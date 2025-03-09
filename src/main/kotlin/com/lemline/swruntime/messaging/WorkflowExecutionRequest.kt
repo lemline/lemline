@@ -1,7 +1,6 @@
 package com.lemline.swruntime.messaging
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.ObjectNode
 
 data class WorkflowExecutionRequest(
     val workflow: WorkflowRequest,
@@ -17,7 +16,7 @@ data class WorkflowRequest(
 data class InstanceRequest(
     val id: String,
     val rawInput: JsonNode,
-    val context: ObjectNode,
+    val context: Map<String, JsonNode>,
     val startedAt: String, // Iso8601
 )
 

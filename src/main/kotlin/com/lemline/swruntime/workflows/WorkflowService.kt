@@ -10,14 +10,14 @@ import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.json.JsonUtils
 import jakarta.enterprise.context.ApplicationScoped
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
 
 typealias WorkflowIndex = Pair<String, String>
 
 @ApplicationScoped
 class WorkflowService(
-    val workflowDefinitionRepository: WorkflowDefinitionRepository
+    private val workflowDefinitionRepository: WorkflowDefinitionRepository
 ) {
-
     /**
      * Retrieves a workflow definition by its name and version.
      *
@@ -245,8 +245,8 @@ class WorkflowService(
 
     companion object {
         private val logger = LoggerFactory.getLogger(this::class.java)
-        private val workflowCache = mutableMapOf<WorkflowIndex, Workflow>()
-        private val taskPositionsCache = mutableMapOf<WorkflowIndex, Map<String, TaskBase>>()
-        private val secretsCache = mutableMapOf<WorkflowIndex, Map<String, JsonNode>>()
+        private val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
+        private val taskPositionsCache = ConcurrentHashMap<WorkflowIndex, Map<String, TaskBase>>()
+        private val secretsCache = ConcurrentHashMap<WorkflowIndex, Map<String, JsonNode>>()
     }
 } 

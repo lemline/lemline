@@ -65,8 +65,8 @@ data class TaskPosition(
      *
      * @return The last path component, or null if the path is empty
      */
-    val lastComponent: String?
-        get() = path.lastOrNull()
+    val last: String
+        get() = path.last()
 
     /**
      * Checks if the path is empty.

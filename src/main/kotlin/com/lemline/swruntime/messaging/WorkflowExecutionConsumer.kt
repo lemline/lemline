@@ -1,5 +1,6 @@
 package com.lemline.swruntime.messaging
 
+import com.lemline.swruntime.tasks.TaskPosition
 import com.lemline.swruntime.workflows.WorkflowInstance
 import com.lemline.swruntime.workflows.WorkflowService
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
@@ -16,7 +17,7 @@ class WorkflowExecutionConsumer(
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Incoming("workflow-executions")
-    fun consume(request: WorkflowExecutionRequest) {
+    suspend fun consume(request: WorkflowExecutionRequest) {
         val workflowRequest = request.workflow
         val instanceRequest = request.instance
         val currentTaskRequest = request.currentTask
@@ -37,7 +38,10 @@ class WorkflowExecutionConsumer(
 
             val nextTaskRequest = when (currentTaskRequest) {
                 null -> instance.start()
-                else -> instance.runTask(currentTaskRequest)
+                else -> instance.runTask(
+                    currentTaskRequest.rawInput,
+                    TaskPosition.fromString(currentTaskRequest.position)
+                )
             }
 
         } catch (e: Exception) {

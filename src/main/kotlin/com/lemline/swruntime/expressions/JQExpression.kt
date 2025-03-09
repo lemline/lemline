@@ -5,6 +5,10 @@ import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.NullNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.node.TextNode
+import com.lemline.swruntime.expressions.scopes.ExpressionScope
+import io.serverlessworkflow.api.types.ExportAs
+import io.serverlessworkflow.api.types.InputFrom
+import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import io.serverlessworkflow.impl.json.JsonUtils
 import net.thisptr.jackson.jq.Output
@@ -21,6 +25,27 @@ object JQExpression {
     // The jqVersion of JQ being used.
     private val jqVersion = Versions.JQ_1_6
 
+    @JvmStatic
+    fun eval(input: JsonNode, expr: String, expressionScope: ExpressionScope) =
+        eval(input, expr, expressionScope.toScope())
+
+    @JvmStatic
+    fun eval(input: JsonNode, expr: JsonNode, expressionScope: ExpressionScope) =
+        eval(input, expr, expressionScope.toScope())
+
+    @JvmStatic
+    fun eval(input: JsonNode, inputFrom: InputFrom?, expressionScope: ExpressionScope): JsonNode =
+        inputFrom?.let { eval(input, JsonUtils.fromValue(it.get()), expressionScope) } ?: input
+
+
+    @JvmStatic
+    fun eval(input: JsonNode, outputAs: OutputAs?, expressionScope: ExpressionScope): JsonNode =
+        outputAs?.let { eval(input, JsonUtils.fromValue(it.get()), expressionScope) } ?: input
+
+    @JvmStatic
+    fun eval(input: JsonNode, exportAs: ExportAs, expressionScope: ExpressionScope): JsonNode =
+        eval(input, JsonUtils.fromValue(exportAs.get()), expressionScope)
+
     /**
      * Evaluates a JQ expression against a given JSON node within a specified scope.
      *
@@ -31,7 +56,7 @@ object JQExpression {
      * @throws IllegalArgumentException If the expression cannot be evaluated.
      */
     @JvmStatic
-    fun eval(input: JsonNode, expr: String, scope: Scope): JsonNode = try {
+    internal fun eval(input: JsonNode, expr: String, scope: Scope): JsonNode = try {
         val output = JsonNodeOutput()
         val trimmedExpr = ExpressionUtils.trimExpr(expr)
         ExpressionParser.compile(trimmedExpr, jqVersion).apply(scope, input, output)
@@ -39,7 +64,6 @@ object JQExpression {
     } catch (e: JsonQueryException) {
         throw IllegalArgumentException("Unable to evaluate content $input using expr $expr", e)
     }
-
 
     /**
      * Evaluates the instanceRawInput from a given JsonNode.
@@ -52,7 +76,7 @@ object JQExpression {
      * @throws IllegalArgumentException if the JsonNode type is unsupported
      */
     @JvmStatic
-    fun eval(input: JsonNode, expr: JsonNode, scope: Scope): JsonNode = when (expr) {
+    internal fun eval(input: JsonNode, expr: JsonNode, scope: Scope): JsonNode = when (expr) {
         is NullNode -> input
         is TextNode -> eval(input, expr.asText(), scope)
         is ObjectNode -> expr.also {

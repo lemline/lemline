@@ -1,7 +1,6 @@
 package com.lemline.swruntime.messaging
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.swruntime.tasks.TaskPosition
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import jakarta.enterprise.context.ApplicationScoped
@@ -21,7 +20,7 @@ class WorkflowExecutionProducer {
         workflowVersion: String,
         instanceId: String,
         instanceRawInput: JsonNode,
-        instanceContext: ObjectNode,
+        instanceContext: Map<String, JsonNode>,
         instanceStartedAt: DateTimeDescriptor,
         taskRawInput: JsonNode,
         taskPosition: TaskPosition,
