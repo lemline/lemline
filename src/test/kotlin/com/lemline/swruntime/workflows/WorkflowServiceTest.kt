@@ -141,6 +141,145 @@ class WorkflowServiceTest {
     }
 
     @Test
+    fun `getScopedTasks should return empty map for root position`() {
+        // Given
+        val spiedService = spyk(workflowService)
+        val position = "/do"
+        val mockPositions = mapOf(
+            "/do/0/call0" to CallHTTP(),
+            "/do/1/call1" to CallGRPC(),
+            "/do/2/call2" to CallOpenAPI()
+        )
+        every { spiedService.getPositionsCache(workflow) } returns mockPositions
+
+        // When
+        val result = spiedService.getScopedTasks(workflow, position)
+
+        // Then
+        assertTrue(result.isEmpty(), "Should return empty map for root position")
+    }
+
+    @Test
+    fun `getScopedTasks should return empty map for invalid position`() {
+        // Given
+        val spiedService = spyk(workflowService)
+        val position = "/invalid/position"
+        val mockPositions = mapOf(
+            "/do/0/call0" to CallHTTP(),
+            "/do/1/call1" to CallGRPC(),
+            "/do/2/call2" to CallOpenAPI()
+        )
+        every { spiedService.getPositionsCache(workflow) } returns mockPositions
+
+        // When
+        val result = spiedService.getScopedTasks(workflow, position)
+
+        // Then
+        assertTrue(result.isEmpty(), "Should return empty map for invalid position")
+    }
+
+    @Test
+    fun `getScopedTasks should return tasks at same scope level`() {
+        // Given
+        val spiedService = spyk(workflowService)
+        val position = "/do/0/call0"
+        val mockPositions = mapOf(
+            "/do/0/call0" to CallHTTP(),
+            "/do/1/call1" to CallGRPC(),
+            "/do/2/call2" to CallOpenAPI()
+        )
+        every { spiedService.getPositionsCache(workflow) } returns mockPositions
+
+        // When
+        val result = spiedService.getScopedTasks(workflow, position)
+
+        // Then
+        assertEquals(3, result.size, "Should return all tasks at the same scope level")
+        assertEquals(CallHTTP::class.java, result[0]?.javaClass, "First task should be CallHTTP")
+        assertEquals(CallGRPC::class.java, result[1]?.javaClass, "Second task should be CallGRPC")
+        assertEquals(CallOpenAPI::class.java, result[2]?.javaClass, "Third task should be CallOpenAPI")
+    }
+
+    @Test
+    fun `getScopedTasks should handle nested scopes correctly`() {
+        // Given
+        val spiedService = spyk(workflowService)
+        val position = "/do/0/do/1/call1"
+        val mockPositions = mapOf(
+            "/do/0/do/0/call0" to CallHTTP(),
+            "/do/0/do/1/call1" to CallGRPC(),
+            "/do/0/do/2/call2" to CallOpenAPI()
+        )
+        every { spiedService.getPositionsCache(workflow) } returns mockPositions
+
+        // When
+        val result = spiedService.getScopedTasks(workflow, position)
+
+        // Then
+        assertEquals(3, result.size, "Should return only tasks at the same nested scope level")
+        assertEquals(CallHTTP::class.java, result[0]?.javaClass, "First task should be CallHTTP")
+        assertEquals(CallGRPC::class.java, result[1]?.javaClass, "Second task should be CallGRPC")
+        assertEquals(CallOpenAPI::class.java, result[2]?.javaClass, "Third task should be CallOpenAPI")
+    }
+
+    @Test
+    fun `getScopedTasks should not include other branches`() {
+        // Given
+        val spiedService = spyk(workflowService)
+        val position = "/do/0/do/1/call1"
+        val mockPositions = mapOf(
+            "/do/0/do/0/call0" to CallHTTP(),
+            "/do/1/do/1/call1" to CallGRPC(),
+            "/do/2/do/2/call2" to CallOpenAPI()
+        )
+        every { spiedService.getPositionsCache(workflow) } returns mockPositions
+
+        // When
+        val result = spiedService.getScopedTasks(workflow, position)
+
+        // Then
+        assertEquals(1, result.size, "Should return only tasks at the same nested scope level")
+        assertEquals(CallHTTP::class.java, result[0]?.javaClass, "First task should be CallHTTP")
+    }
+
+    @Test
+    fun `getScopedTasks should not include deeper tasks`() {
+        // Given
+        val spiedService = spyk(workflowService)
+        val position = "/do/0/do/1/call1"
+        val mockPositions = mapOf(
+            "/do/0/do/0/call0" to CallHTTP(),
+            "/do/0/do/1/call1" to CallGRPC(),
+            "/do/0/do/2/call2" to CallOpenAPI(),
+            "/do/0/do/2/call2/Other" to CallHTTP()
+        )
+        every { spiedService.getPositionsCache(workflow) } returns mockPositions
+
+        // When
+        val result = spiedService.getScopedTasks(workflow, position)
+
+        // Then
+        assertEquals(3, result.size, "Should return only tasks at the same nested scope level")
+        assertEquals(CallHTTP::class.java, result[0]?.javaClass, "First task should be CallHTTP")
+        assertEquals(CallGRPC::class.java, result[1]?.javaClass, "Second task should be CallGRPC")
+        assertEquals(CallOpenAPI::class.java, result[2]?.javaClass, "Third task should be CallOpenAPI")
+    }
+
+    @Test
+    fun `getScopedTasks should handle empty positions cache`() {
+        // Given
+        val spiedService = spyk(workflowService)
+        val position = "/do/0"
+        every { spiedService.getPositionsCache(workflow) } returns emptyMap()
+
+        // When
+        val result = spiedService.getScopedTasks(workflow, position)
+
+        // Then
+        assertTrue(result.isEmpty(), "Should return empty map when positions cache is empty")
+    }
+
+    @Test
     fun `test parsePositions against YAML workflow`() {
         // Get all YAML files from examples directory
         val exampleFiles = getResourceFiles("/examples")

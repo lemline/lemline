@@ -5,7 +5,7 @@ package com.lemline.swruntime.tasks
  * This class allows for building and manipulating JSON pointer paths in a type-safe way.
  */
 data class TaskPosition(
-    private val path: List<String> = listOf()
+    private val path: List<String> = listOf(),
 ) {
 
     companion object {
@@ -23,14 +23,25 @@ data class TaskPosition(
                 .let { TaskPosition(it) }
     }
 
+
     /**
-     * Adds a named property to the path.
+     * Adds a name component to the JSON pointer path.
      *
-     * @param name The property name to add
-     * @return A new Position with the added property
+     * This function ensures that the name does not contain a slash ('/'),
+     * is not an integer, and is not one of the reserved tokens defined in TaskToken.
+     *
+     * @param name The name component to add to the path.
+     * @return A new TaskPosition with the added name component.
+     * @throws IllegalArgumentException if the name contains a slash, is an integer, or is a reserved token.
      */
-    fun addName(name: String): TaskPosition =
-        TaskPosition(path + name)
+    fun addName(name: String): TaskPosition {
+        require(!name.contains("/")) { "Task name $name must not contain '/'" }
+        require(name.toIntOrNull() == null) { "Task name $name must not be an integer" }
+        TaskToken.entries.map { it.token }.let {
+            require(!it.contains(name)) { "Task name $name must not be one of ${it.joinToString()}" }
+        }
+        return TaskPosition(path + name)
+    }
 
     /**
      * Adds a token property to the path.
@@ -91,6 +102,7 @@ data class TaskPosition(
      */
     val depth: Int
         get() = path.size
+
 
     /**
      * Gets the component at the specified index.

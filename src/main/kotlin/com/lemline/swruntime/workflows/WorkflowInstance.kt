@@ -1,22 +1,19 @@
 package com.lemline.swruntime.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.node.TextNode
 import com.lemline.swruntime.expressions.JQExpression
 import com.lemline.swruntime.expressions.scopes.ExpressionScope
 import com.lemline.swruntime.expressions.scopes.RuntimeDescriptor
-import com.lemline.swruntime.expressions.scopes.TaskDescriptor
 import com.lemline.swruntime.expressions.scopes.WorkflowDescriptor
 import com.lemline.swruntime.messaging.TaskRequest
 import com.lemline.swruntime.schemas.SchemaValidator
 import com.lemline.swruntime.tasks.TaskPosition
 import com.lemline.swruntime.tasks.TaskToken.*
+import com.lemline.swruntime.tasks.executeTask
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import io.serverlessworkflow.impl.json.JsonUtils
 import jakarta.inject.Inject
-import java.time.Instant
 
 class WorkflowInstance(
     val workflowName: String,
@@ -31,9 +28,9 @@ class WorkflowInstance(
 
     private val workflow by lazy { workflowService.getWorkflow(workflowName, workflowVersion) }
 
-    private val secrets = workflowService.getSecrets(workflow)
+    internal val secrets = workflowService.getSecrets(workflow)
 
-    private val workflowDescriptor = WorkflowDescriptor(
+    internal val workflowDescriptor = WorkflowDescriptor(
         id = instanceId,
         definition = workflow,
         input = instanceRawInput,
@@ -70,21 +67,10 @@ class WorkflowInstance(
 
         // Handle workflow output transformation if this is the last task
         val finalOutput = if (nextPosition == null) {
-            workflow.output?.`as`?.let { expr ->
-                val scope = ExpressionScope(
-                    context = instanceContext,
-                    workflow = workflowDescriptor,
-                    runtime = RuntimeDescriptor,
-                    secrets = secrets
-                ).toScope()
-                val transformedOutput = JQExpression.eval(taskOutput, JsonUtils.fromValue(expr.get()), scope)
-
-                // Validate final output if schema provided
-                workflow.output?.schema?.let { schema ->
-                    SchemaValidator.validate(transformedOutput, schema)
-                }
-                transformedOutput
-            } ?: taskOutput
+            transformInstanceRawOutput(taskOutput).also {
+                // Validate the final output schema
+                validateInstanceOutputSchema(it)
+            }
         } else taskOutput
 
         // Create task request for next step or workflow completion
@@ -102,6 +88,10 @@ class WorkflowInstance(
      */
     fun validateInstanceInputSchema() {
         workflow.input.schema?.let { schema -> SchemaValidator.validate(instanceRawInput, schema) }
+    }
+
+    fun validateInstanceOutputSchema(output: JsonNode) {
+        workflow.output?.schema?.let { schema -> SchemaValidator.validate(output, schema) }
     }
 
 
@@ -126,171 +116,25 @@ class WorkflowInstance(
         return JQExpression.eval(instanceRawInput, workflow.input.from, expressionScope)
     }
 
-    private suspend fun executeTask(
-        position: TaskPosition,
-        task: TaskBase,
-        rawInput: JsonNode
-    ): JsonNode {
-        // 1. Validate task input if schema is provided
-        task.input?.schema?.let { schema ->
-            SchemaValidator.validate(rawInput, schema)
-        }
-
-        // 2. Transform task input using `input.from` expression if provided
-        val taskDescriptor = TaskDescriptor(
-            name = position.last,
-            reference = position.jsonPointer(),
-            definition = JsonUtils.fromValue(task),
-            input = rawInput,
-            output = null,
-            startedAt = DateTimeDescriptor.from(Instant.now())
-        )
-
-        val expressionScope = ExpressionScope(
+    /**
+     * Transforms the instance raw output using the workflow's output transformation expression.
+     *
+     * This method performs the following steps:
+     * 1. Creates an `ExpressionScope` object with the current workflow instance details.
+     * 2. Constructs an `ExpressionScope` with secrets, workflow descriptor, and runtime descriptor.
+     * 3. Evaluates the transformation expression defined in the workflow output using the `JQExpression` evaluator.
+     *
+     * @param lastTaskOutput The `JsonNode` representing the last task output.
+     * @return The transformed `JsonNode` representing the instance raw output.
+     */
+    private fun transformInstanceRawOutput(lastTaskOutput: JsonNode): JsonNode {
+        val scope = ExpressionScope(
             context = instanceContext,
-            secrets = secrets,
-            task = taskDescriptor,
             workflow = workflowDescriptor,
             runtime = RuntimeDescriptor,
+            secrets = secrets
         )
-
-        val taskInput = JQExpression.eval(rawInput, task.input?.from, expressionScope)
-
-        // 3. Test If task should be executed
-        task.`if`?.let { ifString ->
-            val shouldExecuteTask = JQExpression.eval(taskInput, ifString, expressionScope).let {
-                if (it.isBoolean) it.asBoolean() else throw IllegalArgumentException("Task condition must evaluate to a boolean")
-            }
-            if (!shouldExecuteTask) return rawInput
-        }
-
-        // 4. Execute task based on its type
-        val taskRawOutput = when (task) {
-            is CallHTTP -> executeHttpCall(task, taskInput)
-            is CallGRPC -> executeGrpcCall(task, taskInput)
-            is CallOpenAPI -> executeOpenApiCall(task, taskInput)
-            is CallAsyncAPI -> executeAsyncApiCall(task, taskInput)
-            is CallFunction -> executeFunctionCall(task, taskInput)
-            is DoTask -> executeDoTask(task, taskInput)
-            is EmitTask -> executeEmitTask(task, taskInput)
-            is ForTask -> executeForTask(task, taskInput)
-            is ForkTask -> executeForkTask(task, taskInput)
-            is ListenTask -> executeListenTask(task, taskInput)
-            is RaiseTask -> executeRaiseTask(task, taskInput)
-            is RunTask -> executeRunTask(task, taskInput)
-            is SetTask -> executeSetTask(task, taskInput)
-            is SwitchTask -> executeSwitchTask(task, taskInput)
-            is TryTask -> executeTryTask(task, taskInput)
-            is WaitTask -> executeWaitTask(task, taskInput)
-            else -> throw IllegalArgumentException("Unsupported task type: ${task.javaClass.name}")
-        }
-
-        // 5. Transform task output using output.as expression if provided
-        val taskOutput = JQExpression.eval(taskRawOutput, task.output?.`as`, expressionScope)
-
-        // 6. Validate task output if schema is provided
-        task.output?.schema?.let { schema ->
-            SchemaValidator.validate(taskOutput, schema)
-        }
-
-        // 7. Update workflow context using export.as expression if provided
-        taskDescriptor.output = taskRawOutput
-
-        // 8. export as new context
-        task.export?.`as`?.let { exportAs ->
-            val newContext = when (val context = JQExpression.eval(taskOutput, exportAs, expressionScope)) {
-                is ObjectNode -> context
-                else -> throw IllegalArgumentException("Exported context must be an object")
-            }
-
-            // 9. Validate exported context if schema is provided
-            task.export.schema?.let { schema ->
-                SchemaValidator.validate(newContext, schema)
-            }
-
-            instanceContext = newContext.fields().asSequence().associate { it.key to it.value }
-        }
-
-        // 10. Return task output
-        return taskOutput
-    }
-
-    private suspend fun executeDoTask(task: DoTask, input: JsonNode): JsonNode {
-        var currentInput = input
-        for (taskItem in task.`do`) {
-            //currentInput = executeTask(taskItem.toTask(), currentInput)
-        }
-        return currentInput
-    }
-
-    private suspend fun executeEmitTask(task: EmitTask, input: JsonNode): JsonNode {
-        // Implement event emission logic
-        TODO("Implement event emission")
-    }
-
-    private suspend fun executeForTask(task: ForTask, input: JsonNode): JsonNode {
-        // Implement iteration logic
-        TODO("Implement for loop execution")
-    }
-
-    private suspend fun executeForkTask(task: ForkTask, input: JsonNode): JsonNode {
-        // Implement parallel execution logic
-        TODO("Implement parallel execution")
-    }
-
-    private suspend fun executeListenTask(task: ListenTask, input: JsonNode): JsonNode {
-        // Implement event listening logic
-        TODO("Implement event listening")
-    }
-
-    private suspend fun executeRaiseTask(task: RaiseTask, input: JsonNode): JsonNode {
-        // Implement error raising logic
-        TODO("Implement error raising")
-    }
-
-    private suspend fun executeRunTask(task: RunTask, input: JsonNode): JsonNode {
-        // Implement container/script/shell execution logic
-        TODO("Implement run execution")
-    }
-
-    private suspend fun executeSetTask(task: SetTask, input: JsonNode): JsonNode {
-        // Implement context setting logic
-        TODO("Implement context setting")
-    }
-
-    private suspend fun executeSwitchTask(task: SwitchTask, input: JsonNode): JsonNode {
-        // Implement conditional branching logic
-        TODO("Implement switch execution")
-    }
-
-    private suspend fun executeTryTask(task: TryTask, input: JsonNode): JsonNode {
-        // Implement try-catch-finally logic
-        TODO("Implement try-catch execution")
-    }
-
-    private suspend fun executeWaitTask(task: WaitTask, input: JsonNode): JsonNode {
-        // Implement waiting logic
-        TODO("Implement wait execution")
-    }
-
-    private suspend fun executeHttpCall(task: CallHTTP, input: JsonNode): JsonNode {
-        TODO("Implement HTTP call")
-    }
-
-    private suspend fun executeGrpcCall(task: CallGRPC, input: JsonNode): JsonNode {
-        TODO("Implement gRPC call")
-    }
-
-    private suspend fun executeOpenApiCall(task: CallOpenAPI, input: JsonNode): JsonNode {
-        TODO("Implement OpenAPI call")
-    }
-
-    private suspend fun executeAsyncApiCall(task: CallAsyncAPI, input: JsonNode): JsonNode {
-        TODO("Implement AsyncAPI call")
-    }
-
-    private suspend fun executeFunctionCall(task: CallFunction, input: JsonNode): JsonNode {
-        TODO("Implement custom function call")
+        return JQExpression.eval(lastTaskOutput, workflow.output?.`as`, scope)
     }
 
     /**
@@ -319,7 +163,7 @@ class WorkflowInstance(
             // Handle special flow directives
             when (directive.lowercase()) {
                 "continue" -> {
-                    // Do nothing
+                    // Default behavior: proceed to next task in sequence
                 }
 
                 "end" -> {
@@ -345,9 +189,11 @@ class WorkflowInstance(
         }
 
         // If no 'then' directive, get next task in sequence
+        val nextIndex = currentPosition.parent?.last?.toIntOrNull()
+
         return when {
-            // If we're in a sequence (do/catch/finally), get next in sequence
-            currentPosition.last.toIntOrNull() != null -> {
+            // If we're in a sequence (do/try/catch/), get next in sequence
+            currentPosition.parent?.last?.toIntOrNull() != null -> {
                 val parentPosition = currentPosition.parent ?: return null
                 val currentIndex = currentPosition.last.toInt()
                 val taskList = getTaskListAtPosition(parentPosition)

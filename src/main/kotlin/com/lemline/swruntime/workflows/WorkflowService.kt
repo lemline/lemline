@@ -74,7 +74,7 @@ class WorkflowService(
      * @throws IllegalArgumentException if no task is found at the specified position.
      */
     fun getTask(workflow: Workflow, position: String? = null): TaskBase = (position ?: "/do").let {
-        taskPositionsCache[workflow.index]?.get(it)
+        getPositionsCache(workflow)[it]
             ?: throw IllegalArgumentException("No task found at position $it for workflow ${workflow.document.name} version ${workflow.document.version}")
     }
 
@@ -87,8 +87,44 @@ class WorkflowService(
      */
     fun getParentTask(workflow: Workflow, position: String): TaskBase? =
         taskParentCache[workflow.index]?.get(position)?.let {
-            taskPositionsCache[workflow.index]?.get(it)
+            getPositionsCache(workflow)[it]
         }
+
+    fun getNextTask(workflow: Workflow, position: String): TaskBase? {
+        val pos = TaskPosition.fromString(position)
+        val scopedTasks = getScopedTasks(workflow, position)
+        if (scopedTasks.isEmpty()) {
+            val parent = taskParentCache[workflow.index]?.get(position)
+            return parent?.let { getNextTask(workflow, it) }
+        }
+        TODO()
+    }
+
+    /**
+     * Retrieves a map of scoped tasks from the workflow based on the given position.
+     *
+     * This method finds all tasks that are children of the same root task as the given position
+     * and have the same depth as the given position.
+     *
+     * @param workflow The workflow definition containing the tasks.
+     * @param position The JSON pointer string representing the position of the task in the workflow.
+     * @return A map of task indices to their corresponding TaskBase objects.
+     */
+    fun getScopedTasks(workflow: Workflow, position: String): Map<Int, TaskBase> {
+        val pos = TaskPosition.fromString(position)
+        val parent = pos.parent
+
+        // ensure we are on a scope
+        if (parent == null || parent.depth == 0 || parent.last.toIntOrNull() == null) return emptyMap()
+
+        val root = parent.parent ?: return emptyMap()
+
+        return getPositionsCache(workflow)
+            .keys
+            .map { TaskPosition.fromString(it) }
+            .filter { it.isChildOf(root) && it.depth == pos.depth }
+            .associate { it.parent!!.last.toInt() to getTask(workflow, it.jsonPointer()) }
+    }
 
     /**
      * Parses the given workflow and extracts all tasks and their positions.
@@ -99,18 +135,24 @@ class WorkflowService(
      * @param workflow The workflow to be parsed.
      */
     internal fun parseWorkflow(workflow: Workflow) {
-        // Map of TaskBase per task pointer
+        // Map of TaskBase
         val tasks = mutableMapOf<String, TaskBase>()
-        // Map of parent task pointer per task pointer
+        // Map of parent task pointer
         val parents = mutableMapOf<String, String?>()
+        // Map of next task pointer
+        val next = mutableMapOf<String, String?>()
         // Extract all tasks and their positions
-        extractTaskPosition(DoTask(workflow.`do`), TaskPosition(), null, tasks, parents)
+        parseTask(DoTask(workflow.`do`), TaskPosition(), null, tasks, parents)
         // Initialize caches
         taskPositionsCache[workflow.index] = tasks
         taskParentCache[workflow.index] = parents
     }
 
-    private fun extractTaskPosition(
+    internal fun getPositionsCache(workflow: Workflow): Map<String, TaskBase> =
+        taskPositionsCache[workflow.index]
+            ?: throw IllegalArgumentException("No position parsed for workflow ${workflow.index}")
+
+    private fun parseTask(
         task: TaskBase,
         taskPosition: TaskPosition,
         taskParent: String?,
@@ -123,147 +165,119 @@ class WorkflowService(
         }
 
         when (task) {
-            is DoTask -> extractDoTaskPositions(task, taskPosition, taskParent, tasks, parents)
-            is ForTask -> extractForTaskPositions(task, taskPosition, taskParent, tasks, parents)
-            is TryTask -> extractTryTaskPositions(task, taskPosition, taskParent, tasks, parents)
-            is ForkTask -> extractForkTaskPositions(task, taskPosition, taskParent, tasks, parents)
-            is ListenTask -> extractListenTaskPositions(task, taskPosition, taskParent, tasks, parents)
-            is CallAsyncAPI -> extractCallAsyncAPITaskPositions(task, taskPosition, taskParent, tasks, parents)
+            is DoTask -> task.parse(taskPosition, taskParent, tasks, parents)
+            is ForTask -> task.parse(taskPosition, taskParent, tasks, parents)
+            is TryTask -> task.parse(taskPosition, taskParent, tasks, parents)
+            is ForkTask -> task.parse(taskPosition, taskParent, tasks, parents)
+            is ListenTask -> task.parse(taskPosition, taskParent, tasks, parents)
+            is CallAsyncAPI -> task.parse(taskPosition, taskParent, tasks, parents)
         }
     }
 
-    private fun extractDoTaskPositions(
-        task: DoTask,
-        taskPosition: TaskPosition,
-        taskParent: String?,
+    private fun DoTask.parse(
+        position: TaskPosition,
+        doParent: String?,
         tasks: MutableMap<String, TaskBase>,
         parents: MutableMap<String, String?>
     ) {
-        val doPosition = taskPosition.addToken(DO)
+        val doPosition = position.addToken(DO)
         val doPos = doPosition.jsonPointer()
-        tasks[doPos] = task
-        parents[doPos] = taskParent
-
-        task.`do`.forEachIndexed { index, taskItem ->
-            extractTaskPosition(
-                taskItem.toTask(),
-                doPosition.addIndex(index).addName(taskItem.name),
-                doPos,
-                tasks,
-                parents
-            )
-        }
+        tasks[doPos] = this
+        parents[doPos] = doParent
+        `do`.parse(doPosition, doPos, tasks, parents)
     }
 
-    private fun extractForTaskPositions(
-        task: ForTask,
+    private fun ForTask.parse(
         taskPosition: TaskPosition,
         taskParent: String?,
         tasks: MutableMap<String, TaskBase>,
         parents: MutableMap<String, String?>
     ) {
         val forPos = taskPosition.jsonPointer()
-        tasks[forPos] = task
+        tasks[forPos] = this
         parents[forPos] = taskParent
 
-        task.`do`?.let {
-            val doPosition = taskPosition.addToken(DO)
-            DoTask(it).extract(doPosition, forPos, tasks, parents)
-        }
+        DoTask(`do`).parse(taskPosition, forPos, tasks, parents)
     }
 
-    private fun extractTryTaskPositions(
-        task: TryTask,
+    private fun TryTask.parse(
         taskPosition: TaskPosition,
         taskParent: String?,
         tasks: MutableMap<String, TaskBase>,
         parents: MutableMap<String, String?>
     ) {
         val tryPos = taskPosition.jsonPointer()
-        tasks[tryPos] = task
+        tasks[tryPos] = this
         parents[tryPos] = taskParent
 
-        task.`try`.let {
-            val tryPosition = taskPosition
-                .addToken(TRY)
-            it.extract(tryPosition, tryPos, tasks, parents)
-        }
-        task.catch?.`do`?.let {
-            val doPosition = taskPosition
-                .addToken(CATCH)
-                .addToken(DO)
-            DoTask(it).extract(doPosition, tryPos, tasks, parents)
+        val tryPosition = taskPosition.addToken(TRY)
+        `try`.parse(tryPosition, tryPos, tasks, parents)
+
+        `catch`.`do`?.let {
+            val position = taskPosition.addToken(CATCH)
+            DoTask(it).parse(position, tryPos, tasks, parents)
         }
     }
 
-    private fun extractForkTaskPositions(
-        task: ForkTask,
+    private fun ForkTask.parse(
         taskPosition: TaskPosition,
         taskParent: String?,
         tasks: MutableMap<String, TaskBase>,
         parents: MutableMap<String, String?>
     ) {
         val forPos = taskPosition.jsonPointer()
-        tasks[forPos] = task
+        tasks[forPos] = this
         parents[forPos] = taskParent
 
-        task.fork.branches.let {
-            val position = taskPosition
-                .addToken(FORK)
-                .addToken(BRANCHES)
-            it.extract(position, forPos, tasks, parents)
+        fork.branches?.let {
+            val position = taskPosition.addToken(FORK).addToken(BRANCHES)
+            it.parse(position, forPos, tasks, parents)
         }
     }
 
-    private fun extractListenTaskPositions(
-        task: ListenTask,
+    private fun ListenTask.parse(
         taskPosition: TaskPosition,
         taskParent: String?,
         tasks: MutableMap<String, TaskBase>,
         parents: MutableMap<String, String?>
     ) {
         val listenPos = taskPosition.jsonPointer()
-        tasks[listenPos] = task
+        tasks[listenPos] = this
         parents[listenPos] = taskParent
 
-        task.foreach?.`do`?.let {
-            val doPosition = taskPosition
-                .addToken(FOREACH)
-                .addToken(DO)
-            DoTask(it).extract(doPosition, listenPos, tasks, parents)
+        foreach?.`do`?.let {
+            val position = taskPosition.addToken(FOREACH)
+            DoTask(it).parse(position, listenPos, tasks, parents)
         }
     }
 
-
-    private fun extractCallAsyncAPITaskPositions(
-        task: CallAsyncAPI,
+    private fun CallAsyncAPI.parse(
         taskPosition: TaskPosition,
         taskParent: String?,
         tasks: MutableMap<String, TaskBase>,
         parents: MutableMap<String, String?>
     ) {
         val callPos = taskPosition.jsonPointer()
-        tasks[callPos] = task
+        tasks[callPos] = this
         parents[callPos] = taskParent
 
-        task.with.subscription?.foreach?.`do`?.let {
-            val doPosition = taskPosition
+        with.subscription?.foreach?.`do`?.let {
+            val position = taskPosition
                 .addToken(WITH)
                 .addToken(SUBSCRIPTION)
                 .addToken(FOREACH)
-                .addToken(DO)
-            DoTask(it).extract(doPosition, callPos, tasks, parents)
+            DoTask(it).parse(position, callPos, tasks, parents)
         }
     }
 
-    private fun List<TaskItem>.extract(
+    private fun List<TaskItem>.parse(
         taskPosition: TaskPosition,
         taskParent: String,
         tasks: MutableMap<String, TaskBase>,
         parents: MutableMap<String, String?>
     ) {
         forEachIndexed { index, taskItem ->
-            extractTaskPosition(
+            parseTask(
                 taskItem.toTask(),
                 taskPosition.addIndex(index).addName(taskItem.name),
                 taskParent,
@@ -273,17 +287,6 @@ class WorkflowService(
         }
     }
 
-    private fun DoTask.extract(
-        doPosition: TaskPosition,
-        doParent: String?,
-        tasks: MutableMap<String, TaskBase>,
-        parents: MutableMap<String, String?>
-    ) {
-        val doPos = doPosition.jsonPointer()
-        tasks[doPos] = this
-        parents[doPos] = doParent
-        `do`.extract(doPosition, doPos, tasks, parents)
-    }
 
     private fun TaskItem.toTask(): TaskBase = when (val task = task.get()) {
         is TaskBase -> task
@@ -294,6 +297,7 @@ class WorkflowService(
     private val Workflow.index: WorkflowIndex
         get() = document.name to document.version
 
+
     companion object {
         private val logger = LoggerFactory.getLogger(this::class.java)
         internal val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
@@ -301,4 +305,4 @@ class WorkflowService(
         internal val taskParentCache = ConcurrentHashMap<WorkflowIndex, Map<String, String?>>()
         internal val secretsCache = ConcurrentHashMap<WorkflowIndex, Map<String, JsonNode>>()
     }
-} 
+}
