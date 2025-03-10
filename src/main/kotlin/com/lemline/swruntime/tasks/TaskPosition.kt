@@ -21,21 +21,25 @@ data class TaskPosition(
                 .split("/")
                 .filter { it.isNotEmpty() }
                 .let { TaskPosition(it) }
-
-        /**
-         * Creates a new Position for the root "do" property.
-         */
-        fun doRoot() = TaskPosition(emptyList()).addProperty("do")
     }
 
     /**
-     * Adds a property to the path.
+     * Adds a named property to the path.
      *
-     * @param property The property name to add
+     * @param name The property name to add
      * @return A new Position with the added property
      */
-    fun addProperty(property: String): TaskPosition =
-        TaskPosition(path + property)
+    fun addName(name: String): TaskPosition =
+        TaskPosition(path + name)
+
+    /**
+     * Adds a token property to the path.
+     *
+     * @param token The property name to add
+     * @return A new Position with the added property
+     */
+    fun addToken(token: TaskToken): TaskPosition =
+        TaskPosition(path + token.token)
 
     /**
      * Adds an index to the path.

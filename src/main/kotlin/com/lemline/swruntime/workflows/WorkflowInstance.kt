@@ -2,6 +2,7 @@ package com.lemline.swruntime.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.TextNode
 import com.lemline.swruntime.expressions.JQExpression
 import com.lemline.swruntime.expressions.scopes.ExpressionScope
 import com.lemline.swruntime.expressions.scopes.RuntimeDescriptor
@@ -10,6 +11,7 @@ import com.lemline.swruntime.expressions.scopes.WorkflowDescriptor
 import com.lemline.swruntime.messaging.TaskRequest
 import com.lemline.swruntime.schemas.SchemaValidator
 import com.lemline.swruntime.tasks.TaskPosition
+import com.lemline.swruntime.tasks.TaskToken.*
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import io.serverlessworkflow.impl.json.JsonUtils
@@ -57,11 +59,39 @@ class WorkflowInstance(
     suspend fun runTask(rawInput: JsonNode, position: TaskPosition): TaskRequest {
         currentTaskPosition = position
 
-        // look for the do task
-        val task = workflowService.getTask(workflow, position.jsonPointer())
+        // Get the task at the current position
+        val task = getTaskAtPosition(position)
 
-        executeTask(position, task, rawInput)
-        TODO()
+        // Execute the task
+        val taskOutput = executeTask(position, task, rawInput)
+
+        // Determine next task position
+        val nextPosition = determineNextTaskPosition(task, position)
+
+        // Handle workflow output transformation if this is the last task
+        val finalOutput = if (nextPosition == null) {
+            workflow.output?.`as`?.let { expr ->
+                val scope = ExpressionScope(
+                    context = instanceContext,
+                    workflow = workflowDescriptor,
+                    runtime = RuntimeDescriptor,
+                    secrets = secrets
+                ).toScope()
+                val transformedOutput = JQExpression.eval(taskOutput, JsonUtils.fromValue(expr.get()), scope)
+
+                // Validate final output if schema provided
+                workflow.output?.schema?.let { schema ->
+                    SchemaValidator.validate(transformedOutput, schema)
+                }
+                transformedOutput
+            } ?: taskOutput
+        } else taskOutput
+
+        // Create task request for next step or workflow completion
+        return TaskRequest(
+            rawInput = finalOutput,
+            position = nextPosition?.jsonPointer() ?: ""
+        )
     }
 
     /**
@@ -261,5 +291,142 @@ class WorkflowInstance(
 
     private suspend fun executeFunctionCall(task: CallFunction, input: JsonNode): JsonNode {
         TODO("Implement custom function call")
+    }
+
+    /**
+     * Determines the next task position based on the current task and workflow definition.
+     * Follows the DSL specification for task flow:
+     * 1. If task has a 'then' directive, use it to find the next task or handle special directives:
+     *    - 'continue': proceeds to next task in sequence
+     *    - 'end': ends the workflow
+     *    - 'exit': exits the current scope
+     *    - task name: jumps to the specified task in the same scope
+     * 2. Otherwise, look for the next task in sequence
+     * 3. If no next task exists, the workflow ends
+     *
+     * @param currentTask The current task that was just executed
+     * @param currentPosition The position of the current task
+     * @return The next task position, or null if the workflow should end
+     */
+    private fun determineNextTaskPosition(currentTask: TaskBase, currentPosition: TaskPosition): TaskPosition? {
+        // Check for explicit 'then' directive
+        currentTask.then?.get()?.let { nextTaskName ->
+            val directive = when (nextTaskName) {
+                is TextNode -> nextTaskName.textValue()
+                else -> nextTaskName.toString()
+            }
+
+            // Handle special flow directives
+            when (directive.lowercase()) {
+                "continue" -> {
+                    // Do nothing
+                }
+
+                "end" -> {
+                    // Explicitly end the workflow
+                    return null
+                }
+
+                "exit" -> {
+                    // Exit the current scope by getting the next task after the parent container
+                    val scopePosition = currentPosition.parent ?: return null
+                    val containerPosition = scopePosition.parent ?: return null
+                    return determineNextTaskPosition(
+                        getTaskAtPosition(scopePosition),
+                        scopePosition
+                    )
+                }
+
+                else -> {
+                    // Try to find task with matching name in the same scope
+                    return findTaskPositionByName(directive, currentPosition.parent ?: return null)
+                }
+            }
+        }
+
+        // If no 'then' directive, get next task in sequence
+        return when {
+            // If we're in a sequence (do/catch/finally), get next in sequence
+            currentPosition.last.toIntOrNull() != null -> {
+                val parentPosition = currentPosition.parent ?: return null
+                val currentIndex = currentPosition.last.toInt()
+                val taskList = getTaskListAtPosition(parentPosition)
+
+                if (currentIndex + 1 < taskList.size) {
+                    // Next task in sequence
+                    parentPosition.addIndex(currentIndex + 1)
+                } else {
+                    // End of sequence, go back to parent's next task
+                    determineNextTaskPosition(
+                        getTaskAtPosition(parentPosition),
+                        parentPosition
+                    )
+                }
+            }
+            // If we're at a container task (do/try/fork/etc), enter its first task
+            isContainerTask(currentTask) -> {
+                getFirstTaskInContainer(currentTask, currentPosition)
+            }
+            // Otherwise, we're done with this branch
+            else -> null
+        }
+    }
+
+    /**
+     * Finds a task position by name within a given scope.
+     */
+    private fun findTaskPositionByName(taskName: String, scopePosition: TaskPosition): TaskPosition? {
+        val taskList = getTaskListAtPosition(scopePosition)
+        val index = taskList.indexOfFirst { it.name == taskName }
+        return if (index >= 0) scopePosition.addIndex(index) else null
+    }
+
+    /**
+     * Gets the list of tasks at a given position in the workflow.
+     */
+    private fun getTaskListAtPosition(position: TaskPosition): List<TaskItem> {
+        return when (val task = getTaskAtPosition(position)) {
+            is DoTask -> task.`do`
+            is TryTask -> when (position.last) {
+                TRY.token -> task.`try`
+                CATCH.token -> task.catch?.`do` ?: emptyList()
+                else -> emptyList()
+            }
+
+            is ForkTask -> task.fork.branches.toList()
+            else -> emptyList()
+        }
+    }
+
+    /**
+     * Gets the first task in a container task (do/try/fork/etc).
+     */
+    private fun getFirstTaskInContainer(task: TaskBase, position: TaskPosition): TaskPosition? {
+        return when (task) {
+            is DoTask -> position.addIndex(0)
+            is TryTask -> position.addToken(TRY).addIndex(0)
+            is ForkTask -> position.addToken(FORK).addIndex(0).addToken(DO).addIndex(0)
+            else -> null
+        }
+    }
+
+    /**
+     * Checks if a task is a container that can hold other tasks.
+     */
+    private fun isContainerTask(task: TaskBase): Boolean {
+        return when (task) {
+            is DoTask,
+            is TryTask,
+            is ForkTask -> true
+
+            else -> false
+        }
+    }
+
+    /**
+     * Gets the task at the specified position in the workflow.
+     */
+    private fun getTaskAtPosition(position: TaskPosition): TaskBase {
+        return workflowService.getTask(workflow, position.jsonPointer())
     }
 }

@@ -155,7 +155,10 @@ class WorkflowServiceTest {
             val workflow = loadWorkflowFromYaml("/examples/${file.name}")
 
             // Parse positions
-            val positions = workflowService.getTaskPositions(workflow)
+            workflowService.parseWorkflow(workflow)
+
+            // get task positions
+            val positions = WorkflowService.taskPositionsCache[workflow.document.name to workflow.document.version]!!
 
             // Convert workflow to JSON for comparison
             val workflowJson = objectMapper.valueToTree<ObjectNode>(workflow)
@@ -164,12 +167,10 @@ class WorkflowServiceTest {
             println("Found ${positions.size} positions in ${file.name}:")
             positions.forEach { (pointer, task) ->
                 println("$pointer => ${task.javaClass.simpleName}")
-
                 val jsonNode = findNodeByPointer(workflowJson, pointer)
                 assertNotNull(jsonNode, "Position $pointer not found in workflow JSON in file ${file.name}")
                 val inFile = "In file ${file.name}"
-                println(pointer)
-                println("jsonnode=$jsonNode")
+                println("$pointer => $jsonNode")
                 when (task) {
                     is CallOpenAPI -> assertEquals(jsonNode!!.get("call").textValue(), "openapi", inFile)
                     is CallHTTP -> assertEquals(jsonNode!!.get("call").textValue(), "http", inFile)
