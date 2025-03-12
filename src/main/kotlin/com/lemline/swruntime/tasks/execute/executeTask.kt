@@ -1,4 +1,4 @@
-package com.lemline.swruntime.tasks
+package com.lemline.swruntime.tasks.execute
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -7,6 +7,7 @@ import com.lemline.swruntime.expressions.scopes.ExpressionScope
 import com.lemline.swruntime.expressions.scopes.RuntimeDescriptor
 import com.lemline.swruntime.expressions.scopes.TaskDescriptor
 import com.lemline.swruntime.schemas.SchemaValidator
+import com.lemline.swruntime.tasks.TaskPosition
 import com.lemline.swruntime.workflows.WorkflowInstance
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor

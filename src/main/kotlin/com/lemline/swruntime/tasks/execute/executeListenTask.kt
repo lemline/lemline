@@ -1,4 +1,4 @@
-package com.lemline.swruntime.tasks
+package com.lemline.swruntime.tasks.execute
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.swruntime.workflows.WorkflowInstance

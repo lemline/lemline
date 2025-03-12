@@ -10,7 +10,7 @@ import com.lemline.swruntime.messaging.TaskRequest
 import com.lemline.swruntime.schemas.SchemaValidator
 import com.lemline.swruntime.tasks.TaskPosition
 import com.lemline.swruntime.tasks.TaskToken.*
-import com.lemline.swruntime.tasks.executeTask
+import com.lemline.swruntime.tasks.execute.executeTask
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import jakarta.inject.Inject
@@ -48,7 +48,6 @@ class WorkflowInstance(
         currentTaskPosition = TaskPosition.fromString("/do")
 
         // run the do task
-        val task = workflowService.getTask(workflow, "/do")
 
         TODO()
     }
@@ -273,6 +272,6 @@ class WorkflowInstance(
      * Gets the task at the specified position in the workflow.
      */
     private fun getTaskAtPosition(position: TaskPosition): TaskBase {
-        return workflowService.getTask(workflow, position.jsonPointer())
+        TODO()
     }
 }
