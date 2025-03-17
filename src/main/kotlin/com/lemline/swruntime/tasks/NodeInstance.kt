@@ -6,6 +6,7 @@ import com.lemline.swruntime.expressions.JQExpression
 import com.lemline.swruntime.expressions.scopes.Scope
 import com.lemline.swruntime.expressions.scopes.TaskDescriptor
 import com.lemline.swruntime.schemas.SchemaValidator
+import com.lemline.swruntime.tasks.flows.RootInstance
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
@@ -91,11 +92,19 @@ abstract class NodeInstance<T : TaskBase>(
     }
 
     private fun exit(): NodeInstance<*>? {
-        parent?.let { it.childIndex = it.children.size }
+        // we target the last child and return to parent
+        parent?.let { it.childIndex = it.children.size - 1 }
         return parent
     }
 
-    private fun end(): NodeInstance<*>? = null
+    // Up to RootInstance
+    private fun end(): NodeInstance<*>? = when (this is RootInstance) {
+        true -> this
+        else -> parent!!.let {
+            it.childIndex = it.children.size
+            it.end()
+        }
+    }
 
     /**
      * Get the next node instance, for the `continue` flow directive
@@ -114,26 +123,22 @@ abstract class NodeInstance<T : TaskBase>(
     open fun shouldRun(rawInput: JsonNode): Boolean {
         // if we already started this node, do not ask again
         // (this is important as we do not want to override rawInput, startedAt and transformedInput)
-        if (childIndex != null) return true
+        if (childIndex != null) return false
+
+        this.rawInput = rawInput
+        this.startedAt = DateTimeDescriptor.from(Instant.now())
 
         // Validate task input if schema is provided
         node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput, schema) }
 
         // Transform task input using `input.from` expression if provided
-        val transformedInput = evalTransformedInput()
+        this.transformedInput = evalTransformedInput()
 
         // Test If task should be executed
         val shouldRun = node.task.`if`
             ?.let { JQExpression.eval(transformedInput, it, scope) }
             ?.let { if (it.isBoolean) it.asBoolean() else error("result of .if condition must be a boolean, but is `$it`") }
             ?: true
-
-        // if yes, initialize the task state
-        if (shouldRun) {
-            this.rawInput = rawInput
-            this.startedAt = DateTimeDescriptor.from(Instant.now())
-            this.transformedInput = transformedInput
-        }
 
         return shouldRun
     }
@@ -178,7 +183,7 @@ abstract class NodeInstance<T : TaskBase>(
         state.getIndex()?.let { childIndex = it }
         state.getRawInput()?.let {
             this.rawInput = it
-            this.transformedInput = evalTransformedInput()
+            if (this !is RootInstance && childIndex == null) this.transformedInput = evalTransformedInput()
         }
         state.getRawOutput()?.let { this.rawOutput = it }
     }

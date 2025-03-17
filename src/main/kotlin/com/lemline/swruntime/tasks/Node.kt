@@ -43,6 +43,7 @@ data class Node<T : TaskBase>(
      * @return `true` if the task is an activity, `false` otherwise
      */
     fun isActivity(): Boolean = when (task) {
+        is RootTask,
         is DoTask,
         is ForTask,
         is TryTask,

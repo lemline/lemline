@@ -9,8 +9,6 @@ import com.lemline.swruntime.tasks.flows.*
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import jakarta.inject.Inject
-import java.time.Instant
-import java.time.format.DateTimeParseException
 
 /**
  * Represents an instance of a workflow.
@@ -28,7 +26,7 @@ class WorkflowInstance(
     var position: NodePosition
 ) {
     @Inject
-    private lateinit var workflowService: WorkflowService
+    internal lateinit var workflowService: WorkflowService
 
     /**
      * Instance ID
@@ -59,19 +57,30 @@ class WorkflowInstance(
     // Retrieves the workflow by its name and version
     private val workflow by lazy { workflowService.getWorkflow(name, version) }
 
-    private val nodeInstances: Map<NodePosition, NodeInstance<*>> by lazy { initInstance() }
+    internal val nodeInstances: Map<NodePosition, NodeInstance<*>> by lazy { initInstance() }
 
-    private lateinit var rootInstance: RootInstance
+    internal lateinit var rootInstance: RootInstance
 
     suspend fun run() {
+
         // Get the task at the current position
         val activity = nodeInstances[position] ?: error("task not found in position $position")
 
         // Complete the current activity execution (rawOutput should be part of the state)
-        if (!isStarting()) activity.complete()
+        val input = when (isStarting()) {
+            true -> {
+                activity.shouldRun(activity.rawInput)
+                activity.transformedInput
+            }
+
+            false -> {
+                activity.complete()
+                activity.transformedOutput
+            }
+        }
 
         // find and execute the next activity
-        activity.nextActivity()?.also {
+        activity.nextActivity(input)?.also {
             it.rawOutput = it.execute()
         }
     }
@@ -86,8 +95,6 @@ class WorkflowInstance(
      * This method initializes the root instance with the provided state,
      * and then recursively populates the instance node and its children with the state.
      *
-     * @param workflow The workflow definition containing the task instances.
-     * @param states The state of the task instances to populate.
      * @return A map of task positions to their task instances.
      */
     private fun initInstance(): Map<NodePosition, NodeInstance<*>> {
@@ -125,19 +132,21 @@ class WorkflowInstance(
         return state
     }
 
-    private fun NodeInstance<*>.nextActivity(): NodeInstance<*>? {
+    private fun NodeInstance<*>.nextActivity(input: JsonNode): NodeInstance<*>? {
+        var rawInput = input
         var nextActivity: NodeInstance<*>? = next()
         while (true) {
             // if null, then the workflow is completed
             if (nextActivity == null) break
             // if taskInstance should not run, then continue
-            if (nextActivity.shouldRun(transformedOutput)) {
+            if (nextActivity.shouldRun(rawInput)) {
+                rawInput = nextActivity.transformedInput
                 // if next is an activity, then break
                 if (nextActivity.node.isActivity()) break
             }
             nextActivity = nextActivity.next()
         }
-        return nextActivity?.also { position = it.node.position }
+        return nextActivity.also { position = it?.node?.position ?: NodePosition.root }
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -166,13 +175,6 @@ class WorkflowInstance(
         .also { nodeInstance ->
             nodeInstance.children = this.children?.map { child -> child.createInstance(nodeInstance) } ?: emptyList()
         }
-
-    private fun String.isValidInstant(): Boolean = try {
-        Instant.parse(this)
-        true
-    } catch (e: DateTimeParseException) {
-        false
-    }
 
     private fun error(message: Any): Nothing =
         throw IllegalStateException("Workflow $name (version $version): $message")

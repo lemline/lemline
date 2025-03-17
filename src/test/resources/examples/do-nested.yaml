@@ -9,12 +9,6 @@ do:
       with:
         method: get
         endpoint: https://petstore.swagger.io/v2/pet/{petId}
-  - buyPet:
-      call: http
-      with:
-        method: put
-        endpoint: https://petstore.swagger.io/v2/pet/{petId}
-        body: '${ . + { status: "sold" } }'
   - nested:
       do:
         - getPet:
@@ -28,3 +22,9 @@ do:
               method: put
               endpoint: https://petstore.swagger.io/v2/pet/{petId}
               body: '${ . + { status: "sold" } }'
+  - buyPet:
+      call: http
+      with:
+        method: put
+        endpoint: https://petstore.swagger.io/v2/pet/{petId}
+        body: '${ . + { status: "sold" } }'

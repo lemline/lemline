@@ -113,7 +113,10 @@ class WorkflowService(
         // recursively creates Nodes
         val root = Node(
             position = NodePosition.root,
-            task = RootTask(`do`),
+            task = RootTask(`do`).also {
+                it.output = output
+                it.input = input
+            },
             name = "workflow",
             parent = null,
         )

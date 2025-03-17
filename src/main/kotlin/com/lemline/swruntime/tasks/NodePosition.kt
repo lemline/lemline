@@ -13,7 +13,7 @@ data class NodePosition(
     /**
      * Json pointer representation. (e.g., "/do/0/do")
      */
-    val jsonPointer = JsonPointer(if (path.isEmpty()) "" else "/${path.joinToString("/")}")
+    val jsonPointer = JsonPointer(if (path.isEmpty()) "/" else "/${path.joinToString("/")}")
 
     /**
      * Gets the string representation of the JSON pointer.
