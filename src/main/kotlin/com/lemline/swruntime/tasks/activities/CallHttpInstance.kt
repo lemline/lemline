@@ -1,18 +1,19 @@
-package com.lemline.swruntime.tasks.instances
+package com.lemline.swruntime.tasks.activities
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.swruntime.tasks.Node
+import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
-import io.serverlessworkflow.api.types.CallOpenAPI
+import io.serverlessworkflow.api.types.CallHTTP
 
-class CallOpenApiInstance(
-    override val node: Node<CallOpenAPI>,
+class CallHttpInstance(
+    override val node: Node<CallHTTP>,
     override val parent: NodeInstance<*>,
-) : NodeInstance<CallOpenAPI>(node, parent) {
+) : NodeInstance<CallHTTP>(node, parent) {
     private var status: Int? = null
     private var error: String? = null
 
-    override fun setState(scope: NodeState) {
+    override fun setState(state: NodeState) {
         status = scope[STATUS]?.asInt()
         error = scope[ERROR]?.asText()
     }

@@ -1,8 +1,9 @@
-package com.lemline.swruntime.tasks.instances
+package com.lemline.swruntime.tasks.flows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.swruntime.tasks.Node
+import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
 import io.serverlessworkflow.api.types.ForTask
 
@@ -14,7 +15,7 @@ class ForInstance(
     private var index: Int? = null
     private var forIn: List<JsonNode>? = null
 
-    override fun setState(scope: NodeState) {
+    override fun setState(state: NodeState) {
         forIn = scope[FOR_IN]?.toList()
         index = scope[INDEX]?.asInt()
     }

@@ -1,20 +1,15 @@
-package com.lemline.swruntime.tasks.instances
+package com.lemline.swruntime.tasks.flows
 
-import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.swruntime.tasks.Node
+import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
 import io.serverlessworkflow.api.types.DoTask
 
 open class DoInstance(
     override val node: Node<DoTask>,
-    override val parent: NodeInstance<*>?,
+    override val parent: NodeInstance<*>,
 ) : NodeInstance<DoTask>(node, parent) {
-
-    override fun shouldRun(rawInput: JsonNode): Boolean = when (childIndex) {
-        null -> super.shouldRun(rawInput)
-        else -> true
-    }
 
     override fun `continue`(): NodeInstance<*>? {
         childIndex = when (childIndex) {
@@ -27,7 +22,7 @@ open class DoInstance(
         }
     }
 
-    override fun setState(scope: NodeState) {
+    override fun setState(state: NodeState) {
         childIndex = scope[INDEX]?.asInt()
     }
 

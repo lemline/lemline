@@ -1,7 +1,8 @@
-package com.lemline.swruntime.tasks.instances
+package com.lemline.swruntime.tasks.activities
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.swruntime.tasks.Node
+import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
 import io.serverlessworkflow.api.types.CallAsyncAPI
 
@@ -12,7 +13,7 @@ class CallAsyncApiInstance(
     private var correlationId: String? = null
     private var status: String? = null
 
-    override fun setState(scope: NodeState) {
+    override fun setState(state: NodeState) {
         correlationId = scope[CORRELATION_ID]?.asText()
         status = scope[STATUS]?.asText()
     }

@@ -1,11 +1,10 @@
-package com.lemline.swruntime.tasks.nodes
+package com.lemline.swruntime.tasks
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
-import com.lemline.swruntime.tasks.RootTask
 import com.lemline.swruntime.workflows.WorkflowService
 import com.lemline.swruntime.workflows.index
 import io.mockk.mockk

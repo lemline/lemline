@@ -1,7 +1,8 @@
-package com.lemline.swruntime.tasks.instances
+package com.lemline.swruntime.tasks.activities
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.swruntime.tasks.Node
+import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
 import io.serverlessworkflow.api.types.WaitTask
 
@@ -13,7 +14,7 @@ class WaitInstance(
     private var endTime: Long? = null
     private var status: String? = null
 
-    override fun setState(scope: NodeState) {
+    override fun setState(state: NodeState) {
         startTime = scope[START_TIME]?.asLong()
         endTime = scope[END_TIME]?.asLong()
         status = scope[STATUS]?.asText()

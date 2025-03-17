@@ -67,8 +67,9 @@ class WorkflowService(
      * @param workflow The workflow containing the root node.
      * @return The root node of the workflow.
      */
-    fun getRootNode(workflow: Workflow): Node<DoTask> =
-        getNode(workflow, NodePosition.root) as Node<DoTask>
+    @Suppress("UNCHECKED_CAST")
+    fun getRootNode(workflow: Workflow): Node<RootTask> =
+        getNode(workflow, NodePosition.root) as Node<RootTask>
 
     /**
      * Retrieves the task node at the specified position in the workflow.
@@ -78,7 +79,7 @@ class WorkflowService(
      * @return The task node at the specified position.
      * @throws IllegalStateException if the task node is not found at the specified position.
      */
-    fun getNode(workflow: Workflow, position: NodePosition): Node<*> =
+    internal fun getNode(workflow: Workflow, position: NodePosition): Node<*> =
         nodesCache[workflow.index]?.get(position.jsonPointer)
             ?: error("Task node not found at position $position for workflow ${workflow.document.name} (version ${workflow.document.version})")
 

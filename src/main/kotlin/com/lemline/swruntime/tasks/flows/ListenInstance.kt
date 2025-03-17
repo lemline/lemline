@@ -1,7 +1,8 @@
-package com.lemline.swruntime.tasks.instances
+package com.lemline.swruntime.tasks.flows
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.swruntime.tasks.Node
+import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
 import io.serverlessworkflow.api.types.ListenTask
 
@@ -13,10 +14,10 @@ class ListenInstance(
     private var timeout: Long? = null
     private var status: String? = null
 
-    override fun setState(scope: NodeState) {
-        eventCount = scope[EVENT_COUNT]?.asInt()
-        timeout = scope[TIMEOUT]?.asLong()
-        status = scope[STATUS]?.asText()
+    override fun setState(state: NodeState) {
+        eventCount = state[EVENT_COUNT]?.asInt()
+        timeout = state[TIMEOUT]?.asLong()
+        status = state[STATUS]?.asText()
     }
 
     override fun getState() = NodeState().apply {

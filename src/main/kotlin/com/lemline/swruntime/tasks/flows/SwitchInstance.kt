@@ -1,7 +1,8 @@
-package com.lemline.swruntime.tasks.instances
+package com.lemline.swruntime.tasks.flows
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.swruntime.tasks.Node
+import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
 import io.serverlessworkflow.api.types.SwitchTask
 
@@ -12,7 +13,7 @@ class SwitchInstance(
     private var selectedCase: String? = null
     private var index: Int? = null
 
-    override fun setState(scope: NodeState) {
+    override fun setState(state: NodeState) {
         selectedCase = scope[SELECTED_CASE]?.asText()
         index = scope[INDEX]?.asInt()
     }

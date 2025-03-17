@@ -1,7 +1,8 @@
-package com.lemline.swruntime.tasks.instances
+package com.lemline.swruntime.tasks.flows
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.swruntime.tasks.Node
+import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
 import io.serverlessworkflow.api.types.TryTask
 
@@ -12,7 +13,7 @@ class TryInstance(
     private var index: Int? = null
     private var error: String? = null
 
-    override fun setState(scope: NodeState) {
+    override fun setState(state: NodeState) {
         index = scope[INDEX]?.asInt()
         error = scope[ERROR]?.asText()
     }

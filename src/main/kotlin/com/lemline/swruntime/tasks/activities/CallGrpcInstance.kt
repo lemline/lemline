@@ -1,24 +1,25 @@
-package com.lemline.swruntime.tasks.instances
+package com.lemline.swruntime.tasks.activities
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.swruntime.tasks.Node
+import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
-import io.serverlessworkflow.api.types.CallHTTP
+import io.serverlessworkflow.api.types.CallGRPC
 
-class CallHttpInstance(
-    override val node: Node<CallHTTP>,
+class CallGrpcInstance(
+    override val node: Node<CallGRPC>,
     override val parent: NodeInstance<*>,
-) : NodeInstance<CallHTTP>(node, parent) {
-    private var status: Int? = null
+) : NodeInstance<CallGRPC>(node, parent) {
+    private var status: String? = null
     private var error: String? = null
 
-    override fun setState(scope: NodeState) {
-        status = scope[STATUS]?.asInt()
+    override fun setState(state: NodeState) {
+        status = scope[STATUS]?.asText()
         error = scope[ERROR]?.asText()
     }
 
     override fun getState() = NodeState().apply {
-        status?.let { this[STATUS] = JsonNodeFactory.instance.numberNode(it) }
+        status?.let { this[STATUS] = JsonNodeFactory.instance.textNode(it) }
         error?.let { this[ERROR] = JsonNodeFactory.instance.textNode(it) }
     }
 

@@ -16,8 +16,6 @@ class WorkflowExecutionConsumer(
         logger.info("Received workflow execution request: $workflowMessage}")
 
         try {
-            // Get and validate workflow definition
-
             val instance = WorkflowInstance(
                 name = workflowMessage.name,
                 version = workflowMessage.version,
@@ -27,12 +25,12 @@ class WorkflowExecutionConsumer(
 
             instance.run()
 
-            when (instance.isCompleted()) {
+            when (!instance.isCompleted()) {
                 false -> producer
                     .setData(
                         instance.name,
                         instance.version,
-                        instance.getState().mapKeys { state -> state.key.jsonPointer },
+                        instance.getState().mapKeys { it.key.jsonPointer },
                         instance.position
                     ).send()
 

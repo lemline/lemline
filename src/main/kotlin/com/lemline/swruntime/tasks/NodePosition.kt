@@ -60,41 +60,12 @@ data class NodePosition(
         NodePosition(path + index.toString())
 
     /**
-     * Gets the last component of the path.
-     *
-     * @return The last path component, or null if the path is empty
-     */
-    val last: String
-        get() = path.last()
-
-    /**
-     * Checks if the path is empty.
-     */
-    val isEmpty: Boolean
-        get() = path.isEmpty()
-
-    /**
      * Gets the parent path by removing the last component.
      *
      * @return A new Position with the parent path, or null if this is the root
      */
     val parent: NodePosition?
         get() = if (path.isEmpty()) null else NodePosition(path.dropLast(1))
-
-    /**
-     * Gets the depth of the path (number of components).
-     */
-    val depth: Int
-        get() = path.size
-
-
-    /**
-     * Gets the component at the specified childIndex.
-     *
-     * @param index The childIndex of the component to get
-     * @return The component at the specified childIndex, or null if the childIndex is out of bounds
-     */
-    fun getComponent(index: Int): String? = path.getOrNull(index)
 
     /**
      * Checks if this path is a child of the given parent path.
@@ -105,26 +76,7 @@ data class NodePosition(
     fun isChildOf(parent: NodePosition): Boolean =
         path.size > parent.path.size && path.take(parent.path.size) == parent.path
 
-    /**
-     * Gets the relative path from the given parent path.
-     *
-     * @param parent The parent path
-     * @return The relative path, or null if this path is not a child of the given parent
-     */
-    fun getRelativePath(parent: NodePosition): NodePosition? =
-        if (isChildOf(parent)) {
-            NodePosition(path.drop(parent.path.size))
-        } else null
-
-    /**
-     * Returns the previous position in the workflow.
-     *
-     * @return The previous position, or null if this is the root position
-     */
-    fun back(): NodePosition? = parent
-
     companion object {
         val root = JsonPointer.root.toPosition()
-        val doRoot = JsonPointer.doRoot.toPosition()
     }
 }

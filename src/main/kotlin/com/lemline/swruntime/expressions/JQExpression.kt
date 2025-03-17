@@ -49,24 +49,6 @@ object JQExpression {
     fun eval(input: JsonNode, exportAs: ExportAs, scope: ObjectNode): JsonNode =
         eval(input, JsonUtils.fromValue(exportAs.get()), scope)
 
-
-//    @JvmStatic
-//    fun eval(input: JsonNode, expr: JsonNode, expressionScope: ExpressionScope) =
-//        eval(input, expr, expressionScope.toScope())
-//
-//    @JvmStatic
-//    fun eval(input: JsonNode, inputFrom: InputFrom?, expressionScope: ExpressionScope): JsonNode =
-//        inputFrom?.let { eval(input, JsonUtils.fromValue(it.get()), expressionScope) } ?: input
-//
-//
-//    @JvmStatic
-//    fun eval(input: JsonNode, outputAs: OutputAs?, expressionScope: ExpressionScope): JsonNode =
-//        outputAs?.let { eval(input, JsonUtils.fromValue(it.get()), expressionScope) } ?: input
-//
-//    @JvmStatic
-//    fun eval(input: JsonNode, exportAs: ExportAs, expressionScope: ExpressionScope): JsonNode =
-//        eval(input, JsonUtils.fromValue(exportAs.get()), expressionScope)
-
     /**
      * Evaluates a JQ expression against a given JSON node within a specified scope.
      *

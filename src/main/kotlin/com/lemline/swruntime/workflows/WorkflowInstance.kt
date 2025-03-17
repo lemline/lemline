@@ -3,10 +3,10 @@ package com.lemline.swruntime.workflows
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.swruntime.expressions.scopes.RuntimeDescriptor
 import com.lemline.swruntime.expressions.scopes.WorkflowDescriptor
-import com.lemline.swruntime.tasks.NodePosition
-import com.lemline.swruntime.tasks.NodeState
-import com.lemline.swruntime.tasks.instances.NodeInstance
-import com.lemline.swruntime.tasks.instances.RootInstance
+import com.lemline.swruntime.tasks.*
+import com.lemline.swruntime.tasks.activities.*
+import com.lemline.swruntime.tasks.flows.*
+import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import jakarta.inject.Inject
 import java.time.Instant
@@ -31,7 +31,7 @@ class WorkflowInstance(
     private lateinit var workflowService: WorkflowService
 
     /**
-     * Instance Id
+     * Instance ID
      * (parsed from the state)
      */
     private val id: String
@@ -40,7 +40,7 @@ class WorkflowInstance(
      * Instance starting date
      * (parsed from the state)
      */
-    private val startedAt: Instant
+    private val startedAt: DateTimeDescriptor
 
     /**
      * Instance raw input
@@ -49,33 +49,11 @@ class WorkflowInstance(
     private val rawInput: JsonNode
 
     init {
-        val rootState = state[NodePosition.root]
-        require(rootState != null) {
-            error("no state provided for the root node")
-        }
+        val rootState = state[NodePosition.root] ?: error("no state provided for the root node")
 
-        val workflowDesc = rootState[RootInstance.WORKFLOW_STATE_KEY]
-        require(workflowDesc != null) {
-            error("no workflow description provided")
-        }
-
-        val id = workflowDesc["id"]
-        require(id != null && id.asText().isNotEmpty()) {
-            error("invalid id value provided: $id")
-        }
-        this.id = id.asText()
-
-        val startedAt = workflowDesc["startedAt"]
-        require(startedAt != null && startedAt.asText().isValidInstant()) {
-            error("invalid startedAt value provided: $startedAt")
-        }
-        this.startedAt = Instant.parse(startedAt.asText())
-
-        val rawInput = workflowDesc["input"]
-        require(rawInput != null) {
-            error("no workflow input provided")
-        }
-        this.rawInput = rawInput
+        this.id = rootState.getId()
+        this.startedAt = rootState.getStartedAt()
+        this.rawInput = rootState.getRawInput()!!
     }
 
     // Retrieves the workflow by its name and version
@@ -89,7 +67,7 @@ class WorkflowInstance(
         // Get the task at the current position
         val activity = nodeInstances[position] ?: error("task not found in position $position")
 
-        // Complete the current task execution (rawOutput should be part of the state)
+        // Complete the current activity execution (rawOutput should be part of the state)
         if (!isStarting()) activity.complete()
 
         // find and execute the next activity
@@ -100,7 +78,7 @@ class WorkflowInstance(
 
     private fun isStarting(): Boolean = position == NodePosition.root && rootInstance.childIndex == null
 
-    fun isCompleted(): Boolean = position == NodePosition.root && rootInstance.childIndex == 1
+    internal fun isCompleted(): Boolean = position == NodePosition.root && rootInstance.childIndex == 1
 
     /**
      * Retrieves the task instances of the given workflow with the provided state.
@@ -114,30 +92,29 @@ class WorkflowInstance(
      */
     private fun initInstance(): Map<NodePosition, NodeInstance<*>> {
         val rootNode = workflowService.getRootNode(workflow)
-        rootInstance = RootInstance.from(rootNode, state)
-        // reinit
+        rootInstance = rootNode.createInstance(null) as RootInstance
+        // reinit for this execution
         rootInstance.secrets = workflowService.getSecrets(workflow)
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
             id = id,
             definition = workflow,
             input = rawInput,
-            startedAt = DateTimeDescriptor.from(startedAt)
+            startedAt = startedAt
         )
 
+        // create the map<NodePosition, NodeInstance<*>>
         val nodeInstances = mutableMapOf<NodePosition, NodeInstance<*>>()
-
         fun collect(nodeInstance: NodeInstance<*>) {
             nodeInstances[nodeInstance.node.position] = nodeInstance
             nodeInstance.children.forEach { collect(it) }
         }
-
         collect(rootInstance)
 
         return nodeInstances
     }
 
-    internal fun getState(): Map<NodePosition, NodeState> {
+    internal fun getState(): MutableMap<NodePosition, NodeState> {
         val state = mutableMapOf<NodePosition, NodeState>()
         fun collect(nodeInstance: NodeInstance<*>) {
             nodeInstance.getState()?.let { state[nodeInstance.node.position] = it }
@@ -160,8 +137,35 @@ class WorkflowInstance(
             }
             nextActivity = nextActivity.next()
         }
-        return nextActivity
+        return nextActivity?.also { position = it.node.position }
     }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun Node<*>.createInstance(parent: NodeInstance<*>?): NodeInstance<*> = when (task) {
+        is RootTask -> RootInstance(this as Node<RootTask>)
+        is DoTask -> DoInstance(this as Node<DoTask>, parent!!)
+        is ForTask -> ForInstance(this as Node<ForTask>, parent!!)
+        is TryTask -> TryInstance(this as Node<TryTask>, parent!!)
+        is ForkTask -> ForkInstance(this as Node<ForkTask>, parent!!)
+        is RaiseTask -> RaiseInstance(this as Node<RaiseTask>, parent!!)
+        is SetTask -> SetInstance(this as Node<SetTask>, parent!!)
+        is SwitchTask -> SwitchInstance(this as Node<SwitchTask>, parent!!)
+        is CallAsyncAPI -> CallAsyncApiInstance(this as Node<CallAsyncAPI>, parent!!)
+        is CallGRPC -> CallGrpcInstance(this as Node<CallGRPC>, parent!!)
+        is CallHTTP -> CallHttpInstance(this as Node<CallHTTP>, parent!!)
+        is CallOpenAPI -> CallOpenApiInstance(this as Node<CallOpenAPI>, parent!!)
+        is EmitTask -> EmitInstance(this as Node<EmitTask>, parent!!)
+        is ListenTask -> ListenInstance(this as Node<ListenTask>, parent!!)
+        is RunTask -> RunInstance(this as Node<RunTask>, parent!!)
+        is WaitTask -> WaitInstance(this as Node<WaitTask>, parent!!)
+        else -> throw IllegalArgumentException("Unknown task type: ${task.javaClass.name}")
+    }
+        // apply state for this new node instance
+        .apply { state[node.position]?.let { setState(it) } }
+        // create all children node instances
+        .also { nodeInstance ->
+            nodeInstance.children = this.children?.map { child -> child.createInstance(nodeInstance) } ?: emptyList()
+        }
 
     private fun String.isValidInstant(): Boolean = try {
         Instant.parse(this)
@@ -172,4 +176,5 @@ class WorkflowInstance(
 
     private fun error(message: Any): Nothing =
         throw IllegalStateException("Workflow $name (version $version): $message")
+
 }
