@@ -1,6 +1,6 @@
 package com.lemline.swruntime.tasks
 
-enum class TaskToken(val token: String) {
+enum class Token(val token: String) {
     DO("do"),
     FOR("for"),
     FOREACH("foreach"),

@@ -72,7 +72,7 @@ class WorkflowServiceTest {
         every { mockedRepository.findByNameAndVersion(nonExistentWorkflowName, workflowVersion) }
             .returns(null)
 
-        val exception = assertThrows<IllegalArgumentException> {
+        val exception = assertThrows<IllegalStateException> {
             workflowService.getWorkflow(nonExistentWorkflowName, workflowVersion)
         }
 

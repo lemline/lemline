@@ -1,277 +1,175 @@
 package com.lemline.swruntime.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.TextNode
-import com.lemline.swruntime.expressions.JQExpression
-import com.lemline.swruntime.expressions.scopes.ExpressionScope
 import com.lemline.swruntime.expressions.scopes.RuntimeDescriptor
 import com.lemline.swruntime.expressions.scopes.WorkflowDescriptor
-import com.lemline.swruntime.messaging.TaskRequest
-import com.lemline.swruntime.schemas.SchemaValidator
-import com.lemline.swruntime.tasks.TaskPosition
-import com.lemline.swruntime.tasks.TaskToken.*
-import com.lemline.swruntime.tasks.execute.executeTask
-import io.serverlessworkflow.api.types.*
+import com.lemline.swruntime.tasks.NodePosition
+import com.lemline.swruntime.tasks.NodeState
+import com.lemline.swruntime.tasks.instances.NodeInstance
+import com.lemline.swruntime.tasks.instances.RootInstance
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import jakarta.inject.Inject
+import java.time.Instant
+import java.time.format.DateTimeParseException
 
+/**
+ * Represents an instance of a workflow.
+ *
+ * @property name The name of the workflow.
+ * @property version The version of the workflow.
+ * @property id The unique identifier of the workflow instance.
+ * @property rawInput The raw input data for the instance as a JSON node.
+ *
+ */
 class WorkflowInstance(
-    val workflowName: String,
-    val workflowVersion: String,
-    val instanceId: String,
-    val instanceRawInput: JsonNode,
-    var instanceContext: Map<String, JsonNode>,
-    val instanceStartedAt: DateTimeDescriptor
+    val name: String,
+    val version: String,
+    val state: MutableMap<NodePosition, NodeState>,
+    var position: NodePosition
 ) {
     @Inject
     private lateinit var workflowService: WorkflowService
 
-    private val workflow by lazy { workflowService.getWorkflow(workflowName, workflowVersion) }
+    /**
+     * Instance Id
+     * (parsed from the state)
+     */
+    private val id: String
 
-    internal val secrets = workflowService.getSecrets(workflow)
+    /**
+     * Instance starting date
+     * (parsed from the state)
+     */
+    private val startedAt: Instant
 
-    internal val workflowDescriptor = WorkflowDescriptor(
-        id = instanceId,
-        definition = workflow,
-        input = instanceRawInput,
-        startedAt = instanceStartedAt,
-    )
+    /**
+     * Instance raw input
+     * (parsed from the state)
+     */
+    private val rawInput: JsonNode
 
-    private lateinit var currentTaskPosition: TaskPosition
+    init {
+        val rootState = state[NodePosition.root]
+        require(rootState != null) {
+            error("no state provided for the root node")
+        }
 
-    suspend fun start(): TaskRequest {
-        validateInstanceInputSchema()
+        val workflowDesc = rootState[RootInstance.WORKFLOW_STATE_KEY]
+        require(workflowDesc != null) {
+            error("no workflow description provided")
+        }
 
-        val taskRawInput = transformInstanceRawInput()
+        val id = workflowDesc["id"]
+        require(id != null && id.asText().isNotEmpty()) {
+            error("invalid id value provided: $id")
+        }
+        this.id = id.asText()
 
-        // do task position
-        currentTaskPosition = TaskPosition.fromString("/do")
+        val startedAt = workflowDesc["startedAt"]
+        require(startedAt != null && startedAt.asText().isValidInstant()) {
+            error("invalid startedAt value provided: $startedAt")
+        }
+        this.startedAt = Instant.parse(startedAt.asText())
 
-        // run the do task
-
-        TODO()
+        val rawInput = workflowDesc["input"]
+        require(rawInput != null) {
+            error("no workflow input provided")
+        }
+        this.rawInput = rawInput
     }
 
-    suspend fun runTask(rawInput: JsonNode, position: TaskPosition): TaskRequest {
-        currentTaskPosition = position
+    // Retrieves the workflow by its name and version
+    private val workflow by lazy { workflowService.getWorkflow(name, version) }
 
+    private val nodeInstances: Map<NodePosition, NodeInstance<*>> by lazy { initInstance() }
+
+    private lateinit var rootInstance: RootInstance
+
+    suspend fun run() {
         // Get the task at the current position
-        val task = getTaskAtPosition(position)
+        val activity = nodeInstances[position] ?: error("task not found in position $position")
 
-        // Execute the task
-        val taskOutput = executeTask(position, task, rawInput)
+        // Complete the current task execution (rawOutput should be part of the state)
+        if (!isStarting()) activity.complete()
 
-        // Determine next task position
-        val nextPosition = determineNextTaskPosition(task, position)
-
-        // Handle workflow output transformation if this is the last task
-        val finalOutput = if (nextPosition == null) {
-            transformInstanceRawOutput(taskOutput).also {
-                // Validate the final output schema
-                validateInstanceOutputSchema(it)
-            }
-        } else taskOutput
-
-        // Create task request for next step or workflow completion
-        return TaskRequest(
-            rawInput = finalOutput,
-            position = nextPosition?.jsonPointer() ?: ""
-        )
+        // find and execute the next activity
+        activity.nextActivity()?.also {
+            it.rawOutput = it.execute()
+        }
     }
+
+    private fun isStarting(): Boolean = position == NodePosition.root && rootInstance.childIndex == null
+
+    fun isCompleted(): Boolean = position == NodePosition.root && rootInstance.childIndex == 1
 
     /**
-     * Validates the instance raw input against the workflow's input schema if it exists.
+     * Retrieves the task instances of the given workflow with the provided state.
      *
-     * This method checks if the workflow has an input schema defined. If a schema is present,
-     * it validates the `instanceRawInput` against this schema using the `SchemaValidator`.
+     * This method initializes the root instance with the provided state,
+     * and then recursively populates the instance node and its children with the state.
+     *
+     * @param workflow The workflow definition containing the task instances.
+     * @param states The state of the task instances to populate.
+     * @return A map of task positions to their task instances.
      */
-    fun validateInstanceInputSchema() {
-        workflow.input.schema?.let { schema -> SchemaValidator.validate(instanceRawInput, schema) }
-    }
-
-    fun validateInstanceOutputSchema(output: JsonNode) {
-        workflow.output?.schema?.let { schema -> SchemaValidator.validate(output, schema) }
-    }
-
-
-    /**
-     * Transforms the instance raw input using the workflow's input transformation expression.
-     *
-     * This method performs the following steps:
-     * 1. Creates a `WorkflowDescriptor` object with the current workflow instance details.
-     * 2. Constructs an `ExpressionScope` with secrets, workflow descriptor, and runtime descriptor.
-     * 3. Evaluates the transformation expression defined in the workflow input using the `JQExpression` evaluator.
-     *
-     * @return The transformed `JsonNode` representing the instance raw input.
-     */
-    fun transformInstanceRawInput(): JsonNode {
-
-        val expressionScope = ExpressionScope(
-            secrets = secrets,
-            workflow = workflowDescriptor,
-            runtime = RuntimeDescriptor,
+    private fun initInstance(): Map<NodePosition, NodeInstance<*>> {
+        val rootNode = workflowService.getRootNode(workflow)
+        rootInstance = RootInstance.from(rootNode, state)
+        // reinit
+        rootInstance.secrets = workflowService.getSecrets(workflow)
+        rootInstance.runtimeDescriptor = RuntimeDescriptor
+        rootInstance.workflowDescriptor = WorkflowDescriptor(
+            id = id,
+            definition = workflow,
+            input = rawInput,
+            startedAt = DateTimeDescriptor.from(startedAt)
         )
 
-        return JQExpression.eval(instanceRawInput, workflow.input.from, expressionScope)
-    }
+        val nodeInstances = mutableMapOf<NodePosition, NodeInstance<*>>()
 
-    /**
-     * Transforms the instance raw output using the workflow's output transformation expression.
-     *
-     * This method performs the following steps:
-     * 1. Creates an `ExpressionScope` object with the current workflow instance details.
-     * 2. Constructs an `ExpressionScope` with secrets, workflow descriptor, and runtime descriptor.
-     * 3. Evaluates the transformation expression defined in the workflow output using the `JQExpression` evaluator.
-     *
-     * @param lastTaskOutput The `JsonNode` representing the last task output.
-     * @return The transformed `JsonNode` representing the instance raw output.
-     */
-    private fun transformInstanceRawOutput(lastTaskOutput: JsonNode): JsonNode {
-        val scope = ExpressionScope(
-            context = instanceContext,
-            workflow = workflowDescriptor,
-            runtime = RuntimeDescriptor,
-            secrets = secrets
-        )
-        return JQExpression.eval(lastTaskOutput, workflow.output?.`as`, scope)
-    }
-
-    /**
-     * Determines the next task position based on the current task and workflow definition.
-     * Follows the DSL specification for task flow:
-     * 1. If task has a 'then' directive, use it to find the next task or handle special directives:
-     *    - 'continue': proceeds to next task in sequence
-     *    - 'end': ends the workflow
-     *    - 'exit': exits the current scope
-     *    - task name: jumps to the specified task in the same scope
-     * 2. Otherwise, look for the next task in sequence
-     * 3. If no next task exists, the workflow ends
-     *
-     * @param currentTask The current task that was just executed
-     * @param currentPosition The position of the current task
-     * @return The next task position, or null if the workflow should end
-     */
-    private fun determineNextTaskPosition(currentTask: TaskBase, currentPosition: TaskPosition): TaskPosition? {
-        // Check for explicit 'then' directive
-        currentTask.then?.get()?.let { nextTaskName ->
-            val directive = when (nextTaskName) {
-                is TextNode -> nextTaskName.textValue()
-                else -> nextTaskName.toString()
-            }
-
-            // Handle special flow directives
-            when (directive.lowercase()) {
-                "continue" -> {
-                    // Default behavior: proceed to next task in sequence
-                }
-
-                "end" -> {
-                    // Explicitly end the workflow
-                    return null
-                }
-
-                "exit" -> {
-                    // Exit the current scope by getting the next task after the parent container
-                    val scopePosition = currentPosition.parent ?: return null
-                    val containerPosition = scopePosition.parent ?: return null
-                    return determineNextTaskPosition(
-                        getTaskAtPosition(scopePosition),
-                        scopePosition
-                    )
-                }
-
-                else -> {
-                    // Try to find task with matching name in the same scope
-                    return findTaskPositionByName(directive, currentPosition.parent ?: return null)
-                }
-            }
+        fun collect(nodeInstance: NodeInstance<*>) {
+            nodeInstances[nodeInstance.node.position] = nodeInstance
+            nodeInstance.children.forEach { collect(it) }
         }
 
-        // If no 'then' directive, get next task in sequence
-        val nextIndex = currentPosition.parent?.last?.toIntOrNull()
+        collect(rootInstance)
 
-        return when {
-            // If we're in a sequence (do/try/catch/), get next in sequence
-            currentPosition.parent?.last?.toIntOrNull() != null -> {
-                val parentPosition = currentPosition.parent ?: return null
-                val currentIndex = currentPosition.last.toInt()
-                val taskList = getTaskListAtPosition(parentPosition)
+        return nodeInstances
+    }
 
-                if (currentIndex + 1 < taskList.size) {
-                    // Next task in sequence
-                    parentPosition.addIndex(currentIndex + 1)
-                } else {
-                    // End of sequence, go back to parent's next task
-                    determineNextTaskPosition(
-                        getTaskAtPosition(parentPosition),
-                        parentPosition
-                    )
-                }
+    internal fun getState(): Map<NodePosition, NodeState> {
+        val state = mutableMapOf<NodePosition, NodeState>()
+        fun collect(nodeInstance: NodeInstance<*>) {
+            nodeInstance.getState()?.let { state[nodeInstance.node.position] = it }
+            nodeInstance.children.forEach { collect(it) }
+        }
+        collect(rootInstance)
+
+        return state
+    }
+
+    private fun NodeInstance<*>.nextActivity(): NodeInstance<*>? {
+        var nextActivity: NodeInstance<*>? = next()
+        while (true) {
+            // if null, then the workflow is completed
+            if (nextActivity == null) break
+            // if taskInstance should not run, then continue
+            if (nextActivity.shouldRun(transformedOutput)) {
+                // if next is an activity, then break
+                if (nextActivity.node.isActivity()) break
             }
-            // If we're at a container task (do/try/fork/etc), enter its first task
-            isContainerTask(currentTask) -> {
-                getFirstTaskInContainer(currentTask, currentPosition)
-            }
-            // Otherwise, we're done with this branch
-            else -> null
+            nextActivity = nextActivity.next()
         }
+        return nextActivity
     }
 
-    /**
-     * Finds a task position by name within a given scope.
-     */
-    private fun findTaskPositionByName(taskName: String, scopePosition: TaskPosition): TaskPosition? {
-        val taskList = getTaskListAtPosition(scopePosition)
-        val index = taskList.indexOfFirst { it.name == taskName }
-        return if (index >= 0) scopePosition.addIndex(index) else null
+    private fun String.isValidInstant(): Boolean = try {
+        Instant.parse(this)
+        true
+    } catch (e: DateTimeParseException) {
+        false
     }
 
-    /**
-     * Gets the list of tasks at a given position in the workflow.
-     */
-    private fun getTaskListAtPosition(position: TaskPosition): List<TaskItem> {
-        return when (val task = getTaskAtPosition(position)) {
-            is DoTask -> task.`do`
-            is TryTask -> when (position.last) {
-                TRY.token -> task.`try`
-                CATCH.token -> task.catch?.`do` ?: emptyList()
-                else -> emptyList()
-            }
-
-            is ForkTask -> task.fork.branches.toList()
-            else -> emptyList()
-        }
-    }
-
-    /**
-     * Gets the first task in a container task (do/try/fork/etc).
-     */
-    private fun getFirstTaskInContainer(task: TaskBase, position: TaskPosition): TaskPosition? {
-        return when (task) {
-            is DoTask -> position.addIndex(0)
-            is TryTask -> position.addToken(TRY).addIndex(0)
-            is ForkTask -> position.addToken(FORK).addIndex(0).addToken(DO).addIndex(0)
-            else -> null
-        }
-    }
-
-    /**
-     * Checks if a task is a container that can hold other tasks.
-     */
-    private fun isContainerTask(task: TaskBase): Boolean {
-        return when (task) {
-            is DoTask,
-            is TryTask,
-            is ForkTask -> true
-
-            else -> false
-        }
-    }
-
-    /**
-     * Gets the task at the specified position in the workflow.
-     */
-    private fun getTaskAtPosition(position: TaskPosition): TaskBase {
-        TODO()
-    }
+    private fun error(message: Any): Nothing =
+        throw IllegalStateException("Workflow $name (version $version): $message")
 }

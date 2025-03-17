@@ -8,7 +8,7 @@ do:
       for:
         each: pet
         in: .pets
-        at: index
+        at: childIndex
       while: .vet != null
       do:
         - waitForCheckup:

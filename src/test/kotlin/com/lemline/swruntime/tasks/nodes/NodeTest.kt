@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
+import com.lemline.swruntime.tasks.RootTask
 import com.lemline.swruntime.workflows.WorkflowService
 import com.lemline.swruntime.workflows.index
 import io.mockk.mockk
@@ -13,7 +14,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import java.io.File
 
-class TaskNodeTest {
+class NodeTest {
     // WorkflowService instance
     private val mockedRepository = mockk<WorkflowDefinitionRepository>()
     private val workflowService = WorkflowService(mockedRepository)
@@ -43,11 +44,12 @@ class TaskNodeTest {
             println("Found ${positions.size} positions in ${file.name}:")
             positions.forEach { (pointer, taskNode) ->
                 println("$pointer => ${taskNode.task.javaClass.simpleName}")
-                val jsonNode = findNodeByPointer(workflowJson, pointer)
+                val jsonNode = findNodeByPointer(workflowJson, pointer.toString())
                 assertNotNull(jsonNode, "Position $pointer not found in workflow JSON in file ${file.name}")
                 val inFile = "In file ${file.name}"
                 println("$pointer => $jsonNode")
                 when (taskNode.task) {
+                    is RootTask -> assertTrue(jsonNode!!.get("document").isObject, inFile)
                     is CallOpenAPI -> assertEquals(jsonNode!!.get("call").textValue(), "openapi", inFile)
                     is CallHTTP -> assertEquals(jsonNode!!.get("call").textValue(), "http", inFile)
                     is CallGRPC -> assertEquals(jsonNode!!.get("call").textValue(), "grpc", inFile)
@@ -64,12 +66,12 @@ class TaskNodeTest {
                     is SwitchTask -> assertTrue(jsonNode!!.has("switch"), inFile)
                     is TryTask -> assertTrue(jsonNode!!.has("try"), inFile)
                     is WaitTask -> assertTrue(jsonNode!!.has("wait"), inFile)
-                    else -> fail("Unknown task type ${taskNode.javaClass.name} $inFile")
+                    else -> fail("Unknown task type ${taskNode.task.javaClass.name} $inFile")
                 }
             }
 
             // Verify all tasks in JSON have corresponding positions
-            verifyAllTasksHavePositions(workflowJson, positions, file.name)
+            verifyAllTasksHavePositions(workflowJson, positions.mapKeys { it.key.toString() }, file.name)
         }
     }
 

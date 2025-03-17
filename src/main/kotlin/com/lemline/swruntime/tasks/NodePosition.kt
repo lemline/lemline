@@ -1,28 +1,26 @@
 package com.lemline.swruntime.tasks
 
 /**
- * A WorkflowPosition implementation that represents a JSON pointer path.
- * This class allows for building and manipulating JSON pointer paths in a type-safe way.
+ * Represents a task position in the workflow.
+ *
+ * This class is used to represent the position of a task in the workflow.
+ *
+ * @property path The list of path components.
  */
-data class TaskPosition(
+data class NodePosition(
     private val path: List<String> = listOf(),
 ) {
+    /**
+     * Json pointer representation. (e.g., "/do/0/do")
+     */
+    val jsonPointer = JsonPointer(if (path.isEmpty()) "" else "/${path.joinToString("/")}")
 
-    companion object {
-
-        /**
-         * Creates a new Position from a string path.
-         * The path should be a valid JSON pointer string (e.g., "/do/0/do").
-         *
-         * @param path The JSON pointer string
-         */
-        fun fromString(path: String): TaskPosition =
-            path.trim()
-                .split("/")
-                .filter { it.isNotEmpty() }
-                .let { TaskPosition(it) }
-    }
-
+    /**
+     * Gets the string representation of the JSON pointer.
+     *
+     * @return The JSON pointer string (e.g., "/do/0/do")
+     */
+    override fun toString() = jsonPointer.toString()
 
     /**
      * Adds a name component to the JSON pointer path.
@@ -34,13 +32,13 @@ data class TaskPosition(
      * @return A new TaskPosition with the added name component.
      * @throws IllegalArgumentException if the name contains a slash, is an integer, or is a reserved token.
      */
-    fun addName(name: String): TaskPosition {
+    fun addName(name: String): NodePosition {
         require(!name.contains("/")) { "Task name $name must not contain '/'" }
         require(name.toIntOrNull() == null) { "Task name $name must not be an integer" }
-        TaskToken.entries.map { it.token }.let {
+        Token.entries.map { it.token }.let {
             require(!it.contains(name)) { "Task name $name must not be one of ${it.joinToString()}" }
         }
-        return TaskPosition(path + name)
+        return NodePosition(path + name)
     }
 
     /**
@@ -49,31 +47,17 @@ data class TaskPosition(
      * @param token The property name to add
      * @return A new Position with the added property
      */
-    fun addToken(token: TaskToken): TaskPosition =
-        TaskPosition(path + token.token)
+    fun addToken(token: Token): NodePosition =
+        NodePosition(path + token.token)
 
     /**
-     * Adds an index to the path.
+     * Adds an childIndex to the path.
      *
-     * @param index The numeric index to add
-     * @return A new Position with the added index
+     * @param index The numeric childIndex to add
+     * @return A new Position with the added childIndex
      */
-    fun addIndex(index: Int): TaskPosition =
-        TaskPosition(path + index.toString())
-
-    /**
-     * Gets the JSON pointer string representation.
-     *
-     * @return The JSON pointer string (e.g., "/do/0/do")
-     */
-    fun jsonPointer(): String = if (path.isEmpty()) "" else "/${path.joinToString("/")}"
-
-    /**
-     * Gets the string representation of the JSON pointer.
-     *
-     * @return The JSON pointer string (e.g., "/do/0/do")
-     */
-    override fun toString(): String = jsonPointer()
+    fun addIndex(index: Int): NodePosition =
+        NodePosition(path + index.toString())
 
     /**
      * Gets the last component of the path.
@@ -94,8 +78,8 @@ data class TaskPosition(
      *
      * @return A new Position with the parent path, or null if this is the root
      */
-    val parent: TaskPosition?
-        get() = if (path.isEmpty()) null else TaskPosition(path.dropLast(1))
+    val parent: NodePosition?
+        get() = if (path.isEmpty()) null else NodePosition(path.dropLast(1))
 
     /**
      * Gets the depth of the path (number of components).
@@ -105,10 +89,10 @@ data class TaskPosition(
 
 
     /**
-     * Gets the component at the specified index.
+     * Gets the component at the specified childIndex.
      *
-     * @param index The index of the component to get
-     * @return The component at the specified index, or null if the index is out of bounds
+     * @param index The childIndex of the component to get
+     * @return The component at the specified childIndex, or null if the childIndex is out of bounds
      */
     fun getComponent(index: Int): String? = path.getOrNull(index)
 
@@ -118,7 +102,7 @@ data class TaskPosition(
      * @param parent The potential parent path
      * @return true if this path is a child of the given parent path
      */
-    fun isChildOf(parent: TaskPosition): Boolean =
+    fun isChildOf(parent: NodePosition): Boolean =
         path.size > parent.path.size && path.take(parent.path.size) == parent.path
 
     /**
@@ -127,9 +111,9 @@ data class TaskPosition(
      * @param parent The parent path
      * @return The relative path, or null if this path is not a child of the given parent
      */
-    fun getRelativePath(parent: TaskPosition): TaskPosition? =
+    fun getRelativePath(parent: NodePosition): NodePosition? =
         if (isChildOf(parent)) {
-            TaskPosition(path.drop(parent.path.size))
+            NodePosition(path.drop(parent.path.size))
         } else null
 
     /**
@@ -137,5 +121,10 @@ data class TaskPosition(
      *
      * @return The previous position, or null if this is the root position
      */
-    fun back(): TaskPosition? = parent
+    fun back(): NodePosition? = parent
+
+    companion object {
+        val root = JsonPointer.root.toPosition()
+        val doRoot = JsonPointer.doRoot.toPosition()
+    }
 }

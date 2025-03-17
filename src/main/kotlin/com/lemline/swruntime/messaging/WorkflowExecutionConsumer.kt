@@ -1,47 +1,42 @@
 package com.lemline.swruntime.messaging
 
-import com.lemline.swruntime.tasks.TaskPosition
 import com.lemline.swruntime.workflows.WorkflowInstance
-import com.lemline.swruntime.workflows.WorkflowService
-import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import jakarta.enterprise.context.ApplicationScoped
 import org.eclipse.microprofile.reactive.messaging.Incoming
 import org.slf4j.LoggerFactory
-import java.time.Instant
 
 @ApplicationScoped
 class WorkflowExecutionConsumer(
-    private val workflowService: WorkflowService,
-    private val workflowExecutionProducer: WorkflowExecutionProducer
+    private val producer: WorkflowExecutionProducer
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
     @Incoming("workflow-executions")
-    suspend fun consume(request: WorkflowExecutionRequest) {
-        val workflowRequest = request.workflow
-        val instanceRequest = request.instance
-        val currentTaskRequest = request.currentTask
-        logger.info("Received workflow execution request: ${workflowRequest.name}:${workflowRequest.version} (${instanceRequest.id})")
+    suspend fun consume(workflowMessage: WorkflowExecutionMessage) {
+        logger.info("Received workflow execution request: $workflowMessage}")
 
         try {
             // Get and validate workflow definition
-            val workflow = workflowService.getWorkflow(workflowRequest.name, workflowRequest.version)
 
             val instance = WorkflowInstance(
-                workflowName = workflowRequest.name,
-                workflowVersion = workflowRequest.version,
-                instanceId = instanceRequest.id,
-                instanceRawInput = instanceRequest.rawInput,
-                instanceContext = instanceRequest.context,
-                instanceStartedAt = DateTimeDescriptor.from(Instant.parse(instanceRequest.startedAt))
+                name = workflowMessage.name,
+                version = workflowMessage.version,
+                state = workflowMessage.state.mapKeys { state -> state.key.toPosition() }.toMutableMap(),
+                position = workflowMessage.position.toPosition()
             )
 
-            val nextTaskRequest = when (currentTaskRequest) {
-                null -> instance.start()
-                else -> instance.runTask(
-                    currentTaskRequest.rawInput,
-                    TaskPosition.fromString(currentTaskRequest.position)
-                )
+            instance.run()
+
+            when (instance.isCompleted()) {
+                false -> producer
+                    .setData(
+                        instance.name,
+                        instance.version,
+                        instance.getState().mapKeys { state -> state.key.jsonPointer },
+                        instance.position
+                    ).send()
+
+                true -> logger.info("Workflow execution completed successfully")
             }
 
         } catch (e: Exception) {

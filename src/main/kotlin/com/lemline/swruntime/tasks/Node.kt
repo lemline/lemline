@@ -1,22 +1,32 @@
-package com.lemline.swruntime.tasks.nodes
+package com.lemline.swruntime.tasks
 
-import com.lemline.swruntime.tasks.TaskPosition
-import com.lemline.swruntime.tasks.TaskToken.*
+import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.swruntime.tasks.Token.*
 import io.serverlessworkflow.api.types.*
-import io.serverlessworkflow.impl.TaskContext
-import io.serverlessworkflow.impl.WorkflowContext
+import io.serverlessworkflow.impl.json.JsonUtils
 
-data class TaskNode(
-    val position: TaskPosition,
-    val task: TaskBase,
+/**
+ * Represents a node in the tree defining a workflow.
+ *
+ * @property position The position of the task in the workflow.
+ * @property task The task associated with this node.
+ * @property name The name of the task.
+ * @property parent The parent node of this task node, or null if it is a root node.
+ */
+data class Node<T : TaskBase>(
+    val position: NodePosition,
+    val task: T,
     val name: String,
-    val parent: TaskNode?,
+    val parent: Node<*>? = null
 ) {
+    val definition: JsonNode = JsonUtils.fromValue(task)
+    val reference: String = position.jsonPointer.toString()
 
     /**
      * The list of task nodes depending on this one
      */
-    internal val children: List<TaskNode>? = when (task) {
+    internal val children: List<Node<*>>? = when (task) {
+        is RootTask -> task.parseChildren()
         is DoTask -> task.parseChildren(position, this)
         is ForTask -> task.parseChildren(position, this)
         is TryTask -> task.parseChildren(position, this)
@@ -55,24 +65,6 @@ data class TaskNode(
     }
 
     /**
-     * Returns the next task node in the current sequence.
-     *
-     * @return The next `TaskNode` if it exists, or `null` if there is no next node.
-     */
-    fun nextTaskNode(taskContext: TaskContext, workflowContext: WorkflowContext): TaskNode? {
-        TODO()
-    }
-
-    /**
-     * Returns the next task node, while exiting the current sequence.
-     *
-     * @return The next `TaskNode` if it exists, or `null` if there is no next node.
-     */
-    fun exitTaskNode(taskContext: TaskContext, workflowContext: WorkflowContext): TaskNode? {
-        TODO()
-    }
-
-    /**
      * Generates a Mermaid graph representation of the task hierarchy.
      * The graph shows the relationships between tasks and their children.
      * Each node shows the task type and position.
@@ -90,9 +82,9 @@ data class TaskNode(
             return "${taskType}_$count"
         }
 
-        fun processNode(node: TaskNode, parentId: String? = null) {
+        fun processNode(node: Node<*>, parentId: JsonPointer? = null) {
             val taskType = node.task.javaClass.simpleName
-            val nodeId = node.position.jsonPointer()
+            val nodeId = node.position.jsonPointer
 
             // Add node with task type and position
             val nodeLabel = "\"${node.name}\n($taskType)\""
@@ -128,16 +120,25 @@ data class TaskNode(
     }
 }
 
+private fun RootTask.parseChildren(): List<Node<*>> = listOf(
+    Node(
+        NodePosition.root.addToken(DO),
+        DoTask(`do`),
+        "$DO",
+        null,
+    )
+)
+
 private fun DoTask.parseChildren(
-    position: TaskPosition,
-    parent: TaskNode?,
-): List<TaskNode> = `do`.mapIndexed { index, taskItem ->
+    position: NodePosition,
+    parent: Node<*>?,
+): List<Node<*>> = `do`.mapIndexed { index, taskItem ->
     val child = taskItem.toTask()
     val childPosition = position.addIndex(index).addName(taskItem.name).let {
         if (child is DoTask) it.addToken(DO) else it
     }
 
-    TaskNode(
+    Node(
         childPosition,
         child,
         taskItem.name,
@@ -146,10 +147,10 @@ private fun DoTask.parseChildren(
 }
 
 private fun ForTask.parseChildren(
-    position: TaskPosition,
-    parent: TaskNode?
-): List<TaskNode> = listOf(
-    TaskNode(
+    position: NodePosition,
+    parent: Node<*>?
+): List<Node<*>> = listOf(
+    Node(
         position.addToken(DO),
         DoTask(`do`),
         "$DO",
@@ -158,10 +159,10 @@ private fun ForTask.parseChildren(
 )
 
 private fun TryTask.parseChildren(
-    position: TaskPosition,
-    parent: TaskNode?,
-): List<TaskNode> = mutableListOf(
-    TaskNode(
+    position: NodePosition,
+    parent: Node<*>?,
+): List<Node<*>> = mutableListOf(
+    Node(
         position.addToken(TRY),
         DoTask(`try`),
         "$TRY",
@@ -170,7 +171,7 @@ private fun TryTask.parseChildren(
 ).also { list ->
     `catch`.`do`?.let {
         list.add(
-            TaskNode(
+            Node(
                 position.addToken(CATCH).addToken(DO),
                 DoTask(it),
                 "$CATCH.$DO",
@@ -182,10 +183,10 @@ private fun TryTask.parseChildren(
 
 
 private fun ForkTask.parseChildren(
-    position: TaskPosition,
-    parent: TaskNode?,
-): List<TaskNode>? = fork.branches?.mapIndexed { index, taskItem ->
-    TaskNode(
+    position: NodePosition,
+    parent: Node<*>?,
+): List<Node<*>>? = fork.branches?.mapIndexed { index, taskItem ->
+    Node(
         position.addToken(FORK).addToken(BRANCHES).addIndex(index).addName(taskItem.name),
         taskItem.toTask(),
         taskItem.name,
@@ -194,11 +195,11 @@ private fun ForkTask.parseChildren(
 }
 
 private fun ListenTask.parseChildren(
-    position: TaskPosition,
-    parent: TaskNode?,
-): List<TaskNode>? = foreach?.`do`?.let {
+    position: NodePosition,
+    parent: Node<*>?,
+): List<Node<*>>? = foreach?.`do`?.let {
     listOf(
-        TaskNode(
+        Node(
             position.addToken(FOREACH).addToken(DO),
             DoTask(it),
             "$FOREACH.$DO",
@@ -208,11 +209,11 @@ private fun ListenTask.parseChildren(
 }
 
 private fun CallAsyncAPI.parseChildren(
-    position: TaskPosition,
-    parent: TaskNode?,
-): List<TaskNode>? = with.subscription?.foreach?.`do`?.let {
+    position: NodePosition,
+    parent: Node<*>?,
+): List<Node<*>>? = with.subscription?.foreach?.`do`?.let {
     listOf(
-        TaskNode(
+        Node(
             position.addToken(WITH).addToken(SUBSCRIPTION).addToken(FOREACH).addToken(DO),
             DoTask(it),
             "$WITH.$SUBSCRIPTION.$FOREACH.$DO",

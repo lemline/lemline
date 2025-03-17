@@ -1,8 +1,8 @@
 package com.lemline.swruntime.messaging
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.lemline.swruntime.tasks.TaskPosition
-import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import com.lemline.swruntime.tasks.JsonPointer
+import com.lemline.swruntime.tasks.NodePosition
+import com.lemline.swruntime.tasks.NodeState
 import jakarta.enterprise.context.ApplicationScoped
 import org.eclipse.microprofile.reactive.messaging.Outgoing
 import org.slf4j.LoggerFactory
@@ -11,33 +11,28 @@ import org.slf4j.LoggerFactory
 class WorkflowExecutionProducer {
 
     private val logger = LoggerFactory.getLogger(javaClass)
-    private lateinit var workflowRequest: WorkflowRequest
-    private lateinit var instanceRequest: InstanceRequest
-    private var currentTask: TaskRequest? = null
+    private lateinit var message: WorkflowExecutionMessage
 
     fun setData(
         workflowName: String,
         workflowVersion: String,
-        instanceId: String,
-        instanceRawInput: JsonNode,
-        instanceContext: Map<String, JsonNode>,
-        instanceStartedAt: DateTimeDescriptor,
-        taskRawInput: JsonNode,
-        taskPosition: TaskPosition,
-    ) {
-        this.workflowRequest = WorkflowRequest(workflowName, workflowVersion)
-        this.instanceRequest =
-            InstanceRequest(instanceId, instanceRawInput, instanceContext, instanceStartedAt.iso8601())
-        this.currentTask = TaskRequest(taskRawInput, taskPosition.jsonPointer())
+        instanceStates: Map<JsonPointer, NodeState>,
+        instancePosition: NodePosition,
+    ): WorkflowExecutionProducer {
+        message = WorkflowExecutionMessage(
+            name = workflowName,
+            version = workflowVersion,
+            state = instanceStates,
+            position = instancePosition.jsonPointer
+        )
+
+        return this
     }
 
     @Outgoing("workflow-executions")
-    fun sendNextTask(): WorkflowExecutionRequest {
-        logger.info(
-            "Sending next task for workflow {}:{} ({}) at position {}",
-            workflowRequest.name, workflowRequest.version, instanceRequest.id, currentTask?.position
-        )
+    fun send(): WorkflowExecutionMessage {
+        logger.info("Sending message: {}", message)
 
-        return WorkflowExecutionRequest(workflowRequest, instanceRequest, currentTask)
+        return message
     }
 }
