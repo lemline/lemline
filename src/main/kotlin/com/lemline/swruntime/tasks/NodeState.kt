@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.node.IntNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.databind.node.TextNode
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import io.serverlessworkflow.impl.json.JsonUtils
 import java.time.Instant
 
 /**
@@ -13,7 +14,11 @@ import java.time.Instant
 @JvmInline
 value class NodeState(
     private val map: MutableMap<String, JsonNode> = mutableMapOf()
-) : MutableMap<String, JsonNode> by map {
+) {
+
+    fun set(key: String, any: Any) {
+        map[key] = JsonUtils.fromValue(any)
+    }
 
     fun setIndex(index: Int) {
         map[INDEX] = IntNode(index)
@@ -39,7 +44,8 @@ value class NodeState(
         map[STARTED_AT] = TextNode(startedAt.iso8601())
     }
 
-    fun getIndex(): Int? = map[INDEX]?.asInt()
+    fun <T : Any> get(key: String, klass: Class<T>): T? = JsonUtils.convertValue(map[key], klass)
+    fun getIndex(): Int = map[INDEX]?.asInt() ?: -1
     fun getRawInput(): JsonNode? = map[RAW_INPUT]
     fun getRawOutput(): JsonNode? = map[RAW_OUTPUT]
     fun getContext(): ObjectNode? = map[CONTEXT] as ObjectNode?

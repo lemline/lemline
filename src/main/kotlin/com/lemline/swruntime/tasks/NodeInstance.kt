@@ -17,7 +17,7 @@ import java.time.Instant
  * Task instances maintain the state of a task during execution.
  */
 abstract class NodeInstance<T : TaskBase>(
-    open val node: Node<T>,
+    open val node: NodeTask<T>,
     open val parent: NodeInstance<*>?
 ) {
     /**
@@ -27,36 +27,36 @@ abstract class NodeInstance<T : TaskBase>(
 
     /**
      * Store the current state of this task:
-     * - null when the task has not started yet
+     * - -1 when the task has not started yet
      * - when started, childIndex is set to the index of the child that is currently being executed
      * - when completed, childIndex is set to children size
      */
-    internal var childIndex: Int? = null
+    internal var childIndex: Int = -1
 
     /**
      * The time the task was started at.
      */
-    internal lateinit var startedAt: DateTimeDescriptor
+    internal var startedAt: DateTimeDescriptor? = null
 
     /**
      * The task raw input.
      */
-    internal lateinit var rawInput: JsonNode
+    internal var rawInput: JsonNode? = null
 
     /**
      * The task transformed input.
      */
-    internal lateinit var transformedInput: JsonNode
+    internal var transformedInput: JsonNode? = null
 
     /**
      * The task raw output.
      */
-    internal lateinit var rawOutput: JsonNode
+    internal var rawOutput: JsonNode? = null
 
     /**
      * The task transformed output.
      */
-    internal lateinit var transformedOutput: JsonNode
+    internal var transformedOutput: JsonNode? = null
 
     private val taskDescriptor
         get() = TaskDescriptor(
@@ -64,8 +64,8 @@ abstract class NodeInstance<T : TaskBase>(
             reference = node.reference,
             definition = node.definition,
             startedAt = startedAt,
-            input = rawInput,
-            output = if (::rawOutput.isInitialized) rawOutput else null
+            input = rawInput!!,
+            output = rawOutput,
         )
 
     /**
@@ -74,85 +74,124 @@ abstract class NodeInstance<T : TaskBase>(
     internal open val scope: ObjectNode
         get() = Scope().apply {
             setTask(taskDescriptor)
-            if (::transformedInput.isInitialized) setInput(rawInput)
-            if (::transformedOutput.isInitialized) setOutput(rawOutput)
+            rawInput?.let { setInput(it) }
+            rawOutput?.let { setOutput(it) }
         }.toJson()
             // recursively merge with parent scope, without overriding existing keys
             .merge(parent?.scope)
 
     /**
-     * Get the next node instance
+     * Get the next node instance after completion
      */
-    internal fun next(): NodeInstance<*>? = when (val flow = node.task.then?.get()) {
-        null, FlowDirectiveEnum.CONTINUE -> `continue`()
-        FlowDirectiveEnum.EXIT -> exit()
-        FlowDirectiveEnum.END -> end()
-        is String -> goTo(flow)
-        else -> error("Unknown .then directive: $flow")
-    }
-
-    private fun exit(): NodeInstance<*>? {
-        // we target the last child and return to parent
-        parent?.let { it.childIndex = it.children.size - 1 }
-        return parent
-    }
-
-    // Up to RootInstance
-    private fun end(): NodeInstance<*>? = when (this is RootInstance) {
-        true -> this
-        else -> parent!!.let {
-            it.childIndex = it.children.size
-            it.end()
+    internal fun then(): NodeInstance<*>? {
+        // calculate transformedOutput
+        // validate schema
+        // export context
+        // set parent raw output
+        onLeave()
+        // reset the task instance
+        reset()
+        // find next
+        return when (val flow = node.task.then?.get()) {
+            null, FlowDirectiveEnum.CONTINUE -> parent?.`continue`()
+            FlowDirectiveEnum.EXIT -> parent?.then()
+            FlowDirectiveEnum.END -> parent?.end()
+            is String -> parent?.goTo(flow)
+            else -> error("Unknown '.then' directive: $flow")
         }
     }
 
     /**
      * Get the next node instance, for the `continue` flow directive
-     * (This function should be overridden for flow nodes)
+     * This implementation is for activities only, must be overridden for flows
      */
-    internal open fun `continue`(): NodeInstance<*>? = parent
+    internal open fun `continue`(): NodeInstance<*>? = parent?.`continue`()
 
+    /**
+     * Go to the sibling with a specific name
+     */
     private fun goTo(name: String): NodeInstance<*> {
         val target = parent?.children?.indexOfFirst { it.node.name == name }
-            ?: error(".then directive `$name` can not be used on root")
-        if (target == -1) error(".then directive `$name` not found")
+            ?: error("'.then' directive can not be used on root")
+        if (target == -1) error("'.then' directive '$name' not found")
         parent!!.childIndex = target
-        return parent!!.children[target]
+        return parent!!.children[target].also { it.rawInput = transformedOutput }
     }
 
-    open fun shouldRun(rawInput: JsonNode): Boolean {
-        // if we already started this node, do not ask again
-        // (this is important as we do not want to override rawInput, startedAt and transformedInput)
-        if (childIndex != null) return false
+    /**
+     * End the workflow right away
+     */
+    private fun end(): RootInstance {
+        // calculate transformedOutput
+        // validate schema
+        // export context
+        // set parent raw output
+        val data = onLeave()
+        // get root instance, and reset all instances on path
+        val root = resetUpToRoot()
+        // set rawOutput for the root instance
+        root.rawOutput = data
+        // return root instance
+        return root
+    }
 
-        this.rawInput = rawInput
+    private fun resetUpToRoot(): RootInstance = when (this) {
+        is RootInstance -> this
+        else -> {
+            reset()
+            parent!!.resetUpToRoot()
+        }
+    }
+
+    /**
+     * Called when the task is entered. RawInput should be set before.
+     *
+     * This method:
+     * - sets the start time,
+     * - validates the task input if a schema is provided,
+     * - transforms the task input using the `input.from` expression if provided.
+     *
+     * @return The transformed input as a JSON node.
+     */
+    internal fun onEnter(): JsonNode {
         this.startedAt = DateTimeDescriptor.from(Instant.now())
-
         // Validate task input if schema is provided
-        node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput, schema) }
-
-        // Transform task input using `input.from` expression if provided
+        node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput!!, schema) }
+        // Transform task input using 'input.from' expression if provided
         this.transformedInput = evalTransformedInput()
 
+        return transformedInput!!
+    }
+
+    /**
+     * Determines if the task should be entered.
+     *
+     * @return `true` if the task should be entered, `false` otherwise.
+     */
+    open fun shouldEnter(): Boolean {
+        // set start time, validate and transform the input, used for the calculation
+        onEnter()
         // Test If task should be executed
         val shouldRun = node.task.`if`
-            ?.let { JQExpression.eval(transformedInput, it, scope) }
-            ?.let { if (it.isBoolean) it.asBoolean() else error("result of .if condition must be a boolean, but is `$it`") }
+            ?.let { JQExpression.eval(transformedInput!!, it, scope) }
+            ?.let { if (it.isBoolean) it.asBoolean() else error("result of '.if' condition must be a boolean, but is '$it'") }
             ?: true
+
+        if (!shouldRun) reset()
 
         return shouldRun
     }
 
-    private fun evalTransformedInput() = JQExpression.eval(rawInput, node.task.input?.from, scope)
+    private fun evalTransformedInput() = JQExpression.eval(rawInput!!, node.task.input?.from, scope)
 
     open suspend fun execute(): JsonNode {
         this.rawOutput = transformedInput
-        return rawOutput
+        return rawOutput!!
     }
 
-    open suspend fun complete() {
+    open fun onLeave(): JsonNode {
         // Transform task output using output.as expression if provided
-        val transformedOutput = JQExpression.eval(rawOutput, node.task.output?.`as`, scope)
+        val transformedOutput = JQExpression.eval(rawOutput!!, node.task.output?.`as`, scope)
 
         // Validate task output if schema is provided
         node.task.output?.schema?.let { schema -> SchemaValidator.validate(transformedOutput, schema) }
@@ -163,12 +202,23 @@ abstract class NodeInstance<T : TaskBase>(
                 // Validate exported context if schema is provided
                 node.task.export.schema?.let { schema -> SchemaValidator.validate(it, schema) }
                 // Set new context
-                if (it is ObjectNode) setContext(it) else error("result of .export.as must be an object, but is `$it`")
+                if (it is ObjectNode) setContext(it) else error("result of '.export.as' must be an object, but is '$it'")
             }
         }
 
-        // set task output
-        this.transformedOutput = transformedOutput
+        // set current flow raw output
+        parent?.rawOutput = transformedOutput
+
+        return transformedOutput
+    }
+
+    open fun reset() {
+        childIndex = -1
+        startedAt = null
+        rawInput = null
+        transformedInput = null
+        rawOutput = null
+        transformedOutput = null
     }
 
     // recursively process setContext up to RootInstance
@@ -180,10 +230,10 @@ abstract class NodeInstance<T : TaskBase>(
      * Set the internal state of this task instance.
      */
     open fun setState(state: NodeState) {
-        state.getIndex()?.let { childIndex = it }
+        childIndex = state.getIndex()
         state.getRawInput()?.let {
             this.rawInput = it
-            if (this !is RootInstance && childIndex == null) this.transformedInput = evalTransformedInput()
+            if (this !is RootInstance && childIndex == -1) this.transformedInput = evalTransformedInput()
         }
         state.getRawOutput()?.let { this.rawOutput = it }
     }
@@ -191,12 +241,12 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Gets the internal state of this task instance.
      */
-    open fun getState(): NodeState? = childIndex?.let {
-        if (it < children.size) NodeState().apply {
-            setIndex(it)
-            setRawInput(rawInput)
-            setStartedAt(startedAt)
-            if (::rawOutput.isInitialized) setRawOutput(rawOutput)
+    open fun getState(): NodeState? = childIndex?.let { index ->
+        if (index < children.size) NodeState().apply {
+            setIndex(index)
+            rawInput?.let { setRawInput(it) }
+            startedAt?.let { setStartedAt(it) }
+            rawOutput?.let { setRawOutput(it) }
         } else null
     }
 

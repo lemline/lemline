@@ -1,13 +1,12 @@
 package com.lemline.swruntime.tasks.activities
 
-import com.fasterxml.jackson.databind.node.JsonNodeFactory
-import com.lemline.swruntime.tasks.Node
 import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
+import com.lemline.swruntime.tasks.NodeTask
 import io.serverlessworkflow.api.types.WaitTask
 
 class WaitInstance(
-    override val node: Node<WaitTask>,
+    override val node: NodeTask<WaitTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<WaitTask>(node, parent) {
     private var startTime: Long? = null
@@ -15,15 +14,15 @@ class WaitInstance(
     private var status: String? = null
 
     override fun setState(state: NodeState) {
-        startTime = scope[START_TIME]?.asLong()
-        endTime = scope[END_TIME]?.asLong()
-        status = scope[STATUS]?.asText()
+//        startTime = scope[START_TIME]?.asLong()
+//        endTime = scope[END_TIME]?.asLong()
+//        status = scope[STATUS]?.asText()
     }
 
     override fun getState() = NodeState().apply {
-        startTime?.let { this[START_TIME] = JsonNodeFactory.instance.numberNode(it) }
-        endTime?.let { this[END_TIME] = JsonNodeFactory.instance.numberNode(it) }
-        status?.let { this[STATUS] = JsonNodeFactory.instance.textNode(it) }
+//        startTime?.let { this[START_TIME] = JsonNodeFactory.instance.numberNode(it) }
+//        endTime?.let { this[END_TIME] = JsonNodeFactory.instance.numberNode(it) }
+//        status?.let { this[STATUS] = JsonNodeFactory.instance.textNode(it) }
     }
 
     companion object {

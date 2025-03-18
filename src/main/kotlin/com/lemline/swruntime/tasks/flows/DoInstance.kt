@@ -1,36 +1,31 @@
 package com.lemline.swruntime.tasks.flows
 
-import com.fasterxml.jackson.databind.node.JsonNodeFactory
-import com.lemline.swruntime.tasks.Node
 import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
+import com.lemline.swruntime.tasks.NodeTask
 import io.serverlessworkflow.api.types.DoTask
 
 open class DoInstance(
-    override val node: Node<DoTask>,
+    override val node: NodeTask<DoTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<DoTask>(node, parent) {
 
     override fun `continue`(): NodeInstance<*>? {
-        childIndex = when (childIndex) {
-            null -> 0
-            else -> childIndex!! + 1
-        }
+        childIndex++
+
         return when (childIndex) {
-            children.size -> parent
-            else -> children[childIndex!!]
+            0 -> children[0].also { it.rawInput = transformedInput }
+            children.size -> then()
+            else -> children[childIndex].also { it.rawInput = rawOutput }
         }
     }
 
     override fun setState(state: NodeState) {
-        childIndex = scope[INDEX]?.asInt()
+        childIndex = state.getIndex()
     }
 
-    override fun getState() = childIndex?.let {
-        NodeState().apply { set(INDEX, JsonNodeFactory.instance.numberNode(it)) }
-    }
-
-    companion object {
-        private const val INDEX = "index"
+    override fun getState() = when (childIndex >= 0) {
+        true -> NodeState().apply { setIndex(childIndex) }
+        else -> null
     }
 }

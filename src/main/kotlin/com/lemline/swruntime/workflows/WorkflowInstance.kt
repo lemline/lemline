@@ -64,28 +64,36 @@ class WorkflowInstance(
     suspend fun run() {
 
         // Get the task at the current position
-        val activity = nodeInstances[position] ?: error("task not found in position $position")
+        val current = nodeInstances[position] ?: error("task not found in position $position")
 
         // Complete the current activity execution (rawOutput should be part of the state)
-        val input = when (isStarting()) {
+        var next = when (isStarting()) {
             true -> {
-                activity.shouldRun(activity.rawInput)
-                activity.transformedInput
+                current.onEnter()
+                current.`continue`()
             }
 
-            false -> {
-                activity.complete()
-                activity.transformedOutput
-            }
+            false -> current.then()
         }
 
         // find and execute the next activity
-        activity.nextActivity(input)?.also {
-            it.rawOutput = it.execute()
+        while (true) {
+            // if null, then the workflow is completed
+            if (next == null) break
+            // Get transformed Input for this node
+            if (next.shouldEnter()) {
+                // if next is an activity, then break
+                if (next.node.isActivity()) break
+            }
+            next = next.`continue`()
         }
+        // next is not null, only if it's an activity
+        position = next?.node?.position ?: NodePosition.root
+
+        next?.let { it.rawOutput = it.execute() }
     }
 
-    private fun isStarting(): Boolean = position == NodePosition.root && rootInstance.childIndex == null
+    private fun isStarting(): Boolean = position == NodePosition.root && rootInstance.childIndex == -1
 
     internal fun isCompleted(): Boolean = position == NodePosition.root && rootInstance.childIndex == 1
 
@@ -132,41 +140,24 @@ class WorkflowInstance(
         return state
     }
 
-    private fun NodeInstance<*>.nextActivity(input: JsonNode): NodeInstance<*>? {
-        var rawInput = input
-        var nextActivity: NodeInstance<*>? = next()
-        while (true) {
-            // if null, then the workflow is completed
-            if (nextActivity == null) break
-            // if taskInstance should not run, then continue
-            if (nextActivity.shouldRun(rawInput)) {
-                rawInput = nextActivity.transformedInput
-                // if next is an activity, then break
-                if (nextActivity.node.isActivity()) break
-            }
-            nextActivity = nextActivity.next()
-        }
-        return nextActivity.also { position = it?.node?.position ?: NodePosition.root }
-    }
-
     @Suppress("UNCHECKED_CAST")
-    private fun Node<*>.createInstance(parent: NodeInstance<*>?): NodeInstance<*> = when (task) {
-        is RootTask -> RootInstance(this as Node<RootTask>)
-        is DoTask -> DoInstance(this as Node<DoTask>, parent!!)
-        is ForTask -> ForInstance(this as Node<ForTask>, parent!!)
-        is TryTask -> TryInstance(this as Node<TryTask>, parent!!)
-        is ForkTask -> ForkInstance(this as Node<ForkTask>, parent!!)
-        is RaiseTask -> RaiseInstance(this as Node<RaiseTask>, parent!!)
-        is SetTask -> SetInstance(this as Node<SetTask>, parent!!)
-        is SwitchTask -> SwitchInstance(this as Node<SwitchTask>, parent!!)
-        is CallAsyncAPI -> CallAsyncApiInstance(this as Node<CallAsyncAPI>, parent!!)
-        is CallGRPC -> CallGrpcInstance(this as Node<CallGRPC>, parent!!)
-        is CallHTTP -> CallHttpInstance(this as Node<CallHTTP>, parent!!)
-        is CallOpenAPI -> CallOpenApiInstance(this as Node<CallOpenAPI>, parent!!)
-        is EmitTask -> EmitInstance(this as Node<EmitTask>, parent!!)
-        is ListenTask -> ListenInstance(this as Node<ListenTask>, parent!!)
-        is RunTask -> RunInstance(this as Node<RunTask>, parent!!)
-        is WaitTask -> WaitInstance(this as Node<WaitTask>, parent!!)
+    private fun NodeTask<*>.createInstance(parent: NodeInstance<*>?): NodeInstance<*> = when (task) {
+        is RootTask -> RootInstance(this as NodeTask<RootTask>)
+        is DoTask -> DoInstance(this as NodeTask<DoTask>, parent!!)
+        is ForTask -> ForInstance(this as NodeTask<ForTask>, parent!!)
+        is TryTask -> TryInstance(this as NodeTask<TryTask>, parent!!)
+        is ForkTask -> ForkInstance(this as NodeTask<ForkTask>, parent!!)
+        is RaiseTask -> RaiseInstance(this as NodeTask<RaiseTask>, parent!!)
+        is SetTask -> SetInstance(this as NodeTask<SetTask>, parent!!)
+        is SwitchTask -> SwitchInstance(this as NodeTask<SwitchTask>, parent!!)
+        is CallAsyncAPI -> CallAsyncApiInstance(this as NodeTask<CallAsyncAPI>, parent!!)
+        is CallGRPC -> CallGrpcInstance(this as NodeTask<CallGRPC>, parent!!)
+        is CallHTTP -> CallHttpInstance(this as NodeTask<CallHTTP>, parent!!)
+        is CallOpenAPI -> CallOpenApiInstance(this as NodeTask<CallOpenAPI>, parent!!)
+        is EmitTask -> EmitInstance(this as NodeTask<EmitTask>, parent!!)
+        is ListenTask -> ListenInstance(this as NodeTask<ListenTask>, parent!!)
+        is RunTask -> RunInstance(this as NodeTask<RunTask>, parent!!)
+        is WaitTask -> WaitInstance(this as NodeTask<WaitTask>, parent!!)
         else -> throw IllegalArgumentException("Unknown task type: ${task.javaClass.name}")
     }
         // apply state for this new node instance

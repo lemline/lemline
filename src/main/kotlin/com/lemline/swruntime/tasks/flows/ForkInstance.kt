@@ -1,26 +1,25 @@
 package com.lemline.swruntime.tasks.flows
 
-import com.fasterxml.jackson.databind.node.JsonNodeFactory
-import com.lemline.swruntime.tasks.Node
 import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
+import com.lemline.swruntime.tasks.NodeTask
 import io.serverlessworkflow.api.types.ForkTask
 
 class ForkInstance(
-    override val node: Node<ForkTask>,
+    override val node: NodeTask<ForkTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<ForkTask>(node, parent) {
     private var branchIndex: Int? = null
     private var taskIndex: Int? = null
 
     override fun setState(state: NodeState) {
-        branchIndex = scope[BRANCH_INDEX]?.asInt()
-        taskIndex = scope[TASK_INDEX]?.asInt()
+//        branchIndex = scope[BRANCH_INDEX]?.asInt()
+//        taskIndex = scope[TASK_INDEX]?.asInt()
     }
 
     override fun getState() = NodeState().apply {
-        branchIndex?.let { this[BRANCH_INDEX] = JsonNodeFactory.instance.numberNode(it) }
-        taskIndex?.let { this[TASK_INDEX] = JsonNodeFactory.instance.numberNode(it) }
+//        branchIndex?.let { this[BRANCH_INDEX] = JsonNodeFactory.instance.numberNode(it) }
+//        taskIndex?.let { this[TASK_INDEX] = JsonNodeFactory.instance.numberNode(it) }
     }
 
     companion object {

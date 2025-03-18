@@ -68,8 +68,8 @@ class WorkflowService(
      * @return The root node of the workflow.
      */
     @Suppress("UNCHECKED_CAST")
-    fun getRootNode(workflow: Workflow): Node<RootTask> =
-        getNode(workflow, NodePosition.root) as Node<RootTask>
+    fun getRootNode(workflow: Workflow): NodeTask<RootTask> =
+        getNode(workflow, NodePosition.root) as NodeTask<RootTask>
 
     /**
      * Retrieves the task node at the specified position in the workflow.
@@ -79,7 +79,7 @@ class WorkflowService(
      * @return The task node at the specified position.
      * @throws IllegalStateException if the task node is not found at the specified position.
      */
-    internal fun getNode(workflow: Workflow, position: NodePosition): Node<*> =
+    internal fun getNode(workflow: Workflow, position: NodePosition): NodeTask<*> =
         nodesCache[workflow.index]?.get(position.jsonPointer)
             ?: error("Task node not found at position $position for workflow ${workflow.document.name} (version ${workflow.document.version})")
 
@@ -111,7 +111,7 @@ class WorkflowService(
      */
     internal fun Workflow.parseNodes() {
         // recursively creates Nodes
-        val root = Node(
+        val root = NodeTask(
             position = NodePosition.root,
             task = RootTask(`do`).also {
                 it.output = output
@@ -122,8 +122,8 @@ class WorkflowService(
         )
 
         // Initialize cache
-        nodesCache[index] = mutableMapOf<JsonPointer, Node<*>>().apply {
-            fun processNode(node: Node<*>) {
+        nodesCache[index] = mutableMapOf<JsonPointer, NodeTask<*>>().apply {
+            fun processNode(node: NodeTask<*>) {
                 put(node.position.jsonPointer, node)
                 node.children?.forEach { processNode(it) }
             }
@@ -137,7 +137,7 @@ class WorkflowService(
         private val logger = LoggerFactory.getLogger(this::class.java)
         internal val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
         internal val secretsCache = ConcurrentHashMap<WorkflowIndex, Map<String, JsonNode>>()
-        internal val nodesCache = ConcurrentHashMap<WorkflowIndex, Map<JsonPointer, Node<*>>>()
+        internal val nodesCache = ConcurrentHashMap<WorkflowIndex, Map<JsonPointer, NodeTask<*>>>()
     }
 }
 

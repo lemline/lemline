@@ -16,7 +16,14 @@ do:
             with:
               method: get
               endpoint: https://petstore.swagger.io/v2/pet/{petId}
-        - buyPet:
+        - buyPet0:
+            call: http
+            with:
+              method: put
+              endpoint: https://petstore.swagger.io/v2/pet/{petId}
+              body: '${ . + { status: "sold" } }'
+            then: end
+        - buyPet1:
             call: http
             with:
               method: put

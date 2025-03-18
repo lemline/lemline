@@ -5,14 +5,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.swruntime.expressions.scopes.RuntimeDescriptor
 import com.lemline.swruntime.expressions.scopes.Scope
 import com.lemline.swruntime.expressions.scopes.WorkflowDescriptor
-import com.lemline.swruntime.tasks.Node
 import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
+import com.lemline.swruntime.tasks.NodeTask
 import com.lemline.swruntime.tasks.RootTask
 import io.serverlessworkflow.impl.json.JsonUtils
 
 class RootInstance(
-    override val node: Node<RootTask>,
+    override val node: NodeTask<RootTask>,
 ) : NodeInstance<RootTask>(node, null) {
 
     lateinit var context: ObjectNode
@@ -48,12 +48,14 @@ class RootInstance(
     }
 
     override fun `continue`(): NodeInstance<*>? {
-        childIndex = when (childIndex) {
-            null -> 0
-            else -> 1
-        }
+        childIndex++
+
         return when (childIndex) {
-            0 -> children[0]
+            0 -> children[0].also {
+                it.rawInput = transformedInput
+                it.onEnter()
+            }
+
             else -> null
         }
     }
