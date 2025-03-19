@@ -6,7 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
-class ThenTest {
+class FlowDirectiveTest {
 
     @Test
     fun `test without then`() = runTest {

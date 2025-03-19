@@ -6,7 +6,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
-class FromAsTest {
+class DataFlowTest {
 
     @Test
     fun `test workflow input from directive`() = runTest {

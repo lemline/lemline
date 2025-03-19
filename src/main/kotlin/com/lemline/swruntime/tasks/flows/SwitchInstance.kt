@@ -1,29 +1,33 @@
 package com.lemline.swruntime.tasks.flows
 
+import com.lemline.swruntime.expressions.JQExpression
 import com.lemline.swruntime.tasks.NodeInstance
-import com.lemline.swruntime.tasks.NodeState
 import com.lemline.swruntime.tasks.NodeTask
+import io.serverlessworkflow.api.types.FlowDirective
+import io.serverlessworkflow.api.types.SwitchItem
 import io.serverlessworkflow.api.types.SwitchTask
 
 class SwitchInstance(
     override val node: NodeTask<SwitchTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<SwitchTask>(node, parent) {
-    private var selectedCase: String? = null
-    private var index: Int? = null
 
-    override fun setState(state: NodeState) {
-//        selectedCase = scope[SELECTED_CASE]?.asText()
-//        index = scope[INDEX]?.asInt()
+    private var then: FlowDirective? = null
+
+    override suspend fun execute() {
+        // evaluate the different cases
+        for (item: SwitchItem in node.task.switch) {
+            if ((item.switchCase.`when` == null) || evalCase(item.switchCase.`when`, item.name)) {
+                then = item.switchCase.then
+                break
+            }
+        }
     }
 
-    override fun getState() = NodeState().apply {
-//        selectedCase?.let { this[SELECTED_CASE] = JsonNodeFactory.instance.textNode(it) }
-//        index?.let { this[INDEX] = JsonNodeFactory.instance.numberNode(it) }
-    }
+    override fun `continue`() = then(then?.get())
 
-    companion object {
-//        private const val SELECTED_CASE = "selected.case"
-//        private const val INDEX = "childIndex"
+    private fun evalCase(`when`: String, name: String): Boolean {
+        val out = JQExpression.eval(transformedInput!!, `when`, scope)
+        return if (out.isBoolean) out.asBoolean() else error("in the '$name' case, '.when' condition should be a boolean, got $out")
     }
 } 

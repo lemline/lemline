@@ -93,7 +93,21 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Get the next node instance after completion
      */
-    internal fun then(): NodeInstance<*>? {
+    internal fun then(): NodeInstance<*>? = then(node.task.then?.get())
+
+    /**
+     * Get the next node instance based on the provided flow directive.
+     *
+     * @param flow The flow directive which can be one of the following:
+     * - `null` or `FlowDirectiveEnum.CONTINUE`: Continue to the next sibling.
+     * - `FlowDirectiveEnum.EXIT`: Exit the current flow and continue with the parent flow.
+     * - `FlowDirectiveEnum.END`: End the workflow.
+     * - `String`: Go to the sibling with the specified name.
+     * - Any other value will result in an error.
+     *
+     * @return The next node instance or `null` if there is no next node.
+     */
+    internal fun then(flow: Any?): NodeInstance<*>? {
         // calculate transformedOutput
         // validate schema
         // export context
@@ -102,7 +116,7 @@ abstract class NodeInstance<T : TaskBase>(
         // reset the task instance
         reset()
         // find next
-        return when (val flow = node.task.then?.get()) {
+        return when (flow) {
             null, FlowDirectiveEnum.CONTINUE -> parent?.`continue`()
             FlowDirectiveEnum.EXIT -> parent?.then()
             FlowDirectiveEnum.END -> parent?.end()
@@ -122,7 +136,6 @@ abstract class NodeInstance<T : TaskBase>(
      */
     private fun goTo(name: String): NodeInstance<*> {
         val target = children.indexOfFirst { it.node.name == name }
-            ?: error("'.then' directive can not be used on root")
         if (target == -1) error("'.then' directive '$name' not found")
         childIndex = target
         return children[target].also { it.rawInput = rawOutput }
@@ -271,5 +284,5 @@ abstract class NodeInstance<T : TaskBase>(
             fieldNames().forEachRemaining { key -> it.add(key) }
         }
 
-    private fun error(message: String): Nothing = throw IllegalArgumentException("Task ${node.reference}: $message")
+    protected fun error(message: String): Nothing = throw IllegalArgumentException("Task ${node.reference}: $message")
 }
