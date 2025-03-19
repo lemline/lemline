@@ -41,6 +41,7 @@ dependencies {
     testImplementation("io.kotest:kotest-framework-api:${kotestVersion}")
     // testImplementation("io.kotest:kotest-property:${kotestVersion}")
     testImplementation("io.mockk:mockk:1.13.9")
+    testImplementation(kotlin("test"))
 }
 
 group = "com.lemline"

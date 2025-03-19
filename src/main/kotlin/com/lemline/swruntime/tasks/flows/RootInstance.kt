@@ -51,11 +51,7 @@ class RootInstance(
         childIndex++
 
         return when (childIndex) {
-            0 -> children[0].also {
-                it.rawInput = transformedInput
-                it.onEnter()
-            }
-
+            0 -> children[0].also { it.rawInput = transformedInput }
             else -> null
         }
     }

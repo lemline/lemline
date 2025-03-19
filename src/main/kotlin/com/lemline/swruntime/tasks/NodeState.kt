@@ -15,9 +15,8 @@ import java.time.Instant
 value class NodeState(
     private val map: MutableMap<String, JsonNode> = mutableMapOf()
 ) {
-
-    fun set(key: String, any: Any) {
-        map[key] = JsonUtils.fromValue(any)
+    fun setVariables(scope: ObjectNode) {
+        map[VARIABLES] = scope
     }
 
     fun setIndex(index: Int) {
@@ -44,7 +43,7 @@ value class NodeState(
         map[STARTED_AT] = TextNode(startedAt.iso8601())
     }
 
-    fun <T : Any> get(key: String, klass: Class<T>): T? = JsonUtils.convertValue(map[key], klass)
+    fun getVariables(): ObjectNode = (map[VARIABLES] as ObjectNode?) ?: JsonUtils.`object`()
     fun getIndex(): Int = map[INDEX]?.asInt() ?: -1
     fun getRawInput(): JsonNode? = map[RAW_INPUT]
     fun getRawOutput(): JsonNode? = map[RAW_OUTPUT]
@@ -57,6 +56,7 @@ value class NodeState(
      */
     companion object {
         const val INDEX = "index"
+        const val VARIABLES = "variables"
         const val RAW_INPUT = "rawInput"
         const val RAW_OUTPUT = "rawOutput"
         const val CONTEXT = "context"

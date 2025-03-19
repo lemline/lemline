@@ -62,7 +62,7 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Additional properties for this scope (added by a child Set task)
      */
-    internal val customScope: ObjectNode = JsonUtils.`object`()
+    internal var customScope: ObjectNode = JsonUtils.`object`()
 
     private val taskDescriptor
         get() = TaskDescriptor(
@@ -78,14 +78,16 @@ abstract class NodeInstance<T : TaskBase>(
      * This scope is used during expression evaluation
      */
     internal open val scope: ObjectNode
-        get() = Scope().apply {
-            setTask(taskDescriptor)
-            rawInput?.let { setInput(it) }
-            rawOutput?.let { setOutput(it) }
-        }.toJson()
-            // merge with custom scope
-            .merge(customScope)
-            // recursively merge with parent scope, without overriding existing keys
+        get() = customScope
+            // merge custom scope with current
+            .merge(
+                Scope().apply {
+                    setTask(taskDescriptor)
+                    rawInput?.let { setInput(it) }
+                    rawOutput?.let { setOutput(it) }
+                }.toJson()
+            )
+            // recursively merge with parent scope
             .merge(parent?.scope)
 
     /**
@@ -119,35 +121,22 @@ abstract class NodeInstance<T : TaskBase>(
      * Go to the sibling with a specific name
      */
     private fun goTo(name: String): NodeInstance<*> {
-        val target = parent?.children?.indexOfFirst { it.node.name == name }
+        val target = children.indexOfFirst { it.node.name == name }
             ?: error("'.then' directive can not be used on root")
         if (target == -1) error("'.then' directive '$name' not found")
-        parent!!.childIndex = target
-        return parent!!.children[target].also { it.rawInput = transformedOutput }
+        childIndex = target
+        return children[target].also { it.rawInput = rawOutput }
     }
 
     /**
      * End the workflow right away
      */
-    private fun end(): RootInstance {
-        // calculate transformedOutput
-        // validate schema
-        // export context
-        // set parent raw output
-        val data = onLeave()
-        // get root instance, and reset all instances on path
-        val root = resetUpToRoot()
-        // set rawOutput for the root instance
-        root.rawOutput = data
-        // return root instance
-        return root
-    }
-
-    private fun resetUpToRoot(): RootInstance = when (this) {
-        is RootInstance -> this
+    private fun end(): RootInstance? = when (this) {
+        is RootInstance -> null
         else -> {
+            onLeave()
             reset()
-            parent!!.resetUpToRoot()
+            parent!!.end()
         }
     }
 
@@ -167,6 +156,12 @@ abstract class NodeInstance<T : TaskBase>(
         node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput!!, schema) }
         // Transform task input using 'input.from' expression if provided
         this.transformedInput = evalTransformedInput()
+        // Set default behavior
+        this.rawOutput = transformedInput
+
+        println("Enter task = ${node.name} (${node.task::class.simpleName})")
+        println("      rawInput         = $rawInput")
+        println("      transformedInput = $transformedInput")
 
         return transformedInput!!
     }
@@ -198,14 +193,18 @@ abstract class NodeInstance<T : TaskBase>(
 
     open fun onLeave(): JsonNode {
         // Transform task output using output.as expression if provided
-        val transformedOutput = JQExpression.eval(rawOutput!!, node.task.output?.`as`, scope)
+        transformedOutput = JQExpression.eval(rawOutput!!, node.task.output?.`as`, scope)
+
+        println("Leave task = ${node.name} (${node.task::class.simpleName})")
+        println("      rawOutput         = $rawOutput")
+        println("      transformedOutput = $transformedOutput")
 
         // Validate task output if schema is provided
-        node.task.output?.schema?.let { schema -> SchemaValidator.validate(transformedOutput, schema) }
+        node.task.output?.schema?.let { schema -> SchemaValidator.validate(transformedOutput!!, schema) }
 
         // Update workflow context using export.as expression if provided
         node.task.export?.`as`?.let { exportAs ->
-            JQExpression.eval(transformedOutput, exportAs, scope).let {
+            JQExpression.eval(transformedOutput!!, exportAs, scope).let {
                 // Validate exported context if schema is provided
                 node.task.export.schema?.let { schema -> SchemaValidator.validate(it, schema) }
                 // Set new context
@@ -216,11 +215,12 @@ abstract class NodeInstance<T : TaskBase>(
         // set current flow raw output
         parent?.rawOutput = transformedOutput
 
-        return transformedOutput
+        return transformedOutput!!
     }
 
     open fun reset() {
         childIndex = -1
+        customScope = JsonUtils.`object`()
         startedAt = null
         rawInput = null
         transformedInput = null
@@ -238,6 +238,7 @@ abstract class NodeInstance<T : TaskBase>(
      */
     open fun setState(state: NodeState) {
         childIndex = state.getIndex()
+        customScope = state.getVariables()
         state.getRawInput()?.let {
             this.rawInput = it
             if (this !is RootInstance && childIndex == -1) this.transformedInput = evalTransformedInput()
@@ -248,9 +249,10 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Gets the internal state of this task instance.
      */
-    open fun getState(): NodeState? = childIndex?.let { index ->
+    open fun getState(): NodeState? = childIndex.let { index ->
         if (index < children.size) NodeState().apply {
             setIndex(index)
+            if (!customScope.isEmpty) setVariables(customScope)
             rawInput?.let { setRawInput(it) }
             startedAt?.let { setStartedAt(it) }
             rawOutput?.let { setRawOutput(it) }

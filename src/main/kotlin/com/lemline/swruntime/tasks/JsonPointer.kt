@@ -28,7 +28,6 @@ value class JsonPointer(private val path: String) {
     )
 
     companion object {
-        val root = JsonPointer("/")
-        val doRoot = JsonPointer("/do")
+        val root = JsonPointer("")
     }
 }

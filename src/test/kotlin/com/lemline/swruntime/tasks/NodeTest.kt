@@ -44,11 +44,15 @@ class NodeTest {
             positions.forEach { (pointer, taskNode) ->
                 println("$pointer => ${taskNode.task.javaClass.simpleName}")
                 val jsonNode = findNodeByPointer(workflowJson, pointer.toString())
+                println("jsonNode = $workflowJson, pointer = $pointer")
                 assertNotNull(jsonNode, "Position $pointer not found in workflow JSON in file ${file.name}")
+                println(println(workflowJson.at("")))
                 val inFile = "In file ${file.name}"
                 println("$pointer => $jsonNode")
                 when (taskNode.task) {
-                    is RootTask -> assertTrue(jsonNode!!.get("document").isObject, inFile)
+                    is RootTask ->
+                        assertTrue(jsonNode!!.get("document").isObject, inFile)
+
                     is CallOpenAPI -> assertEquals(jsonNode!!.get("call").textValue(), "openapi", inFile)
                     is CallHTTP -> assertEquals(jsonNode!!.get("call").textValue(), "http", inFile)
                     is CallGRPC -> assertEquals(jsonNode!!.get("call").textValue(), "grpc", inFile)

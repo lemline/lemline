@@ -26,4 +26,6 @@ class SetInstance(
         // add additional property to the parent scope
         variables.forEach { parent.customScope.set<JsonNode>(it.key, it.value) }
     }
+
+    override fun `continue`() = then()
 } 
