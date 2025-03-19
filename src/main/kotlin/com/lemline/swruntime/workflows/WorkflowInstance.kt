@@ -62,17 +62,16 @@ class WorkflowInstance(
     internal lateinit var rootInstance: RootInstance
 
     suspend fun run() {
-
         // Get the task at the current position
         val current = nodeInstances[position] ?: error("task not found in position $position")
 
-        // Complete the current activity execution (rawOutput should be part of the state)
         var next = when (isStarting()) {
+            // enter root and go to `do`
             true -> {
                 current.onEnter()
                 current.`continue`()
             }
-
+            // Complete the current activity execution (rawOutput should be part of the state)
             false -> current.then()
         }
 
@@ -84,13 +83,24 @@ class WorkflowInstance(
             if (next.shouldEnter()) {
                 // if next is an activity, then break
                 if (next.node.isActivity()) break
+                // execute current node
+                next.execute()
             }
             next = next.`continue`()
         }
-        // next is not null, only if it's an activity
-        position = next?.node?.position ?: NodePosition.root
 
-        next?.let { it.rawOutput = it.execute() }
+        when (next) {
+            // complete the workflow
+            null -> {
+                position = NodePosition.root
+                rootInstance.onLeave()
+            }
+            // execute the activity
+            else -> {
+                position = next.node.position
+                next.execute()
+            }
+        }
     }
 
     private fun isStarting(): Boolean = position == NodePosition.root && rootInstance.childIndex == -1

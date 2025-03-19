@@ -11,6 +11,9 @@ do:
         endpoint: https://petstore.swagger.io/v2/pet/{petId}
   - nested:
       do:
+        - init:
+            set:
+              startEvent: ${ $workflow.input[0] }
         - getPet:
             call: http
             with:
@@ -22,7 +25,6 @@ do:
               method: put
               endpoint: https://petstore.swagger.io/v2/pet/{petId}
               body: '${ . + { status: "sold" } }'
-            then: end
         - buyPet1:
             call: http
             with:

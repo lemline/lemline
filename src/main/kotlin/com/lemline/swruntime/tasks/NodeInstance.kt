@@ -10,6 +10,7 @@ import com.lemline.swruntime.tasks.flows.RootInstance
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import io.serverlessworkflow.impl.json.JsonUtils
 import java.time.Instant
 
 /**
@@ -58,6 +59,11 @@ abstract class NodeInstance<T : TaskBase>(
      */
     internal var transformedOutput: JsonNode? = null
 
+    /**
+     * Additional properties for this scope (added by a child Set task)
+     */
+    internal val customScope: ObjectNode = JsonUtils.`object`()
+
     private val taskDescriptor
         get() = TaskDescriptor(
             name = node.name,
@@ -77,6 +83,8 @@ abstract class NodeInstance<T : TaskBase>(
             rawInput?.let { setInput(it) }
             rawOutput?.let { setOutput(it) }
         }.toJson()
+            // merge with custom scope
+            .merge(customScope)
             // recursively merge with parent scope, without overriding existing keys
             .merge(parent?.scope)
 
@@ -184,9 +192,8 @@ abstract class NodeInstance<T : TaskBase>(
 
     private fun evalTransformedInput() = JQExpression.eval(rawInput!!, node.task.input?.from, scope)
 
-    open suspend fun execute(): JsonNode {
+    open suspend fun execute() {
         this.rawOutput = transformedInput
-        return rawOutput!!
     }
 
     open fun onLeave(): JsonNode {
@@ -251,7 +258,7 @@ abstract class NodeInstance<T : TaskBase>(
     }
 
     // merge an ObjectNode with another, without overriding existing keys
-    private infix fun ObjectNode.merge(other: ObjectNode?): ObjectNode {
+    internal infix fun ObjectNode.merge(other: ObjectNode?): ObjectNode {
         other?.fields()?.forEach { (key, value) -> if (key !in keys) set<JsonNode>(key, value) }
         return this
     }

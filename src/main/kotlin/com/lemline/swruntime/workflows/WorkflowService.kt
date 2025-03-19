@@ -3,11 +3,13 @@ package com.lemline.swruntime.workflows
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
 import com.lemline.swruntime.system.System
-import com.lemline.swruntime.tasks.*
-import com.lemline.swruntime.tasks.Token.*
+import com.lemline.swruntime.tasks.JsonPointer
+import com.lemline.swruntime.tasks.NodePosition
+import com.lemline.swruntime.tasks.NodeTask
+import com.lemline.swruntime.tasks.RootTask
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
-import io.serverlessworkflow.api.types.*
+import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.json.JsonUtils
 import jakarta.enterprise.context.ApplicationScoped
 import org.slf4j.LoggerFactory
@@ -107,7 +109,6 @@ class WorkflowService(
      * This method processes the task nodes starting from the current node,
      * and stores them in the `nodesCache` for the given workflow.
      *
-     * @param workflow The workflow whose task nodes are to be cached.
      */
     internal fun Workflow.parseNodes() {
         // recursively creates Nodes
