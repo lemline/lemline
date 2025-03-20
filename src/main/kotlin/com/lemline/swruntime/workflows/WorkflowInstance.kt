@@ -26,7 +26,7 @@ class WorkflowInstance(
     var position: NodePosition
 ) {
     @Inject
-    internal lateinit var workflowService: WorkflowService
+    internal lateinit var workflowParser: WorkflowParser
 
     /**
      * Instance ID
@@ -55,7 +55,7 @@ class WorkflowInstance(
     }
 
     // Retrieves the workflow by its name and version
-    private val workflow by lazy { workflowService.getWorkflow(name, version) }
+    private val workflow by lazy { workflowParser.getWorkflow(name, version) }
 
     internal val nodeInstances: Map<NodePosition, NodeInstance<*>> by lazy { initInstance() }
 
@@ -71,7 +71,7 @@ class WorkflowInstance(
                 current.onEnter()
                 current.`continue`()
             }
-            // Complete the current activity execution (rawOutput should be part of the state)
+            // complete the current activity execution (rawOutput should be part of the state)
             false -> current.then()
         }
 
@@ -79,7 +79,7 @@ class WorkflowInstance(
         while (true) {
             // if null, then the workflow is completed
             if (next == null) break
-            // Get transformed Input for this node
+            // get transformed Input for this node
             if (next.shouldEnter()) {
                 // if next is an activity, then break
                 if (next.node.isActivity()) break
@@ -116,10 +116,10 @@ class WorkflowInstance(
      * @return A map of task positions to their task instances.
      */
     private fun initInstance(): Map<NodePosition, NodeInstance<*>> {
-        val rootNode = workflowService.getRootNode(workflow)
+        val rootNode = workflowParser.getRootNode(workflow)
         rootInstance = rootNode.createInstance(null) as RootInstance
         // reinit for this execution
-        rootInstance.secrets = workflowService.getSecrets(workflow)
+        rootInstance.secrets = workflowParser.getSecrets(workflow)
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
             id = id,

@@ -5,7 +5,7 @@ import com.lemline.swruntime.messaging.WorkflowExecutionMessage
 import com.lemline.swruntime.models.WorkflowDefinition
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
 import com.lemline.swruntime.workflows.WorkflowInstance
-import com.lemline.swruntime.workflows.WorkflowService
+import com.lemline.swruntime.workflows.WorkflowParser
 import io.mockk.every
 import io.mockk.mockk
 import io.serverlessworkflow.api.WorkflowFormat
@@ -36,7 +36,7 @@ internal fun getWorkflowInstance(doYaml: String, input: JsonNode): WorkflowInsta
     }
 
     // apply it to the WorkflowService instance
-    val mockedService = WorkflowService(mockedRepository)
+    val mockedService = WorkflowParser(mockedRepository)
 
     val msg = WorkflowExecutionMessage.create(workflowName, workflowVersion, "testId", input)
 
@@ -45,5 +45,5 @@ internal fun getWorkflowInstance(doYaml: String, input: JsonNode): WorkflowInsta
         version = msg.version,
         state = msg.state.mapKeys { state -> state.key.toPosition() }.toMutableMap(),
         position = msg.position.toPosition()
-    ).apply { workflowService = mockedService }
+    ).apply { workflowParser = mockedService }
 }

@@ -13,7 +13,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
-class WorkflowServiceTest {
+class WorkflowParserTest {
     // get a random workflow
     private val workflowPath = "/examples/do-single.yaml"
     private val workflow = loadWorkflowFromYaml(workflowPath)
@@ -36,7 +36,7 @@ class WorkflowServiceTest {
     }
 
     // apply it to the WorkflowService instance
-    private val workflowService = WorkflowService(mockedRepository)
+    private val workflowParser = WorkflowParser(mockedRepository)
 
     @BeforeEach
     fun setUp() {
@@ -50,8 +50,8 @@ class WorkflowServiceTest {
     @Test
     fun `test getWorkflow uses cache`() {
         // Call the method twice to ensure cache usage
-        workflowService.getWorkflow(workflowName, workflowVersion)
-        workflowService.getWorkflow(workflowName, workflowVersion)
+        workflowParser.getWorkflow(workflowName, workflowVersion)
+        workflowParser.getWorkflow(workflowName, workflowVersion)
 
         // Verify that the repository method was only called once
         verify(exactly = 1) { mockedRepository.findByNameAndVersion(workflowName, workflowVersion) }
@@ -59,7 +59,7 @@ class WorkflowServiceTest {
 
     @Test
     fun `test getWorkflow returns workflow when found`() {
-        val result = workflowService.getWorkflow(workflowName, workflowVersion)
+        val result = workflowParser.getWorkflow(workflowName, workflowVersion)
 
         assertEquals(workflow.document.name, result.document.name)
         assertEquals(workflow.document.version, result.document.version)
@@ -73,7 +73,7 @@ class WorkflowServiceTest {
             .returns(null)
 
         val exception = assertThrows<IllegalStateException> {
-            workflowService.getWorkflow(nonExistentWorkflowName, workflowVersion)
+            workflowParser.getWorkflow(nonExistentWorkflowName, workflowVersion)
         }
 
         assertEquals("Workflow $nonExistentWorkflowName:$workflowVersion not found", exception.message)
@@ -88,7 +88,7 @@ class WorkflowServiceTest {
 
         // When
         System.setEnv(secretName, jsonValue)
-        val result = workflowService.getSecrets(workflowWithMockedUse)
+        val result = workflowParser.getSecrets(workflowWithMockedUse)
 
         // Then
         assertEquals("value", result[secretName]?.get("key")?.asText())
@@ -103,7 +103,7 @@ class WorkflowServiceTest {
 
         // When
         System.setEnv(secretName, plainValue)
-        val result = workflowService.getSecrets(workflowWithMockedUse)
+        val result = workflowParser.getSecrets(workflowWithMockedUse)
 
         // Then
         assertEquals(plainValue, result[secretName]?.asText())
@@ -117,7 +117,7 @@ class WorkflowServiceTest {
 
         // When/Then
         val exception = assertThrows<IllegalStateException> {
-            workflowService.getSecrets(workflowWithMockedUse)
+            workflowParser.getSecrets(workflowWithMockedUse)
         }
         assertEquals("Required secret 'missing-secret' not found in environment variables", exception.message)
     }
@@ -128,7 +128,7 @@ class WorkflowServiceTest {
         every { mockedUse.secrets } returns null
 
         // When
-        val result = workflowService.getSecrets(workflowWithMockedUse)
+        val result = workflowParser.getSecrets(workflowWithMockedUse)
 
         // Then
         assertEquals(0, result.size)
@@ -147,9 +147,9 @@ class WorkflowServiceTest {
     }
 
     private fun clearCache(prop: String) {
-        WorkflowService::class.java.getDeclaredField(prop).apply {
+        WorkflowParser::class.java.getDeclaredField(prop).apply {
             isAccessible = true
-            (get(workflowService) as MutableMap<*, *>).clear()
+            (get(workflowParser) as MutableMap<*, *>).clear()
         }
     }
 

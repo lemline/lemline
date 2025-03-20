@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
-import com.lemline.swruntime.workflows.WorkflowService
+import com.lemline.swruntime.workflows.WorkflowParser
 import com.lemline.swruntime.workflows.index
 import io.mockk.mockk
 import io.serverlessworkflow.api.types.*
@@ -16,7 +16,7 @@ import java.io.File
 class NodeTest {
     // WorkflowService instance
     private val mockedRepository = mockk<WorkflowDefinitionRepository>()
-    private val workflowService = WorkflowService(mockedRepository)
+    private val workflowParser = WorkflowParser(mockedRepository)
     private val objectMapper = ObjectMapper(YAMLFactory())
 
     @Test
@@ -31,10 +31,10 @@ class NodeTest {
 
             // Load workflow from YAML
             val definition = load("/examples/${file.name}")
-            val workflow = workflowService.parseWorkflow(definition)
+            val workflow = workflowParser.parseWorkflow(definition)
 
             // get position<>TaskNode map
-            val positions = WorkflowService.nodesCache[workflow.index]!!
+            val positions = WorkflowParser.nodesCache[workflow.index]!!
 
             // Convert workflow to JSON for comparison
             val workflowJson = objectMapper.valueToTree<ObjectNode>(workflow)

@@ -9,7 +9,7 @@ import kotlin.test.assertEquals
 class SwitchTest {
 
     @Test
-    fun `test switch named`() = runTest {
+    fun `test switch with name`() = runTest {
 
         val doYaml = """
            do:
@@ -77,7 +77,7 @@ class SwitchTest {
     }
 
     @Test
-    fun `test switch enum`() = runTest {
+    fun `test switch with FlowDirectiveEnum`() = runTest {
 
         val doYaml = """
            do:
@@ -140,6 +140,51 @@ class SwitchTest {
         // Assert the output matches our expected transformed value
         assertEquals(
             JsonUtils.fromValue("none"),  // expected
+            none.rootInstance.transformedOutput  // actual
+        )
+    }
+
+    @Test
+    fun `test switch without matching should continue`() = runTest {
+
+        val doYaml = """
+           do:
+            - test:
+                switch:
+                  - high:
+                      when: @{ . == "high" }
+                      then: continue
+                  - low:
+                      when: @{ . == "low" }
+                      then: exit
+            - first:
+                output:
+                  as: @{ . + "1" }
+                set:
+                  input: @{ . }
+                then: exit
+            - second:
+                output:
+                  as: @{ . + "2" }
+                set:
+                  value: @{ . }
+                then: exit
+            - third:
+                output:
+                  as: @{ . + "3" }
+                set:
+                  value: @{ . }
+                then: exit
+        """
+
+        val none = getWorkflowInstance(doYaml, JsonUtils.fromValue("none"))
+
+        // run (one shot)
+        none.run()
+
+        // Assert the output matches our expected transformed value
+        assertEquals(
+            JsonUtils.fromValue("none1"),  // expected
             none.rootInstance.transformedOutput  // actual
         )
     }

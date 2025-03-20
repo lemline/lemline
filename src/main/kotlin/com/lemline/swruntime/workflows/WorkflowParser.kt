@@ -18,7 +18,7 @@ import java.util.concurrent.ConcurrentHashMap
 typealias WorkflowIndex = Pair<String, String>
 
 @ApplicationScoped
-class WorkflowService(
+class WorkflowParser(
     private val workflowDefinitionRepository: WorkflowDefinitionRepository,
 ) {
     /**

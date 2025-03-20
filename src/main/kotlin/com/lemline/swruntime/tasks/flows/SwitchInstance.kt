@@ -28,6 +28,6 @@ class SwitchInstance(
 
     private fun evalCase(`when`: String, name: String): Boolean {
         val out = JQExpression.eval(transformedInput!!, `when`, scope)
-        return if (out.isBoolean) out.asBoolean() else error("in the '$name' case, '.when' condition should be a boolean, got $out")
+        return if (out.isBoolean) out.asBoolean() else error("in the '$name' case, '.when' condition must be a boolean, but is $out")
     }
 } 
