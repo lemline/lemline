@@ -13,7 +13,10 @@ class ForInstance(
 ) : NodeInstance<ForTask>(node, parent) {
 
     // The collection to enumerate.
-    private val forIn by lazy { evalForIn(node.task.`for`.`in`) }
+    private var forIn: List<JsonNode> = listOf()
+
+    // The index into the enumeration
+    private var forIndex: Int = -1
 
     // The name of the variable used to store the current item being enumerated.
     private val forEach = node.task.`for`.each ?: "item"
@@ -21,10 +24,16 @@ class ForInstance(
     // The name of the variable used to store the index of the current item being enumerated.
     private val forAt = node.task.`for`.at ?: "index"
 
-    private var forIndex: Int = -1
+    override fun init() {
+        forIndex = -1
+        forIn = listOf()
+    }
 
     override suspend fun execute() {
+        // useless, but indicate we entered the node
         childIndex++
+        // evaluate forIn with current transformed input
+        forIn = evalForIn(node.task.`for`.`in`)
     }
 
     override fun `continue`(): NodeInstance<*>? {
@@ -40,7 +49,7 @@ class ForInstance(
         // test the while directive
         node.task.`while`?.let { if (!evalWhile(it)) return then() }
 
-        // Do
+        // Go to Do
         return children[childIndex].also { it.rawInput = rawOutput }
     }
 

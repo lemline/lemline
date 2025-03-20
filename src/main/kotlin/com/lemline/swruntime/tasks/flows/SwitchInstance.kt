@@ -12,7 +12,12 @@ class SwitchInstance(
     override val parent: NodeInstance<*>,
 ) : NodeInstance<SwitchTask>(node, parent) {
 
+    // the calculated then directive
     private var then: FlowDirective? = null
+
+    override fun init() {
+        then = null
+    }
 
     override suspend fun execute() {
         // evaluate the different cases

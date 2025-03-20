@@ -64,6 +64,26 @@ abstract class NodeInstance<T : TaskBase>(
      */
     internal var customScope: ObjectNode = JsonUtils.`object`()
 
+    /**
+     * This should be overridden to reset the state of Node Instance implementation
+     */
+    internal open fun init() {}
+
+    /**
+     * Node Instance needs to be reset when exited,
+     * as they can potentially be re-executed again (using a named then directive)
+     */
+    private fun reset() {
+        init()
+        childIndex = -1
+        customScope = JsonUtils.`object`()
+        startedAt = null
+        rawInput = null
+        transformedInput = null
+        rawOutput = null
+        transformedOutput = null
+    }
+
     private val taskDescriptor
         get() = TaskDescriptor(
             name = node.name,
@@ -75,7 +95,7 @@ abstract class NodeInstance<T : TaskBase>(
         )
 
     /**
-     * This scope is used during expression evaluation
+     * Scope used during expression evaluation
      */
     internal open val scope: ObjectNode
         get() = customScope
@@ -235,16 +255,6 @@ abstract class NodeInstance<T : TaskBase>(
         parent?.rawOutput = transformedOutput
 
         return transformedOutput!!
-    }
-
-    open fun reset() {
-        childIndex = -1
-        customScope = JsonUtils.`object`()
-        startedAt = null
-        rawInput = null
-        transformedInput = null
-        rawOutput = null
-        transformedOutput = null
     }
 
     // recursively process setContext up to RootInstance

@@ -54,7 +54,35 @@ class ForTest {
     }
 
     @Test
-    fun `test for each`() = runTest {
+    fun `test for with while`() = runTest {
+
+        val doYaml = """
+           do:
+             - sumAll:
+                 for:
+                   in: @{ .input }
+                 while: @{ @index < 2 }
+                 do:
+                   - accumulate:
+                       set:
+                         counter: @{ .counter + @item }
+                 output:
+                   as: @{ .counter }
+        """
+        val high = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3))))
+
+        // run (one shot)
+        high.run()
+
+        // Assert the output matches our expected transformed value
+        assertEquals(
+            JsonUtils.fromValue(3),  // expected
+            high.rootInstance.transformedOutput  // actual
+        )
+    }
+
+    @Test
+    fun `test for with named each`() = runTest {
 
         val doYaml = """
            do:
@@ -109,7 +137,7 @@ class ForTest {
     }
 
     @Test
-    fun `test name index`() = runTest {
+    fun `test with named index`() = runTest {
 
         val doYaml = """
            do:
