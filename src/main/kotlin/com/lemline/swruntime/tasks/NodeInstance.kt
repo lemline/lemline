@@ -60,7 +60,7 @@ abstract class NodeInstance<T : TaskBase>(
     internal var transformedOutput: JsonNode? = null
 
     /**
-     * Additional properties for this scope (added by a child Set task)
+     * Additional properties for this scope (for example from For task)
      */
     internal var customScope: ObjectNode = JsonUtils.`object`()
 
@@ -167,14 +167,18 @@ abstract class NodeInstance<T : TaskBase>(
         this.startedAt = DateTimeDescriptor.from(Instant.now())
         // Validate task input if schema is provided
         node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput!!, schema) }
-        // Transform task input using 'input.from' expression if provided
-        this.transformedInput = evalTransformedInput()
-        // Set default behavior
-        this.rawOutput = transformedInput
 
         println("Enter task = ${node.name} (${node.task::class.simpleName})")
         println("      rawInput         = $rawInput")
+        println("      scope            = $scope")
+
+        // Transform task input using 'input.from' expression if provided
+        this.transformedInput = evalTransformedInput()
+
         println("      transformedInput = $transformedInput")
+
+        // Set default behavior
+        this.rawOutput = transformedInput
 
         return transformedInput!!
     }
@@ -205,11 +209,13 @@ abstract class NodeInstance<T : TaskBase>(
     }
 
     open fun onLeave(): JsonNode {
+        println("Leave task = ${node.name} (${node.task::class.simpleName})")
+        println("      rawOutput         = $rawOutput")
+        println("      scope            = $scope")
+
         // Transform task output using output.as expression if provided
         transformedOutput = JQExpression.eval(rawOutput!!, node.task.output?.`as`, scope)
 
-        println("Leave task = ${node.name} (${node.task::class.simpleName})")
-        println("      rawOutput         = $rawOutput")
         println("      transformedOutput = $transformedOutput")
 
         // Validate task output if schema is provided

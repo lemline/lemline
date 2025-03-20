@@ -9,101 +9,23 @@ import kotlin.test.assertEquals
 class FlowDirectiveTest {
 
     @Test
-    fun `test without then`() = runTest {
-        val str = ""
-        val doYaml = """
-            do:
-              - first:
-                  output:
-                    as: @{ . + "1" }
-                  set:
-                    input: @{ . }
-              - second:
-                  output:
-                    as: @{ . + "2" }
-                  set:
-                    value: @{ . }
-              - third:
-                  output:
-                    as: @{ . + "3" }
-                  set:
-                    value: @{ . }
-        """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
-
-        // run (one shot)
-        instance.run()
-
-        // Assert the output matches our expected transformed value
-        assertEquals(
-            JsonUtils.fromValue("123"),  // expected
-            instance.rootInstance.transformedOutput  // actual
-        )
-    }
-
-    @Test
-    fun `test nested without then`() = runTest {
-        val str = ""
-        val doYaml = """
-            do:
-              - first:
-                  output:
-                    as: @{ . + "1" }
-                  set:
-                    value: @{ . }
-              - second:
-                  do:
-                    - a:
-                        output:
-                          as: @{ . + "2a" }
-                        set:
-                          value: @{ . }
-                    - b:
-                        output:
-                          as: @{ . + "2b" }
-                        set:
-                          value: @{ . }
-              - third:
-                  output:
-                    as: @{ . + "3" }
-                  set:
-                    value: @{ . }
-        """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
-
-        // run (one shot)
-        instance.run()
-
-        // Assert the output matches our expected transformed value
-        assertEquals(
-            JsonUtils.fromValue("12a2b3"),  // expected
-            instance.rootInstance.transformedOutput  // actual
-        )
-    }
-
-    @Test
     fun `test continue`() = runTest {
-        val str = ""
         val doYaml = """
             do:
               - first:
-                  output:
-                    as: @{ . + "1" }
                   set:
-                    value: @{ . }
+                    value: @{ "1" }
                   then: continue
               - second:
-                  output:
-                    as: @{ . + "2" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "2" }
               - third:
-                  output:
-                    as: @{ . + "3" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "3" }
+            output:
+              as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(""))
 
         // run (one shot)
         instance.run()
@@ -117,34 +39,27 @@ class FlowDirectiveTest {
 
     @Test
     fun `test nested continue`() = runTest {
-        val str = ""
         val doYaml = """
             do:
               - first:
-                  output:
-                    as: @{ . + "1" }
                   set:
-                    value: @{ . }
+                    value: @{ "1" }
               - second:
                   do:
-                    - a:
-                        output:
-                          as: @{ . + "2a" }
+                    - secondA:
                         set:
-                          value: @{ . }
+                          value: @{ .value + "2a" }
                         then: continue
-                    - b:
-                        output:
-                          as: @{ . + "2b" }
+                    - secondB:
                         set:
-                          value: @{ . }
+                          value: @{ .value + "2b" }
               - third:
-                  output:
-                    as: @{ . + "3" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "3" }
+            output:
+              as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(""))
 
         // run (one shot)
         instance.run()
@@ -158,27 +73,51 @@ class FlowDirectiveTest {
 
     @Test
     fun `test end`() = runTest {
-        val str = ""
         val doYaml = """
             do:
               - first:
-                  output:
-                    as: @{ . + "1" }
                   set:
-                    value: @{ . }
+                    value: @{ "1" }
               - second:
-                  output:
-                    as: @{ . + "2" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "2" }
                   then: end
               - third:
-                  output:
-                    as: @{ . + "3" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "3" }
+            output:
+              as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(""))
+
+        // run (one shot)
+        instance.run()
+
+        // Assert the output matches our expected transformed value
+        assertEquals(
+            JsonUtils.fromValue("12"),  // expected
+            instance.rootInstance.transformedOutput  // actual
+        )
+    }
+
+    @Test
+    fun `test end with output as`() = runTest {
+        val doYaml = """
+            do:
+              - first:
+                  set:
+                    value: @{ "1" }
+              - second:
+                  set:
+                    value: @{ .value + "2" }
+                  output:
+                    as: @{ .value }
+                  then: end
+              - third:
+                  set:
+                    value: @{ .value + "3" }
+        """
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(""))
 
         // run (one shot)
         instance.run()
@@ -192,34 +131,27 @@ class FlowDirectiveTest {
 
     @Test
     fun `test nested end`() = runTest {
-        val str = ""
         val doYaml = """
             do:
               - first:
-                  output:
-                    as: @{ . + "1" }
                   set:
-                    value: @{ . }
+                    value: @{ "1" }
               - second:
                   do:
-                    - a:
-                        output:
-                          as: @{ . + "2a" }
+                    - secondA:
                         set:
-                          value: @{ . }
+                          value: @{ .value + "2a" }
                         then: end
-                    - b:
-                        output:
-                          as: @{ . + "2b" }
+                    - secondB:
                         set:
-                          value: @{ . }
+                          value: @{ .value + "2b" }
               - third:
-                  output:
-                    as: @{ . + "3" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "3" }
+            output:
+              as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(""))
 
         // run (one shot)
         instance.run()
@@ -233,27 +165,51 @@ class FlowDirectiveTest {
 
     @Test
     fun `test exit`() = runTest {
-        val str = ""
         val doYaml = """
             do:
               - first:
-                  output:
-                    as: @{ . + "1" }
                   set:
-                    value: @{ . }
+                    value: @{ "1" }
               - second:
-                  output:
-                    as: @{ . + "2" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "2" }
                   then: exit
               - third:
-                  output:
-                    as: @{ . + "3" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "3" }
+            output:
+              as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(""))
+
+        // run (one shot)
+        instance.run()
+
+        // Assert the output matches our expected transformed value
+        assertEquals(
+            JsonUtils.fromValue("12"),  // expected
+            instance.rootInstance.transformedOutput  // actual
+        )
+    }
+
+    @Test
+    fun `test exit with output as`() = runTest {
+        val doYaml = """
+            do:
+              - first:
+                  set:
+                    value: @{ "1" }
+              - second:
+                  set:
+                    value: @{ .value + "2" }
+                  output:
+                    as: @{ .value }
+                  then: exit
+              - third:
+                  set:
+                    value: @{ .value + "3" }
+        """
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(""))
 
         // run (one shot)
         instance.run()
@@ -267,34 +223,27 @@ class FlowDirectiveTest {
 
     @Test
     fun `test nested exit`() = runTest {
-        val str = ""
         val doYaml = """
             do:
               - first:
-                  output:
-                    as: @{ . + "1" }
                   set:
-                    value: @{ . }
+                    value: @{ "1" }
               - second:
                   do:
-                    - a:
-                        output:
-                          as: @{ . + "2a" }
+                    - secondA:
                         set:
-                          value: @{ . }
+                          value: @{ .value + "2a" }
                         then: exit
-                    - b:
-                        output:
-                          as: @{ . + "2b" }
+                    - secondB:
                         set:
-                          value: @{ . }
+                          value: @{ .value + "2b" }
               - third:
-                  output:
-                    as: @{ . + "3" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "3" }
+            output:
+              as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(""))
 
         // run (one shot)
         instance.run()
@@ -308,28 +257,22 @@ class FlowDirectiveTest {
 
     @Test
     fun `test named then`() = runTest {
-        val str = ""
         val doYaml = """
             do:
               - first:
-                  output:
-                    as: @{ . + "1" }
                   set:
-                    value: @{ . }
+                    value: @{ "1" }
                   then: third
               - second:
-                  output:
-                    as: @{ . + "2" }
                   set:
-                    value: @{ . }
-                  then: exit
+                    value: @{ .value + "2" }
               - third:
-                  output:
-                    as: @{ . + "3" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "3" }
+            output:
+              as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(""))
 
         // run (one shot)
         instance.run()
@@ -343,39 +286,30 @@ class FlowDirectiveTest {
 
     @Test
     fun `test nested named then`() = runTest {
-        val str = ""
         val doYaml = """
             do:
               - first:
-                  output:
-                    as: @{ . + "1" }
                   set:
-                    value: @{ . }
+                    value: @{ "1" }
               - second:
                   do:
-                    - a:
-                        output:
-                          as: @{ . + "2a" }
+                    - secondA:
                         set:
-                          value: @{ . }
-                        then: c
-                    - b:
-                        output:
-                          as: @{ . + "2b" }
+                          value: @{ .value + "2a" }
+                        then: secondC
+                    - secondB:
                         set:
-                          value: @{ . }
-                    - c:
-                        output:
-                          as: @{ . + "2c" }
+                          value: @{ .value + "2b" }
+                    - secondC:
                         set:
-                          value: @{ . }
+                          value: @{ .value + "2c" }
               - third:
-                  output:
-                    as: @{ . + "3" }
                   set:
-                    value: @{ . }
+                    value: @{ .value + "3" }
+            output:
+              as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(""))
 
         // run (one shot)
         instance.run()

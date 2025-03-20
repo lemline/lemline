@@ -12,7 +12,7 @@ class SwitchTest {
     fun `test switch with name`() = runTest {
 
         val doYaml = """
-           do:
+          do:
             - test:
                 switch:
                   - high:
@@ -24,23 +24,19 @@ class SwitchTest {
                   - other:
                       then: third
             - first:
-                output:
-                  as: @{ . + "1" }
                 set:
-                  input: @{ . }
+                  out: @{ . + "1" }
                 then: exit
             - second:
-                output:
-                  as: @{ . + "2" }
                 set:
-                  value: @{ . }
+                  out: @{ . + "2" }
                 then: exit
             - third:
-                output:
-                  as: @{ . + "3" }
                 set:
-                  value: @{ . }
+                  out: @{ . + "3" }
                 then: exit
+          output:
+            as: @{ .out }
         """
         val high = getWorkflowInstance(doYaml, JsonUtils.fromValue("high"))
 
@@ -80,7 +76,7 @@ class SwitchTest {
     fun `test switch with FlowDirectiveEnum`() = runTest {
 
         val doYaml = """
-           do:
+          do:
             - test:
                 switch:
                   - high:
@@ -92,22 +88,18 @@ class SwitchTest {
                   - other:
                       then: end
             - first:
-                output:
-                  as: @{ . + "1" }
                 set:
-                  input: @{ . }
+                  out: @{ . + "1" }
+                output:
+                  as: @{ .out }
                 then: exit
             - second:
-                output:
-                  as: @{ . + "2" }
                 set:
-                  value: @{ . }
+                  out: @{ . + "2" }
                 then: exit
             - third:
-                output:
-                  as: @{ . + "3" }
                 set:
-                  value: @{ . }
+                  out: @{ . + "3" }
                 then: exit
         """
         val high = getWorkflowInstance(doYaml, JsonUtils.fromValue("high"))
@@ -148,33 +140,29 @@ class SwitchTest {
     fun `test switch without matching should continue`() = runTest {
 
         val doYaml = """
-           do:
+          do:
             - test:
                 switch:
                   - high:
                       when: @{ . == "high" }
-                      then: continue
+                      then: first
                   - low:
                       when: @{ . == "low" }
-                      then: exit
+                      then: second
             - first:
-                output:
-                  as: @{ . + "1" }
                 set:
-                  input: @{ . }
+                  out: @{ . + "1" }
                 then: exit
             - second:
-                output:
-                  as: @{ . + "2" }
                 set:
-                  value: @{ . }
+                  out: @{ . + "2" }
                 then: exit
             - third:
-                output:
-                  as: @{ . + "3" }
                 set:
-                  value: @{ . }
+                  out: @{ . + "3" }
                 then: exit
+          output:
+            as: @{ .out }
         """
 
         val none = getWorkflowInstance(doYaml, JsonUtils.fromValue("none"))

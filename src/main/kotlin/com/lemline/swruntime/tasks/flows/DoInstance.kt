@@ -13,7 +13,6 @@ open class DoInstance(
         childIndex++
 
         return when (childIndex) {
-            0 -> children[0].also { it.rawInput = transformedInput }
             children.size -> then()
             else -> children[childIndex].also { it.rawInput = rawOutput }
         }

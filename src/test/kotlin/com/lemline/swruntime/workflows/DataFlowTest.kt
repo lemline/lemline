@@ -13,11 +13,11 @@ class DataFlowTest {
         val str = "foo"
         val doYaml = """
             input:
-              from: "@{ {data: .} }"
+              from: "@{ {in: .} }"
             do:
               - first:
                   set:
-                    value: @{ . }
+                    value: @{ .in }
         """
         val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
 
@@ -25,7 +25,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("data" to str)),  // expected
+            JsonUtils.fromValue(mapOf("value" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -34,12 +34,12 @@ class DataFlowTest {
     fun `test workflow output as directive`() = runTest {
         val str = "foo"
         val doYaml = """
-            output:
-              as: "@{ {result: .} }"
             do:
               - first:
                   set:
                     value: @{ . }
+            output:
+              as: "@{ {out: .value} }"
         """
         val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
 
@@ -48,7 +48,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("result" to str)),  // expected
+            JsonUtils.fromValue(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -58,13 +58,13 @@ class DataFlowTest {
         val str = "foo"
         val doYaml = """
             input:
-              from: "@{ {data: .} }"
-            output:
-              as: "@{ {result: .data} }"
+              from: "@{ {in: .} }"
             do:
               - first:
                   set:
-                    value: @{ . }
+                    value: @{ .in }
+            output:
+              as: "@{ {out: .value} }"
         """
         val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
 
@@ -73,7 +73,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("result" to str)),  // expected
+            JsonUtils.fromValue(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -85,9 +85,9 @@ class DataFlowTest {
             do:
               - first:
                   input:
-                    from: "@{ {transformed: .} }"
+                    from: "@{ {in: .} }"
                   set:
-                    value: "@{ . }"
+                    value: "@{ .in }"
         """
         val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
 
@@ -96,7 +96,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("transformed" to str)),  // expected
+            JsonUtils.fromValue(mapOf("value" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -107,10 +107,10 @@ class DataFlowTest {
         val doYaml = """
             do:
               - first:
-                  output:
-                    as: "@{ {transformed: .} }"
                   set:
                     value: "@{ . }"
+                  output:
+                    as: "@{ {out: .value} }"
         """
         val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
 
@@ -119,7 +119,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("transformed" to str)),  // expected
+            JsonUtils.fromValue(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -132,10 +132,10 @@ class DataFlowTest {
               - first:
                   input:
                     from: "@{ {in: .} }"
-                  output:
-                    as: "@{ {out: .in} }"
                   set:
-                    value: "@{ . }"
+                    value: "@{ .in }"
+                  output:
+                    as: "@{ {out: .value} }"
         """
         val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
 
@@ -157,17 +157,17 @@ class DataFlowTest {
               - first:
                   input:
                     from: "@{ {in1: .} }"
-                  output:
-                    as: "@{ {out1: .in1} }"
                   set:
-                    value: "@{ . }"
+                    value: "@{ .in1 }"
+                  output:
+                    as: "@{ {out1: .value} }"
               - second:
                   input:
                     from: "@{ {in2: .out1} }"
-                  output:
-                    as: "@{ {out2: .in2} }"
                   set:
-                    value: "@{ . }"
+                    value: "@{ .in2 }"
+                  output:
+                    as: "@{ {out2: .value} }"
         """
         val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
 
@@ -186,24 +186,24 @@ class DataFlowTest {
         val str = "foo"
         val doYaml = """
             input:
-              from: "@{ {win: .} }"
-            output:
-              as: "@{ {wout: .out2} }"
+              from: "@{ {in: .} }"
             do:
               - first:
                   input:
-                    from: "@{ {in1: .win} }"
-                  output:
-                    as: "@{ {out1: .in1} }"
+                    from: "@{ {in1: .in} }"
                   set:
-                    value: "@{ . }"
+                    value: "@{ .in1 }"
+                  output:
+                    as: "@{ {out1: .value} }"
               - second:
                   input:
                     from: "@{ {in2: .out1} }"
-                  output:
-                    as: "@{ {out2: .in2} }"
                   set:
-                    value: "@{ . }"
+                    value: "@{ .in2 }"
+                  output:
+                    as: "@{ {out2: .value} }"
+            output:
+              as: "@{ {out: .out2} }"
         """
         val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
 
@@ -212,7 +212,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("wout" to str)),  // expected
+            JsonUtils.fromValue(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
