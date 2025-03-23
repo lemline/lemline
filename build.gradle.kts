@@ -9,13 +9,10 @@ repositories {
     mavenCentral()
 }
 
-val quarkusPlatformGroupId: String by project
-val quarkusPlatformArtifactId: String by project
 val quarkusPlatformVersion: String by project
-val kotestVersion = "5.8.0"
 
 dependencies {
-    implementation(enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}"))
+    implementation(enforcedPlatform("io.quarkus:quarkus-bom:$quarkusPlatformVersion"))
 
     // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
@@ -24,6 +21,7 @@ dependencies {
     implementation("io.quarkus:quarkus-kotlin")
     implementation("io.quarkus:quarkus-resteasy-reactive-jackson")
     implementation("io.quarkus:quarkus-smallrye-reactive-messaging-kafka")
+    implementation("io.quarkus:quarkus-mutiny")
     implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin")
     implementation("io.quarkus:quarkus-jdbc-postgresql")
 
@@ -36,10 +34,11 @@ dependencies {
 
     // Testing
     testImplementation("io.quarkus:quarkus-junit5")
-    testImplementation("io.kotest:kotest-runner-junit5:${kotestVersion}")
-    testImplementation("io.kotest:kotest-assertions-core:${kotestVersion}")
-    testImplementation("io.kotest:kotest-framework-api:${kotestVersion}")
-    // testImplementation("io.kotest:kotest-property:${kotestVersion}")
+    testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
+    testImplementation("io.kotest:kotest-runner-junit5")
+    testImplementation("io.kotest:kotest-assertions-core")
+    testImplementation("io.kotest:kotest-framework-api")
+
     testImplementation("io.mockk:mockk:1.13.9")
     testImplementation(kotlin("test"))
 }

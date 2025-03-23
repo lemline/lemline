@@ -7,11 +7,11 @@ import com.lemline.swruntime.expressions.scopes.WorkflowDescriptor
 import com.lemline.swruntime.tasks.*
 import com.lemline.swruntime.tasks.activities.*
 import com.lemline.swruntime.tasks.flows.*
+import com.lemline.swruntime.utils.logger
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import jakarta.inject.Inject
-import org.slf4j.LoggerFactory
 
 /**
  * Represents an instance of a workflow.
@@ -30,6 +30,8 @@ class WorkflowInstance(
 ) {
     @Inject
     internal lateinit var workflowParser: WorkflowParser
+
+    private val logger = logger()
 
     /**
      * Instance status
@@ -65,7 +67,7 @@ class WorkflowInstance(
     // Retrieves the workflow by its name and version
     private val workflow by lazy { workflowParser.getWorkflow(name, version) }
 
-    internal val nodeInstances: Map<NodePosition, NodeInstance<*>> by lazy { initInstance() }
+    private val nodeInstances: Map<NodePosition, NodeInstance<*>> by lazy { initInstance() }
 
     internal lateinit var rootInstance: RootInstance
 
@@ -101,18 +103,19 @@ class WorkflowInstance(
 
         // find and execute the next activity
         while (true) {
-            // if null, then the workflow is completed
-            if (next == null) break
             // get transformed Input for this node
-            if (next.shouldStart()) {
-                // if next is an activity, then break
-                if (next.node.isActivity()) break
-                // execute current node
-                next.execute()
-                // continue
-                next = next.`continue`()
-            } else {
-                next = next.parent?.`continue`()
+            next = when (next?.shouldStart()) {
+                null -> break
+                true -> {
+                    // if next is an activity, then break
+                    if (next.node.isActivity()) break
+                    // execute current node
+                    next.execute()
+                    // continue
+                    next.`continue`()
+                }
+
+                false -> next.parent?.`continue`()
             }
         }
 
@@ -206,8 +209,4 @@ class WorkflowInstance(
 
     private fun error(message: Any): Nothing =
         throw IllegalStateException("Workflow $name (version $version): $message")
-
-    companion object {
-        private val logger = LoggerFactory.getLogger(this::class.java)
-    }
 }

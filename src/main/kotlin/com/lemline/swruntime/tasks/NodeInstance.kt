@@ -10,6 +10,8 @@ import com.lemline.swruntime.expressions.scopes.TaskDescriptor
 import com.lemline.swruntime.schemas.SchemaValidator
 import com.lemline.swruntime.tasks.flows.RootInstance
 import com.lemline.swruntime.tasks.flows.TryInstance
+import com.lemline.swruntime.utils.info
+import com.lemline.swruntime.utils.logger
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import io.serverlessworkflow.impl.json.JsonUtils
@@ -23,6 +25,8 @@ abstract class NodeInstance<T : TaskBase>(
     open val node: NodeTask<T>,
     open val parent: NodeInstance<*>?
 ) {
+    private val logger = logger()
+
     /**
      * Possible children of this task
      */
@@ -54,7 +58,7 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * The time the task was started at.
      */
-    internal var startedAt: DateTimeDescriptor? = null
+    private var startedAt: DateTimeDescriptor? = null
 
     /**
      * The task raw input.
@@ -221,15 +225,14 @@ abstract class NodeInstance<T : TaskBase>(
         // Validate task input if schema is provided
         node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput!!, schema) }
 
-        println("Enter task = ${node.name} (${node.task::class.simpleName})")
-        println("      rawInput         = $rawInput")
-        println("      scope            = $scope")
+        logger.info { "Enter task = ${node.name} (${node.task::class.simpleName})" }
+        logger.info { "      rawInput         = $rawInput" }
+        logger.info { "      scope            = $scope" }
 
         // Transform task input using 'input.from' expression if provided
         this.transformedInput = evalTransformedInput()
-
-        println("      transformedInput = $transformedInput")
-
+        logger.info { "      transformedInput = $transformedInput" }
+        
         // Set default behavior
         this.rawOutput = transformedInput
 
@@ -243,14 +246,13 @@ abstract class NodeInstance<T : TaskBase>(
     }
 
     internal fun complete() {
-        println("Leave task = ${node.name} (${node.task::class.simpleName})")
-        println("      rawOutput        = $rawOutput")
-        println("      scope            = $scope")
+        logger.info { "Leave task = ${node.name} (${node.task::class.simpleName})" }
+        logger.info { "      rawOutput        = $rawOutput" }
+        logger.info { "      scope            = $scope" }
 
         // Transform task output using output.as expression if provided
         transformedOutput = eval(rawOutput!!, node.task.output?.`as`)
-
-        println("      transformedOutput = $transformedOutput")
+        logger.info { "      transformedOutput = $transformedOutput" }
 
         // Validate task output if schema is provided
         node.task.output?.schema?.let { schema -> SchemaValidator.validate(transformedOutput!!, schema) }
