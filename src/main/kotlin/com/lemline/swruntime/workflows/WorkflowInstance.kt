@@ -109,8 +109,11 @@ class WorkflowInstance(
                 if (next.node.isActivity()) break
                 // execute current node
                 next.execute()
+                // continue
+                next = next.`continue`()
+            } else {
+                next = next.parent?.`continue`()
             }
-            next = next.`continue`()
         }
 
         when (next) {
