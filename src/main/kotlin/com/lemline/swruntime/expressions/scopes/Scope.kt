@@ -5,8 +5,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import io.serverlessworkflow.impl.json.JsonUtils
 
 class Scope(val map: MutableMap<String, Any?> = mutableMapOf()) {
-    fun set(key: String, value: Any?) = map.put(key, value)
-    fun setContext(context: Map<String, Any>) = map.set(CONTEXT, context)
+    fun setContext(context: ObjectNode) = map.set(CONTEXT, context)
     fun setInput(input: JsonNode) = map.set(INPUT, input)
     fun setOutput(output: JsonNode) = map.set(OUTPUT, output)
     fun setSecrets(secrets: Map<String, JsonNode>) = map.set(SECRETS, secrets)

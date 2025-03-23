@@ -75,13 +75,6 @@ data class NodeTask<T : TaskBase>(
     fun toMermaidGraph(): String {
         val nodes = mutableSetOf<String>()
         val edges = mutableSetOf<String>()
-        val nodeCounter = mutableMapOf<String, Int>()
-
-        fun generateNodeId(taskType: String): String {
-            val count = nodeCounter.getOrDefault(taskType, 0) + 1
-            nodeCounter[taskType] = count
-            return "${taskType}_$count"
-        }
 
         fun processNode(node: NodeTask<*>, parentId: JsonPointer? = null) {
             val taskType = node.task.javaClass.simpleName

@@ -1,28 +1,10 @@
 package com.lemline.swruntime.workflows
 
-import com.fasterxml.jackson.databind.node.IntNode
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.lemline.swruntime.expressions.JQExpression
 import com.lemline.swruntime.utils.getWorkflowInstance
-import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.impl.json.JsonUtils
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
-
-fun main() {
-    val rawOutput = JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3)))
-    println("rawOutput = $rawOutput")
-
-    val scope = JsonUtils.`object`().set<ObjectNode>("test", IntNode(4))
-    println("scope = $scope")
-
-    val outputAs = OutputAs().apply { setString("\${ \$test }") }
-    println("outputAs = ${outputAs.get()}")
-
-    val out = JQExpression.eval(rawOutput, outputAs, scope)
-    println(out)
-}
 
 class ForTest {
 

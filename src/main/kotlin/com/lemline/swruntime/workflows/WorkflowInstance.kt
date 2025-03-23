@@ -1,14 +1,17 @@
 package com.lemline.swruntime.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.swruntime.errors.CaughtDoWorkflowException
 import com.lemline.swruntime.expressions.scopes.RuntimeDescriptor
 import com.lemline.swruntime.expressions.scopes.WorkflowDescriptor
 import com.lemline.swruntime.tasks.*
 import com.lemline.swruntime.tasks.activities.*
 import com.lemline.swruntime.tasks.flows.*
 import io.serverlessworkflow.api.types.*
+import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import jakarta.inject.Inject
+import org.slf4j.LoggerFactory
 
 /**
  * Represents an instance of a workflow.
@@ -27,6 +30,11 @@ class WorkflowInstance(
 ) {
     @Inject
     internal lateinit var workflowParser: WorkflowParser
+
+    /**
+     * Instance status
+     */
+    private var status = WorkflowStatus.PENDING
 
     /**
      * Instance ID
@@ -61,6 +69,21 @@ class WorkflowInstance(
 
     internal lateinit var rootInstance: RootInstance
 
+    private suspend fun runTryCatch(run: suspend () -> JsonNode?): JsonNode? {
+        var out: JsonNode?
+        do {
+            try {
+                out = run()
+                break
+            } catch (e: CaughtDoWorkflowException) {
+                // at this stage, the doInstance should have a raw input
+                position = e.`do`.node.position
+            }
+        } while (true)
+
+        return out
+    }
+
     suspend fun run() {
         // Get the task at the current position
         val current = nodeInstances[position] ?: error("task not found in position $position")
@@ -68,7 +91,8 @@ class WorkflowInstance(
         var next = when (isStarting()) {
             // enter root and go to `do`
             true -> {
-                current.onEnter()
+                status = WorkflowStatus.RUNNING
+                current.start()
                 current.`continue`()
             }
             // complete the current activity execution (rawOutput should be part of the state)
@@ -80,7 +104,7 @@ class WorkflowInstance(
             // if null, then the workflow is completed
             if (next == null) break
             // get transformed Input for this node
-            if (next.shouldEnter()) {
+            if (next.shouldStart()) {
                 // if next is an activity, then break
                 if (next.node.isActivity()) break
                 // execute current node
@@ -93,7 +117,7 @@ class WorkflowInstance(
             // complete the workflow
             null -> {
                 position = NodePosition.root
-                rootInstance.onLeave()
+                rootInstance.complete()
             }
             // execute the activity
             else -> {
@@ -180,4 +204,7 @@ class WorkflowInstance(
     private fun error(message: Any): Nothing =
         throw IllegalStateException("Workflow $name (version $version): $message")
 
+    companion object {
+        private val logger = LoggerFactory.getLogger(this::class.java)
+    }
 }

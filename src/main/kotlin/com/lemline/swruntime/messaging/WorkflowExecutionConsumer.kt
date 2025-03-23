@@ -2,17 +2,23 @@ package com.lemline.swruntime.messaging
 
 import com.lemline.swruntime.workflows.WorkflowInstance
 import jakarta.enterprise.context.ApplicationScoped
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.future.future
 import org.eclipse.microprofile.reactive.messaging.Incoming
 import org.slf4j.LoggerFactory
+import java.util.concurrent.CompletionStage
 
 @ApplicationScoped
 class WorkflowExecutionConsumer(
     private val producer: WorkflowExecutionProducer
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     @Incoming("workflow-executions")
-    suspend fun consume(workflowMessage: WorkflowExecutionMessage) {
+    fun consume(workflowMessage: WorkflowExecutionMessage): CompletionStage<Any> = scope.future {
         logger.info("Received workflow execution request: $workflowMessage}")
 
         try {

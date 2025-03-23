@@ -2,13 +2,15 @@ package com.lemline.swruntime.tasks
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.swruntime.errors.UncaughtWorkflowException
+import com.lemline.swruntime.errors.WorkflowError
 import com.lemline.swruntime.expressions.JQExpression
 import com.lemline.swruntime.expressions.scopes.Scope
 import com.lemline.swruntime.expressions.scopes.TaskDescriptor
 import com.lemline.swruntime.schemas.SchemaValidator
 import com.lemline.swruntime.tasks.flows.RootInstance
-import io.serverlessworkflow.api.types.FlowDirectiveEnum
-import io.serverlessworkflow.api.types.TaskBase
+import com.lemline.swruntime.tasks.flows.TryInstance
+import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import io.serverlessworkflow.impl.json.JsonUtils
 import java.time.Instant
@@ -22,9 +24,24 @@ abstract class NodeInstance<T : TaskBase>(
     open val parent: NodeInstance<*>?
 ) {
     /**
-     *  Possible children of this task
+     * Possible children of this task
      */
     lateinit var children: List<NodeInstance<*>>
+
+    /**
+     * Current Index of attempts (0 => first attempt, 1 => first retry, 2 => second retry, ...)
+     */
+    internal var attemptIndex = 0
+
+    /**
+     * Root instance
+     */
+    internal val rootInstance: RootInstance by lazy {
+        when (this) {
+            is RootInstance -> this
+            else -> parent!!.rootInstance
+        }
+    }
 
     /**
      * Store the current state of this task:
@@ -90,7 +107,7 @@ abstract class NodeInstance<T : TaskBase>(
             reference = node.reference,
             definition = node.definition,
             startedAt = startedAt,
-            input = rawInput!!,
+            input = rawInput,
             output = rawOutput,
         )
 
@@ -132,9 +149,7 @@ abstract class NodeInstance<T : TaskBase>(
         // validate schema
         // export context
         // set parent raw output
-        onLeave()
-        // reset the task instance
-        reset()
+        complete()
         // find next
         return when (flow) {
             null, FlowDirectiveEnum.CONTINUE -> parent?.`continue`()
@@ -149,7 +164,7 @@ abstract class NodeInstance<T : TaskBase>(
      * Get the next node instance, for the `continue` flow directive
      * This implementation is for activities only, must be overridden for flows
      */
-    internal open fun `continue`(): NodeInstance<*>? = parent?.`continue`()
+    internal open fun `continue`(): NodeInstance<*>? = then()
 
     /**
      * Go to the sibling with a specific name
@@ -167,10 +182,28 @@ abstract class NodeInstance<T : TaskBase>(
     private fun end(): RootInstance? = when (this) {
         is RootInstance -> null
         else -> {
-            onLeave()
-            reset()
+            complete()
             parent!!.end()
         }
+    }
+
+    /**
+     * Determines if the task should be entered.
+     *
+     * @return `true` if the task should be entered, `false` otherwise.
+     */
+    open fun shouldStart(): Boolean {
+        // set start time, validate and transform the input, used for the calculation
+        start()
+        // Test If task should be executed
+        val shouldStart = node.task.`if`
+            ?.let { eval(transformedInput!!, it) }
+            ?.let { if (it.isBoolean) it.asBoolean() else error("result of '.if' condition must be a boolean, but is '$it'") }
+            ?: true
+
+        if (!shouldStart) reset()
+
+        return shouldStart
     }
 
     /**
@@ -183,7 +216,7 @@ abstract class NodeInstance<T : TaskBase>(
      *
      * @return The transformed input as a JSON node.
      */
-    internal fun onEnter(): JsonNode {
+    internal fun start(): JsonNode {
         this.startedAt = DateTimeDescriptor.from(Instant.now())
         // Validate task input if schema is provided
         node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput!!, schema) }
@@ -203,38 +236,19 @@ abstract class NodeInstance<T : TaskBase>(
         return transformedInput!!
     }
 
-    /**
-     * Determines if the task should be entered.
-     *
-     * @return `true` if the task should be entered, `false` otherwise.
-     */
-    open fun shouldEnter(): Boolean {
-        // set start time, validate and transform the input, used for the calculation
-        onEnter()
-        // Test If task should be executed
-        val shouldRun = node.task.`if`
-            ?.let { JQExpression.eval(transformedInput!!, it, scope) }
-            ?.let { if (it.isBoolean) it.asBoolean() else error("result of '.if' condition must be a boolean, but is '$it'") }
-            ?: true
-
-        if (!shouldRun) reset()
-
-        return shouldRun
-    }
-
-    private fun evalTransformedInput() = JQExpression.eval(rawInput!!, node.task.input?.from, scope)
+    private fun evalTransformedInput() = eval(rawInput!!, node.task.input?.from)
 
     open suspend fun execute() {
         this.rawOutput = transformedInput
     }
 
-    open fun onLeave(): JsonNode {
+    internal fun complete() {
         println("Leave task = ${node.name} (${node.task::class.simpleName})")
-        println("      rawOutput         = $rawOutput")
+        println("      rawOutput        = $rawOutput")
         println("      scope            = $scope")
 
         // Transform task output using output.as expression if provided
-        transformedOutput = JQExpression.eval(rawOutput!!, node.task.output?.`as`, scope)
+        transformedOutput = eval(rawOutput!!, node.task.output?.`as`)
 
         println("      transformedOutput = $transformedOutput")
 
@@ -242,19 +256,19 @@ abstract class NodeInstance<T : TaskBase>(
         node.task.output?.schema?.let { schema -> SchemaValidator.validate(transformedOutput!!, schema) }
 
         // Update workflow context using export.as expression if provided
-        node.task.export?.`as`?.let { exportAs ->
-            JQExpression.eval(transformedOutput!!, exportAs, scope).let {
-                // Validate exported context if schema is provided
-                node.task.export.schema?.let { schema -> SchemaValidator.validate(it, schema) }
-                // Set new context
-                if (it is ObjectNode) setContext(it) else error("result of '.export.as' must be an object, but is '$it'")
-            }
+        node.task.export?.let { export ->
+            val exportAs = eval(transformedOutput!!, export.`as`)
+            // Validate exported context if schema is provided
+            export.schema?.let { schema -> SchemaValidator.validate(exportAs, schema) }
+            // Set new context
+            if (exportAs is ObjectNode) setContext(exportAs) else error("result of '.export.as' must be an object, but is '$exportAs'")
         }
 
-        // set current flow raw output
+        // set current raw output of parent flow
         parent?.rawOutput = transformedOutput
 
-        return transformedOutput!!
+        // reset the task instance
+        if (this !is RootInstance) reset()
     }
 
     // recursively process setContext up to RootInstance
@@ -288,8 +302,57 @@ abstract class NodeInstance<T : TaskBase>(
         } else null
     }
 
+    private fun raise(error: WorkflowError) {
+        // Find the closest try instance that can catch this error
+        when (val tryInstance = getTry(error)) {
+            // If no try instance can catch the error, propagate it up
+            null -> throw UncaughtWorkflowException(error, attemptIndex)
+
+            // If a try instance can catch the error, check for retry configuration
+            else -> {
+                when (val delay = tryInstance.getRetryDelay(error, attemptIndex)) {
+                    null -> TODO() // tryInstance.doCatch()
+                    else -> TODO()
+                }
+            }
+        }
+    }
+
+    /**
+     * Get the try parent (if any)
+     */
+    private fun getTry(error: WorkflowError): TryInstance? = when (this) {
+        is RootInstance -> null
+        is TryInstance -> if (isCatching(transformedInput!!, error)) this else parent.getTry(error)
+        else -> parent?.getTry(error)
+    }
+
+    /**
+     * Evaluate an expression
+     */
+    internal fun evalBoolean(data: JsonNode, expr: String, name: String, scope: ObjectNode = this.scope) =
+        eval(data, expr, scope).let {
+            if (it.isBoolean) it.asBoolean() else error("'.$name' expression must be a boolean, but is '$it'")
+        }
+
+    internal fun eval(data: JsonNode, expr: String, scope: ObjectNode = this.scope) =
+        JQExpression.eval(data, expr, scope)
+
+    internal fun eval(data: JsonNode, expr: JsonNode, scope: ObjectNode = this.scope) =
+        JQExpression.eval(data, expr, scope)
+
+    private fun eval(data: JsonNode, inputFrom: InputFrom?) =
+        inputFrom?.let { eval(data, JsonUtils.fromValue(it.get())) } ?: data
+
+    private fun eval(data: JsonNode, outputAs: OutputAs?) =
+        outputAs?.let { eval(data, JsonUtils.fromValue(it.get())) } ?: data
+
+    private fun eval(data: JsonNode, exportAs: ExportAs?) =
+        exportAs?.let { eval(data, JsonUtils.fromValue(it.get())) } ?: data
+
+
     // merge an ObjectNode with another, without overriding existing keys
-    internal infix fun ObjectNode.merge(other: ObjectNode?): ObjectNode {
+    private infix fun ObjectNode.merge(other: ObjectNode?): ObjectNode {
         other?.fields()?.forEach { (key, value) -> if (key !in keys) set<JsonNode>(key, value) }
         return this
     }

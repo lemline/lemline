@@ -2,7 +2,6 @@ package com.lemline.swruntime.tasks.flows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.IntNode
-import com.lemline.swruntime.expressions.JQExpression
 import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeTask
 import io.serverlessworkflow.api.types.ForTask
@@ -54,12 +53,12 @@ class ForInstance(
     }
 
     private fun evalWhile(`while`: String): Boolean {
-        val out = JQExpression.eval(rawOutput ?: transformedInput!!, `while`, scope)
+        val out = eval(rawOutput ?: transformedInput!!, `while`)
         return if (out.isBoolean) out.asBoolean() else error("'.while' condition must be a boolean, but is $out")
     }
 
     private fun evalForIn(forIn: String): List<JsonNode> {
-        val out = JQExpression.eval(transformedInput!!, forIn, scope)
+        val out = eval(transformedInput!!, forIn)
         return if (out.isArray) out.asIterable().toList() else error("'.for.in' must be an array, but is $out")
     }
 }

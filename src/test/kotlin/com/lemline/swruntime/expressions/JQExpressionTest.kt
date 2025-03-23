@@ -1,18 +1,14 @@
 package com.lemline.swruntime.expressions
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.BooleanNode
-import com.fasterxml.jackson.databind.node.JsonNodeFactory
-import com.fasterxml.jackson.databind.node.NullNode
-import com.fasterxml.jackson.databind.node.TextNode
-import net.thisptr.jackson.jq.Scope
+import com.fasterxml.jackson.databind.node.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
 class JQExpressionTest {
 
-    private val scope = Scope.newEmptyScope()
+    private val scope = JsonNodeFactory.instance.objectNode()
 
     @Test
     fun `test eval returns rawInput for NullNode`() {
@@ -70,8 +66,8 @@ class JQExpressionTest {
         val expression = ".key + \$scopedKey"
 
         // Scope to override the value of "$scopedKey"
-        val customScope = Scope.newEmptyScope().apply {
-            setValue("scopedKey", JsonNodeFactory.instance.textNode("ScopedValue"))
+        val customScope = JsonNodeFactory.instance.objectNode().apply {
+            set<TextNode>("scopedKey", JsonNodeFactory.instance.textNode("ScopedValue"))
         }
 
         // Use the custom scope in the evaluation
@@ -91,8 +87,8 @@ class JQExpressionTest {
         val expression = ".key + \$scopedObject.scopedKey"
 
         // Scope to override the value of "$scopedKey"
-        val customScope = Scope.newEmptyScope().apply {
-            setValue("scopedObject", JsonNodeFactory.instance.objectNode().apply {
+        val customScope = JsonNodeFactory.instance.objectNode().apply {
+            set<ObjectNode>("scopedObject", JsonNodeFactory.instance.objectNode().apply {
                 put("scopedKey", "ScopedValue")
             })
         }

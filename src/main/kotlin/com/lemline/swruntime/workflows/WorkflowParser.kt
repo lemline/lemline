@@ -114,7 +114,7 @@ class WorkflowParser(
         // recursively creates Nodes
         val root = NodeTask(
             position = NodePosition.root,
-            task = RootTask(`do`).also {
+            task = RootTask(`do`, use).also {
                 it.output = output
                 it.input = input
             },

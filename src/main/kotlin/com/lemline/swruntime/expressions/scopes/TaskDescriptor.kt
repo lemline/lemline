@@ -19,7 +19,7 @@ data class TaskDescriptor(
     val name: String,
     val reference: String,
     val definition: JsonNode,
-    val input: JsonNode,
+    val input: JsonNode?,
     var output: JsonNode?,
     val startedAt: DateTimeDescriptor?
 )

@@ -9,6 +9,7 @@ import com.lemline.swruntime.tasks.NodeInstance
 import com.lemline.swruntime.tasks.NodeState
 import com.lemline.swruntime.tasks.NodeTask
 import com.lemline.swruntime.tasks.RootTask
+import io.serverlessworkflow.api.types.RetryPolicy
 import io.serverlessworkflow.impl.json.JsonUtils
 
 class RootInstance(
@@ -22,10 +23,10 @@ class RootInstance(
 
     override val scope: ObjectNode
         get() = Scope().apply {
-            setContext(context)
-            setSecrets(secrets)
-            setWorkflow(workflowDescriptor)
-            setRuntime(runtimeDescriptor)
+            this.setContext(context)
+            this.setSecrets(secrets)
+            this.setWorkflow(workflowDescriptor)
+            this.setRuntime(runtimeDescriptor)
         }.toJson()
 
     override fun setContext(context: ObjectNode) {
@@ -55,4 +56,8 @@ class RootInstance(
             else -> null
         }
     }
+
+    fun getRetryPolicy(name: String): RetryPolicy = node.task.use?.retries?.additionalProperties
+        ?.get(name)
+        ?: error("Unknown retry policy name '$name'")
 }
