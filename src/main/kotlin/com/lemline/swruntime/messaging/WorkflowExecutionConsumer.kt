@@ -25,7 +25,7 @@ class WorkflowExecutionConsumer(
             val instance = WorkflowInstance(
                 name = workflowMessage.name,
                 version = workflowMessage.version,
-                state = workflowMessage.state.mapKeys { state -> state.key.toPosition() }.toMutableMap(),
+                states = workflowMessage.state.mapKeys { state -> state.key.toPosition() }.toMutableMap(),
                 position = workflowMessage.position.toPosition()
             )
 

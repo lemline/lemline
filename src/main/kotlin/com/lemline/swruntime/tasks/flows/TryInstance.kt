@@ -87,7 +87,7 @@ class TryInstance(
         }
 
         // add error to the current custom scope
-        this.customScope.set<JsonNode>(errorAs, JsonUtils.fromValue(error))
+        this.variables.set<JsonNode>(errorAs, JsonUtils.fromValue(error))
 
         return true
     }

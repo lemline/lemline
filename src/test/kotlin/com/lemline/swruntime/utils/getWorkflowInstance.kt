@@ -38,12 +38,12 @@ internal fun getWorkflowInstance(doYaml: String, input: JsonNode): WorkflowInsta
     // apply it to the WorkflowService instance
     val mockedService = WorkflowParser(mockedRepository)
 
-    val msg = WorkflowExecutionMessage.create(workflowName, workflowVersion, "testId", input)
+    val msg = WorkflowExecutionMessage.newInstance(workflowName, workflowVersion, "testId", input)
 
     return WorkflowInstance(
         name = msg.name,
         version = msg.version,
-        state = msg.state.mapKeys { state -> state.key.toPosition() }.toMutableMap(),
+        states = msg.state.mapKeys { state -> state.key.toPosition() }.toMutableMap(),
         position = msg.position.toPosition()
     ).apply { workflowParser = mockedService }
 }

@@ -6,8 +6,8 @@ import io.serverlessworkflow.impl.json.JsonUtils
 
 class Scope(val map: MutableMap<String, Any?> = mutableMapOf()) {
     fun setContext(context: ObjectNode) = map.set(CONTEXT, context)
-    fun setInput(input: JsonNode) = map.set(INPUT, input)
-    fun setOutput(output: JsonNode) = map.set(OUTPUT, output)
+    fun setInput(input: JsonNode?) = input?.let { map[INPUT] = it }
+    fun setOutput(output: JsonNode?) = output?.let { map[OUTPUT] = it }
     fun setSecrets(secrets: Map<String, JsonNode>) = map.set(SECRETS, secrets)
     fun setAuthorization(authorization: AuthorizationDescriptor) = map.set(AUTHORIZATION, authorization)
     fun setTask(task: TaskDescriptor) = map.set(TASK, task)

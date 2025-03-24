@@ -24,7 +24,7 @@ data class WorkflowExecutionMessage(
     val position: JsonPointer
 ) {
     companion object {
-        fun create(
+        fun newInstance(
             name: String,
             version: String,
             id: String,
@@ -34,7 +34,7 @@ data class WorkflowExecutionMessage(
             version = version,
             state = mapOf(
                 JsonPointer.root to NodeState().apply {
-                    setId(id)
+                    setWorkflowId(id)
                     setRawInput(input)
                     setStartedAt(DateTimeDescriptor.from(Instant.now()))
                 }),

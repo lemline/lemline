@@ -25,7 +25,7 @@ import jakarta.inject.Inject
 class WorkflowInstance(
     val name: String,
     val version: String,
-    val state: MutableMap<NodePosition, NodeState>,
+    val states: MutableMap<NodePosition, NodeState>,
     var position: NodePosition
 ) {
     @Inject
@@ -39,7 +39,7 @@ class WorkflowInstance(
     private var status = WorkflowStatus.PENDING
 
     /**
-     * Instance ID
+     * Instance WORKFLOW_ID
      * (parsed from the state)
      */
     private val id: String
@@ -57,10 +57,10 @@ class WorkflowInstance(
     private val rawInput: JsonNode
 
     init {
-        val rootState = state[NodePosition.root] ?: error("no state provided for the root node")
+        val rootState = states[NodePosition.root] ?: error("no state provided for the root node")
 
-        this.id = rootState.getId()
-        this.startedAt = rootState.getStartedAt()
+        this.id = rootState.getWorkflowId()
+        this.startedAt = rootState.getStartedAt()!!
         this.rawInput = rootState.getRawInput()!!
     }
 
@@ -201,7 +201,7 @@ class WorkflowInstance(
         else -> throw IllegalArgumentException("Unknown task type: ${task.javaClass.name}")
     }
         // apply state for this new node instance
-        .apply { state[node.position]?.let { setState(it) } }
+        .apply { states[node.position]?.let { setState(it) } }
         // create all children node instances
         .also { nodeInstance ->
             nodeInstance.children = this.children?.map { child -> child.createInstance(nodeInstance) } ?: emptyList()

@@ -42,8 +42,10 @@ class ForInstance(
         if (forIndex == forIn.size) return then()
 
         // else define the additional scope variable
-        this.customScope.set<JsonNode>(forEach, forIn[forIndex])
-        this.customScope.set<JsonNode>(forAt, IntNode(forIndex))
+        with(variables) {
+            set<JsonNode>(forEach, forIn[forIndex])
+            set<JsonNode>(forAt, IntNode(forIndex))
+        }
 
         // test the while directive
         node.task.`while`?.let { if (!evalWhile(it)) return then() }

@@ -10,13 +10,15 @@ import com.lemline.swruntime.tasks.NodeState
 import com.lemline.swruntime.tasks.NodeTask
 import com.lemline.swruntime.tasks.RootTask
 import io.serverlessworkflow.api.types.RetryPolicy
-import io.serverlessworkflow.impl.json.JsonUtils
 
 class RootInstance(
     override val node: NodeTask<RootTask>,
 ) : NodeInstance<RootTask>(node, null) {
 
-    lateinit var context: ObjectNode
+    internal var context: ObjectNode
+        get() = state.getContext()
+        set(value) = state.setContext(value)
+
     lateinit var secrets: Map<String, JsonNode>
     lateinit var workflowDescriptor: WorkflowDescriptor
     lateinit var runtimeDescriptor: RuntimeDescriptor
@@ -29,21 +31,17 @@ class RootInstance(
             this.setRuntime(runtimeDescriptor)
         }.toJson()
 
-    override fun setContext(context: ObjectNode) {
-        this.context = context
-    }
-
     override fun setState(state: NodeState) {
         // set index
         super.setState(state)
         // set context
-        context = state.getContext() ?: JsonUtils.`object`()
+        context = state.getContext()
         // secrets, workflowDescriptor, runtimeDescriptor are set from WorkflowInstance
     }
 
     override fun getState(): NodeState = (super.getState() ?: NodeState()).apply {
         if (!context.isEmpty) this.setContext(context)
-        setId(workflowDescriptor.id)
+        setWorkflowId(workflowDescriptor.id)
         setRawInput(workflowDescriptor.input)
         setStartedAt(workflowDescriptor.startedAt)
     }

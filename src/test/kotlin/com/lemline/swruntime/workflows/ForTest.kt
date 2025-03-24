@@ -23,15 +23,15 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val high = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
-        high.run()
+        instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
             JsonUtils.fromValue(6),  // expected
-            high.rootInstance.transformedOutput  // actual
+            instance.rootInstance.transformedOutput  // actual
         )
     }
 
@@ -51,15 +51,15 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val high = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
-        high.run()
+        instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
             JsonUtils.fromValue(3),  // expected
-            high.rootInstance.transformedOutput  // actual
+            instance.rootInstance.transformedOutput  // actual
         )
     }
 
@@ -79,15 +79,15 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val high = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
-        high.run()
+        instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
             JsonUtils.fromValue(6),  // expected
-            high.rootInstance.transformedOutput  // actual
+            instance.rootInstance.transformedOutput  // actual
         )
     }
 
@@ -106,15 +106,15 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val high = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(4, 5, 6))))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(4, 5, 6))))
 
         // run (one shot)
-        high.run()
+        instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
             JsonUtils.fromValue(3),  // expected
-            high.rootInstance.transformedOutput  // actual
+            instance.rootInstance.transformedOutput  // actual
         )
     }
 
@@ -134,15 +134,15 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val high = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(4, 5, 6))))
+        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(4, 5, 6))))
 
         // run (one shot)
-        high.run()
+        instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
             JsonUtils.fromValue(3),  // expected
-            high.rootInstance.transformedOutput  // actual
+            instance.rootInstance.transformedOutput  // actual
         )
     }
 
