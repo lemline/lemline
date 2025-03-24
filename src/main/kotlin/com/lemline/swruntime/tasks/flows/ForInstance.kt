@@ -12,21 +12,24 @@ class ForInstance(
 ) : NodeInstance<ForTask>(node, parent) {
 
     // The collection to enumerate.
-    private var forIn: List<JsonNode> = listOf()
+    private var forIn: List<JsonNode>
+        get() = state.forIn
+        set(value) {
+            state.forIn = value
+        }
 
     // The index into the enumeration
-    private var forIndex: Int = -1
+    private var forIndex: Int
+        get() = state.forIndex
+        set(value) {
+            state.forIndex = value
+        }
 
     // The name of the variable used to store the current item being enumerated.
     private val forEach = node.task.`for`.each ?: "item"
 
     // The name of the variable used to store the index of the current item being enumerated.
     private val forAt = node.task.`for`.at ?: "index"
-
-    override fun init() {
-        forIndex = -1
-        forIn = listOf()
-    }
 
     override suspend fun execute() {
         // useless, but indicate we entered the node

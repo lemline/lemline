@@ -1,5 +1,6 @@
 package com.lemline.swruntime.messaging
 
+import com.lemline.swruntime.tasks.NodeState
 import com.lemline.swruntime.utils.logger
 import com.lemline.swruntime.workflows.WorkflowInstance
 import jakarta.enterprise.context.ApplicationScoped
@@ -25,7 +26,10 @@ class WorkflowExecutionConsumer(
             val instance = WorkflowInstance(
                 name = workflowMessage.name,
                 version = workflowMessage.version,
-                states = workflowMessage.state.mapKeys { state -> state.key.toPosition() }.toMutableMap(),
+                states = workflowMessage.states
+                    .mapKeys { it.key.toPosition() }
+                    .mapValues { NodeState.fromJson(it.value) }
+                    .toMutableMap(),
                 position = workflowMessage.position.toPosition()
             )
 
@@ -36,7 +40,7 @@ class WorkflowExecutionConsumer(
                     .setData(
                         instance.name,
                         instance.version,
-                        instance.getState().mapKeys { it.key.jsonPointer },
+                        instance.getStates(),
                         instance.position
                     ).send()
 

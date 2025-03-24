@@ -11,16 +11,7 @@ class ForkInstance(
 ) : NodeInstance<ForkTask>(node, parent) {
     private var branchIndex: Int? = null
     private var taskIndex: Int? = null
-
-    override fun setState(state: NodeState) {
-//        branchIndex = scope[BRANCH_INDEX]?.asInt()
-//        taskIndex = scope[TASK_INDEX]?.asInt()
-    }
-
-    override fun getState() = NodeState().apply {
-//        branchIndex?.let { this[BRANCH_INDEX] = JsonNodeFactory.instance.numberNode(it) }
-//        taskIndex?.let { this[TASK_INDEX] = JsonNodeFactory.instance.numberNode(it) }
-    }
+    
 
     companion object {
         private const val BRANCH_INDEX = "branch.childIndex"

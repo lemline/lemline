@@ -1,91 +1,104 @@
 package com.lemline.swruntime.tasks
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.IntNode
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.fasterxml.jackson.databind.node.TextNode
+import com.fasterxml.jackson.databind.node.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import io.serverlessworkflow.impl.json.JsonUtils
 import java.time.Instant
 
+private val jsonFactory = JsonNodeFactory.instance
+
 /**
- * Represents a node's state. Contains state variables for the task during execution.
+ * Represents a node's states.
+ * Contain states variables for the task during execution.
+ * Some value such as forIndex as specific to a specific task
  */
-@JvmInline
-value class NodeState(
-    private val map: MutableMap<String, JsonNode> = mutableMapOf()
+data class NodeState(
+    var variables: ObjectNode = jsonFactory.objectNode(),
+    var attemptIndex: Int = ATTEMPT_INDEX_DEFAULT,
+    var childIndex: Int = CHILD_INDEX_DEFAULT,
+    var rawInput: JsonNode? = null,
+    var rawOutput: JsonNode? = null,
+    var context: ObjectNode = jsonFactory.objectNode(),
+    var workflowId: String? = null,
+    var startedAt: DateTimeDescriptor? = null,
+    var forIndex: Int = FOR_INDEX_DEFAULT,
+    var forIn: List<JsonNode> = listOf()
 ) {
+    fun toJson(): ObjectNode? {
+        val json = jsonFactory.objectNode()
+        if (!variables.isEmpty) json.set<JsonNode>(VARIABLES, variables)
+        if (attemptIndex != ATTEMPT_INDEX_DEFAULT) json.set<IntNode>(ATTEMPT_INDEX, IntNode(attemptIndex))
+        if (childIndex != CHILD_INDEX_DEFAULT) json.set<IntNode>(CHILD_INDEX, IntNode(childIndex))
+        rawInput?.let { json.set<JsonNode>(RAW_INPUT, it) }
+        rawOutput?.let { json.set<JsonNode>(RAW_OUTPUT, it) }
+        if (!context.isEmpty) json.set<JsonNode>(CONTEXT, context)
+        workflowId?.let { json.set<JsonNode>(WORKFLOW_ID, TextNode(it)) }
+        startedAt?.let { json.set<JsonNode>(STARTED_AT, TextNode(it.iso8601())) }
+        if (forIndex != FOR_INDEX_DEFAULT) json.set<IntNode>(FOR_INDEX, IntNode(forIndex))
+        if (forIn.isNotEmpty()) json.set<JsonNode>(FOR_IN, JsonUtils.fromValue(forIn))
 
-    init {
-        init()
+        return if (json.isEmpty) null else json
     }
-
-    private fun init() {
-        setVariables(JsonUtils.`object`())
-        setContext(JsonUtils.`object`())
-    }
-
-    fun reset() {
-        map.clear()
-        init()
-    }
-
-    fun setVariables(scope: ObjectNode) {
-        map[VARIABLES] = scope
-    }
-
-    fun setAttemptIndex(index: Int) {
-        if (index > ATTEMPT_INDEX_DEFAULT) map[ATTEMPT_INDEX] = IntNode(index)
-    }
-
-    fun setChildIndex(index: Int) {
-        if (index > CHILD_INDEX_DEFAULT) map[CHILD_INDEX] = IntNode(index)
-    }
-
-    fun setRawInput(input: JsonNode?) {
-        input?.let { map[RAW_INPUT] = it }
-    }
-
-    fun setRawOutput(output: JsonNode?) {
-        output?.let { map[RAW_OUTPUT] = it }
-    }
-
-    fun setContext(context: ObjectNode) {
-        map[CONTEXT] = context
-    }
-
-    fun setWorkflowId(id: String) {
-        map[WORKFLOW_ID] = TextNode(id)
-    }
-
-    fun setStartedAt(startedAt: DateTimeDescriptor?) {
-        startedAt?.let { map[STARTED_AT] = TextNode(it.iso8601()) }
-    }
-
-    fun getVariables(): ObjectNode = map[VARIABLES] as ObjectNode
-    fun getChildIndex(): Int = map[CHILD_INDEX]?.asInt() ?: CHILD_INDEX_DEFAULT
-    fun getAttemptIndex(): Int = map[ATTEMPT_INDEX]?.asInt() ?: ATTEMPT_INDEX_DEFAULT
-    fun getRawInput(): JsonNode? = map[RAW_INPUT]
-    fun getRawOutput(): JsonNode? = map[RAW_OUTPUT]
-    fun getContext(): ObjectNode = map[CONTEXT] as ObjectNode
-    fun getWorkflowId(): String = map[WORKFLOW_ID]!!.asText()
-    fun getStartedAt(): DateTimeDescriptor? =
-        map[STARTED_AT]?.let { DateTimeDescriptor.from(Instant.parse(it.asText())) }
-
+    
     /**
      * Those constants MUST NOT be changed to ensure backward compatibility of messages
      */
     companion object {
+        fun fromJson(json: ObjectNode) = NodeState().apply {
+            json.get(VARIABLES)?.let { variables ->
+                if (variables is ObjectNode) this.variables = variables
+                else throw IllegalArgumentException("variables must be an ObjectNode")
+            }
+            json.get(ATTEMPT_INDEX)?.let { attemptIndex ->
+                if (attemptIndex is IntNode) this.attemptIndex = attemptIndex.intValue()
+                else throw IllegalArgumentException("attemptIndex must be an IntNode")
+            }
+            json.get(CHILD_INDEX)?.let { childIndex ->
+                if (childIndex is IntNode) this.childIndex = childIndex.intValue()
+                else throw IllegalArgumentException("childIndex must be an IntNode")
+            }
+            json.get(RAW_INPUT)?.let { rawInput ->
+                this.rawInput = rawInput
+            }
+            json.get(RAW_OUTPUT)?.let { rawOutput ->
+                this.rawOutput = rawOutput
+            }
+            json.get(CONTEXT)?.let { context ->
+                if (context is ObjectNode) this.context = context
+                else throw IllegalArgumentException("context must be an ObjectNode")
+            }
+            json.get(WORKFLOW_ID)?.let { workflowId ->
+                if (workflowId is TextNode) this.workflowId = workflowId.textValue()
+            }
+            json.get(STARTED_AT)?.let { startedAt ->
+                if (startedAt is TextNode) this.startedAt =
+                    DateTimeDescriptor.from(Instant.parse(startedAt.textValue()))
+                else throw IllegalArgumentException("startedAt must be an TextNode")
+            }
+            json.get(FOR_INDEX)?.let { forIndex ->
+                if (forIndex is IntNode) this.forIndex = forIndex.intValue()
+                else throw IllegalArgumentException("forIndex must be an IntNode")
+            }
+            json.get(FOR_IN)?.let { forIn ->
+                if (forIn is ArrayNode) this.forIn = forIn.toList()
+                else throw IllegalArgumentException("forIn must be an ArrayNode")
+            }
+        }
+
         const val CHILD_INDEX = "child"
         const val ATTEMPT_INDEX = "retry"
         const val VARIABLES = "var"
         const val RAW_INPUT = "in"
         const val RAW_OUTPUT = "out"
         const val CONTEXT = "ctx"
-        const val WORKFLOW_ID = "id"
+        const val WORKFLOW_ID = "wid"
         const val STARTED_AT = "at"
+        const val FOR_INDEX = "fori"
+        const val FOR_IN = "forl"
 
         const val CHILD_INDEX_DEFAULT = -1
         const val ATTEMPT_INDEX_DEFAULT = 0
+        const val FOR_INDEX_DEFAULT = -1
     }
 }

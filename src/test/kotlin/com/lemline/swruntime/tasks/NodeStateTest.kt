@@ -1,52 +1,202 @@
 package com.lemline.swruntime.tasks
 
-import org.junit.jupiter.api.Assertions.assertEquals
+import com.fasterxml.jackson.databind.node.JsonNodeFactory
+import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import io.serverlessworkflow.impl.json.JsonUtils
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import java.time.Instant
 
 class NodeStateTest {
+    private val jsonFactory = JsonNodeFactory.instance
 
-    /**
-     * This test verifies that the constant values in NodeState don't change.
-     * These constants are used as keys for serialization/deserialization
-     * and changing them would break backward compatibility.
-     */
     @Test
-    fun `test constants should maintain their values`() {
-        // These assertions will fail if someone changes the constants,
-        // providing a reminder about the implications of such changes
-        assertEquals(
-            "child", NodeState.CHILD_INDEX,
-            "NodeState.CHILD_INDEX constant should not be changed as it would break serialization compatibility"
-        )
+    fun `test constants must not change to maintain expected behavior`() {
+        assertEquals(-1, NodeState.CHILD_INDEX_DEFAULT)
+        assertEquals(0, NodeState.ATTEMPT_INDEX_DEFAULT)
+        assertEquals(-1, NodeState.FOR_INDEX_DEFAULT)
+    }
 
-        assertEquals(
-            "var", NodeState.VARIABLES,
-            "NodeState.VARIABLES constant should not be changed as it would break serialization compatibility"
-        )
+    @Test
+    fun `test constants maintain their values for messages backward compatibility`() {
+        assertEquals("child", NodeState.CHILD_INDEX)
+        assertEquals("retry", NodeState.ATTEMPT_INDEX)
+        assertEquals("var", NodeState.VARIABLES)
+        assertEquals("in", NodeState.RAW_INPUT)
+        assertEquals("out", NodeState.RAW_OUTPUT)
+        assertEquals("ctx", NodeState.CONTEXT)
+        assertEquals("wid", NodeState.WORKFLOW_ID)
+        assertEquals("at", NodeState.STARTED_AT)
+        assertEquals("fori", NodeState.FOR_INDEX)
+        assertEquals("forl", NodeState.FOR_IN)
+    }
 
-        assertEquals(
-            "in", NodeState.RAW_INPUT,
-            "NodeState.RAW_INPUT constant should not be changed as it would break serialization compatibility"
-        )
+    @Test
+    fun `test default values`() {
+        val state = NodeState()
+        assertTrue(state.variables.isEmpty)
+        assertEquals(NodeState.ATTEMPT_INDEX_DEFAULT, state.attemptIndex)
+        assertEquals(NodeState.CHILD_INDEX_DEFAULT, state.childIndex)
+        assertNull(state.rawInput)
+        assertNull(state.rawOutput)
+        assertTrue(state.context.isEmpty)
+        assertNull(state.workflowId)
+        assertNull(state.startedAt)
+        assertEquals(NodeState.FOR_INDEX_DEFAULT, state.forIndex)
+        assertTrue(state.forIn.isEmpty())
+    }
 
-        assertEquals(
-            "out", NodeState.RAW_OUTPUT,
-            "NodeState.RAW_OUTPUT constant should not be changed as it would break serialization compatibility"
-        )
+    @Nested
+    inner class SerializationTests {
+        private lateinit var state: NodeState
+        private val testInstant = Instant.parse("2024-01-01T00:00:00Z")
 
-        assertEquals(
-            "ctx", NodeState.CONTEXT,
-            "NodeState.CONTEXT constant should not be changed as it would break serialization compatibility"
-        )
+        @BeforeEach
+        fun setup() {
+            state = NodeState().apply {
+                variables = jsonFactory.objectNode().put("testVar", "value")
+                attemptIndex = 1
+                childIndex = 2
+                rawInput = jsonFactory.objectNode().put("input", "test")
+                rawOutput = jsonFactory.objectNode().put("output", "result")
+                context = jsonFactory.objectNode().put("contextKey", "contextValue")
+                workflowId = "test-workflow"
+                startedAt = DateTimeDescriptor.from(testInstant)
+                forIndex = 3
+                forIn = listOf(JsonUtils.fromValue("item1"), JsonUtils.fromValue("item2"))
+            }
+        }
 
-        assertEquals(
-            "id", NodeState.WORKFLOW_ID,
-            "NodeState.WORKFLOW_ID constant should not be changed as it would break serialization compatibility"
-        )
+        @Test
+        fun `test serialization to JSON`() {
+            val json = state.toJson()
+            assertNotNull(json)
 
-        assertEquals(
-            "at", NodeState.STARTED_AT,
-            "NodeState.STARTED_AT constant should not be changed as it would break serialization compatibility"
-        )
+            assertEquals("value", json?.get(NodeState.VARIABLES)?.get("testVar")?.asText())
+            assertEquals(1, json?.get(NodeState.ATTEMPT_INDEX)?.asInt())
+            assertEquals(2, json?.get(NodeState.CHILD_INDEX)?.asInt())
+            assertEquals("test", json?.get(NodeState.RAW_INPUT)?.get("input")?.asText())
+            assertEquals("result", json?.get(NodeState.RAW_OUTPUT)?.get("output")?.asText())
+            assertEquals("contextValue", json?.get(NodeState.CONTEXT)?.get("contextKey")?.asText())
+            assertEquals("test-workflow", json?.get(NodeState.WORKFLOW_ID)?.asText())
+            assertEquals(testInstant.toString(), json?.get(NodeState.STARTED_AT)?.asText())
+            assertEquals(3, json?.get(NodeState.FOR_INDEX)?.asInt())
+            assertEquals("item1", json?.get(NodeState.FOR_IN)?.get(0)?.asText())
+            assertEquals("item2", json?.get(NodeState.FOR_IN)?.get(1)?.asText())
+        }
+
+        @Test
+        fun `test deserialization from JSON`() {
+            val json = state.toJson()
+            val deserializedState = NodeState.fromJson(json!!)
+
+            assertEquals("value", deserializedState.variables.get("testVar").asText())
+            assertEquals(1, deserializedState.attemptIndex)
+            assertEquals(2, deserializedState.childIndex)
+            assertEquals("test", deserializedState.rawInput?.get("input")?.asText())
+            assertEquals("result", deserializedState.rawOutput?.get("output")?.asText())
+            assertEquals("contextValue", deserializedState.context.get("contextKey").asText())
+            assertEquals("test-workflow", deserializedState.workflowId)
+            assertEquals(testInstant, Instant.parse(deserializedState.startedAt?.iso8601()))
+            assertEquals(3, deserializedState.forIndex)
+            assertEquals(2, deserializedState.forIn.size)
+            assertEquals("item1", deserializedState.forIn[0].asText())
+            assertEquals("item2", deserializedState.forIn[1].asText())
+        }
+    }
+
+    @Nested
+    inner class ErrorHandlingTests {
+        private val invalidJson = jsonFactory.objectNode()
+
+        @BeforeEach
+        fun setup() {
+            invalidJson.put(NodeState.VARIABLES, "not-an-object")
+            invalidJson.put(NodeState.ATTEMPT_INDEX, "not-an-int")
+            invalidJson.put(NodeState.CHILD_INDEX, "not-an-int")
+            invalidJson.put(NodeState.CONTEXT, "not-an-object")
+            invalidJson.put(NodeState.STARTED_AT, "not-a-date")
+            invalidJson.put(NodeState.FOR_INDEX, "not-an-int")
+            invalidJson.put(NodeState.FOR_IN, "not-an-array")
+        }
+
+        @Test
+        fun `test invalid variables type`() {
+            val json = jsonFactory.objectNode().put(NodeState.VARIABLES, "invalid")
+            assertThrows(IllegalArgumentException::class.java) {
+                NodeState.fromJson(json)
+            }
+        }
+
+        @Test
+        fun `test invalid attempt index type`() {
+            val json = jsonFactory.objectNode().put(NodeState.ATTEMPT_INDEX, "invalid")
+            assertThrows(IllegalArgumentException::class.java) {
+                NodeState.fromJson(json)
+            }
+        }
+
+        @Test
+        fun `test invalid child index type`() {
+            val json = jsonFactory.objectNode().put(NodeState.CHILD_INDEX, "invalid")
+            assertThrows(IllegalArgumentException::class.java) {
+                NodeState.fromJson(json)
+            }
+        }
+
+        @Test
+        fun `test invalid context type`() {
+            val json = jsonFactory.objectNode().put(NodeState.CONTEXT, "invalid")
+            assertThrows(IllegalArgumentException::class.java) {
+                NodeState.fromJson(json)
+            }
+        }
+
+        @Test
+        fun `test invalid started at format`() {
+            val json = jsonFactory.objectNode().put(NodeState.STARTED_AT, "invalid-date")
+            assertThrows(Exception::class.java) {
+                NodeState.fromJson(json)
+            }
+        }
+
+        @Test
+        fun `test invalid for index type`() {
+            val json = jsonFactory.objectNode().put(NodeState.FOR_INDEX, "invalid")
+            assertThrows(IllegalArgumentException::class.java) {
+                NodeState.fromJson(json)
+            }
+        }
+
+        @Test
+        fun `test invalid for in type`() {
+            val json = jsonFactory.objectNode().put(NodeState.FOR_IN, "invalid")
+            assertThrows(IllegalArgumentException::class.java) {
+                NodeState.fromJson(json)
+            }
+        }
+    }
+
+    @Test
+    fun `test default state serialization returns null`() {
+        val state = NodeState()
+        assertNull(state.toJson())
+    }
+
+    @Test
+    fun `test partial state serialization`() {
+        val state = NodeState().apply {
+            workflowId = "test-workflow"
+            childIndex = 1
+        }
+
+        val json = state.toJson()
+        assertNotNull(json)
+        assertEquals("test-workflow", json?.get(NodeState.WORKFLOW_ID)?.asText())
+        assertEquals(1, json?.get(NodeState.CHILD_INDEX)?.asInt())
+        assertNull(json?.get(NodeState.VARIABLES))
+        assertNull(json?.get(NodeState.RAW_INPUT))
     }
 }

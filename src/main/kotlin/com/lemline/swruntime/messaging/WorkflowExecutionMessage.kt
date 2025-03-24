@@ -1,6 +1,7 @@
 package com.lemline.swruntime.messaging
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.swruntime.tasks.JsonPointer
 import com.lemline.swruntime.tasks.NodeState
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
@@ -14,13 +15,13 @@ import java.time.Instant
  *
  * @property name The name of the workflow.
  * @property version The version of the workflow.
- * @property state A map of the internal state (per position) of the workflow instance.
+ * @property states A map of the internal states (per position) of the workflow instance.
  * @property position The current active position
  */
 data class WorkflowExecutionMessage(
     val name: String,
     val version: String,
-    val state: Map<JsonPointer, NodeState>,
+    val states: Map<JsonPointer, ObjectNode>,
     val position: JsonPointer
 ) {
     companion object {
@@ -32,12 +33,13 @@ data class WorkflowExecutionMessage(
         ) = WorkflowExecutionMessage(
             name = name,
             version = version,
-            state = mapOf(
-                JsonPointer.root to NodeState().apply {
-                    setWorkflowId(id)
-                    setRawInput(input)
-                    setStartedAt(DateTimeDescriptor.from(Instant.now()))
-                }),
+            states = mapOf(
+                JsonPointer.root to NodeState(
+                    workflowId = id,
+                    rawInput = input,
+                    startedAt = DateTimeDescriptor.from(Instant.now())
+                ).toJson()!!
+            ),
             position = JsonPointer.root
         )
     }

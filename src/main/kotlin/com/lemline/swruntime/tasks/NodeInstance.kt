@@ -19,7 +19,7 @@ import java.time.Instant
 
 /**
  * Base class for all task instances.
- * Task instances maintain the state of a task during execution.
+ * Task instances maintain the states of a task during execution.
  */
 abstract class NodeInstance<T : TaskBase>(
     open val node: NodeTask<T>,
@@ -27,7 +27,10 @@ abstract class NodeInstance<T : TaskBase>(
 ) {
     private val logger = logger()
 
-    internal val state = NodeState()
+    /**
+     * Node internal states
+     */
+    internal var state = NodeState()
 
     /**
      * Possible children of this task
@@ -48,43 +51,55 @@ abstract class NodeInstance<T : TaskBase>(
      * Current Index of attempts (0 => first attempt, 1 => first retry, 2 => second retry, ...)
      */
     private var attemptIndex
-        get() = state.getAttemptIndex()
-        set(value) = state.setAttemptIndex(value)
+        get() = state.attemptIndex
+        set(value) {
+            state.attemptIndex = value
+        }
 
     /**
      * Index of the current child being processed
      */
     internal var childIndex: Int
-        get() = state.getChildIndex()
-        set(value) = state.setChildIndex(value)
+        get() = state.childIndex
+        set(value) {
+            state.childIndex = value
+        }
 
     /**
      * Additional properties for this scope (for example from For task)
      */
     internal var variables: ObjectNode
-        get() = state.getVariables()
-        set(value) = state.setVariables(value)
+        get() = state.variables
+        set(value) {
+            state.variables = value
+        }
 
     /**
      * The time the task was started at.
      */
     private var startedAt: DateTimeDescriptor?
-        get() = state.getStartedAt()
-        set(value) = state.setStartedAt(value)
+        get() = state.startedAt
+        set(value) {
+            state.startedAt = value
+        }
 
     /**
      * The task raw input.
      */
     internal var rawInput: JsonNode?
-        get() = state.getRawInput()
-        set(value) = state.setRawInput(value)
+        get() = state.rawInput
+        set(value) {
+            state.rawInput = value
+        }
 
     /**
      * The task raw output.
      */
     internal var rawOutput: JsonNode?
-        get() = state.getRawOutput()
-        set(value) = state.setRawOutput(value)
+        get() = state.rawOutput
+        set(value) {
+            state.rawOutput = value
+        }
 
     /**
      * The task transformed input.
@@ -96,20 +111,6 @@ abstract class NodeInstance<T : TaskBase>(
      * The task transformed output.
      */
     internal var transformedOutput: JsonNode? = null
-
-    /**
-     * This should be overridden to reset the state of Node Instance implementation
-     */
-    internal open fun init() {}
-
-    /**
-     * Node Instance needs to be reset when exited,
-     * as they can potentially be re-executed again (using a named then directive)
-     */
-    private fun reset() {
-        init()
-        state.reset()
-    }
 
     private val taskDescriptor
         get() = TaskDescriptor(
@@ -211,7 +212,7 @@ abstract class NodeInstance<T : TaskBase>(
             ?.let { if (it.isBoolean) it.asBoolean() else error("result of '.if' condition must be a boolean, but is '$it'") }
             ?: true
 
-        if (!shouldStart) reset()
+        if (!shouldStart) state = NodeState()
 
         return shouldStart
     }
@@ -227,7 +228,7 @@ abstract class NodeInstance<T : TaskBase>(
      * @return The transformed input as a JSON node.
      */
     internal fun start(): JsonNode {
-        this.startedAt = DateTimeDescriptor.from(Instant.now())
+        startedAt = DateTimeDescriptor.from(Instant.now())
         // Validate task input if schema is provided
         node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput!!, schema) }
 
@@ -236,11 +237,11 @@ abstract class NodeInstance<T : TaskBase>(
         logger.info { "      scope            = $scope" }
 
         // Transform task input using 'input.from' expression if provided
-        this.transformedInput = evalTransformedInput()
+        transformedInput = evalTransformedInput()
         logger.info { "      transformedInput = $transformedInput" }
 
         // Set default behavior
-        this.rawOutput = transformedInput
+        rawOutput = transformedInput
 
         return transformedInput!!
     }
@@ -279,32 +280,7 @@ abstract class NodeInstance<T : TaskBase>(
         parent?.rawOutput = transformedOutput
 
         // reset the instance
-        if (this !is RootInstance) reset()
-    }
-
-    /**
-     * Set the internal state of this task instance.
-     */
-    open fun setState(state: NodeState) {
-        childIndex = state.getChildIndex()
-        attemptIndex = state.getAttemptIndex()
-        variables = state.getVariables()
-        startedAt = state.getStartedAt()
-        rawInput = state.getRawInput()
-        //startedAt?.let { transformedInput = evalTransformedInput() }
-        rawOutput = state.getRawOutput()
-    }
-
-    /**
-     * Gets the internal state of this task instance.
-     */
-    open fun getState(): NodeState? = NodeState().apply {
-        setChildIndex(childIndex)
-        setAttemptIndex(attemptIndex)
-        setVariables(variables)
-        setRawInput(rawInput)
-        setStartedAt(startedAt)
-        setRawOutput(rawOutput)
+        if (this !is RootInstance) state = NodeState()
     }
 
     private fun raise(error: WorkflowError) {

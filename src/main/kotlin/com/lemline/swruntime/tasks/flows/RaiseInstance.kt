@@ -10,14 +10,7 @@ class RaiseInstance(
     override val parent: NodeInstance<*>,
 ) : NodeInstance<RaiseTask>(node, parent) {
     private var error: String? = null
-
-    override fun setState(state: NodeState) {
-//        error = scope[ERROR]?.asText()
-    }
-
-    override fun getState() = NodeState().apply {
-//        error?.let { this[ERROR] = JsonNodeFactory.instance.textNode(it) }
-    }
+    
 
     companion object {
         private const val ERROR = "error"

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.swruntime.messaging.WorkflowExecutionMessage
 import com.lemline.swruntime.models.WorkflowDefinition
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
+import com.lemline.swruntime.tasks.NodeState
 import com.lemline.swruntime.workflows.WorkflowInstance
 import com.lemline.swruntime.workflows.WorkflowParser
 import io.mockk.every
@@ -43,7 +44,10 @@ internal fun getWorkflowInstance(doYaml: String, input: JsonNode): WorkflowInsta
     return WorkflowInstance(
         name = msg.name,
         version = msg.version,
-        states = msg.state.mapKeys { state -> state.key.toPosition() }.toMutableMap(),
+        states = msg.states
+            .mapKeys { it.key.toPosition() }
+            .mapValues { NodeState.fromJson(it.value) }
+            .toMutableMap(),
         position = msg.position.toPosition()
     ).apply { workflowParser = mockedService }
 }

@@ -1,8 +1,8 @@
 package com.lemline.swruntime.messaging
 
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.swruntime.tasks.JsonPointer
 import com.lemline.swruntime.tasks.NodePosition
-import com.lemline.swruntime.tasks.NodeState
 import com.lemline.swruntime.utils.logger
 import jakarta.enterprise.context.ApplicationScoped
 import org.eclipse.microprofile.reactive.messaging.Outgoing
@@ -16,13 +16,13 @@ class WorkflowExecutionProducer {
     fun setData(
         workflowName: String,
         workflowVersion: String,
-        instanceStates: Map<JsonPointer, NodeState>,
+        instanceStates: Map<JsonPointer, ObjectNode>,
         instancePosition: NodePosition,
     ): WorkflowExecutionProducer {
         message = WorkflowExecutionMessage(
             name = workflowName,
             version = workflowVersion,
-            state = instanceStates,
+            states = instanceStates,
             position = instancePosition.jsonPointer
         )
 

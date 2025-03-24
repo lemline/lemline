@@ -1,6 +1,7 @@
 package com.lemline.swruntime.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.swruntime.errors.CaughtDoWorkflowException
 import com.lemline.swruntime.expressions.scopes.RuntimeDescriptor
 import com.lemline.swruntime.expressions.scopes.WorkflowDescriptor
@@ -40,28 +41,28 @@ class WorkflowInstance(
 
     /**
      * Instance WORKFLOW_ID
-     * (parsed from the state)
+     * (parsed from the states)
      */
     private val id: String
 
     /**
      * Instance starting date
-     * (parsed from the state)
+     * (parsed from the states)
      */
     private val startedAt: DateTimeDescriptor
 
     /**
      * Instance raw input
-     * (parsed from the state)
+     * (parsed from the states)
      */
     private val rawInput: JsonNode
 
     init {
-        val rootState = states[NodePosition.root] ?: error("no state provided for the root node")
+        val rootState = states[NodePosition.root] ?: error("no states provided for the root node")
 
-        this.id = rootState.getWorkflowId()
-        this.startedAt = rootState.getStartedAt()!!
-        this.rawInput = rootState.getRawInput()!!
+        this.id = rootState.workflowId!!
+        this.startedAt = rootState.startedAt!!
+        this.rawInput = rootState.rawInput!!
     }
 
     // Retrieves the workflow by its name and version
@@ -97,7 +98,7 @@ class WorkflowInstance(
                 current.start()
                 current.`continue`()
             }
-            // complete the current activity execution (rawOutput should be part of the state)
+            // complete the current activity execution (rawOutput should be part of the states)
             false -> current.then()
         }
 
@@ -138,10 +139,10 @@ class WorkflowInstance(
     internal fun isCompleted(): Boolean = position == NodePosition.root && rootInstance.childIndex == 1
 
     /**
-     * Retrieves the task instances of the given workflow with the provided state.
+     * Retrieves the task instances of the given workflow with the provided states.
      *
-     * This method initializes the root instance with the provided state,
-     * and then recursively populates the instance node and its children with the state.
+     * This method initializes the root instance with the provided states,
+     * and then recursively populates the instance node and its children with the states.
      *
      * @return A map of task positions to their task instances.
      */
@@ -169,15 +170,15 @@ class WorkflowInstance(
         return nodeInstances
     }
 
-    internal fun getState(): MutableMap<NodePosition, NodeState> {
-        val state = mutableMapOf<NodePosition, NodeState>()
+    internal fun getStates(): MutableMap<JsonPointer, ObjectNode> {
+        val states = mutableMapOf<JsonPointer, ObjectNode>()
         fun collect(nodeInstance: NodeInstance<*>) {
-            nodeInstance.getState()?.let { state[nodeInstance.node.position] = it }
+            nodeInstance.state.toJson()?.let { states[nodeInstance.node.position.jsonPointer] = it }
             nodeInstance.children.forEach { collect(it) }
         }
         collect(rootInstance)
 
-        return state
+        return states
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -200,8 +201,8 @@ class WorkflowInstance(
         is WaitTask -> WaitInstance(this as NodeTask<WaitTask>, parent!!)
         else -> throw IllegalArgumentException("Unknown task type: ${task.javaClass.name}")
     }
-        // apply state for this new node instance
-        .apply { states[node.position]?.let { setState(it) } }
+        // apply states for this new node instance
+        .apply { states[node.position]?.let { state = it } }
         // create all children node instances
         .also { nodeInstance ->
             nodeInstance.children = this.children?.map { child -> child.createInstance(nodeInstance) } ?: emptyList()

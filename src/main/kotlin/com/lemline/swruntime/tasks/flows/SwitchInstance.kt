@@ -11,14 +11,9 @@ class SwitchInstance(
     override val parent: NodeInstance<*>,
 ) : NodeInstance<SwitchTask>(node, parent) {
 
-    // the calculated then directive
-    private var then: FlowDirective? = null
+    override fun `continue`(): NodeInstance<*>? {
+        var then: FlowDirective? = null
 
-    override fun init() {
-        then = null
-    }
-
-    override suspend fun execute() {
         // evaluate the different cases
         for (item: SwitchItem in node.task.switch) {
             if ((item.switchCase.`when` == null) || evalCase(item.switchCase.`when`, item.name)) {
@@ -26,9 +21,9 @@ class SwitchInstance(
                 break
             }
         }
-    }
 
-    override fun `continue`() = then(then?.get())
+        return then(then?.get())
+    }
 
     private fun evalCase(`when`: String, name: String): Boolean {
         val out = eval(transformedInput!!, `when`)
