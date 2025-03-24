@@ -2,7 +2,6 @@ package com.lemline.swruntime.tasks
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import io.serverlessworkflow.impl.json.JsonUtils
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -30,7 +29,6 @@ class NodeStateTest {
         assertEquals("wid", NodeState.WORKFLOW_ID)
         assertEquals("at", NodeState.STARTED_AT)
         assertEquals("fori", NodeState.FOR_INDEX)
-        assertEquals("forl", NodeState.FOR_IN)
     }
 
     @Test
@@ -45,7 +43,6 @@ class NodeStateTest {
         assertNull(state.workflowId)
         assertNull(state.startedAt)
         assertEquals(NodeState.FOR_INDEX_DEFAULT, state.forIndex)
-        assertTrue(state.forIn.isEmpty())
     }
 
     @Nested
@@ -65,7 +62,6 @@ class NodeStateTest {
                 workflowId = "test-workflow"
                 startedAt = DateTimeDescriptor.from(testInstant)
                 forIndex = 3
-                forIn = listOf(JsonUtils.fromValue("item1"), JsonUtils.fromValue("item2"))
             }
         }
 
@@ -83,8 +79,6 @@ class NodeStateTest {
             assertEquals("test-workflow", json?.get(NodeState.WORKFLOW_ID)?.asText())
             assertEquals(testInstant.toString(), json?.get(NodeState.STARTED_AT)?.asText())
             assertEquals(3, json?.get(NodeState.FOR_INDEX)?.asInt())
-            assertEquals("item1", json?.get(NodeState.FOR_IN)?.get(0)?.asText())
-            assertEquals("item2", json?.get(NodeState.FOR_IN)?.get(1)?.asText())
         }
 
         @Test
@@ -99,11 +93,8 @@ class NodeStateTest {
             assertEquals("result", deserializedState.rawOutput?.get("output")?.asText())
             assertEquals("contextValue", deserializedState.context.get("contextKey").asText())
             assertEquals("test-workflow", deserializedState.workflowId)
-            assertEquals(testInstant, Instant.parse(deserializedState.startedAt?.iso8601()))
+            assertEquals(testInstant, deserializedState.startedAt?.iso8601()?.let { Instant.parse(it) })
             assertEquals(3, deserializedState.forIndex)
-            assertEquals(2, deserializedState.forIn.size)
-            assertEquals("item1", deserializedState.forIn[0].asText())
-            assertEquals("item2", deserializedState.forIn[1].asText())
         }
     }
 
@@ -119,7 +110,6 @@ class NodeStateTest {
             invalidJson.put(NodeState.CONTEXT, "not-an-object")
             invalidJson.put(NodeState.STARTED_AT, "not-a-date")
             invalidJson.put(NodeState.FOR_INDEX, "not-an-int")
-            invalidJson.put(NodeState.FOR_IN, "not-an-array")
         }
 
         @Test
@@ -165,14 +155,6 @@ class NodeStateTest {
         @Test
         fun `test invalid for index type`() {
             val json = jsonFactory.objectNode().put(NodeState.FOR_INDEX, "invalid")
-            assertThrows(IllegalArgumentException::class.java) {
-                NodeState.fromJson(json)
-            }
-        }
-
-        @Test
-        fun `test invalid for in type`() {
-            val json = jsonFactory.objectNode().put(NodeState.FOR_IN, "invalid")
             assertThrows(IllegalArgumentException::class.java) {
                 NodeState.fromJson(json)
             }

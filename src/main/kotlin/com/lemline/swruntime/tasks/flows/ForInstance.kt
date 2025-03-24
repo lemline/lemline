@@ -11,14 +11,17 @@ class ForInstance(
     override val parent: NodeInstance<*>,
 ) : NodeInstance<ForTask>(node, parent) {
 
-    // The collection to enumerate.
-    private var forIn: List<JsonNode>
-        get() = state.forIn
-        set(value) {
-            state.forIn = value
-        }
+    /**
+     * The collection to enumerate (calculated)
+     */
+    private var _forIn: List<JsonNode>? = null
 
-    // The index into the enumeration
+    internal val forIn: List<JsonNode>
+        get() = _forIn ?: evalForIn(node.task.`for`.`in`).also { _forIn = it }
+
+    /**
+     * The index into the enumeration (from state)
+     */
     private var forIndex: Int
         get() = state.forIndex
         set(value) {
@@ -34,8 +37,11 @@ class ForInstance(
     override suspend fun execute() {
         // useless, but indicate we entered the node
         childIndex++
-        // evaluate forIn with current transformed input
-        forIn = evalForIn(node.task.`for`.`in`)
+    }
+
+    override fun reset() {
+        _forIn = null
+        super.reset()
     }
 
     override fun `continue`(): NodeInstance<*>? {
@@ -54,16 +60,16 @@ class ForInstance(
         node.task.`while`?.let { if (!evalWhile(it)) return then() }
 
         // Go to Do
-        return children[childIndex].also { it.rawInput = rawOutput }
+        return children[childIndex].also { it.rawInput = rawOutput!! }
     }
 
     private fun evalWhile(`while`: String): Boolean {
-        val out = eval(rawOutput ?: transformedInput!!, `while`)
+        val out = eval(rawOutput ?: transformedInput, `while`)
         return if (out.isBoolean) out.asBoolean() else error("'.while' condition must be a boolean, but is $out")
     }
 
     private fun evalForIn(forIn: String): List<JsonNode> {
-        val out = eval(transformedInput!!, forIn)
+        val out = eval(transformedInput, forIn)
         return if (out.isArray) out.asIterable().toList() else error("'.for.in' must be an array, but is $out")
     }
 }

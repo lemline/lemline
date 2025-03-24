@@ -14,7 +14,7 @@ open class DoInstance(
 
         return when (childIndex) {
             children.size -> then()
-            else -> children[childIndex].also { it.rawInput = rawOutput }
+            else -> children[childIndex].also { it.rawInput = rawOutput!! }
         }
     }
 }

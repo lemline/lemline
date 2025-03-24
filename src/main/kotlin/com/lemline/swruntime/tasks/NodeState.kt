@@ -1,9 +1,11 @@
 package com.lemline.swruntime.tasks
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.*
+import com.fasterxml.jackson.databind.node.IntNode
+import com.fasterxml.jackson.databind.node.JsonNodeFactory
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.fasterxml.jackson.databind.node.TextNode
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import io.serverlessworkflow.impl.json.JsonUtils
 import java.time.Instant
 
 private val jsonFactory = JsonNodeFactory.instance
@@ -23,7 +25,6 @@ data class NodeState(
     var workflowId: String? = null,
     var startedAt: DateTimeDescriptor? = null,
     var forIndex: Int = FOR_INDEX_DEFAULT,
-    var forIn: List<JsonNode> = listOf()
 ) {
     fun toJson(): ObjectNode? {
         val json = jsonFactory.objectNode()
@@ -36,11 +37,10 @@ data class NodeState(
         workflowId?.let { json.set<JsonNode>(WORKFLOW_ID, TextNode(it)) }
         startedAt?.let { json.set<JsonNode>(STARTED_AT, TextNode(it.iso8601())) }
         if (forIndex != FOR_INDEX_DEFAULT) json.set<IntNode>(FOR_INDEX, IntNode(forIndex))
-        if (forIn.isNotEmpty()) json.set<JsonNode>(FOR_IN, JsonUtils.fromValue(forIn))
 
         return if (json.isEmpty) null else json
     }
-    
+
     /**
      * Those constants MUST NOT be changed to ensure backward compatibility of messages
      */
@@ -80,10 +80,6 @@ data class NodeState(
                 if (forIndex is IntNode) this.forIndex = forIndex.intValue()
                 else throw IllegalArgumentException("forIndex must be an IntNode")
             }
-            json.get(FOR_IN)?.let { forIn ->
-                if (forIn is ArrayNode) this.forIn = forIn.toList()
-                else throw IllegalArgumentException("forIn must be an ArrayNode")
-            }
         }
 
         const val CHILD_INDEX = "child"
@@ -95,7 +91,6 @@ data class NodeState(
         const val WORKFLOW_ID = "wid"
         const val STARTED_AT = "at"
         const val FOR_INDEX = "fori"
-        const val FOR_IN = "forl"
 
         const val CHILD_INDEX_DEFAULT = -1
         const val ATTEMPT_INDEX_DEFAULT = 0

@@ -42,7 +42,7 @@ class TryInstance(
 
         return when (childIndex) {
             children.size -> then()
-            else -> children[childIndex].also { it.rawInput = rawOutput }
+            else -> children[childIndex].also { it.rawInput = rawOutput!! }
         }
     }
 
@@ -53,7 +53,6 @@ class TryInstance(
      * if the current instance should handle the given `WorkflowError`.
      *
      * @param taskInput The input data for the task.
-     * @param taskScope The scope of the task.
      * @param error The workflow error to be checked.
      * @return `true` if the error is caught by this instance, `false` otherwise.
      */
@@ -112,13 +111,13 @@ class TryInstance(
 
         // testing `when` directive
         retryPolicy?.`when`?.let { whenExpr ->
-            val whenFilter = evalBoolean(transformedInput!!, whenExpr, "when")
+            val whenFilter = evalBoolean(transformedInput, whenExpr, "when")
             if (!whenFilter) return null
         }
 
         // testing `exceptWhen` directive
         retryPolicy?.exceptWhen?.let { exceptWhen ->
-            val exceptWhenFilter = evalBoolean(transformedInput!!, exceptWhen, "exceptWhen")
+            val exceptWhenFilter = evalBoolean(transformedInput, exceptWhen, "exceptWhen")
             if (exceptWhenFilter) return null
         }
 

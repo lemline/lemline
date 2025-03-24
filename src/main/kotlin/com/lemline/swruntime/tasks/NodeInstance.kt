@@ -86,8 +86,8 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * The task raw input.
      */
-    internal var rawInput: JsonNode?
-        get() = state.rawInput
+    internal var rawInput: JsonNode
+        get() = state.rawInput!!
         set(value) {
             state.rawInput = value
         }
@@ -102,15 +102,27 @@ abstract class NodeInstance<T : TaskBase>(
         }
 
     /**
-     * The task transformed input.
+     * The task transformed input. (calculated)
      */
-    internal var transformedInput: JsonNode? = null
+    private var _transformedInput: JsonNode? = null
 
+    internal val transformedInput: JsonNode
+        get() = _transformedInput ?: eval(rawInput, node.task.input?.from).also { _transformedInput = it }
 
     /**
-     * The task transformed output.
+     * The task transformed output. (calculated)
      */
-    internal var transformedOutput: JsonNode? = null
+    private var _transformedOutput: JsonNode? = null
+
+    internal val transformedOutput: JsonNode
+        get() = _transformedOutput ?: eval(rawOutput!!, node.task.output?.`as`).also { _transformedOutput = it }
+
+
+    open fun reset() {
+        _transformedInput = null
+        _transformedOutput = null
+        state = NodeState()
+    }
 
     private val taskDescriptor
         get() = TaskDescriptor(
@@ -184,7 +196,7 @@ abstract class NodeInstance<T : TaskBase>(
         val target = children.indexOfFirst { it.node.name == name }
         if (target == -1) error("'.then' directive '$name' not found")
         childIndex = target
-        return children[target].also { it.rawInput = rawOutput }
+        return children[target].also { it.rawInput = rawOutput!! }
     }
 
     /**
@@ -208,11 +220,11 @@ abstract class NodeInstance<T : TaskBase>(
         start()
         // Test If task should be executed
         val shouldStart = node.task.`if`
-            ?.let { eval(transformedInput!!, it) }
+            ?.let { eval(transformedInput, it) }
             ?.let { if (it.isBoolean) it.asBoolean() else error("result of '.if' condition must be a boolean, but is '$it'") }
             ?: true
 
-        if (!shouldStart) state = NodeState()
+        if (!shouldStart) reset()
 
         return shouldStart
     }
@@ -230,23 +242,18 @@ abstract class NodeInstance<T : TaskBase>(
     internal fun start(): JsonNode {
         startedAt = DateTimeDescriptor.from(Instant.now())
         // Validate task input if schema is provided
-        node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput!!, schema) }
+        node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput, schema) }
 
         logger.info { "Entering node ${node.name} (${node.task::class.simpleName})" }
         logger.info { "      rawInput         = $rawInput" }
         logger.info { "      scope            = $scope" }
-
-        // Transform task input using 'input.from' expression if provided
-        transformedInput = evalTransformedInput()
         logger.info { "      transformedInput = $transformedInput" }
 
         // Set default behavior
         rawOutput = transformedInput
 
-        return transformedInput!!
+        return transformedInput
     }
-
-    private fun evalTransformedInput() = eval(rawInput!!, node.task.input?.from)
 
     open suspend fun execute() {
         this.rawOutput = transformedInput
@@ -256,17 +263,14 @@ abstract class NodeInstance<T : TaskBase>(
         logger.info { "Leaving node ${node.name} (${node.task::class.simpleName})" }
         logger.info { "      rawOutput        = $rawOutput" }
         logger.info { "      scope            = $scope" }
-
-        // Transform task output using output.as expression if provided
-        transformedOutput = eval(rawOutput!!, node.task.output?.`as`)
         logger.info { "      transformedOutput = $transformedOutput" }
 
         // Validate task output if schema is provided
-        node.task.output?.schema?.let { schema -> SchemaValidator.validate(transformedOutput!!, schema) }
+        node.task.output?.schema?.let { schema -> SchemaValidator.validate(transformedOutput, schema) }
 
         // Update workflow context using export.as expression if provided
         node.task.export?.let { export ->
-            val exportAs = eval(transformedOutput!!, export.`as`)
+            val exportAs = eval(transformedOutput, export.`as`)
             // Validate exported context if schema is provided
             export.schema?.let { schema -> SchemaValidator.validate(exportAs, schema) }
             // Set new context
@@ -280,7 +284,7 @@ abstract class NodeInstance<T : TaskBase>(
         parent?.rawOutput = transformedOutput
 
         // reset the instance
-        if (this !is RootInstance) state = NodeState()
+        if (this !is RootInstance) reset()
     }
 
     private fun raise(error: WorkflowError) {
@@ -304,7 +308,7 @@ abstract class NodeInstance<T : TaskBase>(
      */
     private fun getTry(error: WorkflowError): TryInstance? = when (this) {
         is RootInstance -> null
-        is TryInstance -> if (isCatching(transformedInput!!, error)) this else parent.getTry(error)
+        is TryInstance -> if (isCatching(transformedInput, error)) this else parent.getTry(error)
         else -> parent?.getTry(error)
     }
 
