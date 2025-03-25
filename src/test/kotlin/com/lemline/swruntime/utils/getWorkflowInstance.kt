@@ -1,12 +1,12 @@
 package com.lemline.swruntime.utils
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.lemline.swruntime.messaging.WorkflowExecutionMessage
+import com.lemline.swruntime.messaging.WorkflowMessage
 import com.lemline.swruntime.models.WorkflowDefinition
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
-import com.lemline.swruntime.tasks.NodeState
-import com.lemline.swruntime.workflows.WorkflowInstance
-import com.lemline.swruntime.workflows.WorkflowParser
+import com.lemline.swruntime.sw.workflows.WorkflowInstance
+import com.lemline.swruntime.sw.workflows.WorkflowParser
+import com.lemline.swruntime.sw.tasks.NodeState
 import io.mockk.every
 import io.mockk.mockk
 import io.serverlessworkflow.api.WorkflowFormat
@@ -39,7 +39,7 @@ internal fun getWorkflowInstance(doYaml: String, input: JsonNode): WorkflowInsta
     // apply it to the WorkflowService instance
     val mockedService = WorkflowParser(mockedRepository)
 
-    val msg = WorkflowExecutionMessage.newInstance(workflowName, workflowVersion, "testId", input)
+    val msg = WorkflowMessage.newInstance(workflowName, workflowVersion, "testId", input)
 
     return WorkflowInstance(
         name = msg.name,

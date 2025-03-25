@@ -1,4 +1,4 @@
-package com.lemline.swruntime.tasks
+package com.lemline.swruntime.sw.tasks
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor

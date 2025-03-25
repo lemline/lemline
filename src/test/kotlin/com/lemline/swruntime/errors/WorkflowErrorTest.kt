@@ -1,6 +1,8 @@
 package com.lemline.swruntime.errors
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.lemline.swruntime.sw.errors.WorkflowError
+import com.lemline.swruntime.sw.errors.WorkflowErrorType
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 

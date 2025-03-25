@@ -1,12 +1,12 @@
-package com.lemline.swruntime.tasks
+package com.lemline.swruntime.sw.tasks
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
-import com.lemline.swruntime.workflows.WorkflowParser
-import com.lemline.swruntime.workflows.index
+import com.lemline.swruntime.sw.workflows.WorkflowParser
+import com.lemline.swruntime.sw.workflows.index
 import io.mockk.mockk
 import io.serverlessworkflow.api.types.*
 import org.junit.jupiter.api.Assertions.*

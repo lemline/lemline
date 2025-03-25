@@ -2,6 +2,7 @@ package com.lemline.swruntime.workflows
 
 import com.lemline.swruntime.models.WorkflowDefinition
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
+import com.lemline.swruntime.sw.workflows.WorkflowParser
 import com.lemline.swruntime.system.System
 import io.mockk.*
 import io.serverlessworkflow.api.WorkflowFormat
