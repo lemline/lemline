@@ -28,7 +28,7 @@ class WorkflowDefinitionRepositoryTest {
 
     companion object {
         @Container
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer(DockerImageName.parse("postgres:15-alpine"))
+        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
             .withDatabaseName("swruntime_test")
             .withUsername("test")
             .withPassword("test")
@@ -52,7 +52,6 @@ class WorkflowDefinitionRepositoryTest {
     }
 
     @Test
-    @DisplayName("should return null when no workflow found")
     @Transactional
     fun `should return null when no workflow found`() {
         // Given
@@ -67,7 +66,6 @@ class WorkflowDefinitionRepositoryTest {
     }
 
     @Test
-    @DisplayName("should return workflow when found")
     @Transactional
     fun `should return workflow when found`() {
         // Given

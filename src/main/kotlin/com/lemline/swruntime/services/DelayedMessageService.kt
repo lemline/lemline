@@ -60,8 +60,8 @@ class DelayedMessageService {
 
             while (true) {
                 // Find and lock messages ready to process
-                val messages =
-                    delayedMessageRepository.findAndLockReadyToProcess(batchSize.toInt(), maxAttempts.toInt())
+                val messages = delayedMessageRepository
+                    .findAndLockReadyToProcess(batchSize.toInt(), maxAttempts.toInt())
 
                 if (messages.isEmpty()) break
 

@@ -17,8 +17,8 @@ class DelayedMessageRepository : PanacheRepository<DelayedMessage> {
                 AND delayed_until <= ?2 
                 AND attempt_count < ?3 
                 ORDER BY delayed_until ASC 
-                FOR UPDATE SKIP LOCKED 
                 LIMIT ?4
+                FOR UPDATE SKIP LOCKED 
             """.trimIndent(), DelayedMessage::class.java
         )
         .setParameter(1, MessageStatus.PENDING.name)

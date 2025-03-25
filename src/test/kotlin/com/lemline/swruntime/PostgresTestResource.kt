@@ -8,7 +8,7 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
     private var postgres: PostgreSQLContainer<*>? = null
 
     override fun start(): Map<String, String> {
-        postgres = PostgreSQLContainer(DockerImageName.parse("postgres:15-alpine"))
+        postgres = PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
             .withDatabaseName("swruntime_test")
             .withUsername("test")
             .withPassword("test")
