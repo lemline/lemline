@@ -8,13 +8,8 @@ import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
 import org.junit.jupiter.api.*
-import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
-import org.testcontainers.utility.DockerImageName
 
 @QuarkusTest
-@Testcontainers
 @QuarkusTestResource(PostgresTestResource::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
@@ -26,24 +21,6 @@ class WorkflowDefinitionRepositoryTest {
     @Inject
     lateinit var entityManager: EntityManager
 
-    companion object {
-        @Container
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
-            .withDatabaseName("swruntime_test")
-            .withUsername("test")
-            .withPassword("test")
-    }
-
-    @BeforeAll
-    fun setup() {
-        postgres.start()
-    }
-
-    @AfterAll
-    fun cleanup() {
-        postgres.stop()
-    }
-
     @BeforeEach
     @Transactional
     fun setupTest() {
@@ -52,7 +29,6 @@ class WorkflowDefinitionRepositoryTest {
     }
 
     @Test
-    @Transactional
     fun `should return null when no workflow found`() {
         // Given
         val name = "non-existent"

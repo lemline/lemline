@@ -10,10 +10,6 @@ import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
 import jakarta.transaction.UserTransaction
 import org.junit.jupiter.api.*
-import org.testcontainers.containers.PostgreSQLContainer
-import org.testcontainers.junit.jupiter.Container
-import org.testcontainers.junit.jupiter.Testcontainers
-import org.testcontainers.utility.DockerImageName
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.CountDownLatch
@@ -24,7 +20,6 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaDuration
 
 @QuarkusTest
-@Testcontainers
 @QuarkusTestResource(PostgresTestResource::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
@@ -39,33 +34,15 @@ class DelayedMessageRepositoryTest {
     @Inject
     lateinit var userTransaction: UserTransaction
 
-    companion object {
-        @Container
-        val postgres: PostgreSQLContainer<*> = PostgreSQLContainer(DockerImageName.parse("postgres:17-alpine"))
-            .withDatabaseName("swruntime_test")
-            .withUsername("test")
-            .withPassword("test")
-    }
-
-    @BeforeAll
-    fun setup() {
-        postgres.start()
-    }
-
-    @AfterAll
-    fun cleanup() {
-        postgres.stop()
-    }
-
     @BeforeEach
     @Transactional
-    fun setupTest() {
+    internal fun setupTest() {
         // Clear the database before each test
         entityManager.createQuery("DELETE FROM DelayedMessage").executeUpdate()
     }
 
     @Transactional
-    fun createPendingMessage(count: Int, attemptCount: Int = 0, duration: Int = -1) {
+    internal fun createPendingMessage(count: Int, attemptCount: Int = 0, duration: Int = -1) {
         // Given
         val now = Instant.now()
         // Create test messages in a transaction
@@ -82,7 +59,7 @@ class DelayedMessageRepositoryTest {
     }
 
     @Transactional
-    fun createSentMessage(count: Int, attemptCount: Int = 0, duration: Int = -2) {
+    internal fun createSentMessage(count: Int, attemptCount: Int = 0, duration: Int = -2) {
         // Given
         val now = Instant.now()
         // Create test messages in a transaction
@@ -98,27 +75,24 @@ class DelayedMessageRepositoryTest {
         entityManager.flush()
     }
 
-    @Transactional
-    fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) =
+    private fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) =
         repository.findAndLockReadyToProcess(limit = limit, maxAttempts = maxAttempts)
 
     @Transactional
-    fun findAndProcess(limit: Int, maxAttempts: Int) =
+    internal fun findAndProcess(limit: Int, maxAttempts: Int) =
         findAndLockReadyToProcess(limit, maxAttempts)
             .onEach { it.status = MessageStatus.SENT }
 
-    @Transactional
-    fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) =
+    private fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) =
         repository.findAndLockForDeletion(cutoffDate, limit)
 
     @Transactional
-    fun findAndDelete(cutoffDate: Instant, limit: Int) =
+    internal fun findAndDelete(cutoffDate: Instant, limit: Int) =
         findAndLockForDeletion(cutoffDate, limit)
             .onEach { it.delete() }
 
     @Test
-    @Transactional
-    fun `findAndLockReadyToProcess should return messages ready to process`() {
+    internal fun `findAndLockReadyToProcess should return messages ready to process`() {
         // Given
         createPendingMessage(2)
 
@@ -133,8 +107,7 @@ class DelayedMessageRepositoryTest {
     }
 
     @Test
-    @Transactional
-    fun `findAndLockReadyToProcess should not return messages with too many attempts`() {
+    internal fun `findAndLockReadyToProcess should not return messages with too many attempts`() {
         // Given
         createPendingMessage(2, 3)
 
@@ -146,8 +119,7 @@ class DelayedMessageRepositoryTest {
     }
 
     @Test
-    @Transactional
-    fun `findAndLockReadyToProcess should not return future messages`() {
+    internal fun `findAndLockReadyToProcess should not return future messages`() {
         // Given
         createPendingMessage(2, duration = 1)
 
@@ -159,8 +131,7 @@ class DelayedMessageRepositoryTest {
     }
 
     @Test
-    @Transactional
-    fun `findAndLockReadyToProcess should respect limit parameter`() {
+    internal fun `findAndLockReadyToProcess should respect limit parameter`() {
         // Given
         createPendingMessage(5)
 
@@ -172,8 +143,7 @@ class DelayedMessageRepositoryTest {
     }
 
     @Test
-    @Transactional
-    fun `findAndLockForDeletion should return sent messages older than cutoff`() {
+    internal fun `findAndLockForDeletion should return sent messages older than cutoff`() {
         // Given
         createSentMessage(1)
 
@@ -188,8 +158,7 @@ class DelayedMessageRepositoryTest {
     }
 
     @Test
-    @Transactional
-    fun `findAndLockForDeletion should not return messages newer than cutoff`() {
+    internal fun `findAndLockForDeletion should not return messages newer than cutoff`() {
         // Given
         createSentMessage(1, duration = 0)
 
@@ -202,7 +171,6 @@ class DelayedMessageRepositoryTest {
     }
 
     @Test
-    @Transactional
     fun `findAndLockForDeletion should not return non-sent messages`() {
         // Given
         createPendingMessage(1, duration = -2 * 24 * 60)
@@ -216,7 +184,6 @@ class DelayedMessageRepositoryTest {
     }
 
     @Test
-    @Transactional
     fun `findAndLockForDeletion should respect limit parameter`() {
         // Given
         createSentMessage(5)
