@@ -2,16 +2,15 @@ package com.lemline.swruntime.sw.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
-import com.lemline.swruntime.system.System
 import com.lemline.swruntime.sw.tasks.NodePosition
 import com.lemline.swruntime.sw.tasks.NodeTask
 import com.lemline.swruntime.sw.tasks.RootTask
+import com.lemline.swruntime.system.System
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.json.JsonUtils
 import jakarta.enterprise.context.ApplicationScoped
-import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 
 typealias WorkflowIndex = Pair<String, String>
@@ -134,7 +133,6 @@ class WorkflowParser(
     fun error(message: String): Nothing = throw IllegalStateException(message)
 
     companion object {
-        private val logger = LoggerFactory.getLogger(this::class.java)
         internal val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
         internal val secretsCache = ConcurrentHashMap<WorkflowIndex, Map<String, JsonNode>>()
         internal val nodesCache =

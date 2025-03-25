@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.swruntime.logger
 import com.lemline.swruntime.messaging.WorkflowMessage
 import com.lemline.swruntime.sw.errors.CaughtDoWorkflowException
-import com.lemline.swruntime.sw.errors.WaitWorkflowException
 import com.lemline.swruntime.sw.expressions.scopes.RuntimeDescriptor
 import com.lemline.swruntime.sw.expressions.scopes.WorkflowDescriptor
 import com.lemline.swruntime.sw.tasks.*
@@ -28,7 +27,7 @@ class WorkflowInstance(
     val name: String,
     val version: String,
     val states: Map<NodePosition, NodeState>,
-    var position: NodePosition
+    val position: NodePosition
 ) {
     @Inject
     internal lateinit var workflowParser: WorkflowParser
@@ -73,32 +72,30 @@ class WorkflowInstance(
 
     internal lateinit var rootInstance: RootInstance
 
-    private suspend fun runCatch(run: suspend () -> JsonNode?) {
+    internal lateinit var current: NodeInstance<*>
+
+    suspend fun run() {
+        var current = nodeInstances[position] ?: error("task not found in position $position")
+        status = WorkflowStatus.RUNNING
+
         do {
             try {
-                run()
+                current.run()
                 break
             } catch (e: CaughtDoWorkflowException) {
-                // at this stage, the doInstance should have a raw input
-                position = e.`do`.node.position
-            } catch (e: WaitWorkflowException) {
-                status = WorkflowStatus.WAITING
-                break
+                // go to `do` task
+                current = e.`do`
             }
         } while (true)
     }
 
-    suspend fun run() {
-        status = WorkflowStatus.RUNNING
+    private suspend fun NodeInstance<*>.run() {
 
-        // Get the task at the current position
-        val current = nodeInstances[position] ?: error("task not found in position $position")
-
-        var next = when (current.rawOutput == null) {
+        var next = when (rawOutput == null) {
             // current is not completed (start or retry)
-            true -> current
+            true -> this
             // complete, and go to next
-            false -> current.then()
+            false -> this.then()
         }
 
         // find and execute the next activity
@@ -123,14 +120,15 @@ class WorkflowInstance(
         when (next) {
             // complete the workflow
             null -> {
-                position = NodePosition.root
+                this@WorkflowInstance.current = rootInstance
                 rootInstance.complete()
                 status = WorkflowStatus.COMPLETED
             }
             // execute the activity
             else -> {
-                position = next.node.position
+                this@WorkflowInstance.current = next
                 next.execute()
+                if (next is WaitInstance) status = WorkflowStatus.WAITING
             }
         }
     }

@@ -3,6 +3,7 @@ package com.lemline.swruntime.messaging
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.swruntime.logger
 import com.lemline.swruntime.services.DelayedMessageService
+import com.lemline.swruntime.sw.tasks.activities.WaitInstance
 import com.lemline.swruntime.sw.workflows.WorkflowInstance
 import io.serverlessworkflow.impl.WorkflowStatus
 import jakarta.enterprise.context.ApplicationScoped
@@ -13,9 +14,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.future.future
 import org.eclipse.microprofile.reactive.messaging.Incoming
 import org.eclipse.microprofile.reactive.messaging.Outgoing
-import java.time.Duration
 import java.time.Instant
 import java.util.concurrent.CompletionStage
+import kotlin.time.Duration
+import kotlin.time.toJavaDuration
 
 @ApplicationScoped
 class WorkflowConsumer {
@@ -38,8 +40,8 @@ class WorkflowConsumer {
 
             when (instance.status) {
                 WorkflowStatus.PENDING -> TODO()
-                WorkflowStatus.RUNNING -> instance.toMessage()
-                WorkflowStatus.WAITING -> null.also { wait(instance) }
+                WorkflowStatus.RUNNING -> instance.running()
+                WorkflowStatus.WAITING -> null.also { instance.waiting() }
                 WorkflowStatus.COMPLETED -> null
                 WorkflowStatus.FAULTED -> TODO()
                 WorkflowStatus.CANCELLED -> TODO()
@@ -51,10 +53,14 @@ class WorkflowConsumer {
         }
     }
 
-    private fun wait(instance: WorkflowInstance) {
-        val msg = instance.toMessage()
-        val delay: Duration = Duration.ZERO //ninstance.getCurrentTaskDuration()
-        val delayedUntil = Instant.now().plus(delay)
+    private fun WorkflowInstance.running(): WorkflowMessage {
+        return this.toMessage()
+    }
+
+    private fun WorkflowInstance.waiting() {
+        val msg = this.toMessage()
+        val delay: Duration = (this.current as WaitInstance).delay
+        val delayedUntil = Instant.now().plus(delay.toJavaDuration())
 
         // Serialize the message to JSON string
         val messageJson = objectMapper.writeValueAsString(msg)

@@ -16,18 +16,18 @@ dependencies {
 
     // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-    
+
     // Quarkus
     implementation("io.quarkus:quarkus-kotlin")
     // Flyway (DB migration)
     implementation("io.quarkus:quarkus-flyway")
     // Rest Server with Json serialization
     implementation("io.quarkus:quarkus-rest-jackson")
-    // Messenging with Kafka
+    // Messaging with Kafka
     implementation("io.quarkus:quarkus-messaging-kafka")
     // Reactive programming
     implementation("io.quarkus:quarkus-mutiny")
-    // ORM
+    // ORM With Hibernate / Panache
     implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin")
     // Scheduler
     implementation("io.quarkus:quarkus-scheduler")

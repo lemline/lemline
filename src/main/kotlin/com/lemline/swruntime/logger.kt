@@ -3,7 +3,7 @@ package com.lemline.swruntime
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-fun <T : Any> T.logger(): Logger = LoggerFactory.getLogger(this::class.java)
+internal fun <T : Any> T.logger(): Logger = LoggerFactory.getLogger(this::class.java)
 
 fun Logger.info(e: Throwable? = null, message: () -> String) {
     if (isInfoEnabled) {

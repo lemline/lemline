@@ -1,8 +1,8 @@
 package com.lemline.swruntime.sw.tasks.activities
 
-import com.lemline.swruntime.sw.errors.WaitWorkflowException
 import com.lemline.swruntime.sw.tasks.NodeInstance
 import com.lemline.swruntime.sw.tasks.NodeTask
+import com.lemline.swruntime.sw.utils.toDuration
 import io.serverlessworkflow.api.types.WaitTask
 
 class WaitInstance(
@@ -10,7 +10,10 @@ class WaitInstance(
     override val parent: NodeInstance<*>,
 ) : NodeInstance<WaitTask>(node, parent) {
 
-    override suspend fun execute() {
-        throw WaitWorkflowException()
-    }
+    /**
+     * Duration for which the workflow should wait before resuming.
+     * The duration is extracted from the WaitTask and converted to a Duration using ISO-8601 duration format.
+     * Examples: "PT15S" (15 seconds), "PT1H" (1 hour), "P1D" (1 day) */
+    val delay by lazy { node.task.wait.toDuration() }
+
 } 

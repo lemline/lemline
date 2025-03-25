@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.swruntime.messaging.WorkflowMessage
 import com.lemline.swruntime.models.WorkflowDefinition
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
+import com.lemline.swruntime.sw.tasks.NodeState
 import com.lemline.swruntime.sw.workflows.WorkflowInstance
 import com.lemline.swruntime.sw.workflows.WorkflowParser
-import com.lemline.swruntime.sw.tasks.NodeState
 import io.mockk.every
 import io.mockk.mockk
 import io.serverlessworkflow.api.WorkflowFormat
