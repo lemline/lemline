@@ -1,4 +1,4 @@
-package com.lemline.swruntime.utils
+package com.lemline.swruntime.sw.utils
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.swruntime.messaging.WorkflowMessage

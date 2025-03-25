@@ -1,4 +1,4 @@
-package com.lemline.swruntime.workflows
+package com.lemline.swruntime.sw.workflows
 
 import com.lemline.swruntime.models.WorkflowDefinition
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository

@@ -9,10 +9,8 @@ repositories {
     mavenCentral()
 }
 
-val quarkusPlatformVersion: String by project
-
 dependencies {
-    implementation(enforcedPlatform("io.quarkus:quarkus-bom:$quarkusPlatformVersion"))
+    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.0"))
 
     // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
@@ -49,6 +47,13 @@ dependencies {
     testImplementation("io.kotest:kotest-framework-api")
     testImplementation("io.mockk:mockk:1.13.9")
     testImplementation(kotlin("test"))
+    testImplementation("org.mockito:mockito-core:5.10.0")
+    testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
+
+    // Testcontainers
+    testImplementation("org.testcontainers:testcontainers:1.19.7")
+    testImplementation("org.testcontainers:postgresql:1.19.7")
+    testImplementation("org.testcontainers:junit-jupiter:1.19.7")
 }
 
 group = "com.lemline"

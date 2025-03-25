@@ -1,8 +1,7 @@
-package com.lemline.swruntime.expressions
+package com.lemline.swruntime.sw.expressions
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.*
-import com.lemline.swruntime.sw.expressions.JQExpression
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows

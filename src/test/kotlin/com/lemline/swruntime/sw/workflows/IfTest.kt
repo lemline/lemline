@@ -1,6 +1,6 @@
-package com.lemline.swruntime.workflows
+package com.lemline.swruntime.sw.workflows
 
-import com.lemline.swruntime.utils.getWorkflowInstance
+import com.lemline.swruntime.sw.utils.getWorkflowInstance
 import io.serverlessworkflow.impl.json.JsonUtils
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
