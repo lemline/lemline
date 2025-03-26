@@ -47,11 +47,11 @@ class DelayedMessageOutboxTest {
         outbox = DelayedMessageOutbox(
             delayedMessageRepository = repository,
             emitter = emitter,
-            maxAttempts = 3,
+            retryMaxAttempts = 3,
             batchSize = 100,
             cleanupBatchSize = 500,
             cleanupAfterDays = 7,
-            initialRetryDelaySeconds = 5
+            retryInitialDelaySeconds = 5
         )
     }
 

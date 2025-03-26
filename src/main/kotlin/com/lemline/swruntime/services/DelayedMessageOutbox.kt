@@ -24,20 +24,20 @@ class DelayedMessageOutbox(
     @Channel("workflow-execution-out")
     val emitter: Emitter<WorkflowMessage>,
 
-    @ConfigProperty(name = "delayed.max-attempts", defaultValue = "3")
-    val maxAttempts: Int,
-
     @ConfigProperty(name = "delayed.batch-size", defaultValue = "100")
     val batchSize: Int,
+
+    @ConfigProperty(name = "delayed.retry-max-attempts", defaultValue = "5")
+    val retryMaxAttempts: Int,
+
+    @ConfigProperty(name = "delayed.retry-initial-delay-seconds", defaultValue = "10")
+    val retryInitialDelaySeconds: Long,
 
     @ConfigProperty(name = "delayed.cleanup-after-days", defaultValue = "7")
     val cleanupAfterDays: Int,
 
     @ConfigProperty(name = "delayed.cleanup-batch-size", defaultValue = "500")
     val cleanupBatchSize: Int,
-
-    @ConfigProperty(name = "delayed.initial-retry-delay-seconds", defaultValue = "5")
-    val initialRetryDelaySeconds: Long
 ) {
     private val logger = logger()
 
@@ -52,10 +52,10 @@ class DelayedMessageOutbox(
     private fun calculateNextRetryDelay(attemptCount: Int): Long {
         // Exponential backoff: initialDelay * 2^attemptCount
         // e.g., with initialDelay=5s:
-        // attempt 1: 5s
-        // attempt 2: 10s
-        // attempt 3: 20s
-        return initialRetryDelaySeconds * (1L shl (attemptCount - 1))
+        // attempt 1: 10s
+        // attempt 2: 20s
+        // attempt 3: 40s
+        return retryInitialDelaySeconds * (1L shl (attemptCount - 1))
     }
 
     @Scheduled(every = "5s", concurrentExecution = SKIP)
@@ -67,7 +67,7 @@ class DelayedMessageOutbox(
 
             while (true) {
                 // Find and lock messages ready to process
-                val messages = delayedMessageRepository.findAndLockReadyToProcess(batchSize, maxAttempts)
+                val messages = delayedMessageRepository.findAndLockReadyToProcess(batchSize, retryMaxAttempts)
 
                 if (messages.isEmpty()) break
 
@@ -89,7 +89,7 @@ class DelayedMessageOutbox(
                         message.attemptCount++
                         message.lastError = e.message ?: "Unknown error"
 
-                        if (message.attemptCount >= maxAttempts) {
+                        if (message.attemptCount >= retryMaxAttempts) {
                             message.status = FAILED
                             logger.error { "Message ${message.id} has reached maximum retry attempts" }
                         } else {
