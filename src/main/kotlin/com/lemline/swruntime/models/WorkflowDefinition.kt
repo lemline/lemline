@@ -1,14 +1,19 @@
 package com.lemline.swruntime.models
 
-import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntity
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.Table
-import jakarta.persistence.UniqueConstraint
+import jakarta.persistence.*
 
 @Entity
-@Table(name = "workflow_definitions", uniqueConstraints = [UniqueConstraint(columnNames = ["name", "version"])])
-class WorkflowDefinition : PanacheEntity() {
+@Table(
+    name = "workflow_definitions",
+    uniqueConstraints = [
+        UniqueConstraint(
+            name = "uk_workflow_definitions_name_version",
+            columnNames = ["name", "version"]
+        )
+    ]
+)
+class WorkflowDefinition : UuidV7Entity() {
+
     @Column(nullable = false)
     lateinit var name: String
 
@@ -17,4 +22,8 @@ class WorkflowDefinition : PanacheEntity() {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     lateinit var definition: String
+
+    @Version
+    @Column(name = "version_number")
+    var versionNumber: Long = 0
 } 

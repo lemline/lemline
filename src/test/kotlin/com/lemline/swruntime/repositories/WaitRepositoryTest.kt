@@ -1,8 +1,8 @@
 package com.lemline.swruntime.repositories
 
 import com.lemline.swruntime.PostgresTestResource
-import com.lemline.swruntime.models.WAIT_TABLE
 import com.lemline.swruntime.models.WaitMessage
+import com.lemline.swruntime.outbox.OutBoxStatus
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
@@ -23,10 +23,10 @@ import kotlin.time.toJavaDuration
 @QuarkusTestResource(PostgresTestResource::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-class WaitMessageRepositoryTest {
+class WaitRepositoryTest {
 
     @Inject
-    lateinit var repository: WaitMessageRepository
+    lateinit var repository: WaitRepository
 
     @Inject
     lateinit var entityManager: EntityManager
@@ -38,7 +38,7 @@ class WaitMessageRepositoryTest {
     @Transactional
     internal fun setupTest() {
         // Clear the database before each test
-        entityManager.createQuery("DELETE FROM ${WAIT_TABLE}").executeUpdate()
+        entityManager.createQuery("DELETE FROM WaitMessage").executeUpdate()
     }
 
     @Transactional
@@ -49,7 +49,7 @@ class WaitMessageRepositoryTest {
         repeat(count) { i ->
             val message = WaitMessage().apply {
                 message = "test$i"
-                status = WaitMessage.MessageStatus.PENDING
+                status = OutBoxStatus.PENDING
                 delayedUntil = now.plus(((1 + i) * duration).minutes.toJavaDuration())
                 this.attemptCount = attemptCount
             }
@@ -66,7 +66,7 @@ class WaitMessageRepositoryTest {
         repeat(count) { i ->
             val message = WaitMessage().apply {
                 message = "test$i"
-                status = WaitMessage.MessageStatus.SENT
+                status = OutBoxStatus.SENT
                 delayedUntil = now.plus(((1 + i) * duration).days.toJavaDuration())
                 this.attemptCount = attemptCount
             }
@@ -81,7 +81,7 @@ class WaitMessageRepositoryTest {
     @Transactional
     internal fun findAndProcess(limit: Int, maxAttempts: Int) =
         findAndLockReadyToProcess(limit, maxAttempts)
-            .onEach { it.status = WaitMessage.MessageStatus.SENT }
+            .onEach { it.status = OutBoxStatus.SENT }
 
     private fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) =
         repository.findAndLockForDeletion(cutoffDate, limit)
@@ -103,13 +103,13 @@ class WaitMessageRepositoryTest {
 
         // Then
         val savedMessage = entityManager
-            .createQuery("FROM $WAIT_TABLE", WaitMessage::class.java)
+            .createQuery("FROM WaitMessage", WaitMessage::class.java)
             .singleResult
 
         Assertions.assertNotNull(savedMessage)
         Assertions.assertEquals(message, savedMessage.message)
         Assertions.assertEquals(delayedUntil, savedMessage.delayedUntil)
-        Assertions.assertEquals(WaitMessage.MessageStatus.PENDING, savedMessage.status)
+        Assertions.assertEquals(OutBoxStatus.PENDING, savedMessage.status)
         Assertions.assertEquals(0, savedMessage.attemptCount)
     }
 
@@ -129,7 +129,7 @@ class WaitMessageRepositoryTest {
 
         // Then
         val savedMessages = entityManager
-            .createQuery("FROM $WAIT_TABLE", WaitMessage::class.java)
+            .createQuery("FROM WaitMessage", WaitMessage::class.java)
             .resultList
 
         Assertions.assertEquals(2, savedMessages.size)
@@ -137,13 +137,13 @@ class WaitMessageRepositoryTest {
         // Verify first message
         Assertions.assertEquals(message, savedMessages[0].message)
         Assertions.assertEquals(firstDelay, savedMessages[0].delayedUntil)
-        Assertions.assertEquals(WaitMessage.MessageStatus.PENDING, savedMessages[0].status)
+        Assertions.assertEquals(OutBoxStatus.PENDING, savedMessages[0].status)
         Assertions.assertEquals(0, savedMessages[0].attemptCount)
 
         // Verify second message
         Assertions.assertEquals(message, savedMessages[1].message)
         Assertions.assertEquals(secondDelay, savedMessages[1].delayedUntil)
-        Assertions.assertEquals(WaitMessage.MessageStatus.PENDING, savedMessages[1].status)
+        Assertions.assertEquals(OutBoxStatus.PENDING, savedMessages[1].status)
         Assertions.assertEquals(0, savedMessages[1].attemptCount)
     }
 
@@ -157,7 +157,7 @@ class WaitMessageRepositoryTest {
 
         // Then
         Assertions.assertEquals(2, result.size)
-        Assertions.assertTrue(result.all { it.status == WaitMessage.MessageStatus.PENDING })
+        Assertions.assertTrue(result.all { it.status == OutBoxStatus.PENDING })
         Assertions.assertTrue(result.all { it.delayedUntil <= Instant.now() })
         Assertions.assertTrue(result.all { it.attemptCount < 3 })
     }
@@ -209,7 +209,7 @@ class WaitMessageRepositoryTest {
 
         // Then
         Assertions.assertEquals(1, result.size)
-        Assertions.assertEquals(WaitMessage.MessageStatus.SENT, result[0].status)
+        Assertions.assertEquals(OutBoxStatus.SENT, result[0].status)
         Assertions.assertTrue(result[0].delayedUntil < cutoffDate)
     }
 
@@ -353,7 +353,7 @@ class WaitMessageRepositoryTest {
         repeat(messageCount) { i ->
             val message = WaitMessage().apply {
                 message = "test$i"
-                status = if (i < messageCount / 2) WaitMessage.MessageStatus.PENDING else WaitMessage.MessageStatus.SENT
+                status = if (i < messageCount / 2) OutBoxStatus.PENDING else OutBoxStatus.SENT
                 delayedUntil = if (i < messageCount / 2) {
                     now.minus((i + 1).toLong(), ChronoUnit.MINUTES)
                 } else {

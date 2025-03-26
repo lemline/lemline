@@ -1,49 +1,41 @@
-package com.lemline.swruntime.services
+package com.lemline.swruntime.outbox
 
-import com.lemline.swruntime.*
-import com.lemline.swruntime.models.RetryMessage
-import com.lemline.swruntime.repositories.RetryMessageRepository
-import io.quarkus.scheduler.Scheduled
-import io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP
-import jakarta.enterprise.context.ApplicationScoped
-import jakarta.transaction.Transactional
-import org.eclipse.microprofile.config.inject.ConfigProperty
-import org.eclipse.microprofile.reactive.messaging.Channel
-import org.eclipse.microprofile.reactive.messaging.Emitter
+import com.lemline.swruntime.debug
+import com.lemline.swruntime.error
+import com.lemline.swruntime.info
+import com.lemline.swruntime.warn
+import org.slf4j.Logger
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.UUID
 
-@ApplicationScoped
-class RetryMessageOutbox(
-    private val retryRepository: RetryMessageRepository,
+enum class OutBoxStatus {
+    PENDING,
+    SENT,
+    FAILED
+}
 
-    @Channel("workflows-out")
-    val emitter: Emitter<String>,
+interface OutboxMessage {
+    var id: UUID?
+    var status: OutBoxStatus
+    var attemptCount: Int
+    var lastError: String?
+    var delayedUntil: Instant
+}
 
-    @ConfigProperty(name = "delayed.batch-size", defaultValue = "100")
-    val batchSize: Int,
+interface OutboxRepository<T : OutboxMessage> {
+    fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int): List<T>
+    fun findAndLockForDeletion(cutoffDate: Instant, limit: Int): List<T>
+    fun delete(entity: T)
+}
 
-    @ConfigProperty(name = "delayed.retry-max-attempts", defaultValue = "5")
-    val retryMaxAttempts: Int,
-
-    @ConfigProperty(name = "delayed.retry-initial-delay-seconds", defaultValue = "10")
-    val retryInitialDelaySeconds: Long,
-
-    @ConfigProperty(name = "delayed.cleanup-after-days", defaultValue = "7")
-    val cleanupAfterDays: Int,
-
-    @ConfigProperty(name = "delayed.cleanup-batch-size", defaultValue = "500")
-    val cleanupBatchSize: Int,
+class OutboxProcessor<T : OutboxMessage>(
+    private val logger: Logger,
+    private val repository: OutboxRepository<T>,
+    private val processor: (T) -> Unit
 ) {
 
-    private val logger = logger()
-
-    private fun processMessage(retryMessage: RetryMessage) {
-        // Send the message to the appropriate channel
-        emitter.send(retryMessage.message)
-    }
-
-    private fun calculateNextRetryDelay(attemptCount: Int): Long {
+    private fun calculateNextRetryDelay(attemptCount: Int, retryInitialDelaySeconds: Int): Long {
         // Exponential backoff: initialDelay * 2^attemptCount
         // e.g., with initialDelay=5s:
         // attempt 1: 10s
@@ -52,16 +44,14 @@ class RetryMessageOutbox(
         return retryInitialDelaySeconds * (1L shl (attemptCount - 1))
     }
 
-    @Scheduled(every = "5s", concurrentExecution = SKIP)
-    @Transactional
-    fun processOutbox() {
+    fun process(batchSize: Int, retryMaxAttempts: Int, retryInitialDelaySeconds: Int) {
         try {
             var totalProcessed = 0
             var batchNumber = 0
 
             while (true) {
                 // Find and lock messages ready to process
-                val messages = retryRepository.findAndLockReadyToProcess(batchSize, retryMaxAttempts)
+                val messages = repository.findAndLockReadyToProcess(batchSize, retryMaxAttempts)
 
                 if (messages.isEmpty()) break
 
@@ -71,10 +61,10 @@ class RetryMessageOutbox(
                 for (message in messages) {
                     try {
                         // Process the message
-                        processMessage(message)
+                        processor(message)
 
                         // Update status to SENT in the same transaction
-                        message.status = RetryMessage.MessageStatus.SENT
+                        message.status = OutBoxStatus.SENT
                         logger.debug { "Successfully processed message ${message.id}" }
                         totalProcessed++
                     } catch (e: Exception) {
@@ -84,11 +74,11 @@ class RetryMessageOutbox(
                         message.lastError = e.message ?: "Unknown error"
 
                         if (message.attemptCount >= retryMaxAttempts) {
-                            message.status = RetryMessage.MessageStatus.FAILED
+                            message.status = OutBoxStatus.FAILED
                             logger.error { "Message ${message.id} has reached maximum retry attempts" }
                         } else {
                             // Calculate next retry time using exponential backoff
-                            val nextDelay = calculateNextRetryDelay(message.attemptCount)
+                            val nextDelay = calculateNextRetryDelay(message.attemptCount, retryInitialDelaySeconds)
                             message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.SECONDS)
                             logger.debug { "Message ${message.id} will be retried in ${nextDelay}s (attempt ${message.attemptCount})" }
                         }
@@ -106,9 +96,7 @@ class RetryMessageOutbox(
         }
     }
 
-    @Scheduled(every = "1h", concurrentExecution = SKIP)
-    @Transactional
-    fun cleanupOutbox() {
+    fun cleanup(cleanupAfterDays: Int, cleanupBatchSize: Int) {
         try {
             val cutoffDate = Instant.now().minusSeconds(cleanupAfterDays * 24 * 60 * 60L)
             var totalDeleted = 0
@@ -116,8 +104,7 @@ class RetryMessageOutbox(
 
             while (true) {
                 // Find and lock a chunk of messages for deletion
-                val messagesToDelete =
-                    retryRepository.findAndLockForDeletion(cutoffDate, cleanupBatchSize)
+                val messagesToDelete = repository.findAndLockForDeletion(cutoffDate, cleanupBatchSize)
 
                 if (messagesToDelete.isEmpty()) break
 
@@ -125,7 +112,7 @@ class RetryMessageOutbox(
                 val chunkDeleted = messagesToDelete.size
 
                 // Delete the chunk
-                messagesToDelete.forEach { it.delete() }
+                messagesToDelete.forEach { repository.delete(it) }
                 totalDeleted += chunkDeleted
 
                 logger.info { "Cleaned up chunk $chunkNumber: $chunkDeleted messages (total: $totalDeleted)" }

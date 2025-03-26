@@ -1,8 +1,8 @@
 package com.lemline.swruntime.models
 
-import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntity
+import com.lemline.swruntime.outbox.OutBoxStatus
+import com.lemline.swruntime.outbox.OutboxMessage
 import jakarta.persistence.*
-import kotlinx.serialization.Serializable
 import java.time.Instant
 
 const val WAIT_TABLE = "wait_messages"
@@ -13,30 +13,23 @@ const val WAIT_TABLE = "wait_messages"
     // Combined index for our main query pattern: status + delayed_until + attempt_count
     indexes = [Index(name = "idx_wait_ready", columnList = "status, delayed_until, attempt_count")]
 )
-class WaitMessage : PanacheEntity() {
-
-    @Serializable
-    enum class MessageStatus {
-        PENDING,
-        SENT,
-        FAILED
-    }
+class WaitMessage : UuidV7Entity(), OutboxMessage {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     lateinit var message: String
 
     @Column(nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
-    var status: MessageStatus = MessageStatus.PENDING
+    override var status: OutBoxStatus = OutBoxStatus.PENDING
 
     @Column(name = "delayed_until", nullable = false)
-    lateinit var delayedUntil: Instant
+    override lateinit var delayedUntil: Instant
 
     @Column(name = "attempt_count", nullable = false)
-    var attemptCount: Int = 0
+    override var attemptCount: Int = 0
 
     @Column(name = "last_error", columnDefinition = "TEXT")
-    var lastError: String? = null
+    override var lastError: String? = null
 
     @Version
     @Column(name = "version")
@@ -48,7 +41,7 @@ class WaitMessage : PanacheEntity() {
             delayedUntil: Instant = Instant.now(),
             attemptCount: Int = 0,
             lastError: Exception? = null,
-            status: MessageStatus = MessageStatus.PENDING
+            status: OutBoxStatus = OutBoxStatus.PENDING
         ) = WaitMessage().apply {
             this.message = message
             this.delayedUntil = delayedUntil

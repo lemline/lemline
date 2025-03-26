@@ -1,6 +1,6 @@
 CREATE TABLE retry_messages
 (
-    id            SERIAL PRIMARY KEY,
+    id            UUID PRIMARY KEY,
     message       TEXT        NOT NULL,
     status        VARCHAR(20) NOT NULL,
     delayed_until TIMESTAMP   NOT NULL,

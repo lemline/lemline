@@ -3,8 +3,8 @@ package com.lemline.swruntime.messaging
 import com.lemline.swruntime.logger
 import com.lemline.swruntime.models.RetryMessage
 import com.lemline.swruntime.models.WaitMessage
-import com.lemline.swruntime.repositories.RetryMessageRepository
-import com.lemline.swruntime.repositories.WaitMessageRepository
+import com.lemline.swruntime.repositories.RetryRepository
+import com.lemline.swruntime.repositories.WaitRepository
 import com.lemline.swruntime.sw.tasks.activities.WaitInstance
 import com.lemline.swruntime.sw.workflows.WorkflowInstance
 import io.serverlessworkflow.impl.WorkflowStatus
@@ -22,8 +22,8 @@ import kotlin.time.toJavaDuration
 
 @ApplicationScoped
 class WorkflowConsumer(
-    private val retryMessageRepository: RetryMessageRepository,
-    private val waitMessageRepository: WaitMessageRepository,
+    private val retryRepository: RetryRepository,
+    private val waitMessageRepository: WaitRepository,
 ) {
     private val logger = logger()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -49,7 +49,7 @@ class WorkflowConsumer(
             logger.error("Error processing workflow execution request", e)
             // Instead of throwing, we'll store the message for retry
             // if an error occurs here also, scope.future will fail and the message sent to DLQ
-            with(retryMessageRepository) {
+            with(retryRepository) {
                 RetryMessage.create(
                     message = msg.toJson(),
                     delayedUntil = Instant.now(),

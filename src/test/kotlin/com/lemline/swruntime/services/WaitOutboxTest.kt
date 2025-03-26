@@ -3,10 +3,10 @@ package com.lemline.swruntime.services
 import com.lemline.swruntime.PostgresTestResource
 import com.lemline.swruntime.json.Json
 import com.lemline.swruntime.messaging.WorkflowMessage
-import com.lemline.swruntime.models.WAIT_TABLE
 import com.lemline.swruntime.models.WaitMessage
-import com.lemline.swruntime.models.WaitMessage.MessageStatus
-import com.lemline.swruntime.repositories.WaitMessageRepository
+import com.lemline.swruntime.outbox.OutBoxStatus
+import com.lemline.swruntime.outbox.WaitOutbox
+import com.lemline.swruntime.repositories.WaitRepository
 import com.lemline.swruntime.sw.tasks.JsonPointer
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
@@ -24,28 +24,28 @@ import java.time.temporal.ChronoUnit
 @QuarkusTestResource(PostgresTestResource::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-class WaitMessageOutboxTest {
+class WaitOutboxTest {
 
     @Inject
-    lateinit var repository: WaitMessageRepository
+    lateinit var repository: WaitRepository
 
     @Inject
     lateinit var entityManager: EntityManager
 
     private lateinit var emitter: Emitter<String>
-    private lateinit var outbox: WaitMessageOutbox
+    private lateinit var outbox: WaitOutbox
 
     @BeforeEach
     @Transactional
     fun setupTest() {
         // Clear the database before each test
-        entityManager.createQuery("DELETE FROM $WAIT_TABLE").executeUpdate()
+        entityManager.createQuery("DELETE FROM WaitMessage").executeUpdate()
 
         // Create a fresh mock emitter for each test
         emitter = mock()
 
         // Create a new outbox instance with the mock emitter
-        outbox = WaitMessageOutbox(
+        outbox = WaitOutbox(
             repository = repository,
             emitter = emitter,
             retryMaxAttempts = 3,
@@ -69,7 +69,7 @@ class WaitMessageOutboxTest {
 
         val message = WaitMessage().apply {
             message = messageJson
-            status = WaitMessage.MessageStatus.PENDING
+            status = OutBoxStatus.PENDING
             delayedUntil = Instant.now().minus(1, ChronoUnit.MINUTES)
             attemptCount = 0
         }
@@ -85,7 +85,7 @@ class WaitMessageOutboxTest {
 
         // Verify message status was updated
         val updatedMessage = entityManager.find(WaitMessage::class.java, message.id)
-        Assertions.assertEquals(MessageStatus.SENT, updatedMessage.status)
+        Assertions.assertEquals(OutBoxStatus.SENT, updatedMessage.status)
         Assertions.assertEquals(0, updatedMessage.attemptCount)
     }
 
@@ -95,7 +95,7 @@ class WaitMessageOutboxTest {
         // Given
         val message = WaitMessage().apply {
             message = "invalid json"
-            status = MessageStatus.PENDING
+            status = OutBoxStatus.PENDING
             delayedUntil = Instant.now().minus(1, ChronoUnit.MINUTES)
             attemptCount = 0
         }
@@ -111,7 +111,7 @@ class WaitMessageOutboxTest {
         // Then
         // Verify message status and attempt count were updated
         val updatedMessage = entityManager.find(WaitMessage::class.java, message.id)
-        Assertions.assertEquals(MessageStatus.PENDING, updatedMessage.status)
+        Assertions.assertEquals(OutBoxStatus.PENDING, updatedMessage.status)
         Assertions.assertEquals(1, updatedMessage.attemptCount)
         Assertions.assertEquals("Emitter failed", updatedMessage.lastError)
     }
@@ -122,7 +122,7 @@ class WaitMessageOutboxTest {
         // Given
         val message = WaitMessage().apply {
             message = "invalid json"
-            status = MessageStatus.PENDING
+            status = OutBoxStatus.PENDING
             delayedUntil = Instant.now().minus(1, ChronoUnit.MINUTES)
             attemptCount = 2  // One more attempt will exceed max attempts (3)
         }
@@ -138,7 +138,7 @@ class WaitMessageOutboxTest {
         // Then
         // Verify message was marked as failed
         val updatedMessage = entityManager.find(WaitMessage::class.java, message.id)
-        Assertions.assertEquals(MessageStatus.FAILED, updatedMessage.status)
+        Assertions.assertEquals(OutBoxStatus.FAILED, updatedMessage.status)
         Assertions.assertEquals(3, updatedMessage.attemptCount)
         Assertions.assertEquals("Emitter failed", updatedMessage.lastError)
     }
@@ -152,7 +152,7 @@ class WaitMessageOutboxTest {
 
         val message = WaitMessage().apply {
             message = messageJson
-            status = MessageStatus.PENDING
+            status = OutBoxStatus.PENDING
             delayedUntil = Instant.now().minus(1, ChronoUnit.MINUTES)
             attemptCount = 0
         }
@@ -168,7 +168,7 @@ class WaitMessageOutboxTest {
         // Then
         // Verify message status and attempt count were updated
         val updatedMessage = entityManager.find(WaitMessage::class.java, message.id)
-        Assertions.assertEquals(MessageStatus.PENDING, updatedMessage.status)
+        Assertions.assertEquals(OutBoxStatus.PENDING, updatedMessage.status)
         Assertions.assertEquals(1, updatedMessage.attemptCount)
         Assertions.assertEquals("Emitter failed", updatedMessage.lastError)
     }
@@ -179,12 +179,12 @@ class WaitMessageOutboxTest {
         // Given
         val oldMessage = WaitMessage().apply {
             message = "old message"
-            status = MessageStatus.SENT
+            status = OutBoxStatus.SENT
             delayedUntil = Instant.now().minus(8, ChronoUnit.DAYS)
         }
         val recentMessage = WaitMessage().apply {
             message = "recent message"
-            status = MessageStatus.SENT
+            status = OutBoxStatus.SENT
             delayedUntil = Instant.now().minus(1, ChronoUnit.DAYS)
         }
         entityManager.persist(oldMessage)
@@ -197,7 +197,7 @@ class WaitMessageOutboxTest {
         // Then
         // Verify old message was deleted
         val remainingMessages = entityManager
-            .createQuery("FROM $WAIT_TABLE", WaitMessage::class.java)
+            .createQuery("FROM WaitMessage", WaitMessage::class.java)
             .resultList
 
         Assertions.assertEquals(1, remainingMessages.size)
@@ -210,12 +210,12 @@ class WaitMessageOutboxTest {
         // Given
         val oldPendingMessage = WaitMessage().apply {
             message = "old pending message"
-            status = MessageStatus.PENDING
+            status = OutBoxStatus.PENDING
             delayedUntil = Instant.now().minus(8, ChronoUnit.DAYS)
         }
         val oldFailedMessage = WaitMessage().apply {
             message = "old failed message"
-            status = MessageStatus.FAILED
+            status = OutBoxStatus.FAILED
             delayedUntil = Instant.now().minus(8, ChronoUnit.DAYS)
         }
         entityManager.persist(oldPendingMessage)
@@ -228,7 +228,7 @@ class WaitMessageOutboxTest {
         // Then
         // Verify messages were not deleted
         val remainingMessages = entityManager
-            .createQuery("FROM $WAIT_TABLE", WaitMessage::class.java)
+            .createQuery("FROM WaitMessage", WaitMessage::class.java)
             .resultList
 
         Assertions.assertEquals(2, remainingMessages.size)
@@ -242,16 +242,16 @@ class WaitMessageOutboxTest {
         val messageJson = Json.toJson(workflowMessage)
 
         // Create 150 messages (more than default batch size of 100)
-        repeat(150) {
+        repeat(150) { i ->
             val message = WaitMessage().apply {
                 message = messageJson
-                status = MessageStatus.PENDING
+                status = OutBoxStatus.PENDING
                 delayedUntil = Instant.now().minus(1, ChronoUnit.MINUTES)
                 attemptCount = 0
             }
             entityManager.persist(message)
         }
-        entityManager.flush()
+        entityManager.flush() // Final flush for any remaining messages
 
         // When
         outbox.processOutbox()
@@ -259,8 +259,8 @@ class WaitMessageOutboxTest {
         // Then
         // Verify all messages were processed
         val processedMessages = entityManager
-            .createQuery("FROM $WAIT_TABLE WHERE status = :status", WaitMessage::class.java)
-            .setParameter("status", MessageStatus.SENT)
+            .createQuery("FROM WaitMessage WHERE status = :status", WaitMessage::class.java)
+            .setParameter("status", OutBoxStatus.SENT)
             .resultList
 
         Assertions.assertEquals(150, processedMessages.size)
