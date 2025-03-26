@@ -2,6 +2,7 @@ package com.lemline.swruntime.models
 
 import com.lemline.swruntime.outbox.OutBoxStatus
 import com.lemline.swruntime.outbox.OutboxMessage
+import com.lemline.swruntime.repositories.UuidV7Entity
 import jakarta.persistence.*
 import java.time.Instant
 
@@ -13,7 +14,7 @@ const val WAIT_TABLE = "wait_messages"
     // Combined index for our main query pattern: status + delayed_until + attempt_count
     indexes = [Index(name = "idx_wait_ready", columnList = "status, delayed_until, attempt_count")]
 )
-class WaitMessage : UuidV7Entity(), OutboxMessage {
+internal class WaitMessage : UuidV7Entity(), OutboxMessage {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     lateinit var message: String

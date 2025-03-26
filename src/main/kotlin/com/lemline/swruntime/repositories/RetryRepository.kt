@@ -2,7 +2,6 @@ package com.lemline.swruntime.repositories
 
 import com.lemline.swruntime.models.RETRY_TABLE
 import com.lemline.swruntime.models.RetryMessage
-import com.lemline.swruntime.models.UuidV7Repository
 import com.lemline.swruntime.outbox.OutBoxStatus
 import com.lemline.swruntime.outbox.OutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
@@ -10,8 +9,8 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 
 @ApplicationScoped
-class RetryRepository : UuidV7Repository<RetryMessage>, OutboxRepository<RetryMessage> {
-    
+internal class RetryRepository : UuidV7Repository<RetryMessage>, OutboxRepository<RetryMessage> {
+
     @Transactional
     fun RetryMessage.save() {
         persist()

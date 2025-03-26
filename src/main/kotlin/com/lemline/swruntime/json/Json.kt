@@ -7,7 +7,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 
-object Json {
+internal object Json {
     val json = kotlinx.serialization.json.Json {
         ignoreUnknownKeys = true
         isLenient = true

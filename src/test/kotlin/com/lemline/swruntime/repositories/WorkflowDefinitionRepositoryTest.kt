@@ -13,7 +13,7 @@ import org.junit.jupiter.api.*
 @QuarkusTestResource(PostgresTestResource::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-class WorkflowDefinitionRepositoryTest {
+internal class WorkflowDefinitionRepositoryTest {
 
     @Inject
     lateinit var repository: WorkflowDefinitionRepository

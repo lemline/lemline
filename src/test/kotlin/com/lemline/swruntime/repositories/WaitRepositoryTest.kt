@@ -23,7 +23,7 @@ import kotlin.time.toJavaDuration
 @QuarkusTestResource(PostgresTestResource::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-class WaitRepositoryTest {
+internal class WaitRepositoryTest {
 
     @Inject
     lateinit var repository: WaitRepository

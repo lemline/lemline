@@ -4,18 +4,19 @@ import com.lemline.swruntime.debug
 import com.lemline.swruntime.error
 import com.lemline.swruntime.info
 import com.lemline.swruntime.warn
+import org.jetbrains.annotations.VisibleForTesting
 import org.slf4j.Logger
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.UUID
+import java.util.*
 
-enum class OutBoxStatus {
+internal enum class OutBoxStatus {
     PENDING,
     SENT,
     FAILED
 }
 
-interface OutboxMessage {
+internal interface OutboxMessage {
     var id: UUID?
     var status: OutBoxStatus
     var attemptCount: Int
@@ -23,25 +24,33 @@ interface OutboxMessage {
     var delayedUntil: Instant
 }
 
-interface OutboxRepository<T : OutboxMessage> {
+internal interface OutboxRepository<T : OutboxMessage> {
     fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int): List<T>
     fun findAndLockForDeletion(cutoffDate: Instant, limit: Int): List<T>
     fun delete(entity: T)
 }
 
-class OutboxProcessor<T : OutboxMessage>(
+internal class OutboxProcessor<T : OutboxMessage>(
     private val logger: Logger,
     private val repository: OutboxRepository<T>,
     private val processor: (T) -> Unit
 ) {
 
-    private fun calculateNextRetryDelay(attemptCount: Int, retryInitialDelaySeconds: Int): Long {
+    @VisibleForTesting
+    internal fun calculateNextRetryDelay(attemptCount: Int, retryInitialDelaySeconds: Int): Long {
         // Exponential backoff: initialDelay * 2^attemptCount
-        // e.g., with initialDelay=5s:
-        // attempt 1: 10s
-        // attempt 2: 20s
-        // attempt 3: 40s
-        return retryInitialDelaySeconds * (1L shl (attemptCount - 1))
+        // e.g., with initialDelay=10s:
+        // attempt 1: 10s +/- 20%
+        // attempt 2: 20s +/- 20%
+        // attempt 3: 40s +/- 20%
+        // Base delay with exponential backoff: initialDelay * 2^(attemptCount-1)
+        val baseDelay = retryInitialDelaySeconds * (1L shl (attemptCount - 1))
+
+        // Add jitter of ±20%
+        val jitterRange = (baseDelay * 0.2).toLong() // 20% of base delay
+        val jitter = (-jitterRange..jitterRange).random()
+
+        return (baseDelay + jitter).coerceAtLeast(1) // Ensure we never return less than 1 second
     }
 
     fun process(batchSize: Int, retryMaxAttempts: Int, retryInitialDelaySeconds: Int) {

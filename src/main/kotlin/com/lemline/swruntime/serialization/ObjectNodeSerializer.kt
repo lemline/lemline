@@ -9,7 +9,7 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-object ObjectNodeSerializer : KSerializer<ObjectNode> {
+internal object ObjectNodeSerializer : KSerializer<ObjectNode> {
     private val mapper = ObjectMapper()
 
     override val descriptor: SerialDescriptor =

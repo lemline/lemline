@@ -1,5 +1,6 @@
 package com.lemline.swruntime.models
 
+import com.lemline.swruntime.repositories.UuidV7Entity
 import jakarta.persistence.*
 
 @Entity
@@ -12,7 +13,7 @@ import jakarta.persistence.*
         )
     ]
 )
-class WorkflowDefinition : UuidV7Entity() {
+internal class WorkflowDefinition : UuidV7Entity() {
 
     @Column(nullable = false)
     lateinit var name: String

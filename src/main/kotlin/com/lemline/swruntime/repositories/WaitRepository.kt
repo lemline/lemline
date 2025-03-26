@@ -1,6 +1,5 @@
 package com.lemline.swruntime.repositories
 
-import com.lemline.swruntime.models.UuidV7Repository
 import com.lemline.swruntime.models.WAIT_TABLE
 import com.lemline.swruntime.models.WaitMessage
 import com.lemline.swruntime.outbox.OutBoxStatus
@@ -10,7 +9,7 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 
 @ApplicationScoped
-class WaitRepository : UuidV7Repository<WaitMessage>, OutboxRepository<WaitMessage> {
+internal class WaitRepository : UuidV7Repository<WaitMessage>, OutboxRepository<WaitMessage> {
 
     @Transactional
     fun WaitMessage.save() {

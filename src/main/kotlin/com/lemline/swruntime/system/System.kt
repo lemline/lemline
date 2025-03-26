@@ -5,7 +5,7 @@ import org.jetbrains.annotations.TestOnly
 /**
  * Object that provides utility methods to access (and test) environment variables.
  */
-object System {
+internal object System {
 
     private val _env by lazy {
         java.lang.System.getenv().toMutableMap()

@@ -3,10 +3,10 @@ package com.lemline.swruntime.services
 import com.lemline.swruntime.PostgresTestResource
 import com.lemline.swruntime.json.Json
 import com.lemline.swruntime.messaging.WorkflowMessage
-import com.lemline.swruntime.models.WaitMessage
+import com.lemline.swruntime.models.RetryMessage
 import com.lemline.swruntime.outbox.OutBoxStatus
-import com.lemline.swruntime.outbox.WaitOutbox
-import com.lemline.swruntime.repositories.WaitRepository
+import com.lemline.swruntime.outbox.RetryOutbox
+import com.lemline.swruntime.repositories.RetryRepository
 import com.lemline.swruntime.sw.tasks.JsonPointer
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
@@ -24,28 +24,28 @@ import java.time.temporal.ChronoUnit
 @QuarkusTestResource(PostgresTestResource::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-internal class WaitOutboxTest {
+internal class RetryOutboxTest {
 
     @Inject
-    lateinit var repository: WaitRepository
+    lateinit var repository: RetryRepository
 
     @Inject
     lateinit var entityManager: EntityManager
 
     private lateinit var emitter: Emitter<String>
-    private lateinit var outbox: WaitOutbox
+    private lateinit var outbox: RetryOutbox
 
     @BeforeEach
     @Transactional
     fun setupTest() {
         // Clear the database before each test
-        entityManager.createQuery("DELETE FROM WaitMessage").executeUpdate()
+        entityManager.createQuery("DELETE FROM RetryMessage").executeUpdate()
 
         // Create a fresh mock emitter for each test
         emitter = mock()
 
         // Create a new outbox instance with the mock emitter
-        outbox = WaitOutbox(
+        outbox = RetryOutbox(
             repository = repository,
             emitter = emitter,
             retryMaxAttempts = 3,
@@ -67,7 +67,7 @@ internal class WaitOutboxTest {
         val workflowMessage = getWorkflowMessage()
         val messageJson = Json.toJson(workflowMessage)
 
-        val message = WaitMessage().apply {
+        val message = RetryMessage().apply {
             message = messageJson
             status = OutBoxStatus.PENDING
             delayedUntil = Instant.now().minus(1, ChronoUnit.MINUTES)
@@ -84,7 +84,7 @@ internal class WaitOutboxTest {
         verify(emitter).send(argThat { this == messageJson })
 
         // Verify message status was updated
-        val updatedMessage = entityManager.find(WaitMessage::class.java, message.id)
+        val updatedMessage = entityManager.find(RetryMessage::class.java, message.id)
         Assertions.assertEquals(OutBoxStatus.SENT, updatedMessage.status)
         Assertions.assertEquals(0, updatedMessage.attemptCount)
     }
@@ -93,7 +93,7 @@ internal class WaitOutboxTest {
     @Transactional
     fun `processOutbox should mark message for retry after processing failure`() {
         // Given
-        val message = WaitMessage().apply {
+        val message = RetryMessage().apply {
             message = "invalid json"
             status = OutBoxStatus.PENDING
             delayedUntil = Instant.now().minus(1, ChronoUnit.MINUTES)
@@ -110,7 +110,7 @@ internal class WaitOutboxTest {
 
         // Then
         // Verify message status and attempt count were updated
-        val updatedMessage = entityManager.find(WaitMessage::class.java, message.id)
+        val updatedMessage = entityManager.find(RetryMessage::class.java, message.id)
         Assertions.assertEquals(OutBoxStatus.PENDING, updatedMessage.status)
         Assertions.assertEquals(1, updatedMessage.attemptCount)
         Assertions.assertEquals("Emitter failed", updatedMessage.lastError)
@@ -120,7 +120,7 @@ internal class WaitOutboxTest {
     @Transactional
     fun `processOutbox should mark message as failed after max attempts`() {
         // Given
-        val message = WaitMessage().apply {
+        val message = RetryMessage().apply {
             message = "invalid json"
             status = OutBoxStatus.PENDING
             delayedUntil = Instant.now().minus(1, ChronoUnit.MINUTES)
@@ -137,7 +137,7 @@ internal class WaitOutboxTest {
 
         // Then
         // Verify message was marked as failed
-        val updatedMessage = entityManager.find(WaitMessage::class.java, message.id)
+        val updatedMessage = entityManager.find(RetryMessage::class.java, message.id)
         Assertions.assertEquals(OutBoxStatus.FAILED, updatedMessage.status)
         Assertions.assertEquals(3, updatedMessage.attemptCount)
         Assertions.assertEquals("Emitter failed", updatedMessage.lastError)
@@ -150,7 +150,7 @@ internal class WaitOutboxTest {
         val workflowMessage = WorkflowMessage("test-workflow", "1.0.0", emptyMap(), JsonPointer(""))
         val messageJson = Json.toJson(workflowMessage)
 
-        val message = WaitMessage().apply {
+        val message = RetryMessage().apply {
             message = messageJson
             status = OutBoxStatus.PENDING
             delayedUntil = Instant.now().minus(1, ChronoUnit.MINUTES)
@@ -167,7 +167,7 @@ internal class WaitOutboxTest {
 
         // Then
         // Verify message status and attempt count were updated
-        val updatedMessage = entityManager.find(WaitMessage::class.java, message.id)
+        val updatedMessage = entityManager.find(RetryMessage::class.java, message.id)
         Assertions.assertEquals(OutBoxStatus.PENDING, updatedMessage.status)
         Assertions.assertEquals(1, updatedMessage.attemptCount)
         Assertions.assertEquals("Emitter failed", updatedMessage.lastError)
@@ -177,12 +177,12 @@ internal class WaitOutboxTest {
     @Transactional
     fun `cleanupOutbox should delete old sent messages`() {
         // Given
-        val oldMessage = WaitMessage().apply {
+        val oldMessage = RetryMessage().apply {
             message = "old message"
             status = OutBoxStatus.SENT
             delayedUntil = Instant.now().minus(8, ChronoUnit.DAYS)
         }
-        val recentMessage = WaitMessage().apply {
+        val recentMessage = RetryMessage().apply {
             message = "recent message"
             status = OutBoxStatus.SENT
             delayedUntil = Instant.now().minus(1, ChronoUnit.DAYS)
@@ -197,7 +197,7 @@ internal class WaitOutboxTest {
         // Then
         // Verify old message was deleted
         val remainingMessages = entityManager
-            .createQuery("FROM WaitMessage", WaitMessage::class.java)
+            .createQuery("FROM RetryMessage", RetryMessage::class.java)
             .resultList
 
         Assertions.assertEquals(1, remainingMessages.size)
@@ -208,12 +208,12 @@ internal class WaitOutboxTest {
     @Transactional
     fun `cleanupOutbox should not delete non-sent messages`() {
         // Given
-        val oldPendingMessage = WaitMessage().apply {
+        val oldPendingMessage = RetryMessage().apply {
             message = "old pending message"
             status = OutBoxStatus.PENDING
             delayedUntil = Instant.now().minus(8, ChronoUnit.DAYS)
         }
-        val oldFailedMessage = WaitMessage().apply {
+        val oldFailedMessage = RetryMessage().apply {
             message = "old failed message"
             status = OutBoxStatus.FAILED
             delayedUntil = Instant.now().minus(8, ChronoUnit.DAYS)
@@ -228,7 +228,7 @@ internal class WaitOutboxTest {
         // Then
         // Verify messages were not deleted
         val remainingMessages = entityManager
-            .createQuery("FROM WaitMessage", WaitMessage::class.java)
+            .createQuery("FROM RetryMessage", RetryMessage::class.java)
             .resultList
 
         Assertions.assertEquals(2, remainingMessages.size)
@@ -243,7 +243,7 @@ internal class WaitOutboxTest {
 
         // Create 150 messages (more than default batch size of 100)
         repeat(150) { i ->
-            val message = WaitMessage().apply {
+            val message = RetryMessage().apply {
                 message = messageJson
                 status = OutBoxStatus.PENDING
                 delayedUntil = Instant.now().minus(1, ChronoUnit.MINUTES)
@@ -259,7 +259,7 @@ internal class WaitOutboxTest {
         // Then
         // Verify all messages were processed
         val processedMessages = entityManager
-            .createQuery("FROM WaitMessage WHERE status = :status", WaitMessage::class.java)
+            .createQuery("FROM RetryMessage WHERE status = :status", RetryMessage::class.java)
             .setParameter("status", OutBoxStatus.SENT)
             .resultList
 

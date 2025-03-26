@@ -21,7 +21,7 @@ import kotlin.time.Duration
 import kotlin.time.toJavaDuration
 
 @ApplicationScoped
-class WorkflowConsumer(
+internal class WorkflowConsumer(
     private val retryRepository: RetryRepository,
     private val waitMessageRepository: WaitRepository,
 ) {

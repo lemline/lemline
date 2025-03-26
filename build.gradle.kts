@@ -59,7 +59,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.2")
 
     // UUID Creator
-    implementation("com.github.f4b6a3:uuid-creator:5.3.7")
+    implementation("com.github.f4b6a3:uuid-creator:6.0.0")
 }
 
 group = "com.lemline"

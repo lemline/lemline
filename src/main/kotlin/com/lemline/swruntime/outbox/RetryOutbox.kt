@@ -11,26 +11,26 @@ import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
 @ApplicationScoped
-class RetryOutbox(
+internal class RetryOutbox(
     repository: RetryRepository,
 
     @Channel("workflows-out")
     val emitter: Emitter<String>,
 
-    @ConfigProperty(name = "delayed.batch-size", defaultValue = "100")
+    @ConfigProperty(name = "retry.outbox.batch-size", defaultValue = "100")
     val batchSize: Int,
 
-    @ConfigProperty(name = "delayed.retry-max-attempts", defaultValue = "5")
+    @ConfigProperty(name = "retry.outbox.max-attempts", defaultValue = "5")
     val retryMaxAttempts: Int,
 
-    @ConfigProperty(name = "delayed.retry-initial-delay-seconds", defaultValue = "10")
+    @ConfigProperty(name = "retry.outbox.initial-delay-seconds", defaultValue = "10")
     val retryInitialDelaySeconds: Int,
 
-    @ConfigProperty(name = "delayed.cleanup-after-days", defaultValue = "7")
+    @ConfigProperty(name = "retry.cleanup.after-days", defaultValue = "7")
     val cleanupAfterDays: Int,
 
-    @ConfigProperty(name = "delayed.cleanup-batch-size", defaultValue = "500")
-    val cleanupBatchSize: Int,
+    @ConfigProperty(name = "retry.cleanup.batch-size", defaultValue = "500")
+    val cleanupBatchSize: Int
 ) {
     private val logger = logger()
 
@@ -38,13 +38,13 @@ class RetryOutbox(
         emitter.send(retryMessage.message)
     }
 
-    @Scheduled(every = "5s", concurrentExecution = SKIP)
+    @Scheduled(every = "{retry.outbox.schedule}", concurrentExecution = SKIP)
     @Transactional
     fun processOutbox() {
         outboxProcessor.process(batchSize, retryMaxAttempts, retryInitialDelaySeconds)
     }
 
-    @Scheduled(every = "1h", concurrentExecution = SKIP)
+    @Scheduled(every = "{retry.cleanup.schedule}", concurrentExecution = SKIP)
     @Transactional
     fun cleanupOutbox() {
         outboxProcessor.cleanup(cleanupAfterDays, cleanupBatchSize)
