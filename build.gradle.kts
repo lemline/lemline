@@ -2,6 +2,7 @@ plugins {
     kotlin("jvm") version "2.1.10"
     kotlin("plugin.allopen") version "2.1.10"
     kotlin("plugin.jpa") version "2.1.10"
+    kotlin("plugin.serialization") version "1.9.22"
     id("io.quarkus") version "3.21.0"
 }
 
@@ -32,9 +33,6 @@ dependencies {
     // Postgres Database driver
     implementation("io.quarkus:quarkus-jdbc-postgresql")
 
-    // Jackson
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
-
     // Serverless Workflow SDK
     implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
     implementation("io.serverlessworkflow:serverlessworkflow-impl-core:7.0.0.Final")
@@ -49,11 +47,16 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.mockito:mockito-core:5.10.0")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
+    testImplementation("io.quarkus:quarkus-junit5-mockito")
 
     // Testcontainers
     testImplementation("org.testcontainers:testcontainers:1.19.7")
     testImplementation("org.testcontainers:postgresql:1.19.7")
     testImplementation("org.testcontainers:junit-jupiter:1.19.7")
+
+    // Add Kotlin Serialization
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.2")
 }
 
 group = "com.lemline"
@@ -76,4 +79,12 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    jvmArgs = listOf("-XX:+EnableDynamicAgentLoading")
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs = listOf("-Xjsr305=strict")
+    }
 } 

@@ -1,54 +1,61 @@
 package com.lemline.swruntime.services
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.swruntime.*
+import com.lemline.swruntime.json.Json
 import com.lemline.swruntime.messaging.WorkflowMessage
 import com.lemline.swruntime.models.DelayedMessage
+import com.lemline.swruntime.models.DelayedMessage.MessageStatus.FAILED
+import com.lemline.swruntime.models.DelayedMessage.MessageStatus.SENT
 import com.lemline.swruntime.repositories.DelayedMessageRepository
 import io.quarkus.scheduler.Scheduled
 import io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.inject.Inject
 import jakarta.transaction.Transactional
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 
-@Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
 @ApplicationScoped
-class DelayedMessageService {
-    private val logger = logger()
+class DelayedMessageOutbox(
+    val delayedMessageRepository: DelayedMessageRepository,
 
-    @Inject
-    private lateinit var delayedMessageRepository: DelayedMessageRepository
-
-    @Inject
     @Channel("workflow-execution-out")
-    private lateinit var emitter: Emitter<WorkflowMessage>
+    val emitter: Emitter<WorkflowMessage>,
 
     @ConfigProperty(name = "delayed.max-attempts", defaultValue = "3")
-    private lateinit var maxAttempts: Integer
+    val maxAttempts: Int,
 
     @ConfigProperty(name = "delayed.batch-size", defaultValue = "100")
-    private lateinit var batchSize: Integer
+    val batchSize: Int,
 
     @ConfigProperty(name = "delayed.cleanup-after-days", defaultValue = "7")
-    private lateinit var cleanupAfterDays: Integer
+    val cleanupAfterDays: Int,
 
     @ConfigProperty(name = "delayed.cleanup-batch-size", defaultValue = "500")
-    private lateinit var cleanupBatchSize: Integer
+    val cleanupBatchSize: Int,
 
-    private val objectMapper = ObjectMapper()
+    @ConfigProperty(name = "delayed.initial-retry-delay-seconds", defaultValue = "5")
+    val initialRetryDelaySeconds: Long
+) {
+    private val logger = logger()
 
-    @Transactional
-    fun saveMessage(message: String, delayedUntil: Instant) {
-        val delayedMessage = DelayedMessage().apply {
-            this.message = message
-            this.delayedUntil = delayedUntil
-            this.status = DelayedMessage.MessageStatus.PENDING
-        }
-        delayedMessage.persist()
+    private fun processMessage(message: DelayedMessage) {
+        println("MESSAGE = ${message.message}")
+        val workflowMessage: WorkflowMessage = Json.fromJson(message.message)
+        println(workflowMessage)
+        // Send the message to the appropriate channel
+        emitter.send(workflowMessage)
+    }
+
+    private fun calculateNextRetryDelay(attemptCount: Int): Long {
+        // Exponential backoff: initialDelay * 2^attemptCount
+        // e.g., with initialDelay=5s:
+        // attempt 1: 5s
+        // attempt 2: 10s
+        // attempt 3: 20s
+        return initialRetryDelaySeconds * (1L shl (attemptCount - 1))
     }
 
     @Scheduled(every = "5s", concurrentExecution = SKIP)
@@ -60,8 +67,7 @@ class DelayedMessageService {
 
             while (true) {
                 // Find and lock messages ready to process
-                val messages = delayedMessageRepository
-                    .findAndLockReadyToProcess(batchSize.toInt(), maxAttempts.toInt())
+                val messages = delayedMessageRepository.findAndLockReadyToProcess(batchSize, maxAttempts)
 
                 if (messages.isEmpty()) break
 
@@ -74,19 +80,23 @@ class DelayedMessageService {
                         processMessage(message)
 
                         // Update status to SENT in the same transaction
-                        message.status = DelayedMessage.MessageStatus.SENT
+                        message.status = SENT
                         logger.debug { "Successfully processed message ${message.id}" }
                         totalProcessed++
                     } catch (e: Exception) {
                         logger.warn(e) { "Failed to process message ${message.id}: ${e.message}" }
                         // Update status to PENDING and increment attempt count in the same transaction
-                        message.status = DelayedMessage.MessageStatus.PENDING
                         message.attemptCount++
                         message.lastError = e.message ?: "Unknown error"
 
-                        if (message.attemptCount >= maxAttempts.toInt()) {
+                        if (message.attemptCount >= maxAttempts) {
+                            message.status = FAILED
                             logger.error { "Message ${message.id} has reached maximum retry attempts" }
-                            message.status = DelayedMessage.MessageStatus.FAILED
+                        } else {
+                            // Calculate next retry time using exponential backoff
+                            val nextDelay = calculateNextRetryDelay(message.attemptCount)
+                            message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.SECONDS)
+                            logger.debug { "Message ${message.id} will be retried in ${nextDelay}s (attempt ${message.attemptCount})" }
                         }
                     }
                 }
@@ -104,16 +114,16 @@ class DelayedMessageService {
 
     @Scheduled(every = "1h", concurrentExecution = SKIP)
     @Transactional
-    fun cleanupOldMessages() {
+    fun cleanupOutbox() {
         try {
-            val cutoffDate = Instant.now().minusSeconds(cleanupAfterDays.toInt() * 24 * 60 * 60L)
+            val cutoffDate = Instant.now().minusSeconds(cleanupAfterDays * 24 * 60 * 60L)
             var totalDeleted = 0
             var chunkNumber = 0
 
             while (true) {
                 // Find and lock a chunk of messages for deletion
                 val messagesToDelete =
-                    delayedMessageRepository.findAndLockForDeletion(cutoffDate, cleanupBatchSize.toInt())
+                    delayedMessageRepository.findAndLockForDeletion(cutoffDate, cleanupBatchSize)
 
                 if (messagesToDelete.isEmpty()) break
 
@@ -135,10 +145,5 @@ class DelayedMessageService {
             // Don't throw the exception to prevent scheduler from stopping
             // The next scheduled run will try again
         }
-    }
-
-    private fun processMessage(message: DelayedMessage) {
-        // Send the message to the appropriate channel
-        emitter.send(objectMapper.readValue(message.message, WorkflowMessage::class.java))
     }
 } 

@@ -2,6 +2,7 @@ package com.lemline.swruntime.models
 
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntity
 import jakarta.persistence.*
+import kotlinx.serialization.Serializable
 import java.time.Instant
 
 @Entity
@@ -12,7 +13,14 @@ import java.time.Instant
 )
 class DelayedMessage : PanacheEntity() {
 
-    @Column(nullable = false)
+    @Serializable
+    enum class MessageStatus {
+        PENDING,
+        SENT,
+        FAILED
+    }
+
+    @Column(nullable = false, columnDefinition = "TEXT")
     lateinit var message: String
 
     @Column(nullable = false, length = 20)
@@ -22,19 +30,13 @@ class DelayedMessage : PanacheEntity() {
     @Column(name = "delayed_until", nullable = false)
     lateinit var delayedUntil: Instant
 
-    @Column(name = "attempt_count")
+    @Column(name = "attempt_count", nullable = false)
     var attemptCount: Int = 0
 
-    @Column(name = "last_error", length = 1000)
+    @Column(name = "last_error", columnDefinition = "TEXT")
     var lastError: String? = null
 
     @Version
     @Column(name = "version")
     var version: Long = 0
-
-    enum class MessageStatus {
-        PENDING,
-        SENT,
-        FAILED
-    }
-} 
+}

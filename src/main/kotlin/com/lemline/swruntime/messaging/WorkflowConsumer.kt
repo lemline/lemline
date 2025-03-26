@@ -1,8 +1,7 @@
 package com.lemline.swruntime.messaging
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.swruntime.logger
-import com.lemline.swruntime.services.DelayedMessageService
+import com.lemline.swruntime.repositories.DelayedMessageRepository
 import com.lemline.swruntime.sw.tasks.activities.WaitInstance
 import com.lemline.swruntime.sw.workflows.WorkflowInstance
 import io.serverlessworkflow.impl.WorkflowStatus
@@ -23,10 +22,9 @@ import kotlin.time.toJavaDuration
 class WorkflowConsumer {
     private val logger = logger()
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private val objectMapper = ObjectMapper()
 
     @Inject
-    private lateinit var delayedMessageService: DelayedMessageService
+    private lateinit var delayedMessageRepository: DelayedMessageRepository
 
     @Incoming("workflow-executions-in")
     @Outgoing("workflow-executions-out")
@@ -63,10 +61,10 @@ class WorkflowConsumer {
         val delayedUntil = Instant.now().plus(delay.toJavaDuration())
 
         // Serialize the message to JSON string
-        val messageJson = objectMapper.writeValueAsString(msg)
+        val messageJson = msg.toJson()
 
         // Save message to outbox for delayed sending
-        delayedMessageService.saveMessage(
+        delayedMessageRepository.saveMessage(
             message = messageJson,
             delayedUntil = delayedUntil
         )

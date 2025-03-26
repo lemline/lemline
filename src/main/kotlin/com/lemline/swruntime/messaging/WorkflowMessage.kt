@@ -1,10 +1,14 @@
 package com.lemline.swruntime.messaging
 
-import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.swruntime.json.Json
+import com.lemline.swruntime.json.toJackson
+import com.lemline.swruntime.serialization.ObjectNodeSerializer
 import com.lemline.swruntime.sw.tasks.JsonPointer
 import com.lemline.swruntime.sw.tasks.NodeState
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 import java.time.Instant
 
 /**
@@ -18,10 +22,11 @@ import java.time.Instant
  * @property states A map of the internal states (per position) of the workflow instance.
  * @property position The current active position
  */
+@Serializable
 data class WorkflowMessage(
     val name: String,
     val version: String,
-    val states: Map<JsonPointer, ObjectNode>,
+    val states: Map<JsonPointer, @Serializable(with = ObjectNodeSerializer::class) ObjectNode>,
     val position: JsonPointer
 ) {
     companion object {
@@ -29,20 +34,24 @@ data class WorkflowMessage(
             name: String,
             version: String,
             id: String,
-            input: JsonNode
+            input: JsonElement,
         ) = WorkflowMessage(
             name = name,
             version = version,
             states = mapOf(
                 JsonPointer.root to NodeState(
                     workflowId = id,
-                    rawInput = input,
+                    rawInput = input.toJackson(),
                     startedAt = DateTimeDescriptor.from(Instant.now())
                 ).toJson()!!
             ),
             position = JsonPointer.root
         )
     }
+
+    fun toJson() = Json.toJson(this)
 }
+
+
 
 

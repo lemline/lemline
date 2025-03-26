@@ -1,5 +1,6 @@
 package com.lemline.swruntime.sw.workflows
 
+import com.lemline.swruntime.json.Json.toJsonElement
 import com.lemline.swruntime.sw.utils.getWorkflowInstance
 import io.serverlessworkflow.impl.json.JsonUtils
 import kotlinx.coroutines.test.runTest
@@ -23,7 +24,8 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3))))
+        val list = listOf(1, 2, 3)
+        val instance = getWorkflowInstance(doYaml, toJsonElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
@@ -51,7 +53,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, toJsonElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
@@ -79,7 +81,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, toJsonElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
@@ -106,7 +108,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(4, 5, 6))))
+        val instance = getWorkflowInstance(doYaml, toJsonElement(mapOf("input" to listOf(4, 5, 6))))
 
         // run (one shot)
         instance.run()
@@ -134,7 +136,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(mapOf("input" to listOf(4, 5, 6))))
+        val instance = getWorkflowInstance(doYaml, toJsonElement(mapOf("input" to listOf(4, 5, 6))))
 
         // run (one shot)
         instance.run()

@@ -1,13 +1,26 @@
 package com.lemline.swruntime.repositories
 
 import com.lemline.swruntime.models.DelayedMessage
-import com.lemline.swruntime.models.DelayedMessage.MessageStatus
+import com.lemline.swruntime.models.DelayedMessage.MessageStatus.PENDING
+import com.lemline.swruntime.models.DelayedMessage.MessageStatus.SENT
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepository
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.transaction.Transactional
 import java.time.Instant
 
 @ApplicationScoped
 class DelayedMessageRepository : PanacheRepository<DelayedMessage> {
+
+    @Transactional
+    fun saveMessage(message: String, delayedUntil: Instant) {
+        val delayedMessage = DelayedMessage().apply {
+            this.message = message
+            this.delayedUntil = delayedUntil
+            this.status = PENDING
+        }
+        delayedMessage.persist()
+    }
+
     @Suppress("UNCHECKED_CAST")
     fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) = getEntityManager()
         .createNativeQuery(
@@ -21,7 +34,7 @@ class DelayedMessageRepository : PanacheRepository<DelayedMessage> {
                 LIMIT ?4
             """.trimIndent(), DelayedMessage::class.java
         )
-        .setParameter(1, MessageStatus.PENDING.name)
+        .setParameter(1, PENDING.name)
         .setParameter(2, Instant.now())
         .setParameter(3, maxAttempts)
         .setParameter(4, limit)
@@ -39,7 +52,7 @@ class DelayedMessageRepository : PanacheRepository<DelayedMessage> {
                 LIMIT ?3
             """.trimIndent(), DelayedMessage::class.java
         )
-        .setParameter(1, MessageStatus.SENT.name)
+        .setParameter(1, SENT.name)
         .setParameter(2, cutoffDate)
         .setParameter(3, limit)
         .resultList as List<DelayedMessage>

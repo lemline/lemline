@@ -1,6 +1,5 @@
 package com.lemline.swruntime.sw.utils
 
-import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.swruntime.messaging.WorkflowMessage
 import com.lemline.swruntime.models.WorkflowDefinition
 import com.lemline.swruntime.repositories.WorkflowDefinitionRepository
@@ -11,8 +10,9 @@ import io.mockk.every
 import io.mockk.mockk
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
+import kotlinx.serialization.json.JsonElement
 
-internal fun getWorkflowInstance(doYaml: String, input: JsonNode): WorkflowInstance {
+internal fun getWorkflowInstance(doYaml: String, input: JsonElement): WorkflowInstance {
     val hash = doYaml.hashCode()
     val document = """
             document:

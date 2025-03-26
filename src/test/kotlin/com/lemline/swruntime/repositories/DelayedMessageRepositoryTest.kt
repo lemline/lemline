@@ -92,6 +92,60 @@ class DelayedMessageRepositoryTest {
             .onEach { it.delete() }
 
     @Test
+    @Transactional
+    fun `saveMessage should create a new delayed message with correct properties`() {
+        // Given
+        val message = "test message"
+        val delayedUntil = Instant.now().plus(5, ChronoUnit.MINUTES)
+
+        // When
+        repository.saveMessage(message, delayedUntil)
+
+        // Then
+        val savedMessage = entityManager
+            .createQuery("FROM DelayedMessage", DelayedMessage::class.java)
+            .singleResult
+
+        Assertions.assertNotNull(savedMessage)
+        Assertions.assertEquals(message, savedMessage.message)
+        Assertions.assertEquals(delayedUntil, savedMessage.delayedUntil)
+        Assertions.assertEquals(MessageStatus.PENDING, savedMessage.status)
+        Assertions.assertEquals(0, savedMessage.attemptCount)
+    }
+
+    @Test
+    @Transactional
+    fun `saveMessage should allow multiple messages with same content but different delays`() {
+        // Given
+        val message = "test message"
+        val firstDelay = Instant.now().plus(5, ChronoUnit.MINUTES)
+        val secondDelay = Instant.now().plus(10, ChronoUnit.MINUTES)
+
+        // When
+        repository.saveMessage(message, firstDelay)
+        repository.saveMessage(message, secondDelay)
+
+        // Then
+        val savedMessages = entityManager
+            .createQuery("FROM DelayedMessage ORDER BY delayedUntil", DelayedMessage::class.java)
+            .resultList
+
+        Assertions.assertEquals(2, savedMessages.size)
+
+        // Verify first message
+        Assertions.assertEquals(message, savedMessages[0].message)
+        Assertions.assertEquals(firstDelay, savedMessages[0].delayedUntil)
+        Assertions.assertEquals(MessageStatus.PENDING, savedMessages[0].status)
+        Assertions.assertEquals(0, savedMessages[0].attemptCount)
+
+        // Verify second message
+        Assertions.assertEquals(message, savedMessages[1].message)
+        Assertions.assertEquals(secondDelay, savedMessages[1].delayedUntil)
+        Assertions.assertEquals(MessageStatus.PENDING, savedMessages[1].status)
+        Assertions.assertEquals(0, savedMessages[1].attemptCount)
+    }
+    
+    @Test
     internal fun `findAndLockReadyToProcess should return messages ready to process`() {
         // Given
         createPendingMessage(2)

@@ -3,6 +3,8 @@ package com.lemline.swruntime.sw.workflows
 import com.lemline.swruntime.sw.utils.getWorkflowInstance
 import io.serverlessworkflow.impl.json.JsonUtils
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
@@ -17,15 +19,15 @@ class SetTest {
                 set:
                   counter: @{ 0 }
         """
-        val high = getWorkflowInstance(doYaml, JsonUtils.`object`())
+        val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
 
         // run (one shot)
-        high.run()
+        instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
             JsonUtils.fromValue(mapOf("counter" to 0)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            instance.rootInstance.transformedOutput  // actual
         )
     }
 
@@ -38,21 +40,20 @@ class SetTest {
                 set:
                   counter: @{ . + 1 }
         """
-        val high = getWorkflowInstance(doYaml, JsonUtils.fromValue(1))
+        val instance = getWorkflowInstance(doYaml, JsonPrimitive(1))
 
         // run (one shot)
-        high.run()
+        instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
             JsonUtils.fromValue(mapOf("counter" to 2)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            instance.rootInstance.transformedOutput  // actual
         )
     }
 
     @Test
     fun `multiple set tasks`() = runTest {
-        val str = ""
         val doYaml = """
             do:
               - first:
@@ -67,7 +68,7 @@ class SetTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
+        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -81,7 +82,6 @@ class SetTest {
 
     @Test
     fun `multiple and nested set tasks`() = runTest {
-        val str = ""
         val doYaml = """
             do:
               - first:
@@ -101,7 +101,7 @@ class SetTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonUtils.fromValue(str))
+        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
