@@ -28,7 +28,7 @@ class WorkflowConsumer {
 
     @Incoming("workflow-executions-in")
     @Outgoing("workflow-executions-out")
-    fun consume(msg: WorkflowMessage): CompletionStage<WorkflowMessage?> = scope.future {
+    fun consume(msg: WorkflowMessage): CompletionStage<String?> = scope.future {
         logger.info("Received workflow execution request: $msg}")
 
         try {
@@ -43,7 +43,7 @@ class WorkflowConsumer {
                 WorkflowStatus.COMPLETED -> null
                 WorkflowStatus.FAULTED -> TODO()
                 WorkflowStatus.CANCELLED -> TODO()
-            }
+            }?.toJson()
 
         } catch (e: Exception) {
             logger.error("Error processing workflow execution request", e)

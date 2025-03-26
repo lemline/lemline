@@ -31,7 +31,7 @@ class DelayedMessageOutboxTest {
     @Inject
     lateinit var entityManager: EntityManager
 
-    private lateinit var emitter: Emitter<WorkflowMessage>
+    private lateinit var emitter: Emitter<String>
     private lateinit var outbox: DelayedMessageOutbox
 
     @BeforeEach
@@ -80,7 +80,7 @@ class DelayedMessageOutboxTest {
 
         // Then
         // Verify message was sent
-        verify(emitter).send(argThat { this.name == workflowMessage.name && this.version == workflowMessage.version })
+        verify(emitter).send(argThat { this == messageJson })
 
         // Verify message status was updated
         val updatedMessage = entityManager.find(DelayedMessage::class.java, message.id)
@@ -90,7 +90,7 @@ class DelayedMessageOutboxTest {
 
     @Test
     @Transactional
-    fun `processOutbox should handle invalid message content`() {
+    fun `processOutbox should mark message for retry after processing failure`() {
         // Given
         val message = DelayedMessage().apply {
             message = "invalid json"
@@ -101,18 +101,18 @@ class DelayedMessageOutboxTest {
         entityManager.persist(message)
         entityManager.flush()
 
+        // Mock emitter to throw exception
+        whenever(emitter.send(any())).thenThrow(RuntimeException("Emitter failed"))
+
         // When
         outbox.processOutbox()
 
         // Then
-        // Verify no message was sent
-        verify(emitter, never()).send(any())
-
         // Verify message status and attempt count were updated
         val updatedMessage = entityManager.find(DelayedMessage::class.java, message.id)
         Assertions.assertEquals(MessageStatus.PENDING, updatedMessage.status)
         Assertions.assertEquals(1, updatedMessage.attemptCount)
-        Assertions.assertNotNull(updatedMessage.lastError)
+        Assertions.assertEquals("Emitter failed", updatedMessage.lastError)
     }
 
     @Test
@@ -128,6 +128,9 @@ class DelayedMessageOutboxTest {
         entityManager.persist(message)
         entityManager.flush()
 
+        // Mock emitter to throw exception
+        whenever(emitter.send(any())).thenThrow(RuntimeException("Emitter failed"))
+
         // When
         outbox.processOutbox()
 
@@ -136,7 +139,7 @@ class DelayedMessageOutboxTest {
         val updatedMessage = entityManager.find(DelayedMessage::class.java, message.id)
         Assertions.assertEquals(MessageStatus.FAILED, updatedMessage.status)
         Assertions.assertEquals(3, updatedMessage.attemptCount)
-        Assertions.assertNotNull(updatedMessage.lastError)
+        Assertions.assertEquals("Emitter failed", updatedMessage.lastError)
     }
 
     @Test

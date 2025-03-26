@@ -1,8 +1,6 @@
 package com.lemline.swruntime.services
 
 import com.lemline.swruntime.*
-import com.lemline.swruntime.json.Json
-import com.lemline.swruntime.messaging.WorkflowMessage
 import com.lemline.swruntime.models.DelayedMessage
 import com.lemline.swruntime.models.DelayedMessage.MessageStatus.FAILED
 import com.lemline.swruntime.models.DelayedMessage.MessageStatus.SENT
@@ -22,7 +20,7 @@ class DelayedMessageOutbox(
     val delayedMessageRepository: DelayedMessageRepository,
 
     @Channel("workflow-execution-out")
-    val emitter: Emitter<WorkflowMessage>,
+    val emitter: Emitter<String>,
 
     @ConfigProperty(name = "delayed.batch-size", defaultValue = "100")
     val batchSize: Int,
@@ -41,12 +39,9 @@ class DelayedMessageOutbox(
 ) {
     private val logger = logger()
 
-    private fun processMessage(message: DelayedMessage) {
-        println("MESSAGE = ${message.message}")
-        val workflowMessage: WorkflowMessage = Json.fromJson(message.message)
-        println(workflowMessage)
+    private fun processMessage(delayedMessage: DelayedMessage) {
         // Send the message to the appropriate channel
-        emitter.send(workflowMessage)
+        emitter.send(delayedMessage.message)
     }
 
     private fun calculateNextRetryDelay(attemptCount: Int): Long {
