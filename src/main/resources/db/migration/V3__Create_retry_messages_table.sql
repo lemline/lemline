@@ -1,4 +1,4 @@
-CREATE TABLE delayed_messages
+CREATE TABLE retry_messages
 (
     id            SERIAL PRIMARY KEY,
     message       TEXT        NOT NULL,
@@ -10,4 +10,4 @@ CREATE TABLE delayed_messages
 );
 
 -- Create a single combined index for our main query pattern
-CREATE INDEX idx_delayed_ready ON delayed_messages (status, delayed_until, attempt_count);
+CREATE INDEX idx_retry_ready ON retry_messages (status, delayed_until, attempt_count);

@@ -5,14 +5,15 @@ import jakarta.persistence.*
 import kotlinx.serialization.Serializable
 import java.time.Instant
 
+const val RETRY_TABLE = "retry_messages"
+
 @Entity
 @Table(
-    name = "delayed_messages",
+    name = "retry_messages",
     // Combined index for our main query pattern: status + delayed_until + attempt_count
-    indexes = [Index(name = "idx_delayed_ready", columnList = "status, delayed_until, attempt_count")]
+    indexes = [Index(name = "idx_retry_ready", columnList = "status, delayed_until, attempt_count")]
 )
-class DelayedMessage : PanacheEntity() {
-
+class RetryMessage : PanacheEntity() {
     @Serializable
     enum class MessageStatus {
         PENDING,
@@ -39,4 +40,20 @@ class DelayedMessage : PanacheEntity() {
     @Version
     @Column(name = "version")
     var version: Long = 0
+
+    companion object {
+        fun create(
+            message: String,
+            delayedUntil: Instant = Instant.now(),
+            attemptCount: Int = 0,
+            lastError: Exception? = null,
+            status: MessageStatus = MessageStatus.PENDING
+        ) = RetryMessage().apply {
+            this.message = message
+            this.delayedUntil = delayedUntil
+            this.attemptCount = attemptCount
+            this.lastError = lastError?.message
+            this.status = status
+        }
+    }
 }

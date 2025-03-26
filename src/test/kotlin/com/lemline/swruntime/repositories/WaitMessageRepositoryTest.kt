@@ -1,8 +1,8 @@
 package com.lemline.swruntime.repositories
 
 import com.lemline.swruntime.PostgresTestResource
-import com.lemline.swruntime.models.DelayedMessage
-import com.lemline.swruntime.models.DelayedMessage.MessageStatus
+import com.lemline.swruntime.models.WAIT_TABLE
+import com.lemline.swruntime.models.WaitMessage
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
@@ -23,10 +23,10 @@ import kotlin.time.toJavaDuration
 @QuarkusTestResource(PostgresTestResource::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-class DelayedMessageRepositoryTest {
+class WaitMessageRepositoryTest {
 
     @Inject
-    lateinit var repository: DelayedMessageRepository
+    lateinit var repository: WaitMessageRepository
 
     @Inject
     lateinit var entityManager: EntityManager
@@ -38,7 +38,7 @@ class DelayedMessageRepositoryTest {
     @Transactional
     internal fun setupTest() {
         // Clear the database before each test
-        entityManager.createQuery("DELETE FROM DelayedMessage").executeUpdate()
+        entityManager.createQuery("DELETE FROM ${WAIT_TABLE}").executeUpdate()
     }
 
     @Transactional
@@ -47,9 +47,9 @@ class DelayedMessageRepositoryTest {
         val now = Instant.now()
         // Create test messages in a transaction
         repeat(count) { i ->
-            val message = DelayedMessage().apply {
+            val message = WaitMessage().apply {
                 message = "test$i"
-                status = MessageStatus.PENDING
+                status = WaitMessage.MessageStatus.PENDING
                 delayedUntil = now.plus(((1 + i) * duration).minutes.toJavaDuration())
                 this.attemptCount = attemptCount
             }
@@ -64,9 +64,9 @@ class DelayedMessageRepositoryTest {
         val now = Instant.now()
         // Create test messages in a transaction
         repeat(count) { i ->
-            val message = DelayedMessage().apply {
+            val message = WaitMessage().apply {
                 message = "test$i"
-                status = MessageStatus.SENT
+                status = WaitMessage.MessageStatus.SENT
                 delayedUntil = now.plus(((1 + i) * duration).days.toJavaDuration())
                 this.attemptCount = attemptCount
             }
@@ -81,7 +81,7 @@ class DelayedMessageRepositoryTest {
     @Transactional
     internal fun findAndProcess(limit: Int, maxAttempts: Int) =
         findAndLockReadyToProcess(limit, maxAttempts)
-            .onEach { it.status = MessageStatus.SENT }
+            .onEach { it.status = WaitMessage.MessageStatus.SENT }
 
     private fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) =
         repository.findAndLockForDeletion(cutoffDate, limit)
@@ -99,17 +99,17 @@ class DelayedMessageRepositoryTest {
         val delayedUntil = Instant.now().plus(5, ChronoUnit.MINUTES)
 
         // When
-        repository.saveMessage(message, delayedUntil)
+        with(repository) { WaitMessage.create(message, delayedUntil).save() }
 
         // Then
         val savedMessage = entityManager
-            .createQuery("FROM DelayedMessage", DelayedMessage::class.java)
+            .createQuery("FROM $WAIT_TABLE", WaitMessage::class.java)
             .singleResult
 
         Assertions.assertNotNull(savedMessage)
         Assertions.assertEquals(message, savedMessage.message)
         Assertions.assertEquals(delayedUntil, savedMessage.delayedUntil)
-        Assertions.assertEquals(MessageStatus.PENDING, savedMessage.status)
+        Assertions.assertEquals(WaitMessage.MessageStatus.PENDING, savedMessage.status)
         Assertions.assertEquals(0, savedMessage.attemptCount)
     }
 
@@ -122,12 +122,14 @@ class DelayedMessageRepositoryTest {
         val secondDelay = Instant.now().plus(10, ChronoUnit.MINUTES)
 
         // When
-        repository.saveMessage(message, firstDelay)
-        repository.saveMessage(message, secondDelay)
+        with(repository) {
+            WaitMessage.create(message, firstDelay).save()
+            WaitMessage.create(message, secondDelay).save()
+        }
 
         // Then
         val savedMessages = entityManager
-            .createQuery("FROM DelayedMessage ORDER BY delayedUntil", DelayedMessage::class.java)
+            .createQuery("FROM $WAIT_TABLE", WaitMessage::class.java)
             .resultList
 
         Assertions.assertEquals(2, savedMessages.size)
@@ -135,16 +137,16 @@ class DelayedMessageRepositoryTest {
         // Verify first message
         Assertions.assertEquals(message, savedMessages[0].message)
         Assertions.assertEquals(firstDelay, savedMessages[0].delayedUntil)
-        Assertions.assertEquals(MessageStatus.PENDING, savedMessages[0].status)
+        Assertions.assertEquals(WaitMessage.MessageStatus.PENDING, savedMessages[0].status)
         Assertions.assertEquals(0, savedMessages[0].attemptCount)
 
         // Verify second message
         Assertions.assertEquals(message, savedMessages[1].message)
         Assertions.assertEquals(secondDelay, savedMessages[1].delayedUntil)
-        Assertions.assertEquals(MessageStatus.PENDING, savedMessages[1].status)
+        Assertions.assertEquals(WaitMessage.MessageStatus.PENDING, savedMessages[1].status)
         Assertions.assertEquals(0, savedMessages[1].attemptCount)
     }
-    
+
     @Test
     internal fun `findAndLockReadyToProcess should return messages ready to process`() {
         // Given
@@ -155,7 +157,7 @@ class DelayedMessageRepositoryTest {
 
         // Then
         Assertions.assertEquals(2, result.size)
-        Assertions.assertTrue(result.all { it.status == MessageStatus.PENDING })
+        Assertions.assertTrue(result.all { it.status == WaitMessage.MessageStatus.PENDING })
         Assertions.assertTrue(result.all { it.delayedUntil <= Instant.now() })
         Assertions.assertTrue(result.all { it.attemptCount < 3 })
     }
@@ -207,7 +209,7 @@ class DelayedMessageRepositoryTest {
 
         // Then
         Assertions.assertEquals(1, result.size)
-        Assertions.assertEquals(MessageStatus.SENT, result[0].status)
+        Assertions.assertEquals(WaitMessage.MessageStatus.SENT, result[0].status)
         Assertions.assertTrue(result[0].delayedUntil < cutoffDate)
     }
 
@@ -261,7 +263,7 @@ class DelayedMessageRepositoryTest {
         createPendingMessage(messageCount)
 
         // When
-        val results = mutableListOf<List<DelayedMessage>>()
+        val results = mutableListOf<List<WaitMessage>>()
         val latch = CountDownLatch(concurrentRequests)
         val executor = Executors.newFixedThreadPool(concurrentRequests)
 
@@ -304,7 +306,7 @@ class DelayedMessageRepositoryTest {
         createSentMessage(messageCount)
 
         // When
-        val results = mutableListOf<List<DelayedMessage>>()
+        val results = mutableListOf<List<WaitMessage>>()
         val latch = CountDownLatch(concurrentRequests)
         val executor = Executors.newFixedThreadPool(concurrentRequests)
 
@@ -349,9 +351,9 @@ class DelayedMessageRepositoryTest {
         // Create test messages
         userTransaction.begin()
         repeat(messageCount) { i ->
-            val message = DelayedMessage().apply {
+            val message = WaitMessage().apply {
                 message = "test$i"
-                status = if (i < messageCount / 2) MessageStatus.PENDING else MessageStatus.SENT
+                status = if (i < messageCount / 2) WaitMessage.MessageStatus.PENDING else WaitMessage.MessageStatus.SENT
                 delayedUntil = if (i < messageCount / 2) {
                     now.minus((i + 1).toLong(), ChronoUnit.MINUTES)
                 } else {
@@ -365,8 +367,8 @@ class DelayedMessageRepositoryTest {
         userTransaction.commit()
 
         // When
-        val processResults = mutableListOf<List<DelayedMessage>>()
-        val deleteResults = mutableListOf<List<DelayedMessage>>()
+        val processResults = mutableListOf<List<WaitMessage>>()
+        val deleteResults = mutableListOf<List<WaitMessage>>()
         val latch = CountDownLatch(concurrentRequests)
         val executor = Executors.newFixedThreadPool(concurrentRequests)
 

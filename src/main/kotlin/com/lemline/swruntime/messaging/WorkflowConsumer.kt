@@ -1,12 +1,14 @@
 package com.lemline.swruntime.messaging
 
 import com.lemline.swruntime.logger
-import com.lemline.swruntime.repositories.DelayedMessageRepository
+import com.lemline.swruntime.models.RetryMessage
+import com.lemline.swruntime.models.WaitMessage
+import com.lemline.swruntime.repositories.RetryMessageRepository
+import com.lemline.swruntime.repositories.WaitMessageRepository
 import com.lemline.swruntime.sw.tasks.activities.WaitInstance
 import com.lemline.swruntime.sw.workflows.WorkflowInstance
 import io.serverlessworkflow.impl.WorkflowStatus
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,35 +21,42 @@ import kotlin.time.Duration
 import kotlin.time.toJavaDuration
 
 @ApplicationScoped
-class WorkflowConsumer {
+class WorkflowConsumer(
+    private val retryMessageRepository: RetryMessageRepository,
+    private val waitMessageRepository: WaitMessageRepository,
+) {
     private val logger = logger()
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    @Inject
-    private lateinit var delayedMessageRepository: DelayedMessageRepository
-
-    @Incoming("workflow-executions-in")
-    @Outgoing("workflow-executions-out")
+    @Incoming("workflows-in")
+    @Outgoing("workflows-out")
     fun consume(msg: WorkflowMessage): CompletionStage<String?> = scope.future {
         logger.info("Received workflow execution request: $msg}")
 
         try {
             val instance = WorkflowInstance.from(msg)
-
             instance.run()
 
             when (instance.status) {
                 WorkflowStatus.PENDING -> TODO()
                 WorkflowStatus.RUNNING -> instance.running()
-                WorkflowStatus.WAITING -> null.also { instance.waiting() }
+                WorkflowStatus.WAITING -> instance.waiting()
                 WorkflowStatus.COMPLETED -> null
-                WorkflowStatus.FAULTED -> TODO()
-                WorkflowStatus.CANCELLED -> TODO()
+                WorkflowStatus.FAULTED -> null
+                WorkflowStatus.CANCELLED -> null
             }?.toJson()
-
         } catch (e: Exception) {
             logger.error("Error processing workflow execution request", e)
-            throw e
+            // Instead of throwing, we'll store the message for retry
+            // if an error occurs here also, scope.future will fail and the message sent to DLQ
+            with(retryMessageRepository) {
+                RetryMessage.create(
+                    message = msg.toJson(),
+                    delayedUntil = Instant.now(),
+                    lastError = e
+                ).save()
+            }
+            null
         }
     }
 
@@ -55,18 +64,19 @@ class WorkflowConsumer {
         return this.toMessage()
     }
 
-    private fun WorkflowInstance.waiting() {
+    private fun WorkflowInstance.waiting(): WorkflowMessage? {
         val msg = this.toMessage()
         val delay: Duration = (this.current as WaitInstance).delay
         val delayedUntil = Instant.now().plus(delay.toJavaDuration())
 
-        // Serialize the message to JSON string
-        val messageJson = msg.toJson()
-
         // Save message to outbox for delayed sending
-        delayedMessageRepository.saveMessage(
-            message = messageJson,
-            delayedUntil = delayedUntil
-        )
+        with(waitMessageRepository) {
+            WaitMessage.create(
+                message = msg.toJson(),
+                delayedUntil = delayedUntil
+            ).save()
+        }
+
+        return null
     }
 } 

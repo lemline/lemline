@@ -1,10 +1,8 @@
 package com.lemline.swruntime.services
 
 import com.lemline.swruntime.*
-import com.lemline.swruntime.models.DelayedMessage
-import com.lemline.swruntime.models.DelayedMessage.MessageStatus.FAILED
-import com.lemline.swruntime.models.DelayedMessage.MessageStatus.SENT
-import com.lemline.swruntime.repositories.DelayedMessageRepository
+import com.lemline.swruntime.models.RetryMessage
+import com.lemline.swruntime.repositories.RetryMessageRepository
 import io.quarkus.scheduler.Scheduled
 import io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP
 import jakarta.enterprise.context.ApplicationScoped
@@ -16,10 +14,10 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 @ApplicationScoped
-class DelayedMessageOutbox(
-    val delayedMessageRepository: DelayedMessageRepository,
+class RetryMessageOutbox(
+    private val retryRepository: RetryMessageRepository,
 
-    @Channel("workflow-execution-out")
+    @Channel("workflows-out")
     val emitter: Emitter<String>,
 
     @ConfigProperty(name = "delayed.batch-size", defaultValue = "100")
@@ -37,11 +35,12 @@ class DelayedMessageOutbox(
     @ConfigProperty(name = "delayed.cleanup-batch-size", defaultValue = "500")
     val cleanupBatchSize: Int,
 ) {
+
     private val logger = logger()
 
-    private fun processMessage(delayedMessage: DelayedMessage) {
+    private fun processMessage(retryMessage: RetryMessage) {
         // Send the message to the appropriate channel
-        emitter.send(delayedMessage.message)
+        emitter.send(retryMessage.message)
     }
 
     private fun calculateNextRetryDelay(attemptCount: Int): Long {
@@ -62,7 +61,7 @@ class DelayedMessageOutbox(
 
             while (true) {
                 // Find and lock messages ready to process
-                val messages = delayedMessageRepository.findAndLockReadyToProcess(batchSize, retryMaxAttempts)
+                val messages = retryRepository.findAndLockReadyToProcess(batchSize, retryMaxAttempts)
 
                 if (messages.isEmpty()) break
 
@@ -75,7 +74,7 @@ class DelayedMessageOutbox(
                         processMessage(message)
 
                         // Update status to SENT in the same transaction
-                        message.status = SENT
+                        message.status = RetryMessage.MessageStatus.SENT
                         logger.debug { "Successfully processed message ${message.id}" }
                         totalProcessed++
                     } catch (e: Exception) {
@@ -85,7 +84,7 @@ class DelayedMessageOutbox(
                         message.lastError = e.message ?: "Unknown error"
 
                         if (message.attemptCount >= retryMaxAttempts) {
-                            message.status = FAILED
+                            message.status = RetryMessage.MessageStatus.FAILED
                             logger.error { "Message ${message.id} has reached maximum retry attempts" }
                         } else {
                             // Calculate next retry time using exponential backoff
@@ -118,7 +117,7 @@ class DelayedMessageOutbox(
             while (true) {
                 // Find and lock a chunk of messages for deletion
                 val messagesToDelete =
-                    delayedMessageRepository.findAndLockForDeletion(cutoffDate, cleanupBatchSize)
+                    retryRepository.findAndLockForDeletion(cutoffDate, cleanupBatchSize)
 
                 if (messagesToDelete.isEmpty()) break
 
@@ -141,4 +140,4 @@ class DelayedMessageOutbox(
             // The next scheduled run will try again
         }
     }
-} 
+}
