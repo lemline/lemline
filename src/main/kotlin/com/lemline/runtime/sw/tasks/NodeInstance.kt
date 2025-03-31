@@ -57,7 +57,7 @@ abstract class NodeInstance<T : TaskBase>(
         }
 
     /**
-     * Index of the current child being processed
+     * Index of the currentNodeInstance child being processed
      */
     internal var childIndex: Int
         get() = state.childIndex
@@ -139,7 +139,7 @@ abstract class NodeInstance<T : TaskBase>(
      */
     internal open val scope: ObjectNode
         get() = variables
-            // merge custom scope with current
+            // merge custom scope with currentNodeInstance
             .merge(
                 Scope().apply {
                     setTask(taskDescriptor)
@@ -160,7 +160,7 @@ abstract class NodeInstance<T : TaskBase>(
      *
      * @param flow The flow directive which can be one of the following:
      * - `null` or `FlowDirectiveEnum.CONTINUE`: Continue to the next sibling.
-     * - `FlowDirectiveEnum.EXIT`: Exit the current flow and continue with the parent flow.
+     * - `FlowDirectiveEnum.EXIT`: Exit the currentNodeInstance flow and continue with the parent flow.
      * - `FlowDirectiveEnum.END`: End the workflow.
      * - `String`: Go to the sibling with the specified name.
      * - Any other value will result in an error.
@@ -277,7 +277,7 @@ abstract class NodeInstance<T : TaskBase>(
                 error("result of '.export.as' must be an object, but is '$exportAs'")
         }
 
-        // set current raw output of parent flow
+        // set currentNodeInstance raw output of parent flow
         parent?.rawOutput = transformedOutput
 
         // reset the instance

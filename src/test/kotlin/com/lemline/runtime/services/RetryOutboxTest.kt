@@ -69,7 +69,7 @@ internal class RetryOutboxTest {
 
     @Test
     @Transactional
-    fun `processOutbox should process pending messages and mark them as sent`() {
+    fun `RetryOutbox should process pending messages and mark them as sent`() {
         // Given
         val workflowMessage = getWorkflowMessage()
         val messageJson = Json.toJson(workflowMessage)
@@ -98,7 +98,7 @@ internal class RetryOutboxTest {
 
     @Test
     @Transactional
-    fun `processOutbox should mark message for retry after processing failure`() {
+    fun `RetryOutbox should mark message for retry after processing failure`() {
         // Given
         val message = RetryMessage().apply {
             message = "invalid json"
@@ -125,7 +125,7 @@ internal class RetryOutboxTest {
 
     @Test
     @Transactional
-    fun `processOutbox should mark message as failed after max attempts`() {
+    fun `RetryOutbox should mark message as failed after max attempts`() {
         // Given
         val message = RetryMessage().apply {
             message = "invalid json"
@@ -157,7 +157,7 @@ internal class RetryOutboxTest {
 
     @Test
     @Transactional
-    fun `processOutbox should handle emitter failure`() {
+    fun `RetryOutbox should handle emitter failure`() {
         // Given
         val workflowMessage = WorkflowMessage("test-workflow", "1.0.0", emptyMap(), JsonPointer(""))
         val messageJson = Json.toJson(workflowMessage)
@@ -248,7 +248,7 @@ internal class RetryOutboxTest {
 
     @Test
     @Transactional
-    fun `processOutbox should process messages in batches`() {
+    fun `RetryOutbox should process messages in batches`() {
         // Given
         val workflowMessage = WorkflowMessage("test-workflow", "1.0.0", emptyMap(), JsonPointer(""))
         val messageJson = Json.toJson(workflowMessage)

@@ -20,7 +20,7 @@ import java.time.Instant
  * @property name The name of the workflow.
  * @property version The version of the workflow.
  * @property states A map of the internal states (per position) of the workflow instance.
- * @property position The current active position
+ * @property position The currentNodeInstance active position
  */
 @Serializable
 data class WorkflowMessage(
@@ -47,6 +47,8 @@ data class WorkflowMessage(
             ),
             position = JsonPointer.root
         )
+
+        fun fromJson(json: String): WorkflowMessage = Json.fromJson(json)
     }
 
     fun toJson() = Json.toJson(this)

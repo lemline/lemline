@@ -16,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap
 typealias WorkflowIndex = Pair<String, String>
 
 @ApplicationScoped
-internal class WorkflowParser(
+class WorkflowParser(
     private val workflowDefinitionRepository: WorkflowDefinitionRepository,
 ) {
     /**
@@ -104,7 +104,7 @@ internal class WorkflowParser(
     /**
      * Caches the task nodes of the given workflow.
      *
-     * This method processes the task nodes starting from the current node,
+     * This method processes the task nodes starting from the currentNodeInstance node,
      * and stores them in the `nodesCache` for the given workflow.
      *
      */

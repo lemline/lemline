@@ -53,6 +53,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers:1.19.7")
     testImplementation("org.testcontainers:postgresql:1.19.7")
     testImplementation("org.testcontainers:junit-jupiter:1.19.7")
+    testImplementation("org.testcontainers:kafka:1.19.7")
 
     // Add Kotlin Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
@@ -60,6 +61,9 @@ dependencies {
 
     // UUID Creator
     implementation("com.github.f4b6a3:uuid-creator:6.0.0")
+
+    // Kafka client for tests
+    testImplementation("org.apache.kafka:kafka-clients:3.6.1")
 }
 
 group = "com.lemline"
@@ -85,9 +89,9 @@ tasks.withType<Test> {
     jvmArgs = listOf("-XX:+EnableDynamicAgentLoading")
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs = listOf("-Xjsr305=strict")
-    }
-} 
+//tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+//    kotlinOptions {
+//        jvmTarget = "17"
+//        freeCompilerArgs = listOf("-Xjsr305=strict")
+//    }
+//}

@@ -13,7 +13,7 @@ import jakarta.persistence.*
         )
     ]
 )
-internal class WorkflowDefinition : UuidV7Entity() {
+class WorkflowDefinition : UuidV7Entity() {
 
     @Column(nullable = false)
     lateinit var name: String

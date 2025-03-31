@@ -9,7 +9,7 @@ import jakarta.persistence.MappedSuperclass
 import java.util.*
 
 @MappedSuperclass
-internal abstract class UuidV7Entity : PanacheEntityBase {
+abstract class UuidV7Entity : PanacheEntityBase {
     @Id
     @GeneratedValue
     @UuidV7

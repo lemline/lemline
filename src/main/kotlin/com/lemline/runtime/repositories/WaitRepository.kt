@@ -9,7 +9,7 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 
 @ApplicationScoped
-internal class WaitRepository : UuidV7Repository<WaitMessage>, OutboxRepository<WaitMessage> {
+class WaitRepository : UuidV7Repository<WaitMessage>, OutboxRepository<WaitMessage> {
 
     @Transactional
     fun WaitMessage.save() {

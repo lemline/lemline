@@ -12,7 +12,6 @@ import com.lemline.runtime.sw.tasks.flows.*
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import jakarta.inject.Inject
 
 /**
  * Represents an instance of a workflow.
@@ -29,7 +28,6 @@ class WorkflowInstance(
     val states: Map<NodePosition, NodeState>,
     val position: NodePosition
 ) {
-    @Inject
     internal lateinit var workflowParser: WorkflowParser
 
     private val logger = logger()
@@ -72,7 +70,7 @@ class WorkflowInstance(
 
     internal lateinit var rootInstance: RootInstance
 
-    internal lateinit var current: NodeInstance<*>
+    internal lateinit var currentNodeInstance: NodeInstance<*>
 
     suspend fun run() {
         var current = nodeInstances[position] ?: error("task not found in position $position")
@@ -92,9 +90,9 @@ class WorkflowInstance(
     private suspend fun NodeInstance<*>.run() {
 
         var next = when (rawOutput == null) {
-            // current is not completed (start or retry)
+            // current node instance is not completed (start or retry)
             true -> this
-            // current is completed, go to next
+            // current node instance is completed, go to next
             false -> this.then()
         }
 
@@ -107,7 +105,7 @@ class WorkflowInstance(
                 true -> {
                     // if next is an activity, then break
                     if (next.node.isActivity()) break
-                    // execute current flow node
+                    // execute currentNodeInstance flow node
                     next.execute()
                     // continue flow node
                     next.`continue`()
@@ -120,13 +118,13 @@ class WorkflowInstance(
         when (next) {
             // complete the workflow
             null -> {
-                this@WorkflowInstance.current = rootInstance
+                this@WorkflowInstance.currentNodeInstance = rootInstance
                 rootInstance.complete()
                 status = WorkflowStatus.COMPLETED
             }
             // execute the activity
             else -> {
-                this@WorkflowInstance.current = next
+                this@WorkflowInstance.currentNodeInstance = next
                 next.execute()
                 if (next is WaitInstance) status = WorkflowStatus.WAITING
             }
@@ -197,9 +195,9 @@ class WorkflowInstance(
 
 
     /**
-     * Converts the current workflow instance to a `WorkflowExecutionMessage`.
+     * Converts the currentNodeInstance workflow instance to a `WorkflowMessage`.
      *
-     * @return A `WorkflowExecutionMessage` representing the current state of the workflow instance.
+     * @return A `WorkflowExecutionMessage` representing the currentNodeInstance state of the workflow instance.
      */
     internal fun toMessage() = WorkflowMessage(
         name = name,

@@ -9,7 +9,7 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 
 @ApplicationScoped
-internal class RetryRepository : UuidV7Repository<RetryMessage>, OutboxRepository<RetryMessage> {
+class RetryRepository : UuidV7Repository<RetryMessage>, OutboxRepository<RetryMessage> {
 
     @Transactional
     fun RetryMessage.save() {

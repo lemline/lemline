@@ -50,7 +50,7 @@ class TryInstance(
      * Determines if this tryInstance is catching the specified error.
      *
      * This method evaluates the `catch` conditions defined in the `TryTask` to determine
-     * if the current instance should handle the given `WorkflowError`.
+     * if the currentNodeInstance instance should handle the given `WorkflowError`.
      *
      * @param taskInput The input data for the task.
      * @param error The workflow error to be checked.
@@ -85,7 +85,7 @@ class TryInstance(
             if (exceptWhenFilter) return false
         }
 
-        // add error to the current custom scope
+        // add error to the currentNodeInstance custom scope
         this.variables.set<JsonNode>(errorAs, JsonUtils.fromValue(error))
 
         return true

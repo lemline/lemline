@@ -14,7 +14,7 @@ const val RETRY_TABLE = "retry_messages"
     // Combined index for our main query pattern: status + delayed_until + attempt_count
     indexes = [Index(name = "idx_retry_ready", columnList = "status, delayed_until, attempt_count")]
 )
-internal class RetryMessage : UuidV7Entity(), OutboxMessage {
+class RetryMessage : UuidV7Entity(), OutboxMessage {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     lateinit var message: String

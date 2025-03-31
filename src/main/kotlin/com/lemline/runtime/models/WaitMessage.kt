@@ -14,7 +14,7 @@ const val WAIT_TABLE = "wait_messages"
     // Combined index for our main query pattern: status + delayed_until + attempt_count
     indexes = [Index(name = "idx_wait_ready", columnList = "status, delayed_until, attempt_count")]
 )
-internal class WaitMessage : UuidV7Entity(), OutboxMessage {
+class WaitMessage : UuidV7Entity(), OutboxMessage {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     lateinit var message: String
