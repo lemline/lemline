@@ -3,11 +3,13 @@ package com.lemline.swruntime.services
 import com.lemline.swruntime.PostgresTestResource
 import com.lemline.swruntime.json.Json
 import com.lemline.swruntime.messaging.WorkflowMessage
+import com.lemline.swruntime.metrics.OutboxMetrics
 import com.lemline.swruntime.models.RetryMessage
 import com.lemline.swruntime.outbox.OutBoxStatus
 import com.lemline.swruntime.outbox.RetryOutbox
 import com.lemline.swruntime.repositories.RetryRepository
 import com.lemline.swruntime.sw.tasks.JsonPointer
+import io.mockk.mockk
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
@@ -27,12 +29,12 @@ import java.time.temporal.ChronoUnit
 internal class RetryOutboxTest {
 
     @Inject
-    lateinit var repository: RetryRepository
-
-    @Inject
     lateinit var entityManager: EntityManager
 
-    private lateinit var emitter: Emitter<String>
+    private val repository = mockk<RetryRepository>()
+    private val emitter = mockk<Emitter<String>>()
+    private val metrics = mockk<OutboxMetrics>(relaxed = true)
+
     private lateinit var outbox: RetryOutbox
 
     @BeforeEach
@@ -41,12 +43,10 @@ internal class RetryOutboxTest {
         // Clear the database before each test
         entityManager.createQuery("DELETE FROM RetryMessage").executeUpdate()
 
-        // Create a fresh mock emitter for each test
-        emitter = mock()
-
         // Create a new outbox instance with the mock emitter
         outbox = RetryOutbox(
             repository = repository,
+            metrics = metrics,
             emitter = emitter,
             retryMaxAttempts = 3,
             batchSize = 100,

@@ -3,6 +3,7 @@ package com.lemline.swruntime.outbox
 import com.lemline.swruntime.debug
 import com.lemline.swruntime.error
 import com.lemline.swruntime.info
+import com.lemline.swruntime.metrics.OutboxMetrics
 import com.lemline.swruntime.warn
 import org.jetbrains.annotations.VisibleForTesting
 import org.slf4j.Logger
@@ -10,13 +11,13 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.*
 
-internal enum class OutBoxStatus {
+enum class OutBoxStatus {
     PENDING,
     SENT,
     FAILED
 }
 
-internal interface OutboxMessage {
+interface OutboxMessage {
     var id: UUID?
     var status: OutBoxStatus
     var attemptCount: Int
@@ -24,16 +25,19 @@ internal interface OutboxMessage {
     var delayedUntil: Instant
 }
 
-internal interface OutboxRepository<T : OutboxMessage> {
+interface OutboxRepository<T : OutboxMessage> {
     fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int): List<T>
     fun findAndLockForDeletion(cutoffDate: Instant, limit: Int): List<T>
     fun delete(entity: T)
+    fun count(query: String, vararg params: Any?): Long
 }
 
-internal class OutboxProcessor<T : OutboxMessage>(
+class OutboxProcessor<T : OutboxMessage>(
     private val logger: Logger,
     private val repository: OutboxRepository<T>,
-    private val processor: (T) -> Unit
+    private val processor: (T) -> Unit,
+    private val metrics: OutboxMetrics,
+    private val type: String
 ) {
 
     @VisibleForTesting
@@ -57,6 +61,7 @@ internal class OutboxProcessor<T : OutboxMessage>(
         try {
             var totalProcessed = 0
             var batchNumber = 0
+            val batchStartTime = System.currentTimeMillis()
 
             while (true) {
                 // Find and lock messages ready to process
@@ -68,6 +73,7 @@ internal class OutboxProcessor<T : OutboxMessage>(
                 logger.debug { "Processing batch $batchNumber with ${messages.size} messages" }
 
                 for (message in messages) {
+                    val startTime = System.currentTimeMillis()
                     try {
                         // Process the message
                         processor(message)
@@ -76,6 +82,9 @@ internal class OutboxProcessor<T : OutboxMessage>(
                         message.status = OutBoxStatus.SENT
                         logger.debug { "Successfully processed message ${message.id}" }
                         totalProcessed++
+
+                        // Record metrics
+                        metrics.recordProcessedMessage(System.currentTimeMillis() - startTime, type)
                     } catch (e: Exception) {
                         logger.warn(e) { "Failed to process message ${message.id}: ${e.message}" }
                         // Update status to PENDING and increment attempt count in the same transaction
@@ -91,13 +100,24 @@ internal class OutboxProcessor<T : OutboxMessage>(
                             message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.SECONDS)
                             logger.debug { "Message ${message.id} will be retried in ${nextDelay}s (attempt ${message.attemptCount})" }
                         }
+
+                        // Record failed message metric
+                        metrics.recordFailedMessage(type)
                     }
                 }
             }
 
             if (totalProcessed > 0) {
                 logger.info { "Completed processing $totalProcessed messages in $batchNumber batches" }
+                metrics.recordBatchProcessingTime(
+                    System.currentTimeMillis() - batchStartTime,
+                    totalProcessed,
+                    type
+                )
             }
+
+            // Update pending messages count
+            metrics.updatePendingMessages(repository.count("status = ?1", OutBoxStatus.PENDING), type)
         } catch (e: Exception) {
             logger.error(e) { "Error processing delayed messages: ${e.message}" }
             // Don't throw the exception to prevent scheduler from stopping

@@ -1,6 +1,7 @@
 package com.lemline.swruntime.outbox
 
 import com.lemline.swruntime.logger
+import com.lemline.swruntime.metrics.OutboxMetrics
 import com.lemline.swruntime.repositories.RetryRepository
 import io.quarkus.scheduler.Scheduled
 import io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP
@@ -13,6 +14,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
 @ApplicationScoped
 internal class RetryOutbox(
     repository: RetryRepository,
+    metrics: OutboxMetrics,
 
     @Channel("workflows-out")
     val emitter: Emitter<String>,
@@ -34,9 +36,13 @@ internal class RetryOutbox(
 ) {
     private val logger = logger()
 
-    private val outboxProcessor = OutboxProcessor(logger, repository) { retryMessage ->
-        emitter.send(retryMessage.message)
-    }
+    private val outboxProcessor = OutboxProcessor(
+        logger = logger,
+        repository = repository,
+        processor = { retryMessage -> emitter.send(retryMessage.message) },
+        metrics = metrics,
+        type = "retry"
+    )
 
     @Scheduled(every = "{retry.outbox.schedule}", concurrentExecution = SKIP)
     @Transactional

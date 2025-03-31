@@ -249,9 +249,6 @@ abstract class NodeInstance<T : TaskBase>(
         logger.info { "      scope            = $scope" }
         logger.info { "      transformedInput = $transformedInput" }
 
-        // Set default behavior
-        rawOutput = transformedInput
-
         return transformedInput
     }
 

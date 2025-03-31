@@ -1,6 +1,7 @@
 package com.lemline.swruntime.outbox
 
 import com.lemline.swruntime.logger
+import com.lemline.swruntime.metrics.OutboxMetrics
 import com.lemline.swruntime.repositories.WaitRepository
 import io.quarkus.scheduler.Scheduled
 import io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP
@@ -13,6 +14,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
 @ApplicationScoped
 internal class WaitOutbox(
     repository: WaitRepository,
+    private val metrics: OutboxMetrics,
 
     @Channel("workflows-out")
     val emitter: Emitter<String>,
@@ -34,9 +36,13 @@ internal class WaitOutbox(
 ) {
     private val logger = logger()
 
-    private val outboxProcessor = OutboxProcessor(logger, repository) { waitMessage ->
-        emitter.send(waitMessage.message)
-    }
+    private val outboxProcessor = OutboxProcessor(
+        logger = logger,
+        repository = repository,
+        processor = { waitMessage -> emitter.send(waitMessage.message) },
+        metrics = metrics,
+        type = "wait"
+    )
 
     @Scheduled(every = "{wait.outbox.schedule}", concurrentExecution = SKIP)
     @Transactional

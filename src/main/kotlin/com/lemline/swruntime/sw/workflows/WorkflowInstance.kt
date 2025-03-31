@@ -94,7 +94,7 @@ class WorkflowInstance(
         var next = when (rawOutput == null) {
             // current is not completed (start or retry)
             true -> this
-            // complete, and go to next
+            // current is completed, go to next
             false -> this.then()
         }
 

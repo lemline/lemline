@@ -20,6 +20,15 @@ internal class RetryRepository : UuidV7Repository<RetryMessage>, OutboxRepositor
         super.delete(entity)
     }
 
+    override fun count(query: String, vararg params: Any?): Long = getEntityManager()
+        .createQuery("SELECT COUNT(r) FROM RetryMessage r WHERE $query", Long::class.java)
+        .apply {
+            params.forEachIndexed { index, param ->
+                setParameter(index + 1, param)
+            }
+        }
+        .singleResult
+
     @Suppress("UNCHECKED_CAST")
     override fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) = getEntityManager()
         .createNativeQuery(

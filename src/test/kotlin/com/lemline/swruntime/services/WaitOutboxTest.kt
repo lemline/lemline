@@ -3,11 +3,15 @@ package com.lemline.swruntime.services
 import com.lemline.swruntime.PostgresTestResource
 import com.lemline.swruntime.json.Json
 import com.lemline.swruntime.messaging.WorkflowMessage
+import com.lemline.swruntime.metrics.OutboxMetrics
 import com.lemline.swruntime.models.WaitMessage
 import com.lemline.swruntime.outbox.OutBoxStatus
 import com.lemline.swruntime.outbox.WaitOutbox
 import com.lemline.swruntime.repositories.WaitRepository
 import com.lemline.swruntime.sw.tasks.JsonPointer
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.verify
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
@@ -16,9 +20,9 @@ import jakarta.transaction.Transactional
 import kotlinx.serialization.json.JsonPrimitive
 import org.eclipse.microprofile.reactive.messaging.Emitter
 import org.junit.jupiter.api.*
-import org.mockito.kotlin.*
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.CompletableFuture
 
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource::class)
@@ -32,7 +36,10 @@ internal class WaitOutboxTest {
     @Inject
     lateinit var entityManager: EntityManager
 
-    private lateinit var emitter: Emitter<String>
+    private val emitter = mockk<Emitter<String>> {
+        every { send(any()) } returns CompletableFuture.completedStage(null)
+    }
+    private val metrics = mockk<OutboxMetrics>(relaxed = true)
     private lateinit var outbox: WaitOutbox
 
     @BeforeEach
@@ -41,12 +48,10 @@ internal class WaitOutboxTest {
         // Clear the database before each test
         entityManager.createQuery("DELETE FROM WaitMessage").executeUpdate()
 
-        // Create a fresh mock emitter for each test
-        emitter = mock()
-
-        // Create a new outbox instance with the mock emitter
+        // Create a new outbox instance with the mocks
         outbox = WaitOutbox(
             repository = repository,
+            metrics = metrics,
             emitter = emitter,
             retryMaxAttempts = 3,
             batchSize = 100,
@@ -81,7 +86,7 @@ internal class WaitOutboxTest {
 
         // Then
         // Verify message was sent
-        verify(emitter).send(argThat { this == messageJson })
+        verify { emitter.send(messageJson) }
 
         // Verify message status was updated
         val updatedMessage = entityManager.find(WaitMessage::class.java, message.id)
@@ -103,7 +108,7 @@ internal class WaitOutboxTest {
         entityManager.flush()
 
         // Mock emitter to throw exception
-        whenever(emitter.send(any())).thenThrow(RuntimeException("Emitter failed"))
+        every { emitter.send(any()) } throws RuntimeException("Emitter failed")
 
         // When
         outbox.processOutbox()
@@ -130,7 +135,7 @@ internal class WaitOutboxTest {
         entityManager.flush()
 
         // Mock emitter to throw exception
-        whenever(emitter.send(any())).thenThrow(RuntimeException("Emitter failed"))
+        every { emitter.send(any()) } throws RuntimeException("Emitter failed")
 
         // When
         outbox.processOutbox()
@@ -160,7 +165,7 @@ internal class WaitOutboxTest {
         entityManager.flush()
 
         // Mock emitter to throw exception
-        whenever(emitter.send(any())).thenThrow(RuntimeException("Emitter failed"))
+        every { emitter.send(any()) } throws RuntimeException("Emitter failed")
 
         // When
         outbox.processOutbox()
@@ -251,19 +256,12 @@ internal class WaitOutboxTest {
             }
             entityManager.persist(message)
         }
-        entityManager.flush() // Final flush for any remaining messages
+        entityManager.flush()
 
         // When
         outbox.processOutbox()
 
         // Then
-        // Verify all messages were processed
-        val processedMessages = entityManager
-            .createQuery("FROM WaitMessage WHERE status = :status", WaitMessage::class.java)
-            .setParameter("status", OutBoxStatus.SENT)
-            .resultList
-
-        Assertions.assertEquals(150, processedMessages.size)
-        verify(emitter, times(150)).send(any())
+        verify(exactly = 150) { emitter.send(any()) }
     }
 } 

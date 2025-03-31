@@ -42,6 +42,8 @@ class ForInstance(
     override suspend fun execute() {
         // useless, but indicate we entered the node
         childIndex++
+        // set rawOutput
+        super.execute()
     }
 
     override fun `continue`(): NodeInstance<*>? {
