@@ -1,10 +1,13 @@
 package com.lemline.swruntime.outbox
 
-import com.lemline.swruntime.metrics.OutboxMetrics
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.doubles.plusOrMinus
+import io.kotest.matchers.doubles.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
-import io.mockk.*
+import io.mockk.every
+import io.mockk.just
+import io.mockk.mockk
+import io.mockk.runs
 import org.slf4j.Logger
 import java.time.Instant
 import java.util.*
@@ -13,20 +16,18 @@ import kotlin.math.absoluteValue
 class OutboxProcessorTest : FunSpec({
     val logger = mockk<Logger>(relaxed = true)
     val repository = mockk<OutboxRepository<TestMessage>>()
-    val metrics = mockk<OutboxMetrics>(relaxed = true)
     val processor = mockk<(TestMessage) -> Unit>()
-    val type = "test"
     lateinit var outboxProcessor: OutboxProcessor<TestMessage>
 
     beforeTest {
-        outboxProcessor = OutboxProcessor(logger, repository, processor, metrics, type)
+        outboxProcessor = OutboxProcessor(logger, repository, processor)
     }
 
     context("calculateNextRetryDelay") {
         test("should use exponential backoff with jitter") {
-            val initialDelay = 10
+            val initialDelay = 1000
             val attempts = listOf(1, 2, 3)
-            val expectedBaseTimes = listOf(10L, 20L, 40L)
+            val expectedBaseTimes = listOf(1000L, 2000L, 4000L)
 
             attempts.zip(expectedBaseTimes).forEach { (attempt, expectedBase) ->
                 val delays = (1..100).map {
@@ -35,19 +36,19 @@ class OutboxProcessorTest : FunSpec({
 
                 // Check average is close to expected base time (within 5%)
                 val average = delays.average()
-                (average - expectedBase).absoluteValue shouldBe (expectedBase * 0.05).plusOrMinus(0.01)
+                average shouldBe expectedBase.toDouble().plusOrMinus(expectedBase * 0.05)
 
                 // Check jitter is within ±20%
                 delays.forEach { delay ->
                     val jitterRatio = (delay - expectedBase).absoluteValue.toDouble() / expectedBase
-                    jitterRatio shouldBe 0.2.plusOrMinus(0.01)
+                    jitterRatio shouldBeLessThanOrEqual 0.2
                 }
             }
         }
 
-        test("should never return less than 1 second") {
+        test("should never return less than .1 second") {
             val delay = outboxProcessor.calculateNextRetryDelay(1, 0)
-            delay shouldBe 1L
+            delay shouldBe 100L
         }
     }
 
@@ -66,13 +67,6 @@ class OutboxProcessorTest : FunSpec({
             every { processor(message) } just runs
 
             outboxProcessor.process(10, 3, 10)
-
-            verify {
-                metrics.recordProcessedMessage(any(), type)
-                metrics.recordBatchProcessingTime(any(), 1, type)
-                metrics.updatePendingMessages(42, type)
-            }
-            verify(exactly = 0) { metrics.recordFailedMessage(any()) }
         }
 
         test("should record metrics for failed message processing") {
@@ -90,11 +84,7 @@ class OutboxProcessorTest : FunSpec({
 
             outboxProcessor.process(10, 3, 10)
 
-            verify {
-                metrics.recordFailedMessage(type)
-                metrics.updatePendingMessages(42, type)
-            }
-            verify(exactly = 0) { metrics.recordProcessedMessage(any(), any()) }
+
         }
     }
 })

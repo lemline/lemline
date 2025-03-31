@@ -3,8 +3,8 @@ package com.lemline.swruntime.outbox
 import com.lemline.swruntime.debug
 import com.lemline.swruntime.error
 import com.lemline.swruntime.info
-import com.lemline.swruntime.metrics.OutboxMetrics
 import com.lemline.swruntime.warn
+import jakarta.transaction.Transactional
 import org.jetbrains.annotations.VisibleForTesting
 import org.slf4j.Logger
 import java.time.Instant
@@ -36,32 +36,29 @@ class OutboxProcessor<T : OutboxMessage>(
     private val logger: Logger,
     private val repository: OutboxRepository<T>,
     private val processor: (T) -> Unit,
-    private val metrics: OutboxMetrics,
-    private val type: String
 ) {
 
     @VisibleForTesting
-    internal fun calculateNextRetryDelay(attemptCount: Int, retryInitialDelaySeconds: Int): Long {
-        // Exponential backoff: initialDelay * 2^attemptCount
-        // e.g., with initialDelay=10s:
-        // attempt 1: 10s +/- 20%
-        // attempt 2: 20s +/- 20%
-        // attempt 3: 40s +/- 20%
-        // Base delay with exponential backoff: initialDelay * 2^(attemptCount-1)
-        val baseDelay = retryInitialDelaySeconds * (1L shl (attemptCount - 1))
+    internal fun calculateNextRetryDelay(attemptCount: Int, retryInitialDelayMillis: Int): Long {
+        // Exponential backoff: initialDelay * 2^(attemptCount-1)
+        // e.g., with initialDelay=1000ms (10s):
+        // attempt 1: 1000ms * 2^0 = 1000ms +/- 20%
+        // attempt 2: 1000ms * 2^1 = 2000ms +/- 20%
+        // attempt 3: 1000ms * 2^2 = 4000ms +/- 20%
+        val baseDelay = retryInitialDelayMillis * (1L shl (attemptCount - 1))
 
         // Add jitter of ±20%
-        val jitterRange = (baseDelay * 0.2).toLong() // 20% of base delay
-        val jitter = (-jitterRange..jitterRange).random()
+        val jitterRange = baseDelay * 0.2 // 20% of base delay
+        val jitter = (Math.random() - 0.5) * 2 * jitterRange // Random value between -1 and 1, multiplied by range
 
-        return (baseDelay + jitter).coerceAtLeast(1) // Ensure we never return less than 1 second
+        return (baseDelay + jitter).toLong().coerceAtLeast(100) // Ensure we never return less than .1 second (100ms)
     }
 
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
     fun process(batchSize: Int, retryMaxAttempts: Int, retryInitialDelaySeconds: Int) {
         try {
             var totalProcessed = 0
             var batchNumber = 0
-            val batchStartTime = System.currentTimeMillis()
 
             while (true) {
                 // Find and lock messages ready to process
@@ -73,7 +70,6 @@ class OutboxProcessor<T : OutboxMessage>(
                 logger.debug { "Processing batch $batchNumber with ${messages.size} messages" }
 
                 for (message in messages) {
-                    val startTime = System.currentTimeMillis()
                     try {
                         // Process the message
                         processor(message)
@@ -82,9 +78,6 @@ class OutboxProcessor<T : OutboxMessage>(
                         message.status = OutBoxStatus.SENT
                         logger.debug { "Successfully processed message ${message.id}" }
                         totalProcessed++
-
-                        // Record metrics
-                        metrics.recordProcessedMessage(System.currentTimeMillis() - startTime, type)
                     } catch (e: Exception) {
                         logger.warn(e) { "Failed to process message ${message.id}: ${e.message}" }
                         // Update status to PENDING and increment attempt count in the same transaction
@@ -96,28 +89,18 @@ class OutboxProcessor<T : OutboxMessage>(
                             logger.error { "Message ${message.id} has reached maximum retry attempts" }
                         } else {
                             // Calculate next retry time using exponential backoff
-                            val nextDelay = calculateNextRetryDelay(message.attemptCount, retryInitialDelaySeconds)
-                            message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.SECONDS)
-                            logger.debug { "Message ${message.id} will be retried in ${nextDelay}s (attempt ${message.attemptCount})" }
+                            val nextDelay =
+                                calculateNextRetryDelay(message.attemptCount, retryInitialDelaySeconds * 1000)
+                            message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.MILLIS)
+                            logger.debug { "Message ${message.id} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})" }
                         }
-
-                        // Record failed message metric
-                        metrics.recordFailedMessage(type)
                     }
                 }
             }
 
             if (totalProcessed > 0) {
                 logger.info { "Completed processing $totalProcessed messages in $batchNumber batches" }
-                metrics.recordBatchProcessingTime(
-                    System.currentTimeMillis() - batchStartTime,
-                    totalProcessed,
-                    type
-                )
             }
-
-            // Update pending messages count
-            metrics.updatePendingMessages(repository.count("status = ?1", OutBoxStatus.PENDING), type)
         } catch (e: Exception) {
             logger.error(e) { "Error processing delayed messages: ${e.message}" }
             // Don't throw the exception to prevent scheduler from stopping
@@ -125,6 +108,7 @@ class OutboxProcessor<T : OutboxMessage>(
         }
     }
 
+    @Transactional(Transactional.TxType.REQUIRES_NEW)
     fun cleanup(cleanupAfterDays: Int, cleanupBatchSize: Int) {
         try {
             val cutoffDate = Instant.now().minusSeconds(cleanupAfterDays * 24 * 60 * 60L)

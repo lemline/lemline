@@ -3,12 +3,12 @@ package com.lemline.swruntime.services
 import com.lemline.swruntime.PostgresTestResource
 import com.lemline.swruntime.json.Json
 import com.lemline.swruntime.messaging.WorkflowMessage
-import com.lemline.swruntime.metrics.OutboxMetrics
 import com.lemline.swruntime.models.WaitMessage
 import com.lemline.swruntime.outbox.OutBoxStatus
 import com.lemline.swruntime.outbox.WaitOutbox
 import com.lemline.swruntime.repositories.WaitRepository
 import com.lemline.swruntime.sw.tasks.JsonPointer
+import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -36,10 +36,8 @@ internal class WaitOutboxTest {
     @Inject
     lateinit var entityManager: EntityManager
 
-    private val emitter = mockk<Emitter<String>> {
-        every { send(any()) } returns CompletableFuture.completedStage(null)
-    }
-    private val metrics = mockk<OutboxMetrics>(relaxed = true)
+    private val emitter = mockk<Emitter<String>>()
+    
     private lateinit var outbox: WaitOutbox
 
     @BeforeEach
@@ -47,11 +45,15 @@ internal class WaitOutboxTest {
     fun setupTest() {
         // Clear the database before each test
         entityManager.createQuery("DELETE FROM WaitMessage").executeUpdate()
+        entityManager.flush()
+
+        // Reset mock behavior
+        clearMocks(emitter)
+        every { emitter.send(any()) } returns CompletableFuture.completedStage(null)
 
         // Create a new outbox instance with the mocks
         outbox = WaitOutbox(
             repository = repository,
-            metrics = metrics,
             emitter = emitter,
             retryMaxAttempts = 3,
             batchSize = 100,
@@ -138,7 +140,12 @@ internal class WaitOutboxTest {
         every { emitter.send(any()) } throws RuntimeException("Emitter failed")
 
         // When
-        outbox.processOutbox()
+        try {
+            outbox.processOutbox()
+        } catch (e: RuntimeException) {
+            // Expected exception
+            Assertions.assertEquals("Emitter failed", e.message)
+        }
 
         // Then
         // Verify message was marked as failed

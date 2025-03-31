@@ -38,3 +38,4 @@ references/
 
 ### Kotlin ###
 .kotlin
+bin/
