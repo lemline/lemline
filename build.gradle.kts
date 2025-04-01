@@ -16,30 +16,20 @@ repositories {
 dependencies {
     // Enforce Quarkus platform versions
     implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.0"))
-    // Enforce Netty version from Quarkus BOM - Removed incorrect BOM
-    //implementation(enforcedPlatform("io.quarkus:quarkus-netty"))
     // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
     // Quarkus
     implementation("io.quarkus:quarkus-kotlin")
-    implementation("io.quarkus:quarkus-netty") // Ensure Quarkus Netty is included
-    // Flyway (DB migration)
-    implementation("io.quarkus:quarkus-flyway")
-    // Rest Server with Json serialization
-    implementation("io.quarkus:quarkus-rest-jackson")
-    // Messaging
+    implementation("io.quarkus:quarkus-flyway") // DB migration
+    implementation("io.quarkus:quarkus-rest-jackson") // Rest Server with Json serialization
     implementation("io.quarkus:quarkus-messaging")
-    implementation("io.quarkus:quarkus-messaging-kafka")
-
-    // Reactive programming
-    implementation("io.quarkus:quarkus-mutiny")
-    // ORM With Hibernate / Panache
-    implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin")
-    // Scheduler
-    implementation("io.quarkus:quarkus-scheduler")
-    // Postgres Database driver
-    implementation("io.quarkus:quarkus-jdbc-postgresql")
+    implementation("io.quarkus:quarkus-messaging-kafka") // Kafka Messaging
+    implementation("io.quarkus:quarkus-messaging-amqp") // AMQP Messaging
+    implementation("io.quarkus:quarkus-mutiny") // Reactive programming
+    implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin") // ORM With Hibernate / Panache
+    implementation("io.quarkus:quarkus-scheduler")  // Scheduler
+    implementation("io.quarkus:quarkus-jdbc-postgresql") // Postgres Database driver
 
     // Serverless Workflow SDK
     implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
@@ -62,10 +52,12 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.9")
 
     // Testcontainers
-    testImplementation("org.testcontainers:testcontainers:1.19.7")
-    testImplementation("org.testcontainers:postgresql:1.19.7")
-    testImplementation("org.testcontainers:junit-jupiter:1.19.7")
-    testImplementation("org.testcontainers:kafka:1.19.7")
+    testImplementation("org.testcontainers:testcontainers-bom:1.20.6")
+    testImplementation("org.testcontainers:testcontainers")
+    testImplementation("org.testcontainers:junit-jupiter")
+    testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.testcontainers:kafka")
+    testImplementation("org.testcontainers:rabbitmq")
 }
 
 group = "com.lemline"
@@ -88,19 +80,7 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    // Rely on Quarkus properties for Netty config where possible
-    systemProperty("pulsar.client.netty.ioThreads", "1")
-    systemProperty("pulsar.client.netty.eventLoopGroup", "io.netty.channel.nio.NioEventLoopGroup")
-    systemProperty("pulsar.client.netty.forceNio", "true") // Keep forcing NIO
-    jvmArgs = listOf(
-        "-XX:+EnableDynamicAgentLoading",
-        "-Dio.netty.tryReflectionSetAccessible=true"
-    )
+//    jvmArgs = listOf(
+//        "-XX:+EnableDynamicAgentLoading",
+//    )
 }
-
-//tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
-//    kotlinOptions {
-//        jvmTarget = "17"
-//        freeCompilerArgs = listOf("-Xjsr305=strict")
-//    }
-//}

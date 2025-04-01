@@ -59,11 +59,8 @@ internal class WorkflowConsumerKafkaTest {
     @ConfigProperty(name = "kafka.bootstrap.servers")
     lateinit var bootstrapServers: String
 
-    @ConfigProperty(name = "mp.messaging.incoming.workflows-in.topic")
-    lateinit var inputTopic: String
-
-    @ConfigProperty(name = "mp.messaging.outgoing.workflows-out.topic")
-    lateinit var outputTopic: String
+    private val inputTopic = "workflows"
+    private val outputTopic = "workflows"
 
     private lateinit var producer: KafkaProducer<String, String>
     private lateinit var consumer: KafkaConsumer<String, String>
