@@ -10,20 +10,28 @@ repositories {
     mavenCentral()
 }
 
-dependencies {
-    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.0"))
+// Define the Netty version based on Quarkus BOM (usually managed automatically, but explicit for clarity)
+// Let's rely on the Quarkus BOM primarily.
 
+dependencies {
+    // Enforce Quarkus platform versions
+    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.0"))
+    // Enforce Netty version from Quarkus BOM - Removed incorrect BOM
+    //implementation(enforcedPlatform("io.quarkus:quarkus-netty"))
     // Kotlin
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
     // Quarkus
     implementation("io.quarkus:quarkus-kotlin")
+    implementation("io.quarkus:quarkus-netty") // Ensure Quarkus Netty is included
     // Flyway (DB migration)
     implementation("io.quarkus:quarkus-flyway")
     // Rest Server with Json serialization
     implementation("io.quarkus:quarkus-rest-jackson")
-    // Messaging with Kafka
+    // Messaging
+    implementation("io.quarkus:quarkus-messaging")
     implementation("io.quarkus:quarkus-messaging-kafka")
+
     // Reactive programming
     implementation("io.quarkus:quarkus-mutiny")
     // ORM With Hibernate / Panache
@@ -37,24 +45,6 @@ dependencies {
     implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
     implementation("io.serverlessworkflow:serverlessworkflow-impl-core:7.0.0.Final")
 
-    // Testing
-    testImplementation("io.quarkus:quarkus-junit5")
-    testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
-    testImplementation("io.kotest:kotest-runner-junit5")
-    testImplementation("io.kotest:kotest-assertions-core")
-    testImplementation("io.kotest:kotest-framework-api")
-    testImplementation("io.mockk:mockk:1.13.9")
-    testImplementation(kotlin("test"))
-    testImplementation("org.mockito:mockito-core:5.10.0")
-    testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")
-    testImplementation("io.quarkus:quarkus-junit5-mockito")
-
-    // Testcontainers
-    testImplementation("org.testcontainers:testcontainers:1.19.7")
-    testImplementation("org.testcontainers:postgresql:1.19.7")
-    testImplementation("org.testcontainers:junit-jupiter:1.19.7")
-    testImplementation("org.testcontainers:kafka:1.19.7")
-
     // Add Kotlin Serialization
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.2")
@@ -62,8 +52,20 @@ dependencies {
     // UUID Creator
     implementation("com.github.f4b6a3:uuid-creator:6.0.0")
 
-    // Kafka client for tests
-    testImplementation("org.apache.kafka:kafka-clients:3.6.1")
+    // Testing
+    testImplementation(kotlin("test"))
+    testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
+    testImplementation("io.quarkus:quarkus-junit5")
+    testImplementation("io.kotest:kotest-runner-junit5")
+    testImplementation("io.kotest:kotest-assertions-core")
+    testImplementation("io.kotest:kotest-framework-api")
+    testImplementation("io.mockk:mockk:1.13.9")
+
+    // Testcontainers
+    testImplementation("org.testcontainers:testcontainers:1.19.7")
+    testImplementation("org.testcontainers:postgresql:1.19.7")
+    testImplementation("org.testcontainers:junit-jupiter:1.19.7")
+    testImplementation("org.testcontainers:kafka:1.19.7")
 }
 
 group = "com.lemline"
@@ -86,7 +88,14 @@ kotlin {
 
 tasks.withType<Test> {
     useJUnitPlatform()
-    jvmArgs = listOf("-XX:+EnableDynamicAgentLoading")
+    // Rely on Quarkus properties for Netty config where possible
+    systemProperty("pulsar.client.netty.ioThreads", "1")
+    systemProperty("pulsar.client.netty.eventLoopGroup", "io.netty.channel.nio.NioEventLoopGroup")
+    systemProperty("pulsar.client.netty.forceNio", "true") // Keep forcing NIO
+    jvmArgs = listOf(
+        "-XX:+EnableDynamicAgentLoading",
+        "-Dio.netty.tryReflectionSetAccessible=true"
+    )
 }
 
 //tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {

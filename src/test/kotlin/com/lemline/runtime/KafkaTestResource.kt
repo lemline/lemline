@@ -25,22 +25,10 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
         // Start Kafka
         kafka.start()
 
-        // Get the bootstrap servers
-        val bootstrapServers = kafka.bootstrapServers ?: throw RuntimeException("Failed to start Kafka container")
-
-        System.setProperty("kafka.bootstrap.servers", bootstrapServers)
-        
+        // Return only the bootstrap servers configuration
         return mapOf(
-            "kafka.bootstrap.servers" to bootstrapServers,
-            "mp.messaging.incoming.workflows-in.connector" to "smallrye-kafka",
-            "mp.messaging.incoming.workflows-in.topic" to "workflows-in",
-            "mp.messaging.incoming.workflows-in.bootstrap.servers" to bootstrapServers,
-            "mp.messaging.incoming.workflows-in.group.id" to "test-group",
-            "mp.messaging.incoming.workflows-in.auto.offset.reset" to "earliest",
-            "mp.messaging.outgoing.workflows-out.connector" to "smallrye-kafka",
-            "mp.messaging.outgoing.workflows-out.topic" to "workflows-out",
-            "mp.messaging.outgoing.workflows-out.bootstrap.servers" to bootstrapServers,
-            "mp.messaging.outgoing.workflows-out.value.serializer" to "org.apache.kafka.common.serialization.StringSerializer"
+            "kafka.bootstrap.servers" to (kafka.bootstrapServers 
+                ?: throw RuntimeException("Failed to start Kafka container"))
         )
     }
 

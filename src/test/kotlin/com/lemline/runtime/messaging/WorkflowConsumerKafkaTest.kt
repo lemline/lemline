@@ -1,5 +1,6 @@
 package com.lemline.runtime.messaging
 
+import com.lemline.runtime.KafkaTestProfile
 import com.lemline.runtime.KafkaTestResource
 import com.lemline.runtime.PostgresTestResource
 import com.lemline.runtime.json.Json
@@ -10,6 +11,7 @@ import com.lemline.runtime.repositories.WaitRepository
 import com.lemline.runtime.repositories.WorkflowDefinitionRepository
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
+import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
@@ -21,6 +23,7 @@ import org.apache.kafka.clients.producer.ProducerConfig
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
+import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.*
 import java.time.Duration
 import java.time.Instant
@@ -33,9 +36,10 @@ import kotlin.test.assertTrue
 @QuarkusTest
 @QuarkusTestResource(KafkaTestResource::class)
 @QuarkusTestResource(PostgresTestResource::class)
+@TestProfile(KafkaTestProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-internal class WorkflowConsumerTest {
+internal class WorkflowConsumerKafkaTest {
 
     @Inject
     lateinit var entityManager: EntityManager
@@ -52,10 +56,17 @@ internal class WorkflowConsumerTest {
     @Inject
     lateinit var workflowConsumer: WorkflowConsumer
 
+    @ConfigProperty(name = "kafka.bootstrap.servers")
+    lateinit var bootstrapServers: String
+
+    @ConfigProperty(name = "mp.messaging.incoming.workflows-in.topic")
+    lateinit var inputTopic: String
+
+    @ConfigProperty(name = "mp.messaging.outgoing.workflows-out.topic")
+    lateinit var outputTopic: String
+
     private lateinit var producer: KafkaProducer<String, String>
     private lateinit var consumer: KafkaConsumer<String, String>
-    private val inputTopic = "workflows-in"
-    private val outputTopic = "workflows-out"
 
     @BeforeEach
     @Transactional
@@ -108,7 +119,7 @@ internal class WorkflowConsumerTest {
 
         // Setup Kafka producer
         val producerProps = Properties().apply {
-            put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, System.getProperty("kafka.bootstrap.servers"))
+            put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
             put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer::class.java.name)
             put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer::class.java.name)
         }
@@ -116,7 +127,7 @@ internal class WorkflowConsumerTest {
 
         // Setup Kafka consumer
         val consumerProps = Properties().apply {
-            put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, System.getProperty("kafka.bootstrap.servers"))
+            put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
             put(ConsumerConfig.GROUP_ID_CONFIG, "test-group")
             put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
             put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer::class.java.name)
