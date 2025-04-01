@@ -31,12 +31,6 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerBaseTest() {
     @ConfigProperty(name = "mp.messaging.outgoing.workflows-out.topic")
     lateinit var topicOut: String
 
-    override val inputTopic: String
-        get() = topicIn
-
-    override val outputTopic: String
-        get() = topicOut
-
     private lateinit var producer: KafkaProducer<String, String>
     private lateinit var consumer: KafkaConsumer<String, String>
 

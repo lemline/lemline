@@ -42,9 +42,6 @@ abstract class WorkflowConsumerBaseTest {
     @Inject
     lateinit var workflowConsumer: WorkflowConsumer
 
-    protected abstract val inputTopic: String
-    protected abstract val outputTopic: String
-
     @BeforeEach
     @Transactional
     fun setup() {

@@ -36,12 +36,6 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerBaseTest() {
     @ConfigProperty(name = "mp.messaging.outgoing.workflows-out.queue.name")
     lateinit var queueOut: String
 
-    override val inputTopic: String
-        get() = queueIn
-
-    override val outputTopic: String
-        get() = queueOut
-
     private lateinit var connection: Connection
     private lateinit var channel: Channel
     private val deliveries: BlockingQueue<Delivery> = LinkedBlockingQueue()
