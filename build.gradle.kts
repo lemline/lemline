@@ -25,7 +25,7 @@ dependencies {
     implementation("io.quarkus:quarkus-rest-jackson") // Rest Server with Json serialization
     implementation("io.quarkus:quarkus-messaging")
     implementation("io.quarkus:quarkus-messaging-kafka") // Kafka Messaging
-    implementation("io.quarkus:quarkus-messaging-amqp") // AMQP Messaging
+    implementation("io.quarkus:quarkus-messaging-rabbitmq") // RabbitMQ Messaging
     implementation("io.quarkus:quarkus-mutiny") // Reactive programming
     implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin") // ORM With Hibernate / Panache
     implementation("io.quarkus:quarkus-scheduler")  // Scheduler

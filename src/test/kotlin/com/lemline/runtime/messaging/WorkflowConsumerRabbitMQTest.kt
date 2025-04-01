@@ -1,14 +1,15 @@
 package com.lemline.runtime.messaging
 
-import com.lemline.runtime.KafkaTestProfile
-import com.lemline.runtime.KafkaTestResource
 import com.lemline.runtime.PostgresTestResource
+import com.lemline.runtime.RabbitMQTestProfile
+import com.lemline.runtime.RabbitMQTestResource
 import com.lemline.runtime.json.Json
 import com.lemline.runtime.models.WorkflowDefinition
 import com.lemline.runtime.outbox.OutBoxStatus
 import com.lemline.runtime.repositories.RetryRepository
 import com.lemline.runtime.repositories.WaitRepository
 import com.lemline.runtime.repositories.WorkflowDefinitionRepository
+import com.rabbitmq.client.*
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -16,31 +17,24 @@ import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
 import kotlinx.serialization.json.JsonPrimitive
-import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.clients.consumer.KafkaConsumer
-import org.apache.kafka.clients.producer.KafkaProducer
-import org.apache.kafka.clients.producer.ProducerConfig
-import org.apache.kafka.clients.producer.ProducerRecord
-import org.apache.kafka.common.serialization.StringDeserializer
-import org.apache.kafka.common.serialization.StringSerializer
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.*
-import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.*
+import java.util.concurrent.BlockingQueue
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 @QuarkusTest
-@QuarkusTestResource(KafkaTestResource::class)
+@QuarkusTestResource(RabbitMQTestResource::class)
 @QuarkusTestResource(PostgresTestResource::class)
-@TestProfile(KafkaTestProfile::class)
+@TestProfile(RabbitMQTestProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-internal class WorkflowConsumerKafkaTest {
+internal class WorkflowConsumerRabbitMQTest {
 
     @Inject
     lateinit var entityManager: EntityManager
@@ -57,14 +51,27 @@ internal class WorkflowConsumerKafkaTest {
     @Inject
     lateinit var workflowConsumer: WorkflowConsumer
 
-    @ConfigProperty(name = "kafka.bootstrap.servers")
-    lateinit var bootstrapServers: String
+    @ConfigProperty(name = "rabbitmq-host")
+    lateinit var rabbitmqHost: String
 
-    private val inputTopic = "workflows"
-    private val outputTopic = "workflows"
+    @ConfigProperty(name = "rabbitmq-port")
+    lateinit var rabbitmqPort: String
 
-    private lateinit var producer: KafkaProducer<String, String>
-    private lateinit var consumer: KafkaConsumer<String, String>
+    @ConfigProperty(name = "rabbitmq-username")
+    lateinit var rabbitmqUsername: String
+
+    @ConfigProperty(name = "rabbitmq-password")
+    lateinit var rabbitmqPassword: String
+
+    @ConfigProperty(name = "mp.messaging.incoming.workflows-in.queue.name")
+    lateinit var queueIn: String
+
+    @ConfigProperty(name = "mp.messaging.outgoing.workflows-out.queue.name")
+    lateinit var queueOut: String
+
+    private lateinit var connection: Connection
+    private lateinit var channel: Channel
+    private val deliveries: BlockingQueue<Delivery> = LinkedBlockingQueue()
 
     @BeforeEach
     @Transactional
@@ -115,41 +122,40 @@ internal class WorkflowConsumerKafkaTest {
         with(workflowDefinitionRepository) { workflowDefinition.save() }
         entityManager.flush()
 
-        // Setup Kafka producer
-        val producerProps = Properties().apply {
-            put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
-            put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer::class.java.name)
-            put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer::class.java.name)
+        // Setup RabbitMQ connection
+        val factory = ConnectionFactory().apply {
+            host = rabbitmqHost
+            port = rabbitmqPort.toInt()
+            username = rabbitmqUsername
+            password = rabbitmqPassword
         }
-        producer = KafkaProducer(producerProps)
+        connection = factory.newConnection()
+        channel = connection.createChannel()
 
-        // Setup Kafka consumer
-        val consumerProps = Properties().apply {
-            put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
-            put(ConsumerConfig.GROUP_ID_CONFIG, "test-group")
-            put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest")
-            put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer::class.java.name)
-            put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer::class.java.name)
-        }
-        consumer = KafkaConsumer(consumerProps)
-        consumer.subscribe(listOf(outputTopic))
+        // Declare queue
+        require(queueIn == queueOut) { "Queues In and Out must be equal: $queueIn != $queueOut" }
+        channel.queueDeclare(queueIn, true, false, false, null)
+
+        // Setup consumer
+        val deliverCallback = DeliverCallback { _, delivery -> deliveries.offer(delivery) }
+        channel.basicConsume(queueOut, true, deliverCallback, CancelCallback { })
     }
 
     @AfterEach
     fun cleanup() {
-        producer.close()
-        consumer.close()
+        channel.close()
+        connection.close()
     }
 
-    private fun sendMessage(message: String) {
-        producer.send(ProducerRecord(inputTopic, message)).get()
+    private fun sendMessage(msg: String) {
+        channel.basicPublish("", queueIn, MessageProperties.PERSISTENT_TEXT_PLAIN, msg.toByteArray())
     }
 
-    private fun receiveMessage(timeout: Long, unit: TimeUnit): String? =
-        consumer.poll(Duration.ofMillis(unit.toMillis(timeout)))?.first()?.value()
+    private fun receiveMessage(timeout: Long, unit: TimeUnit) =
+        deliveries.poll(timeout, unit)?.let { String(it.body) }
 
     @Test
-    fun `should process valid workflow message and send to output topic`() {
+    fun `should process valid workflow message and send to output queue`() {
         // Given
         val workflowMessage = WorkflowMessage.newInstance(
             name = "test-workflow",
@@ -165,7 +171,7 @@ internal class WorkflowConsumerKafkaTest {
         // Then
         // Wait for message to be processed
         val outputMessage = receiveMessage(5, TimeUnit.SECONDS)
-        assertNotNull(outputMessage, "Ne message received")
+        assertNotNull(outputMessage, "No messages received from output queue")
     }
 
     @Test
@@ -266,8 +272,8 @@ internal class WorkflowConsumerKafkaTest {
         // Then
         // Wait for message to be processed
         workflowConsumer.waitForProcessing(messageJson).get()
-        val records = consumer.poll(Duration.ofSeconds(1))
-        assertEquals(0, records.count(), "Messages were sent to output topic")
+        val delivery = deliveries.poll(1, TimeUnit.SECONDS)
+        assertTrue(delivery == null, "Messages were sent to output queue")
 
         // Verify no messages were stored in repositories
         val retryMessages = retryRepository.listAll()

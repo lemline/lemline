@@ -33,14 +33,6 @@ open class WorkflowConsumer(
     private val logger = logger()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    // For testing purposes
-    private val processingFutures = ConcurrentHashMap<String, CompletableFuture<Unit>>()
-
-    // For testing purposes
-    internal fun waitForProcessing(msg: String): CompletableFuture<Unit> {
-        return processingFutures.computeIfAbsent(msg) { CompletableFuture() }
-    }
-
     @Incoming("workflows-in")
     @Outgoing("workflows-out")
     fun consume(msg: String): CompletionStage<String?> = scope.future {
@@ -90,6 +82,14 @@ open class WorkflowConsumer(
         }
         // we do not send any message
         return null
+    }
+
+    // For testing purposes
+    private val processingFutures = ConcurrentHashMap<String, CompletableFuture<Unit>>()
+
+    // For testing purposes
+    internal fun waitForProcessing(msg: String): CompletableFuture<Unit> {
+        return processingFutures.computeIfAbsent(msg) { CompletableFuture() }
     }
 
     private fun WorkflowInstance.running(): WorkflowMessage {
