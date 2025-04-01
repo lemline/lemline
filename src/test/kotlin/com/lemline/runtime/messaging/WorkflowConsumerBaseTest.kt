@@ -120,7 +120,7 @@ abstract class WorkflowConsumerBaseTest {
 
         // When
         sendMessage(messageJson)
-
+        
         // Then
         // Wait for message to be processed
         val outputMessage = receiveMessage(5, TimeUnit.SECONDS)

@@ -52,8 +52,9 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerBaseTest() {
         channel = connection.createChannel()
 
         // Declare queue
-        require(queueIn == queueOut) { "Queues In and Out must be equal: $queueIn != $queueOut" }
+        require(queueIn != queueOut) { "For RabbitMQ *testing*, queues In and Out must be different : $queueIn == $queueOut" }
         channel.queueDeclare(queueIn, true, false, false, null)
+        channel.queueDeclare(queueOut, true, false, false, null)
 
         // Setup consumer
         val deliverCallback = DeliverCallback { _, delivery -> deliveries.offer(delivery) }
