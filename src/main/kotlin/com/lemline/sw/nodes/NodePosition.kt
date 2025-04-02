@@ -1,4 +1,4 @@
-package com.lemline.sw.tasks
+package com.lemline.sw.nodes
 
 /**
  * Represents a task position in the workflow.
@@ -14,7 +14,7 @@ data class NodePosition(
      * Json pointer representation. (e.g., "/do/0/do")
      */
     val jsonPointer =
-        if (path.isEmpty()) com.lemline.sw.tasks.JsonPointer.root else com.lemline.sw.tasks.JsonPointer(
+        if (path.isEmpty()) com.lemline.sw.nodes.JsonPointer.root else com.lemline.sw.nodes.JsonPointer(
             "/${path.joinToString("/")}"
         )
 
@@ -38,7 +38,7 @@ data class NodePosition(
     fun addName(name: String): NodePosition {
         require(!name.contains("/")) { "Task name $name must not contain '/'" }
         require(name.toIntOrNull() == null) { "Task name $name must not be an integer" }
-        com.lemline.sw.tasks.Token.entries.map { it.token }.let {
+        com.lemline.sw.nodes.Token.entries.map { it.token }.let {
             require(!it.contains(name)) { "Task name $name must not be one of ${it.joinToString()}" }
         }
         return NodePosition(path + name)
@@ -50,7 +50,7 @@ data class NodePosition(
      * @param token The property name to add
      * @return A new Position with the added property
      */
-    fun addToken(token: com.lemline.sw.tasks.Token): NodePosition =
+    fun addToken(token: com.lemline.sw.nodes.Token): NodePosition =
         NodePosition(path + token.token)
 
     /**
@@ -80,6 +80,6 @@ data class NodePosition(
         path.size > parent.path.size && path.take(parent.path.size) == parent.path
 
     companion object {
-        val root = com.lemline.sw.tasks.JsonPointer.root.toPosition()
+        val root = com.lemline.sw.nodes.JsonPointer.root.toPosition()
     }
 }

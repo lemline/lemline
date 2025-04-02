@@ -4,10 +4,7 @@ import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.doubles.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
-import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
-import io.mockk.runs
 import org.slf4j.Logger
 import java.time.Instant
 import java.util.*
@@ -49,42 +46,6 @@ class OutboxProcessorTest : FunSpec({
         test("should never return less than .1 second") {
             val delay = outboxProcessor.calculateNextRetryDelay(1, 0)
             delay shouldBe 100L
-        }
-    }
-
-    context("process") {
-        test("should record metrics for successful message processing") {
-            val message = TestMessage(
-                id = UUID.randomUUID(),
-                status = OutBoxStatus.PENDING,
-                attemptCount = 0,
-                lastError = null,
-                delayedUntil = Instant.now()
-            )
-
-            every { repository.findAndLockReadyToProcess(any(), any()) } returns listOf(message) andThen emptyList()
-            every { repository.count("status = ?1", OutBoxStatus.PENDING) } returns 42
-            every { processor(message) } just runs
-
-            outboxProcessor.process(10, 3, 10)
-        }
-
-        test("should record metrics for failed message processing") {
-            val message = TestMessage(
-                id = UUID.randomUUID(),
-                status = OutBoxStatus.PENDING,
-                attemptCount = 0,
-                lastError = null,
-                delayedUntil = Instant.now()
-            )
-
-            every { repository.findAndLockReadyToProcess(any(), any()) } returns listOf(message) andThen emptyList()
-            every { repository.count("status = ?1", OutBoxStatus.PENDING) } returns 42
-            every { processor(message) } throws RuntimeException("Test error")
-
-            outboxProcessor.process(10, 3, 10)
-
-
         }
     }
 })

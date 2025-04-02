@@ -5,9 +5,9 @@ import com.lemline.common.logger
 import com.lemline.sw.errors.CaughtDoWorkflowException
 import com.lemline.sw.expressions.scopes.RuntimeDescriptor
 import com.lemline.sw.expressions.scopes.WorkflowDescriptor
-import com.lemline.sw.tasks.*
-import com.lemline.sw.tasks.activities.*
-import com.lemline.sw.tasks.flows.*
+import com.lemline.sw.nodes.*
+import com.lemline.sw.nodes.activities.*
+import com.lemline.sw.nodes.flows.*
 import com.lemline.worker.messaging.WorkflowMessage
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.WorkflowStatus

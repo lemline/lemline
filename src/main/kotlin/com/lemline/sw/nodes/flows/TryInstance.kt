@@ -1,9 +1,9 @@
-package com.lemline.sw.tasks.flows
+package com.lemline.sw.nodes.flows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.sw.errors.WorkflowError
-import com.lemline.sw.tasks.NodeInstance
-import com.lemline.sw.tasks.NodeTask
+import com.lemline.sw.nodes.NodeInstance
+import com.lemline.sw.nodes.NodeTask
 import com.lemline.sw.utils.toDuration
 import com.lemline.sw.utils.toRandomDuration
 import io.serverlessworkflow.api.types.*

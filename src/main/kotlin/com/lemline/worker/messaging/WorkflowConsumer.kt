@@ -1,7 +1,7 @@
 package com.lemline.worker.messaging
 
 import com.lemline.common.logger
-import com.lemline.sw.tasks.activities.WaitInstance
+import com.lemline.sw.nodes.activities.WaitInstance
 import com.lemline.sw.workflows.WorkflowInstance
 import com.lemline.sw.workflows.WorkflowParser
 import com.lemline.worker.models.RetryMessage

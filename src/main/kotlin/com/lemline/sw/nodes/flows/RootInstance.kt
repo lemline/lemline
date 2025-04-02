@@ -1,14 +1,14 @@
-package com.lemline.sw.tasks.flows
+package com.lemline.sw.nodes.flows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.sw.expressions.scopes.RuntimeDescriptor
 import com.lemline.sw.expressions.scopes.Scope
 import com.lemline.sw.expressions.scopes.WorkflowDescriptor
-import com.lemline.sw.tasks.NodeInstance
-import com.lemline.sw.tasks.NodeState
-import com.lemline.sw.tasks.NodeTask
-import com.lemline.sw.tasks.RootTask
+import com.lemline.sw.nodes.NodeInstance
+import com.lemline.sw.nodes.NodeState
+import com.lemline.sw.nodes.NodeTask
+import com.lemline.sw.nodes.RootTask
 import io.serverlessworkflow.api.types.RetryPolicy
 
 class RootInstance(

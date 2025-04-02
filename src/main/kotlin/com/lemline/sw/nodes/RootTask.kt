@@ -1,4 +1,4 @@
-package com.lemline.sw.tasks
+package com.lemline.sw.nodes
 
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TaskItem

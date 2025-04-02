@@ -160,7 +160,7 @@ internal class WaitOutboxTest {
         // Given
         val workflowMessage = WorkflowMessage(
             "test-workflow", "1.0.0", emptyMap(),
-            com.lemline.sw.tasks.JsonPointer("")
+            com.lemline.sw.nodes.JsonPointer("")
         )
         val messageJson = Json.toJson(workflowMessage)
 
@@ -254,7 +254,7 @@ internal class WaitOutboxTest {
         // Given
         val workflowMessage = WorkflowMessage(
             "test-workflow", "1.0.0", emptyMap(),
-            com.lemline.sw.tasks.JsonPointer("")
+            com.lemline.sw.nodes.JsonPointer("")
         )
         val messageJson = Json.toJson(workflowMessage)
 

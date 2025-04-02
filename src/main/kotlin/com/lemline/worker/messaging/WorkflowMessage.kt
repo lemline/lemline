@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.Json
 import com.lemline.common.json.ObjectNodeSerializer
 import com.lemline.common.json.toJackson
-import com.lemline.sw.tasks.NodeState
+import com.lemline.sw.nodes.NodeState
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -26,8 +26,8 @@ import java.time.Instant
 data class WorkflowMessage(
     @SerialName("n") val name: String,
     @SerialName("v") val version: String,
-    @SerialName("s") val states: Map<com.lemline.sw.tasks.JsonPointer, @Serializable(with = ObjectNodeSerializer::class) ObjectNode>,
-    @SerialName("p") val position: com.lemline.sw.tasks.JsonPointer
+    @SerialName("s") val states: Map<com.lemline.sw.nodes.JsonPointer, @Serializable(with = ObjectNodeSerializer::class) ObjectNode>,
+    @SerialName("p") val position: com.lemline.sw.nodes.JsonPointer
 ) {
     companion object {
         fun newInstance(
@@ -39,13 +39,13 @@ data class WorkflowMessage(
             name = name,
             version = version,
             states = mapOf(
-                com.lemline.sw.tasks.JsonPointer.root to NodeState(
+                com.lemline.sw.nodes.JsonPointer.root to NodeState(
                     workflowId = id,
                     rawInput = input.toJackson(),
                     startedAt = DateTimeDescriptor.from(Instant.now())
                 ).toJson()!!
             ),
-            position = com.lemline.sw.tasks.JsonPointer.root
+            position = com.lemline.sw.nodes.JsonPointer.root
         )
 
         fun fromJson(json: String): WorkflowMessage = Json.fromJson(json)

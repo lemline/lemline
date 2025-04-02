@@ -1,4 +1,4 @@
-package com.lemline.sw.tasks
+package com.lemline.sw.nodes
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor

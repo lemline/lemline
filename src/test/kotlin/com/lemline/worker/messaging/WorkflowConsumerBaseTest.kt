@@ -69,7 +69,7 @@ abstract class WorkflowConsumerBaseTest {
                           when: @{ . == "completed" }
                           then: exit
                       - error:
-                          when: @{ . =&= "error" }
+                          when: @{ . =a= "error" }
                           then: exit
                 - taskCase:
                     call: http

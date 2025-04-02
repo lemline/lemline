@@ -1,4 +1,4 @@
-package com.lemline.sw.tasks
+package com.lemline.sw.nodes
 
 import kotlinx.serialization.Serializable
 
@@ -24,13 +24,13 @@ value class JsonPointer(private val path: String) {
      *
      * @return A Position object representing the task pointer.
      */
-    fun toPosition() = com.lemline.sw.tasks.NodePosition(
+    fun toPosition() = com.lemline.sw.nodes.NodePosition(
         path.trim()
             .split("/")
             .filter { it.isNotEmpty() }
     )
 
     companion object {
-        val root = com.lemline.sw.tasks.JsonPointer("")
+        val root = com.lemline.sw.nodes.JsonPointer("")
     }
 }

@@ -1,9 +1,9 @@
 package com.lemline.sw.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.lemline.sw.tasks.NodePosition
-import com.lemline.sw.tasks.NodeTask
-import com.lemline.sw.tasks.RootTask
+import com.lemline.sw.nodes.NodePosition
+import com.lemline.sw.nodes.NodeTask
+import com.lemline.sw.nodes.RootTask
 import com.lemline.worker.repositories.WorkflowDefinitionRepository
 import com.lemline.worker.system.System
 import io.serverlessworkflow.api.WorkflowFormat
@@ -121,7 +121,7 @@ class WorkflowParser(
         )
 
         // Initialize cache
-        nodesCache[index] = mutableMapOf<com.lemline.sw.tasks.JsonPointer, NodeTask<*>>().apply {
+        nodesCache[index] = mutableMapOf<com.lemline.sw.nodes.JsonPointer, NodeTask<*>>().apply {
             fun processNode(node: NodeTask<*>) {
                 put(node.position.jsonPointer, node)
                 node.children?.forEach { processNode(it) }
@@ -136,7 +136,7 @@ class WorkflowParser(
         internal val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
         internal val secretsCache = ConcurrentHashMap<WorkflowIndex, Map<String, JsonNode>>()
         internal val nodesCache =
-            ConcurrentHashMap<WorkflowIndex, Map<com.lemline.sw.tasks.JsonPointer, NodeTask<*>>>()
+            ConcurrentHashMap<WorkflowIndex, Map<com.lemline.sw.nodes.JsonPointer, NodeTask<*>>>()
     }
 }
 

@@ -1,9 +1,9 @@
-package com.lemline.sw.tasks.flows
+package com.lemline.sw.nodes.flows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.IntNode
-import com.lemline.sw.tasks.NodeInstance
-import com.lemline.sw.tasks.NodeTask
+import com.lemline.sw.nodes.NodeInstance
+import com.lemline.sw.nodes.NodeTask
 import io.serverlessworkflow.api.types.ForTask
 
 class ForInstance(

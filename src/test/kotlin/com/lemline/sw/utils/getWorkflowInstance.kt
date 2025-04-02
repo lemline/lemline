@@ -1,6 +1,6 @@
 package com.lemline.sw.utils
 
-import com.lemline.sw.tasks.NodeState
+import com.lemline.sw.nodes.NodeState
 import com.lemline.sw.workflows.WorkflowInstance
 import com.lemline.sw.workflows.WorkflowParser
 import com.lemline.worker.messaging.WorkflowMessage

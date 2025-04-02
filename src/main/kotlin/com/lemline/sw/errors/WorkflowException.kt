@@ -1,7 +1,7 @@
 package com.lemline.sw.errors
 
-import com.lemline.sw.tasks.NodeInstance
-import com.lemline.sw.tasks.flows.DoInstance
+import com.lemline.sw.nodes.NodeInstance
+import com.lemline.sw.nodes.flows.DoInstance
 import kotlin.time.Duration
 
 sealed class WorkflowException : RuntimeException()

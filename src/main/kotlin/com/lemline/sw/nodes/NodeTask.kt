@@ -1,7 +1,7 @@
-package com.lemline.sw.tasks
+package com.lemline.sw.nodes
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.lemline.sw.tasks.Token.*
+import com.lemline.sw.nodes.Token.*
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.json.JsonUtils
 
@@ -76,7 +76,7 @@ data class NodeTask<T : TaskBase>(
         val nodes = mutableSetOf<String>()
         val edges = mutableSetOf<String>()
 
-        fun processNode(node: NodeTask<*>, parentId: com.lemline.sw.tasks.JsonPointer? = null) {
+        fun processNode(node: NodeTask<*>, parentId: com.lemline.sw.nodes.JsonPointer? = null) {
             val taskType = node.task.javaClass.simpleName
             val nodeId = node.position.jsonPointer
 

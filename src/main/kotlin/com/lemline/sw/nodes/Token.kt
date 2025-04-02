@@ -1,4 +1,4 @@
-package com.lemline.sw.tasks
+package com.lemline.sw.nodes
 
 enum class Token(val token: String) {
     DO("do"),

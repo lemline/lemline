@@ -1,4 +1,4 @@
-package com.lemline.sw.tasks
+package com.lemline.sw.nodes
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
@@ -9,9 +9,9 @@ import com.lemline.sw.errors.WorkflowError
 import com.lemline.sw.expressions.JQExpression
 import com.lemline.sw.expressions.scopes.Scope
 import com.lemline.sw.expressions.scopes.TaskDescriptor
+import com.lemline.sw.nodes.flows.RootInstance
+import com.lemline.sw.nodes.flows.TryInstance
 import com.lemline.sw.schemas.SchemaValidator
-import com.lemline.sw.tasks.flows.RootInstance
-import com.lemline.sw.tasks.flows.TryInstance
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import io.serverlessworkflow.impl.json.JsonUtils
@@ -257,7 +257,7 @@ abstract class NodeInstance<T : TaskBase>(
         this.rawOutput = transformedInput
     }
 
-    internal fun complete() {
+    private fun complete() {
         logger.info { "Leaving node ${node.name} (${node.task::class.simpleName})" }
         logger.info { "      rawOutput        = $rawOutput" }
         logger.info { "      scope            = $scope" }
