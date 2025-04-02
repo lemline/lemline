@@ -1,0 +1,54 @@
+package com.lemline.worker.models
+
+import com.lemline.worker.outbox.OutBoxStatus
+import com.lemline.worker.outbox.OutboxMessage
+import com.lemline.worker.repositories.UuidV7Entity
+import jakarta.persistence.*
+import java.time.Instant
+
+const val RETRY_TABLE = "retry_messages"
+
+@Entity
+@Table(
+    name = "retry_messages",
+    // Combined index for our main query pattern: status + delayed_until + attempt_count
+    indexes = [Index(name = "idx_retry_ready", columnList = "status, delayed_until, attempt_count")]
+)
+class RetryMessage : UuidV7Entity(), OutboxMessage {
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    lateinit var message: String
+
+    @Column(nullable = false, length = 20)
+    @Enumerated(EnumType.STRING)
+    override var status: OutBoxStatus = OutBoxStatus.PENDING
+
+    @Column(name = "delayed_until", nullable = false)
+    override lateinit var delayedUntil: Instant
+
+    @Column(name = "attempt_count", nullable = false)
+    override var attemptCount: Int = 0
+
+    @Column(name = "last_error", columnDefinition = "TEXT")
+    override var lastError: String? = null
+
+    @Version
+    @Column(name = "version")
+    var version: Long = 0
+
+    companion object {
+        fun create(
+            message: String,
+            delayedUntil: Instant = Instant.now(),
+            attemptCount: Int = 0,
+            lastError: Exception? = null,
+            status: OutBoxStatus = OutBoxStatus.PENDING
+        ) = RetryMessage().apply {
+            this.message = message
+            this.delayedUntil = delayedUntil
+            this.attemptCount = attemptCount
+            this.lastError = lastError?.message
+            this.status = status
+        }
+    }
+}
