@@ -20,14 +20,14 @@ class NodeStateTest {
 
     @Test
     fun `test constants maintain their values for messages backward compatibility`() {
-        assertEquals("child", NodeState.CHILD_INDEX)
-        assertEquals("retry", NodeState.ATTEMPT_INDEX)
+        assertEquals("i", NodeState.CHILD_INDEX)
+        assertEquals("try", NodeState.ATTEMPT_INDEX)
         assertEquals("var", NodeState.VARIABLES)
-        assertEquals("in", NodeState.RAW_INPUT)
+        assertEquals("inp", NodeState.RAW_INPUT)
         assertEquals("out", NodeState.RAW_OUTPUT)
         assertEquals("ctx", NodeState.CONTEXT)
         assertEquals("wid", NodeState.WORKFLOW_ID)
-        assertEquals("at", NodeState.STARTED_AT)
+        assertEquals("sat", NodeState.STARTED_AT)
         assertEquals("fori", NodeState.FOR_INDEX)
     }
 

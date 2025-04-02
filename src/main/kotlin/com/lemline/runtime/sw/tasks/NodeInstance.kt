@@ -202,11 +202,12 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * End the workflow right away
      */
-    private fun end(): RootInstance? = when (this) {
-        is RootInstance -> null
-        else -> {
-            complete()
-            parent!!.end()
+    private fun end(): RootInstance? {
+        complete()
+
+        return when (this) {
+            is RootInstance -> null
+            else -> parent!!.end()
         }
     }
 
@@ -281,7 +282,7 @@ abstract class NodeInstance<T : TaskBase>(
         parent?.rawOutput = transformedOutput
 
         // reset the instance
-        if (this !is RootInstance) reset()
+        reset()
     }
 
     private fun raise(error: WorkflowError) {

@@ -1,5 +1,6 @@
 package com.lemline.runtime.messaging
 
+import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.runtime.json.Json
 import com.lemline.runtime.json.toJackson
@@ -17,6 +18,38 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 
 class WorkflowMessageTest {
+
+    @Test
+    fun `serialized keys maintain their values for messages backward compatibility`() {
+        // Given
+        val message = WorkflowMessage(
+            name = "test-workflow",
+            version = "1.0.0",
+            states = mapOf(JsonPointer.root to NodeState(rawInput = JsonNodeFactory.instance.textNode("")).toJson()!!),
+            position = JsonPointer.root
+        )
+
+        // When
+        assertEquals(
+            message.toJson(),
+            "{\"n\":\"test-workflow\",\"v\":\"1.0.0\",\"s\":{\"\":\"{\\\"inp\\\":\\\"\\\"}\"},\"p\":\"\"}"
+        )
+    }
+
+    @Test
+    fun `should be JSON serializable and deserializable`() {
+        // Given
+        val message = WorkflowMessage(
+            name = "test-workflow",
+            version = "1.0.0",
+            states = mapOf(JsonPointer.root to NodeState(rawInput = JsonNodeFactory.instance.textNode("")).toJson()!!),
+            position = JsonPointer.root
+        )
+
+        // When
+        val jsonString = message.toJson()
+        assertEquals(message, WorkflowMessage.fromJson(jsonString))
+    }
 
     @Test
     fun `should serialize and deserialize WorkflowMessage`() {

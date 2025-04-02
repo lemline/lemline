@@ -82,14 +82,14 @@ data class NodeState(
             }
         }
 
-        const val CHILD_INDEX = "child"
-        const val ATTEMPT_INDEX = "retry"
+        const val CHILD_INDEX = "i"
+        const val ATTEMPT_INDEX = "try"
         const val VARIABLES = "var"
-        const val RAW_INPUT = "in"
+        const val RAW_INPUT = "inp"
         const val RAW_OUTPUT = "out"
         const val CONTEXT = "ctx"
         const val WORKFLOW_ID = "wid"
-        const val STARTED_AT = "at"
+        const val STARTED_AT = "sat"
         const val FOR_INDEX = "fori"
 
         const val CHILD_INDEX_DEFAULT = -1

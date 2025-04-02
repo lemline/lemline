@@ -120,9 +120,10 @@ abstract class WorkflowConsumerBaseTest {
 
         // When
         sendMessage(messageJson)
-        
+
         // Then
         // Wait for message to be processed
+        println("output = ${workflowConsumer.waitForProcessing(messageJson).get()}")
         val outputMessage = receiveMessage(5, TimeUnit.SECONDS)
         assertNotNull(outputMessage, "No messages received from output topic")
     }

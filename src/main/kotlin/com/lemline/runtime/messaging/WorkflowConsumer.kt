@@ -36,16 +36,15 @@ open class WorkflowConsumer(
     @Incoming("workflows-in")
     @Outgoing("workflows-out")
     fun consume(msg: String): CompletionStage<String?> = scope.future {
-        logger.info("Received workflow execution request: $msg}")
-
+        logger.info("Received request: $msg}")
         try {
             processMessage(msg)
         } catch (e: Exception) {
             logger.error("Error processing workflow execution request", e)
             handleError(msg, e)
-        } finally {
-            // Signal that processing is complete
-            processingFutures.remove(msg)?.complete(Unit)
+        }.also {
+            processingFutures.remove(msg)?.complete(it)
+            logger.info("Processed request: $it}")
         }
     }
 
@@ -85,10 +84,10 @@ open class WorkflowConsumer(
     }
 
     // For testing purposes
-    private val processingFutures = ConcurrentHashMap<String, CompletableFuture<Unit>>()
+    private val processingFutures = ConcurrentHashMap<String, CompletableFuture<String?>>()
 
     // For testing purposes
-    internal fun waitForProcessing(msg: String): CompletableFuture<Unit> {
+    internal fun waitForProcessing(msg: String): CompletableFuture<String?> {
         return processingFutures.computeIfAbsent(msg) { CompletableFuture() }
     }
 

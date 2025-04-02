@@ -6,6 +6,7 @@ import com.lemline.runtime.sw.expressions.scopes.RuntimeDescriptor
 import com.lemline.runtime.sw.expressions.scopes.Scope
 import com.lemline.runtime.sw.expressions.scopes.WorkflowDescriptor
 import com.lemline.runtime.sw.tasks.NodeInstance
+import com.lemline.runtime.sw.tasks.NodeState
 import com.lemline.runtime.sw.tasks.NodeTask
 import com.lemline.runtime.sw.tasks.RootTask
 import io.serverlessworkflow.api.types.RetryPolicy
@@ -39,6 +40,10 @@ class RootInstance(
             0 -> children[0].also { it.rawInput = transformedInput }
             else -> null
         }
+    }
+
+    override fun reset() {
+        state.childIndex = NodeState.CHILD_INDEX_DEFAULT
     }
 
     fun getRetryPolicy(name: String): RetryPolicy = node.task.use?.retries?.additionalProperties

@@ -7,6 +7,7 @@ import com.lemline.runtime.serialization.ObjectNodeSerializer
 import com.lemline.runtime.sw.tasks.JsonPointer
 import com.lemline.runtime.sw.tasks.NodeState
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import java.time.Instant
@@ -24,10 +25,10 @@ import java.time.Instant
  */
 @Serializable
 data class WorkflowMessage(
-    val name: String,
-    val version: String,
-    val states: Map<JsonPointer, @Serializable(with = ObjectNodeSerializer::class) ObjectNode>,
-    val position: JsonPointer
+    @SerialName("n") val name: String,
+    @SerialName("v") val version: String,
+    @SerialName("s") val states: Map<JsonPointer, @Serializable(with = ObjectNodeSerializer::class) ObjectNode>,
+    @SerialName("p") val position: JsonPointer
 ) {
     companion object {
         fun newInstance(
