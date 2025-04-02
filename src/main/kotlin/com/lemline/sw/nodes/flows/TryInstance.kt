@@ -20,8 +20,8 @@ class TryInstance(
 
     private val errorAs = node.task.catch.`as` ?: "error"
 
-    private val tryDoInstance = children[0] as DoInstance
-    internal val catchDoInstance = children[1] as DoInstance?
+    private val tryDoInstance by lazy { children[0] as DoInstance }
+    internal val catchDoInstance by lazy { children[1] as DoInstance? }
 
     internal var delay: Duration = Duration.ZERO
 
@@ -37,9 +37,13 @@ class TryInstance(
      * First time we enter the node, we continue to the tryDoInstance
      * If we return, this means the processing was successful
      */
-    override fun `continue`(): NodeInstance<*>? = when (rawOutput == null) {
-        true -> tryDoInstance.also { it.rawInput = transformedInput }
-        false -> then()
+    override fun `continue`(): NodeInstance<*>? {
+        childIndex++
+
+        return when (childIndex) {
+            0 -> tryDoInstance.also { it.rawInput = transformedInput }
+            else -> then()
+        }
     }
 
     /**
@@ -87,7 +91,7 @@ class TryInstance(
         catches.errors?.with?.let { filter ->
             if (filter.type != null && filter.type != error.type) return false
             if (filter.status > 0 && filter.status != error.status) return false
-            if (filter.instance != null && filter.instance != error.position) return false
+            if (filter.instance != null && filter.instance != error.instance) return false
             if (filter.title != null && filter.title != error.title) return false
             if (filter.details != null && filter.details != error.details) return false
         }

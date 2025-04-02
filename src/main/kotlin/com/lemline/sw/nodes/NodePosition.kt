@@ -13,10 +13,10 @@ data class NodePosition(
     /**
      * Json pointer representation. (e.g., "/do/0/do")
      */
-    val jsonPointer =
-        if (path.isEmpty()) com.lemline.sw.nodes.JsonPointer.root else com.lemline.sw.nodes.JsonPointer(
-            "/${path.joinToString("/")}"
-        )
+    val jsonPointer = when (path.isEmpty()) {
+        true -> JsonPointer.root
+        else -> JsonPointer("/${path.joinToString("/")}")
+    }
 
     /**
      * Gets the string representation of the JSON pointer.
@@ -38,7 +38,7 @@ data class NodePosition(
     fun addName(name: String): NodePosition {
         require(!name.contains("/")) { "Task name $name must not contain '/'" }
         require(name.toIntOrNull() == null) { "Task name $name must not be an integer" }
-        com.lemline.sw.nodes.Token.entries.map { it.token }.let {
+        Token.entries.map { it.token }.let {
             require(!it.contains(name)) { "Task name $name must not be one of ${it.joinToString()}" }
         }
         return NodePosition(path + name)

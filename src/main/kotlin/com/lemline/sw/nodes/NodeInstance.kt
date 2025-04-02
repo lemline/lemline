@@ -365,15 +365,20 @@ abstract class NodeInstance<T : TaskBase>(
         type: WorkflowErrorType,
         title: String?,
         details: String? = null,
-        status: Int = type.defaultStatus
+        status: Int = type.defaultStatus,
     ): Nothing {
         val error = WorkflowError(
             errorType = type,
             title = title ?: "Unknown Error",
             details = details,
             status = status,
-            position = node.position.jsonPointer.toString()
+            position = node.position
         )
+
+        raise(error)
+    }
+
+    protected fun raise(error: WorkflowError): Nothing {
         // get catching try, if any reset states up to it
         val catching: TryInstance? = getTry(error)?.also { resetUpTo(it) }
 
@@ -388,7 +393,7 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Get the try parent (if any)
      */
-    private fun getTry(error: WorkflowError): TryInstance? = when (this) {
+    protected fun getTry(error: WorkflowError): TryInstance? = when (this) {
         is TryInstance -> if (isCatching(error)) this else parent.getTry(error)
         else -> parent?.getTry(error)
     }
@@ -397,7 +402,7 @@ abstract class NodeInstance<T : TaskBase>(
         reset()
         parent?.let {
             when (it) {
-                node -> node.rawOutput = null
+                node -> Unit
                 else -> it.resetUpTo(node)
             }
         }
