@@ -2,12 +2,12 @@ package com.lemline.sw.nodes.flows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.IntNode
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
-import com.lemline.sw.nodes.NodeTask
 import io.serverlessworkflow.api.types.ForTask
 
 class ForInstance(
-    override val node: NodeTask<ForTask>,
+    override val node: Node<ForTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<ForTask>(node, parent) {
 

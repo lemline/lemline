@@ -13,11 +13,11 @@ import io.serverlessworkflow.impl.json.JsonUtils
  * @property name The name of the task.
  * @property parent The parent node of this task node, or null if it is a root node.
  */
-data class NodeTask<T : TaskBase>(
+data class Node<T : TaskBase>(
     val position: NodePosition,
     val task: T,
     val name: String,
-    val parent: NodeTask<*>? = null
+    val parent: Node<*>? = null
 ) {
     val definition: JsonNode = JsonUtils.fromValue(task)
     val reference: String = position.jsonPointer.toString()
@@ -25,7 +25,7 @@ data class NodeTask<T : TaskBase>(
     /**
      * The list of task nodes depending on this one
      */
-    internal val children: List<NodeTask<*>>? = when (task) {
+    internal val children: List<Node<*>>? = when (task) {
         is RootTask -> task.parseChildren()
         is DoTask -> task.parseChildren(position, this)
         is ForTask -> task.parseChildren(position, this)
@@ -76,7 +76,7 @@ data class NodeTask<T : TaskBase>(
         val nodes = mutableSetOf<String>()
         val edges = mutableSetOf<String>()
 
-        fun processNode(node: NodeTask<*>, parentId: com.lemline.sw.nodes.JsonPointer? = null) {
+        fun processNode(node: Node<*>, parentId: com.lemline.sw.nodes.JsonPointer? = null) {
             val taskType = node.task.javaClass.simpleName
             val nodeId = node.position.jsonPointer
 
@@ -114,8 +114,8 @@ data class NodeTask<T : TaskBase>(
     }
 }
 
-private fun RootTask.parseChildren(): List<NodeTask<*>> = listOf(
-    NodeTask(
+private fun RootTask.parseChildren(): List<Node<*>> = listOf(
+    Node(
         NodePosition.root.addToken(DO),
         DoTask(`do`),
         "$DO",
@@ -125,14 +125,14 @@ private fun RootTask.parseChildren(): List<NodeTask<*>> = listOf(
 
 private fun DoTask.parseChildren(
     position: NodePosition,
-    parent: NodeTask<*>?,
-): List<NodeTask<*>> = `do`.mapIndexed { index, taskItem ->
+    parent: Node<*>?,
+): List<Node<*>> = `do`.mapIndexed { index, taskItem ->
     val child = taskItem.toTask()
     val childPosition = position.addIndex(index).addName(taskItem.name).let {
         if (child is DoTask) it.addToken(DO) else it
     }
 
-    NodeTask(
+    Node(
         childPosition,
         child,
         taskItem.name,
@@ -142,9 +142,9 @@ private fun DoTask.parseChildren(
 
 private fun ForTask.parseChildren(
     position: NodePosition,
-    parent: NodeTask<*>?
-): List<NodeTask<*>> = listOf(
-    NodeTask(
+    parent: Node<*>?
+): List<Node<*>> = listOf(
+    Node(
         position.addToken(DO),
         DoTask(`do`),
         "$DO",
@@ -154,9 +154,9 @@ private fun ForTask.parseChildren(
 
 private fun TryTask.parseChildren(
     position: NodePosition,
-    parent: NodeTask<*>?,
-): List<NodeTask<*>> = mutableListOf(
-    NodeTask(
+    parent: Node<*>?,
+): List<Node<*>> = mutableListOf(
+    Node(
         position.addToken(TRY),
         DoTask(`try`),
         "$TRY",
@@ -165,7 +165,7 @@ private fun TryTask.parseChildren(
 ).also { list ->
     `catch`.`do`?.let {
         list.add(
-            NodeTask(
+            Node(
                 position.addToken(CATCH).addToken(DO),
                 DoTask(it),
                 "$CATCH.$DO",
@@ -178,9 +178,9 @@ private fun TryTask.parseChildren(
 
 private fun ForkTask.parseChildren(
     position: NodePosition,
-    parent: NodeTask<*>?,
-): List<NodeTask<*>>? = fork.branches?.mapIndexed { index, taskItem ->
-    NodeTask(
+    parent: Node<*>?,
+): List<Node<*>>? = fork.branches?.mapIndexed { index, taskItem ->
+    Node(
         position.addToken(FORK).addToken(BRANCHES).addIndex(index).addName(taskItem.name),
         taskItem.toTask(),
         taskItem.name,
@@ -190,10 +190,10 @@ private fun ForkTask.parseChildren(
 
 private fun ListenTask.parseChildren(
     position: NodePosition,
-    parent: NodeTask<*>?,
-): List<NodeTask<*>>? = foreach?.`do`?.let {
+    parent: Node<*>?,
+): List<Node<*>>? = foreach?.`do`?.let {
     listOf(
-        NodeTask(
+        Node(
             position.addToken(FOREACH).addToken(DO),
             DoTask(it),
             "$FOREACH.$DO",
@@ -204,10 +204,10 @@ private fun ListenTask.parseChildren(
 
 private fun CallAsyncAPI.parseChildren(
     position: NodePosition,
-    parent: NodeTask<*>?,
-): List<NodeTask<*>>? = with.subscription?.foreach?.`do`?.let {
+    parent: Node<*>?,
+): List<Node<*>>? = with.subscription?.foreach?.`do`?.let {
     listOf(
-        NodeTask(
+        Node(
             position.addToken(WITH).addToken(SUBSCRIPTION).addToken(FOREACH).addToken(DO),
             DoTask(it),
             "$WITH.$SUBSCRIPTION.$FOREACH.$DO",

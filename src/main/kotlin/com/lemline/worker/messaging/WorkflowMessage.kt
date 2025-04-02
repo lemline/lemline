@@ -19,7 +19,7 @@ import java.time.Instant
  *
  * @property name The name of the workflow.
  * @property version The version of the workflow.
- * @property states A map of the internal states (per position) of the workflow instance.
+ * @property states A map of the internal states (per position) of the workflow position.
  * @property position The currentNodeInstance active position
  */
 @Serializable

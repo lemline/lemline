@@ -50,7 +50,7 @@ internal class WaitOutboxTest {
         clearMocks(emitter)
         every { emitter.send(any()) } returns CompletableFuture.completedStage(null)
 
-        // Create a new outbox instance with the mocks
+        // Create a new outbox position with the mocks
         outbox = WaitOutbox(
             repository = repository,
             emitter = emitter,

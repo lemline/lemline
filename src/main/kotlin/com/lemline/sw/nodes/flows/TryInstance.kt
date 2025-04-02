@@ -2,8 +2,8 @@ package com.lemline.sw.nodes.flows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.sw.errors.WorkflowError
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
-import com.lemline.sw.nodes.NodeTask
 import com.lemline.sw.utils.toDuration
 import com.lemline.sw.utils.toRandomDuration
 import io.serverlessworkflow.api.types.*
@@ -14,16 +14,39 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 
 class TryInstance(
-    override val node: NodeTask<TryTask>,
+    override val node: Node<TryTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<TryTask>(node, parent) {
 
-    // children[0] => try DoTask
-    // children[1] (if any) => catch DoTask
-
     private val errorAs = node.task.catch.`as` ?: "error"
 
-    // Retry policy
+    private val tryDoInstance = children[0] as DoInstance
+    internal val catchDoInstance = children[1] as DoInstance?
+
+    internal var delay: Duration = Duration.ZERO
+
+    /**
+     * delay is a transient value, not part of the state
+     */
+    override fun reset() {
+        delay = Duration.ZERO
+        super.reset()
+    }
+
+    /**
+     * First time we enter the node, we continue to the tryDoInstance
+     * If we return, this means the processing was successful
+     */
+    override fun `continue`(): NodeInstance<*>? = when (rawOutput == null) {
+        true -> tryDoInstance.also { it.rawInput = transformedInput }
+        false -> then()
+    }
+
+    /**
+     * Lazily retrieve the Retry Policy
+     * - either by name
+     * - either set directly
+     */
     private val retryPolicy: RetryPolicy? by lazy {
         when (val retry = node.task.catch?.retry?.get()) {
             // from workflow.use
@@ -34,36 +57,37 @@ class TryInstance(
         }
     }
 
-    // Max number of retries
+    /**
+     * Maximum number of retries
+     */
     private val retryLimit: Int? by lazy { retryPolicy?.limit?.attempt?.count }
 
-    override fun `continue`(): NodeInstance<*>? {
-        childIndex++
-
-        return when (childIndex) {
-            children.size -> then()
-            else -> children[childIndex].also { it.rawInput = rawOutput!! }
+    /**
+     * Current Index of attempts (0 => first attempt, 1 => first retry, 2 => second retry, ...)
+     */
+    internal var attemptIndex
+        get() = state.attemptIndex
+        set(value) {
+            state.attemptIndex = value
         }
-    }
 
     /**
      * Determines if this tryInstance is catching the specified error.
      *
      * This method evaluates the `catch` conditions defined in the `TryTask` to determine
-     * if the currentNodeInstance instance should handle the given `WorkflowError`.
+     * if the currentNodeInstance position should handle the given `WorkflowError`.
      *
-     * @param taskInput The input data for the task.
      * @param error The workflow error to be checked.
-     * @return `true` if the error is caught by this instance, `false` otherwise.
+     * @return `true` if the error is caught by this position, `false` otherwise.
      */
-    internal fun isCatching(taskInput: JsonNode, error: WorkflowError): Boolean {
+    internal fun isCatching(error: WorkflowError): Boolean {
         val catches: TryTaskCatch = node.task.catch ?: return false
 
         // testing `errors.with` directive
         catches.errors?.with?.let { filter ->
             if (filter.type != null && filter.type != error.type) return false
             if (filter.status > 0 && filter.status != error.status) return false
-            if (filter.instance != null && filter.instance != error.instance) return false
+            if (filter.instance != null && filter.instance != error.position) return false
             if (filter.title != null && filter.title != error.title) return false
             if (filter.details != null && filter.details != error.details) return false
         }
@@ -75,13 +99,13 @@ class TryInstance(
 
         // testing `when` directive
         catches.`when`?.let { whenExpr ->
-            val whenFilter = evalBoolean(taskInput, whenExpr, "when", filterScope)
+            val whenFilter = evalBoolean(transformedInput, whenExpr, "when", filterScope)
             if (!whenFilter) return false
         }
 
         // testing `exceptWhen` directive
         catches.exceptWhen?.let { exceptWhen ->
-            val exceptWhenFilter = evalBoolean(taskInput, exceptWhen, "exceptWhen", filterScope)
+            val exceptWhenFilter = evalBoolean(transformedInput, exceptWhen, "exceptWhen", filterScope)
             if (exceptWhenFilter) return false
         }
 
@@ -94,7 +118,7 @@ class TryInstance(
     /**
      * Calculate the delay before the next retry attempt based on the retry configuration
      */
-    fun getRetryDelay(error: WorkflowError, attemptIndex: Int): Duration? {
+    fun getRetryDelay(error: WorkflowError): Duration? {
         // if no retry policy
         retryPolicy ?: return null
 
@@ -137,6 +161,6 @@ class TryInstance(
         // apply jitter if any
         delay += retryPolicy?.jitter.toRandomDuration()
 
-        return delay
+        return if (delay > Duration.ZERO) delay.also { this.delay = it } else null
     }
 } 

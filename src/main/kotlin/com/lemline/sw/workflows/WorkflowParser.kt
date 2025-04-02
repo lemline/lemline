@@ -1,8 +1,9 @@
 package com.lemline.sw.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.sw.nodes.JsonPointer
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodePosition
-import com.lemline.sw.nodes.NodeTask
 import com.lemline.sw.nodes.RootTask
 import com.lemline.worker.repositories.WorkflowDefinitionRepository
 import com.lemline.worker.system.System
@@ -68,8 +69,8 @@ class WorkflowParser(
      * @return The root node of the workflow.
      */
     @Suppress("UNCHECKED_CAST")
-    fun getRootNode(workflow: Workflow): NodeTask<RootTask> =
-        getNode(workflow, NodePosition.root) as NodeTask<RootTask>
+    fun getRootNode(workflow: Workflow): Node<RootTask> =
+        getNode(workflow, NodePosition.root) as Node<RootTask>
 
     /**
      * Retrieves the task node at the specified position in the workflow.
@@ -79,7 +80,7 @@ class WorkflowParser(
      * @return The task node at the specified position.
      * @throws IllegalStateException if the task node is not found at the specified position.
      */
-    internal fun getNode(workflow: Workflow, position: NodePosition): NodeTask<*> =
+    private fun getNode(workflow: Workflow, position: NodePosition): Node<*> =
         nodesCache[workflow.index]?.get(position.jsonPointer)
             ?: error("Task node not found at position $position for workflow ${workflow.document.name} (version ${workflow.document.version})")
 
@@ -108,9 +109,9 @@ class WorkflowParser(
      * and stores them in the `nodesCache` for the given workflow.
      *
      */
-    internal fun Workflow.parseNodes() {
+    private fun Workflow.parseNodes() {
         // recursively creates Nodes
-        val root = NodeTask(
+        val root = Node(
             position = NodePosition.root,
             task = RootTask(`do`, use).also {
                 it.output = output
@@ -121,8 +122,8 @@ class WorkflowParser(
         )
 
         // Initialize cache
-        nodesCache[index] = mutableMapOf<com.lemline.sw.nodes.JsonPointer, NodeTask<*>>().apply {
-            fun processNode(node: NodeTask<*>) {
+        nodesCache[index] = mutableMapOf<JsonPointer, Node<*>>().apply {
+            fun processNode(node: Node<*>) {
                 put(node.position.jsonPointer, node)
                 node.children?.forEach { processNode(it) }
             }
@@ -135,8 +136,7 @@ class WorkflowParser(
     companion object {
         internal val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
         internal val secretsCache = ConcurrentHashMap<WorkflowIndex, Map<String, JsonNode>>()
-        internal val nodesCache =
-            ConcurrentHashMap<WorkflowIndex, Map<com.lemline.sw.nodes.JsonPointer, NodeTask<*>>>()
+        internal val nodesCache = ConcurrentHashMap<WorkflowIndex, Map<JsonPointer, Node<*>>>()
     }
 }
 

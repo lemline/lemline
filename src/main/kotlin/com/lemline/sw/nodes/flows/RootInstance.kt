@@ -5,14 +5,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.sw.expressions.scopes.RuntimeDescriptor
 import com.lemline.sw.expressions.scopes.Scope
 import com.lemline.sw.expressions.scopes.WorkflowDescriptor
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
 import com.lemline.sw.nodes.NodeState
-import com.lemline.sw.nodes.NodeTask
 import com.lemline.sw.nodes.RootTask
 import io.serverlessworkflow.api.types.RetryPolicy
 
 class RootInstance(
-    override val node: NodeTask<RootTask>,
+    override val node: Node<RootTask>,
 ) : NodeInstance<RootTask>(node, null) {
 
     internal var context: ObjectNode

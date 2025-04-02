@@ -1,11 +1,11 @@
 package com.lemline.sw.nodes.flows
 
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
-import com.lemline.sw.nodes.NodeTask
 import io.serverlessworkflow.api.types.ForkTask
 
 class ForkInstance(
-    override val node: NodeTask<ForkTask>,
+    override val node: Node<ForkTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<ForkTask>(node, parent) {
     private var branchIndex: Int? = null

@@ -1,11 +1,11 @@
 package com.lemline.sw.nodes.activities
 
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
-import com.lemline.sw.nodes.NodeTask
 import io.serverlessworkflow.api.types.CallHTTP
 
 class CallHttpInstance(
-    override val node: NodeTask<CallHTTP>,
+    override val node: Node<CallHTTP>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<CallHTTP>(node, parent) {
     private var status: Int? = null

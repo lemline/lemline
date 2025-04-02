@@ -2,7 +2,7 @@ package com.lemline.sw.workflows
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.common.logger
-import com.lemline.sw.errors.CaughtDoWorkflowException
+import com.lemline.sw.errors.WorkflowException
 import com.lemline.sw.expressions.scopes.RuntimeDescriptor
 import com.lemline.sw.expressions.scopes.WorkflowDescriptor
 import com.lemline.sw.nodes.*
@@ -14,12 +14,12 @@ import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 
 /**
- * Represents an instance of a workflow.
+ * Represents an position of a workflow.
  *
  * @property name The name of the workflow.
  * @property version The version of the workflow.
- * @property id The unique identifier of the workflow instance.
- * @property rawInput The raw input data for the instance as a JSON node.
+ * @property id The unique identifier of the workflow position.
+ * @property rawInput The raw input data for the position as a JSON node.
  *
  */
 class WorkflowInstance(
@@ -80,20 +80,41 @@ class WorkflowInstance(
             try {
                 current.run()
                 break
-            } catch (e: CaughtDoWorkflowException) {
-                // go to `do` task
-                current = e.`do`
+            } catch (e: WorkflowException) {
+                val tryInstance = e.catching
+                // the error was not caught
+                if (tryInstance == null) {
+                    // the workflow is faulted
+                    status = WorkflowStatus.FAULTED
+                    // and stopped there
+                    current = e.raising
+                    break
+                }
+                // the error was caught
+                tryInstance.attemptIndex++
+                // should we retry?
+                val delay = tryInstance.getRetryDelay(e.error)
+                if (delay != null) {
+                    // current being a TryInstance, implies that it should be retried
+                    current = tryInstance
+                    break
+                }
+                // continue with the catch node if any, or just continue if none
+                current = tryInstance.catchDoInstance?.also { it.rawInput = tryInstance.transformedInput }
+                    ?: tryInstance.then() ?: rootInstance
             }
         } while (true)
+
+        currentNodeInstance = current
     }
 
     private suspend fun NodeInstance<*>.run() {
 
         var next = when (rawOutput == null) {
-            // current node instance is not completed (start or retry)
+            // current node position is not completed (start or retry)
             true -> this
-            // current node instance is completed, go to next
-            false -> this.then()
+            // current node position is completed, go to next
+            false -> then()
         }
 
         // find and execute the next activity
@@ -105,7 +126,7 @@ class WorkflowInstance(
                 true -> {
                     // if next is an activity, then break
                     if (next.node.isActivity()) break
-                    // execute currentNodeInstance flow node
+                    // execute current NodeInstance flow node
                     next.execute()
                     // continue flow node
                     next.`continue`()
@@ -118,13 +139,13 @@ class WorkflowInstance(
         when (next) {
             // complete the workflow
             null -> {
-                this@WorkflowInstance.currentNodeInstance = rootInstance
+                currentNodeInstance = rootInstance
                 //rootInstance.complete()
                 status = WorkflowStatus.COMPLETED
             }
             // execute the activity
             else -> {
-                this@WorkflowInstance.currentNodeInstance = next
+                currentNodeInstance = next
                 next.execute()
                 if (next is WaitInstance) status = WorkflowStatus.WAITING
             }
@@ -134,8 +155,8 @@ class WorkflowInstance(
     /**
      * Retrieves the task instances of the given workflow with the provided states.
      *
-     * This method initializes the root instance with the provided states,
-     * and then recursively populates the instance node and its children with the states.
+     * This method initializes the root position with the provided states,
+     * and then recursively populates the position node and its children with the states.
      *
      * @return A map of task positions to their task instances.
      */
@@ -164,26 +185,26 @@ class WorkflowInstance(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun NodeTask<*>.createInstance(parent: NodeInstance<*>?): NodeInstance<*> = when (task) {
-        is RootTask -> RootInstance(this as NodeTask<RootTask>)
-        is DoTask -> DoInstance(this as NodeTask<DoTask>, parent!!)
-        is ForTask -> ForInstance(this as NodeTask<ForTask>, parent!!)
-        is TryTask -> TryInstance(this as NodeTask<TryTask>, parent!!)
-        is ForkTask -> ForkInstance(this as NodeTask<ForkTask>, parent!!)
-        is RaiseTask -> RaiseInstance(this as NodeTask<RaiseTask>, parent!!)
-        is SetTask -> SetInstance(this as NodeTask<SetTask>, parent!!)
-        is SwitchTask -> SwitchInstance(this as NodeTask<SwitchTask>, parent!!)
-        is CallAsyncAPI -> CallAsyncApiInstance(this as NodeTask<CallAsyncAPI>, parent!!)
-        is CallGRPC -> CallGrpcInstance(this as NodeTask<CallGRPC>, parent!!)
-        is CallHTTP -> CallHttpInstance(this as NodeTask<CallHTTP>, parent!!)
-        is CallOpenAPI -> CallOpenApiInstance(this as NodeTask<CallOpenAPI>, parent!!)
-        is EmitTask -> EmitInstance(this as NodeTask<EmitTask>, parent!!)
-        is ListenTask -> ListenInstance(this as NodeTask<ListenTask>, parent!!)
-        is RunTask -> RunInstance(this as NodeTask<RunTask>, parent!!)
-        is WaitTask -> WaitInstance(this as NodeTask<WaitTask>, parent!!)
+    private fun Node<*>.createInstance(parent: NodeInstance<*>?): NodeInstance<*> = when (task) {
+        is RootTask -> RootInstance(this as Node<RootTask>)
+        is DoTask -> DoInstance(this as Node<DoTask>, parent!!)
+        is ForTask -> ForInstance(this as Node<ForTask>, parent!!)
+        is TryTask -> TryInstance(this as Node<TryTask>, parent!!)
+        is ForkTask -> ForkInstance(this as Node<ForkTask>, parent!!)
+        is RaiseTask -> RaiseInstance(this as Node<RaiseTask>, parent!!)
+        is SetTask -> SetInstance(this as Node<SetTask>, parent!!)
+        is SwitchTask -> SwitchInstance(this as Node<SwitchTask>, parent!!)
+        is CallAsyncAPI -> CallAsyncApiInstance(this as Node<CallAsyncAPI>, parent!!)
+        is CallGRPC -> CallGrpcInstance(this as Node<CallGRPC>, parent!!)
+        is CallHTTP -> CallHttpInstance(this as Node<CallHTTP>, parent!!)
+        is CallOpenAPI -> CallOpenApiInstance(this as Node<CallOpenAPI>, parent!!)
+        is EmitTask -> EmitInstance(this as Node<EmitTask>, parent!!)
+        is ListenTask -> ListenInstance(this as Node<ListenTask>, parent!!)
+        is RunTask -> RunInstance(this as Node<RunTask>, parent!!)
+        is WaitTask -> WaitInstance(this as Node<WaitTask>, parent!!)
         else -> throw IllegalArgumentException("Unknown task type: ${task.javaClass.name}")
     }
-        // apply states for this new node instance
+        // apply states for this new node position
         .apply { states[node.position]?.let { state = it } }
         // create all children node instances
         .also { nodeInstance ->
@@ -195,9 +216,9 @@ class WorkflowInstance(
 
 
     /**
-     * Converts the currentNodeInstance workflow instance to a `WorkflowMessage`.
+     * Converts the currentNodeInstance workflow position to a `WorkflowMessage`.
      *
-     * @return A `WorkflowExecutionMessage` representing the currentNodeInstance state of the workflow instance.
+     * @return A `WorkflowExecutionMessage` representing the currentNodeInstance state of the workflow position.
      */
     internal fun toMessage() = WorkflowMessage(
         name = name,

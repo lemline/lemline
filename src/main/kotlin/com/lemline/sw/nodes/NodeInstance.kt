@@ -4,8 +4,10 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.info
 import com.lemline.common.logger
-import com.lemline.sw.errors.UncaughtWorkflowException
 import com.lemline.sw.errors.WorkflowError
+import com.lemline.sw.errors.WorkflowErrorType
+import com.lemline.sw.errors.WorkflowErrorType.*
+import com.lemline.sw.errors.WorkflowException
 import com.lemline.sw.expressions.JQExpression
 import com.lemline.sw.expressions.scopes.Scope
 import com.lemline.sw.expressions.scopes.TaskDescriptor
@@ -22,7 +24,7 @@ import java.time.Instant
  * Task instances maintain the states of a task during execution.
  */
 abstract class NodeInstance<T : TaskBase>(
-    open val node: NodeTask<T>,
+    open val node: Node<T>,
     open val parent: NodeInstance<*>?
 ) {
     private val logger = logger()
@@ -38,23 +40,15 @@ abstract class NodeInstance<T : TaskBase>(
     lateinit var children: List<NodeInstance<*>>
 
     /**
-     * Root instance
+     * Root position
      */
     internal val rootInstance: RootInstance by lazy {
         when (this) {
             is RootInstance -> this
-            else -> parent?.rootInstance ?: error("$this is not root, but does not have a parent")
+            else -> parent?.rootInstance
+                ?: error(RUNTIME, "$this is not root, but does not have a parent")
         }
     }
-
-    /**
-     * Current Index of attempts (0 => first attempt, 1 => first retry, 2 => second retry, ...)
-     */
-    private var attemptIndex
-        get() = state.attemptIndex
-        set(value) {
-            state.attemptIndex = value
-        }
 
     /**
      * Index of the currentNodeInstance child being processed
@@ -106,8 +100,11 @@ abstract class NodeInstance<T : TaskBase>(
      */
     private var _transformedInput: JsonNode? = null
 
-    internal val transformedInput: JsonNode
+    internal var transformedInput: JsonNode
         get() = _transformedInput ?: eval(rawInput, node.task.input?.from).also { _transformedInput = it }
+        set(value) {
+            _transformedInput = value
+        }
 
     /**
      * The task transformed output. (calculated)
@@ -118,12 +115,18 @@ abstract class NodeInstance<T : TaskBase>(
         get() = _transformedOutput ?: eval(rawOutput!!, node.task.output?.`as`).also { _transformedOutput = it }
 
 
+    /**
+     * Reset the internal state of this instance
+     */
     open fun reset() {
         _transformedInput = null
         _transformedOutput = null
         state = NodeState()
     }
 
+    /**
+     * Recalculate the task descriptor
+     */
     private val taskDescriptor
         get() = TaskDescriptor(
             name = node.name,
@@ -151,12 +154,12 @@ abstract class NodeInstance<T : TaskBase>(
             .merge(parent?.scope)
 
     /**
-     * Get the next node instance after completion
+     * Get the next node position after completion
      */
     internal fun then(): NodeInstance<*>? = then(node.task.then?.get())
 
     /**
-     * Get the next node instance based on the provided flow directive.
+     * Get the next node position based on the provided flow directive.
      *
      * @param flow The flow directive which can be one of the following:
      * - `null` or `FlowDirectiveEnum.CONTINUE`: Continue to the next sibling.
@@ -165,7 +168,7 @@ abstract class NodeInstance<T : TaskBase>(
      * - `String`: Go to the sibling with the specified name.
      * - Any other value will result in an error.
      *
-     * @return The next node instance or `null` if we reach the end of the workflow
+     * @return The next node position or `null` if we reach the end of the workflow
      */
     internal fun then(flow: Any?): NodeInstance<*>? {
         // calculate transformedOutput
@@ -179,22 +182,22 @@ abstract class NodeInstance<T : TaskBase>(
             FlowDirectiveEnum.EXIT -> parent?.then()
             FlowDirectiveEnum.END -> parent?.end()
             is String -> parent?.goTo(flow)
-            else -> error("Unknown '.then' directive: $flow")
+            else -> error(CONFIGURATION, "Unknown '.then' directive: $flow")
         }
     }
 
     /**
-     * Get the next node instance, for the `continue` flow directive
+     * Get the next node position, for the `continue` flow directive
      * This implementation is for activities only, must be overridden for flows
      */
     internal open fun `continue`(): NodeInstance<*>? = then()
 
     /**
-     * Go to the sibling with a specific name
+     * Go to the sibling with the specified name
      */
     private fun goTo(name: String): NodeInstance<*> {
         val target = children.indexOfFirst { it.node.name == name }
-        if (target == -1) error("'.then' directive '$name' not found")
+        if (target == -1) error(CONFIGURATION, "'.then' directive '$name' not found")
         childIndex = target
         return children[target].also { it.rawInput = rawOutput!! }
     }
@@ -203,8 +206,10 @@ abstract class NodeInstance<T : TaskBase>(
      * End the workflow right away
      */
     private fun end(): RootInstance? {
+        // complete current node
         complete()
 
+        // recursively up to Root
         return when (this) {
             is RootInstance -> null
             else -> parent!!.end()
@@ -221,8 +226,7 @@ abstract class NodeInstance<T : TaskBase>(
         start()
         // Test If task should be executed
         val shouldStart = node.task.`if`
-            ?.let { eval(transformedInput, it) }
-            ?.let { if (it.isBoolean) it.asBoolean() else error("result of '.if' condition must be a boolean, but is '$it'") }
+            ?.let { evalBoolean(transformedInput, it, ".if") }
             ?: true
 
         if (!shouldStart) reset()
@@ -242,12 +246,14 @@ abstract class NodeInstance<T : TaskBase>(
      */
     internal fun start(): JsonNode {
         startedAt = DateTimeDescriptor.from(Instant.now())
-        // Validate task input if schema is provided
-        node.task.input?.schema?.let { schema -> SchemaValidator.validate(rawInput, schema) }
 
         logger.info { "Entering node ${node.name} (${node.task::class.simpleName})" }
         logger.info { "      rawInput         = $rawInput" }
         logger.info { "      scope            = $scope" }
+
+        // Validate rawInput using schema if provided
+        node.task.input?.schema?.let { schema -> validate(rawInput, schema) }
+
         logger.info { "      transformedInput = $transformedInput" }
 
         return transformedInput
@@ -263,51 +269,32 @@ abstract class NodeInstance<T : TaskBase>(
         logger.info { "      scope            = $scope" }
         logger.info { "      transformedOutput = $transformedOutput" }
 
-        // Validate task output if schema is provided
-        node.task.output?.schema?.let { schema -> SchemaValidator.validate(transformedOutput, schema) }
+        // Validate transformedOutput using schema if provided
+        node.task.output?.schema?.let { schema -> validate(transformedOutput, schema) }
 
         // Update workflow context using export.as expression if provided
         node.task.export?.let { export ->
-            val exportAs = eval(transformedOutput, export.`as`)
-            // Validate exported context if schema is provided
-            export.schema?.let { schema -> SchemaValidator.validate(exportAs, schema) }
+            val exportAs = evalObject(transformedOutput, export.`as`, ".export.as")
+            // Validate exported context using schema if provided
+            export.schema?.let { schema -> validate(exportAs, schema) }
             // Set new context
-            if (exportAs is ObjectNode)
-                rootInstance.context = exportAs
-            else
-                error("result of '.export.as' must be an object, but is '$exportAs'")
+            rootInstance.context = exportAs
         }
 
-        // set currentNodeInstance raw output of parent flow
+        // set current parent raw output
         parent?.rawOutput = transformedOutput
 
-        // reset the instance
+        // reset the node instance
         reset()
     }
 
-    private fun raise(error: WorkflowError) {
-        // Find the closest try instance that can catch this error
-        when (val tryInstance = getTry(error)) {
-            // If no try instance can catch the error, propagate it up
-            null -> throw UncaughtWorkflowException(error, attemptIndex)
-
-            // If a try instance can catch the error, check for retry configuration
-            else -> {
-                when (val delay = tryInstance.getRetryDelay(error, attemptIndex)) {
-                    null -> TODO() // tryInstance.doCatch()
-                    else -> TODO()
-                }
-            }
-        }
-    }
-
     /**
-     * Get the try parent (if any)
+     * Validate a Schema
      */
-    private fun getTry(error: WorkflowError): TryInstance? = when (this) {
-        is RootInstance -> null
-        is TryInstance -> if (isCatching(transformedInput, error)) this else parent.getTry(error)
-        else -> parent?.getTry(error)
+    private fun validate(data: JsonNode, schemaUnion: SchemaUnion) = try {
+        SchemaValidator.validate(data, schemaUnion)
+    } catch (e: Exception) {
+        error(VALIDATION, e.message, e.stackTraceToString())
     }
 
     /**
@@ -315,41 +302,104 @@ abstract class NodeInstance<T : TaskBase>(
      */
     internal fun evalBoolean(data: JsonNode, expr: String, name: String, scope: ObjectNode = this.scope) =
         eval(data, expr, scope).let {
-            if (it.isBoolean) it.asBoolean() else error("'.$name' expression must be a boolean, but is '$it'")
+            when (it.isBoolean) {
+                true -> it.asBoolean()
+                false -> error(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
+            }
         }
 
     internal fun evalList(data: JsonNode, expr: String, name: String, scope: ObjectNode = this.scope) =
         eval(data, expr, scope).let {
-            if (it.isArray) it.asIterable().toList() else error("'.$name' expression must be an array, but is '$it'")
+            when (it.isArray) {
+                true -> it.asIterable().toList()
+                false -> error(EXPRESSION, "'.$name' expression must be an array, but is '$it'")
+            }
         }
 
-    internal fun eval(data: JsonNode, expr: String, scope: ObjectNode = this.scope) =
+    private fun evalObject(data: JsonNode, expr: ExportAs, name: String, scope: ObjectNode = this.scope) =
+        eval(data, expr, scope).let {
+            when (it.isObject) {
+                true -> (it as ObjectNode)
+                false -> error(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
+            }
+        }
+
+    private fun eval(data: JsonNode, inputFrom: InputFrom?, scope: ObjectNode = this.scope) =
+        inputFrom?.let { eval(data, JsonUtils.fromValue(it.get()), scope) } ?: data
+
+    private fun eval(data: JsonNode, outputAs: OutputAs?, scope: ObjectNode = this.scope) =
+        outputAs?.let { eval(data, JsonUtils.fromValue(it.get()), scope) } ?: data
+
+    private fun eval(data: JsonNode, exportAs: ExportAs?, scope: ObjectNode = this.scope) =
+        exportAs?.let { eval(data, JsonUtils.fromValue(it.get()), scope) } ?: data
+
+    internal fun eval(data: JsonNode, expr: String, scope: ObjectNode = this.scope) = try {
         JQExpression.eval(data, expr, scope)
+    } catch (e: Exception) {
+        error(EXPRESSION, e.message, e.stackTraceToString())
+    }
 
-    internal fun eval(data: JsonNode, expr: JsonNode, scope: ObjectNode = this.scope) =
+    internal fun eval(data: JsonNode, expr: JsonNode, scope: ObjectNode = this.scope) = try {
         JQExpression.eval(data, expr, scope)
+    } catch (e: Exception) {
+        error(EXPRESSION, e.message, e.stackTraceToString())
+    }
 
-    private fun eval(data: JsonNode, inputFrom: InputFrom?) =
-        inputFrom?.let { eval(data, JsonUtils.fromValue(it.get())) } ?: data
-
-    private fun eval(data: JsonNode, outputAs: OutputAs?) =
-        outputAs?.let { eval(data, JsonUtils.fromValue(it.get())) } ?: data
-
-    private fun eval(data: JsonNode, exportAs: ExportAs?) =
-        exportAs?.let { eval(data, JsonUtils.fromValue(it.get())) } ?: data
-
-
-    // merge an ObjectNode with another, without overriding existing keys
+    /**
+     * Merge an ObjectNode with another, without overriding existing keys
+     */
     private infix fun ObjectNode.merge(other: ObjectNode?): ObjectNode {
         other?.fields()?.forEach { (key, value) -> if (key !in keys) set<JsonNode>(key, value) }
         return this
     }
 
-    // Get keys of an ObjectNode
+    /**
+     * Get keys of an ObjectNode
+     */
     private val ObjectNode.keys: List<String>
         get() = mutableListOf<String>().also {
             fieldNames().forEachRemaining { key -> it.add(key) }
         }
 
-    protected fun error(message: String): Nothing = throw IllegalArgumentException("Task ${node.reference}: $message")
+    protected fun error(
+        type: WorkflowErrorType,
+        title: String?,
+        details: String? = null,
+        status: Int = type.defaultStatus
+    ): Nothing {
+        val error = WorkflowError(
+            errorType = type,
+            title = title ?: "Unknown Error",
+            details = details,
+            status = status,
+            position = node.position.jsonPointer.toString()
+        )
+        // get catching try, if any reset states up to it
+        val catching: TryInstance? = getTry(error)?.also { resetUpTo(it) }
+
+        // send an exception that will be caught by the WorkflowInstance::run
+        throw WorkflowException(
+            raising = this,
+            catching = catching,
+            error = error
+        )
+    }
+
+    /**
+     * Get the try parent (if any)
+     */
+    private fun getTry(error: WorkflowError): TryInstance? = when (this) {
+        is TryInstance -> if (isCatching(error)) this else parent.getTry(error)
+        else -> parent?.getTry(error)
+    }
+
+    private fun resetUpTo(node: TryInstance) {
+        reset()
+        parent?.let {
+            when (it) {
+                node -> node.rawOutput = null
+                else -> it.resetUpTo(node)
+            }
+        }
+    }
 }

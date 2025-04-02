@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 class NodeTest {
-    // WorkflowService instance
+    // WorkflowService position
     private val mockedRepository = mockk<WorkflowDefinitionRepository>()
     private val workflowParser = WorkflowParser(mockedRepository)
     private val objectMapper = ObjectMapper(YAMLFactory())

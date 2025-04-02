@@ -42,13 +42,13 @@ class WorkflowErrorTypeTest {
 
     @Test
     fun `verify default status codes`() {
+        assertEquals(400, WorkflowErrorType.CONFIGURATION.defaultStatus)
         assertEquals(400, WorkflowErrorType.VALIDATION.defaultStatus)
+        assertEquals(400, WorkflowErrorType.EXPRESSION.defaultStatus)
         assertEquals(401, WorkflowErrorType.AUTHENTICATION.defaultStatus)
         assertEquals(403, WorkflowErrorType.AUTHORIZATION.defaultStatus)
-        assertEquals(404, WorkflowErrorType.NOT_FOUND.defaultStatus)
         assertEquals(408, WorkflowErrorType.TIMEOUT.defaultStatus)
         assertEquals(500, WorkflowErrorType.COMMUNICATION.defaultStatus)
-        assertEquals(400, WorkflowErrorType.EXPRESSION.defaultStatus)
-        assertEquals(500, WorkflowErrorType.INTERNAL.defaultStatus)
+        assertEquals(500, WorkflowErrorType.RUNTIME.defaultStatus)
     }
 }

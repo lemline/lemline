@@ -1,11 +1,11 @@
 package com.lemline.sw.nodes.activities
 
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
-import com.lemline.sw.nodes.NodeTask
 import io.serverlessworkflow.api.types.CallAsyncAPI
 
 class CallAsyncApiInstance(
-    override val node: NodeTask<CallAsyncAPI>,
+    override val node: Node<CallAsyncAPI>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<CallAsyncAPI>(node, parent) {
     private var correlationId: String? = null

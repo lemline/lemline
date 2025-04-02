@@ -1,11 +1,11 @@
 package com.lemline.sw.nodes.flows
 
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
-import com.lemline.sw.nodes.NodeTask
 import io.serverlessworkflow.api.types.DoTask
 
 open class DoInstance(
-    override val node: NodeTask<DoTask>,
+    override val node: Node<DoTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<DoTask>(node, parent) {
 

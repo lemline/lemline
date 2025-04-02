@@ -1,11 +1,11 @@
 package com.lemline.sw.nodes.activities
 
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
-import com.lemline.sw.nodes.NodeTask
 import io.serverlessworkflow.api.types.EmitTask
 
 class EmitInstance(
-    override val node: NodeTask<EmitTask>,
+    override val node: Node<EmitTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<EmitTask>(node, parent) {
     private var eventId: String? = null

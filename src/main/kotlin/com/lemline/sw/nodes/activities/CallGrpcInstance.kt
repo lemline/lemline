@@ -1,11 +1,11 @@
 package com.lemline.sw.nodes.activities
 
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
-import com.lemline.sw.nodes.NodeTask
 import io.serverlessworkflow.api.types.CallGRPC
 
 class CallGrpcInstance(
-    override val node: NodeTask<CallGRPC>,
+    override val node: Node<CallGRPC>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<CallGRPC>(node, parent) {
     private var status: String? = null

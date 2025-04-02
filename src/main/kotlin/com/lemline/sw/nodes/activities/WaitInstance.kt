@@ -1,12 +1,12 @@
 package com.lemline.sw.nodes.activities
 
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
-import com.lemline.sw.nodes.NodeTask
 import com.lemline.sw.utils.toDuration
 import io.serverlessworkflow.api.types.WaitTask
 
 class WaitInstance(
-    override val node: NodeTask<WaitTask>,
+    override val node: Node<WaitTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<WaitTask>(node, parent) {
 

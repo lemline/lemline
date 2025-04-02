@@ -2,6 +2,7 @@ package com.lemline.worker.messaging
 
 import com.lemline.common.logger
 import com.lemline.sw.nodes.activities.WaitInstance
+import com.lemline.sw.nodes.flows.TryInstance
 import com.lemline.sw.workflows.WorkflowInstance
 import com.lemline.sw.workflows.WorkflowParser
 import com.lemline.worker.models.RetryMessage
@@ -27,7 +28,7 @@ import kotlin.time.toJavaDuration
 @ApplicationScoped
 open class WorkflowConsumer(
     private val retryRepository: RetryRepository,
-    private val waitMessageRepository: WaitRepository,
+    private val waitRepository: WaitRepository,
     private val workflowParser: WorkflowParser,
 ) {
     private val logger = logger()
@@ -59,8 +60,12 @@ open class WorkflowConsumer(
 
         val result = when (instance.status) {
             WorkflowStatus.PENDING -> TODO()
-            WorkflowStatus.RUNNING -> instance.running()
             WorkflowStatus.WAITING -> instance.waiting()
+            WorkflowStatus.RUNNING -> when (instance.currentNodeInstance is TryInstance) {
+                true -> instance.retry()
+                else -> instance.running()
+            }
+
             WorkflowStatus.COMPLETED -> null
             WorkflowStatus.FAULTED -> null
             WorkflowStatus.CANCELLED -> null
@@ -91,8 +96,22 @@ open class WorkflowConsumer(
         return processingFutures.computeIfAbsent(msg) { CompletableFuture() }
     }
 
-    private fun WorkflowInstance.running(): WorkflowMessage {
-        return this.toMessage()
+    private fun WorkflowInstance.running(): WorkflowMessage = this.toMessage()
+
+    private fun WorkflowInstance.retry(): WorkflowMessage? {
+        val msg = this.toMessage()
+        val delay = (currentNodeInstance as TryInstance).delay
+        val delayedUntil = Instant.now().plus(delay.toJavaDuration())
+
+        // Save message to outbox for delayed sending
+        with(retryRepository) {
+            RetryMessage.create(
+                message = msg.toJson(),
+                delayedUntil = delayedUntil
+            ).save()
+        }
+
+        return null
     }
 
     private fun WorkflowInstance.waiting(): WorkflowMessage? {
@@ -101,7 +120,7 @@ open class WorkflowConsumer(
         val delayedUntil = Instant.now().plus(delay.toJavaDuration())
 
         // Save message to outbox for delayed sending
-        with(waitMessageRepository) {
+        with(waitRepository) {
             WaitMessage.create(
                 message = msg.toJson(),
                 delayedUntil = delayedUntil

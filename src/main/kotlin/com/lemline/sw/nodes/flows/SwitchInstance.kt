@@ -1,13 +1,13 @@
 package com.lemline.sw.nodes.flows
 
+import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
-import com.lemline.sw.nodes.NodeTask
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.SwitchItem
 import io.serverlessworkflow.api.types.SwitchTask
 
 class SwitchInstance(
-    override val node: NodeTask<SwitchTask>,
+    override val node: Node<SwitchTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<SwitchTask>(node, parent) {
 
