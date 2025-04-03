@@ -18,7 +18,7 @@ class ErrorHandlingTest {
             do:
               - trySomething:
                   try:
-                    - raiseRuntimeError:
+                    - raiseError:
                         raise:
                           error:
                             type: https://serverlessworkflow.io/errors/not-implemented
@@ -48,15 +48,17 @@ class ErrorHandlingTest {
     fun `error in try-catch with retry limit reached continues to catch block`() = runTest {
         val workflowYaml = """
             do:
-              - try:
-                  do:
-                    - raise:
-                        error: runtime
-                        title: "Test Error"
+              - trySomething:
+                  try:
+                    - raiseError:
+                        raise:
+                          error:
+                            type: https://serverlessworkflow.io/errors/not-implemented
+                            status: 500
                   catch:
                     errors:
                       with:
-                        type: runtime
+                        type: https://serverlessworkflow.io/errors/not-implemented
                     retry:
                       limit:
                         attempt:
