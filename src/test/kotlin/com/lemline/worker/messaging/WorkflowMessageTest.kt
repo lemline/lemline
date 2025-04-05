@@ -79,8 +79,8 @@ class WorkflowMessageTest {
         )
 
         // When
-        val json = Json.toJson(message)
-        val deserialized = Json.fromJson<WorkflowMessage>(json)
+        val json = Json.encodeToString(message)
+        val deserialized = Json.decodeFromString<WorkflowMessage>(json)
 
         // Then
         assertEquals(message.name, deserialized.name)
@@ -138,8 +138,8 @@ class WorkflowMessageTest {
         )
 
         // When
-        val json = Json.toJson(message)
-        val deserialized = Json.fromJson<WorkflowMessage>(json)
+        val json = Json.encodeToString(message)
+        val deserialized = Json.decodeFromString<WorkflowMessage>(json)
 
         // Then
         assertEquals(2, deserialized.states.size)
@@ -170,8 +170,8 @@ class WorkflowMessageTest {
         )
 
         // When
-        val json = Json.toJson(message)
-        val deserialized = Json.fromJson<WorkflowMessage>(json)
+        val json = Json.encodeToString(message)
+        val deserialized = Json.decodeFromString<WorkflowMessage>(json)
         // Then
         val rootState = deserialized.states[com.lemline.sw.nodes.JsonPointer.root] as ObjectNode
         val rawInput = rootState.get(RAW_INPUT) as ObjectNode

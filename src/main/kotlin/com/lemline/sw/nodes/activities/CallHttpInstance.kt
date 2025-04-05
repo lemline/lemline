@@ -8,11 +8,5 @@ class CallHttpInstance(
     override val node: Node<CallHTTP>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<CallHTTP>(node, parent) {
-    private var status: Int? = null
-    private var error: String? = null
-
-    companion object {
-        private const val STATUS = "status"
-        private const val ERROR = "error"
-    }
+   
 } 

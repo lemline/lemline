@@ -8,11 +8,5 @@ class CallOpenApiInstance(
     override val node: Node<CallOpenAPI>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<CallOpenAPI>(node, parent) {
-    private var status: Int? = null
-    private var error: String? = null
-
-    companion object {
-        private const val STATUS = "status"
-        private const val ERROR = "error"
-    }
+    
 } 

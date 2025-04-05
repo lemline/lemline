@@ -19,10 +19,6 @@ object JQExpression : ExpressionEvaluator {
     // The jqVersion of JQ being used.
     private val jqVersion = Versions.JQ_1_6
 
-    private fun ObjectNode.toJQScope() = JQScope.newEmptyScope().apply {
-        fields().forEach { field -> setValue(field.key, field.value) }
-    }
-
     /**
      * Evaluates a JQ expression against a given JSON node within a specified scope.
      *
@@ -62,5 +58,10 @@ object JQExpression : ExpressionEvaluator {
         }
     }
 
-
+    /**`
+     * Converts an object JSON to a JQScope
+     */
+    private fun ObjectNode.toJQScope() = JQScope.newEmptyScope().apply {
+        fields().forEach { field -> setValue(field.key, field.value) }
+    }
 }

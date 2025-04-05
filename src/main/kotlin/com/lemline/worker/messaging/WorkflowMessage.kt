@@ -48,10 +48,10 @@ data class WorkflowMessage(
             position = com.lemline.sw.nodes.JsonPointer.root
         )
 
-        fun fromJson(json: String): WorkflowMessage = Json.fromJson(json)
+        fun fromJson(json: String): WorkflowMessage = Json.decodeFromString(json)
     }
 
-    fun toJson() = Json.toJson(this)
+    fun toJson() = Json.encodeToString(this)
 }
 
 

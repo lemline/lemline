@@ -8,12 +8,5 @@ class ForkInstance(
     override val node: Node<ForkTask>,
     override val parent: NodeInstance<*>,
 ) : NodeInstance<ForkTask>(node, parent) {
-    private var branchIndex: Int? = null
-    private var taskIndex: Int? = null
-
-
-    companion object {
-        private const val BRANCH_INDEX = "branch.childIndex"
-        private const val TASK_INDEX = "task.childIndex"
-    }
+   
 } 

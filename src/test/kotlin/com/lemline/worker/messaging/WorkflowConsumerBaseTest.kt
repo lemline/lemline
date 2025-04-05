@@ -111,7 +111,7 @@ abstract class WorkflowConsumerBaseTest {
             id = "test-id",
             input = JsonPrimitive("task")
         )
-        val messageJson = Json.toJson(workflowMessage)
+        val messageJson = Json.encodeToString(workflowMessage)
 
         // When
         sendMessage(messageJson)
@@ -152,7 +152,7 @@ abstract class WorkflowConsumerBaseTest {
             "test-id",
             JsonPrimitive("error")
         )
-        val messageJson = Json.toJson(workflowMessage)
+        val messageJson = Json.encodeToString(workflowMessage)
 
         // When
         sendMessage(messageJson)
@@ -178,7 +178,7 @@ abstract class WorkflowConsumerBaseTest {
             "test-id",
             JsonPrimitive("wait")
         )
-        val messageJson = Json.toJson(workflowMessage)
+        val messageJson = Json.encodeToString(workflowMessage)
 
         // When
         sendMessage(messageJson)
@@ -213,7 +213,7 @@ abstract class WorkflowConsumerBaseTest {
             "test-id",
             JsonPrimitive("completed")
         )
-        val messageJson = Json.toJson(workflowMessage)
+        val messageJson = Json.encodeToString(workflowMessage)
 
         // When
         sendMessage(messageJson)
@@ -229,14 +229,14 @@ abstract class WorkflowConsumerBaseTest {
         assertEquals(
             0,
             retryMessages.size,
-            "Messages were stored in retry repository: ${retryMessages.map { Json.toPrettyJson(it) }}"
+            "Messages were stored in retry repository: ${retryMessages.map { Json.encodeToPrettyString(it) }}"
         )
 
         val waitMessages = waitRepository.listAll()
         assertEquals(
             0,
             waitMessages.size,
-            "Messages were stored in wait repository:  ${waitMessages.map { Json.toPrettyJson(it) }}"
+            "Messages were stored in wait repository:  ${waitMessages.map { Json.encodeToPrettyString(it) }}"
         )
     }
 } 

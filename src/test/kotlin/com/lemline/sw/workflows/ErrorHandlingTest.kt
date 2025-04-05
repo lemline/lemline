@@ -50,6 +50,11 @@ class ErrorHandlingTest {
             do:
               - trySomething:
                   try:
+                    - increment:
+                        set:
+                          count: @{ @context.count + 1 }
+                        export:
+                          as: @{ . }
                     - raiseError:
                         raise:
                           error:
@@ -65,10 +70,11 @@ class ErrorHandlingTest {
                           count: 2
                       delay: PT1S
                       backoff:
-                        constant: true
+                        constant: {}
                     do:
-                      - set:
-                          handled: true
+                      - setHandled:
+                          set:
+                            handled: @{ @context }
         """
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
@@ -119,6 +125,26 @@ class ErrorHandlingTest {
             JsonUtils.fromValue(mapOf("attempt" to 2)),
             instance.rootInstance.transformedOutput
         )
+    }
+
+    @Test
+    fun `uncaught error faeults the workflow`() = runTest {
+        val workflowYaml = """
+do:
+  - call-http:
+      call: http
+      wixth:
+        method: GET
+        endpoint: https://swapi.dev/api/people
+        """
+        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+
+        // Run the workflow
+        instance.run()
+
+        // Verify the workflow is faulted
+        assertEquals(WorkflowStatus.FAULTED, instance.status)
+        assertNotNull(instance.currentNodeInstance)
     }
 
     @Test

@@ -38,11 +38,11 @@ data class WorkflowError(
         details = details
     )
 
-    internal fun toJson() = Json.toJson(this)
+    internal fun toJson() = Json.encodeToString(this)
 
     companion object {
         private const val URI_BASE = "https://serverlessworkflow.io/spec/1.0.0/errors"
 
-        internal fun fromJson(json: String) = Json.fromJson<WorkflowError>(json)
+        internal fun fromJson(json: String) = Json.decodeFromString<WorkflowError>(json)
     }
 }

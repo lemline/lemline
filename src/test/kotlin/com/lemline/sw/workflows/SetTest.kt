@@ -17,7 +17,7 @@ class SetTest {
            do:
              - first:
                 set:
-                  counter: @{ 0 }
+                  counter: 0 
         """
         val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
 
@@ -32,7 +32,28 @@ class SetTest {
     }
 
     @Test
-    fun `set task use expression`() = runTest {
+    fun `set task does not use expression by default`() = runTest {
+
+        val doYaml = """
+           do:
+             - first:
+                set:
+                  counter:  .
+        """
+        val instance = getWorkflowInstance(doYaml, JsonPrimitive(1))
+
+        // run (one shot)
+        instance.run()
+
+        // Assert the output matches our expected transformed value
+        assertEquals(
+            JsonUtils.fromValue(mapOf("counter" to ".")),  // expected
+            instance.rootInstance.transformedOutput  // actual
+        )
+    }
+
+    @Test
+    fun `set task can use expression`() = runTest {
 
         val doYaml = """
            do:
@@ -52,6 +73,29 @@ class SetTest {
         )
     }
 
+    @Test
+    fun `set value can be nested`() = runTest {
+
+        val doYaml = """
+           do:
+             - first:
+                set:
+                  counter:  
+                    a: 0
+                    b: @{ . }
+        """
+        val instance = getWorkflowInstance(doYaml, JsonPrimitive(1))
+
+        // run (one shot)
+        instance.run()
+
+        // Assert the output matches our expected transformed value
+        assertEquals(
+            JsonUtils.fromValue(mapOf("counter" to mapOf("a" to 0, "b" to 1))),  // expected
+            instance.rootInstance.transformedOutput  // actual
+        )
+    }
+    
     @Test
     fun `multiple set tasks`() = runTest {
         val doYaml = """

@@ -325,13 +325,28 @@ abstract class NodeInstance<T : TaskBase>(
         }
 
     private fun eval(data: JsonNode, inputFrom: InputFrom?, scope: ObjectNode = this.scope) =
-        inputFrom?.let { eval(data, JsonUtils.fromValue(it.get()), scope) } ?: data
+        inputFrom?.let {
+            when (val expr = it.get()) {
+                is String -> eval(data, expr, scope)
+                else -> eval(data, JsonUtils.fromValue(expr), scope, true)
+            }
+        } ?: data
 
     private fun eval(data: JsonNode, outputAs: OutputAs?, scope: ObjectNode = this.scope) =
-        outputAs?.let { eval(data, JsonUtils.fromValue(it.get()), scope) } ?: data
+        outputAs?.let {
+            when (val expr = it.get()) {
+                is String -> eval(data, expr, scope)
+                else -> eval(data, JsonUtils.fromValue(expr), scope, true)
+            }
+        } ?: data
 
     private fun eval(data: JsonNode, exportAs: ExportAs?, scope: ObjectNode = this.scope) =
-        exportAs?.let { eval(data, JsonUtils.fromValue(it.get()), scope) } ?: data
+        exportAs?.let {
+            when (val expr = it.get()) {
+                is String -> eval(data, expr, scope)
+                else -> eval(data, JsonUtils.fromValue(expr), scope, true)
+            }
+        } ?: data
 
     internal fun eval(data: JsonNode, expr: String, scope: ObjectNode = this.scope) = try {
         JQExpression.eval(data, expr, scope)
@@ -339,8 +354,8 @@ abstract class NodeInstance<T : TaskBase>(
         error(EXPRESSION, e.message, e.stackTraceToString())
     }
 
-    internal fun eval(data: JsonNode, expr: JsonNode, scope: ObjectNode = this.scope) = try {
-        JQExpression.eval(data, expr, scope)
+    protected fun eval(data: JsonNode, expr: JsonNode, scope: ObjectNode = this.scope, force: Boolean = false) = try {
+        JQExpression.eval(data, expr, scope, force)
     } catch (e: Exception) {
         error(EXPRESSION, e.message, e.stackTraceToString())
     }
@@ -349,17 +364,12 @@ abstract class NodeInstance<T : TaskBase>(
      * Merge an ObjectNode with another, without overriding existing keys
      */
     private infix fun ObjectNode.merge(other: ObjectNode?): ObjectNode {
+        // Get keys of this
+        val keys = fieldNames().iterator().asSequence().toList()
+        // Merge this with other without overriding
         other?.fields()?.forEach { (key, value) -> if (key !in keys) set<JsonNode>(key, value) }
         return this
     }
-
-    /**
-     * Get keys of an ObjectNode
-     */
-    private val ObjectNode.keys: List<String>
-        get() = mutableListOf<String>().also {
-            fieldNames().forEachRemaining { key -> it.add(key) }
-        }
 
     protected fun error(
         type: WorkflowErrorType,

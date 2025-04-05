@@ -71,7 +71,7 @@ internal class RetryOutboxTest {
     fun `RetryOutbox should process pending messages and mark them as sent`() {
         // Given
         val workflowMessage = getWorkflowMessage()
-        val messageJson = Json.toJson(workflowMessage)
+        val messageJson = Json.encodeToString(workflowMessage)
 
         val message = RetryMessage().apply {
             message = messageJson
@@ -162,7 +162,7 @@ internal class RetryOutboxTest {
             "test-workflow", "1.0.0", emptyMap(),
             com.lemline.sw.nodes.JsonPointer("")
         )
-        val messageJson = Json.toJson(workflowMessage)
+        val messageJson = Json.encodeToString(workflowMessage)
 
         val message = RetryMessage().apply {
             message = messageJson
@@ -256,7 +256,7 @@ internal class RetryOutboxTest {
             "test-workflow", "1.0.0", emptyMap(),
             com.lemline.sw.nodes.JsonPointer("")
         )
-        val messageJson = Json.toJson(workflowMessage)
+        val messageJson = Json.encodeToString(workflowMessage)
 
         // Create 150 messages (more than default batch size of 100)
         repeat(150) { i ->

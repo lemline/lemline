@@ -23,24 +23,24 @@ internal object Json {
     /**
      * Converts an object to its JSON string representation
      */
-    inline fun <reified T> toJson(value: T): String = json.encodeToString(value)
+    inline fun <reified T> encodeToString(value: T): String = json.encodeToString(value)
 
     /**
      * Converts an object to its pretty JSON string representation
      */
-    inline fun <reified T> toPrettyJson(value: T): String = jsonPretty.encodeToString(value)
+    inline fun <reified T> encodeToPrettyString(value: T): String = jsonPretty.encodeToString(value)
 
     /**
      * Converts an object to a JSON element
      */
-    inline fun <reified T> toJsonElement(value: T): JsonElement = json.encodeToJsonElement(value)
+    inline fun <reified T> encodeToElement(value: T): JsonElement = json.encodeToJsonElement(value)
 
     /**
      * Creates an object from its JSON string representation
      */
-    inline fun <reified T> fromJson(jsonString: String): T = json.decodeFromString(jsonString)
+    inline fun <reified T> decodeFromString(jsonString: String): T = json.decodeFromString(jsonString)
 }
 
 fun JsonElement.toJackson(): JsonNode = ObjectMapper().readTree(toString())
 
-fun JsonNode.toKotlin(): JsonElement = Json.fromJson(toString())
+fun JsonNode.toKotlin(): JsonElement = Json.decodeFromString(toString())

@@ -1,6 +1,6 @@
 package com.lemline.sw.workflows
 
-import com.lemline.common.json.Json.toJsonElement
+import com.lemline.common.json.Json.encodeToElement
 import com.lemline.sw.utils.getWorkflowInstance
 import io.serverlessworkflow.impl.json.JsonUtils
 import kotlinx.coroutines.test.runTest
@@ -16,16 +16,15 @@ class ForTest {
            do:
              - sumAll:
                  for:
-                   in: @{ .input }
+                   in: .input 
                  do:
                    - accumulate:
                        set:
-                         counter: @{ .counter + @item }
+                         counter: .counter + @item
                  output:
-                   as: @{ .counter }
+                   as:  .counter 
         """
-        val list = listOf(1, 2, 3)
-        val instance = getWorkflowInstance(doYaml, toJsonElement(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, encodeToElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
@@ -53,7 +52,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, toJsonElement(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, encodeToElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
@@ -81,7 +80,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, toJsonElement(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, encodeToElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
@@ -108,7 +107,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, toJsonElement(mapOf("input" to listOf(4, 5, 6))))
+        val instance = getWorkflowInstance(doYaml, encodeToElement(mapOf("input" to listOf(4, 5, 6))))
 
         // run (one shot)
         instance.run()
@@ -136,7 +135,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, toJsonElement(mapOf("input" to listOf(4, 5, 6))))
+        val instance = getWorkflowInstance(doYaml, encodeToElement(mapOf("input" to listOf(4, 5, 6))))
 
         // run (one shot)
         instance.run()

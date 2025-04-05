@@ -1,6 +1,6 @@
 package com.lemline.sw.workflows
 
-import com.lemline.common.json.Json.toJsonElement
+import com.lemline.common.json.Json.encodeToElement
 import com.lemline.sw.utils.getWorkflowInstance
 import io.serverlessworkflow.impl.json.JsonUtils
 import kotlinx.coroutines.test.runTest
@@ -24,7 +24,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, toJsonElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -52,7 +52,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, toJsonElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -80,7 +80,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, toJsonElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -109,7 +109,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, toJsonElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -137,7 +137,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, toJsonElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -165,7 +165,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, toJsonElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -200,7 +200,7 @@ class IfTest {
                 set:
                   in: @{ .in + 5}
         """
-        val high = getWorkflowInstance(doYaml, toJsonElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -236,7 +236,7 @@ class IfTest {
                 set:
                   in: @{ .in + 5}
         """
-        val high = getWorkflowInstance(doYaml, toJsonElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -272,7 +272,7 @@ class IfTest {
                 set:
                   in: @{ .in + 5}
         """
-        val high = getWorkflowInstance(doYaml, toJsonElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()

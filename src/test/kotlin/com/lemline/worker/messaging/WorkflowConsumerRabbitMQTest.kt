@@ -1,7 +1,7 @@
 package com.lemline.worker.messaging
 
-//import com.lemline.runtime.RabbitMQTestProfile
-//import com.lemline.runtime.RabbitMQTestResource
+//import com.lemline.worker.RabbitMQTestProfile
+//import com.lemline.worker.RabbitMQTestResource
 //import com.rabbitmq.client.*
 //import io.quarkus.test.common.QuarkusTestResource
 //import io.quarkus.test.junit.QuarkusTest
