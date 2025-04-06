@@ -44,8 +44,8 @@ class ScopeTest : StringSpec({
 
     "should serialize and deserialize Workflow" {
 
-        val jsonString = Json.encodeToString(workflow)
-        val deserializedWorkflow = Json.decodeFromString<Workflow>(jsonString)
+        val jsonString = Json.encodeToElement(workflow).toString()
+        val deserializedWorkflow = Json.jacksonMapper.readValue(jsonString, Workflow::class.java)
 
         deserializedWorkflow.document.dsl shouldBe workflow.document.dsl
         deserializedWorkflow.document.name shouldBe workflow.document.name

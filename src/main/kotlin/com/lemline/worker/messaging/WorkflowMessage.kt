@@ -3,7 +3,6 @@ package com.lemline.worker.messaging
 import com.lemline.common.json.Json
 import com.lemline.sw.nodes.NodePosition
 import com.lemline.sw.nodes.NodeState
-import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -17,8 +16,8 @@ import java.time.Instant
  *
  * @property name The name of the workflow.
  * @property version The version of the workflow.
- * @property states A map of the internal states (per position) of the workflow position.
- * @property position The currentNodeInstance active position
+ * @property states A map of the internal initialStates (per initialPosition) of the workflow initialPosition.
+ * @property position The currentNodeInstance active initialPosition
  */
 @Serializable
 data class WorkflowMessage(
@@ -40,7 +39,7 @@ data class WorkflowMessage(
                 NodePosition.root to NodeState(
                     workflowId = id,
                     rawInput = input,
-                    startedAt = DateTimeDescriptor.from(Instant.now())
+                    startedAt = Instant.now()
                 )
             ),
             position = NodePosition.root

@@ -12,7 +12,7 @@ class WorkflowErrorTest {
 //            title = "Invalid_input",
 //            status = 400,
 //            details = "The_input_data_does_not_match_the_required_schema",
-//            position = JsonPointer("/do/0").toPosition()
+//            initialPosition = JsonPointer("/do/0").toPosition()
 //        )
 //
 //        val json = mapper.writeValueAsString(error)
@@ -20,7 +20,7 @@ class WorkflowErrorTest {
 //            {
 //                "type":"https://serverlessworkflow.io/spec/1.0.0/errors/validation",
 //                "status":400,
-//                "position":"/do/0",
+//                "initialPosition":"/do/0",
 //                "title":"Invalid_input",
 //                "details":"The_input_data_does_not_match_the_required_schema"
 //            }
@@ -35,7 +35,7 @@ class WorkflowErrorTest {
 //            {
 //                "type":"https://serverlessworkflow.io/spec/1.0.0/errors/timeout",
 //                "status":408,
-//                "position":"/do/1/try",
+//                "initialPosition":"/do/1/try",
 //                "title":"Operation timed out",
 //                "details":"The operation exceeded the maximum allowed time"
 //            }
@@ -56,7 +56,7 @@ class WorkflowErrorTest {
 //            errorType = RUNTIME,
 //            title = "Internal_error",
 //            details = "An_unexpected_error_occurred",
-//            position = JsonPointer("/do/2").toPosition(),
+//            initialPosition = JsonPointer("/do/2").toPosition(),
 //            status = 455
 //        )
 //

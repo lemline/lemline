@@ -20,7 +20,7 @@ import java.time.Instant
 
 /**
  * Base class for all task instances.
- * Task instances maintain the states of a task during execution.
+ * Task instances maintain the initialStates of a task during execution.
  */
 abstract class NodeInstance<T : TaskBase>(
     open val node: Node<T>,
@@ -29,7 +29,7 @@ abstract class NodeInstance<T : TaskBase>(
     private val logger = logger()
 
     /**
-     * Node internal states
+     * Node internal initialStates
      */
     internal var state = NodeState()
 
@@ -39,7 +39,7 @@ abstract class NodeInstance<T : TaskBase>(
     lateinit var children: List<NodeInstance<*>>
 
     /**
-     * Root position
+     * Root initialPosition
      */
     internal val rootInstance: RootInstance by lazy {
         when (this) {
@@ -70,7 +70,7 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * The time the task was started at.
      */
-    private var startedAt: DateTimeDescriptor?
+    private var startedAt: Instant?
         get() = state.startedAt
         set(value) {
             state.startedAt = value
@@ -131,7 +131,7 @@ abstract class NodeInstance<T : TaskBase>(
             name = node.name,
             reference = node.reference,
             definition = node.definition,
-            startedAt = startedAt?.let { Json.encodeToElement(it) },
+            startedAt = startedAt?.let { Json.encodeToElement(DateTimeDescriptor.from(it)) },
             input = rawInput,
             output = rawOutput,
         )
@@ -153,12 +153,12 @@ abstract class NodeInstance<T : TaskBase>(
             .merge(parent?.scope)
 
     /**
-     * Get the next node position after completion
+     * Get the next node initialPosition after completion
      */
     internal fun then(): NodeInstance<*>? = then(node.task.then?.get())
 
     /**
-     * Get the next node position based on the provided flow directive.
+     * Get the next node initialPosition based on the provided flow directive.
      *
      * @param flow The flow directive which can be one of the following:
      * - `null` or `FlowDirectiveEnum.CONTINUE`: Continue to the next sibling.
@@ -167,7 +167,7 @@ abstract class NodeInstance<T : TaskBase>(
      * - `String`: Go to the sibling with the specified name.
      * - Any other value will result in an error.
      *
-     * @return The next node position or `null` if we reach the end of the workflow
+     * @return The next node initialPosition or `null` if we reach the end of the workflow
      */
     internal fun then(flow: Any?): NodeInstance<*>? {
         // calculate transformedOutput
@@ -186,7 +186,7 @@ abstract class NodeInstance<T : TaskBase>(
     }
 
     /**
-     * Get the next node position, for the `continue` flow directive
+     * Get the next node initialPosition, for the `continue` flow directive
      * This implementation is for activities only, must be overridden for flows
      */
     internal open fun `continue`(): NodeInstance<*>? = then()
@@ -244,7 +244,7 @@ abstract class NodeInstance<T : TaskBase>(
      * @return The transformed input as a JSON node.
      */
     internal fun start(): JsonElement {
-        startedAt = DateTimeDescriptor.from(Instant.now())
+        startedAt = Instant.now()
 
         logger.info { "Entering node ${node.name} (${node.task::class.simpleName})" }
         logger.info { "      rawInput         = $rawInput" }
@@ -374,7 +374,7 @@ abstract class NodeInstance<T : TaskBase>(
     }
 
     protected fun raise(error: WorkflowError): Nothing {
-        // get catching try, if any reset states up to it
+        // get catching try, if any reset initialStates up to it
         val catching: TryInstance? = getTry(error)?.also { resetUpTo(it) }
 
         // send an exception that will be caught by the WorkflowInstance::run

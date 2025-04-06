@@ -4,7 +4,6 @@ import com.lemline.common.json.Json
 import com.lemline.sw.nodes.NodePosition
 import com.lemline.sw.nodes.NodeState
 import com.lemline.sw.set
-import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -54,7 +53,7 @@ class WorkflowMessageTest {
                 NodePosition.root to NodeState(
                     workflowId = "test-id",
                     rawInput = Json.jsonObject.set("test", "value"),
-                    startedAt = DateTimeDescriptor.from(Instant.now())
+                    startedAt = Instant.now()
                 )
             ),
             position = NodePosition.root
@@ -89,7 +88,7 @@ class WorkflowMessageTest {
                 NodePosition.root to NodeState(
                     workflowId = id,
                     rawInput = input,
-                    startedAt = DateTimeDescriptor.from(Instant.now())
+                    startedAt = Instant.now()
                 )
             ),
             position = NodePosition.root

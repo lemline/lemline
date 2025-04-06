@@ -54,7 +54,7 @@ internal fun getWorkflowInstance(doYaml: String, input: JsonElement): WorkflowIn
         every { findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
     }
 
-    // apply it to the WorkflowService position
+    // apply it to the WorkflowService initialPosition
     val mockedService = WorkflowParser(mockedRepository)
 
     val msg = WorkflowMessage.newInstance(workflowName, workflowVersion, "testId", input)
@@ -62,7 +62,7 @@ internal fun getWorkflowInstance(doYaml: String, input: JsonElement): WorkflowIn
     return WorkflowInstance(
         name = msg.name,
         version = msg.version,
-        states = msg.states,
-        position = msg.position
+        initialStates = msg.states,
+        initialPosition = msg.position
     ).apply { workflowParser = mockedService }
 }

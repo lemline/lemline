@@ -1,6 +1,9 @@
 package com.lemline.sw.workflows
 
 import com.lemline.common.json.Json
+import com.lemline.sw.expressions.scopes.RuntimeDescriptor
+import com.lemline.sw.expressions.scopes.TaskDescriptor
+import com.lemline.sw.expressions.scopes.WorkflowDescriptor
 import com.lemline.sw.getWorkflowInstance
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -10,19 +13,18 @@ import kotlin.test.assertEquals
 
 class ExpressionTest {
 
-   
     @Test
-    fun `check workflow context in expressions`() = runTest {
+    fun `check context (expr)`() = runTest {
         val doYaml = """
             do:
               - first:
                   set:
                     foo: 42
                   export:
-                    as: .
+                    as: "@{ {ctx: .} }"
               - second:
                   set:
-                    number: @{ @context.foo }
+                    number: @{ @context.ctx.foo }
         """
         val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
 
@@ -35,136 +37,118 @@ class ExpressionTest {
     }
 
     @Test
-    fun `test task context in expressions`() = runTest {
+    fun `check context (json)`() = runTest {
         val doYaml = """
             do:
               - first:
-                  context:
-                    foo: "bar"
-                    num: 42
                   set:
-                    value: @{ .context.foo }
+                    foo: 42
+                  export:
+                    as: {ctx: .}
               - second:
-                  context:
-                    foo: "baz"
                   set:
-                    value: @{ .context.foo }
+                    number: @{ @context.ctx.foo }
         """
         val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
 
         instance.run()
 
         assertEquals(
-            Json.encodeToElement(mapOf("value" to "baz")),
+            Json.encodeToElement(mapOf("number" to 42)),
             instance.rootInstance.transformedOutput
         )
     }
 
     @Test
-    fun `test nested context in expressions`() = runTest {
+    fun `check context (yaml)`() = runTest {
         val doYaml = """
-            context:
-              outer:
-                inner:
-                  value: "nested"
             do:
               - first:
                   set:
-                    value: @{ .context.outer.inner.value }
+                    foo: 42
+                  export:
+                    as: 
+                      ctx: .
+              - second:
+                  set:
+                    number: @{ @context.ctx.foo }
         """
         val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
 
         instance.run()
 
         assertEquals(
-            Json.encodeToElement(mapOf("value" to "nested")),
+            Json.encodeToElement(mapOf("number" to 42)),
             instance.rootInstance.transformedOutput
         )
     }
 
     @Test
-    fun `test context with input and output transformations`() = runTest {
+    fun `check expression can access task descriptor`() = runTest {
+        val taskName = "myTask"
         val doYaml = """
-            context:
-              prefix: "test_"
-            input:
-              from: "@{ {in: .} }"
             do:
-              - first:
+              - $taskName:
                   set:
-                    value: @{ .context.prefix + .in }
-            output:
-              as: "@{ {out: .value} }"
+                    taskFromScope: @{ @task }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive("value"))
+        val instance = getWorkflowInstance(doYaml, JsonPrimitive(0))
 
         instance.run()
 
-        assertEquals(
-            Json.encodeToElement(mapOf("out" to "test_value")),
-            instance.rootInstance.transformedOutput
+        val expected = TaskDescriptor(
+            name = taskName,
+            reference = "/do/0/$taskName",
+            definition = JsonObject(mapOf()),
+            input = JsonPrimitive(0),
+            output = null,
+            startedAt = null
         )
+        val actual = (instance.rootInstance.transformedOutput as JsonObject)["taskFromScope"] as JsonObject
+        assertEquals(JsonPrimitive(expected.name), actual["name"])
+        assertEquals(JsonPrimitive(expected.reference), actual["reference"])
+        assertEquals(expected.input, actual["input"])
     }
 
     @Test
-    fun `test context with conditional expressions`() = runTest {
+    fun `check expression can access workflow descriptor`() = runTest {
+        val taskName = "myTask"
         val doYaml = """
-            context:
-              threshold: 10
             do:
-              - first:
+              - $taskName:
                   set:
-                    value: @{ .context.threshold > 5 ? "above" : "below" }
+                    workflowFromScope: @{ @workflow }
         """
-        val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
+        val instance = getWorkflowInstance(doYaml, JsonPrimitive(0))
 
         instance.run()
 
-        assertEquals(
-            Json.encodeToElement(mapOf("value" to "above")),
-            instance.rootInstance.transformedOutput
+        val expected = WorkflowDescriptor(
+            id = instance.id,
+            definition = JsonObject(mapOf()),
+            input = JsonPrimitive(0),
+            startedAt = JsonObject(mapOf()),
         )
+        val actual = (instance.rootInstance.transformedOutput as JsonObject)["workflowFromScope"] as JsonObject
+        assertEquals(JsonPrimitive(expected.id), actual["id"])
+        assertEquals(expected.input, actual["input"])
     }
 
     @Test
-    fun `test context with arithmetic expressions`() = runTest {
+    fun `check expression can access runtime`() = runTest {
+        val taskName = "myTask"
         val doYaml = """
-            context:
-              base: 10
-              multiplier: 2
             do:
-              - first:
+              - $taskName:
                   set:
-                    result: @{ .context.base * .context.multiplier }
+                    runtimeFromScope: @{ @runtime }
         """
-        val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
+        val instance = getWorkflowInstance(doYaml, JsonPrimitive(0))
 
         instance.run()
 
-        assertEquals(
-            Json.encodeToElement(mapOf("result" to 20)),
-            instance.rootInstance.transformedOutput
-        )
+        val actual = (instance.rootInstance.transformedOutput as JsonObject)["runtimeFromScope"] as JsonObject
+        assertEquals(actual, Json.encodeToElement(RuntimeDescriptor))
     }
 
-    @Test
-    fun `test context with string concatenation`() = runTest {
-        val doYaml = """
-            context:
-              greeting: "Hello"
-              separator: ", "
-            do:
-              - first:
-                  set:
-                    message: @{ .context.greeting + .context.separator + "World" }
-        """
-        val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
-
-        instance.run()
-
-        assertEquals(
-            Json.encodeToElement(mapOf("message" to "Hello, World")),
-            instance.rootInstance.transformedOutput
-        )
-    }
 }

@@ -101,7 +101,7 @@ open class WorkflowConsumer(
     private fun WorkflowInstance.retry(): WorkflowMessage? {
         val msg = this.toMessage()
         val delay = (currentNodeInstance as TryInstance).delay
-        val delayedUntil = Instant.now().plus(delay.toJavaDuration())
+        val delayedUntil = Instant.now().plus(delay?.toJavaDuration() ?: error("No delay set in for $this"))
 
         // Save message to outbox for delayed sending
         with(retryRepository) {

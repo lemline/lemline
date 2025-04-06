@@ -6,6 +6,8 @@ import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import kotlinx.serialization.modules.SerializersModule
+import kotlinx.serialization.modules.contextual
 
 internal object Json {
     // Expose Jackson ObjectMapper - configure as needed
@@ -13,11 +15,18 @@ internal object Json {
 
     val jsonObject: JsonObject get() = JsonObject(emptyMap())
 
+    // Define the serializers module
+    private val module = SerializersModule {
+        contextual(InstantSerializer)
+        // Potentially add other contextual serializers here
+    }
+
     // Configure kotlinx.serialization Json instances with the module
     val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
         encodeDefaults = false
+        serializersModule = module // Add the module here
     }
 
     val jsonPretty = Json {
@@ -25,6 +34,7 @@ internal object Json {
         isLenient = true
         encodeDefaults = false
         prettyPrint = true
+        serializersModule = module // Add the module here
     }
 
     /**

@@ -51,7 +51,7 @@ internal class RetryOutboxTest {
         clearMocks(emitter)
         every { emitter.send(any()) } returns CompletableFuture.completedStage(null)
 
-        // Create a new outbox position with the mock emitter
+        // Create a new outbox initialPosition with the mock emitter
         outbox = RetryOutbox(
             repository = repository,
             emitter = emitter,

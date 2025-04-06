@@ -1,16 +1,16 @@
 package com.lemline.sw.nodes
 
-import com.lemline.common.json.DateTimeDescriptorSerializer
 import com.lemline.common.json.Json
-import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import java.time.Instant
 
 /**
- * Represents a node's states.
- * Contain states variables for the task during execution.
+ * Represents a node's initialStates.
+ * Contain initialStates variables for the task during execution.
  * Some value such as forIndex as specific to a specific task
  */
 @Serializable
@@ -30,8 +30,8 @@ data class NodeState(
     @SerialName(WORKFLOW_ID)
     var workflowId: String? = null,
     @SerialName(STARTED_AT)
-    @Serializable(with = DateTimeDescriptorSerializer::class)
-    var startedAt: DateTimeDescriptor? = null,
+    @Contextual
+    var startedAt: Instant? = null,
     @SerialName(FOR_INDEX)
     var forIndex: Int = FOR_INDEX_DEFAULT,
 ) {

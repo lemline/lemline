@@ -24,7 +24,7 @@ class TryInstance(
     private val tryDoInstance by lazy { children[0] as DoInstance }
     internal val catchDoInstance by lazy { children[1] as DoInstance? }
 
-    internal var delay: Duration = Duration.ZERO
+    internal var delay: Duration? = Duration.ZERO
 
     /**
      * delay is a transient value, not part of the state
@@ -76,14 +76,20 @@ class TryInstance(
             state.attemptIndex = value
         }
 
+    override fun shouldStart(): Boolean {
+        // if has already started and is retrying
+        if (attemptIndex > 0) return true
+        return super.shouldStart()
+    }
+
     /**
      * Determines if this tryInstance is catching the specified error.
      *
      * This method evaluates the `catch` conditions defined in the `TryTask` to determine
-     * if the currentNodeInstance position should handle the given `WorkflowError`.
+     * if the currentNodeInstance initialPosition should handle the given `WorkflowError`.
      *
      * @param error The workflow error to be checked.
-     * @return `true` if the error is caught by this position, `false` otherwise.
+     * @return `true` if the error is caught by this initialPosition, `false` otherwise.
      */
     internal fun isCatching(error: WorkflowError): Boolean {
         val catches: TryTaskCatch = node.task.catch ?: return false
@@ -120,19 +126,30 @@ class TryInstance(
         // add error to the currentNodeInstance custom scope
         variables = JsonObject(mapOf(errorAs to Json.encodeToElement(error)))
 
-        return true
+        // new attempt
+        attemptIndex++
+
+        // get delay before retry
+        delay = getRetryDelay(error)
+
+        return when (delay) {
+            // if we don't retry, catch this error only if catchDoInstance is not null
+            null -> (catchDoInstance?.children?.size !in setOf(0, null)) // if no catch, we don't retry
+            // if we retry, set the delay
+            else -> true
+        }
     }
 
     /**
      * Calculate the delay before the next retry attempt based on the retry configuration
      */
-    fun getRetryDelay(error: WorkflowError): Duration? {
+    private fun getRetryDelay(error: WorkflowError): Duration? {
         // if no retry policy
         retryPolicy ?: return null
 
         // if attempt limit is reached, we do not retry
         retryLimit?.let {
-            if (attemptIndex + 1 >= it) return null
+            if (attemptIndex > it) return null
         }
 
         // Max attempt duration before a task attempt timeout

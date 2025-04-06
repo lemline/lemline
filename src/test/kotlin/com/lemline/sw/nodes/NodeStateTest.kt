@@ -3,7 +3,6 @@ package com.lemline.sw.nodes
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.common.json.Json
 import com.lemline.sw.set
-import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -62,7 +61,7 @@ class NodeStateTest {
                 rawOutput = Json.jsonObject.set("output", "result")
                 context = Json.jsonObject.set("contextKey", "contextValue")
                 workflowId = "test-workflow"
-                startedAt = DateTimeDescriptor.from(testInstant)
+                startedAt = testInstant
                 forIndex = 3
             }
         }

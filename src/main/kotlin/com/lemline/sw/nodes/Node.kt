@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonObject
 /**
  * Represents a node in the tree defining a workflow.
  *
- * @property position The position of the task in the workflow.
+ * @property position The initialPosition of the task in the workflow.
  * @property task The task associated with this node.
  * @property name The name of the task.
  * @property parent The parent node of this task node, or null if it is a root node.
@@ -68,7 +68,7 @@ data class Node<T : TaskBase>(
     /**
      * Generates a Mermaid graph representation of the task hierarchy.
      * The graph shows the relationships between tasks and their children.
-     * Each node shows the task type and position.
+     * Each node shows the task type and initialPosition.
      *
      * @return A string containing the Mermaid graph definition
      */
@@ -80,7 +80,7 @@ data class Node<T : TaskBase>(
             val taskType = node.task.javaClass.simpleName
             val nodeId = node.position.jsonPointer
 
-            // Add node with task type and position
+            // Add node with task type and initialPosition
             val nodeLabel = "\"${node.name}\n($taskType)\""
             val nodeDesc = when {
                 taskType == SwitchTask::class.simpleName -> "{$nodeLabel}"

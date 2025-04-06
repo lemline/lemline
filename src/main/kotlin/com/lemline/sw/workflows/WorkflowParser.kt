@@ -75,16 +75,16 @@ class WorkflowParser(
         getNode(workflow, NodePosition.root) as Node<RootTask>
 
     /**
-     * Retrieves the task node at the specified position in the workflow.
+     * Retrieves the task node at the specified initialPosition in the workflow.
      *
      * @param workflow The workflow containing the task node.
-     * @param position The position of the task node to retrieve.
-     * @return The task node at the specified position.
-     * @throws IllegalStateException if the task node is not found at the specified position.
+     * @param position The initialPosition of the task node to retrieve.
+     * @return The task node at the specified initialPosition.
+     * @throws IllegalStateException if the task node is not found at the specified initialPosition.
      */
     private fun getNode(workflow: Workflow, position: NodePosition): Node<*> =
         nodesCache[workflow.index]?.get(position.jsonPointer)
-            ?: error("Task node not found at position $position for workflow ${workflow.document.name} (version ${workflow.document.version})")
+            ?: error("Task node not found at initialPosition $position for workflow ${workflow.document.name} (version ${workflow.document.version})")
 
     /**
      * Parses the given workflow definition string and returns a Workflow object.

@@ -36,7 +36,7 @@ class WorkflowParserTest {
         every { findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
     }
 
-    // apply it to the WorkflowService position
+    // apply it to the WorkflowService initialPosition
     private val workflowParser = WorkflowParser(mockedRepository)
 
     @BeforeEach

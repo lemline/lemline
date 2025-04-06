@@ -15,21 +15,22 @@ import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.serialization.json.JsonElement
+import java.time.Instant
 
 /**
- * Represents a position of a workflow.
+ * Represents a initialPosition of a workflow.
  *
  * @property name The name of the workflow.
  * @property version The version of the workflow.
- * @property id The unique identifier of the workflow position.
- * @property rawInput The raw input data for the position as a JSON node.
+ * @property id The unique identifier of the workflow initialPosition.
+ * @property rawInput The raw input data for the initialPosition as a JSON node.
  *
  */
 class WorkflowInstance(
     val name: String,
     val version: String,
-    val states: Map<NodePosition, NodeState>,
-    val position: NodePosition
+    val initialStates: Map<NodePosition, NodeState>,
+    val initialPosition: NodePosition
 ) {
     internal lateinit var workflowParser: WorkflowParser
 
@@ -42,24 +43,24 @@ class WorkflowInstance(
 
     /**
      * Instance ID
-     * (parsed from the states)
+     * (parsed from the initialStates)
      */
-    private val id: String
+    internal val id: String
 
     /**
      * Instance starting date
-     * (parsed from the states)
+     * (parsed from the initialStates)
      */
-    private val startedAt: DateTimeDescriptor
+    internal val startedAt: Instant
 
     /**
      * Instance raw input
-     * (parsed from the states)
+     * (parsed from the initialStates)
      */
-    private val rawInput: JsonElement
+    internal val rawInput: JsonElement
 
     init {
-        val rootState = states[NodePosition.root] ?: error("no states provided for the root node")
+        val rootState = initialStates[NodePosition.root] ?: error("no initialStates provided for the root node")
 
         this.id = rootState.workflowId!!
         this.startedAt = rootState.startedAt!!
@@ -73,10 +74,51 @@ class WorkflowInstance(
 
     internal lateinit var rootInstance: RootInstance
 
-    internal lateinit var currentNodeInstance: NodeInstance<*>
+    /**
+     * The current node instance in the workflow.
+     *
+     * This property is initialized when the workflow is run and represents
+     * the current nodeInstance in the workflow execution.
+     */
+    private var _currentNodeInstance: NodeInstance<*>? = null
+    internal var currentNodeInstance: NodeInstance<*>
+        get() = _currentNodeInstance
+            ?: nodeInstances[initialPosition].also { _currentNodeInstance = it }
+            ?: error("task not found in initialPosition $initialPosition")
+        set(value) {
+            _currentNodeInstance = value
+        }
+
+    /**
+     * Retrieves the current position in the workflow.
+     */
+    internal val currentNodePosition: NodePosition
+        get() = currentNodeInstance.node.position
+
+    /**
+     * Retrieves the current initialStates of all nodes in the workflow.
+     *
+     * This property collects the initialStates of all nodes starting from the root instance
+     * and returns them as a map where the keys are the node positions and the values
+     * are the node initialStates.
+     *
+     * @return A map of node positions to their corresponding node initialStates.
+     */
+    internal val currentNodeStates: Map<NodePosition, NodeState>
+        get() {
+            val currentStates = mutableMapOf<NodePosition, NodeState>()
+            fun collectStates(nodeInstance: NodeInstance<*>) {
+                if (nodeInstance.state != NodeState()) {
+                    currentStates[nodeInstance.node.position] = nodeInstance.state
+                }
+                nodeInstance.children.forEach { collectStates(it) }
+            }
+            collectStates(rootInstance)
+            return currentStates
+        }
 
     suspend fun run() {
-        var current = nodeInstances[position] ?: error("task not found in position $position")
+        var current = currentNodeInstance
         status = WorkflowStatus.RUNNING
 
         do {
@@ -95,11 +137,9 @@ class WorkflowInstance(
                     break
                 }
                 logger.info { "Workflow $id $name($version): ${e.error}" }
-                // the error was caught
-                tryInstance.attemptIndex++
-                // should we retry?
-                val delay = tryInstance.getRetryDelay(e.error)
-                if (delay != null) {
+                if (tryInstance.delay != null) {
+                    // reinit childIndex, as we are going to retry
+                    tryInstance.childIndex = -1
                     // current being a TryInstance, implies that it should be retried
                     current = tryInstance
                     break
@@ -115,7 +155,12 @@ class WorkflowInstance(
 
     private suspend fun NodeInstance<*>.run() {
 
-        var next = when (rawOutput == null) {
+        // Possible cases when starting here:
+        // - starting a workflow
+        // - continuing right after an activity execution (before transformedOutput is set)
+        // - restarting a TryInstance
+
+        var next = when (rawOutput == null || this is TryInstance) {
             // current node position is not completed (start or retry)
             true -> this
             // current node position is completed, go to next
@@ -158,10 +203,9 @@ class WorkflowInstance(
     }
 
     /**
-     * Retrieves the task instances of the given workflow with the provided states.
+     * Retrieves the task instances of the given workflow with the provided initialStates.
      *
-     * This method initializes the root position with the provided states,
-     * and then recursively populates the position node and its children with the states.
+     * This method initializes the node instance with the provided initialStates,
      *
      * @return A map of task positions to their task instances.
      */
@@ -175,7 +219,7 @@ class WorkflowInstance(
             id = id,
             definition = Json.encodeToElement(workflow),
             input = rawInput,
-            startedAt = Json.encodeToElement(startedAt)
+            startedAt = Json.encodeToElement(DateTimeDescriptor.from(startedAt))
         )
 
         // create the map<NodePosition, NodeInstance<*>>
@@ -209,8 +253,8 @@ class WorkflowInstance(
         is WaitTask -> WaitInstance(this as Node<WaitTask>, parent!!)
         else -> throw IllegalArgumentException("Unknown task type: ${task.javaClass.name}")
     }
-        // apply states for this new node position
-        .apply { states[node.position]?.let { state = it } }
+        // apply initialStates for this new node position
+        .apply { initialStates[node.position]?.let { state = it } }
         // create all children node instances
         .also { nodeInstance ->
             nodeInstance.children = this.children?.map { child -> child.createInstance(nodeInstance) } ?: emptyList()
@@ -221,15 +265,15 @@ class WorkflowInstance(
 
 
     /**
-     * Converts the currentNodeInstance workflow position to a `WorkflowMessage`.
+     * Converts the current workflow instance to a `WorkflowMessage`.
      *
-     * @return A `WorkflowExecutionMessage` representing the currentNodeInstance state of the workflow position.
+     * @return A `WorkflowMessage` representing the state of the workflow instance.
      */
     internal fun toMessage() = WorkflowMessage(
         name = name,
         version = version,
-        states = states.filterValues { it != NodeState() },
-        position = position
+        states = currentNodeStates,
+        position = currentNodePosition
     )
 
     companion object {
@@ -243,8 +287,8 @@ class WorkflowInstance(
         internal fun from(msg: WorkflowMessage) = WorkflowInstance(
             name = msg.name,
             version = msg.version,
-            states = msg.states,
-            position = msg.position
+            initialStates = msg.states,
+            initialPosition = msg.position
         )
     }
 }

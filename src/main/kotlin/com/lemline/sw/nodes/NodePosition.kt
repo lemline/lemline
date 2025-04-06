@@ -4,9 +4,9 @@ import com.lemline.common.json.NodePositionSerializer
 import kotlinx.serialization.Serializable
 
 /**
- * Represents a task position in the workflow.
+ * Represents a task initialPosition in the workflow.
  *
- * This class is used to represent the position of a task in the workflow.
+ * This class is used to represent the initialPosition of a task in the workflow.
  *
  * @property path The list of path components.
  */

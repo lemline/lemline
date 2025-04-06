@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 class NodeTest {
-    // WorkflowService position
+    // WorkflowService initialPosition
     private val mockedRepository = mockk<WorkflowDefinitionRepository>()
     private val workflowParser = WorkflowParser(mockedRepository)
     private val objectMapper = ObjectMapper(YAMLFactory())
@@ -33,13 +33,13 @@ class NodeTest {
             val definition = load("/examples/${file.name}")
             val workflow = workflowParser.parseWorkflow(definition)
 
-            // get position<>TaskNode map
+            // get initialPosition<>TaskNode map
             val positions = WorkflowParser.nodesCache[workflow.index]!!
 
             // Convert workflow to JSON for comparison
             val workflowJson = objectMapper.valueToTree<ObjectNode>(workflow)
 
-            // Verify each position exists in the JSON
+            // Verify each initialPosition exists in the JSON
             println("Found ${positions.size} positions in ${file.name}:")
             positions.forEach { (pointer, taskNode) ->
                 println("$pointer => ${taskNode.task.javaClass.simpleName}")
@@ -118,13 +118,13 @@ class NodeTest {
                 if (node.isNoDoTask()) {
                     assertTrue(
                         positions.containsKey(currentPath),
-                        "Task at position $currentPath not found in positions map in file $fileName"
+                        "Task at initialPosition $currentPath not found in positions map in file $fileName"
                     )
                 }
                 node.get("do")?.let {
                     assertTrue(
                         positions.containsKey("$currentPath/do"),
-                        "Task at position $currentPath/do not found in positions map in file $fileName"
+                        "Task at initialPosition $currentPath/do not found in positions map in file $fileName"
                     )
                 }
                 // Recursively check all fields
