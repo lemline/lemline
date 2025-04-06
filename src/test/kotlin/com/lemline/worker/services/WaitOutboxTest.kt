@@ -1,6 +1,7 @@
 package com.lemline.worker.services
 
 import com.lemline.common.json.Json
+import com.lemline.sw.nodes.NodePosition
 import com.lemline.worker.PostgresTestResource
 import com.lemline.worker.messaging.WorkflowMessage
 import com.lemline.worker.models.WaitMessage
@@ -159,8 +160,7 @@ internal class WaitOutboxTest {
     fun `WaitOutbox should handle emitter failure`() {
         // Given
         val workflowMessage = WorkflowMessage(
-            "test-workflow", "1.0.0", emptyMap(),
-            com.lemline.sw.nodes.JsonPointer("")
+            "test-workflow", "1.0.0", emptyMap(), NodePosition(listOf())
         )
         val messageJson = Json.encodeToString(workflowMessage)
 
@@ -253,8 +253,7 @@ internal class WaitOutboxTest {
     fun `WaitOutbox should process messages in batches`() {
         // Given
         val workflowMessage = WorkflowMessage(
-            "test-workflow", "1.0.0", emptyMap(),
-            com.lemline.sw.nodes.JsonPointer("")
+            "test-workflow", "1.0.0", emptyMap(), NodePosition(listOf())
         )
         val messageJson = Json.encodeToString(workflowMessage)
 

@@ -1,9 +1,7 @@
 package com.lemline.worker.messaging
 
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.Json
-import com.lemline.common.json.ObjectNodeSerializer
-import com.lemline.common.json.toJackson
+import com.lemline.sw.nodes.NodePosition
 import com.lemline.sw.nodes.NodeState
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.serialization.SerialName
@@ -26,8 +24,8 @@ import java.time.Instant
 data class WorkflowMessage(
     @SerialName("n") val name: String,
     @SerialName("v") val version: String,
-    @SerialName("s") val states: Map<com.lemline.sw.nodes.JsonPointer, @Serializable(with = ObjectNodeSerializer::class) ObjectNode>,
-    @SerialName("p") val position: com.lemline.sw.nodes.JsonPointer
+    @SerialName("s") val states: Map<NodePosition, NodeState>,
+    @SerialName("p") val position: NodePosition
 ) {
     companion object {
         fun newInstance(
@@ -39,19 +37,19 @@ data class WorkflowMessage(
             name = name,
             version = version,
             states = mapOf(
-                com.lemline.sw.nodes.JsonPointer.root to NodeState(
+                NodePosition.root to NodeState(
                     workflowId = id,
-                    rawInput = input.toJackson(),
+                    rawInput = input,
                     startedAt = DateTimeDescriptor.from(Instant.now())
-                ).toJson()!!
+                )
             ),
-            position = com.lemline.sw.nodes.JsonPointer.root
+            position = NodePosition.root
         )
 
-        fun fromJson(json: String): WorkflowMessage = Json.decodeFromString(json)
+        fun fromJsonString(json: String): WorkflowMessage = Json.decodeFromString(json)
     }
 
-    fun toJson() = Json.encodeToString(this)
+    fun toJsonString() = Json.encodeToString(this)
 }
 
 

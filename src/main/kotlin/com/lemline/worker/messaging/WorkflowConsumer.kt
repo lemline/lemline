@@ -51,7 +51,7 @@ open class WorkflowConsumer(
 
     @Transactional
     open suspend fun processMessage(msg: String): String? {
-        val workflowMessage = WorkflowMessage.fromJson(msg)
+        val workflowMessage = WorkflowMessage.fromJsonString(msg)
         val instance = WorkflowInstance.from(workflowMessage).apply {
             workflowParser = this@WorkflowConsumer.workflowParser
         }
@@ -69,7 +69,7 @@ open class WorkflowConsumer(
             WorkflowStatus.COMPLETED -> null
             WorkflowStatus.FAULTED -> null
             WorkflowStatus.CANCELLED -> null
-        }?.toJson()
+        }?.toJsonString()
 
         return result
     }
@@ -106,7 +106,7 @@ open class WorkflowConsumer(
         // Save message to outbox for delayed sending
         with(retryRepository) {
             RetryMessage.create(
-                message = msg.toJson(),
+                message = msg.toJsonString(),
                 delayedUntil = delayedUntil
             ).save()
         }
@@ -122,7 +122,7 @@ open class WorkflowConsumer(
         // Save message to outbox for delayed sending
         with(waitRepository) {
             WaitMessage.create(
-                message = msg.toJson(),
+                message = msg.toJsonString(),
                 delayedUntil = delayedUntil
             ).save()
         }

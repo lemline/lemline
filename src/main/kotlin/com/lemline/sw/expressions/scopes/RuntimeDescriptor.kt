@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.sw.expressions.scopes.RuntimeDescriptor.metadata
 import com.lemline.sw.expressions.scopes.RuntimeDescriptor.name
 import com.lemline.sw.expressions.scopes.RuntimeDescriptor.version
+import kotlinx.serialization.Serializable
 
 /**
  * Data class representing a runtime descriptor.
@@ -15,6 +16,7 @@ import com.lemline.sw.expressions.scopes.RuntimeDescriptor.version
  * @see <a href="https://github.com/serverlessworkflow/specification/blob/main/dsl.md#runtime-descriptor">Runtime Descriptor</a>
  */
 @Suppress("MemberVisibilityCanBePrivate", "MayBeConstant")
+@Serializable
 object RuntimeDescriptor {
     val name = "lemline"
     val version = "1.0.0-SNAPSHOT"

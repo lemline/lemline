@@ -1,9 +1,9 @@
 package com.lemline.sw.nodes
 
-import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.Json
 import com.lemline.sw.nodes.Token.*
 import io.serverlessworkflow.api.types.*
-import io.serverlessworkflow.impl.json.JsonUtils
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Represents a node in the tree defining a workflow.
@@ -19,7 +19,7 @@ data class Node<T : TaskBase>(
     val name: String,
     val parent: Node<*>? = null
 ) {
-    val definition: JsonNode = JsonUtils.fromValue(task)
+    val definition: JsonObject = Json.encodeToElement(task)
     val reference: String = position.jsonPointer.toString()
 
     /**

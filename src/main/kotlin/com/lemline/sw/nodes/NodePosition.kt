@@ -1,5 +1,8 @@
 package com.lemline.sw.nodes
 
+import com.lemline.common.json.NodePositionSerializer
+import kotlinx.serialization.Serializable
+
 /**
  * Represents a task position in the workflow.
  *
@@ -7,6 +10,7 @@ package com.lemline.sw.nodes
  *
  * @property path The list of path components.
  */
+@Serializable(with = NodePositionSerializer::class)
 data class NodePosition(
     private val path: List<String> = listOf(),
 ) {

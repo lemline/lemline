@@ -1,6 +1,7 @@
 package com.lemline.sw.schemas
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.Json
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion.VersionFlag
 import com.networknt.schema.ValidationMessage
@@ -8,13 +9,15 @@ import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.impl.json.JsonUtils
 import io.serverlessworkflow.impl.resources.DefaultResourceLoaderFactory
+import kotlinx.serialization.json.JsonElement
 import java.util.function.Consumer
 
 object SchemaValidator {
     private val resourceLoader = DefaultResourceLoaderFactory.get().getResourceLoader(null)
     private val jsonSchemaFactory = JsonSchemaFactory.getInstance(VersionFlag.V7)
 
-    fun validate(node: JsonNode, schemaUnion: SchemaUnion) = validateSchema(node, schemaUnionToSchema(schemaUnion))
+    fun validate(node: JsonElement, schemaUnion: SchemaUnion) =
+        validateSchema(with(Json) { node.toJsonNode() }, schemaUnionToSchema(schemaUnion))
 
     private fun schemaUnionToSchema(schemaUnion: SchemaUnion): JsonNode = when {
         schemaUnion.schemaInline != null ->

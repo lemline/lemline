@@ -1,8 +1,8 @@
 package com.lemline.sw.expressions.scopes
 
-import com.fasterxml.jackson.databind.JsonNode
-import io.serverlessworkflow.api.types.Workflow
-import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Data class representing a workflow descriptor.
@@ -14,9 +14,10 @@ import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
  *
  * @see <a href="https://github.com/serverlessworkflow/specification/blob/main/dsl.md#workflow-descriptor">Workflow Descriptor</a>
  */
+@Serializable
 data class WorkflowDescriptor(
     val id: String,
-    val definition: Workflow,
-    val input: JsonNode,
-    val startedAt: DateTimeDescriptor
+    val definition: JsonObject,
+    val input: JsonElement,
+    val startedAt: JsonObject,
 )

@@ -1,6 +1,6 @@
 package com.lemline.sw.workflows
 
-import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.Json
 import com.lemline.common.logger
 import com.lemline.sw.errors.WorkflowException
 import com.lemline.sw.expressions.scopes.RuntimeDescriptor
@@ -12,9 +12,10 @@ import com.lemline.worker.messaging.WorkflowMessage
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import kotlinx.serialization.json.JsonElement
 
 /**
- * Represents an position of a workflow.
+ * Represents a position of a workflow.
  *
  * @property name The name of the workflow.
  * @property version The version of the workflow.
@@ -53,7 +54,7 @@ class WorkflowInstance(
      * Instance raw input
      * (parsed from the states)
      */
-    private val rawInput: JsonNode
+    private val rawInput: JsonElement
 
     init {
         val rootState = states[NodePosition.root] ?: error("no states provided for the root node")
@@ -168,9 +169,9 @@ class WorkflowInstance(
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
             id = id,
-            definition = workflow,
+            definition = Json.encodeToElement(workflow),
             input = rawInput,
-            startedAt = startedAt
+            startedAt = Json.encodeToElement(startedAt)
         )
 
         // create the map<NodePosition, NodeInstance<*>>
@@ -223,12 +224,8 @@ class WorkflowInstance(
     internal fun toMessage() = WorkflowMessage(
         name = name,
         version = version,
-        states = states
-            .mapKeys { it.key.jsonPointer }
-            .mapValues { it.value.toJson() }
-            .filterValues { it != null }
-            .mapValues { it.value!! },
-        position = position.jsonPointer
+        states = states.filterValues { it != NodeState() },
+        position = position
     )
 
     companion object {
@@ -242,10 +239,8 @@ class WorkflowInstance(
         internal fun from(msg: WorkflowMessage) = WorkflowInstance(
             name = msg.name,
             version = msg.version,
-            states = msg.states
-                .mapKeys { it.key.toPosition() }
-                .mapValues { NodeState.fromJson(it.value) },
-            position = msg.position.toPosition()
+            states = msg.states,
+            position = msg.position
         )
     }
 }

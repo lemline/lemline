@@ -1,7 +1,6 @@
 package com.lemline.sw.workflows
 
-import com.lemline.sw.utils.getWorkflowInstance
-import io.serverlessworkflow.impl.json.JsonUtils
+import com.lemline.sw.getWorkflowInstance
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
@@ -33,7 +32,7 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("123"),  // expected
+            JsonPrimitive("123"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -67,7 +66,7 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("12a2b3"),  // expected
+            JsonPrimitive("12a2b3"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -96,7 +95,7 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("12"),  // expected
+            JsonPrimitive("12"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -125,7 +124,7 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("12"),  // expected
+            JsonPrimitive("12"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -159,7 +158,7 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("12a"),  // expected
+            JsonPrimitive("12a"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -188,7 +187,7 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("12"),  // expected
+            JsonPrimitive("12"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -217,7 +216,7 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("12"),  // expected
+            JsonPrimitive("12"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -251,7 +250,7 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("12a3"),  // expected
+            JsonPrimitive("12a3"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -280,7 +279,7 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("13"),  // expected
+            JsonPrimitive("13"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -317,7 +316,7 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("12a2c3"),  // expected
+            JsonPrimitive("12a2c3"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }

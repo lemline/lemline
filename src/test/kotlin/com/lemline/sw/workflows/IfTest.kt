@@ -1,8 +1,7 @@
 package com.lemline.sw.workflows
 
-import com.lemline.common.json.Json.encodeToElement
-import com.lemline.sw.utils.getWorkflowInstance
-import io.serverlessworkflow.impl.json.JsonUtils
+import com.lemline.common.json.Json
+import com.lemline.sw.getWorkflowInstance
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -24,14 +23,14 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("in" to 6)),  // expected
+            Json.encodeToElement(mapOf("in" to 6)),  // expected
             high.rootInstance.transformedOutput  // actual
         )
     }
@@ -52,14 +51,14 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("in" to 5)),  // expected
+            Json.encodeToElement(mapOf("in" to 5)),  // expected
             high.rootInstance.transformedOutput  // actual
         )
     }
@@ -80,14 +79,14 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("in" to 6)),  // expected
+            Json.encodeToElement(mapOf("in" to 6)),  // expected
             high.rootInstance.transformedOutput  // actual
         )
     }
@@ -109,14 +108,14 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("in" to 3)),  // expected
+            Json.encodeToElement(mapOf("in" to 3)),  // expected
             high.rootInstance.transformedOutput  // actual
         )
     }
@@ -137,14 +136,14 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("in" to 4)),  // expected
+            Json.encodeToElement(mapOf("in" to 4)),  // expected
             high.rootInstance.transformedOutput  // actual
         )
     }
@@ -165,14 +164,14 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("in" to 3)),  // expected
+            Json.encodeToElement(mapOf("in" to 3)),  // expected
             high.rootInstance.transformedOutput  // actual
         )
     }
@@ -200,14 +199,14 @@ class IfTest {
                 set:
                   in: @{ .in + 5}
         """
-        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("in" to 15)),  // expected
+            Json.encodeToElement(mapOf("in" to 15)),  // expected
             high.rootInstance.transformedOutput  // actual
         )
     }
@@ -236,14 +235,14 @@ class IfTest {
                 set:
                   in: @{ .in + 5}
         """
-        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("in" to 6)),  // expected
+            Json.encodeToElement(mapOf("in" to 6)),  // expected
             high.rootInstance.transformedOutput  // actual
         )
     }
@@ -272,14 +271,14 @@ class IfTest {
                 set:
                   in: @{ .in + 5}
         """
-        val high = getWorkflowInstance(doYaml, encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("in" to 13)),  // expected
+            Json.encodeToElement(mapOf("in" to 13)),  // expected
             high.rootInstance.transformedOutput  // actual
         )
     }

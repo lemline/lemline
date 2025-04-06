@@ -1,7 +1,7 @@
 package com.lemline.sw.workflows
 
-import com.lemline.sw.utils.getWorkflowInstance
-import io.serverlessworkflow.impl.json.JsonUtils
+import com.lemline.common.json.Json
+import com.lemline.sw.getWorkflowInstance
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -26,7 +26,7 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("counter" to 0)),  // expected
+            Json.encodeToElement(mapOf("counter" to 0)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -47,7 +47,7 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("counter" to ".")),  // expected
+            Json.encodeToElement(mapOf("counter" to ".")),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -68,7 +68,7 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("counter" to 2)),  // expected
+            Json.encodeToElement(mapOf("counter" to 2)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -91,11 +91,11 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("counter" to mapOf("a" to 0, "b" to 1))),  // expected
+            Json.encodeToElement(mapOf("counter" to mapOf("a" to 0, "b" to 1))),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
-    
+
     @Test
     fun `multiple set tasks`() = runTest {
         val doYaml = """
@@ -119,7 +119,7 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("123"),  // expected
+            JsonPrimitive("123"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -152,7 +152,7 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("12a2b3"),  // expected
+            JsonPrimitive("12a2b3"),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }

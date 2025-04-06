@@ -1,25 +1,32 @@
 package com.lemline.sw.expressions
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.NullNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import com.fasterxml.jackson.databind.node.TextNode
+import com.lemline.common.json.Json
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
+import kotlinx.serialization.json.*
 
 internal interface ExpressionEvaluator {
     fun eval(input: JsonNode, expr: String, scope: ObjectNode): JsonNode
 
-    fun eval(data: JsonNode, expr: JsonNode, scope: ObjectNode, force: Boolean): JsonNode = when (expr) {
-        is NullNode -> data
-        is TextNode -> when (force || ExpressionUtils.isExpr(expr.asText())) {
-            true -> eval(data, expr.asText(), scope)
+    /**
+     * Convert JsonElement to JsonNode and JsonObject to ObjectNode then evaluate the expression.
+     */
+    fun eval(input: JsonElement, expr: String, scope: JsonObject): JsonElement = with(Json) {
+        eval(input.toJsonNode(), expr, scope.toJsonNode() as ObjectNode).toJsonElement()
+    }
+
+    fun eval(data: JsonElement, expr: JsonElement, scope: JsonObject, force: Boolean): JsonElement = when (expr) {
+        is JsonNull -> data
+
+        is JsonPrimitive -> when (expr.isString && (force || ExpressionUtils.isExpr(expr.content))) {
+            true -> eval(data, expr.content, scope)
             false -> expr
         }
 
-        is ObjectNode -> expr.apply {
-            fields().forEach { it.setValue(eval(data, it.value, scope, force)) }
-        }
+        is JsonObject -> JsonObject(expr.mapValues { (_, value) -> eval(data, value, scope, force) })
 
-        else -> expr
+        is JsonArray -> JsonArray(expr.map { value -> eval(data, value, scope, force) })
     }
+
 }

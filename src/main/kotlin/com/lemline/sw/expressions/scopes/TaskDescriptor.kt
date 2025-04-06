@@ -1,7 +1,8 @@
 package com.lemline.sw.expressions.scopes
 
-import com.fasterxml.jackson.databind.JsonNode
-import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Data class representing a task descriptor.
@@ -15,11 +16,12 @@ import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
  *
  * @see <a href="https://github.com/serverlessworkflow/specification/blob/main/dsl.md#task-descriptor">Task Descriptor</a>
  */
+@Serializable
 data class TaskDescriptor(
     val name: String,
     val reference: String,
-    val definition: JsonNode,
-    val input: JsonNode?,
-    var output: JsonNode?,
-    val startedAt: DateTimeDescriptor?
+    val definition: JsonObject,
+    val input: JsonElement?,
+    var output: JsonElement?,
+    val startedAt: JsonObject?
 )

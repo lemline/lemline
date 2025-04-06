@@ -1,17 +1,16 @@
 package com.lemline.sw.errors
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.lemline.common.json.Json
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 class WorkflowErrorTypeTest {
-    private val mapper = ObjectMapper()
 
     @Test
     fun `test serialization to JSON`() {
         // Test all error types
         WorkflowErrorType.entries.forEach { errorType ->
-            val json = mapper.writeValueAsString(errorType)
+            val json = Json.encodeToString(errorType)
             assertEquals("\"${errorType.type}\"", json)
         }
     }
@@ -21,7 +20,7 @@ class WorkflowErrorTypeTest {
         // Test all error types
         WorkflowErrorType.entries.forEach { expectedType ->
             val json = "\"${expectedType.type}\""
-            val deserializedType = mapper.readValue(json, WorkflowErrorType::class.java)
+            val deserializedType = Json.decodeFromString<WorkflowErrorType>(json)
             assertEquals(expectedType, deserializedType)
         }
     }
@@ -29,14 +28,14 @@ class WorkflowErrorTypeTest {
     @Test
     fun `test specific error type serialization`() {
         val error = WorkflowErrorType.VALIDATION
-        val json = mapper.writeValueAsString(error)
+        val json = Json.encodeToString(error)
         assertEquals("\"validation\"", json)
     }
 
     @Test
     fun `test specific error type deserialization`() {
         val json = "\"timeout\""
-        val error = mapper.readValue(json, WorkflowErrorType::class.java)
+        val error = Json.decodeFromString<WorkflowErrorType>(json)
         assertEquals(WorkflowErrorType.TIMEOUT, error)
     }
 

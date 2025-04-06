@@ -25,8 +25,5 @@ class SwitchInstance(
         return then(then?.get())
     }
 
-    private fun evalCase(`when`: String, name: String): Boolean {
-        val out = eval(transformedInput!!, `when`)
-        return if (out.isBoolean) out.asBoolean() else error("in the '$name' case, '.when' condition must be a boolean, but is $out")
-    }
+    private fun evalCase(`when`: String, name: String) = evalBoolean(transformedInput, `when`, name)
 } 

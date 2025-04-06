@@ -1,9 +1,9 @@
 package com.lemline.sw.workflows
 
-import com.lemline.common.json.Json.encodeToElement
-import com.lemline.sw.utils.getWorkflowInstance
-import io.serverlessworkflow.impl.json.JsonUtils
+import com.lemline.common.json.Json
+import com.lemline.sw.getWorkflowInstance
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
@@ -20,18 +20,18 @@ class ForTest {
                  do:
                    - accumulate:
                        set:
-                         counter: .counter + @item
+                         counter: @{ .counter + @item }
                  output:
                    as:  .counter 
         """
-        val instance = getWorkflowInstance(doYaml, encodeToElement(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(6),  // expected
+            JsonPrimitive(6),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -52,14 +52,14 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, encodeToElement(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(3),  // expected
+            JsonPrimitive(3),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -80,14 +80,14 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, encodeToElement(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(6),  // expected
+            JsonPrimitive(6),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -107,14 +107,14 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, encodeToElement(mapOf("input" to listOf(4, 5, 6))))
+        val instance = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("input" to listOf(4, 5, 6))))
 
         // run (one shot)
         instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(3),  // expected
+            JsonPrimitive(3),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -135,14 +135,14 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, encodeToElement(mapOf("input" to listOf(4, 5, 6))))
+        val instance = getWorkflowInstance(doYaml, Json.encodeToElement(mapOf("input" to listOf(4, 5, 6))))
 
         // run (one shot)
         instance.run()
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(3),  // expected
+            JsonPrimitive(3),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }

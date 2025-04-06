@@ -1,8 +1,8 @@
 package com.lemline.sw.workflows
 
-import com.lemline.sw.utils.getWorkflowInstance
+import com.lemline.common.json.Json
+import com.lemline.sw.getWorkflowInstance
 import io.serverlessworkflow.impl.WorkflowStatus
-import io.serverlessworkflow.impl.json.JsonUtils
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -39,7 +39,7 @@ class ErrorHandlingTest {
 
         // Verify the error was caught and handled
         assertEquals(
-            JsonUtils.fromValue(mapOf("handled" to true)),
+            Json.encodeToElement(mapOf("handled" to true)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -83,7 +83,7 @@ class ErrorHandlingTest {
 
         // Verify the error was caught and handled after retries
         assertEquals(
-            JsonUtils.fromValue(mapOf("handled" to true)),
+            Json.encodeToElement(mapOf("handled" to true)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -122,7 +122,7 @@ class ErrorHandlingTest {
 
         // Verify the error was handled after successful retry
         assertEquals(
-            JsonUtils.fromValue(mapOf("attempt" to 2)),
+            Json.encodeToElement(mapOf("attempt" to 2)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -190,7 +190,7 @@ do:
 
         // Verify the error was caught when condition was true
         assertEquals(
-            JsonUtils.fromValue(mapOf("handled" to true)),
+            Json.encodeToElement(mapOf("handled" to true)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -251,7 +251,7 @@ do:
 
         // Verify the validation error was caught
         assertEquals(
-            JsonUtils.fromValue(mapOf("handled" to true)),
+            Json.encodeToElement(mapOf("handled" to true)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -285,7 +285,7 @@ do:
 
         // Verify the validation error was caught
         assertEquals(
-            JsonUtils.fromValue(mapOf("handled" to true)),
+            Json.encodeToElement(mapOf("handled" to true)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -313,7 +313,7 @@ do:
 
         // Verify the expression error was caught
         assertEquals(
-            JsonUtils.fromValue(mapOf("handled" to true)),
+            Json.encodeToElement(mapOf("handled" to true)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -342,7 +342,7 @@ do:
 
         // Verify the flow error was caught
         assertEquals(
-            JsonUtils.fromValue(mapOf("handled" to true)),
+            Json.encodeToElement(mapOf("handled" to true)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -372,7 +372,7 @@ do:
 
         // Verify the runtime error was caught
         assertEquals(
-            JsonUtils.fromValue(mapOf("handled" to true)),
+            Json.encodeToElement(mapOf("handled" to true)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -406,7 +406,7 @@ do:
 
         // Verify the error was caught
         assertEquals(
-            JsonUtils.fromValue(mapOf("handled" to true)),
+            Json.encodeToElement(mapOf("handled" to true)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -437,7 +437,7 @@ do:
 
         // Verify the error was caught
         assertEquals(
-            JsonUtils.fromValue(mapOf("handled" to true)),
+            Json.encodeToElement(mapOf("handled" to true)),
             instance.rootInstance.transformedOutput
         )
     }

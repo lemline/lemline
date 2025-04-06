@@ -1,7 +1,7 @@
 package com.lemline.sw.workflows
 
-import com.lemline.sw.utils.getWorkflowInstance
-import io.serverlessworkflow.impl.json.JsonUtils
+import com.lemline.common.json.Json
+import com.lemline.sw.getWorkflowInstance
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -27,7 +27,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("value" to str)),  // expected
+            Json.encodeToElement(mapOf("value" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -48,7 +48,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("value" to "foo")),  // expected
+            Json.encodeToElement(mapOf("value" to "foo")),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -70,7 +70,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("value" to "foo")),  // expected
+            Json.encodeToElement(mapOf("value" to "foo")),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -93,7 +93,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -116,7 +116,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -140,7 +140,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -165,7 +165,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -188,7 +188,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("value" to str)),  // expected
+            Json.encodeToElement(mapOf("value" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -211,7 +211,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("value" to str)),  // expected
+            Json.encodeToElement(mapOf("value" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -235,7 +235,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("value" to str)),  // expected
+            Json.encodeToElement(mapOf("value" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -258,7 +258,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -281,7 +281,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -305,7 +305,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -330,7 +330,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -362,7 +362,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out2" to str)),  // expected
+            Json.encodeToElement(mapOf("out2" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -398,7 +398,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -434,7 +434,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -475,7 +475,7 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to str)),  // expected
+            Json.encodeToElement(mapOf("out" to str)),  // expected
             instance.rootInstance.transformedOutput  // actual
         )
     }
@@ -498,7 +498,7 @@ class DataFlowTest {
         instance.run()
 
         assertEquals(
-            JsonUtils.fromValue(mapOf("number" to 42)),
+            Json.encodeToElement(mapOf("number" to 42)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -524,7 +524,7 @@ class DataFlowTest {
         instance.run()
 
         assertEquals(
-            JsonUtils.fromValue(mapOf("value" to "baz")),
+            Json.encodeToElement(mapOf("value" to "baz")),
             instance.rootInstance.transformedOutput
         )
     }
@@ -546,7 +546,7 @@ class DataFlowTest {
         instance.run()
 
         assertEquals(
-            JsonUtils.fromValue(mapOf("value" to "nested")),
+            Json.encodeToElement(mapOf("value" to "nested")),
             instance.rootInstance.transformedOutput
         )
     }
@@ -570,7 +570,7 @@ class DataFlowTest {
         instance.run()
 
         assertEquals(
-            JsonUtils.fromValue(mapOf("out" to "test_value")),
+            Json.encodeToElement(mapOf("out" to "test_value")),
             instance.rootInstance.transformedOutput
         )
     }
@@ -590,7 +590,7 @@ class DataFlowTest {
         instance.run()
 
         assertEquals(
-            JsonUtils.fromValue(mapOf("value" to "above")),
+            Json.encodeToElement(mapOf("value" to "above")),
             instance.rootInstance.transformedOutput
         )
     }
@@ -611,7 +611,7 @@ class DataFlowTest {
         instance.run()
 
         assertEquals(
-            JsonUtils.fromValue(mapOf("result" to 20)),
+            Json.encodeToElement(mapOf("result" to 20)),
             instance.rootInstance.transformedOutput
         )
     }
@@ -632,7 +632,7 @@ class DataFlowTest {
         instance.run()
 
         assertEquals(
-            JsonUtils.fromValue(mapOf("message" to "Hello, World")),
+            Json.encodeToElement(mapOf("message" to "Hello, World")),
             instance.rootInstance.transformedOutput
         )
     }

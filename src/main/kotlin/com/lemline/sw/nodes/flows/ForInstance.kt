@@ -1,10 +1,11 @@
 package com.lemline.sw.nodes.flows
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.IntNode
 import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
 import io.serverlessworkflow.api.types.ForTask
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 class ForInstance(
     override val node: Node<ForTask>,
@@ -14,9 +15,9 @@ class ForInstance(
     /**
      * The collection to enumerate (calculated)
      */
-    private var _forIn: List<JsonNode>? = null
+    private var _forIn: List<JsonElement>? = null
 
-    private val forIn: List<JsonNode>
+    private val forIn: List<JsonElement>
         get() = _forIn ?: evalForIn(node.task.`for`.`in`).also { _forIn = it }
 
     /**
@@ -53,10 +54,7 @@ class ForInstance(
         if (forIndex == forIn.size) return then()
 
         // else define the additional scope variable
-        with(variables) {
-            set<JsonNode>(forEach, forIn[forIndex])
-            set<JsonNode>(forAt, IntNode(forIndex))
-        }
+        variables = JsonObject(mapOf(forEach to forIn[forIndex], forAt to JsonPrimitive(forIndex)))
 
         // test the while directive
         node.task.`while`?.let { if (!evalWhile(it)) return then() }

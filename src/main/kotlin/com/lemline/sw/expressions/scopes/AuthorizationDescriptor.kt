@@ -1,5 +1,7 @@
 package com.lemline.sw.expressions.scopes
 
+import kotlinx.serialization.Serializable
+
 /**
  * Data class representing an authorization descriptor.
  *
@@ -8,6 +10,7 @@ package com.lemline.sw.expressions.scopes
  *
  * @see <a href="https://github.com/serverlessworkflow/specification/blob/main/dsl.md#authorization-descriptor">Authorization Descriptor</a>
  */
+@Serializable
 data class AuthorizationDescriptor(
     val scheme: String,
     val parameter: String,

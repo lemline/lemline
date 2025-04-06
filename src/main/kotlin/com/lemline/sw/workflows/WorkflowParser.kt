@@ -1,6 +1,5 @@
 package com.lemline.sw.workflows
 
-import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.sw.nodes.JsonPointer
 import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodePosition
@@ -10,8 +9,11 @@ import com.lemline.worker.system.System
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
-import io.serverlessworkflow.impl.json.JsonUtils
 import jakarta.enterprise.context.ApplicationScoped
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.util.concurrent.ConcurrentHashMap
 
 typealias WorkflowIndex = Pair<String, String>
@@ -48,15 +50,15 @@ class WorkflowParser(
      * @return A map of secret names to their JsonNode values from environment variables
      * @throws IllegalStateException if a required secret is not found in environment variables
      */
-    fun getSecrets(workflow: Workflow): Map<String, JsonNode> =
+    fun getSecrets(workflow: Workflow): Map<String, JsonElement> =
         secretsCache.getOrPut(workflow.index) {
             workflow.use?.secrets?.associateWith { secretName ->
                 val value = System.getEnv(secretName)
                     ?: error("Required secret '$secretName' not found in environment variables")
                 try {
-                    JsonUtils.mapper().readTree(value)
+                    Json.decodeFromString<JsonObject>(value)
                 } catch (e: Exception) {
-                    JsonUtils.fromValue(value)
+                    JsonPrimitive(value)
                 }
             } ?: emptyMap()
         }
@@ -135,7 +137,7 @@ class WorkflowParser(
 
     companion object {
         internal val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
-        internal val secretsCache = ConcurrentHashMap<WorkflowIndex, Map<String, JsonNode>>()
+        internal val secretsCache = ConcurrentHashMap<WorkflowIndex, Map<String, JsonElement>>()
         internal val nodesCache = ConcurrentHashMap<WorkflowIndex, Map<JsonPointer, Node<*>>>()
     }
 }

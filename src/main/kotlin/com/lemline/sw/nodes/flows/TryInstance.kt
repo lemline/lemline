@@ -1,13 +1,14 @@
 package com.lemline.sw.nodes.flows
 
-import com.fasterxml.jackson.databind.JsonNode
+import com.lemline.common.json.Json
 import com.lemline.sw.errors.WorkflowError
 import com.lemline.sw.nodes.Node
 import com.lemline.sw.nodes.NodeInstance
 import com.lemline.sw.utils.toDuration
 import com.lemline.sw.utils.toRandomDuration
 import io.serverlessworkflow.api.types.*
-import io.serverlessworkflow.impl.json.JsonUtils
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
@@ -98,7 +99,10 @@ class TryInstance(
 
         // get transient scope with error
         val filterScope by lazy {
-            scope.deepCopy().apply { set<JsonNode>(errorAs, JsonUtils.fromValue(error)) }
+            buildJsonObject {
+                scope.forEach { (key, value) -> put(key, value) }
+                put(errorAs, Json.encodeToElement(error))
+            }
         }
 
         // testing `when` directive
@@ -114,7 +118,7 @@ class TryInstance(
         }
 
         // add error to the currentNodeInstance custom scope
-        this.variables.set<JsonNode>(errorAs, JsonUtils.fromValue(error))
+        variables = JsonObject(mapOf(errorAs to Json.encodeToElement(error)))
 
         return true
     }

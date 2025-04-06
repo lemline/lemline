@@ -1,13 +1,14 @@
 package com.lemline.sw.workflows
 
+import com.lemline.common.json.Json
+import com.lemline.sw.load
+import com.lemline.sw.loadWorkflowFromYaml
 import com.lemline.worker.models.WorkflowDefinition
 import com.lemline.worker.repositories.WorkflowDefinitionRepository
 import com.lemline.worker.system.System
 import io.mockk.*
-import io.serverlessworkflow.api.WorkflowFormat
-import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Use
-import io.serverlessworkflow.api.types.Workflow
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -91,7 +92,10 @@ class WorkflowParserTest {
         val result = workflowParser.getSecrets(workflowWithMockedUse)
 
         // Then
-        assertEquals("value", result[secretName]?.get("key")?.asText())
+        assertEquals(
+            Json.encodeToElement(mapOf("key" to "value")),
+            result[secretName]
+        )
     }
 
     @Test
@@ -106,7 +110,10 @@ class WorkflowParserTest {
         val result = workflowParser.getSecrets(workflowWithMockedUse)
 
         // Then
-        assertEquals(plainValue, result[secretName]?.asText())
+        assertEquals(
+            JsonPrimitive(plainValue),
+            result[secretName]
+        )
     }
 
     @Test
@@ -132,18 +139,6 @@ class WorkflowParserTest {
 
         // Then
         assertEquals(0, result.size)
-    }
-
-    private fun load(resourcePath: String): String {
-        val inputStream = javaClass.getResourceAsStream(resourcePath)
-            ?: throw IllegalArgumentException("Resource not found: $resourcePath")
-
-        return inputStream.bufferedReader().use { it.readText() }
-    }
-
-    private fun loadWorkflowFromYaml(resourcePath: String): Workflow {
-        val yamlContent = load(resourcePath)
-        return validation().read(yamlContent, WorkflowFormat.YAML)
     }
 
     private fun clearCache(prop: String) {

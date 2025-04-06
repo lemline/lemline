@@ -1,7 +1,6 @@
 package com.lemline.sw.workflows
 
-import com.lemline.sw.utils.getWorkflowInstance
-import io.serverlessworkflow.impl.json.JsonUtils
+import com.lemline.sw.getWorkflowInstance
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
@@ -46,7 +45,7 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("high1"),  // expected
+            JsonPrimitive("high1"),  // expected
             high.rootInstance.transformedOutput  // actual
         )
 
@@ -57,7 +56,7 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("low2"),  // expected
+            JsonPrimitive("low2"),  // expected
             low.rootInstance.transformedOutput  // actual
         )
 
@@ -68,7 +67,7 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("none3"),  // expected
+            JsonPrimitive("none3"),  // expected
             none.rootInstance.transformedOutput  // actual
         )
     }
@@ -110,7 +109,7 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("high1"),  // expected
+            JsonPrimitive("high1"),  // expected
             high.rootInstance.transformedOutput  // actual
         )
 
@@ -121,7 +120,7 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("low"),  // expected
+            JsonPrimitive("low"),  // expected
             low.rootInstance.transformedOutput  // actual
         )
 
@@ -132,7 +131,7 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("none"),  // expected
+            JsonPrimitive("none"),  // expected
             none.rootInstance.transformedOutput  // actual
         )
     }
@@ -173,7 +172,7 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonUtils.fromValue("none1"),  // expected
+            JsonPrimitive("none1"),  // expected
             none.rootInstance.transformedOutput  // actual
         )
     }

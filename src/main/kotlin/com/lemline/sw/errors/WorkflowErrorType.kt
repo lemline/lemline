@@ -1,6 +1,6 @@
 package com.lemline.sw.errors
 
-import com.fasterxml.jackson.annotation.JsonValue
+import kotlinx.serialization.Serializable
 
 /**
  * Enum representing different types of workflow errors.
@@ -10,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonValue
  *
  * cf. https://github.com/serverlessworkflow/specification/blob/main/dsl-reference.md#standard-error-types
  */
+@Serializable(with = WorkflowErrorTypeSerializer::class)
 enum class WorkflowErrorType(val type: String, val defaultStatus: Int) {
     CONFIGURATION("configuration", 400),
     VALIDATION("validation", 400),
@@ -19,7 +20,4 @@ enum class WorkflowErrorType(val type: String, val defaultStatus: Int) {
     TIMEOUT("timeout", 408),
     COMMUNICATION("communication", 500),
     RUNTIME("runtime", 500);
-
-    @JsonValue
-    fun toJson(): String = type
 }

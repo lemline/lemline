@@ -1,8 +1,9 @@
-package com.lemline.sw.utils
+package com.lemline.sw
 
-import com.lemline.sw.nodes.NodeState
+import com.lemline.common.json.Json
 import com.lemline.sw.workflows.WorkflowInstance
 import com.lemline.sw.workflows.WorkflowParser
+import com.lemline.sw.workflows.WorkflowParserTest
 import com.lemline.worker.messaging.WorkflowMessage
 import com.lemline.worker.models.WorkflowDefinition
 import com.lemline.worker.repositories.WorkflowDefinitionRepository
@@ -10,7 +11,24 @@ import io.mockk.every
 import io.mockk.mockk
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
+import io.serverlessworkflow.api.types.Workflow
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+
+internal inline fun <reified T> JsonObject.set(key: String, value: T) =
+    JsonObject(toMutableMap().apply { set(key, Json.encodeToElement(value)) })
+
+internal fun load(resourcePath: String): String {
+    val inputStream = WorkflowParserTest::class.java.getResourceAsStream(resourcePath)
+        ?: throw IllegalArgumentException("Resource not found: $resourcePath")
+
+    return inputStream.bufferedReader().use { it.readText() }
+}
+
+internal fun loadWorkflowFromYaml(resourcePath: String): Workflow {
+    val yamlContent = load(resourcePath)
+    return validation().read(yamlContent, WorkflowFormat.YAML)
+}
 
 internal fun getWorkflowInstance(doYaml: String, input: JsonElement): WorkflowInstance {
     val hash = doYaml.hashCode()
@@ -44,10 +62,7 @@ internal fun getWorkflowInstance(doYaml: String, input: JsonElement): WorkflowIn
     return WorkflowInstance(
         name = msg.name,
         version = msg.version,
-        states = msg.states
-            .mapKeys { it.key.toPosition() }
-            .mapValues { NodeState.fromJson(it.value) }
-            .toMutableMap(),
-        position = msg.position.toPosition()
+        states = msg.states,
+        position = msg.position
     ).apply { workflowParser = mockedService }
 }

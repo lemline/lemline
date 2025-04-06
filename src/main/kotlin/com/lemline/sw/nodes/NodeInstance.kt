@@ -1,8 +1,7 @@
 package com.lemline.sw.nodes
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.info
+import com.lemline.common.json.Json
 import com.lemline.common.logger
 import com.lemline.sw.errors.WorkflowError
 import com.lemline.sw.errors.WorkflowErrorType
@@ -16,7 +15,7 @@ import com.lemline.sw.nodes.flows.TryInstance
 import com.lemline.sw.schemas.SchemaValidator
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import io.serverlessworkflow.impl.json.JsonUtils
+import kotlinx.serialization.json.*
 import java.time.Instant
 
 /**
@@ -62,7 +61,7 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Additional properties for this scope (for example from For task)
      */
-    internal var variables: ObjectNode
+    internal var variables: JsonObject
         get() = state.variables
         set(value) {
             state.variables = value
@@ -80,7 +79,7 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * The task raw input.
      */
-    internal var rawInput: JsonNode
+    internal var rawInput: JsonElement
         get() = state.rawInput!!
         set(value) {
             state.rawInput = value
@@ -89,7 +88,7 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * The task raw output.
      */
-    internal var rawOutput: JsonNode?
+    internal var rawOutput: JsonElement?
         get() = state.rawOutput
         set(value) {
             state.rawOutput = value
@@ -98,9 +97,9 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * The task transformed input. (calculated)
      */
-    private var _transformedInput: JsonNode? = null
+    private var _transformedInput: JsonElement? = null
 
-    internal var transformedInput: JsonNode
+    internal var transformedInput: JsonElement
         get() = _transformedInput ?: eval(rawInput, node.task.input?.from).also { _transformedInput = it }
         set(value) {
             _transformedInput = value
@@ -109,9 +108,9 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * The task transformed output. (calculated)
      */
-    private var _transformedOutput: JsonNode? = null
+    private var _transformedOutput: JsonElement? = null
 
-    internal val transformedOutput: JsonNode
+    internal val transformedOutput: JsonElement
         get() = _transformedOutput ?: eval(rawOutput!!, node.task.output?.`as`).also { _transformedOutput = it }
 
 
@@ -132,7 +131,7 @@ abstract class NodeInstance<T : TaskBase>(
             name = node.name,
             reference = node.reference,
             definition = node.definition,
-            startedAt = startedAt,
+            startedAt = startedAt?.let { Json.encodeToElement(it) },
             input = rawInput,
             output = rawOutput,
         )
@@ -140,15 +139,15 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Scope used during expression evaluation
      */
-    internal open val scope: ObjectNode
+    internal open val scope: JsonObject
         get() = variables
             // merge custom scope with currentNodeInstance
             .merge(
-                Scope().apply {
-                    setTask(taskDescriptor)
-                    setInput(rawInput)
-                    setOutput(rawOutput)
-                }.toJson()
+                Scope(
+                    task = taskDescriptor,
+                    input = rawInput,
+                    output = rawOutput,
+                ).toJsonObject()
             )
             // recursively merge with parent scope
             .merge(parent?.scope)
@@ -244,7 +243,7 @@ abstract class NodeInstance<T : TaskBase>(
      *
      * @return The transformed input as a JSON node.
      */
-    internal fun start(): JsonNode {
+    internal fun start(): JsonElement {
         startedAt = DateTimeDescriptor.from(Instant.now())
 
         logger.info { "Entering node ${node.name} (${node.task::class.simpleName})" }
@@ -291,7 +290,7 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Validate a Schema
      */
-    private fun validate(data: JsonNode, schemaUnion: SchemaUnion) = try {
+    private fun validate(data: JsonElement, schemaUnion: SchemaUnion) = try {
         SchemaValidator.validate(data, schemaUnion)
     } catch (e: Exception) {
         error(VALIDATION, e.message, e.stackTraceToString())
@@ -300,75 +299,61 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Evaluate an expression
      */
-    internal fun evalBoolean(data: JsonNode, expr: String, name: String, scope: ObjectNode = this.scope) =
+    internal fun evalBoolean(data: JsonElement, expr: String, name: String, scope: JsonObject = this.scope) =
         eval(data, expr, scope).let {
-            when (it.isBoolean) {
-                true -> it.asBoolean()
+            when (it is JsonPrimitive && it.booleanOrNull != null) {
+                true -> it.boolean
                 false -> error(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
             }
         }
 
-    internal fun evalList(data: JsonNode, expr: String, name: String, scope: ObjectNode = this.scope) =
+    internal fun evalList(data: JsonElement, expr: String, name: String, scope: JsonObject = this.scope) =
         eval(data, expr, scope).let {
-            when (it.isArray) {
-                true -> it.asIterable().toList()
+            when (it is JsonArray) {
+                true -> it.toList()
                 false -> error(EXPRESSION, "'.$name' expression must be an array, but is '$it'")
             }
         }
 
-    private fun evalObject(data: JsonNode, expr: ExportAs, name: String, scope: ObjectNode = this.scope) =
+    private fun evalObject(data: JsonElement, expr: ExportAs, name: String, scope: JsonObject = this.scope) =
         eval(data, expr, scope).let {
-            when (it.isObject) {
-                true -> (it as ObjectNode)
+            when (it is JsonObject) {
+                true -> it
                 false -> error(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
             }
         }
 
-    private fun eval(data: JsonNode, inputFrom: InputFrom?, scope: ObjectNode = this.scope) =
-        inputFrom?.let {
-            when (val expr = it.get()) {
-                is String -> eval(data, expr, scope)
-                else -> eval(data, JsonUtils.fromValue(expr), scope, true)
-            }
-        } ?: data
+    private fun eval(data: JsonElement, inputFrom: InputFrom?, scope: JsonObject = this.scope) =
+        inputFrom?.let { eval(data, Json.encodeToElement(it), scope, true) } ?: data
 
-    private fun eval(data: JsonNode, outputAs: OutputAs?, scope: ObjectNode = this.scope) =
-        outputAs?.let {
-            when (val expr = it.get()) {
-                is String -> eval(data, expr, scope)
-                else -> eval(data, JsonUtils.fromValue(expr), scope, true)
-            }
-        } ?: data
+    private fun eval(data: JsonElement, outputAs: OutputAs?, scope: JsonObject = this.scope) =
+        outputAs?.let { eval(data, Json.encodeToElement(it), scope, true) } ?: data
 
-    private fun eval(data: JsonNode, exportAs: ExportAs?, scope: ObjectNode = this.scope) =
-        exportAs?.let {
-            when (val expr = it.get()) {
-                is String -> eval(data, expr, scope)
-                else -> eval(data, JsonUtils.fromValue(expr), scope, true)
-            }
-        } ?: data
+    private fun eval(data: JsonElement, exportAs: ExportAs?, scope: JsonObject = this.scope) =
+        exportAs?.let { eval(data, Json.encodeToElement(it), scope, true) } ?: data
 
-    internal fun eval(data: JsonNode, expr: String, scope: ObjectNode = this.scope) = try {
+    private fun eval(data: JsonElement, expr: String, scope: JsonObject = this.scope) = try {
         JQExpression.eval(data, expr, scope)
     } catch (e: Exception) {
         error(EXPRESSION, e.message, e.stackTraceToString())
     }
 
-    protected fun eval(data: JsonNode, expr: JsonNode, scope: ObjectNode = this.scope, force: Boolean = false) = try {
-        JQExpression.eval(data, expr, scope, force)
-    } catch (e: Exception) {
-        error(EXPRESSION, e.message, e.stackTraceToString())
-    }
+    protected fun eval(data: JsonElement, expr: JsonElement, scope: JsonObject = this.scope, force: Boolean = false) =
+        try {
+            JQExpression.eval(data, expr, scope, force)
+        } catch (e: Exception) {
+            error(EXPRESSION, e.message, e.stackTraceToString())
+        }
 
     /**
-     * Merge an ObjectNode with another, without overriding existing keys
+     * Merge an JsonObject with another, without overriding existing keys
      */
-    private infix fun ObjectNode.merge(other: ObjectNode?): ObjectNode {
-        // Get keys of this
-        val keys = fieldNames().iterator().asSequence().toList()
-        // Merge this with other without overriding
-        other?.fields()?.forEach { (key, value) -> if (key !in keys) set<JsonNode>(key, value) }
-        return this
+    private fun JsonObject.merge(other: JsonObject?): JsonObject {
+        val mergedMap = buildMap {
+            other?.let { putAll(it) }
+            putAll(this)
+        }
+        return JsonObject(mergedMap)
     }
 
     protected fun error(
