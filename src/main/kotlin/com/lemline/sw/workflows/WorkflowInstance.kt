@@ -1,7 +1,9 @@
 package com.lemline.sw.workflows
 
+import com.lemline.common.info
 import com.lemline.common.json.Json
 import com.lemline.common.logger
+import com.lemline.common.warn
 import com.lemline.sw.errors.WorkflowException
 import com.lemline.sw.expressions.scopes.RuntimeDescriptor
 import com.lemline.sw.expressions.scopes.WorkflowDescriptor
@@ -85,12 +87,14 @@ class WorkflowInstance(
                 val tryInstance = e.catching
                 // the error was not caught
                 if (tryInstance == null) {
+                    logger.warn { "Workflow $id $name($version): ${e.error}" }
                     // the workflow is faulted
                     status = WorkflowStatus.FAULTED
                     // and stopped there
                     current = e.raising
                     break
                 }
+                logger.info { "Workflow $id $name($version): ${e.error}" }
                 // the error was caught
                 tryInstance.attemptIndex++
                 // should we retry?

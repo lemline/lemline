@@ -54,7 +54,12 @@ class ForInstance(
         if (forIndex == forIn.size) return then()
 
         // else define the additional scope variable
-        variables = JsonObject(mapOf(forEach to forIn[forIndex], forAt to JsonPrimitive(forIndex)))
+        variables = JsonObject(
+            mapOf(
+                forEach to forIn[forIndex],
+                forAt to JsonPrimitive(forIndex)
+            )
+        )
 
         // test the while directive
         node.task.`while`?.let { if (!evalWhile(it)) return then() }

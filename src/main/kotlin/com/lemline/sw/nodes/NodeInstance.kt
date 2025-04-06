@@ -141,7 +141,7 @@ abstract class NodeInstance<T : TaskBase>(
      */
     internal open val scope: JsonObject
         get() = variables
-            // merge custom scope with currentNodeInstance
+            // merge current scope
             .merge(
                 Scope(
                     task = taskDescriptor,
@@ -350,8 +350,8 @@ abstract class NodeInstance<T : TaskBase>(
      */
     private fun JsonObject.merge(other: JsonObject?): JsonObject {
         val mergedMap = buildMap {
-            other?.let { putAll(it) }
-            putAll(this)
+            other?.forEach { put(it.key, it.value) }
+            this@merge.forEach { put(it.key, it.value) }
         }
         return JsonObject(mergedMap)
     }
