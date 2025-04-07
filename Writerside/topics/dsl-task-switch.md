@@ -1,4 +1,4 @@
-# Switch Task (`switch`)
+# Switch
 
 ## Purpose
 
@@ -98,11 +98,13 @@ do:
 a default case (no `when`) exists, it should typically be placed last.
 Targeted tasks typically have a `then: exit` to prevent further execution.
 
-### Data Flow
+## Data Flow
+
 <include from="_common-task-data-flow.md" element-id="common-data-flow"/>
 **Note**: The `rawOutput` of the `Switch` task (feeding into its `output.as`/`export.as`) is its own `transformedInput`. The `Switch` itself doesn't modify the data; it only directs the flow.
 
-### Flow Control
+## Flow Control
+
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
 **Note**: The `Switch` task has unique flow control. Instead of using its own `then` property, flow continues based on the `then` property of the *matched* `case` within the `switch` block. If no case matches, flow follows the `Switch` task's own `then` property.
 

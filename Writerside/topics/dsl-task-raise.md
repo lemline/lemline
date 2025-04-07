@@ -1,4 +1,4 @@
-# Raise Task (`raise`)
+# Raise
 
 ## Purpose
 
@@ -36,15 +36,12 @@ do:
       if: "${ .value < 0 }" # Check if input value is negative
       raise:
         error: invalidInputError # Reference the defined error
-        # Optionally add dynamic details
-        with:
-          details: "Negative value not allowed: ${ .value }"
   - processValue: # Only executed if value >= 0
     # ...
 ```
 
 In this example, if the `validateInput` task receives an input object where `.value` is less than 0, it raises the
-predefined `invalidInputError`. The `details` field is dynamically constructed using the input value. This raised error
+predefined `invalidInputError`. This raised error
 would then typically be caught by a surrounding `Try` task.
 
 You can also define the error inline:
@@ -63,6 +60,53 @@ do:
           detail: "Requested ${ .requestedAmount }, but only ${ .stockCount } available."
 ```
 
+## Additional Examples
+
+### Example: Raising Error with Dynamic Detail (Inline)
+
+```yaml
+do:
+  - processItem:
+      # ... some logic ...
+      if: "${ .itemStatus == \"FAILED\" }"
+      raise:
+        error:
+          type: "https://myapp.com/errors/processing-failure"
+          title: "Item Processing Failed"
+          status: 500
+          # Construct detail dynamically using workflow context/input
+          detail: "Failed to process item ID ${ .itemId }. Error code: ${ $context.errorCodeFromPreviousStep }"
+          instance: "${ $task.reference }" # Include task path for context
+```
+
+This example shows how to define an error completely inline, using runtime expressions within the `detail` and `instance` fields to provide context-specific information when the error is raised.
+
+### Example: Raising Error to be Caught by Try
+
+```yaml
+do:
+  - outerTask:
+      try:
+        - riskyOperation:
+            if: "${ .needsSpecialHandling == false }"
+            # This error will be caught by the 'catch' block below
+            raise:
+              error: specialHandlingRequiredError # Defined in workflow.use.errors
+        - normalProcessing: # Skipped if error was raised
+            # ...
+      catch:
+        errors:
+          with: { type: "https://myapp.com/errors/special-handling" } # Matches the type from specialHandlingRequiredError
+        do:
+          - handleSpecialCase:
+              # ... logic for the special case ...
+      then: continueAfterTry
+  - continueAfterTry:
+      # ... 
+```
+
+Here, the `riskyOperation` might raise a specific error. The surrounding `Try` task is configured to `catch` errors of that specific type (`specialHandlingRequiredError` presumably has the type `https://myapp.com/errors/special-handling`). Instead of faulting the workflow, control transfers to the `catch.do` block (`handleSpecialCase`).
+
 ## Configuration Options
 
 ### `raise` (Object, Required)
@@ -74,51 +118,20 @@ This mandatory object defines the error to be raised.
       pre-defined in the `workflow.use.errors` section.
     * An **Inline Error Object**: A complete [Error object](dsl-error-handling.md#error-definition-problem-details)
       defined directly within the `raise` task, specifying `type`, `status`, `title`, `detail`, etc.
-* **`with`** (Object, Optional): An object containing properties that override or add to the fields of the referenced or
-  inline error definition. This is commonly used to add dynamic `detail` information based on the current workflow
-  state.
-    * The properties within `with` (e.g., `title`, `detail`, `status`, `instance`) will overwrite the corresponding
-      fields from the base error definition before the error is raised.
 
-```yaml
-raise:
-  error: myBaseError # Reference error defined in workflow.use.errors
-  with:
-    # Override or add details dynamically
-    detail: "Operation failed for ID: ${ .itemId }. Context: ${ $context }"
-    instance: "${ $task.reference }" # Set instance to the current task path
-```
+## Data Flow
 
-### Input/Output Handling
+**Note on `Raise` Data Flow**:
+*   Standard `input.from` and `input.schema` are processed before the task attempts to raise the error.
+*   The resulting `transformedInput` is available if needed by expressions within the `raise.error` definition (though the error definition itself is often static).
+*   Crucially, if the `Raise` task executes (i.e., its `if` condition is met or absent), it **never produces an output** and **does not process `output.as` or `export.as` logic**. Its sole purpose upon execution is to interrupt the flow by raising the specified error.
 
-The `Raise` task fundamentally interrupts the normal data flow.
+## Flow Control
 
-* **`input.schema` / `input.from`**: Standard validation and transformation. This transformed input is available for use
-  in expressions within `raise.with`.
-* **Output**: A `Raise` task **does not produce an output** in the normal sense. Its execution results in a
-  [error](dsl-error-handling.md#error-definition-problem-details) being thrown, which bypasses standard output
-  processing (`output.as`, `export.as`).
-* **Context (`export.as`)**: Because the task faults, it does not reach the stage where `export.as` would normally be
-  evaluated.
+**Note on `Raise` Flow Control**:
+*   The standard `if` condition is evaluated first. If `false`, the `Raise` task is skipped entirely, and its `then` directive is followed as usual.
+*   However, if the `if` condition is `true` (or absent), the `Raise` task *will* execute.
+*   Upon execution, it **immediately raises the specified error** and transfers control to the [Error Handling](dsl-error-handling.md) mechanism (searching for a suitable `Try` block).
+*   Consequently, the `Raise` task's `then` directive is **completely ignored** when the task executes and raises its error.
 
-### Conditional Execution `if` (String, Optional)
 
-Standard conditional execution. The `Raise` task only executes (and thus raises the error) if the `if` expression
-evaluates to `true`.
-
-### Flow Control (`then`)
-
-* **Type**: `string | FlowDirectiveEnum`
-* **Required**: No
-
-The `then` directive is **ignored** if the `Raise` task executes, because raising an error immediately transfers control
-to the error handling mechanism (searching for a `Try` task). The `then` directive *would* apply only if the `Raise`
-task was skipped due to its `if` condition evaluating to `false`.
-
-### Data Flow
-
-The `Raise` task does not produce output or perform export operations, as it interrupts the flow by design.
-
-### Flow Control
-
-The `Raise` task ignores its `then` directive when it executes (as it transfers control to error handling).

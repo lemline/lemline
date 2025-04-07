@@ -4,18 +4,61 @@
 
 <instance-profile id="sandbox"
                   name="sandbox"
-                  start-page="starter-topic.md">
+                  start-page="introduction.md">
 
-    <toc-element topic="starter-topic.md"/>
-    <toc-element topic="dsl-task-do.md"/>
-    <toc-element topic="dsl-task-for.md"/>
-    <toc-element topic="dsl-task-raise.md"/>
-    <toc-element topic="dsl-task-switch.md"/>
-    <toc-element topic="dsl-task-wait.md"/>
-    <toc-element topic="dsl-task-try.md"/>
-    <toc-element topic="dsl-task-set.md"/>
-    <toc-element topic="dsl-data-flow.md"/>
-    <toc-element topic="dsl-runtime-expressions.md"/>
-    <toc-element topic="dsl-flow-control.md"/>
-    <toc-element topic="dsl-error-handling.md"/>
+    <toc-element topic="introduction.md"/>
+    <toc-element topic="dsl-workflow-examples.md"/>
+    <toc-element topic="dsl-workflow-definition.md"/>
+
+    <!-- Core Concepts Group -->
+    <toc-element title="Core Concepts" topic="dsl-core-concepts-overview.md">
+        <toc-element topic="dsl-flow-control.md"/>
+        <toc-element topic="dsl-data-flow.md"/>
+        <toc-element topic="dsl-runtime-expressions.md"/>
+        <toc-element topic="dsl-error-handling.md"/>
+    </toc-element>
+
+    <toc-element title="Tasks" topic="dsl-tasks-overview.md">
+        <toc-element topic="dsl-task-do.md"/>
+        <toc-element topic="dsl-task-for.md"/>
+        <toc-element topic="dsl-task-set.md"/>
+        <toc-element topic="dsl-task-switch.md"/>
+        <toc-element topic="dsl-task-wait.md"/>
+        <toc-element topic="dsl-task-try.md"/>
+        <toc-element topic="dsl-task-raise.md"/>
+        <toc-element topic="dsl-task-fork.md"/>
+
+        <!-- Call Task Sub-group -->
+        <toc-element title="Call Tasks" topic="dsl-call-overview.md">
+            <toc-element topic="dsl-call-function.md"/>
+            <toc-element topic="dsl-call-http.md"/>
+            <toc-element topic="dsl-call-grpc.md"/>
+            <toc-element topic="dsl-call-openapi.md"/>
+            <toc-element topic="dsl-call-asyncapi.md"/>
+        </toc-element>
+
+        <!-- Run Task Sub-group -->
+        <toc-element title="Run Tasks" topic="dsl-run-overview.md">
+            <toc-element topic="dsl-run-container.md"/>
+            <toc-element topic="dsl-run-script.md"/>
+            <toc-element topic="dsl-run-shell.md"/>
+            <toc-element topic="dsl-run-workflow.md"/>
+        </toc-element>
+    </toc-element>
+
+    <!-- Changed Events group to toc-element for rendering -->
+    <toc-element title="Events" topic="dsl-event-overview.md">
+        <toc-element topic="dsl-task-listen.md"/>
+        <toc-element topic="dsl-task-emit.md"/>
+        <toc-element topic="dsl-event-correlation.md"/>
+    </toc-element>
+    
+    <!-- Resources & Configuration Group -->
+    <toc-element title="Resources & Configuration" topic="dsl-resources-configuration-overview.md">
+        <toc-element topic="dsl-resource-catalog.md"/>
+        <toc-element topic="dsl-uri-templates.md"/>
+        <toc-element topic="dsl-timeouts.md"/>
+        <toc-element topic="dsl-authentication.md"/>
+    </toc-element>
+
 </instance-profile>

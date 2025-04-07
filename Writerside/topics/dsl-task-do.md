@@ -1,4 +1,4 @@
-# Do Task (`do`)
+# Do
 
 ## Purpose
 
@@ -62,10 +62,12 @@ do:
               processedData: "${ .body }" # Access output from firstSubTask
 ```
 
-### Data Flow
+## Data Flow
+
 <include from="_common-task-data-flow.md" element-id="common-data-flow"/>
 
-### Flow Control
+## Flow Control
+
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
 
 

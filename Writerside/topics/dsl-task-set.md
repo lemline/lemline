@@ -1,4 +1,4 @@
-# Set Task (`set`)
+# Set
 
 ## Purpose
 
@@ -80,9 +80,11 @@ set:
     source: "workflowX"
 ```
 
-### Data Flow
+## Data Flow
+
 <include from="_common-task-data-flow.md" element-id="common-data-flow"/>
 **Note**: The `Set` task's primary purpose is to generate its `rawOutput` based on the `set` configuration. Standard `output.as` and `export.as` then process this generated output.
 
-### Flow Control
+## Flow Control
+
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>

@@ -1,4 +1,4 @@
-# Wait Task (`wait`)
+# Wait
 
 ## Purpose
 
@@ -41,15 +41,21 @@ seconds before the `checkStatus` task is executed.
 
 ## Configuration Options
 
-### Data Flow
-<include from="_common-task-data-flow.md" element-id="common-data-flow"/>
-**Note**: The `Wait` task typically acts as a pass-through for data; its `rawOutput` is identical to its `transformedInput` unless explicitly changed by `output.as`.
-
-### Flow Control
-<include from="_common-task-flow_control.md" element-id="common-flow-control"/>
-
 ### `wait` (Object, Required)
 
 This mandatory object defines the duration of the pause.
 
-* **`duration`
+* **`duration` ** (String, Required):
+  A [duration string](https://docs.oracle.com/javase/8/docs/api/java/time/Duration.html) that specifies
+  the length of time to wait. It must be in the ISO-8601 duration format (e.g., `PT5S` for 5 seconds, `PT1H30M` for 1
+  hour
+  and 30 minutes).
+
+## Data Flow
+
+<include from="_common-task-data-flow.md" element-id="common-data-flow"/>
+**Note**: The `Wait` task typically acts as a pass-through for data; its `rawOutput` is identical to its `transformedInput` unless explicitly changed by `output.as`.
+
+## Flow Control
+
+<include from="_common-task-flow_control.md" element-id="common-flow-control"/>

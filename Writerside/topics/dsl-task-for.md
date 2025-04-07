@@ -1,4 +1,4 @@
-# For Task (`for`)
+# For
 
 ## Purpose
 
@@ -102,7 +102,7 @@ do:
     # ... task definition ...
 ```
 
-### Data Flow
+## Data Flow
 
 <include from="_common-task-data-flow.md" element-id="common-data-flow"/>
 
@@ -114,7 +114,7 @@ do:
   `transformedOutput` of the *last* successfully executed iteration's `do` block, or the `For` task's own
   `transformedInput` if the loop didn't execute at all (e.g., empty `for.in` or initial `while` was false).
 
-### Flow Control
+## Flow Control
 
 <include from="_common-task-flow_control.md" element-id="common-flow-control"/>
 
