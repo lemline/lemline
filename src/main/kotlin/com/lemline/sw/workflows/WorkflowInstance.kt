@@ -123,7 +123,7 @@ class WorkflowInstance(
 
         do {
             try {
-                current.run()
+                current = current.run()
                 break
             } catch (e: WorkflowException) {
                 val tryInstance = e.catching
@@ -153,7 +153,7 @@ class WorkflowInstance(
         currentNodeInstance = current
     }
 
-    private suspend fun NodeInstance<*>.run() {
+    private suspend fun NodeInstance<*>.run(): NodeInstance<*> {
 
         // Possible cases when starting here:
         // - starting a workflow
@@ -186,16 +186,11 @@ class WorkflowInstance(
             }
         }
 
-        when (next) {
-            // complete the workflow
-            null -> {
-                currentNodeInstance = rootInstance
-                //rootInstance.complete()
-                status = WorkflowStatus.COMPLETED
-            }
+        return when (next) {
+            null -> rootInstance.also { status = WorkflowStatus.COMPLETED }
+
             // execute the activity
-            else -> {
-                currentNodeInstance = next
+            else -> next.also {
                 next.execute()
                 if (next is WaitInstance) status = WorkflowStatus.WAITING
             }

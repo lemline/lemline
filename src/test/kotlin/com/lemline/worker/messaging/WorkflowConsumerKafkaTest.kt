@@ -9,6 +9,7 @@ import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.eclipse.microprofile.config.inject.ConfigProperty
@@ -72,7 +73,7 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerBaseTest() {
     }
 
     override fun sendMessage(message: String) {
-        producer.send(org.apache.kafka.clients.producer.ProducerRecord(topicIn, message)).get()
+        producer.send(ProducerRecord(topicIn, message)).get()
     }
 
     override fun receiveMessage(timeout: Long, unit: TimeUnit): String? {

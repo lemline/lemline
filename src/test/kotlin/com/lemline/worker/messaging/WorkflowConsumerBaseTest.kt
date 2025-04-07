@@ -6,6 +6,8 @@ import com.lemline.worker.outbox.OutBoxStatus
 import com.lemline.worker.repositories.RetryRepository
 import com.lemline.worker.repositories.WaitRepository
 import com.lemline.worker.repositories.WorkflowDefinitionRepository
+import io.kotest.assertions.throwables.shouldThrowAny
+import io.kotest.matchers.shouldBe
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -69,8 +72,8 @@ abstract class WorkflowConsumerBaseTest {
                           when: @{ . == "completed" }
                           then: exit
                       - error:
-                          when: @{ . =a= "error" }
-                          then: exit
+                          when: @{ . == "retry" }
+                          then: retryCase
                 - taskCase:
                     call: http
                     with:
@@ -81,6 +84,23 @@ abstract class WorkflowConsumerBaseTest {
                     wait:
                       seconds: 30
                     then: exit
+                - retryCase:
+                    try:
+                      - raiseError:
+                          raise:
+                            error:
+                              type: https://serverlessworkflow.io/errors/not-implemented
+                              status: 500
+                    catch:
+                      retry:
+                        limit:
+                           attempt:
+                            count: 2
+                        delay: PT1S
+                      do:
+                        - setCaught:
+                            set:
+                              caught: true
             """.trimIndent().replace("@", "$")
         }
         with(workflowDefinitionRepository) { workflowDefinition.save() }
@@ -102,6 +122,13 @@ abstract class WorkflowConsumerBaseTest {
 
     protected abstract fun receiveMessage(timeout: Long, unit: TimeUnit): String?
 
+    private fun sendMessageFuture(messageJson: String): CompletableFuture<String?> {
+        val future = workflowConsumer.waitForProcessing(messageJson)
+        // Send the message to the input topic
+        sendMessage(messageJson)
+        return future
+    }
+
     @Test
     fun `should process valid workflow message and send to output topic`() {
         // Given
@@ -114,63 +141,68 @@ abstract class WorkflowConsumerBaseTest {
         val messageJson = Json.encodeToString(workflowMessage)
 
         // When
-        sendMessage(messageJson)
+        val future = sendMessageFuture(messageJson)
 
         // Then
         // Wait for message to be processed
-        println("output = ${workflowConsumer.waitForProcessing(messageJson).get()}")
+        println("output = ${future.get()}")
         val outputMessage = receiveMessage(5, TimeUnit.SECONDS)
         assertNotNull(outputMessage, "No messages received from output topic")
+
+        // Verify no message were stored in repositories
+        val retryMessages = retryRepository.listAll()
+        val waitMessages = waitRepository.listAll()
+        assertTrue(retryMessages.isEmpty(), "Messages found in retry repository")
+        assertTrue(waitMessages.isEmpty(), "Messages found in wait repository")
     }
 
     @Test
-    fun `should store invalid message in retry repository`() {
+    fun `invalid message should be stored in retry table as Failed`() {
         // Given
         val invalidMessage = "invalid json message"
 
         // When
-        sendMessage(invalidMessage)
+        val future = sendMessageFuture(invalidMessage)
 
-        // Wait for message to be processed
-        workflowConsumer.waitForProcessing(invalidMessage).get()
+        // This message can not be processed
+        shouldThrowAny { future.get() }
 
-        // Verify message was stored in retry repository
         val retryMessages = retryRepository.listAll()
+        retryMessages[0].message shouldBe invalidMessage
+        retryMessages[0].status shouldBe OutBoxStatus.FAILED
 
-        assertTrue(retryMessages.isNotEmpty(), "No messages found in retry repository")
-        assertEquals(invalidMessage, retryMessages[0].message, "Retry message doesn't match input message")
-        assertEquals(OutBoxStatus.PENDING, retryMessages[0].status, "Retry message status is not PENDING")
-        assertEquals(0, retryMessages[0].attemptCount, "Retry message attempt count is not 0")
+        // Verify no message were stored in wait repository
+        val waitMessages = waitRepository.listAll()
+        assertTrue(waitMessages.isEmpty(), "Messages found in wait repository")
     }
 
     @Test
-    fun `should store instance with error in retry repository`() {
+    fun `should store instance with retry in retry repository`() {
         // Given
         val workflowMessage = WorkflowMessage.newInstance(
             "test-workflow",
             "1.0.0",
             "test-id",
-            JsonPrimitive("error")
+            JsonPrimitive("retry")
         )
         val messageJson = Json.encodeToString(workflowMessage)
 
         // When
-        sendMessage(messageJson)
+        val future = sendMessageFuture(messageJson)
 
         // Wait for message to be processed
-        workflowConsumer.waitForProcessing(messageJson).get()
+        future.get()
 
         // Verify message was stored in retry repository
         val retryMessages = retryRepository.listAll()
 
         assertTrue(retryMessages.isNotEmpty(), "No messages found in retry repository")
-        assertEquals(messageJson, retryMessages[0].message, "Retry message doesn't match input message")
         assertEquals(OutBoxStatus.PENDING, retryMessages[0].status, "Retry message status is not PENDING")
         assertEquals(0, retryMessages[0].attemptCount, "Retry message attempt count is not 0")
     }
 
     @Test
-    fun `should store waiting workflow in wait repository`() {
+    fun `should store waiting instance in wait repository`() {
         // Given
         val workflowMessage = WorkflowMessage.newInstance(
             "test-workflow",
@@ -181,11 +213,11 @@ abstract class WorkflowConsumerBaseTest {
         val messageJson = Json.encodeToString(workflowMessage)
 
         // When
-        sendMessage(messageJson)
+        val future = sendMessageFuture(messageJson)
 
         // Then
         // Wait for message to be processed
-        workflowConsumer.waitForProcessing(messageJson).get()
+        future.get()
 
         // Verify message was stored in wait repository
         val waitMessages = waitRepository.listAll()
@@ -216,11 +248,11 @@ abstract class WorkflowConsumerBaseTest {
         val messageJson = Json.encodeToString(workflowMessage)
 
         // When
-        sendMessage(messageJson)
+        val future = sendMessageFuture(messageJson)
 
         // Then
         // Wait for message to be processed
-        workflowConsumer.waitForProcessing(messageJson).get()
+        future.get()
         val outputMessage = receiveMessage(1, TimeUnit.SECONDS)
         assertTrue(outputMessage == null, "Messages were sent to output topic: $outputMessage")
 

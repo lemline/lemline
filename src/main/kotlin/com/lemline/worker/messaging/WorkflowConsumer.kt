@@ -7,6 +7,7 @@ import com.lemline.sw.workflows.WorkflowInstance
 import com.lemline.sw.workflows.WorkflowParser
 import com.lemline.worker.models.RetryMessage
 import com.lemline.worker.models.WaitMessage
+import com.lemline.worker.outbox.OutBoxStatus
 import com.lemline.worker.repositories.RetryRepository
 import com.lemline.worker.repositories.WaitRepository
 import io.serverlessworkflow.impl.WorkflowStatus
@@ -37,28 +38,39 @@ open class WorkflowConsumer(
     @Incoming("workflows-in")
     @Outgoing("workflows-out")
     fun consume(msg: String): CompletionStage<String?> = scope.future {
-        logger.info("Received request: $msg}")
-        try {
-            processMessage(msg)
+        val workflowMessage = try {
+            logger.debug("Received request: $msg")
+            WorkflowMessage.fromJsonString(msg)
         } catch (e: Exception) {
-            logger.error("Error processing workflow execution request", e)
-            handleError(msg, e)
-        }.also {
-            processingFutures.remove(msg)?.complete(it)
-            logger.info("Processed request: $it}")
+            logger.error("Unable to deserialize msg $msg", e)
+            // save to retry table with a status of FAILED
+            msg.saveMsgAsFailed(e)
+            // message will be sent to dead letter queue
+            throw e
+        }
+
+        try {
+            process(workflowMessage).also {
+                logger.debug("Processed request: $it}")
+                processingMessages.remove(msg)?.complete(it)
+            }
+        } catch (e: Exception) {
+            logger.error("Unable to process $workflowMessage", e)
+            msg.saveMsgAsFailed(e)
+            // message will be sent to dead letter queue
+            throw e
         }
     }
 
     @Transactional
-    open suspend fun processMessage(msg: String): String? {
-        val workflowMessage = WorkflowMessage.fromJsonString(msg)
+    open suspend fun process(workflowMessage: WorkflowMessage): String? {
         val instance = WorkflowInstance.from(workflowMessage).apply {
             workflowParser = this@WorkflowConsumer.workflowParser
         }
 
         instance.run()
 
-        val result = when (instance.status) {
+        val nextMessage = when (instance.status) {
             WorkflowStatus.PENDING -> TODO()
             WorkflowStatus.WAITING -> instance.waiting()
             WorkflowStatus.RUNNING -> when (instance.currentNodeInstance is TryInstance) {
@@ -66,51 +78,57 @@ open class WorkflowConsumer(
                 else -> instance.running()
             }
 
-            WorkflowStatus.COMPLETED -> null
-            WorkflowStatus.FAULTED -> null
-            WorkflowStatus.CANCELLED -> null
+            WorkflowStatus.COMPLETED -> null // Nothing to do
+            WorkflowStatus.FAULTED -> instance.faulted()
+            WorkflowStatus.CANCELLED -> TODO()
         }?.toJsonString()
 
-        return result
-    }
-
-    @Transactional
-    open fun handleError(msg: String, e: Exception): String? {
-        // Store the message for retry
-        with(retryRepository) {
-            RetryMessage.create(
-                message = msg,
-                delayedUntil = Instant.now(),
-                lastError = e
-            ).save()
-        }
-        // we do not send any message
-        return null
+        return nextMessage
     }
 
     // For testing purposes
-    private val processingFutures = ConcurrentHashMap<String, CompletableFuture<String?>>()
+    private val processingMessages = ConcurrentHashMap<String, CompletableFuture<String?>>()
 
     // For testing purposes
-    internal fun waitForProcessing(msg: String): CompletableFuture<String?> {
-        return processingFutures.computeIfAbsent(msg) { CompletableFuture() }
-    }
+    internal fun waitForProcessing(msg: String): CompletableFuture<String?> =
+        processingMessages.computeIfAbsent(msg) { CompletableFuture() }
 
     private fun WorkflowInstance.running(): WorkflowMessage = this.toMessage()
+
+    private fun String.saveMsgAsFailed(e: Exception?) {
+        // Store the message in retry in failed state (for information)
+        with(retryRepository) {
+            RetryMessage.create(
+                message = this@saveMsgAsFailed,
+                delayedUntil = Instant.now(),
+                lastError = e,
+                status = OutBoxStatus.FAILED
+            ).save()
+        }
+        // for testing, set the CompletableFuture to failed
+        processingMessages.remove(this)?.completeExceptionally(e)
+    }
+
+    private fun WorkflowInstance.faulted(): WorkflowMessage? {
+        // Store the message in retry in failed state (for information)
+        toMessage().toJsonString().saveMsgAsFailed(null)
+        // Stop the processing of this instance
+        return null
+    }
 
     private fun WorkflowInstance.retry(): WorkflowMessage? {
         val msg = this.toMessage()
         val delay = (currentNodeInstance as TryInstance).delay
         val delayedUntil = Instant.now().plus(delay?.toJavaDuration() ?: error("No delay set in for $this"))
 
-        // Save message to outbox for delayed sending
+        // Save message to the retry table
         with(retryRepository) {
             RetryMessage.create(
                 message = msg.toJsonString(),
                 delayedUntil = delayedUntil
             ).save()
         }
-
+        // Stop here instance, the outbox will process it later
         return null
     }
 
@@ -119,14 +137,14 @@ open class WorkflowConsumer(
         val delay: Duration = (this.currentNodeInstance as WaitInstance).delay
         val delayedUntil = Instant.now().plus(delay.toJavaDuration())
 
-        // Save message to outbox for delayed sending
+        // Save message to the wait table
         with(waitRepository) {
             WaitMessage.create(
                 message = msg.toJsonString(),
                 delayedUntil = delayedUntil
             ).save()
         }
-
+        // Stop here instance, the outbox will process it later
         return null
     }
 } 

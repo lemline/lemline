@@ -1,7 +1,5 @@
 ## Current development
 
-- add tests to Try/catch
-
 Next:
 
 - add tests to Wait
@@ -37,7 +35,7 @@ Supporting:
 
 ## Flow:
 
-- [ ] Status
+- [x] Status
 
 - [x] Error Management
 

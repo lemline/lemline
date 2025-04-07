@@ -81,22 +81,17 @@ class WorkflowMessageTest {
         val message = WorkflowMessage.newInstance(name, version, id, input)
 
         // Then
-        val expected = WorkflowMessage(
-            name = name,
-            version = version,
-            states = mapOf(
-                NodePosition.root to NodeState(
-                    workflowId = id,
-                    rawInput = input,
-                    startedAt = Instant.now()
-                )
-            ),
-            position = NodePosition.root
+        val expectedStates = mapOf(
+            NodePosition.root to NodeState(
+                workflowId = id,
+                rawInput = input,
+                startedAt = message.states[NodePosition.root]!!.startedAt
+            )
         )
 
-        assertEquals(
-            expected,
-            message
-        )
+        assertEquals(name, message.name)
+        assertEquals(version, message.version)
+        assertEquals(expectedStates, message.states)
+        assertEquals(NodePosition.root, message.position)
     }
 } 
