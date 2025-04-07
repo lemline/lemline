@@ -45,7 +45,9 @@ open class WorkflowConsumer(
             logger.error("Unable to deserialize msg $msg", e)
             // save to retry table with a status of FAILED
             msg.saveMsgAsFailed(e)
-            // message will be sent to dead letter queue
+            // Send message to dead letter queue
+            // NOTE - we MUST set mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
+            // If not, Quarkus will stop consuming messages
             throw e
         }
 
@@ -57,7 +59,9 @@ open class WorkflowConsumer(
         } catch (e: Exception) {
             logger.error("Unable to process $workflowMessage", e)
             msg.saveMsgAsFailed(e)
-            // message will be sent to dead letter queue
+            // Send message to dead letter queue
+            // NOTE - we MUST set mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
+            // If not, Quarkus will stop consuming messages
             throw e
         }
     }
@@ -86,15 +90,6 @@ open class WorkflowConsumer(
         return nextMessage
     }
 
-    // For testing purposes
-    private val processingMessages = ConcurrentHashMap<String, CompletableFuture<String?>>()
-
-    // For testing purposes
-    internal fun waitForProcessing(msg: String): CompletableFuture<String?> =
-        processingMessages.computeIfAbsent(msg) { CompletableFuture() }
-
-    private fun WorkflowInstance.running(): WorkflowMessage = this.toMessage()
-
     private fun String.saveMsgAsFailed(e: Exception?) {
         // Store the message in retry in failed state (for information)
         with(retryRepository) {
@@ -108,6 +103,15 @@ open class WorkflowConsumer(
         // for testing, set the CompletableFuture to failed
         processingMessages.remove(this)?.completeExceptionally(e)
     }
+
+    // For testing purposes
+    private val processingMessages = ConcurrentHashMap<String, CompletableFuture<String?>>()
+
+    // For testing purposes
+    internal fun waitForProcessing(msg: String): CompletableFuture<String?> =
+        processingMessages.computeIfAbsent(msg) { CompletableFuture() }
+
+    private fun WorkflowInstance.running(): WorkflowMessage = this.toMessage()
 
     private fun WorkflowInstance.faulted(): WorkflowMessage? {
         // Store the message in retry in failed state (for information)

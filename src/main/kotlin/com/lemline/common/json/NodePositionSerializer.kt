@@ -13,7 +13,7 @@ import kotlinx.serialization.encoding.Encoder
  * Custom kotlinx.serialization serializer for [NodePosition].
  * Serializes to/from the string representation of its JsonPointer.
  */
-object NodePositionSerializer : KSerializer<NodePosition> {
+internal object NodePositionSerializer : KSerializer<NodePosition> {
 
     override val descriptor: SerialDescriptor =
         PrimitiveSerialDescriptor("NodePosition", PrimitiveKind.STRING)
