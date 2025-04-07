@@ -15,6 +15,7 @@
         <toc-element topic="dsl-flow-control.md"/>
         <toc-element topic="dsl-data-flow.md"/>
         <toc-element topic="dsl-runtime-expressions.md"/>
+        <toc-element topic="dsl-lifecycle-events.md"/>
         <toc-element topic="dsl-error-handling.md"/>
     </toc-element>
 

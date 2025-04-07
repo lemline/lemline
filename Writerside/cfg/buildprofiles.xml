@@ -7,6 +7,15 @@
     <build-profile instance="sandbox">
         <variables>
             <noindex-content>true</noindex-content>
+            <!-- Theme settings to match docs.infinitic.io -->
+            <primary-color>amethyst</primary-color>
+            <color-preset>vivid</color-preset>
+            <!-- Enable syntax highlighting for code snippets -->
+            <highlighted-code>true</highlighted-code>
+            <!-- Enable smooth scrolling for better navigation experience -->
+            <smooth-scrolling>true</smooth-scrolling>
+            <!-- Custom CSS for enhanced styling -->
+            <custom-css-path>custom.css</custom-css-path>
         </variables>
     </build-profile>
 

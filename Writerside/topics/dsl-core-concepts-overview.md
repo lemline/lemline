@@ -18,5 +18,6 @@ This section covers the following critical mechanisms:
 *   **[Runtime Expressions](dsl-runtime-expressions.md):** Details the syntax and usage of expressions evaluated *during* workflow execution. These are crucial for accessing data, making decisions, and dynamically configuring tasks based on the current context.
 *   **[Flow Control](dsl-flow-control.md):** Describes the mechanisms that dictate the sequence of execution, including conditional branching (`Switch`), looping (`For`), parallel execution (`Fork`), and sequential progression (`Do`, `then`).
 *   **[Error Handling](dsl-error-handling.md):** Covers how workflows detect, manage, and recover from errors using mechanisms like `Try/Catch` blocks, standard error types, and custom error definitions (`Raise`).
+*   **[Lifecycle Events](dsl-lifecycle-events.md):** Explains the standardized events emitted during workflow and task execution, providing observability into state changes and enabling monitoring, auditing, and event-driven reactions to workflow status.
 
 Understanding these building blocks provides the foundation necessary to effectively utilize the various [Tasks](dsl-tasks-overview.md) and [Event](dsl-event-overview.md) handling capabilities of the DSL. 
