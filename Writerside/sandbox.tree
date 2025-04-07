@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE instance-profile
+        SYSTEM "https://resources.jetbrains.com/writerside/1.0/product-profile.dtd">
+
+<instance-profile id="sandbox"
+                  name="sandbox"
+                  start-page="starter-topic.md">
+
+    <toc-element topic="starter-topic.md"/>
+    <toc-element topic="dsl-task-do.md"/>
+    <toc-element topic="dsl-task-for.md"/>
+    <toc-element topic="dsl-task-raise.md"/>
+    <toc-element topic="dsl-task-switch.md"/>
+    <toc-element topic="dsl-task-wait.md"/>
+    <toc-element topic="dsl-task-try.md"/>
+    <toc-element topic="dsl-task-set.md"/>
+    <toc-element topic="dsl-data-flow.md"/>
+    <toc-element topic="dsl-runtime-expressions.md"/>
+    <toc-element topic="dsl-flow-control.md"/>
+    <toc-element topic="dsl-error-handling.md"/>
+</instance-profile>
