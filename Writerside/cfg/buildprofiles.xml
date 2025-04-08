@@ -16,6 +16,10 @@
             <smooth-scrolling>true</smooth-scrolling>
             <!-- Custom CSS for enhanced styling -->
             <custom-css-path>custom.css</custom-css-path>
+            <!-- Logo settings -->
+            <product-logo>serverless-logo.png</product-logo>
+            <header-logo>serverless-logo.png</header-logo>
+            <logo-width>200</logo-width>
         </variables>
     </build-profile>
 

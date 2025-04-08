@@ -29,7 +29,7 @@ By default, expressions are written using the syntax of the configured expressio
   `com.lemline.sw.expressions.JQExpression.kt`).
 * **Configuration**: Runtimes *may* support other languages. If so, the language for a workflow can typically be
   specified using the top-level `evaluate.language` property in the workflow definition (refer to the
-  `dsl-reference.md`).
+  [Resources Configuration Overview](dsl-resources-configuration-overview.md)).
 
 ## Available Arguments
 

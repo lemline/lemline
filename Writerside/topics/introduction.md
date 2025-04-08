@@ -2,9 +2,52 @@
 title: Introduction to the Serverless Workflow DSL
 ---
 
-# Introduction to the Serverless Workflow DSL
+# Introduction to Serverless Workflow DSL
 
-Welcome! This documentation provides a comprehensive guide to the **Serverless Workflow Domain Specific Language (DSL)**, a powerful, vendor-neutral standard for defining stateful, orchestrated workflows. Whether you're automating simple business logic sequences or building complex, event-driven, distributed systems, this DSL offers a declarative approach to defining your process logic.
+The Serverless Workflow DSL (Domain Specific Language) provides a powerful and flexible way to define workflows in a declarative manner. This documentation will guide you through the key concepts and components of the DSL.
+
+## Key Concepts
+
+The Serverless Workflow DSL is built around several core concepts:
+
+- **Workflows**: The top-level container for your workflow definition
+- **States**: The building blocks of your workflow
+- **Tasks**: The individual units of work that can be executed
+- **Events**: Mechanisms for handling asynchronous events
+- **Functions**: Reusable pieces of code that can be invoked by tasks
+- **Retries**: Strategies for handling transient failures
+- **Secrets**: Secure storage for sensitive information
+
+## Documentation Structure
+
+This documentation is organized into several main sections:
+
+1. **Workflow Definition**: Learn how to define and structure your workflows
+   - [Workflow Definition](dsl-workflow-definition.md)
+   - [Workflow Examples](dsl-workflow-examples.md)
+
+2. **Tasks**: Explore the different types of tasks available
+   - [Flow Control Tasks](dsl-flow-overview.md)
+   - [Data Tasks](dsl-data-flow.md)
+     - [Set Task](dsl-task-set.md) - For data manipulation and transformation
+     - [Data Flow Management](dsl-data-flow.md) - For input/output handling and validation
+   - [Error Handling Tasks](dsl-errors-overview.md)
+   - [Time Tasks](dsl-task-wait.md)
+   - [Event Tasks](dsl-events-overview.md)
+   - [Call Tasks](dsl-call-overview.md)
+   - [Run Tasks](dsl-run-overview.md)
+
+3. **Events**: Understand how to work with events
+   - [Event Tasks](dsl-events-overview.md)
+   - [Event Correlation](dsl-event-correlation.md)
+
+4. **Functions**: Learn about function definitions and usage
+   - [Function Definition](dsl-call-function.md)
+   - [Function Types](dsl-call-overview.md)
+
+5. **Advanced Features**: Explore advanced workflow capabilities
+   - [Retries](dsl-task-try.md)
+   - [Secrets](dsl-secrets.md)
 
 ## What is the Serverless Workflow DSL?
 
@@ -27,22 +70,20 @@ This documentation is intended for:
 *   **Operations Engineers:** Automating infrastructure tasks and operational procedures.
 *   Anyone interested in learning and applying the Serverless Workflow standard.
 
-## How This Documentation is Structured
-
-This site is organized to help you quickly find the information you need:
-
-*   **Core Concepts:** Fundamental ideas underpinning the DSL, such as [Data Flow](dsl-data-flow.md), [Runtime Expressions](dsl-runtime-expressions.md), [Error Handling](dsl-error-handling.md), [Authentication](dsl-authentication.md), and more. Understanding these is crucial for effective workflow design.
-*   **[Tasks Overview](dsl-tasks-overview.md):** Introduces the building blocks of workflows. Specific task types are detailed within this section, including control flow tasks (`Do`, `For`, `Switch`, `Try`, `Raise`), data manipulation (`Set`), timing (`Wait`), parallelism (`Fork`), and external interactions grouped under:
-    *   **[Call Tasks](dsl-call-overview.md):** For invoking functions, HTTP/gRPC APIs, OpenAPI/AsyncAPI definitions.
-    *   **[Run Tasks](dsl-run-overview.md):** For executing containers, scripts, shells, or other workflows.
-*   **[Events Overview](dsl-event-overview.md):** Explains how workflows can interact with events, covering how to [Emit Events](dsl-task-emit.md), [Listen for Events](dsl-task-listen.md), and perform advanced [Event Correlation](dsl-event-correlation.md).
-*   **Other Topics:** Covers essential aspects like [Timeouts](dsl-timeouts.md), [Retries](dsl-retries.md), [Secrets Management](dsl-secrets.md), etc.
 
 ## Getting Started
 
-1.  Read this **Introduction** page thoroughly.
-2.  Explore the **Core Concepts** section, paying particular attention to [Data Flow](dsl-data-flow.md) and [Runtime Expressions](dsl-runtime-expressions.md), as they are used extensively.
-3.  Review the **[Tasks Overview](dsl-tasks-overview.md)** and **[Events Overview](dsl-event-overview.md)** pages to understand the available building blocks.
-4.  Dive into the specific **Task** or **Concept** pages relevant to your immediate needs. The examples within each page are designed to illustrate practical usage.
+To get started with the Serverless Workflow DSL:
+
+1. Read this **Introduction** page thoroughly.
+2. Explore the **Core Concepts** section, paying particular attention to [Data Flow](dsl-data-flow.md) and [Runtime Expressions](dsl-runtime-expressions.md), as they are used extensively.
+3. Review the **Tasks** and **Events** sections to understand the available building blocks.
+4. Dive into the specific **Task** or **Concept** pages relevant to your immediate needs. The examples within each page are designed to illustrate practical usage.
+
+## Additional Resources
+
+- [Serverless Workflow Specification](https://serverlessworkflow.io/)
+- [Serverless Workflow Examples](https://github.com/serverlessworkflow/specification/tree/main/examples)
+- [Serverless Workflow Tools](https://serverlessworkflow.io/tools/)
 
 We hope this documentation helps you effectively leverage the power and flexibility of the Serverless Workflow DSL. Happy orchestrating! 

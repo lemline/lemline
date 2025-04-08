@@ -28,7 +28,7 @@ do:
       try:
         # Tasks to attempt inside the 'try' block (must be a list)
         - callMyApi:
-            call: http
+            call: http  # See [HTTP Call Task](dsl-call-http.md) for details
             with:
               method: get
               uri: https://api.unreliable.com/data

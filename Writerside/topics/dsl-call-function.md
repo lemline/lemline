@@ -6,7 +6,7 @@ title: Function Call
 
 ## Purpose
 
-The generic `Call` task enables the execution of a specified, named function within a workflow. This allows seamless integration with custom business logic, reusable workflow components, or functions defined externally (e.g., in a [Function Catalog](dsl-function-catalog.md)).
+The generic `Call` task enables the execution of a specified, named function within a workflow. This allows seamless integration with custom business logic, reusable workflow components, or functions defined externally (e.g., in a [Resource Catalog](dsl-resource-catalog.md)).
 
 *Note: This describes the generic function call using a function name. For specific protocol interactions like HTTP, gRPC, OpenAPI, or AsyncAPI, refer to their dedicated task pages.*
 
@@ -73,7 +73,7 @@ do:
 Specifies the **name** of the function to execute. This name must correspond to:
 
 *   A function defined in the workflow's `use.functions` section.
-*   A function available from an imported [Function Catalog](dsl-function-catalog.md).
+*   A function available from an imported [Resource Catalog](dsl-resource-catalog.md).
 *   A built-in function provided by the runtime (like `http`, `grpc`, etc., although using their specific task pages is recommended).
 
 ### `with` (Object, Optional)

@@ -94,10 +94,10 @@ do:
       then: displayInfo
   - displayInfo:
       # Input to this task is the array from the fork
-      # Access results via index: @{ .[0].profile.name }, @{ .[1].orders[0].orderId }
+      # Access results via index: ${ .[0].profile.name }, ${ .[1].orders[0].orderId }
       call: log
       with:
-        message: "User: @{ .[0].profile.name }, First Order: @{ .[1].orders[0].orderId }"
+        message: "User: ${ .[0].profile.name }, First Order: ${ .[1].orders[0].orderId }"
 ```
 
 This demonstrates the output when `compete` is false. The `rawOutput` of the `gatherInfo` task is an array where the

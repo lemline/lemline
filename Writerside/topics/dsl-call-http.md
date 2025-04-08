@@ -120,7 +120,7 @@ The configuration for an HTTP call is provided within the `with` property of the
 
 ### Authentication
 
-Authentication for HTTP calls is typically defined within the [`Endpoint`](#endpoint) object if you are using the object structure for the `endpoint` property. This allows you to associate an authentication policy (defined globally in `use.authentications` or inline) directly with the target URI.
+Authentication for HTTP calls is typically defined within the `Endpoint` object if you are using the object structure for the `endpoint` property. This allows you to associate an authentication policy (defined globally in `use.authentications` or inline) directly with the target URI.
 
 See the main [Authentication](dsl-authentication.md) page for details on defining different authentication schemes (Basic, Bearer, OAuth2, etc.).
 

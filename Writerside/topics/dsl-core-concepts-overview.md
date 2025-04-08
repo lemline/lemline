@@ -20,4 +20,4 @@ This section covers the following critical mechanisms:
 *   **[Error Handling](dsl-error-handling.md):** Covers how workflows detect, manage, and recover from errors using mechanisms like `Try/Catch` blocks, standard error types, and custom error definitions (`Raise`).
 *   **[Lifecycle Events](dsl-lifecycle-events.md):** Explains the standardized events emitted during workflow and task execution, providing observability into state changes and enabling monitoring, auditing, and event-driven reactions to workflow status.
 
-Understanding these building blocks provides the foundation necessary to effectively utilize the various [Tasks](dsl-tasks-overview.md) and [Event](dsl-event-overview.md) handling capabilities of the DSL. 
+Understanding these building blocks provides the foundation necessary to effectively utilize the various [Tasks](dsl-flow-overview.md) and [Event](dsl-events-overview.md) handling capabilities of the DSL. 

@@ -18,6 +18,20 @@
   --content-width: 860px; /* Constrained width for content */
 }
 
+/* Logo styling */
+.wrs-header-logo img {
+  max-height: 36px;
+  width: auto;
+}
+
+.wrs-sidebar__logo img {
+  max-width: 90%;
+  height: auto;
+  margin: 0 auto;
+  display: block;
+  padding: 12px;
+}
+
 /* Content width constraint - like docs.infinitic.io */
 .wrs-content {
   max-width: var(--content-width);
