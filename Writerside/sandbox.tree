@@ -65,12 +65,12 @@
     </toc-element>
     
     <!-- Resources & Configuration Group -->
-    <toc-element title="Resources & Configuration" topic="dsl-resources-configuration-overview.md">
+    <toc-element title="Resources &amp; Configuration" topic="dsl-resources-configuration-overview.md">
         <toc-element topic="dsl-secrets.md"/>
         <toc-element topic="dsl-authentication.md"/>
         <toc-element topic="dsl-timeouts.md"/>
         <toc-element topic="dsl-event-correlation.md"/>
-     <toc-element topic="dsl-uri-templates.md"/>
+        <toc-element topic="dsl-uri-templates.md"/>
         <toc-element topic="dsl-resource-catalog.md"/>
     </toc-element>
 
