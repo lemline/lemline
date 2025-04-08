@@ -10,16 +10,9 @@
             <!-- Theme settings to match docs.infinitic.io -->
             <primary-color>amethyst</primary-color>
             <color-preset>vivid</color-preset>
-            <!-- Enable syntax highlighting for code snippets -->
-            <highlighted-code>true</highlighted-code>
-            <!-- Enable smooth scrolling for better navigation experience -->
-            <smooth-scrolling>true</smooth-scrolling>
-            <!-- Custom CSS for enhanced styling -->
-            <custom-css-path>custom.css</custom-css-path>
             <!-- Logo settings -->
-            <product-logo>serverless-logo.png</product-logo>
-            <header-logo>serverless-logo.png</header-logo>
-            <logo-width>200</logo-width>
+            <header-logo>sw-logo.png</header-logo>
+            <custom-favicons>favicon.ico</custom-favicons>
         </variables>
     </build-profile>
 

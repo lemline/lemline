@@ -135,20 +135,3 @@ A Serverless Workflow definition document consists of the following top-level pr
   output:
     as: "${ { orderId: .orderId, status: .status, processedItems: .items | length } }"
   ```
-
-## Workflow Examples
-
-The structure and use of these properties is best understood through examples. For a comprehensive set of workflow
-definition examples covering various use cases and patterns, please refer to
-the [Workflow Definition Examples](dsl-workflow-examples.md) page.
-
-This examples page includes:
-
-- Basic sequential task execution
-- Event-driven workflows using the resource catalog
-- Workflows with parallel execution and error handling
-- Time-based scheduled workflows
-- Input/output transformation workflows
-
-Each example is annotated with explanations and highlights key features to help you understand how to effectively
-structure your own workflow definitions. 
