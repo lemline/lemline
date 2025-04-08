@@ -8,6 +8,16 @@ title: Lifecycle Events
 
 Lifecycle events are standardized [CloudEvents](https://cloudevents.io/) that provide visibility into the state changes of workflows and tasks throughout their execution. These events offer valuable insights for monitoring, auditing, and building reactive systems that respond to workflow states.
 
+> **Lifecycle Events vs. Regular Events**
+> 
+> Lifecycle events are fundamentally different from the regular events used in workflow tasks `Emit` and `Listen`:
+> 
+> - **Lifecycle Events** are automatically emitted by the runtime to track the state of workflows and tasks. They are read-only and cannot be used to control workflow execution.
+> - **Regular Events** are explicitly used in your workflow using `Emit` and `Listen` tasks, for workflow control flow and inter-workflow communication.
+> 
+> Do not expect to use lifecycle events in `Listen` tasks or try to emit them using `Emit` tasks. They are meant for monitoring and observability purposes only.
+
+
 The Serverless Workflow DSL defines two categories of lifecycle events:
 1. **Workflow Lifecycle Events** - Events emitted during the lifecycle of a workflow instance
 2. **Task Lifecycle Events** - Events emitted during the lifecycle of individual tasks

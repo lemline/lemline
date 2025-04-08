@@ -11,7 +11,7 @@ Think of `call` tasks as the workflow's way of making requests or invoking funct
 ## Types of Call Tasks
 
 *   **`call: <functionName>`**:
-    *   Invokes a named function defined either within the workflow (`use.functions`), imported from a [Function Catalog](dsl-function-catalog.md), or potentially provided by the runtime.
+    *   Invokes a named function defined either within the workflow (`use.functions`), imported from a [Resource Catalog](dsl-resource-catalog.md), or potentially provided by the runtime.
     *   This is the most generic call type, suitable for custom logic or reusable components.
     *   Configuration and arguments are passed via the `with` property.
     *   See: [Function Call Task](dsl-call-function.md)

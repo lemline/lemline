@@ -69,8 +69,7 @@ Each case contains:
       and its `then` directive is followed. If omitted, this case acts as the default branch (executed only if no
       preceding `when` condition was met).
     * **`then`** (String, Required): Defines the next step if this case is selected. It follows the
-      standard [Flow Control](dsl-flow-control.md#explicit-flow-the-then-directive) rules (`continue`, `exit`, `end`, or
-      a task name).
+      standard [Flow Control](dsl-flow-control.md) rules (`continue`, `exit`, `end`, or a task name).
 
 ```yaml
 do:
