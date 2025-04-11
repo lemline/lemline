@@ -12,7 +12,7 @@ The gRPC Call task enables workflows to interact with external systems using the
 
 ```yaml
 document:
-  dsl: '1.0.0' # Assuming alpha5 or later based on reference example
+  dsl: '1.0.0'
   namespace: test
   name: grpc-example
   version: '0.1.0'
@@ -28,15 +28,17 @@ do:
           name: GreeterApi.Greeter # Service name defined in proto
           host: localhost
           port: 5011
-          # authentication: myGrpcAuth # Optional authentication
+          authentication:
+            use: myGrpcAuth # Optional authentication
         # Method and arguments
         method: SayHello # Method name defined in proto
         arguments:
           name: "${ .user.preferredDisplayName }"
       # Output is the response message from the SayHello method
-      then: processGreeting
   - processGreeting:
-      # ... uses the greeting response ...
+      # Store the greeting response
+      set:
+        greeting: "${ .greetUser.response }"
 ```
 
 ## Additional Examples
@@ -44,32 +46,39 @@ do:
 ### Example: Using Authentication
 
 ```yaml
-# Assume an Authentication block named 'myGrpcAuth' is defined elsewhere
 document:
-  # ... namespace, name, version ...
-  use:
-    authentications:
-      - name: myGrpcAuth
-        type: oauth2 # Example type
-        with:
-          # ... OAuth2 details ...
+  dsl: '1.0.0'
+  namespace: test
+  name: grpc-auth-example
+  version: '0.1.0'
+use:
+  authentications:
+    myGrpcAuth:
+      oauth2:
+        authority: "https://auth.example.com"
+        client:
+          id: "client-id"
+          secret: "client-secret"
+        grant: "client_credentials"
 do:
   - getAccountDetails:
       call: grpc
       with:
-        proto: { endpoint: file://protos/account.proto }
+        proto: 
+          endpoint: "file://protos/account.proto"
         service:
           name: AccountService
-          host: secure-grpc.example.com
+          host: secure-grpc
           port: 50051
-          # Reference the named Authentication definition
-          authentication: myGrpcAuth 
+          authentication:
+            use: myGrpcAuth
         method: GetAccount
         arguments:
           accountId: "${ .user.id }"
       then: processAccount
+  - processAccount:
+      ###
 ```
-
 ## Configuration Options
 
 The configuration for a gRPC call is provided within the `with` property of the `call: grpc` task.

@@ -22,7 +22,8 @@ do:
       with:
         method: get
         # URI Template used here for dynamic petId
-        endpoint: https://petstore.swagger.io/v2/pet/{petId} 
+        endpoint: 
+          uri: https://petstore.swagger.io/v2/pet/{petId} 
         headers:
           Accept: "application/json"
         # Assume petId is available in the task input or context
@@ -64,7 +65,8 @@ do:
       call: http
       with:
         method: get
-        endpoint: https://status.example.com/health
+        endpoint:
+          uri: https://status.example.com/health
         # Get the full response including status code and headers
         output: response 
         # Allow redirects to be considered successful
@@ -85,7 +87,8 @@ do:
       call: http
       with:
         method: get
-        endpoint: https://images.example.com/logo.png
+        endpoint: 
+          uri: https://images.example.com/logo.png
         # Get the raw response bytes (likely base64 encoded)
         output: raw 
       # output.as could decode the base64 if needed

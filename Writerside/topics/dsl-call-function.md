@@ -15,25 +15,52 @@ The generic `Call` task enables the execution of a specified, named function wit
 ```yaml
 document:
   dsl: '1.0.0'
-  namespace: custom_functions
+  namespace: custom-functions
   name: call-custom-example
   version: '1.0.0'
-  # Assume 'validateAddress' is defined elsewhere (e.g., in a catalog or built-in)
 use:
   functions:
-    - name: validateAddress
-      # ... definition or reference ...
+    validateAddress:
+      call: expression
+      with:
+        code: |
+          function validateAddress(street, city, zipCode) {
+            // Basic validation logic
+            if (!street || !city || !zipCode) {
+              return { valid: false, error: "Missing required fields" };
+            }
+            // Additional validation logic here
+            return { valid: true, normalized: { street, city, zipCode } };
+          }
 do:
   - checkAddress:
-      call: validateAddress # Name of the function to call
-      with: # Arguments passed to the function
+      call: validateAddress
+      with:
         street: "${ .customer.address.street }"
         city: "${ .customer.address.city }"
         zipCode: "${ .customer.address.zip }"
       # Output of the 'validateAddress' function becomes output of this task
       then: processValidationResult
   - processValidationResult:
-      # ... uses output from checkAddress ...
+      switch:
+        - case:
+            when: "${ .checkAddress.valid }"
+            then: setNormalizedAddress
+        - case:
+            when: "!${ .checkAddress.valid }"
+            then: raiseValidationError
+  - setNormalizedAddress:
+      set:
+        normalizedAddress: "${ .checkAddress.normalized }"
+      then: exit
+  - raiseValidationError:
+      raise:
+        error:
+          type: "https://example.com/errors/validation"
+          status: 400
+          detail: "${ .checkAddress.error }"
+      then: exit
+          
 ```
 
 In this example, the `checkAddress` task calls a function named `validateAddress`, passing arguments derived from the current context or input using the `with` property.
@@ -48,7 +75,6 @@ do:
       # Assumes 'startBackgroundJob' function requires no specific arguments
       call: startBackgroundJob 
       # No 'with' property needed
-      then: monitorJob
   - monitorJob:
       # ...
 ```

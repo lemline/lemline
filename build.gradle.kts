@@ -10,8 +10,6 @@ repositories {
     mavenCentral()
 }
 
-// Define the Netty version based on Quarkus BOM (usually managed automatically, but explicit for clarity)
-// Let's rely on the Quarkus BOM primarily.
 
 dependencies {
     // Enforce Quarkus platform versions

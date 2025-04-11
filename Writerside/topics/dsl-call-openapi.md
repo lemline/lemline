@@ -45,13 +45,17 @@ do:
   - updatePetDetails:
       call: openapi
       with:
-        document: { endpoint: https://petstore.swagger.io/v2/swagger.json }
-        operationId: updatePetWithForm
+        document:
+          endpoint:
+            uri: "https://petstore.swagger.io/v2/swagger.json"
+        operationId: "updatePetWithForm"
         parameters:
-          petId: 123 # Path parameter (inferred from OpenAPI doc)
-          name: "Fluffy Updated" # Form data parameter
-          status: "pending" # Form data parameter
-        authentication: petstore_auth # Defined elsewhere
+          petId: 123
+          name: "Fluffy Updated"
+          status: "pending"
+        authentication:
+          bearer:
+            token: "${secrets.petstore_auth}"
       then: checkUpdateStatus
 ```
 
@@ -62,15 +66,15 @@ do:
   - getPetAndCheckHeaders:
       call: openapi
       with:
-        document: { endpoint: https://petstore.swagger.io/v2/swagger.json }
-        operationId: getPetById
+        document:
+          endpoint:
+            uri: "https://petstore.swagger.io/v2/swagger.json"
+        operationId: "getPetById"
         parameters:
           petId: "${ .targetPetId }"
-        # Get the full underlying HTTP response
-        output: response 
+        output: response
       then: analyzeHttpResponse
   - analyzeHttpResponse:
-      # Input includes status, headers, body
       set:
         petData: "${ .body }"
         contentType: "${ .headers['Content-Type'] }"

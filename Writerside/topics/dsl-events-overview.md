@@ -57,108 +57,85 @@ document:
   name: event-driven-order-processing
   version: '1.0.0'
 use:
-  events:
-    orderCreated:
-      source: order-service
-      type: com.example.order.created
-      dataSchema:
-        type: object
-        properties:
-          orderId:
-            type: string
-          customerId:
-            type: string
-          items:
-            type: array
-            items:
-              type: object
-              properties:
-                productId: 
-                  type: string
-                quantity:
-                  type: integer
-          totalAmount:
-            type: number
-    paymentProcessed:
-      source: payment-service
-      type: com.example.payment.processed
-      dataSchema:
-        type: object
-        properties:
-          orderId:
-            type: string
-          paymentId:
-            type: string
-          status:
-            type: string
-            enum: [SUCCESS, FAILED]
-          amount:
-            type: number
-    orderConfirmed:
-      source: order-system
-      type: com.example.order.confirmed
-      dataSchema:
-        type: object
-        properties:
-          orderId:
-            type: string
-          status:
-            type: string
   functions:
     reserveInventory:
-      operation:
-        serviceType: rest
-        endpoint: https://api.example.com/inventory/reserve
-        method: POST
+      call: function
+      with:
+        function: reserveInventory
+        args:
+          orderId: ${ .orderId }
+          items: ${ .items }
 do:
   - waitForNewOrder:
       listen:
-        event: orderCreated
-        result: newOrder
+        to:
+          one:
+            with:
+              source: "http://order-service"
+              type: "com.example.order.created"
+        read: "data"
         
   - reserveInventoryItems:
-      call:
-        function: reserveInventory
+      call: "reserveInventory"
+      with:
         args:
-          orderId: ${ .newOrder.data.orderId }
-          items: ${ .newOrder.data.items }
-        result: inventoryReservation
+          orderId: ${ .waitForNewOrder.data.orderId }
+          items: ${ .waitForNewOrder.data.items }
         
   - waitForPayment:
       listen:
-        event: paymentProcessed
-        eventFilter:
-          correlate:
-            orderId:
-              from: ${ .data.orderId }
-              expect: ${ .newOrder.data.orderId }
-        timeout: PT1H
-        result: paymentEvent
+        to:
+          one:
+            with:
+              source: "http://payment-service"
+              type: "com.example.payment.processed"
+            correlate:
+              orderId:
+                from: ${ .data.orderId }
+                expect: ${ .waitForNewOrder.data.orderId }
+        read: "data"
+      timeout:
+        after: PT1H
         
-  - finalizeOrder:
+  - checkPaymentStatus:
       switch:
-        condition: ${ .paymentEvent.data.status }
-        cases:
-          - value: SUCCESS
-            do:
-              - confirmOrder:
-                  emit:
-                    event: orderConfirmed
-                    data:
-                      orderId: ${ .newOrder.data.orderId }
-                      status: CONFIRMED
-                      paymentId: ${ .paymentEvent.data.paymentId }
-                      confirmedAt: ${ new Date().toISOString() }
-        default:
-          - handleFailedPayment:
-              emit:
-                event: orderConfirmed
-                data:
-                  orderId: ${ .newOrder.data.orderId }
-                  status: PAYMENT_FAILED
-                  reason: "Payment processing failed"
-                  failedAt: ${ new Date().toISOString() }
+        - case:
+            when: ${ .waitForPayment.data.status == "SUCCESS" }
+            then: "confirmOrder"
+        - default:
+            then: "handleFailedPayment"
+            
+  - confirmOrder:
+      emit:
+        event:
+          with:
+            source: "http://order-system"
+            type: "com.example.order.confirmed"
+            data:
+              orderId: ${ .waitForNewOrder.data.orderId }
+              status: "CONFIRMED"
+              paymentId: ${ .waitForPayment.data.paymentId }
+              confirmedAt: ${ new Date().toISOString() }
+      then: exit
+      
+  - handleFailedPayment:
+      emit:
+        event:
+          with:
+            source: "http://order-system"
+            type: "com.example.order.failed"
+            data:
+              orderId: ${ .waitForNewOrder.data.orderId }
+              status: "PAYMENT_FAILED"
+              reason: "Payment processing failed"
+              failedAt: ${ new Date().toISOString() }
+      then: exit                    
 ```
+
+
+
+
+
 
 ### Event-Based Microservice Coordination
 
@@ -169,105 +146,127 @@ document:
   name: microservice-coordination
   version: '1.0.0'
 use:
-  events:
-    userRegistered:
-      source: user-service
-      type: com.example.user.registered
-    welcomeEmailSent:
-      source: email-service
-      type: com.example.email.sent
-    userProfileCreated:
-      source: profile-service
-      type: com.example.profile.created
-    onboardingCompleted:
-      source: onboarding-service
-      type: com.example.onboarding.completed
   functions:
     createUserProfile:
-      operation:
-        serviceType: rest
-        endpoint: https://api.example.com/profiles
+      call: http
+      with:
         method: POST
+        endpoint: "http://profile-service/api/v1/profiles"
+        headers:
+          Content-Type: "application/json"
+        body:
+          userId: ${ .userId }
+          email: ${ .email }
+          username: ${ .username }
     sendWelcomeEmail:
-      operation:
-        serviceType: rest
-        endpoint: https://api.example.com/emails/welcome
+      call: http
+      with:
         method: POST
+        endpoint: "http://email-service/api/v1/emails"
+        headers:
+          Content-Type: "application/json"
+        body:
+          to: ${ .to }
+          template: "welcome-email"
+          data:
+            name: ${ .name }
+            language: ${ .language }
 do:
   - waitForNewUser:
       listen:
-        event: userRegistered
-        result: newUser
+        to:
+          one:
+            with:
+              source: "http://user-service"
+              type: "com.example.user.registered"
+        read: data
+      timeout:
+        after: PT30M
         
   - processNewUser:
-      parallel:
+      fork:
         branches:
           - createProfile:
               do:
                 - initiateProfileCreation:
-                    call:
-                      function: createUserProfile
+                    call: createUserProfile
+                    with:
                       args:
-                        userId: ${ .newUser.data.userId }
-                        email: ${ .newUser.data.email }
-                        username: ${ .newUser.data.username }
-                      result: profileCreationResult
-                      
+                        userId: ${ .waitForNewUser.data.userId }
+                        email: ${ .waitForNewUser.data.email }
+                        username: ${ .waitForNewUser.data.username }
+                
                 - notifyProfileCreated:
                     emit:
-                      event: userProfileCreated
-                      data:
-                        userId: ${ .newUser.data.userId }
-                        profileId: ${ .profileCreationResult.profileId }
-                        createdAt: ${ new Date().toISOString() }
+                      event:
+                        with:
+                          source: "http://profile-service"
+                          type: "com.example.profile.created"
+                          data:
+                            userId: ${ .waitForNewUser.data.userId }
+                            profileId: ${ .initiateProfileCreation.profileId }
+                            createdAt: ${ new Date().toISOString() }
                 
           - sendWelcome:
               do:
                 - initiateWelcomeEmail:
-                    call:
-                      function: sendWelcomeEmail
+                    call: sendWelcomeEmail
+                    with:
                       args:
-                        to: ${ .newUser.data.email }
-                        name: ${ .newUser.data.firstName }
-                        language: ${ .newUser.data.preferences.language || "en" }
-                      result: emailResult
+                        to: ${ .waitForNewUser.data.email }
+                        name: ${ .waitForNewUser.data.firstName }
+                        language: ${ .waitForNewUser.data.preferences.language || "en" }
                       
                 - notifyEmailSent:
                     emit:
-                      event: welcomeEmailSent
-                      data:
-                        userId: ${ .newUser.data.userId }
-                        emailId: ${ .emailResult.emailId }
-                        sentAt: ${ new Date().toISOString() }
+                      event:
+                        with:
+                          source: "http://email-service"
+                          type: "com.example.email.sent"
+                          data:
+                            userId: ${ .waitForNewUser.data.userId }
+                            emailId: ${ .initiateWelcomeEmail.emailId }
+                            sentAt: ${ new Date().toISOString() }
                 
   - completeOnboarding:
       listen:
-        all:
-          - event: userProfileCreated
-            eventFilter:
+        to:
+          all:
+            - with:
+                source: "http://profile-service"
+                type: "com.example.profile.created"
               correlate:
                 userId:
                   from: ${ .data.userId }
-                  expect: ${ .newUser.data.userId }
-                
-          - event: welcomeEmailSent
-            eventFilter:
+                  expect: ${ .waitForNewUser.data.userId }
+            - with:
+                source: "http://email-service"
+                type: "com.example.email.sent"
               correlate:
                 userId:
                   from: ${ .data.userId }
-                  expect: ${ .newUser.data.userId }
-        timeout: PT30M
-        result: onboardingEvents
+                  expect: ${ .waitForNewUser.data.userId }
+        read: data
+      timeout:
+        after: PT30M
         
   - notifyOnboardingCompletion:
       emit:
-        event: onboardingCompleted
-        data:
-          userId: ${ .newUser.data.userId }
-          status: "COMPLETE"
-          profileId: ${ .onboardingEvents[0].data.profileId }
-          emailSent: true
-          completedAt: ${ new Date().toISOString() }
+        event:
+          with:
+            source: "http://onboarding-service"
+            type: "com.example.onboarding.completed"
+            data:
+              userId: ${ .waitForNewUser.data.userId }
+              status: "COMPLETE"
+              profileId: ${ .completeOnboarding.data[0].profileId }
+              emailSent: true
+              completedAt: ${ new Date().toISOString() }
 ```
 
-Event tasks form the foundation of event-driven architecture within workflows, enabling responsive, loosely-coupled systems that can react to changes across distributed environments. By using Listen and Emit tasks appropriately, workflows can participate in complex event ecosystems, coordinating business processes that span multiple services while maintaining resilience and scalability. 
+Event tasks form the foundation of event-driven architecture within workflows, 
+enabling responsive, loosely-coupled systems that can react to changes across distributed environments. 
+By using Listen and Emit tasks appropriately, workflows can participate in complex event ecosystems, 
+coordinating business processes that span multiple services while maintaining resilience and scalability. 
+
+

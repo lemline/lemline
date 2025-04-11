@@ -13,14 +13,14 @@ The `run: shell` task allows a workflow to execute a command line instruction us
 ```yaml
 document:
   dsl: '1.0.0'
-  namespace: shell_runs
+  namespace: shell-runs
   name: run-simple-shell
   version: '1.0.0'
 do:
   - executeShellCommand:
       run:
         shell:
-          command: 'echo "Processing file: ${fileName}" && grep -c "ERROR" "${filePath}' 
+          command: 'echo "Processing file: ${fileName}" && grep -c "ERROR" "${filePath}"' 
           # Pass arguments as environment variables
           environment: 
             fileName: "${ .inputFile.name }"

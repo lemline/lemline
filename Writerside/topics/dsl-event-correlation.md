@@ -48,7 +48,7 @@ Imagine a workflow processing an order needs to wait for a specific payment conf
 ```yaml
 document:
   dsl: '1.0.0'
-  namespace: order_processing
+  namespace: order-processing
   name: wait-for-payment
   version: '1.0.0'
 do:
@@ -58,15 +58,12 @@ do:
         orderId: "${ .initialOrder.id }"
       export:
          as: "${ $context + { currentOrderId: .orderId } }"
-      then: waitForPaymentEvent
   - waitForPaymentEvent:
       listen:
         to:
           one: # Wait for one specific event
-            eventFilter:
-              # Basic filtering on event type
-              with:
-                type: com.payment.processed.v1
+            with: # Basic filtering on event type
+              type: com.payment.processed.v1
               # Correlation based on data
               correlate:
                 # Name this correlation check 'matchOrderId'
@@ -76,9 +73,10 @@ do:
                   # Expect it to match the 'currentOrderId' stored in workflow context
                   expect: "${ $context.currentOrderId }"
         # Optional: Timeout if the event doesn't arrive
-        timeout: { minutes: 30 }
+      timeout:
+        after:
+          minutes: 30
       # Output contains the received event if successful
-      then: processPaymentConfirmation
   - processPaymentConfirmation:
       # ... task input is the matched payment event ...
 ```
@@ -92,7 +90,7 @@ Suppose a workflow needs to wait for a system status update event indicating tha
 ```yaml
 document:
   dsl: '1.0.0'
-  namespace: system_monitor
+  namespace: system-monitor
   name: wait-for-component-ready
   version: '1.0.0'
 do:
@@ -100,17 +98,15 @@ do:
       listen:
         to:
           one:
-            eventFilter:
-              with:
-                type: com.system.status.update.v1
-                source: /systems/monitoring/component-abc # Filter by source
+            with:
+              type: com.system.status.update.v1
+              source: http://systems/monitoring/component-abc # Filter by source
               correlate:
                 matchComponentStatus:
                   # Extract the status field from the event data
                   from: "${ .data.status }"
                   # Expect the status to be the exact string 'Ready'
                   expect: "Ready"
-      then: componentIsReady
   - componentIsReady:
       # ... task to execute now that the component is ready ...
 ```
@@ -124,7 +120,7 @@ Consider a scenario where a workflow orchestrates a travel booking and needs to 
 ```yaml
 document:
   dsl: '1.0.0'
-  namespace: travel_booking
+  namespace: travel-booking 
   name: wait-for-flight-confirmation
   version: '1.0.0'
 do:
@@ -139,9 +135,8 @@ do:
       listen:
         to:
           one:
-            eventFilter:
-              with:
-                type: com.travel.confirmation.flight.v1
+            with:
+              type: com.travel.confirmation.flight.v1
               # Requires BOTH correlations to succeed
               correlate:
                 matchBookingId:
@@ -150,8 +145,9 @@ do:
                 matchProvider:
                   from: "${ .data.confirmation.providerName }"
                   expect: "${ $context.currentProvider }" # Or could be expect: "AcmeAir"
-        timeout: { hours: 1 }
-      then: processFlightConfirmation
+      timeout:
+        after:
+          hours: 1
   - processFlightConfirmation:
       # ... task input is the confirmation event matching both criteria ...
 ```

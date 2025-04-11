@@ -8,41 +8,41 @@ how data is validated, transformed, and passed between steps and into the workfl
 
 This allows you to:
 
-* Ensure tasks receive only the data they need in the correct format.
-* Validate data structures at key points to prevent errors.
-* Shape the final output of tasks and the entire workflow.
-* Maintain a shared state (`$context`) across tasks in a controlled manner.
+* Ensure tasks receive only the data they need in the correct format
+* Validate data structures at key points to prevent errors
+* Shape the final output of tasks and the entire workflow
+* Maintain a shared state (`$context`) across tasks in a controlled manner
 
 ## Key Concepts and Keywords
 
 Data flows through a sequence of validation and transformation steps:
 
 1. **Workflow Input Processing**:
-    * `workflow.input.schema`: Validates the initial `raw input` provided when the workflow starts.
+    * `workflow.input.schema`: Validates the initial `raw input` provided when the workflow starts
     * `workflow.input.from`: Transforms the `raw input` of the workflow.
-      The result (workflow's `transformed input`) becomes the initial `raw input` of the *first* task.
+      The result (workflow's `transformed input`) becomes the initial `raw input` of the *first* task
 2. **Task Input Processing** (for each task):
-    * `task.input.schema`: Validates the `raw input` received by the task
-      (which is the `transformed output` of the previous task, or the workflow `transformed input` for the first task).
-    * `task.input.from`: Transforms the `raw input` of the task.
+    * `task.input.schema`: Validates the task's `raw input`
+      (which is either the `transformed output` of the previous task or the workflow's `transformed input` for the first task)
+    * `task.input.from`: Transforms the task's `raw input`.
       The result (task's `transformed input`) is available as `$input` within the task's execution scope
-      and is used for evaluating expressions within the task definition.
+      and is used for evaluating expressions within the task definition
 3. **Task Execution**: The task performs its action (e.g., calls an API, runs a script, sets data).
-   The result of this action is the task's `raw output`.
+   The result of this action is the task's `raw output`
 4. **Task Output Processing** (for each task):
     * `task.output.as`: Transforms the `raw output` of the task.
       The result (task's `transformed output`) is available as `$output` in subsequent steps and
-      becomes the `raw input` for the *next* task (or the workflow's `raw output` if it's the last task).
-    * `task.output.schema`: Validates the task's `transformed output`.
+      becomes the `raw input` for the *next* task (or the workflow's `raw output` if it's the last task)
+    * `task.output.schema`: Validates the task's `transformed output`
 5. **Task Context Export** (for each task):
-    * `task.export.as`: Transforms the task's `transformed output` to become the shared
-      context (`$context`) ot the workflow.
-    * `task.export.schema`: Validates the data produced by `export.as` *before* it replaces the current
-      `$context`.
+    * `task.export.as`: Transforms the task's `transformed output` to update the shared
+      context (`$context`) of the workflow
+    * `task.export.schema`: Validates the data produced by `export.as` *before* it updates the current
+      `$context`
 6. **Workflow Output Processing**:
-    * `workflow.output.as`: Transforms the workflow `raw output` (`transformed output` of the *last* task executed).
-      This defines the workflow's `transformed output`, final result returned by the workflow execution.
-    * `workflow.output.schema`: Validates the final `transformed output` of the workflow.
+    * `workflow.output.as`: Transforms the workflow's `raw output` (the `transformed output` of the *last* task executed).
+      This defines the workflow's `transformed output`, which becomes the final result returned by the workflow execution
+    * `workflow.output.schema`: Validates the final `transformed output` of the workflow
 
 ## Workflow Level Data Handling
 
@@ -54,9 +54,9 @@ Controls processing of the initial data the workflow receives.
 
 * **`from`** (String | Object | Array | ..., Optional): A [Runtime Expression](dsl-runtime-expressions.md) or literal
   value defining how to transform the raw workflow input. The result initializes `$context` and is passed as raw input
-  to the first task. Defaults to identity (`${. }`).
+  to the first task. Defaults to identity (`${. }`)
 * **`schema`** (Schema Definition, Optional): A [JSON Schema](https://json-schema.org/) used to validate the *raw*
-  workflow input *before* `input.from` is applied. If validation fails, the workflow faults immediately.
+  workflow input *before* `input.from` is applied. If validation fails, the workflow faults immediately
 
 ```yaml
 document:
@@ -64,8 +64,16 @@ document:
   # ... workflow metadata ...
 input:
   schema:
-    # Ensures raw input has required fields (schema definition omitted)
-    ...
+    type: object
+    required: ["user", "payload"]
+    properties:
+      user:
+        type: object
+        properties:
+          id:
+            type: string
+      payload:
+        type: object
   from: "${ { userId: .user.id, orderDetails: .payload } }" # Select and restructure
 do:
   - firstTask: # Receives { userId: ..., orderDetails: ... } as raw input
@@ -77,9 +85,9 @@ do:
 Controls processing of the final data returned by the workflow.
 
 * **`as`** (String | Object | Array | ..., Optional): A [Runtime Expression](dsl-runtime-expressions.md) or literal
-  value defining how to transform the *transformed output* of the *last* task. Defaults to identity (`${. }`).
+  value defining how to transform the *transformed output* of the *last* task. Defaults to identity (`${. }`)
 * **`schema`** (Schema Definition, Optional): A [JSON Schema](https://json-schema.org/) used to validate the *final
-  transformed workflow output* (after `output.as` is applied). If validation fails, the workflow faults.
+  transformed workflow output* (after `output.as` is applied). If validation fails, the workflow faults
 
 ```yaml
 document:
@@ -94,8 +102,11 @@ output:
   # Only return the confirmation field from the last task's output
   as: "${ { confirmationId: .confirmation } }"
   schema:
-    # Ensure final output has the correct structure (schema definition omitted)
-    ...
+    type: object
+    required: ["confirmationId"]
+    properties:
+      confirmationId:
+        type: string
 ```
 
 ## Task Level Data Handling
@@ -107,17 +118,20 @@ These properties can be defined within individual task definitions.
 Controls processing of data entering a specific task.
 
 * **`from`** (String | Object | Array | ..., Optional): Transforms the task's *raw input*. The result is available as
-  `$input` within the task's scope. Defaults to identity (`${. }`).
-* **`schema`** (Schema Definition, Optional): Validates the task's *raw input* *before* `input.from` is applied.
+  `$input` within the task's scope. Defaults to identity (`${ . }`)
+* **`schema`** (Schema Definition, Optional): Validates the task's *raw input* *before* `input.from` is applied
 
 ```yaml
 - taskA:
     # Assume previous task output was { "data": { "value": 10 }, "meta": ... }
     input:
-      from: "${ .data }" # Pass only the 'data' part to this task
       schema:
-        # Validate the structure of '.data' (schema omitted)
-        ...
+        type: object
+        required: ["data"]
+        properties:
+          value:
+            type: number
+      from: "${ .data }" # Pass only the 'data' part to this task
     set:
       doubled: "${ $input.value * 2 }" # Use the transformed input ($input)
 ```
@@ -128,8 +142,8 @@ Controls processing of data produced by a specific task.
 
 * **`as`** (String | Object | Array | ..., Optional): Transforms the task's *raw output* (the direct result of its
   action, e.g., HTTP response body, script return value). The result becomes the raw input for the next task and is
-  available as `$output` for `export.as`. Defaults to identity (`${. }`).
-* **`schema`** (Schema Definition, Optional): Validates the *transformed output* (after `output.as` is applied).
+  available as `$output` for `export.as`. Defaults to identity (`${. }`)
+* **`schema`** (Schema Definition, Optional): Validates the *transformed output* (after `output.as` is applied)
 
 ```yaml
 - callApi:
@@ -141,11 +155,13 @@ Controls processing of data produced by a specific task.
       # Select only the payload from the API response
       as: "${ .result.payload }"
       schema:
-        # Validate the structure of the payload (schema omitted)
-        ...
+        # Define expected payload structure
+        type: object
+        properties:
+          # ... payload schema ...
 - nextTask:
-  # Raw input here will be the value of 'result.payload' from the API call
-  # ...
+    # Raw input here will be the value of 'result.payload' from the API call
+    # ...
 ```
 
 ### `export` (Object, Optional)
@@ -153,11 +169,10 @@ Controls processing of data produced by a specific task.
 Controls how the task's results update the shared workflow context (`$context`).
 
 * **`as`** (String | Object | Array | ..., Optional): A [Runtime Expression](dsl-runtime-expressions.md) evaluated
-  against the task's *transformed output* (`$output`). The result of this expression **replaces** the current value of
-  `$context`. Defaults to an expression returning the existing `$context` (i.e., no change). Use
-  `$context + { newField: ... }` (jq syntax) to merge.
+  against the task's *transformed output* (`$output`). The result of this expression **updates** the current value of
+  `$context`. Use `$context + { newField: ... }` (jq syntax) to merge with existing context
 * **`schema`** (Schema Definition, Optional): Validates the data structure produced by `export.as` *before* it updates
-  `$context`.
+  `$context`
 
 ```yaml
 - updateUser:
@@ -167,8 +182,11 @@ Controls how the task's results update the shared workflow context (`$context`).
       # Add/update the lastUserId in the context
       as: "${ $context + { lastUserId: $output.userId } }"
       schema:
-        # Ensure context maintains expected structure (schema omitted)
-        ...
+        type: object
+        required: ["lastUserId"]
+        properties:
+          lastUserId:
+            type: string
 - subsequentTask:
     # Can now access $context.lastUserId
     set:
@@ -262,19 +280,21 @@ flowchart TD
 Several types of errors can occur during data flow processing:
 
 1. **Schema Validation Errors (`ValidationError`)**:
-    * **When**: Occurs if data fails validation against an `input.schema`, `output.schema`, `export.schema`, or the
-      top-level workflow `input.schema` or `output.schema`.
+    * **When**: Occurs if data fails validation against any schema (`input.schema`, `output.schema`, or `export.schema`)
+      at either workflow or task level
     * **Type**: `https://serverlessworkflow.io/spec/1.0.0/errors/validation`
     * **Status**: `400` (Bad Request)
-    * **Effect**: The workflow faults immediately.
+    * **Effect**: The workflow faults immediately unless handled by a `Try` task
 
 2. **Expression Evaluation Errors (`ExpressionError`)**:
-    * **When**: Occurs if a runtime expression within `input.from`, `output.as`, or `export.as` (at task or workflow
-      level) fails to evaluate correctly. This could be due to syntax errors in the expression, missing data referenced
-      by the expression, or type mismatches during evaluation.
+    * **When**: Occurs if a runtime expression within `input.from`, `output.as`, or `export.as` fails to evaluate.
+      Common causes include:
+      - Syntax errors in the expression
+      - References to missing data
+      - Type mismatches during evaluation
     * **Type**: `https://serverlessworkflow.io/spec/1.0.0/errors/expression`
     * **Status**: `400` (Bad Request)
-    * **Effect**: The workflow faults immediately.
+    * **Effect**: The workflow faults immediately unless handled by a `Try` task
 
-These errors are typically critical and, unless caught by a `Try` task, will cause the workflow execution to halt in a
-`faulted` state.
+These errors are critical and will cause the workflow execution to halt in a `faulted` state unless properly handled
+using error handling mechanisms like `Try` tasks.

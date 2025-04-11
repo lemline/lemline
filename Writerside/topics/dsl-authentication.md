@@ -25,7 +25,7 @@ potentially using secrets) from the task logic.
 ```yaml
 document:
   dsl: '1.0.0'
-  namespace: auth_examples
+  namespace: auth-examples
   name: reusable-auth-workflow
   version: '1.0.0'
 use:
@@ -51,7 +51,7 @@ use:
     # Simple Bearer Token (potentially from context)
     userBearerTokenAuth:
       bearer:
-        token: ${ $context.userProvidedToken }
+        token: ${ $secrets.userProvidedToken }
     # Digest Auth (Requires username/password, often from secrets)
     myDigestServiceAuth:
       digest:
@@ -95,7 +95,8 @@ do:
         endpoint: https://internalsystem.example.com/update
         # Reference another named policy
         authentication: mySystemBasicAuth
-        body: # ...
+        body:
+        # ...
 ```
 
 **Key Properties (`use.authentications`):**

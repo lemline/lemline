@@ -1,3 +1,6 @@
+
+<!-- Exemples are valided -->
+
 # Listen
 
 ## Purpose
@@ -19,22 +22,21 @@ document:
 do:
   - startMonitoring:
       # ... task that initiates monitoring ...
-      then: waitForVitalSignAlert
   - waitForVitalSignAlert:
       listen:
-        # Wait up to 1 hour for a high temperature OR abnormal BPM event
-        timeout: PT1H
         to:
           any: # Complete when any of the following conditions are met
             - with: # Condition 1: High Temperature
-                type: com.fake-hospital.vitals.measurements.temperature
-                # Expression evaluated against event data
+                source: "http://vitals-service"
+                type: "com.fake-hospital.vitals.measurements.temperature"
                 data: '${ .temperature > 38 }'
             - with: # Condition 2: Abnormal BPM
-                type: com.fake-hospital.vitals.measurements.bpm
-                # Expression evaluated against event data
+                source: "http://vitals-service"
+                type: "com.fake-hospital.vitals.measurements.bpm"
                 data: '${ .bpm < 60 or .bpm > 100 }'
         read: data # Read only the event data (default)
+      timeout:
+        after: PT1H
       then: processAlert
   - processAlert:
     # ... task that handles the alert based on the received event data ...

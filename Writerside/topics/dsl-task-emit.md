@@ -1,3 +1,6 @@
+
+<!-- Exemples are valided -->
+
 # Emit
 
 ## Purpose
@@ -17,51 +20,57 @@ document:
   namespace: test
   name: emit-example
   version: '0.1.0'
+use:
+  secrets:
+    - orderServiceApiKey
+  authentications:
+    orderServiceAuth:
+      bearer:
+        token: ${ $secrets.orderServiceApiKey }
 do:
   - placeOrder:
-      # ... logic to process an order ...
+      call: http
+      with:
+        method: POST
+        endpoint:
+          uri: "http://orders-service/api/v1/orders"
+          authentication:
+            use: orderServiceAuth
+        headers:
+          Content-Type: "application/json"
+        body:
+          customerId: ${ .customerId }
+          items: ${ .items }
+      output:
+        as: orderResult
       then: emitOrderPlacedEvent
+      catch:
+        errors:
+          with:
+            type: "*"
+        then: handleOrderError
   - emitOrderPlacedEvent:
       emit:
         event:
-          # Defines the event to be emitted
           with:
-            source: https://petstore.com/orders
-            type: com.petstore.order.placed.v1
-            subject: "order-123"
-            # Event data payload, often constructed using runtime expressions
+            source: "https://petstore.com/orders"
+            type: "com.petstore.order.placed.v1"
+            subject: "${ .orderResult.orderId }"
             data:
               client:
-                # Assuming client info is in the context or previous task output
                 firstName: "${ $context.customer.first }"
                 lastName: "${ $context.customer.last }"
-              # Assuming items are in the context or previous task output
-              items: "${ $context.orderItems }"
-```
-
-In this example, after an order is processed, the `emitOrderPlacedEvent` task publishes a CloudEvent with specific
-attributes (`source`, `type`, `subject`) and a data payload constructed from the workflow context.
-
-## Configuration Options
-
-### `emit` (Emit, Required)
-
-This object defines the event to be published.
-
-* **`event`** (`eventProperties`, Required): Specifies the properties of the CloudEvent to emit. This typically
-  includes:
-    * `with`: An object containing standard CloudEvent attributes (like `type`, `source`, `subject`, `id`, `time`,
-      `datacontenttype`, `dataschema`) and the event `data` payload. Values can often be defined
-      using [Runtime Expressions](dsl-runtime-expressions.md) to include dynamic information from the workflow context
-      or task input.
-
-### Data Flow
-
-<include from="_common-task-data-flow.md" element-id="common-data-flow"/>
-**Note**: 
-*   The `Emit` task primarily uses its configuration (`emit.event.with`) to construct the event to be sent. The `transformedInput` to the `Emit` task is available for use within runtime expressions inside the `emit.event.with` definition.
-*   The `Emit` task itself typically does not produce a meaningful `rawOutput`. If specific output is needed, it must be explicitly defined using `output.as`.
-
-### Flow Control
-
-<include from="_common-task-flow_control.md" element-id="common-flow-control"/> 
+              orderId: "${ .orderResult.orderId }"
+              items: "${ .orderResult.items }"
+      output:
+        as: eventResult
+  - handleOrderError:
+      emit:
+        event:
+          with:
+            source: "https://petstore.com/orders"
+            type: "com.petstore.order.error.v1"
+            subject: "order-error"
+            data:
+              error: "${ .error.message }"
+              customerId: "${ .customerId }"

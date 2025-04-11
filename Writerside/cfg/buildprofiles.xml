@@ -7,13 +7,18 @@
     <build-profile instance="sandbox">
         <variables>
             <noindex-content>true</noindex-content>
-            <!-- Theme settings to match docs.infinitic.io -->
+            <!-- Theme settings to use system preference -->
             <primary-color>amethyst</primary-color>
-            <color-preset>vivid</color-preset>
             <!-- Logo settings -->
             <header-logo>sw-logo.png</header-logo>
             <custom-favicons>favicon.ico</custom-favicons>
+            <custom-css>custom.css</custom-css>
         </variables>
     </build-profile>
-
+    <llms-txt single-file="true"/>
+    <footer>
+        <copyright>2025 Zenaton (c)</copyright>
+        <!--        <social type="twitter" href="https://twitter.com/onwriterside"/>-->
+        <!--        <link href="https://blog.jetbrains.com">Blog</link>-->
+    </footer>
 </buildprofiles>
