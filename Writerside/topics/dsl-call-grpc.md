@@ -1,6 +1,7 @@
 ---
 title: gRPC Call
 ---
+<!-- Examples are validated -->
 
 # gRPC Call Task (`call: grpc`)
 

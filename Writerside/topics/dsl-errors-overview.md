@@ -1,16 +1,17 @@
 ---
-title: Error Handling Tasks
+title: Error Handling
 ---
 
 # Error Handling Tasks
 
-Error handling tasks provide mechanisms to manage exceptions, failures, and unexpected conditions in your workflows. They enable you to create resilient workflows that can detect, respond to, and recover from errors gracefully.
+Error handling tasks provide mechanisms to manage exceptions, failures, and unexpected conditions in your workflows.
+They enable you to create resilient workflows that can detect, respond to, and recover from errors gracefully.
 
 ## Error Handling Task Types
 
-| Task | Purpose |
-|------|---------|
-| [Try](dsl-task-try.md) | Execute tasks with error handling and recovery logic |
+| Task                       | Purpose                                                  |
+|----------------------------|----------------------------------------------------------|
+| [Try](dsl-task-try.md)     | Execute tasks with error handling and recovery logic     |
 | [Raise](dsl-task-raise.md) | Explicitly throw errors to signal exceptional conditions |
 
 ## When to Use Error Handling Tasks
@@ -18,6 +19,7 @@ Error handling tasks provide mechanisms to manage exceptions, failures, and unex
 ### Exception Handling with Try
 
 Use the **Try** task when you need to:
+
 - Catch and handle potential errors from risky operations
 - Provide alternative execution paths when errors occur
 - Implement retry strategies for transient failures
@@ -28,6 +30,7 @@ Use the **Try** task when you need to:
 ### Error Signaling with Raise
 
 Use the **Raise** task when you need to:
+
 - Signal that an exceptional condition has occurred
 - Abort the current execution path when validation fails
 - Create custom error types for specific failure scenarios
@@ -169,7 +172,7 @@ do:
                 status: 400
                 title: "Missing required fields"
                 detail: "${ \"The following fields are required but missing: \" + [if(!.input.email) \"email\", if(!.input.username) \"username\", if(!.input.password) \"password\"].filter(Boolean).join(\", \") }"
-      
+
         - validateEmail:
             if: ${ !.input.email.match(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/) }
             raise:
@@ -178,7 +181,7 @@ do:
                 status: 400
                 title: "Invalid email format"
                 detail: "${ \"Email address '\" + .input.email + \"' does not match the required format: username@domain.tld\" }"
-        
+
         - validatePassword:
             if: ${ .input.password.length < 8 }
             raise:
@@ -187,7 +190,7 @@ do:
                 status: 400
                 title: "Password too short"
                 detail: "${ \"Password must be at least 8 characters long. Current length: \" + .input.password.length }"
-                
+
 ```
 
 ### Business Rule Validation
@@ -208,7 +211,7 @@ do:
           productId: ${ .input.productId }
         headers:
           Content-Type: "application/json"
-  
+
   - validateOrder:
       do:
         - checkProductAvailability:
@@ -219,7 +222,7 @@ do:
                 status: 412
                 title: "Insufficient inventory"
                 detail: "${ \"Product '\" + .input.productId + \"' has insufficient inventory. Requested: \" + .input.quantity + \", Available: \" + .inventoryData.quantityAvailable + \". Next restock date: \" + .inventoryData.nextDeliveryDate }"
-        
+
         - checkOrderLimit:
             if: ${ .input.quantity > 10 && .input.customerType != "wholesale" }
             raise:
@@ -243,9 +246,9 @@ document:
 use:
   functions:
     - logger:
-        ### ... logger implementation
+      ### ... logger implementation
     - supportSystem:
-        ### ... support system implementation
+      ### ... support system implementation
 do:
   - processOrder:
       try:
@@ -259,7 +262,7 @@ do:
                       status: 400
                       title: "Order must contain at least one item"
                       detail: "The order must contain at least one item to be processed"
-              
+
               - verifyPaymentInfo:
                   if: ${ !.input.paymentMethod || !.input.paymentMethod.type }
                   raise:
@@ -268,21 +271,21 @@ do:
                       status: 400
                       title: "Payment validation failed"
                       detail: "Payment information is required"
-        
+
         - processPayment:
             call: http
             with:
               method: "POST"
-               endpoint:
-                uri: "https://api.example.com/payments/process"
-                authentication:
-                  basic:
-                    username: "${ .user }"
-                    password: "${ $secrets.pass }"
+                endpoint:
+                  uri: "https://api.example.com/payments/process"
+                  authentication:
+                    basic:
+                      username: "${ .user }"
+                      password: "${ $secrets.pass }"
               headers:
                 Content-Type: "application/json"
               body: ${ .input }
-        
+
         - verifyPaymentSuccess:
             if: ${ !.paymentResult.success }
             raise:
@@ -297,30 +300,31 @@ do:
           - handleOrderError:
               switch:
                 - condition: ${ .orderError.error == "INVALID_ARGUMENT" }
-                  then: handleValidationError
-                - condition: ${ .orderError.error == "ABORTED" }
-                  then: handlePaymentError
-                - condition: true
-                  then: handleGenericError
-          
-          - handleValidationError:
-              set:
-                result:
-                  success: false
-                  type: "VALIDATION_ERROR"
-                  message: ${ .orderError.message }
-                  details: ${ .orderError.details || {} }
-              then: exit
-          
-          - handlePaymentError:
-              do:
-                - logPaymentIssue:
-                    call: function
-                    with:
-                      function: logger
-                      args:
-                        level: "WARNING"
-                        message: ${ "Payment processing failed for order: " + .input.order.id }
+                                                                                                                             then: handleValidationError
+                            - condition: ${ .orderError.error == "ABORTED" }
+                              then: handlePaymentError
+                            - condition: true
+                              then: handleGenericError
+
+            - handleValidationError:
+                set:
+                  result:
+                    success: false
+                    type: "VALIDATION_ERROR"
+                    message: ${ .orderError.message }
+                    details: ${ .orderError.details || {} }
+                then: exit
+
+            - handlePaymentError:
+                do:
+                  - logPaymentIssue:
+                      call: function
+                      with:
+                        function: logger
+                        args:
+                          level: "WARNING"
+                          message:
+                            ${ "Payment processing failed for order: " + .input.order.id }
                         data: ${ .orderError }
                 
                 - suggestAlternativePayment:
@@ -328,22 +332,23 @@ do:
                       result:
                         success: false
                         type: "PAYMENT_ERROR"
-                        message: ${ .orderError.message }
-                        suggestedActions: [
-                          "Try a different payment method",
-                          "Verify your payment details",
-                          "Contact your payment provider"
-                        ]
-              then: exit
-          
-          - handleGenericError:
-              do:
-                - logError:
-                    call: logger
-                    with:
-                      args:
-                        level: "ERROR"
-                        message: ${ "Unexpected error processing order: " + .input.order.id }
+                          message: ${ .orderError.message }
+                          suggestedActions: [
+                            "Try a different payment method",
+                            "Verify your payment details",
+                            "Contact your payment provider"
+                          ]
+                then: exit
+
+            - handleGenericError:
+                do:
+                  - logError:
+                      call: logger
+                      with:
+                        args:
+                          level: "ERROR"
+                          message:
+                            ${ "Unexpected error processing order: " + .input.order.id }
                         error: ${ .orderError }
                 
                 - createSupportTicket:
@@ -351,19 +356,21 @@ do:
                     with:
                       args:
                         issueType: "ORDER_PROCESSING_FAILURE"
-                        orderId: ${ .input.order.id }
-                        customerEmail: ${ .input.order.customerEmail }
-                        errorDetails: ${ .orderError }
-                
-                - setErrorResponse:
-                    set:
-                      result:
-                        success: false
-                        type: "SYSTEM_ERROR"
-                        message: "We encountered an unexpected issue processing your order"
-                        supportTicket: ${ .ticketInfo.ticketId }
-                        supportEmail: "support@example.com"
-            then: exit
+                          orderId: ${ .input.order.id }
+                          customerEmail: ${ .input.order.customerEmail }
+                          errorDetails: ${ .orderError }
+
+                  - setErrorResponse:
+                      set:
+                        result:
+                          success: false
+                          type: "SYSTEM_ERROR"
+                          message: "We encountered an unexpected issue processing your order"
+                          supportTicket: ${ .ticketInfo.ticketId }
+                          supportEmail: "support@example.com"
+              then: exit
 ```
 
-Error handling tasks are essential for building robust, production-ready workflows. The Try and Raise tasks work together to provide comprehensive error management capabilities, allowing you to create workflows that gracefully handle exceptions, implement recovery strategies, and maintain system reliability even when unexpected conditions occur. 
+Error handling tasks are essential for building robust, production-ready workflows. The Try and Raise tasks work
+together to provide comprehensive error management capabilities, allowing you to create workflows that gracefully handle
+exceptions, implement recovery strategies, and maintain system reliability even when unexpected conditions occur. 

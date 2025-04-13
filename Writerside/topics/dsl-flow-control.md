@@ -1,3 +1,9 @@
+---
+title: Flow Control
+---
+
+<!-- Examples are validated -->
+
 # Flow Control and Directives
 
 ## Purpose
@@ -16,17 +22,20 @@ document:
   dsl: '1.0.0'
   # ...
 do:
-  - taskA: # Executes first
-      set: { message: "Hello" }
-  - taskB: # Executes second, receives output of taskA
-      set: { fullMessage: "${ .message + ' World' }" }
-  - taskC: # Executes third, receives output of taskB
+  - setMessage: # Executes first
+      set:
+        message: "Hello"
+  - setFullMessage: # Executes second, receives output of taskA
+      set:
+        fullMessage: "${ .message + ' World' }"
+  - logMessage: # Executes third, receives output of taskB
       call: log
       with:
         text: "${ .fullMessage }"
 ```
 
-In this example, `taskA`, `taskB`, and `taskC` run one after the other because no `then` directives are used.
+In this example, `setMessage`, `setFullMessage`, and `logMessage` run one after the other because no `then` directives
+are used.
 
 ## Conditional Execution: The `if` Property
 

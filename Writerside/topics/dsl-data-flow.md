@@ -1,3 +1,5 @@
+<!-- Examples are validated -->
+
 # Data Flow Management
 
 ## Purpose

@@ -1,5 +1,4 @@
-
-<!-- Exemples are valided -->
+<!-- Examples are validated -->
 
 # Listen
 
@@ -21,7 +20,7 @@ document:
   version: '1.0.0'
 do:
   - startMonitoring:
-      # ... task that initiates monitoring ...
+    # ... task that initiates monitoring ...
   - waitForVitalSignAlert:
       listen:
         to:
@@ -130,11 +129,17 @@ This object defines the core parameters for the listening behavior.
 ### Data Flow
 
 <include from="_common-task-data-flow.md" element-id="common-data-flow"/>
+
 **Note**:
-*   The `transformedInput` to the `Listen` task is available for use within the `data` expressions defined under `listen.to` (e.g., referencing `$context`).
-*   The `rawOutput` of the `Listen` task is **always** a sequentially ordered array containing the content specified by `listen.read` (e.g., event data, envelope, or raw) for **all** the event(s) consumed to satisfy the `listen.to` condition.
-*   If `foreach` is used, the transformation configured within the iterator (e.g., `foreach.output.as`) is applied to each item *before* it's added to the final output array.
-*   Standard `output.as` and `export.as` process this resulting `rawOutput` array.
+
+* The `transformed input` to the `Listen` task is available for use within the `data` expressions defined under
+  `listen.to` (e.g., referencing `$context`).
+* The `raw output` of the `Listen` task is **always** a sequentially ordered array containing the content specified by
+  `listen.read` (e.g., event data, envelope, or raw) for **all** the event(s) consumed to satisfy the `listen.to`
+  condition.
+* If `foreach` is used, the transformation configured within the iterator (e.g., `foreach.output.as`) is applied to each
+  item *before* it's added to the final output array.
+* Standard `output.as` and `export.as` process this resulting `rawOutput` array.
 
 > [!WARNING]
 > Events consumed solely to satisfy an `until` clause should **not** be included in the task's output array.

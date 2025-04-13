@@ -1,7 +1,7 @@
 ---
 title: Core Concepts Overview
 ---
-<!-- Exemples are valided -->
+<!-- Examples are validated -->
 
 # Core Concepts Overview
 

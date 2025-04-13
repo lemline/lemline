@@ -1,6 +1,7 @@
 ---
 title: AsyncAPI Call
 ---
+<!-- Examples are validated -->
 
 # AsyncAPI Call Task (`call: asyncapi`)
 

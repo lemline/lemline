@@ -2,6 +2,9 @@
 title: Event Correlation
 ---
 
+<!-- Examples are validated -->
+
+
 # Event Correlation
 
 ## Purpose

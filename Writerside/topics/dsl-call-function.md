@@ -1,6 +1,7 @@
 ---
 title: Function Call
 ---
+<!-- Examples are validated -->
 
 # Function Call Task (`call`)
 
@@ -40,14 +41,12 @@ do:
         city: "${ .customer.address.city }"
         zipCode: "${ .customer.address.zip }"
       # Output of the 'validateAddress' function becomes output of this task
-      then: processValidationResult
   - processValidationResult:
       switch:
-        - case:
+        - caseValid:
             when: "${ .checkAddress.valid }"
             then: setNormalizedAddress
-        - case:
-            when: "!${ .checkAddress.valid }"
+        - default:
             then: raiseValidationError
   - setNormalizedAddress:
       set:

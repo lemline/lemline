@@ -1,6 +1,7 @@
 ---
 title: Authentication
 ---
+<!-- Examples are validated -->
 
 # Authentication
 

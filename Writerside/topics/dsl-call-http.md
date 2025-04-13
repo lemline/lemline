@@ -1,6 +1,7 @@
 ---
 title: HTTP Call
 ---
+<!-- Examples are validated -->
 
 # HTTP Call Task (`call: http`)
 

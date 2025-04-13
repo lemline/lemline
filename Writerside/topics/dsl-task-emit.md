@@ -1,5 +1,5 @@
 
-<!-- Exemples are valided -->
+<!-- Examples are validated -->
 
 # Emit
 

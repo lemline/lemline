@@ -2,6 +2,9 @@
 title: Event Tasks
 ---
 
+<!-- Examples are validated -->
+
+
 Event tasks enable workflows to interact with event-driven systems, allowing workflows to listen for external events and emit events to other systems, facilitating asynchronous and reactive patterns in your applications.
 
 ## Common Use Cases

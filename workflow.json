@@ -1,0 +1,84 @@
+{
+  "document": {
+    "dsl": "1.0.0",
+    "namespace": "examples",
+    "name": "order-fulfillment-workflow",
+    "version": "1.0.0"
+  },
+  "do": [
+    {
+      "validateOrder": {
+        "call": "http",
+        "with": {
+          "method": "POST",
+          "endpoint": {
+            "uri": "http://order-validator-service/validate"
+          },
+          "body": "${ .input.order }"
+        }
+      }
+    },
+    {
+      "checkOrderValidity": {
+        "switch": [
+          {
+            "when": "${ .validationResult.valid == false }",
+            "then": "exit"
+          }
+        ]
+      }
+    },
+    {
+      "processValidOrder": {
+        "fork": {
+          "branches": [
+            {
+              "handlePayment": {
+                "call": "http",
+                "with": {
+                  "method": "POST",
+                  "endpoint": {
+                    "uri": "http://payment-service/process"
+                  },
+                  "body": {
+                    "amount": "${ .input.order.totalAmount }",
+                    "currency": "${ .input.order.currency }",
+                    "paymentMethod": "${ .input.paymentInfo }"
+                  }
+                }
+              }
+            },
+            {
+              "reserveInventory": {
+                "call": "http",
+                "with": {
+                  "method": "POST",
+                  "endpoint": {
+                    "uri": "http://inventory-service/reserve"
+                  },
+                  "body": {
+                    "items": "${ .input.order.items }"
+                  }
+                }
+              }
+            }
+          ],
+          "join": "all"
+        }
+      }
+    },
+    {
+      "prepareOrderResponse": {
+        "set": {
+          "result": {
+            "orderId": "${ .input.order.id }",
+            "status": "PROCESSING",
+            "paymentStatus": "${ .processingResults.handlePayment.status }",
+            "inventoryStatus": "${ .processingResults.reserveInventory.status }",
+            "estimatedShipDate": "${ new Date(Date.now() + 86400000 * 2).toISOString() }"
+          }
+        }
+      }
+    }
+  ]
+} 

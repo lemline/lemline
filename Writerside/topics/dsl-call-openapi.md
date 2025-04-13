@@ -1,6 +1,7 @@
 ---
 title: OpenAPI Call
 ---
+<!-- Examples are validated -->
 
 # OpenAPI Call Task (`call: openapi`)
 
