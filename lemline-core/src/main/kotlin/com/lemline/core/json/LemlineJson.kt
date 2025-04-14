@@ -18,6 +18,7 @@ object LemlineJson {
     // Define the serializers module
     private val module = SerializersModule {
         contextual(InstantSerializer)
+        contextual(UUIDSerializer)
         // Potentially add other contextual serializers here
     }
 

@@ -1,7 +1,7 @@
 package com.lemline.worker.repositories
 
 import com.lemline.worker.PostgresTestResource
-import com.lemline.worker.models.WorkflowDefinition
+import com.lemline.worker.models.WorkflowModel
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
@@ -13,7 +13,7 @@ import org.junit.jupiter.api.*
 @QuarkusTestResource(PostgresTestResource::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-internal class WorkflowRepositoryTest {
+internal class WorkflowModelRepositoryTest {
 
     @Inject
     lateinit var repository: WorkflowRepository
@@ -25,7 +25,7 @@ internal class WorkflowRepositoryTest {
     @Transactional
     fun setupTest() {
         // Clear the database before each test
-        entityManager.createQuery("DELETE FROM WorkflowDefinition").executeUpdate()
+        entityManager.createQuery("DELETE FROM WorkflowModel").executeUpdate()
     }
 
     @Test
@@ -47,12 +47,12 @@ internal class WorkflowRepositoryTest {
         // Given
         val name = "test-workflow"
         val version = "1.0.0"
-        val workflow = WorkflowDefinition().apply {
+        val workflowModel = WorkflowModel().apply {
             this.name = name
             this.version = version
             this.definition = "test definition"
         }
-        entityManager.persist(workflow)
+        entityManager.persist(workflowModel)
         entityManager.flush()
 
         // When

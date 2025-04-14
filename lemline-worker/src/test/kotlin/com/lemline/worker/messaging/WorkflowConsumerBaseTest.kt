@@ -1,7 +1,7 @@
 package com.lemline.worker.messaging
 
 import com.lemline.core.json.LemlineJson
-import com.lemline.worker.models.WorkflowDefinition
+import com.lemline.worker.models.WorkflowModel
 import com.lemline.worker.outbox.OutBoxStatus
 import com.lemline.worker.repositories.RetryRepository
 import com.lemline.worker.repositories.WaitRepository
@@ -45,12 +45,13 @@ abstract class WorkflowConsumerBaseTest {
     fun setup() {
         // Clear the database
         entityManager.createQuery("DELETE FROM RetryModel").executeUpdate()
+        entityManager.createQuery("DELETE FROM WaitModel").executeUpdate()
         entityManager.createQuery("DELETE FROM TimeoutModel").executeUpdate()
-        entityManager.createQuery("DELETE FROM WorkflowDefinition").executeUpdate()
+        entityManager.createQuery("DELETE FROM WorkflowModel").executeUpdate()
         entityManager.flush()
 
         // Create test workflow definition
-        val workflowDefinition = WorkflowDefinition().apply {
+        val workflowModel = WorkflowModel().apply {
             name = "test-workflow"
             version = "1.0.0"
             definition = """
@@ -103,7 +104,7 @@ abstract class WorkflowConsumerBaseTest {
                               caught: true
             """.trimIndent().replace("@", "$")
         }
-        with(workflowRepository) { workflowDefinition.save() }
+        with(workflowRepository) { workflowModel.save() }
         entityManager.flush()
 
         setupMessaging()

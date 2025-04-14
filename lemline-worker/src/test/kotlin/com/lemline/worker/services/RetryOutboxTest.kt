@@ -222,7 +222,7 @@ internal class RetryOutboxTest {
         assertEquals(
             recentMessage.id,
             remainingMessages[0].id,
-            "Remaining messages is not $recentMessage:\n${remainingMessages.joinToString("\n")}"
+            "Remaining messages is not $recentMessage:\n${remainingMessages.map { LemlineJson.encodeToPrettyString(it) }}"
         )
     }
 
@@ -262,7 +262,7 @@ internal class RetryOutboxTest {
         assertEquals(
             2,
             remainingMessages.size,
-            "Remaining messages size is not 2:\n${remainingMessages.joinToString("\n")}"
+            "Remaining messages size is not 2:\n${remainingMessages.map { LemlineJson.encodeToPrettyString(it) }}"
         )
     }
 
