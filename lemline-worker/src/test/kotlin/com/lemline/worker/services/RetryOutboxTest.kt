@@ -218,11 +218,15 @@ internal class RetryOutboxTest {
             .createQuery("FROM RetryModel", RetryModel::class.java)
             .resultList
 
-        assertEquals(1, remainingMessages.size)
+        assertEquals(
+            1,
+            remainingMessages.size,
+            "Remaining messages is not recentMessage:\n${remainingMessages.map { LemlineJson.encodeToPrettyString(it) }}"
+        )
         assertEquals(
             recentMessage.id,
             remainingMessages[0].id,
-            "Remaining messages is not $recentMessage:\n${remainingMessages.map { LemlineJson.encodeToPrettyString(it) }}"
+            "Remaining messages is not recentMessage:\n${remainingMessages.map { LemlineJson.encodeToPrettyString(it) }}"
         )
     }
 

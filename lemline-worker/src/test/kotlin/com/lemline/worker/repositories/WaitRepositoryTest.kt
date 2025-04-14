@@ -39,6 +39,7 @@ internal class WaitRepositoryTest {
     internal fun setupTest() {
         // Clear the database before each test
         entityManager.createQuery("DELETE FROM WaitModel").executeUpdate()
+        entityManager.flush()
     }
 
     @Transactional
@@ -48,7 +49,7 @@ internal class WaitRepositoryTest {
         // Create test messages in a transaction
         repeat(count) { i ->
             val message = WaitModel().apply {
-                message = "test$i"
+                message = "test+$i"
                 status = OutBoxStatus.PENDING
                 delayedUntil = now.plus(((1 + i) * duration).minutes.toJavaDuration())
                 this.attemptCount = attemptCount
@@ -350,7 +351,7 @@ internal class WaitRepositoryTest {
         userTransaction.begin()
         repeat(messageCount) { i ->
             val message = WaitModel().apply {
-                message = "test$i"
+                message = "test-$i"
                 status = if (i < messageCount / 2) OutBoxStatus.PENDING else OutBoxStatus.SENT
                 delayedUntil = if (i < messageCount / 2) {
                     now.minus((i + 1).toLong(), ChronoUnit.MINUTES)

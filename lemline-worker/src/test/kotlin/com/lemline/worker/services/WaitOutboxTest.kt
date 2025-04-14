@@ -214,8 +214,14 @@ internal class WaitOutboxTest {
             .createQuery("FROM WaitModel", WaitModel::class.java)
             .resultList
 
-        Assertions.assertEquals(1, remainingMessages.size)
-        Assertions.assertEquals(recentMessage.id, remainingMessages[0].id)
+        Assertions.assertEquals(
+            1, remainingMessages.size,
+            "Remaining messages is not recentMessage:\n${remainingMessages.map { LemlineJson.encodeToPrettyString(it) }}"
+        )
+        Assertions.assertEquals(
+            recentMessage.id, remainingMessages[0].id,
+            "Remaining messages is not recentMessage:\n${remainingMessages.map { LemlineJson.encodeToPrettyString(it) }}"
+        )
     }
 
     @Test
@@ -245,7 +251,10 @@ internal class WaitOutboxTest {
             .createQuery("FROM WaitModel", WaitModel::class.java)
             .resultList
 
-        Assertions.assertEquals(2, remainingMessages.size)
+        Assertions.assertEquals(
+            2, remainingMessages.size,
+            "Remaining messages size is not 2:\n${remainingMessages.map { LemlineJson.encodeToPrettyString(it) }}"
+        )
     }
 
     @Test
