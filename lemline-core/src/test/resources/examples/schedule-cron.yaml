@@ -1,0 +1,13 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: cron-schedule
+  version: '0.1.0'
+schedule:
+  cron: 0 0 * * *
+do:
+  - backup:
+      call: http
+      with:
+        method: post
+        endpoint: https://example.com/api/v1/backup/start

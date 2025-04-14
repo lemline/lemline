@@ -1,0 +1,26 @@
+document:
+  dsl: '1.0.0'
+  namespace: examples
+  name: bearer-auth
+  version: '0.1.0'
+do:
+  - trySomething:
+      try:
+        - setInvalid:
+            input:
+              schema:
+                format: json
+                document:
+                  type: object
+                  required:
+                    - searchQuery
+                  properties:
+                    searchQuery:
+                      type: string
+            set:
+              value: "invalid"
+      catch:
+        do:
+          - setCaught:
+              set:
+                caught: true

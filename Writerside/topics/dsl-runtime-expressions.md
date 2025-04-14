@@ -26,7 +26,7 @@ By default, expressions are written using the syntax of the configured expressio
 
 * **Default**: The default and mandatory expression language is **JQ** ([
   `jq` documentation](https://jqlang.github.io/jq/)). The implementation uses the `net.thisptr.jackson.jq` library (see
-  `com.lemline.sw.expressions.JQExpression.kt`).
+  `com.lemline.core.expressions.JQExpression.kt`).
 * **Configuration**: Runtimes *may* support other languages. If so, the language for a workflow can typically be
   specified using the top-level `evaluate.language` property in the workflow definition (refer to the
   [Resources Configuration Overview](dsl-resources-configuration-overview.md)).
@@ -59,7 +59,7 @@ These provide access to the current state of the workflow and task execution.
 
 ### Argument Structures
 
-These structures define the data available within the descriptor arguments. See `com.lemline.sw.expressions.scopes.*`
+These structures define the data available within the descriptor arguments. See `com.lemline.core.expressions.scopes.*`
 classes for implementation details.
 
 #### Runtime Descriptor (`$runtime`)

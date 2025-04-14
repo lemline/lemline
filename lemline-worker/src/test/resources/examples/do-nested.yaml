@@ -1,0 +1,39 @@
+document:
+  dsl: '1.0.0-alpha5'
+  namespace: examples
+  name: call-http-shorthand-endpoint
+  version: '0.1.0'
+do:
+  - getPet:
+      call: http
+      with:
+        method: get
+        endpoint: https://petstore.swagger.io/v2/pet/{petId}
+  - nested:
+      do:
+        - init:
+            set:
+              startEvent: ${ $workflow.input[0] }
+        - getPet:
+            call: http
+            with:
+              method: get
+              endpoint: https://petstore.swagger.io/v2/pet/{petId}
+        - buyPet0:
+            call: http
+            with:
+              method: put
+              endpoint: https://petstore.swagger.io/v2/pet/{petId}
+              body: '${ . + { status: "sold" } }'
+        - buyPet1:
+            call: http
+            with:
+              method: put
+              endpoint: https://petstore.swagger.io/v2/pet/{petId}
+              body: '${ . + { status: "sold" } }'
+  - buyPet:
+      call: http
+      with:
+        method: put
+        endpoint: https://petstore.swagger.io/v2/pet/{petId}
+        body: '${ . + { status: "sold" } }'
