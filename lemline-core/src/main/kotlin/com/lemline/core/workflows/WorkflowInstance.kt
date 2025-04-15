@@ -30,8 +30,8 @@ import kotlinx.serialization.json.JsonElement
 class WorkflowInstance(
     val name: String,
     val version: String,
-    initialStates: Map<NodePosition, NodeState>,
-    initialPosition: NodePosition,
+    states: Map<NodePosition, NodeState>,
+    position: NodePosition,
     secrets: Map<String, JsonElement>,
 ) {
 
@@ -55,14 +55,14 @@ class WorkflowInstance(
         ) = WorkflowInstance(
             name = name,
             version = version,
-            initialStates = mapOf(
+            states = mapOf(
                 NodePosition.root to NodeState(
                     workflowId = id,
                     rawInput = rawInput,
                     startedAt = Clock.System.now(),
                 )
             ),
-            initialPosition = NodePosition.root,
+            position = NodePosition.root,
             secrets = secrets
         )
     }
@@ -115,7 +115,7 @@ class WorkflowInstance(
         workflow = Workflows.getOrNull(name, version) ?: error("workflow $name (version $version) not found")
 
         // init workflow data
-        val rootState = initialStates[NodePosition.root] ?: error("no initial state provided for the root node")
+        val rootState = states[NodePosition.root] ?: error("no initial state provided for the root node")
         val errorStr by lazy { "provided in the root node of the initial state" }
         this.id = rootState.workflowId ?: error("no workflow id $errorStr")
         this.startedAt = rootState.startedAt ?: error("no startedAt $errorStr")
@@ -123,7 +123,7 @@ class WorkflowInstance(
 
         // init root instance and workflow scope
         val rootNode = Workflows.getRootNode(workflow)
-        rootInstance = rootNode.createInstance(initialStates, null) as RootInstance
+        rootInstance = rootNode.createInstance(states, null) as RootInstance
         rootInstance.secrets = secrets
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
@@ -150,8 +150,8 @@ class WorkflowInstance(
      * This property is initialized when the workflow is run and represents
      * the current nodeInstance in the workflow execution.
      */
-    var currentNodeInstance: NodeInstance<*> = nodeInstances[initialPosition]
-        ?: error("node not found in initialPosition $initialPosition")
+    var currentNodeInstance: NodeInstance<*> = nodeInstances[position]
+        ?: error("node not found in initialPosition $position")
 
     /**
      * Retrieves the current position in the workflow.

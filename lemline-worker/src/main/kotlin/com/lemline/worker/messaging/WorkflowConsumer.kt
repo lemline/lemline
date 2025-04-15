@@ -48,7 +48,7 @@ open class WorkflowConsumer(
             // save to retry table with a status of FAILED
             msg.saveMsgAsFailed(e)
             // Send message to dead letter queue
-            // NOTE - we MUST set mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
+            // NOTE - MUST have mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
             // If not, Quarkus will stop consuming messages
             throw e
         }
@@ -77,15 +77,15 @@ open class WorkflowConsumer(
             // Load workflow definition from database
             val workflowDefinition = workflowRepository.findByNameAndVersion(name, version)
                 ?: error("Workflow $name:$version not found")
-            // load and validate workflow definition
+            // validate workflow definition and put it in cache
             Workflows.parseAndPut(workflowDefinition.definition)
         }
 
         val instance = WorkflowInstance(
             name = workflowMessage.name,
             version = workflowMessage.version,
-            initialStates = workflowMessage.states,
-            initialPosition = workflowMessage.position,
+            states = workflowMessage.states,
+            position = workflowMessage.position,
             secrets = Secrets.get(workflow)
         )
 

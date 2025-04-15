@@ -22,15 +22,15 @@ dependencies {
 
     // Quarkus
     implementation("io.quarkus:quarkus-kotlin")
-    implementation("io.quarkus:quarkus-flyway") // DB migration
-    implementation("io.quarkus:quarkus-rest-jackson") // Rest Server with Json serialization
+    implementation("io.quarkus:quarkus-flyway")             // DB migration
+    implementation("io.quarkus:quarkus-rest-jackson")       // Rest Server with Json serialization
     implementation("io.quarkus:quarkus-messaging")
-    implementation("io.quarkus:quarkus-messaging-kafka") // Kafka Messaging
+    implementation("io.quarkus:quarkus-messaging-kafka")    // Kafka Messaging
     implementation("io.quarkus:quarkus-messaging-rabbitmq") // RabbitMQ Messaging
-    implementation("io.quarkus:quarkus-mutiny") // Reactive programming
+    implementation("io.quarkus:quarkus-mutiny")             // Reactive programming
     implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin") // ORM With Hibernate / Panache
-    implementation("io.quarkus:quarkus-scheduler")  // Scheduler
-    implementation("io.quarkus:quarkus-jdbc-postgresql") // Postgres Database driver
+    implementation("io.quarkus:quarkus-scheduler")          // Scheduler
+    implementation("io.quarkus:quarkus-jdbc-postgresql")    // Postgres Database driver
 
     // Serverless Workflow SDK
     implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
@@ -58,8 +58,8 @@ dependencies {
     testImplementation("org.testcontainers:rabbitmq")
 }
 
-group = "com.lemline"
-version = "1.0.0-SNAPSHOT"
+group = "com.lemline.worker"
+version = "0.0.1-SNAPSHOT"
 
 allOpen {
     // Allows Hibernate to work with Kotlin classes by marking classes annotated with @Entity as open for extension.
@@ -73,6 +73,10 @@ allOpen {
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+}
+
+quarkus {
+    this
 }
 
 kotlin {
