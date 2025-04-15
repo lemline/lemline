@@ -5,9 +5,9 @@ plugins {
     // Apply Kotlin Serialization plugin from `gradle/libs.versions.toml`.
     alias(libs.plugins.kotlinPluginSerialization)
 
-    kotlin("plugin.allopen") version "2.1.10"
-    kotlin("plugin.jpa") version "2.1.10"
-    id("io.quarkus") version "3.21.0"
+    kotlin("plugin.allopen") version "2.1.20"
+    kotlin("plugin.jpa") version "2.1.20"
+    id("io.quarkus") version "3.21.2"
 }
 
 dependencies {
@@ -35,10 +35,6 @@ dependencies {
     // Serverless Workflow SDK
     implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
     implementation("io.serverlessworkflow:serverlessworkflow-impl-core:7.0.0.Final")
-
-    // Add Kotlin Serialization
-    //implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-    //implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.2")
 
     // UUID Creator
     implementation("com.github.f4b6a3:uuid-creator:6.0.0")
