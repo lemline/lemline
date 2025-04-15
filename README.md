@@ -80,3 +80,11 @@ Supporting:
 ### [ ] Catalog:
 
 ### [ ] Extension
+
+## Database Support
+
+The lemline-worker module supports the following databases:
+- PostgreSQL (default)
+- MySQL
+
+You can find more information about database configuration in the [lemline-worker README](lemline-worker/README.md).

@@ -39,6 +39,7 @@ internal class RetryRepositoryTest {
     internal fun setupTest() {
         // Clear the database before each test
         entityManager.createQuery("DELETE FROM RetryModel").executeUpdate()
+        entityManager.flush()
     }
 
     @Transactional

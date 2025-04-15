@@ -31,6 +31,7 @@ dependencies {
     implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin") // ORM With Hibernate / Panache
     implementation("io.quarkus:quarkus-scheduler")          // Scheduler
     implementation("io.quarkus:quarkus-jdbc-postgresql")    // Postgres Database driver
+    implementation("io.quarkus:quarkus-jdbc-mysql")         // MySQL Database driver
 
     // Serverless Workflow SDK
     implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
