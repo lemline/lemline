@@ -1,12 +1,15 @@
-package com.lemline.worker.repositories
+package com.lemline.worker.repositories.bases
 
 import com.lemline.worker.models.RetryModel
 import com.lemline.worker.outbox.OutBoxStatus
+import com.lemline.worker.repositories.RetryRepository
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
 import jakarta.transaction.UserTransaction
-import org.junit.jupiter.api.*
+import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.CountDownLatch

@@ -1,8 +1,12 @@
-package com.lemline.worker.outbox
+package com.lemline.worker.outbox.bases
 
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.worker.messaging.WorkflowMessage
+import com.lemline.worker.outbox.OutBoxStatus
+import com.lemline.worker.outbox.OutboxMessage
+import com.lemline.worker.outbox.OutboxProcessor
+import com.lemline.worker.outbox.OutboxRepository
 import io.mockk.clearMocks
 import io.mockk.every
 import io.mockk.mockk

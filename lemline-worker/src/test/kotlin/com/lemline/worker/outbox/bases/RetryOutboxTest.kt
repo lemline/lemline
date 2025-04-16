@@ -1,21 +1,22 @@
-package com.lemline.worker.outbox
+package com.lemline.worker.outbox.bases
 
-import com.lemline.worker.models.WaitModel
-import com.lemline.worker.repositories.WaitRepository
+import com.lemline.worker.models.RetryModel
+import com.lemline.worker.outbox.RetryOutbox
+import com.lemline.worker.repositories.RetryRepository
 import jakarta.inject.Inject
 
 /**
- * Base test class for WaitOutbox implementations that works with both MySQL and PostgreSQL.
+ * Base test class for RetryOutbox implementations that works with both MySQL and PostgreSQL.
  */
-abstract class WaitOutboxTest : AbstractOutboxTest<WaitModel>() {
+abstract class RetryOutboxTest : AbstractOutboxTest<RetryModel>() {
 
     @Inject
-    override lateinit var repository: WaitRepository
+    override lateinit var repository: RetryRepository
 
-    override val entity = WaitModel::class.java
+    override val entity = RetryModel::class.java
 
     private val outbox by lazy {
-        WaitOutbox(
+        RetryOutbox(
             repository = repository,
             emitter = emitter,
             retryMaxAttempts = 3,
@@ -38,3 +39,4 @@ abstract class WaitOutboxTest : AbstractOutboxTest<WaitModel>() {
         outbox.cleanupOutbox()
     }
 }
+

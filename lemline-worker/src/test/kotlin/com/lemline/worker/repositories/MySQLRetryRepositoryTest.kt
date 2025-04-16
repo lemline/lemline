@@ -1,5 +1,6 @@
 package com.lemline.worker.repositories
 
+import com.lemline.worker.repositories.bases.AbstractRetryRepositoryTest
 import com.lemline.worker.tests.profiles.MySQLTestProfile
 import com.lemline.worker.tests.resources.MySQLTestResource
 import io.quarkus.test.common.QuarkusTestResource
@@ -17,4 +18,4 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
 @Tag("mysql")
-class MySQLRetryRepositoryTest : AbstractRetryRepositoryTest() 
+class MySQLRetryRepositoryTest : AbstractRetryRepositoryTest()

@@ -1,5 +1,6 @@
 package com.lemline.worker.outbox
 
+import com.lemline.worker.outbox.bases.WaitOutboxTest
 import com.lemline.worker.tests.profiles.MySQLTestProfile
 import com.lemline.worker.tests.resources.MySQLTestResource
 import io.quarkus.test.common.QuarkusTestResource

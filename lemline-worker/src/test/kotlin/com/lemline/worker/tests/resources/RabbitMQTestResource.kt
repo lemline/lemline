@@ -35,8 +35,12 @@ class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
     }
 
     override fun stop() {
-        rabbitmq.stop()
-        rabbitmq.close()
-        network.close()
+        if (::rabbitmq.isInitialized) {
+            rabbitmq.stop()
+            rabbitmq.close()
+        }
+        if (::network.isInitialized) {
+            network.close()
+        }
     }
 } 

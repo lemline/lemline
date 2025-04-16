@@ -1,7 +1,8 @@
-package com.lemline.worker.repositories
+package com.lemline.worker.repositories.bases
 
 import com.lemline.worker.models.WaitModel
 import com.lemline.worker.outbox.OutBoxStatus
+import com.lemline.worker.repositories.WaitRepository
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
@@ -11,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -29,7 +29,7 @@ abstract class AbstractWaitRepositoryTest {
 
     @Inject
     protected lateinit var entityManager: EntityManager
-    
+
     @Inject
     protected lateinit var userTransaction: UserTransaction
 
@@ -40,7 +40,7 @@ abstract class AbstractWaitRepositoryTest {
         entityManager.createQuery("DELETE FROM WaitModel").executeUpdate()
         entityManager.flush()
     }
-    
+
     @Transactional
     protected fun createPendingMessage(count: Int, attemptCount: Int = 0, duration: Int = -1) {
         // Given

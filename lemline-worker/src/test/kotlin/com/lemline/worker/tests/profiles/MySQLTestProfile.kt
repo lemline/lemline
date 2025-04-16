@@ -7,7 +7,5 @@ import io.quarkus.test.junit.QuarkusTestProfile
  * This ensures that MySQL-specific configuration is used.
  */
 class MySQLTestProfile : QuarkusTestProfile {
-    override fun getConfigProfile(): String {
-        return "mysql"
-    }
+    override fun getConfigProfile() = "mysql"
 } 

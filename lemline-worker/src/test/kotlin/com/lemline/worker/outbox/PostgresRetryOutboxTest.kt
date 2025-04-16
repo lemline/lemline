@@ -1,5 +1,6 @@
 package com.lemline.worker.outbox
 
+import com.lemline.worker.outbox.bases.RetryOutboxTest
 import com.lemline.worker.tests.profiles.PostgresTestProfile
 import com.lemline.worker.tests.resources.PostgresTestResource
 import io.quarkus.test.common.QuarkusTestResource

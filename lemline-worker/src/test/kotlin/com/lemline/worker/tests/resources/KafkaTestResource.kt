@@ -33,8 +33,12 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
     }
 
     override fun stop() {
-        kafka.stop()
-        kafka.close()
-        network.close()
+        if (::kafka.isInitialized) {
+            kafka.stop()
+            kafka.close()
+        }
+        if (::network.isInitialized) {
+            network.close()
+        }
     }
 } 

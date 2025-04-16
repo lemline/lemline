@@ -9,7 +9,7 @@ import org.slf4j.Logger
 import java.time.Instant
 import kotlin.math.absoluteValue
 
-class OutboxProcessorTest : FunSpec({
+internal class OutboxProcessorTest : FunSpec({
     val logger = mockk<Logger>(relaxed = true)
     val repository = mockk<OutboxRepository<TestMessage>>()
     val processor = mockk<(TestMessage) -> Unit>()
@@ -49,7 +49,7 @@ class OutboxProcessorTest : FunSpec({
     }
 })
 
-data class TestMessage(
+internal data class TestMessage(
     override var id: String?,
     override var message: String,
     override var status: OutBoxStatus,

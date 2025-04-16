@@ -9,7 +9,7 @@ import org.testcontainers.utility.DockerImageName
  * This spins up a PostgreSQL container for tests.
  */
 class PostgresTestResource : QuarkusTestResourceLifecycleManager {
-    private var postgres: PostgreSQLContainer<*>? = null
+    private lateinit var postgres: PostgreSQLContainer<*>
 
     override fun start(): Map<String, String> {
         postgres = PostgreSQLContainer(DockerImageName.parse("postgres:14-alpine"))
@@ -17,13 +17,13 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
             .withUsername("test")
             .withPassword("test")
 
-        postgres?.start()
+        postgres.start()
 
         // Set system properties for datasource config - Quarkus will pick these up
         System.setProperty("quarkus.datasource.db-kind", "postgresql")
-        System.setProperty("quarkus.datasource.jdbc.url", postgres?.jdbcUrl ?: "")
-        System.setProperty("quarkus.datasource.username", postgres?.username ?: "")
-        System.setProperty("quarkus.datasource.password", postgres?.password ?: "")
+        System.setProperty("quarkus.datasource.jdbc.url", postgres.jdbcUrl)
+        System.setProperty("quarkus.datasource.username", postgres.username)
+        System.setProperty("quarkus.datasource.password", postgres.password)
         // Do NOT set flyway locations dynamically
 
         // Only return the profile setting
@@ -34,11 +34,13 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
     }
 
     override fun stop() {
-        postgres?.stop()
-        // Clean up system properties
-        System.clearProperty("quarkus.datasource.db-kind")
-        System.clearProperty("quarkus.datasource.jdbc.url")
-        System.clearProperty("quarkus.datasource.username")
-        System.clearProperty("quarkus.datasource.password")
+        if (::postgres.isInitialized) {
+            postgres.stop()
+            // Clean up system properties
+            System.clearProperty("quarkus.datasource.db-kind")
+            System.clearProperty("quarkus.datasource.jdbc.url")
+            System.clearProperty("quarkus.datasource.username")
+            System.clearProperty("quarkus.datasource.password")
+        }
     }
 } 

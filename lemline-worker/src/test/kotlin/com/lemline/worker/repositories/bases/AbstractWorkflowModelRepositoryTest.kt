@@ -1,6 +1,7 @@
-package com.lemline.worker.repositories
+package com.lemline.worker.repositories.bases
 
 import com.lemline.worker.models.WorkflowModel
+import com.lemline.worker.repositories.WorkflowRepository
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
