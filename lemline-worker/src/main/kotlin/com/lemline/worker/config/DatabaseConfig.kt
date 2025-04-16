@@ -1,10 +1,10 @@
 package com.lemline.worker.config
 
+import com.lemline.common.logger
 import io.quarkus.runtime.StartupEvent
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
 import org.eclipse.microprofile.config.inject.ConfigProperty
-import org.jboss.logging.Logger
 
 /**
  * Configuration class for database selection.
@@ -13,7 +13,7 @@ import org.jboss.logging.Logger
 @ApplicationScoped
 class DatabaseConfig {
 
-    private val logger = Logger.getLogger(DatabaseConfig::class.java)
+    private val logger = logger()
 
     @ConfigProperty(name = "lemline.database.type", defaultValue = "postgresql")
     lateinit var databaseType: String

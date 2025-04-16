@@ -253,9 +253,9 @@ abstract class AbstractRetryRepositoryTest {
     @Test
     fun `findAndLockReadyToProcess should not return same messages to concurrent requests`() {
         // Given
-        val messageCount = 10
+        val messageCount = 100
         val concurrentRequests = 5
-        val limit = 3
+        val limit = 40
 
         // Create test messages in a transaction
         createPendingMessage(messageCount)
@@ -296,9 +296,9 @@ abstract class AbstractRetryRepositoryTest {
     @Test
     fun `findAndLockForDeletion should handle concurrent deletion requests`() {
         // Given
-        val messageCount = 10
+        val messageCount = 100
         val concurrentRequests = 5
-        val limit = 3
+        val limit = 40
 
         // Create test messages
         createSentMessage(messageCount)

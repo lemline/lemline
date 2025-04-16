@@ -58,6 +58,7 @@ dependencies {
     testImplementation("org.testcontainers:mysql")
     testImplementation("org.testcontainers:kafka")
     testImplementation("org.testcontainers:rabbitmq")
+    testImplementation("io.quarkus:quarkus-jdbc-h2") // Add H2 for testing
 }
 
 group = "com.lemline.worker"

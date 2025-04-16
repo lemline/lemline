@@ -1,20 +1,15 @@
 package com.lemline.worker.repositories
 
-import com.lemline.worker.config.DatabaseConfig
 import com.lemline.worker.models.RETRY_TABLE
 import com.lemline.worker.models.RetryModel
 import com.lemline.worker.outbox.OutBoxStatus
 import com.lemline.worker.outbox.OutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.inject.Inject
 import jakarta.transaction.Transactional
 import java.time.Instant
 
 @ApplicationScoped
 class RetryRepository : UuidV7Repository<RetryModel>, OutboxRepository<RetryModel> {
-
-    @Inject
-    lateinit var databaseConfig: DatabaseConfig
 
     @Transactional
     fun save(retry: RetryModel) {
@@ -37,27 +32,15 @@ class RetryRepository : UuidV7Repository<RetryModel>, OutboxRepository<RetryMode
     @Suppress("UNCHECKED_CAST")
     override fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) = getEntityManager()
         .createNativeQuery(
-            if (databaseConfig.isPostgreSQL()) {
-                """
-                    SELECT * FROM $RETRY_TABLE 
-                    WHERE status = ?1 
-                    AND delayed_until <= ?2 
-                    AND attempt_count < ?3 
-                    ORDER BY delayed_until ASC 
-                    FOR UPDATE SKIP LOCKED 
-                    LIMIT ?4
-                """.trimIndent()
-            } else {
-                """
-                    SELECT * FROM $RETRY_TABLE 
-                    WHERE status = ?1 
-                    AND delayed_until <= ?2 
-                    AND attempt_count < ?3 
-                    ORDER BY delayed_until ASC 
-                    LIMIT ?4
-                    FOR UPDATE SKIP LOCKED
-                """.trimIndent()
-            }, RetryModel::class.java
+            """
+            SELECT * FROM $RETRY_TABLE 
+            WHERE status = ?1 
+            AND delayed_until <= ?2 
+            AND attempt_count < ?3 
+            ORDER BY delayed_until ASC 
+            LIMIT ?4
+            FOR UPDATE SKIP LOCKED
+            """.trimIndent(), RetryModel::class.java
         )
         .setParameter(1, OutBoxStatus.PENDING.name)
         .setParameter(2, Instant.now())
@@ -68,25 +51,14 @@ class RetryRepository : UuidV7Repository<RetryModel>, OutboxRepository<RetryMode
     @Suppress("UNCHECKED_CAST")
     override fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) = getEntityManager()
         .createNativeQuery(
-            if (databaseConfig.isPostgreSQL()) {
-                """
-                    SELECT * FROM $RETRY_TABLE 
-                    WHERE status = ?1 
-                    AND delayed_until < ?2 
-                    ORDER BY delayed_until ASC 
-                    FOR UPDATE SKIP LOCKED 
-                    LIMIT ?3
-                """.trimIndent()
-            } else {
-                """
-                    SELECT * FROM $RETRY_TABLE 
-                    WHERE status = ?1 
-                    AND delayed_until < ?2 
-                    ORDER BY delayed_until ASC 
-                    LIMIT ?3
-                    FOR UPDATE SKIP LOCKED
-                """.trimIndent()
-            }, RetryModel::class.java
+            """
+            SELECT * FROM $RETRY_TABLE 
+            WHERE status = ?1 
+            AND delayed_until < ?2 
+            ORDER BY delayed_until ASC 
+            LIMIT ?3
+            FOR UPDATE SKIP LOCKED
+            """.trimIndent(), RetryModel::class.java
         )
         .setParameter(1, OutBoxStatus.SENT.name)
         .setParameter(2, cutoffDate)
