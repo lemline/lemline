@@ -7,7 +7,6 @@ import io.kotest.matchers.shouldBe
 import io.mockk.mockk
 import org.slf4j.Logger
 import java.time.Instant
-import java.util.*
 import kotlin.math.absoluteValue
 
 class OutboxProcessorTest : FunSpec({
@@ -51,7 +50,8 @@ class OutboxProcessorTest : FunSpec({
 })
 
 data class TestMessage(
-    override var id: UUID?,
+    override var id: String?,
+    override var message: String,
     override var status: OutBoxStatus,
     override var attemptCount: Int,
     override var lastError: String?,

@@ -55,6 +55,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")
+    testImplementation("org.testcontainers:mysql")
     testImplementation("org.testcontainers:kafka")
     testImplementation("org.testcontainers:rabbitmq")
 }

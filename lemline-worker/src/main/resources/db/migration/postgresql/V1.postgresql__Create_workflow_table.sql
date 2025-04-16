@@ -1,6 +1,6 @@
 CREATE TABLE workflows
 (
-    id             UUID PRIMARY KEY,
+    id             VARCHAR(36) PRIMARY KEY,
     name           VARCHAR(255) NOT NULL,
     version        VARCHAR(255) NOT NULL,
     definition     TEXT         NOT NULL,

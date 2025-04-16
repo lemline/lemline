@@ -1,17 +1,17 @@
 package com.lemline.worker.repositories
 
-import com.lemline.worker.PostgresTestResource
-import com.lemline.worker.models.RetryModel
+import com.lemline.worker.models.WaitModel
 import com.lemline.worker.outbox.OutBoxStatus
-import io.quarkus.test.common.QuarkusTestResource
-import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
 import jakarta.transaction.UserTransaction
-import org.junit.jupiter.api.*
+import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -19,37 +19,36 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaDuration
 
-@QuarkusTest
-@QuarkusTestResource(PostgresTestResource::class)
-@TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Tag("integration")
-internal class RetryRepositoryTest {
+/**
+ * Abstract base class for wait repository tests.
+ */
+abstract class AbstractWaitRepositoryTest {
 
     @Inject
-    lateinit var repository: RetryRepository
+    protected lateinit var repository: WaitRepository
 
     @Inject
-    lateinit var entityManager: EntityManager
-
+    protected lateinit var entityManager: EntityManager
+    
     @Inject
-    lateinit var userTransaction: UserTransaction
+    protected lateinit var userTransaction: UserTransaction
 
     @BeforeEach
     @Transactional
-    internal fun setupTest() {
+    fun setupTest() {
         // Clear the database before each test
-        entityManager.createQuery("DELETE FROM RetryModel").executeUpdate()
+        entityManager.createQuery("DELETE FROM WaitModel").executeUpdate()
         entityManager.flush()
     }
-
+    
     @Transactional
-    internal fun createPendingMessage(count: Int, attemptCount: Int = 0, duration: Int = -1) {
+    protected fun createPendingMessage(count: Int, attemptCount: Int = 0, duration: Int = -1) {
         // Given
         val now = Instant.now()
         // Create test messages in a transaction
         repeat(count) { i ->
-            val message = RetryModel().apply {
-                message = "test$i"
+            val message = WaitModel().apply {
+                message = "test+$i"
                 status = OutBoxStatus.PENDING
                 delayedUntil = now.plus(((1 + i) * duration).minutes.toJavaDuration())
                 this.attemptCount = attemptCount
@@ -60,12 +59,12 @@ internal class RetryRepositoryTest {
     }
 
     @Transactional
-    internal fun createSentMessage(count: Int, attemptCount: Int = 0, duration: Int = -2) {
+    protected fun createSentMessage(count: Int, attemptCount: Int = 0, duration: Int = -2) {
         // Given
         val now = Instant.now()
         // Create test messages in a transaction
         repeat(count) { i ->
-            val message = RetryModel().apply {
+            val message = WaitModel().apply {
                 message = "test$i"
                 status = OutBoxStatus.SENT
                 delayedUntil = now.plus(((1 + i) * duration).days.toJavaDuration())
@@ -80,7 +79,7 @@ internal class RetryRepositoryTest {
         repository.findAndLockReadyToProcess(limit = limit, maxAttempts = maxAttempts)
 
     @Transactional
-    internal fun findAndProcess(limit: Int, maxAttempts: Int) =
+    protected fun findAndProcess(limit: Int, maxAttempts: Int) =
         findAndLockReadyToProcess(limit, maxAttempts)
             .onEach { it.status = OutBoxStatus.SENT }
 
@@ -88,7 +87,7 @@ internal class RetryRepositoryTest {
         repository.findAndLockForDeletion(cutoffDate, limit)
 
     @Transactional
-    internal fun findAndDelete(cutoffDate: Instant, limit: Int) =
+    protected fun findAndDelete(cutoffDate: Instant, limit: Int) =
         findAndLockForDeletion(cutoffDate, limit)
             .onEach { it.delete() }
 
@@ -100,11 +99,11 @@ internal class RetryRepositoryTest {
         val delayedUntil = Instant.now().plus(5, ChronoUnit.MINUTES)
 
         // When
-        repository.save(RetryModel.create(message, delayedUntil))
+        repository.save(WaitModel.create(message, delayedUntil))
 
         // Then
         val savedMessage = entityManager
-            .createQuery("FROM RetryModel", RetryModel::class.java)
+            .createQuery("FROM WaitModel", WaitModel::class.java)
             .singleResult
 
         Assertions.assertNotNull(savedMessage)
@@ -123,12 +122,12 @@ internal class RetryRepositoryTest {
         val secondDelay = Instant.now().plus(10, ChronoUnit.MINUTES)
 
         // When
-        repository.save(RetryModel.create(message, firstDelay))
-        repository.save(RetryModel.create(message, secondDelay))
+        repository.save(WaitModel.create(message, firstDelay))
+        repository.save(WaitModel.create(message, secondDelay))
 
         // Then
         val savedMessages = entityManager
-            .createQuery("FROM RetryModel", RetryModel::class.java)
+            .createQuery("FROM WaitModel", WaitModel::class.java)
             .resultList
 
         Assertions.assertEquals(2, savedMessages.size)
@@ -147,7 +146,7 @@ internal class RetryRepositoryTest {
     }
 
     @Test
-    internal fun `findAndLockReadyToProcess should return messages ready to process`() {
+    fun `findAndLockReadyToProcess should return messages ready to process`() {
         // Given
         createPendingMessage(2)
 
@@ -162,7 +161,7 @@ internal class RetryRepositoryTest {
     }
 
     @Test
-    internal fun `findAndLockReadyToProcess should not return messages with too many attempts`() {
+    fun `findAndLockReadyToProcess should not return messages with too many attempts`() {
         // Given
         createPendingMessage(2, 3)
 
@@ -174,7 +173,7 @@ internal class RetryRepositoryTest {
     }
 
     @Test
-    internal fun `findAndLockReadyToProcess should not return future messages`() {
+    fun `findAndLockReadyToProcess should not return future messages`() {
         // Given
         createPendingMessage(2, duration = 1)
 
@@ -186,7 +185,7 @@ internal class RetryRepositoryTest {
     }
 
     @Test
-    internal fun `findAndLockReadyToProcess should respect limit parameter`() {
+    fun `findAndLockReadyToProcess should respect limit parameter`() {
         // Given
         createPendingMessage(5)
 
@@ -198,7 +197,7 @@ internal class RetryRepositoryTest {
     }
 
     @Test
-    internal fun `findAndLockForDeletion should return sent messages older than cutoff`() {
+    fun `findAndLockForDeletion should return sent messages older than cutoff`() {
         // Given
         createSentMessage(1)
 
@@ -213,7 +212,7 @@ internal class RetryRepositoryTest {
     }
 
     @Test
-    internal fun `findAndLockForDeletion should not return messages newer than cutoff`() {
+    fun `findAndLockForDeletion should not return messages newer than cutoff`() {
         // Given
         createSentMessage(1, duration = 0)
 
@@ -262,7 +261,7 @@ internal class RetryRepositoryTest {
         createPendingMessage(messageCount)
 
         // When
-        val results = mutableListOf<List<RetryModel>>()
+        val results = mutableListOf<List<WaitModel>>()
         val latch = CountDownLatch(concurrentRequests)
         val executor = Executors.newFixedThreadPool(concurrentRequests)
 
@@ -305,7 +304,7 @@ internal class RetryRepositoryTest {
         createSentMessage(messageCount)
 
         // When
-        val results = mutableListOf<List<RetryModel>>()
+        val results = mutableListOf<List<WaitModel>>()
         val latch = CountDownLatch(concurrentRequests)
         val executor = Executors.newFixedThreadPool(concurrentRequests)
 
@@ -350,8 +349,8 @@ internal class RetryRepositoryTest {
         // Create test messages
         userTransaction.begin()
         repeat(messageCount) { i ->
-            val message = RetryModel().apply {
-                message = "test$i"
+            val message = WaitModel().apply {
+                message = "test-$i"
                 status = if (i < messageCount / 2) OutBoxStatus.PENDING else OutBoxStatus.SENT
                 delayedUntil = if (i < messageCount / 2) {
                     now.minus((i + 1).toLong(), ChronoUnit.MINUTES)
@@ -366,8 +365,8 @@ internal class RetryRepositoryTest {
         userTransaction.commit()
 
         // When
-        val processResults = mutableListOf<List<RetryModel>>()
-        val deleteResults = mutableListOf<List<RetryModel>>()
+        val processResults = mutableListOf<List<WaitModel>>()
+        val deleteResults = mutableListOf<List<WaitModel>>()
         val latch = CountDownLatch(concurrentRequests)
         val executor = Executors.newFixedThreadPool(concurrentRequests)
 

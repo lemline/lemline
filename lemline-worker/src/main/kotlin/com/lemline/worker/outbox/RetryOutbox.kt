@@ -33,7 +33,7 @@ internal class RetryOutbox(
 ) {
     private val logger = logger()
 
-    private val outboxProcessor = OutboxProcessor(
+    internal val outboxProcessor = OutboxProcessor(
         logger = logger,
         repository = repository,
         processor = { retryMessage -> emitter.send(retryMessage.message) },

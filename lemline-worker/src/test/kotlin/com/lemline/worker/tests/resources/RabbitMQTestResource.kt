@@ -1,4 +1,4 @@
-package com.lemline.worker
+package com.lemline.worker.tests.resources
 
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.Network

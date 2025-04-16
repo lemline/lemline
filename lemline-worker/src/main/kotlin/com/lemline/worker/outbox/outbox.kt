@@ -9,7 +9,6 @@ import org.jetbrains.annotations.VisibleForTesting
 import org.slf4j.Logger
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import java.util.*
 
 enum class OutBoxStatus {
     PENDING,
@@ -18,7 +17,8 @@ enum class OutBoxStatus {
 }
 
 interface OutboxMessage {
-    var id: UUID?
+    var id: String?
+    var message: String
     var status: OutBoxStatus
     var attemptCount: Int
     var lastError: String?

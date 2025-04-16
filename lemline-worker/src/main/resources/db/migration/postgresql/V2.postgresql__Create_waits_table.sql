@@ -1,9 +1,9 @@
 CREATE TABLE waits
 (
-    id            UUID PRIMARY KEY,
+    id            VARCHAR(36) PRIMARY KEY,
     message       TEXT        NOT NULL,
     status        VARCHAR(20) NOT NULL,
-    delayed_until TIMESTAMP   NOT NULL,
+    delayed_until TIMESTAMP WITHOUT TIME ZONE NOT NULL,
     attempt_count INTEGER     NOT NULL DEFAULT 0,
     last_error    TEXT,
     version       BIGINT      NOT NULL DEFAULT 0

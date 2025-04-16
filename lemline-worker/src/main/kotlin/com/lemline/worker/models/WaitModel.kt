@@ -20,7 +20,7 @@ const val WAIT_TABLE = "waits"
 class WaitModel : UuidV7Entity(), OutboxMessage {
 
     @Column(nullable = false, columnDefinition = "TEXT")
-    lateinit var message: String
+    override lateinit var message: String
 
     @Column(nullable = false, length = 20)
     @Enumerated(EnumType.STRING)

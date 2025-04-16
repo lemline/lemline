@@ -6,15 +6,15 @@ import jakarta.persistence.Column
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.Id
 import jakarta.persistence.MappedSuperclass
-import java.util.*
+import org.hibernate.annotations.GenericGenerator
 
 @MappedSuperclass
 abstract class UuidV7Entity : PanacheEntityBase {
     @Id
-    @GeneratedValue
-    @UuidV7
-    @Column(name = "id", columnDefinition = "uuid")
-    var id: UUID? = null
+    @GeneratedValue(generator = "uuid7")
+    @GenericGenerator(name = "uuid7", strategy = "com.lemline.worker.repositories.TimeOrderedUuidGenerator")
+    @Column(name = "id", length = 36)
+    var id: String? = null
 }
 
-internal interface UuidV7Repository<T : UuidV7Entity> : PanacheRepositoryBase<T, UUID>
+internal interface UuidV7Repository<T : UuidV7Entity> : PanacheRepositoryBase<T, String>

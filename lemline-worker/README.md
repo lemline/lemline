@@ -63,6 +63,42 @@ The database migrations are organized in database-specific folders:
 
 The appropriate migrations are applied automatically based on the selected database type.
 
+## Running Tests
+
+The tests are organized to run against both PostgreSQL and MySQL. By default, only PostgreSQL tests are run.
+
+### Running PostgreSQL Tests
+
+PostgreSQL tests run by default:
+
+```bash
+./gradlew lemline-worker:test
+```
+
+### Running MySQL Tests
+
+To run MySQL tests, use:
+
+```bash
+./gradlew lemline-worker:test -DincludeMySQL=true
+```
+
+### Running Both Database Tests
+
+To run tests against both databases:
+
+```bash
+./gradlew lemline-worker:test -DincludeMySQL=true
+```
+
+### Skipping PostgreSQL Tests
+
+To run only MySQL tests and skip PostgreSQL tests:
+
+```bash
+./gradlew lemline-worker:test -DskipPostgres=true -DincludeMySQL=true
+```
+
 ## Development Mode
 
 You can run your application in dev mode that enables live coding using:

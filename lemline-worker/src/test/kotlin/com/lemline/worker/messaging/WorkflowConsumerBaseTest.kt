@@ -46,7 +46,6 @@ abstract class WorkflowConsumerBaseTest {
         // Clear the database
         entityManager.createQuery("DELETE FROM RetryModel").executeUpdate()
         entityManager.createQuery("DELETE FROM WaitModel").executeUpdate()
-        entityManager.createQuery("DELETE FROM TimeoutModel").executeUpdate()
         entityManager.createQuery("DELETE FROM WorkflowModel").executeUpdate()
         entityManager.flush()
 

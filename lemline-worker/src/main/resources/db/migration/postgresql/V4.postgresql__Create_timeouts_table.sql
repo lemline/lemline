@@ -1,7 +1,7 @@
 CREATE TABLE timeouts
 (
-    id            UUID         NOT NULL,
-    instanceId    UUID         NOT NULL,
+    id            VARCHAR(36)  NOT NULL,
+    instanceId    VARCHAR(36)  NOT NULL,
     position      VARCHAR(255) NOT NULL,
     status        VARCHAR(20)  NOT NULL,
     delayed_until TIMESTAMP WITHOUT TIME ZONE NOT NULL,

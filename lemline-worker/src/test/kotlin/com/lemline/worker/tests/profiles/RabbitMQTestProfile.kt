@@ -1,4 +1,4 @@
-package com.lemline.worker
+package com.lemline.worker.tests.profiles
 
 import io.quarkus.test.junit.QuarkusTestProfile
 

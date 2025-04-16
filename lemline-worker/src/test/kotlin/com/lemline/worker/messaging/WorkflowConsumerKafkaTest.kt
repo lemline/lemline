@@ -1,7 +1,7 @@
 package com.lemline.worker.messaging
 
-import com.lemline.worker.KafkaTestProfile
-import com.lemline.worker.KafkaTestResource
+import com.lemline.worker.tests.profiles.KafkaTestProfile
+import com.lemline.worker.tests.resources.KafkaTestResource
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile

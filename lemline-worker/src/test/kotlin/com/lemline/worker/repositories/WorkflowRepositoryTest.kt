@@ -1,6 +1,6 @@
 package com.lemline.worker.repositories
 
-import com.lemline.worker.PostgresTestResource
+import com.lemline.worker.tests.resources.PostgresTestResource
 import com.lemline.worker.models.WorkflowModel
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
@@ -13,7 +13,8 @@ import org.junit.jupiter.api.*
 @QuarkusTestResource(PostgresTestResource::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-internal class WorkflowModelRepositoryTest {
+@Tag("postgresql")
+class WorkflowRepositoryTest {
 
     @Inject
     lateinit var repository: WorkflowRepository
@@ -64,4 +65,4 @@ internal class WorkflowModelRepositoryTest {
         Assertions.assertEquals(version, result?.version)
         Assertions.assertEquals("test definition", result?.definition)
     }
-}
+} 

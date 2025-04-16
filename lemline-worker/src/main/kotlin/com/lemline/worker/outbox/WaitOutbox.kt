@@ -33,7 +33,7 @@ internal class WaitOutbox(
 ) {
     private val logger = logger()
 
-    private val outboxProcessor = OutboxProcessor(
+    internal val outboxProcessor = OutboxProcessor(
         logger = logger,
         repository = repository,
         processor = { waitMessage -> emitter.send(waitMessage.message) },
