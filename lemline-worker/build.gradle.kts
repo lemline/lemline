@@ -45,6 +45,7 @@ dependencies {
 
     testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
     testImplementation("io.quarkus:quarkus-junit5")
+    testImplementation("io.quarkus:quarkus-jdbc-h2")
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")
     testImplementation("io.kotest:kotest-framework-api")
@@ -58,7 +59,6 @@ dependencies {
     testImplementation("org.testcontainers:mysql")
     testImplementation("org.testcontainers:kafka")
     testImplementation("org.testcontainers:rabbitmq")
-    testImplementation("io.quarkus:quarkus-jdbc-h2") // Add H2 for testing
 }
 
 group = "com.lemline.worker"

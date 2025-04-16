@@ -1,5 +1,6 @@
 package com.lemline.worker.messaging
 
+import com.lemline.worker.messaging.bases.WorkflowConsumerBaseTest
 import com.lemline.worker.tests.profiles.KafkaTestProfile
 import com.lemline.worker.tests.resources.KafkaTestResource
 import io.quarkus.test.common.QuarkusTestResource

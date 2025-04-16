@@ -1,6 +1,8 @@
-package com.lemline.worker.messaging
+package com.lemline.worker.messaging.bases
 
 import com.lemline.core.json.LemlineJson
+import com.lemline.worker.messaging.WorkflowConsumer
+import com.lemline.worker.messaging.WorkflowMessage
 import com.lemline.worker.models.WorkflowModel
 import com.lemline.worker.outbox.OutBoxStatus
 import com.lemline.worker.repositories.RetryRepository
