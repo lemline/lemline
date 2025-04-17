@@ -69,8 +69,8 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerBaseTest() {
     }
 
     override fun cleanupMessaging() {
-        producer.close()
-        consumer.close()
+        if (::producer.isInitialized) producer.close()
+        if (::consumer.isInitialized) consumer.close()
     }
 
     override fun sendMessage(message: String) {

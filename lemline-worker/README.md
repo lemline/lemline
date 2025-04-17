@@ -63,6 +63,64 @@ The database migrations are organized in database-specific folders:
 
 The appropriate migrations are applied automatically based on the selected database type.
 
+## Messaging Configuration
+
+The Lemline Worker supports Kafka (default) and RabbitMQ for messaging. Configure the broker through the application properties.
+
+### Using Kafka (Default)
+
+Kafka is configured by default.
+
+1. Start the Kafka container using the provided Docker Compose file:
+
+```bash
+docker-compose -f kafka-docker-compose.yaml up -d
+```
+
+2. To explicitly use Kafka, ensure the following settings in your `application.properties`:
+
+```properties
+# Messaging selection
+lemline.messaging.type=kafka
+
+# Kafka configuration
+quarkus.kafka.bootstrap.servers=localhost:9092
+
+# RabbitMQ configuration (disabled)
+# lemaline.messaging.type=rabbitmq
+# quarkus.rabbitmq.hosts=localhost
+# quarkus.rabbitmq.port=5672
+# quarkus.rabbitmq.username=guest
+# quarkus.rabbitmq.password=guest
+```
+
+### Using RabbitMQ
+
+To use RabbitMQ instead of Kafka:
+
+1. Start the RabbitMQ container using the provided Docker Compose file:
+
+```bash
+docker-compose -f rabbitmq-docker-compose.yaml up -d
+```
+
+2. Update your `application.properties` to use RabbitMQ:
+
+```properties
+# Messaging selection
+lemline.messaging.type=rabbitmq
+
+# RabbitMQ configuration
+quarkus.rabbitmq.hosts=localhost
+quarkus.rabbitmq.port=5672
+quarkus.rabbitmq.username=guest
+quarkus.rabbitmq.password=guest
+
+# Kafka configuration (disabled)
+# lemaline.messaging.type=kafka
+# quarkus.kafka.bootstrap.servers=localhost:9092
+```
+
 ## Running Tests
 
 The tests are organized to run against both PostgreSQL and MySQL. By default, only PostgreSQL tests are run.
@@ -75,29 +133,6 @@ PostgreSQL tests run by default:
 ./gradlew lemline-worker:test
 ```
 
-### Running MySQL Tests
-
-To run MySQL tests, use:
-
-```bash
-./gradlew lemline-worker:test -DincludeMySQL=true
-```
-
-### Running Both Database Tests
-
-To run tests against both databases:
-
-```bash
-./gradlew lemline-worker:test -DincludeMySQL=true
-```
-
-### Skipping PostgreSQL Tests
-
-To run only MySQL tests and skip PostgreSQL tests:
-
-```bash
-./gradlew lemline-worker:test -DskipPostgres=true -DincludeMySQL=true
-```
 
 ## Development Mode
 

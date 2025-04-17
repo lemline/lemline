@@ -27,8 +27,9 @@ build/
 ### VS Code ###
 .vscode/
 
-### references files 
+### other local docs 
 references/
+articles/
 
 ### cursor rules
 .cursorrules

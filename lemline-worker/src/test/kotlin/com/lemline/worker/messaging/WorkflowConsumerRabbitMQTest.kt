@@ -81,8 +81,8 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerBaseTest() {
     }
 
     override fun cleanupMessaging() {
-        channel.close()
-        connection.close()
+        if (::channel.isInitialized) channel.close()
+        if (::connection.isInitialized) connection.close()
     }
 
     override fun sendMessage(message: String) {

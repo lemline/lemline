@@ -22,20 +22,17 @@ document:
   dsl: '1.0.0'
   # ...
 do:
-  - setMessage: # Executes first
-      set:
-        message: "Hello"
-  - setFullMessage: # Executes second, receives output of taskA
-      set:
-        fullMessage: "${ .message + ' World' }"
-  - logMessage: # Executes third, receives output of taskB
-      call: log
-      with:
-        text: "${ .fullMessage }"
+  - validateOrder:
+      # ...
+
+  - checkInventory:
+      # ...
+
+  - processPayment:
+      # ...
 ```
 
-In this example, `setMessage`, `setFullMessage`, and `logMessage` run one after the other because no `then` directives
-are used.
+In this example, `validateOrder`, `checkInventory`, and `processPayment` run one after the other.
 
 ## Conditional Execution: The `if` Property
 
@@ -55,6 +52,10 @@ boolean (`true` or `false`).
       not exist (e.g. the workflow *does not follow* that skipped task's `then` directive to determine the next step).
 
 ```yaml
+```yaml
+document:
+  dsl: '1.0.0'
+  # ...
 do:
   - checkInput:
       set:
@@ -187,9 +188,11 @@ Some tasks inherently control the flow:
 
 * **`Switch`**: Evaluates `when` conditions and uses the `then` directive of the *first matching case* to determine the
   next task.
+
 * **`Try`**: If an error is caught and handled by a `catch.do` block, the flow continues after the `Try` task based on
   the `Try` task's own `then` directive. If an error is caught and retried, the flow loops back to the beginning of the
   `try` block. If an uncaught error occurs, the flow is interrupted.
+
 * **`Raise`**: Immediately interrupts the normal flow and transfers control to the error handling mechanism (searching
   for a `Try`). Its `then` directive is ignored.
 
@@ -197,5 +200,6 @@ Some tasks inherently control the flow:
 
 * **Target Not Found**: If `then` specifies a task name that does not exist within the same scope, the workflow will
   raise a `Configuration` error (e.g., `https://serverlessworkflow.io/spec/1.0.0/errors/configuration`).
+
 * **Invalid Directive**: Using an unknown string (that isn't a valid task name or `continue`/`exit`/`end`) in the `then`
   property will also cause the workflow to raise a `Configuration` error.

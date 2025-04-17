@@ -18,23 +18,31 @@ A Serverless Workflow definition document consists of the following top-level pr
 
 * **`dsl`** (String, Required): Specifies the version of the Serverless Workflow DSL specification the document conforms
   to (e.g., `'1.0.0'`). This ensures the workflow engine interprets the syntax correctly.
+
 * **`namespace`** (String, Required): Provides a logical grouping for the workflow, often used for organization,
   identification, and potentially scoping of resources or events within a runtime environment (e.g.,
   `'com.example.billing'`).
+
 * **`name`** (String, Required): The unique name of the workflow within its namespace (e.g., `'process-invoice'`).
   `namespace` + `name` typically forms a unique workflow identifier.
+
 * **`version`** (String, Required): The version of this specific workflow definition (e.g., `'1.0.2'`). This allows for
-  versioning and evolution of workflows over time.
+  versioning and evolution of workflows over time. In a given environment, the combination of `namespace`, `name`, and `version` must be unique to identify a specific workflow definition.
+
 * **`title`** (String, Optional): A short, human-readable title for the workflow (e.g.,
   `'Invoice Processing Workflow'`).
+
 * **`description`** (String, Optional): A more detailed human-readable description of the workflow's purpose.
-* **`use`** (Object, Optional): Defines reusable resources and definitions used throughout the workflow. This includes
+
+* **`use`** (Optional): Defines reusable resources and definitions used throughout the workflow. This includes
   things like function definitions, event definitions, authentication configurations, etc.
   See [Resource Catalog](dsl-resource-catalog.md) for details.
-* **`do`** (Array<String: Task>, Required): Defines the core execution logic of the workflow as a sequence (or
+
+* **`do`** (Array<String, Task>, Required): Defines the core execution logic of the workflow as a sequence (or
   structure)
   of Tasks. This is where the main steps, control flow, and actions are specified.
-* **`schedule`** (Object | Array&lt;Object\>, Optional): Defines how the workflow should be triggered based on time
+
+* **`schedule`** (Object, Optional): Defines how the workflow should be triggered based on time
   schedules or events. The following formats are supported:
     * **Time-based Schedule (Cron)**: Uses standard cron syntax to execute workflows on a time-based schedule.
       ```yaml
@@ -66,12 +74,9 @@ A Serverless Workflow definition document consists of the following top-level pr
   > - For event-based schedules, each instance will independently listen for and react to the specified events
   > - When using `after` scheduling (which runs the workflow again after completion), each instance manages its own
       restart cycle
-  >
-  > This behavior can lead to resource contention if not carefully managed. In production environments, consider
-  > implementing instance coordination or limiting the number of concurrent instances to avoid unexpected behavior or
-  > resource exhaustion.
+  
 
-* **`timeout`** (Object, Optional): Defines the maximum duration the entire workflow instance is allowed to execute
+* **`timeout`** (Optional): Defines the maximum duration the entire workflow instance is allowed to execute
   before being timed out. This can prevent runaway workflows, resource leaks, or deadlock situations.
   ```yaml
   timeout:
@@ -79,7 +84,8 @@ A Serverless Workflow definition document consists of the following top-level pr
     minutes: 30  # Total timeout of 1 hour and 30 minutes
   ```
   See [Timeouts](dsl-timeouts.md) for more details on timeout configurations.
-* **`evaluate`** (Object, Optional): Configures how runtime expressions are evaluated within the workflow. This allows
+
+* **`evaluate`** (Optional): Configures how runtime expressions are evaluated within the workflow. This allows
   customization of the expression language and evaluation mode.
   ```yaml
   evaluate:
@@ -88,7 +94,8 @@ A Serverless Workflow definition document consists of the following top-level pr
                   # while 'loose' evaluates any value (defaults to 'strict')
   ```
   These settings affect how all runtime expressions throughout the workflow are processed.
-* **`metadata`** (Object, Optional): An optional map of custom key-value pairs that can be used to attach arbitrary
+
+* **`metadata`** (Map<String, Object>, Optional): An optional map of custom key-value pairs that can be used to attach arbitrary
   metadata to the workflow definition (e.g., author, team, deployment environment tags). These values are typically used
   for documentation, governance, or filtering workflows in management UIs, but don't affect runtime behavior.
   ```yaml
@@ -99,7 +106,8 @@ A Serverless Workflow definition document consists of the following top-level pr
     priority: "high"
     lastReviewDate: "2023-10-15"
   ```
-* **`extensions`** (Array<String: Object>, Optional): Defines extensions that enhance or modify the behavior of tasks in
+
+* **`extensions`** (Map<String: Object>, Optional): Defines extensions that enhance or modify the behavior of tasks in
   the
   workflow. Extensions can be used to implement cross-cutting concerns like logging, monitoring, or mocking. Each
   extension consists of a name, specification for which tasks it extends, and the tasks to execute before and/or after
@@ -115,6 +123,7 @@ A Serverless Workflow definition document consists of the following top-level pr
           - logTaskEnd:
               # Task to run after each extended task
   ```
+
 * **`input`** (Object, Optional): Configures the validation and transformation of data coming into the workflow. This
   allows for ensuring the workflow only receives properly structured input and can transform it into the format required
   by the workflow.
@@ -129,6 +138,7 @@ A Serverless Workflow definition document consists of the following top-level pr
         items: { type: array }
     from: "${ . | select(.items != null) }"  # Transform the input before processing
   ```
+
 * **`output`** (Object, Optional): Configures the filtering and transformation of data that the workflow will return.
   This ensures the workflow produces consistent and properly formatted results.
   ```yaml
