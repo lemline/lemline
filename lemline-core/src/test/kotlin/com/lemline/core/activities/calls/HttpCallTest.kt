@@ -1,308 +1,332 @@
 package com.lemline.core.activities.calls
 
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.node.JsonNodeFactory
-import io.mockk.every
-import io.mockk.junit5.MockKExtension
-import io.mockk.mockk
-import io.mockk.verify
-import jakarta.ws.rs.HttpMethod
-import jakarta.ws.rs.client.Client
-import jakarta.ws.rs.client.Entity
-import jakarta.ws.rs.client.Invocation
-import jakarta.ws.rs.client.WebTarget
-import jakarta.ws.rs.core.Response
-import org.junit.jupiter.api.BeforeEach
+import com.lemline.core.json.LemlineJson
+import io.ktor.client.*
+import io.ktor.client.engine.mock.*
+import io.ktor.client.plugins.contentnegotiation.*
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.extension.ExtendWith
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 
-@ExtendWith(MockKExtension::class)
 class HttpCallTest {
 
-    private lateinit var httpCall: HttpCall
-    private lateinit var mockClient: Client
-    private lateinit var mockWebTarget: WebTarget
-    private lateinit var mockBuilder: Invocation.Builder
-    private lateinit var mockResponse: Response
+    private fun createHttpCallWithMockEngine(handler: MockRequestHandler): HttpCall {
+        val mockEngine = MockEngine(handler)
+        val mockClient = HttpClient(mockEngine) {
+            install(ContentNegotiation) {
+                json(LemlineJson.json)
+            }
+        }
 
-    @BeforeEach
-    fun setup() {
-        // Mock the JAX-RS client components
-        mockClient = mockk<Client>()
-        mockWebTarget = mockk<WebTarget>()
-        mockBuilder = mockk<Invocation.Builder>()
-        mockResponse = mockk<Response>()
-
-        // Create a real HttpCall but with a mocked client
-        httpCall = HttpCall()
+        val httpCall = HttpCall()
         val clientField = HttpCall::class.java.getDeclaredField("client")
         clientField.isAccessible = true
         clientField.set(httpCall, mockClient)
 
-        // Setup common mock behaviors
-        every { mockClient.target(any<String>()) } returns mockWebTarget
-        every { mockWebTarget.queryParam(any(), any()) } returns mockWebTarget
-        every { mockWebTarget.request() } returns mockBuilder
-        every { mockBuilder.header(any(), any()) } returns mockBuilder
+        return httpCall
     }
 
     @Test
-    fun `test GET request with successful response`() {
+    fun `test GET request with successful response`() = runTest {
         // Setup
-        val jsonResponse = JsonNodeFactory.instance.objectNode().put("result", "success")
+        val jsonResponse = buildJsonObject { put("result", "success") }
 
-        // Mock response
-        every { mockBuilder.get() } returns mockResponse
-        every { mockResponse.status } returns 200
-        every { mockResponse.readEntity(JsonNode::class.java) } returns jsonResponse
+        val httpCall = createHttpCallWithMockEngine { request ->
+            // Verify request properties
+            assertEquals(HttpMethod.Get, request.method)
+            assertEquals("https://example.com/api?redirect=false", request.url.toString())
+            assertEquals("application/json", request.headers["Content-Type"])
+
+            // Return mock response
+            respond(
+                content = jsonResponse.toString(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            )
+        }
 
         // Execute
-        val future = httpCall.execute(
-            method = HttpMethod.GET,
+        val result = httpCall.execute(
+            method = "GET",
             endpoint = "https://example.com/api",
-            headers = mapOf("Content-Type" to "application/json"),
+            headers = mapOf("Content-Type" to JsonPrimitive("application/json")),
             body = null
-        )
-        val result = future.get()
+        ) as JsonObject
 
         // Verify
-        assertEquals("success", result.get("result").asText())
-        verify { mockClient.target("https://example.com/api") }
-        verify { mockWebTarget.queryParam("redirect", "false") }
-        verify { mockBuilder.header("Content-Type", "application/json") }
-        verify { mockBuilder.get() }
+        assertEquals(JsonPrimitive("success"), result["result"])
     }
 
     @Test
-    fun `test POST request with body and successful response`() {
+    fun `test POST request with body and successful response`() = runTest {
         // Setup
-        val requestBody = JsonNodeFactory.instance.objectNode().put("name", "test")
-        val jsonResponse = JsonNodeFactory.instance.objectNode().put("id", 123)
+        val requestBody = JsonObject(mapOf("name" to JsonPrimitive("test")))
+        val jsonResponse = JsonObject(mapOf("id" to JsonPrimitive(123)))
 
-        // Mock response
-        every { mockBuilder.post(any<Entity<JsonNode>>()) } returns mockResponse
-        every { mockResponse.status } returns 201
-        every { mockResponse.readEntity(JsonNode::class.java) } returns jsonResponse
+        val httpCall = createHttpCallWithMockEngine { request ->
+            // Verify request properties
+            assertEquals(HttpMethod.Post, request.method)
+            assertEquals("https://example.com/api/create?redirect=false", request.url.toString())
+
+            // Return mock response
+            respond(
+                content = jsonResponse.toString(),
+                status = HttpStatusCode.Created,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            )
+        }
 
         // Execute
-        val future = httpCall.execute(
-            method = HttpMethod.POST,
+        val result = httpCall.execute(
+            method = "POST",
             endpoint = "https://example.com/api/create",
-            headers = mapOf("Content-Type" to "application/json"),
+            headers = mapOf("Content-Type" to JsonPrimitive("application/json")),
             body = requestBody
-        )
-        val result = future.get()
+        ) as JsonObject
 
         // Verify
-        assertEquals(123, result.get("id").asInt())
-        verify { mockClient.target("https://example.com/api/create") }
-        verify {
-            mockBuilder.post(match {
-                it.entity == requestBody && it.mediaType.toString() == "application/json"
-            })
-        }
+        assertEquals(JsonPrimitive(123), result["id"])
     }
 
     @Test
-    fun `test PUT request with body and successful response`() {
+    fun `test PUT request with body and successful response`() = runTest {
         // Setup
-        val requestBody = JsonNodeFactory.instance.objectNode().put("name", "updated")
-        val jsonResponse = JsonNodeFactory.instance.objectNode().put("updated", true)
+        val requestBody = JsonObject(mapOf("name" to JsonPrimitive("updated")))
+        val jsonResponse = JsonObject(mapOf("updated" to JsonPrimitive(true)))
 
-        // Mock response
-        every { mockBuilder.put(any<Entity<JsonNode>>()) } returns mockResponse
-        every { mockResponse.status } returns 200
-        every { mockResponse.readEntity(JsonNode::class.java) } returns jsonResponse
+        val httpCall = createHttpCallWithMockEngine { request ->
+            // Verify request properties
+            assertEquals(HttpMethod.Put, request.method)
+            assertEquals("https://example.com/api/update/123?redirect=false", request.url.toString())
+
+            // Return mock response
+            respond(
+                content = jsonResponse.toString(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            )
+        }
 
         // Execute
-        val future = httpCall.execute(
-            method = HttpMethod.PUT,
+        val result = httpCall.execute(
+            method = "PUT",
             endpoint = "https://example.com/api/update/123",
-            headers = mapOf("Content-Type" to "application/json"),
+            headers = mapOf("Content-Type" to JsonPrimitive("application/json")),
             body = requestBody
-        )
-        val result = future.get()
+        ) as JsonObject
 
         // Verify
-        assertEquals(true, result.get("updated").asBoolean())
-        verify { mockClient.target("https://example.com/api/update/123") }
-        verify {
-            mockBuilder.put(match {
-                it.entity == requestBody && it.mediaType.toString() == "application/json"
-            })
+        assertEquals(JsonPrimitive(true), result["updated"])
+    }
+
+    @Test
+    fun `test DELETE request with successful response`() = runTest {
+        // Setup
+        val jsonResponse = buildJsonObject {
+            put("deleted", true)
         }
-    }
 
-    @Test
-    fun `test DELETE request with successful response`() {
-        // Setup
-        val jsonResponse = JsonNodeFactory.instance.objectNode().put("deleted", true)
+        val httpCall = createHttpCallWithMockEngine { request ->
+            // Verify request properties
+            assertEquals(HttpMethod.Delete, request.method)
+            assertEquals("https://example.com/api/delete/123?redirect=false", request.url.toString())
 
-        // Mock response
-        every { mockBuilder.delete() } returns mockResponse
-        every { mockResponse.status } returns 200
-        every { mockResponse.readEntity(JsonNode::class.java) } returns jsonResponse
+            // Return mock response
+            respond(
+                content = jsonResponse.toString(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            )
+        }
 
         // Execute
-        val future = httpCall.execute(
-            method = HttpMethod.DELETE,
+        val result = httpCall.execute(
+            method = "DELETE",
             endpoint = "https://example.com/api/delete/123",
-            headers = mapOf("Content-Type" to "application/json"),
+            headers = mapOf("Content-Type" to JsonPrimitive("application/json")),
             body = null
-        )
-        val result = future.get()
+        ) as JsonObject
 
         // Verify
-        assertEquals(true, result.get("deleted").asBoolean())
-        verify { mockClient.target("https://example.com/api/delete/123") }
-        verify { mockBuilder.delete() }
+        assertEquals(JsonPrimitive(true), result["deleted"])
     }
 
     @Test
-    fun `test with query parameters`() {
+    fun `test with query parameters`() = runTest {
         // Setup
-        val jsonResponse = JsonNodeFactory.instance.objectNode().put("result", "success")
+        val jsonResponse = buildJsonObject {
+            put("result", "success")
+        }
 
-        // Mock response
-        every { mockBuilder.get() } returns mockResponse
-        every { mockResponse.status } returns 200
-        every { mockResponse.readEntity(JsonNode::class.java) } returns jsonResponse
+        val httpCall = createHttpCallWithMockEngine { request ->
+            // Verify request properties
+            assertEquals(HttpMethod.Get, request.method)
+            // The order of parameters might vary, so we check each parameter individually
+            assertEquals("test", request.url.parameters["q"])
+            assertEquals("1", request.url.parameters["page"])
+            assertEquals("false", request.url.parameters["redirect"])
+
+            // Return mock response
+            respond(
+                content = jsonResponse.toString(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            )
+        }
 
         // Execute
-        val future = httpCall.execute(
-            method = HttpMethod.GET,
+        val result = httpCall.execute(
+            method = "GET",
             endpoint = "https://example.com/api/search",
             headers = emptyMap(),
             body = null,
-            query = mapOf("q" to "test", "page" to 1)
-        )
-        val result = future.get()
+            query = mapOf("q" to JsonPrimitive("test"), "page" to JsonPrimitive(1))
+        ) as JsonObject
 
         // Verify
-        assertEquals("success", result.get("result").asText())
-        verify { mockClient.target("https://example.com/api/search") }
-        verify { mockWebTarget.queryParam("q", "test") }
-        verify { mockWebTarget.queryParam("page", 1) }
+        assertEquals(JsonPrimitive("success"), result["result"])
     }
 
     @Test
-    fun `test with raw output format`() {
+    fun `test with raw output format`() = runTest {
         // Setup
         val responseText = """{"result":"success"}"""
 
-        // Mock response
-        every { mockBuilder.get() } returns mockResponse
-        every { mockResponse.status } returns 200
-        every { mockResponse.readEntity(String::class.java) } returns responseText
+        val httpCall = createHttpCallWithMockEngine { _ ->
+            // Return mock response
+            respond(
+                content = responseText,
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            )
+        }
 
         // Execute
-        val future = httpCall.execute(
-            method = HttpMethod.GET,
+        val result = httpCall.execute(
+            method = "GET",
             endpoint = "https://example.com/api",
             headers = emptyMap(),
             body = null,
             output = "raw"
         )
-        val result = future.get()
 
         // Verify
         val expectedBase64 = java.util.Base64.getEncoder().encodeToString(responseText.toByteArray())
-        assertEquals(expectedBase64, result.asText())
+        assertEquals(JsonPrimitive(expectedBase64), result)
     }
 
     @Test
-    fun `test with response output format`() {
+    fun `test with response output format`() = runTest {
         // Setup
-        val jsonResponse = JsonNodeFactory.instance.objectNode().put("result", "success")
+        val jsonResponse = buildJsonObject {
+            put("result", "success")
+        }
 
-        // Mock response
-        every { mockBuilder.get() } returns mockResponse
-        every { mockResponse.status } returns 200
-        every { mockResponse.readEntity(JsonNode::class.java) } returns jsonResponse
+        val httpCall = createHttpCallWithMockEngine { request ->
+            // Return mock response
+            respond(
+                content = jsonResponse.toString(),
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            )
+        }
 
         // Execute
-        val future = httpCall.execute(
-            method = HttpMethod.GET,
+        val result = httpCall.execute(
+            method = "GET",
             endpoint = "https://example.com/api",
             headers = emptyMap(),
             body = null,
             output = "response"
-        )
-        val result = future.get()
+        ) as JsonObject
 
         // Verify
-        assertEquals("success", result.get("result").asText())
+        assertEquals(JsonPrimitive("success"), result["result"])
     }
 
     @Test
-    fun `test with HTTP error response`() {
+    fun `test with HTTP error response`() = runTest {
         // Setup
-        every { mockBuilder.get() } returns mockResponse
-        every { mockResponse.status } returns 404
-        every { mockResponse.readEntity(String::class.java) } returns "Not Found"
-
-        // Execute and verify
-        val future = httpCall.execute(
-            method = HttpMethod.GET,
-            endpoint = "https://example.com/api/nonexistent",
-            headers = emptyMap(),
-            body = null
-        )
-
-        // The future should complete exceptionally
-        val exception = assertFailsWith<java.util.concurrent.ExecutionException> {
-            future.get()
+        val httpCall = createHttpCallWithMockEngine { request ->
+            // Return mock error response
+            respond(
+                content = "Not Found",
+                status = HttpStatusCode.NotFound,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Plain.toString())
+            )
         }
 
-        // Verify the cause is a RuntimeException with the correct message
-        assert(exception.cause is RuntimeException)
-        assert(exception.cause?.message?.contains("404") == true)
+        // Execute and verify
+        val exception = assertFailsWith<RuntimeException> {
+            httpCall.execute(
+                method = "GET",
+                endpoint = "https://example.com/api/nonexistent",
+                headers = emptyMap(),
+                body = null
+            )
+        }
+
+        // Verify the exception has the correct message
+        assert(exception.message?.contains("404") == true)
     }
 
     @Test
-    fun `test with unsupported HTTP method`() {
-        // Execute and verify
-        val future = httpCall.execute(
-            method = "PATCH", // Not supported in the implementation
-            endpoint = "https://example.com/api",
-            headers = emptyMap(),
-            body = null
-        )
-
-        // The future should complete exceptionally
-        val exception = assertFailsWith<java.util.concurrent.ExecutionException> {
-            future.get()
-        }
-
-        // Verify the cause is an IllegalArgumentException with the correct message
-        assert(exception.cause is IllegalArgumentException)
-        assert(exception.cause?.message?.contains("Unsupported HTTP method") == true)
-    }
-
-    @Test
-    fun `test with unsupported output format`() {
+    fun `test with unsupported HTTP method`() = runTest {
         // Setup
-        every { mockBuilder.get() } returns mockResponse
-        every { mockResponse.status } returns 200
-
-        // Execute and verify
-        val future = httpCall.execute(
-            method = HttpMethod.GET,
-            endpoint = "https://example.com/api",
-            headers = emptyMap(),
-            body = null,
-            output = "invalid" // Not supported
-        )
-
-        // The future should complete exceptionally
-        val exception = assertFailsWith<java.util.concurrent.ExecutionException> {
-            future.get()
+        val httpCall = createHttpCallWithMockEngine { request ->
+            // This should not be called because the method validation happens before the request
+            respond(
+                content = "{}",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            )
         }
 
-        // Verify the cause is an IllegalArgumentException with the correct message
-        assert(exception.cause is IllegalArgumentException)
-        assert(exception.cause?.message?.contains("Unsupported output format") == true)
+        // Execute and verify
+        val exception = assertFailsWith<RuntimeException> {
+            httpCall.execute(
+                method = "PATCH", // Not supported in the implementation
+                endpoint = "https://example.com/api",
+                headers = emptyMap(),
+                body = null
+            )
+        }
+
+        // Verify the exception has the correct message
+        assert(exception.message?.contains("Unsupported HTTP method") == true)
+    }
+
+    @Test
+    fun `test with unsupported output format`() = runTest {
+        // Setup
+        val httpCall = createHttpCallWithMockEngine { request ->
+            // Return mock response
+            respond(
+                content = "{}",
+                status = HttpStatusCode.OK,
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+            )
+        }
+
+        // Execute and verify
+        val exception = assertFailsWith<RuntimeException> {
+            httpCall.execute(
+                method = "GET",
+                endpoint = "https://example.com/api",
+                headers = emptyMap(),
+                body = null,
+                output = "invalid" // Not supported
+            )
+        }
+
+        // Verify the exception has the correct message
+        assert(exception.message?.contains("Unsupported output format") == true)
     }
 }

@@ -63,29 +63,62 @@ object LemlineJson {
      */
     inline fun <reified T> decodeFromElement(jsonElement: JsonElement): T = json.decodeFromJsonElement(jsonElement)
 
-    fun encodeToElement(task: TaskBase): JsonObject =
-        decodeFromString(jacksonMapper.writeValueAsString(task)) as JsonObject
+    /**
+     * Encodes a `TaskBase` object into a `JsonObject`.
+     */
+    fun encodeToElement(task: TaskBase) = decodeFromString(jacksonMapper.writeValueAsString(task)) as JsonObject
 
-    fun encodeToElement(workflow: Workflow): JsonObject =
-        decodeFromString(jacksonMapper.writeValueAsString(workflow)) as JsonObject
+    /**
+     * Encodes a `Workflow` object into a `JsonObject`.
+     */
+    fun encodeToElement(workflow: Workflow) = decodeFromString(jacksonMapper.writeValueAsString(workflow)) as JsonObject
 
+    /**
+     * Encodes a `SetTaskConfiguration` object into a `JsonElement`.
+     */
     fun encodeToElement(set: SetTaskConfiguration) = set.additionalProperties.toJsonElement()
 
+    /**
+     * Encodes an `ExportAs` object into a `JsonElement`.
+     */
     fun encodeToElement(exportAs: ExportAs) = exportAs.get().toJsonElement()
 
+    /**
+     * Encodes an `InputFrom` object into a `JsonElement`.
+     */
     fun encodeToElement(inputFrom: InputFrom) = inputFrom.get().toJsonElement()
 
+    /**
+     * Encodes an `OutputAs` object into a `JsonElement`.
+     */
     fun encodeToElement(outputAs: OutputAs) = outputAs.get().toJsonElement()
 
+    /**
+     * Encodes an `HTTPQuery` object into a `Map<String, JsonPrimitive>`.
+     */
+    fun encodeToPrimitive(httpQuery: HTTPQuery?) =
+        httpQuery?.additionalProperties?.mapValues { it.value.toJsonPrimitive() } ?: emptyMap()
+
+    /**
+     * Encodes an `HTTPHeaders` object into a `Map<String, JsonPrimitive>`.
+     */
+    fun encodeToPrimitive(httpHeaders: HTTPHeaders?): Map<String, JsonPrimitive> {
+        return httpHeaders?.additionalProperties?.mapValues { it.value.toJsonPrimitive() } ?: emptyMap()
+    }
+
+    /**
+     * Encodes a `DateTimeDescriptor` object into a `JsonObject`.
+     */
     fun encodeToElement(dateTimeDescriptor: DateTimeDescriptor) = dateTimeDescriptor.toJsonElement() as JsonObject
 
     fun JsonElement.toJsonNode(): JsonNode = jacksonMapper.readTree(toString())
 
     fun JsonNode.toJsonElement(): JsonElement = decodeFromString(toString())
 
-    private fun Any?.toJsonElement(): JsonElement =
+    internal fun Any?.toJsonElement(): JsonElement =
         when (this) {
             null -> JsonNull
+            is JsonElement -> this
             is Number -> JsonPrimitive(this)
             is String -> JsonPrimitive(this)
             is Boolean -> JsonPrimitive(this)
@@ -96,6 +129,12 @@ object LemlineJson {
             is DateTimeDescriptor -> decodeFromString(jacksonMapper.writeValueAsString(this))
 
             else -> throw IllegalArgumentException("Unsupported type: ${this::class}")
+        }
+
+    private fun Any?.toJsonPrimitive(): JsonPrimitive =
+        when (val element = this.toJsonElement()) {
+            is JsonPrimitive -> element
+            else -> JsonPrimitive(toString())
         }
 }
 

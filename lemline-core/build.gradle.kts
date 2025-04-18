@@ -18,10 +18,12 @@ dependencies {
 
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
 
-    implementation("jakarta.ws.rs:jakarta.ws.rs-api:3.1.0")
-    implementation("org.glassfish.jersey.core:jersey-client:3.1.5")
-    implementation("org.glassfish.jersey.inject:jersey-hk2:3.1.5")
-    implementation("org.glassfish.jersey.media:jersey-media-json-jackson:3.1.5")
+    // Ktor client for native Kotlin HTTP client with coroutine support
+    implementation("io.ktor:ktor-client-core:2.3.9")
+    implementation("io.ktor:ktor-client-cio:2.3.9")
+    implementation("io.ktor:ktor-client-content-negotiation:2.3.9")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.9")
+
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
@@ -29,4 +31,5 @@ dependencies {
     testImplementation("io.kotest:kotest-assertions-core")
     testImplementation("io.kotest:kotest-framework-api")
     testImplementation("io.mockk:mockk:1.13.9")
+    testImplementation("io.ktor:ktor-client-mock:2.3.9")
 }

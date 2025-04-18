@@ -359,6 +359,14 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Evaluate an expression
      */
+    internal fun evalString(data: JsonElement, expr: String, name: String, scope: JsonObject = this.scope) =
+        eval(data, expr, scope).let {
+            when (it is JsonPrimitive && it.isString) {
+                true -> it.content
+                false -> error(EXPRESSION, "'.$name' expression must be a string, but is '$it'")
+            }
+        }
+
     internal fun evalBoolean(data: JsonElement, expr: String, name: String, scope: JsonObject = this.scope) =
         eval(data, expr, scope).let {
             when (it is JsonPrimitive && it.booleanOrNull != null) {
@@ -448,7 +456,7 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Get the try parent (if any)
      */
-    private fun getTry(error: WorkflowError): TryInstance? = when (this) {
+    internal fun getTry(error: WorkflowError): TryInstance? = when (this) {
         is TryInstance -> if (isCatching(error)) this else parent.getTry(error)
         else -> parent?.getTry(error)
     }

@@ -161,11 +161,11 @@ open class WorkflowConsumer(
         name = this.name,
         version = this.version,
         states = this.currentNodeStates,
-        position = this.currentPosition,
+        position = this.currentPosition!!,
     )
 
     private fun WorkflowInstance.faulted(): WorkflowMessage? {
-        // Store the message in retry in failed state (for information)
+        // Store the message in retry in a failed state (for information)
         toMessage().toJsonString().saveMsgAsFailed(null)
         // Stop the processing of this instance
         return null
@@ -208,6 +208,6 @@ open class WorkflowConsumer(
         name = this.name,
         version = this.version,
         states = this.currentNodeStates,
-        position = this.currentPosition,
+        position = this.currentPosition!!,
     )
 } 

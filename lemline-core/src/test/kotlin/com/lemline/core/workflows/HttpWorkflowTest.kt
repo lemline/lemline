@@ -107,9 +107,6 @@ class HttpWorkflowTest {
         // Run the workflow
         instance.run()
 
-        // Print the output for debugging
-        println("[DEBUG_LOG] Current node rawOutput: ${instance.current?.state?.rawOutput}")
-
         // Assert the response contains our updated data
         val outputStr = instance.current?.state?.rawOutput.toString()
         assertTrue(outputStr.contains("\"id\":1"))
