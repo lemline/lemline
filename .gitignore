@@ -41,3 +41,7 @@ articles/
 .kotlin
 bin/
 out/
+
+### Docs ###
+webHelpDOCS2-all.zip
+webHelpDOCS2-all/

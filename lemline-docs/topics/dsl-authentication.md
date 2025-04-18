@@ -126,8 +126,8 @@ The `Authentication` object defines the specific mechanism. Only *one* of the sc
     * `client.id` (String): The client ID.
     * `client.secret` (String): The client secret.
     * `client.authentication` (String): Client auth method (e.g., `client_secret_basic`, `client_secret_post`).
-    * `scopes` (List<String>): List of requested scopes.
-    * `audiences` (List<String>): List of intended audiences.
+    * `scopes` (List&lt;String>): List of requested scopes.
+    * `audiences` (List&lt;String>): List of intended audiences.
     * (Other properties for different grants like `username`, `password`, `subject`, `actor`, specific endpoints - refer
       to detailed OAuth2 specifications if needed).
 * **`oidc`** (Object, Optional): Defines OpenID Connect Authentication. Often relies on OIDC discovery via the
@@ -137,8 +137,8 @@ The `Authentication` object defines the specific mechanism. Only *one* of the sc
     * `client.id` (String): The client ID.
     * `client.secret` (String): The client secret.
     * `client.authentication` (String): Client auth method.
-    * `scopes` (List<String>): List of requested OIDC scopes (e.g., `openid`, `profile`, `email`).
-    * `audiences` (List<String>): List of intended audiences.
+    * `scopes` (List&lt;String>): List of requested OIDC scopes (e.g., `openid`, `profile`, `email`).
+    * `audiences` (List&lt;String>): List of intended audiences.
     * (Other grant-specific properties like `username`, `password`, `subject`, `actor`).
 * **`certificate`** (Object, Optional): Defines Certificate-based Authentication (details depend on runtime support).
 * **`digest`** (Object, Optional): Defines Digest Authentication. Contains:

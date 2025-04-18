@@ -4,15 +4,15 @@
                xsi:noNamespaceSchemaLocation="https://resources.jetbrains.com/writerside/1.0/build-profiles.xsd">
 
     <variables></variables>
-    <build-profile instance="sandbox">
+    <build-profile instance="docs">
         <variables>
-            <noindex-content>true</noindex-content>
             <!-- Theme settings to use system preference -->
             <primary-color>amethyst</primary-color>
             <!-- Logo settings -->
             <header-logo>sw-logo.png</header-logo>
             <custom-favicons>favicon.ico</custom-favicons>
             <custom-css>custom.css</custom-css>
+            <noindex-content>true</noindex-content>
         </variables>
     </build-profile>
     <llms-txt single-file="true"/>
