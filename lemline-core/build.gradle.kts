@@ -19,6 +19,9 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
 
     implementation("jakarta.ws.rs:jakarta.ws.rs-api:3.1.0")
+    implementation("org.glassfish.jersey.core:jersey-client:3.1.5")
+    implementation("org.glassfish.jersey.inject:jersey-hk2:3.1.5")
+    implementation("org.glassfish.jersey.media:jersey-media-json-jackson:3.1.5")
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))

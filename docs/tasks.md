@@ -91,8 +91,14 @@ with a checkbox that can be checked off when completed.
 - [ ] Complete implementation of Listen task
 - [ ] Complete implementation of Emit task
 - [ ] Implement Fork task
-- [ ] Complete Call task implementations (OpenAPI, gRPC, AsyncAPI)
-- [ ] Complete Run task implementations (Container, Script, Shell, Workflow)
+- [x] Complete Call HTTP implementation
+- [ ] Complete Call OpenAPI implementation
+- [ ] Complete Call gRPC implementation
+- [ ] Complete Call AsyncAPI implementation
+- [ ] Complete Run Container task implementation
+- [ ] Complete Run Script task implementation
+- [ ] Complete Run Shell task implementation
+- [ ] Complete Run Workflow task implementation
 - [ ] Implement workflow and task timeouts
 - [ ] Implement workflow scheduling
 - [ ] Implement lifecycle events for workflows and tasks
