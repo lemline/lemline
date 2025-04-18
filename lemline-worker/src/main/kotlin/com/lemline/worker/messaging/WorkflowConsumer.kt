@@ -1,6 +1,7 @@
 package com.lemline.worker.messaging
 
-import com.lemline.common.logger
+import com.lemline.common.*
+import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.activities.WaitInstance
 import com.lemline.core.nodes.flows.TryInstance
 import com.lemline.core.workflows.WorkflowInstance
@@ -40,31 +41,59 @@ open class WorkflowConsumer(
     @Incoming("workflows-in")
     @Outgoing("workflows-out")
     fun consume(msg: String): CompletionStage<String?> = scope.future {
-        val workflowMessage = try {
-            logger.debug("Received request: $msg")
-            WorkflowMessage.fromJsonString(msg)
-        } catch (e: Exception) {
-            logger.error("Unable to deserialize msg $msg", e)
-            // save to retry table with a status of FAILED
-            msg.saveMsgAsFailed(e)
-            // Send message to dead letter queue
-            // NOTE - MUST have mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
-            // If not, Quarkus will stop consuming messages
-            throw e
-        }
+        // Generate a unique request ID for this message processing
+        val requestId = java.util.UUID.randomUUID().toString()
 
-        try {
-            process(workflowMessage).also {
-                logger.debug("Processed request: $it}")
-                processingMessages.remove(msg)?.complete(it)
+        // Use logging context for all logs in this message processing
+        withLoggingContext(
+            LogContext.REQUEST_ID to requestId,
+            LogContext.CORRELATION_ID to requestId // Use same ID for correlation until we extract a better one
+        ) {
+            logger.debug { "Received message for processing" }
+
+            val workflowMessage = try {
+                logger.trace { "Message content: $msg" }
+                WorkflowMessage.fromJsonString(msg)
+            } catch (e: Exception) {
+                logger.error(e) { "Failed to deserialize message" }
+                // save to retry table with a status of FAILED
+                msg.saveMsgAsFailed(e)
+                // Send message to dead letter queue
+                // NOTE - MUST have mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
+                // If not, Quarkus will stop consuming messages
+                throw e
             }
-        } catch (e: Exception) {
-            logger.error("Unable to process $workflowMessage", e)
-            msg.saveMsgAsFailed(e)
-            // Send message to dead letter queue
-            // NOTE - we MUST set mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
-            // If not, Quarkus will stop consuming messages
-            throw e
+
+            // Extract workflow ID from root state if available
+            val workflowId = workflowMessage.states[NodePosition.root]?.workflowId
+
+            // Add workflow context information once we have it
+            withLoggingContext(
+                LogContext.WORKFLOW_ID to workflowId,
+                LogContext.WORKFLOW_NAME to workflowMessage.name,
+                LogContext.WORKFLOW_VERSION to workflowMessage.version,
+                LogContext.NODE_POSITION to workflowMessage.position.toString()
+            ) {
+                try {
+                    logger.info { "Processing workflow message" }
+                    process(workflowMessage).also { result ->
+                        if (result != null) {
+                            logger.info { "Workflow processing completed with next message" }
+                            logger.debug { "Next message: $result" }
+                        } else {
+                            logger.info { "Workflow processing completed with no next message" }
+                        }
+                        processingMessages.remove(msg)?.complete(result)
+                    }
+                } catch (e: Exception) {
+                    logger.error(e) { "Failed to process workflow message" }
+                    msg.saveMsgAsFailed(e)
+                    // Send message to dead letter queue
+                    // NOTE - we MUST set mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
+                    // If not, Quarkus will stop consuming messages
+                    throw e
+                }
+            }
         }
     }
 

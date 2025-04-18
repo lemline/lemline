@@ -1,8 +1,6 @@
 package com.lemline.core.workflows
 
-import com.lemline.common.info
-import com.lemline.common.logger
-import com.lemline.common.warn
+import com.lemline.common.*
 import com.lemline.core.RuntimeDescriptor
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
@@ -182,39 +180,75 @@ class WorkflowInstance(
         }
 
     suspend fun run() {
-        var current = currentNodeInstance
-        status = WorkflowStatus.RUNNING
+        // Set workflow context for all logging within this method
+        withWorkflowContext(
+            workflowId = id,
+            workflowName = name,
+            workflowVersion = version,
+            nodePosition = currentNodePosition.toString()
+        ) {
+            var current = currentNodeInstance
+            status = WorkflowStatus.RUNNING
 
-        do {
-            try {
-                current = current.run()
-                break
-            } catch (e: WorkflowException) {
-                val tryInstance = e.catching
-                // the error was not caught
-                if (tryInstance == null) {
-                    logger.warn { "Workflow $id $name($version): ${e.error}" }
-                    // the workflow is faulted
-                    status = WorkflowStatus.FAULTED
-                    // and stopped there
-                    current = e.raising
-                    break
-                }
-                logger.info { "Workflow $id $name($version): ${e.error}" }
-                if (tryInstance.delay != null) {
-                    // reinit childIndex, as we are going to retry
-                    tryInstance.childIndex = -1
-                    // current being a TryInstance, implies that it should be retried
-                    current = tryInstance
-                    break
-                }
-                // continue with the catch node if any, or just continue if none
-                current = tryInstance.catchDoInstance?.also { it.rawInput = tryInstance.transformedInput }
-                    ?: tryInstance.then() ?: rootInstance
-            }
-        } while (true)
+            logger.debug { "Starting workflow execution" }
 
-        currentNodeInstance = current
+            do {
+                try {
+                    // Update node position before running the current node
+                    updateNodePosition(current.node.position.toString())
+
+                    current = current.run()
+                    logger.debug { "Workflow execution completed successfully" }
+                    break
+                } catch (e: WorkflowException) {
+                    val tryInstance = e.catching
+                    // the error was not caught
+                    if (tryInstance == null) {
+                        logger.warn(e) { "Uncaught workflow exception: ${e.error}" }
+                        // the workflow is faulted
+                        status = WorkflowStatus.FAULTED
+                        // and stopped there
+                        current = e.raising
+                        // Update node position after exception
+                        updateNodePosition(current.node.position.toString())
+                        logger.error { "Workflow execution faulted" }
+                        break
+                    }
+
+                    logger.info { "Caught workflow exception: ${e.error}" }
+
+                    if (tryInstance.delay != null) {
+                        // reinit childIndex, as we are going to retry
+                        tryInstance.childIndex = -1
+                        // current being a TryInstance, implies that it should be retried
+                        current = tryInstance
+                        // Update node position after setting retry
+                        updateNodePosition(current.node.position.toString())
+                        logger.info { "Scheduling retry with delay: ${tryInstance.delay}" }
+                        break
+                    }
+
+                    // continue with the catch node if any, or just continue if none
+                    current = tryInstance.catchDoInstance?.also { 
+                        it.rawInput = tryInstance.transformedInput
+                        // Update node position after setting catch handler
+                        updateNodePosition(it.node.position.toString())
+                        logger.debug { "Continuing with catch handler" }
+                    } ?: tryInstance.then().also {
+                        if (it != null) {
+                            // Update node position after moving to next node
+                            updateNodePosition(it.node.position.toString())
+                        }
+                        logger.debug { "No catch handler, continuing with next node" }
+                    } ?: rootInstance
+                }
+            } while (true)
+
+            // Update node position one last time before setting currentNodeInstance
+            updateNodePosition(current.node.position.toString())
+            currentNodeInstance = current
+            logger.debug { "Workflow status: $status, current position: ${current.node.position}" }
+        }
     }
 
     private suspend fun NodeInstance<*>.run(): NodeInstance<*> {
