@@ -21,10 +21,9 @@ with a checkbox that can be checked off when completed.
 - [ ] Implement static code analysis tools (e.g., Detekt, SonarQube)
 - [ ] Reduce code duplication in workflow execution logic
 - [ ] Refactor large classes (e.g., WorkflowInstance) to improve maintainability
-- [ ] Implement comprehensive null safety throughout the codebase
 - [ ] Review and optimize exception handling patterns
 - [ ] Implement design patterns consistently across the codebase
-- [ ] Improve code comments and documentation for complex algorithms
+- [x] Improve code comments and documentation for complex algorithms
 - [ ] Refactor any code that violates SOLID principles
 
 ## Testing

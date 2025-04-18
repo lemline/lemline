@@ -219,7 +219,21 @@ abstract class NodeInstance<T : TaskBase>(
     }
 
     /**
-     * Determines if the task should be entered.
+     * Determines if the task should be entered based on its condition.
+     *
+     * This method:
+     * 1. Initializes the node by calling start() to set timestamps and transform input
+     * 2. Evaluates the node's conditional expression (if present)
+     * 3. Resets the node state if the condition evaluates to false
+     *
+     * The algorithm handles conditional execution based on the task's `if` property:
+     * - If no condition is specified, the node is always executed (returns true)
+     * - If a condition is specified, it's evaluated against the transformed input
+     * - If the condition evaluates to false, the node state is reset
+     *
+     * Edge cases:
+     * - If the condition expression is invalid or doesn't evaluate to a boolean, an error is thrown
+     * - If the condition evaluates to false, the node is reset to its initial state
      *
      * @return `true` if the task should be entered, `false` otherwise.
      */
@@ -237,14 +251,28 @@ abstract class NodeInstance<T : TaskBase>(
     }
 
     /**
-     * Called when the task is entered. RawInput should be set before.
+     * Initializes node execution by setting timestamps, validating input, and transforming input data.
      *
-     * This method:
-     * - sets the start time,
-     * - validates the task input if a schema is provided,
-     * - transforms the task input using the `input.from` expression if provided.
+     * This method is called when a node is about to be executed and performs several key functions:
+     * 1. Records the start time of the node execution
+     * 2. Logs entry into the node with input data for debugging
+     * 3. Validates the raw input against a schema if one is provided
+     * 4. Transforms the input using expressions if configured
      *
-     * @return The transformed input as a JSON node.
+     * The input transformation process:
+     * - If no input transformation is configured, rawInput is used as-is
+     * - If input.from is specified, the expression is evaluated against rawInput
+     * - The transformed input is available via the transformedInput property
+     *
+     * Validation behavior:
+     * - If input.schema is provided, the rawInput is validated against it
+     * - If validation fails, a VALIDATION error is thrown and execution stops
+     *
+     * Prerequisites:
+     * - The rawInput property must be set before calling this method
+     *
+     * @return The transformed input as a JSON element, also available via the transformedInput property
+     * @throws WorkflowException with VALIDATION error type if input validation fails
      */
     internal fun start(): JsonElement {
         startedAt = Clock.System.now()
@@ -265,6 +293,35 @@ abstract class NodeInstance<T : TaskBase>(
         this.rawOutput = transformedInput
     }
 
+    /**
+     * Finalizes node execution by validating output, updating context, and resetting state.
+     *
+     * This method is called when a node has finished execution and performs several key functions:
+     * 1. Logs completion of the node with output data for debugging
+     * 2. Validates the transformed output against a schema if one is provided
+     * 3. Updates the workflow context using export expressions if configured
+     * 4. Propagates the output to the parent node
+     * 5. Resets the node state to prepare for potential reuse
+     *
+     * The output processing workflow:
+     * 1. Output validation: If output.schema is provided, the transformedOutput is validated
+     * 2. Context update: If export.as is specified, the expression is evaluated and validated
+     * 3. Parent update: The parent node's rawOutput is set to this node's transformedOutput
+     * 4. State reset: The node state is reset to its initial state
+     *
+     * Validation behavior:
+     * - If output.schema is provided, the transformedOutput is validated against it
+     * - If export.schema is provided, the exported context is validated against it
+     * - If validation fails, a VALIDATION error is thrown and execution stops
+     *
+     * Context update behavior:
+     * - The export.as expression must evaluate to a JSON object
+     * - The resulting object becomes the new workflow context
+     * - The previous context is completely replaced (not merged)
+     *
+     * @throws WorkflowException with VALIDATION error type if output validation fails
+     * @throws WorkflowException with EXPRESSION error type if export.as doesn't evaluate to an object
+     */
     private fun complete() {
         logger.info { "Leaving node ${node.name} (${node.task::class.simpleName})" }
         logger.info { "      rawOutput        = $rawOutput" }

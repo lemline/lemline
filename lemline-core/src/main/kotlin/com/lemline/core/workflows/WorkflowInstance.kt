@@ -217,6 +217,25 @@ class WorkflowInstance(
             return currentStates
         }
 
+    /**
+     * Executes the workflow until completion, error, or waiting state.
+     * 
+     * This method implements the main workflow execution loop with error handling:
+     * 1. Sets the workflow status to RUNNING
+     * 2. Executes the workflow nodes using tryRun() until completion or error
+     * 3. Handles exceptions using TryInstance error handlers if available
+     * 4. Manages retry logic with delays when configured
+     * 5. Updates workflow status based on execution result (COMPLETED, FAULTED, WAITING)
+     *
+     * Error handling strategy:
+     * - If an exception is caught by a TryInstance, execution continues with the catch handler
+     * - If a retry is configured with delay, execution pauses and will resume later
+     * - If no error handler catches the exception, the workflow is marked as FAULTED
+     *
+     * Edge cases:
+     * - If current is null after an iteration, the loop terminates
+     * - If a TryInstance has a delay, execution breaks to allow scheduling the retry
+     */
     suspend fun run() {
         status = WorkflowStatus.RUNNING
 
@@ -264,6 +283,34 @@ class WorkflowInstance(
         debug { "Workflow status: $status, current position: $currentPosition" }
     }
 
+    /**
+     * Core workflow execution algorithm that processes nodes until an activity is reached or workflow completes.
+     * 
+     * This method implements the main workflow execution algorithm:
+     * 1. Determines the next node to execute based on current state
+     * 2. Executes flow nodes (non-activity nodes) in sequence until an activity node is reached
+     * 3. Executes the activity node if one is reached
+     * 4. Updates workflow status based on execution result
+     *
+     * The algorithm has three main phases:
+     * - Initialization: Determine the starting node based on current state
+     * - Flow node execution: Process flow nodes in sequence until an activity is reached
+     * - Activity execution: Execute the activity node and update workflow status
+     *
+     * Entry points:
+     * - Starting a new workflow
+     * - Continuing after an activity execution
+     * - Restarting a TryInstance after an error
+     *
+     * Exit conditions:
+     * - Workflow completed (current == null)
+     * - Activity node reached and executed
+     * - WaitInstance encountered (workflow enters WAITING state)
+     *
+     * Performance considerations:
+     * - Flow nodes are executed synchronously in a loop
+     * - Activity nodes may perform I/O operations and should be designed for efficiency
+     */
     private suspend fun tryRun() {
 
         // Possible cases when starting here:
@@ -307,6 +354,28 @@ class WorkflowInstance(
         }
     }
 
+    /**
+     * Creates a node instance based on the node type and recursively builds the node tree.
+     *
+     * This method is responsible for:
+     * 1. Creating the appropriate NodeInstance implementation based on the task type
+     * 2. Applying any saved state from initialStates to restore workflow state
+     * 3. Recursively creating child node instances to build the complete node tree
+     *
+     * The algorithm uses a factory pattern approach:
+     * - Each task type maps to a specific NodeInstance implementation
+     * - The node tree is built in a depth-first manner
+     * - State is restored from initialStates if available
+     *
+     * Edge cases:
+     * - If an unknown task type is encountered, an IllegalArgumentException is thrown
+     * - For non-root tasks, parent must not be null (enforced by !!)
+     *
+     * @param initialStates Map of saved states by position to restore workflow state
+     * @param parent The parent node instance (null only for root nodes)
+     * @return The created node instance with its complete subtree
+     * @throws IllegalArgumentException if an unknown task type is encountered
+     */
     @Suppress("UNCHECKED_CAST")
     private fun Node<*>.createInstance(
         initialStates: Map<NodePosition, NodeState>,
