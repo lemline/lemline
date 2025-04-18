@@ -29,10 +29,10 @@ class ForInstance(
             state.forIndex = value
         }
 
-    // The name of the variable used to store the currentNodeInstance item being enumerated.
+    // The name of the variable used to store the current item being enumerated.
     private val forEach = node.task.`for`.each ?: "item"
 
-    // The name of the variable used to store the index of the currentNodeInstance item being enumerated.
+    // The name of the variable used to store the index of the current item being enumerated.
     private val forAt = node.task.`for`.at ?: "index"
 
     override fun reset() {

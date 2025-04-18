@@ -183,15 +183,15 @@ class TryCatchTest {
         // Run the workflow
         instance.run()
 
-        (instance.currentNodeInstance as TryInstance).delay shouldBe 1.seconds
-        (instance.currentNodeInstance as TryInstance).attemptIndex shouldBe 1
+        (instance.current as TryInstance).delay shouldBe 1.seconds
+        (instance.current as TryInstance).attemptIndex shouldBe 1
         instance.status shouldBe WorkflowStatus.RUNNING
         println("Retrying...")
         // Run the workflow
         instance.run()
 
-        (instance.currentNodeInstance as TryInstance).delay shouldBe 1.seconds
-        (instance.currentNodeInstance as TryInstance).attemptIndex shouldBe 2
+        (instance.current as TryInstance).delay shouldBe 1.seconds
+        (instance.current as TryInstance).attemptIndex shouldBe 2
         instance.status shouldBe WorkflowStatus.RUNNING
         println("Retrying...")
 
@@ -227,16 +227,16 @@ class TryCatchTest {
         // Run the workflow
         instance.run()
 
-        (instance.currentNodeInstance as TryInstance).delay shouldBe 1.seconds
-        (instance.currentNodeInstance as TryInstance).attemptIndex shouldBe 1
+        (instance.current as TryInstance).delay shouldBe 1.seconds
+        (instance.current as TryInstance).attemptIndex shouldBe 1
         instance.status shouldBe WorkflowStatus.RUNNING
         println("Retrying...")
 
         // Run the workflow
         instance.run()
 
-        (instance.currentNodeInstance as TryInstance).delay shouldBe 1.seconds
-        (instance.currentNodeInstance as TryInstance).attemptIndex shouldBe 2
+        (instance.current as TryInstance).delay shouldBe 1.seconds
+        (instance.current as TryInstance).attemptIndex shouldBe 2
         instance.status shouldBe WorkflowStatus.RUNNING
         println("Retrying...")
 

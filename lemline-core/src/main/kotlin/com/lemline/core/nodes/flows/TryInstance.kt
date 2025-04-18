@@ -35,7 +35,7 @@ class TryInstance(
     }
 
     /**
-     * First time we enter the node, we continue to the tryDoInstance
+     * The first time we enter the node, we continue to the tryDoInstance
      * If we return, this means the processing was successful
      */
     override fun `continue`(): NodeInstance<*>? {
@@ -86,7 +86,7 @@ class TryInstance(
      * Determines if this tryInstance is catching the specified error.
      *
      * This method evaluates the `catch` conditions defined in the `TryTask` to determine
-     * if the currentNodeInstance initialPosition should handle the given `WorkflowError`.
+     * if the current initialPosition should handle the given `WorkflowError`.
      *
      * @param error The workflow error to be checked.
      * @return `true` if the error is caught by this initialPosition, `false` otherwise.
@@ -123,7 +123,7 @@ class TryInstance(
             if (exceptWhenFilter) return false
         }
 
-        // add error to the currentNodeInstance custom scope
+        // add error to the current custom scope
         variables = JsonObject(mapOf(errorAs to LemlineJson.encodeToElement(error)))
 
         // new attempt

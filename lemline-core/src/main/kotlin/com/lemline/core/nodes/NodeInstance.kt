@@ -52,7 +52,7 @@ abstract class NodeInstance<T : TaskBase>(
     }
 
     /**
-     * Index of the currentNodeInstance child being processed
+     * Index of the current child being processed
      */
     internal var childIndex: Int
         get() = state.childIndex
@@ -164,7 +164,7 @@ abstract class NodeInstance<T : TaskBase>(
      *
      * @param flow The flow directive which can be one of the following:
      * - `null` or `FlowDirectiveEnum.CONTINUE`: Continue to the next sibling.
-     * - `FlowDirectiveEnum.EXIT`: Exit the currentNodeInstance flow and continue with the parent flow.
+     * - `FlowDirectiveEnum.EXIT`: Exit the current flow and continue with the parent flow.
      * - `FlowDirectiveEnum.END`: End the workflow.
      * - `String`: Go to the sibling with the specified name.
      * - Any other value will result in an error.
@@ -190,8 +190,9 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Get the next node initialPosition, for the `continue` flow directive
      * This implementation is for activities only, must be overridden for flows
+     * Note: continue should return null only if the workflow is finished
      */
-    internal open fun `continue`(): NodeInstance<*>? = then()
+    internal open fun `continue`(): NodeInstance<out TaskBase>? = then()
 
     /**
      * Go to the sibling with the specified name
@@ -223,9 +224,9 @@ abstract class NodeInstance<T : TaskBase>(
      * @return `true` if the task should be entered, `false` otherwise.
      */
     open fun shouldStart(): Boolean {
-        // set start time, validate and transform the input, used for the calculation
+        // set the start time, validate and transform the input, used for the calculation
         start()
-        // Test If task should be executed
+        // Test if the task should be executed
         val shouldStart = node.task.`if`
             ?.let { evalBoolean(transformedInput, it, ".if") }
             ?: true
@@ -348,7 +349,7 @@ abstract class NodeInstance<T : TaskBase>(
         }
 
     /**
-     * Merge an JsonObject with another, without overriding existing keys
+     * Merge a JsonObject with another, without overriding existing keys
      */
     private fun JsonObject.merge(other: JsonObject?): JsonObject {
         val mergedMap = buildMap {
@@ -376,7 +377,7 @@ abstract class NodeInstance<T : TaskBase>(
     }
 
     protected fun raise(error: WorkflowError): Nothing {
-        // get catching try, if any reset initialStates up to it
+        // get catching try if any reset initialStates up to it
         val catching: TryInstance? = getTry(error)?.also { resetUpTo(it) }
 
         // send an exception that will be caught by the WorkflowInstance::run
@@ -390,7 +391,7 @@ abstract class NodeInstance<T : TaskBase>(
     /**
      * Get the try parent (if any)
      */
-    protected fun getTry(error: WorkflowError): TryInstance? = when (this) {
+    private fun getTry(error: WorkflowError): TryInstance? = when (this) {
         is TryInstance -> if (isCatching(error)) this else parent.getTry(error)
         else -> parent?.getTry(error)
     }

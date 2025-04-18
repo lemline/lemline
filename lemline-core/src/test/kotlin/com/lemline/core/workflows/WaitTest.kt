@@ -33,8 +33,8 @@ class WaitTest {
 
         // Assert the current node is the wait
         instance.status shouldBe WorkflowStatus.WAITING
-        instance.currentNodeInstance.shouldBeInstanceOf<WaitInstance>()
-        (instance.currentNodeInstance as WaitInstance).delay shouldBe 1.days + 2.hours + 30.minutes + 15.seconds
+        instance.current.shouldBeInstanceOf<WaitInstance>()
+        (instance.current as WaitInstance).delay shouldBe 1.days + 2.hours + 30.minutes + 15.seconds
         println("Continuing...")
         // Re-Run the workflow (starting from the wait)
         instance.run()
@@ -57,8 +57,8 @@ class WaitTest {
 
         // Assert the current node is the wait
         instance.status shouldBe WorkflowStatus.WAITING
-        instance.currentNodeInstance.shouldBeInstanceOf<WaitInstance>()
-        (instance.currentNodeInstance as WaitInstance).delay shouldBe 1.days + 2.hours + 30.minutes + 15.seconds
+        instance.current.shouldBeInstanceOf<WaitInstance>()
+        (instance.current as WaitInstance).delay shouldBe 1.days + 2.hours + 30.minutes + 15.seconds
         println("Continuing...")
 
         // Re-Run the workflow (starting from the wait)

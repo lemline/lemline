@@ -123,7 +123,7 @@ open class WorkflowConsumer(
         val nextMessage = when (instance.status) {
             WorkflowStatus.PENDING -> TODO()
             WorkflowStatus.WAITING -> instance.waiting()
-            WorkflowStatus.RUNNING -> when (instance.currentNodeInstance is TryInstance) {
+            WorkflowStatus.RUNNING -> when (instance.current is TryInstance) {
                 true -> instance.retry()
                 else -> instance.running()
             }
@@ -161,7 +161,7 @@ open class WorkflowConsumer(
         name = this.name,
         version = this.version,
         states = this.currentNodeStates,
-        position = this.currentNodePosition,
+        position = this.currentPosition,
     )
 
     private fun WorkflowInstance.faulted(): WorkflowMessage? {
@@ -173,7 +173,7 @@ open class WorkflowConsumer(
 
     private fun WorkflowInstance.retry(): WorkflowMessage? {
         val msg = this.toMessage()
-        val delay = (currentNodeInstance as TryInstance).delay
+        val delay = (current as TryInstance).delay
         val delayedUntil = Instant.now().plus(delay?.toJavaDuration() ?: error("No delay set in for $this"))
 
         // Save message to the retry table
@@ -190,7 +190,7 @@ open class WorkflowConsumer(
 
     private fun WorkflowInstance.waiting(): WorkflowMessage? {
         val msg = this.toMessage()
-        val delay: Duration = (this.currentNodeInstance as WaitInstance).delay
+        val delay: Duration = (this.current as WaitInstance).delay
         val delayedUntil = Instant.now().plus(delay.toJavaDuration())
 
         // Save message to the wait table
@@ -208,6 +208,6 @@ open class WorkflowConsumer(
         name = this.name,
         version = this.version,
         states = this.currentNodeStates,
-        position = this.currentNodePosition,
+        position = this.currentPosition,
     )
 } 

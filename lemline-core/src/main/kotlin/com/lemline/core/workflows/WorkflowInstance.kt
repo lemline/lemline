@@ -68,6 +68,44 @@ class WorkflowInstance(
     private val logger = logger()
 
     /**
+     * Local debug function that sets the workflow context each time it's called
+     */
+    private fun debug(e: Throwable? = null, message: () -> String) = withWorkflowContext(
+        workflowId = id,
+        workflowName = name,
+        workflowVersion = version,
+        nodePosition = currentPosition.toString()
+    ) {
+        logger.debug(e, message)
+    }
+
+    /**
+     * Local info function that sets the workflow context each time it's called
+     */
+    private fun info(e: Throwable? = null, message: () -> String) = withWorkflowContext(
+        workflowId = id,
+        workflowName = name,
+        workflowVersion = version,
+        nodePosition = currentPosition.toString()
+    ) {
+        logger.info(e, message)
+    }
+
+    /**
+     * Local error function that sets the workflow context each time it's called
+     */
+    private fun error(e: Throwable? = null, message: () -> String) {
+        withWorkflowContext(
+            workflowId = id,
+            workflowName = name,
+            workflowVersion = version,
+            nodePosition = currentPosition.toString()
+        ) {
+            logger.error(e, message)
+        }
+    }
+
+    /**
      * Workflow definition
      */
     private val workflow: Workflow
@@ -148,14 +186,14 @@ class WorkflowInstance(
      * This property is initialized when the workflow is run and represents
      * the current nodeInstance in the workflow execution.
      */
-    var currentNodeInstance: NodeInstance<*> = nodeInstances[position]
+    var current: NodeInstance<*>? = nodeInstances[position]
         ?: error("node not found in initialPosition $position")
 
     /**
      * Retrieves the current position in the workflow.
      */
-    val currentNodePosition: NodePosition
-        get() = currentNodeInstance.node.position
+    val currentPosition: NodePosition?
+        get() = current?.node?.position
 
     /**
      * Retrieves the current initialStates of all nodes in the workflow.
@@ -180,117 +218,91 @@ class WorkflowInstance(
         }
 
     suspend fun run() {
-        // Set workflow context for all logging within this method
-        withWorkflowContext(
-            workflowId = id,
-            workflowName = name,
-            workflowVersion = version,
-            nodePosition = currentNodePosition.toString()
-        ) {
-            var current = currentNodeInstance
-            status = WorkflowStatus.RUNNING
+        status = WorkflowStatus.RUNNING
 
-            logger.debug { "Starting workflow execution" }
+        debug { "Starting workflow execution" }
 
-            do {
-                try {
-                    // Update node position before running the current node
-                    updateNodePosition(current.node.position.toString())
-
-                    current = current.run()
-                    logger.debug { "Workflow execution completed successfully" }
+        do {
+            try {
+                tryRun()
+                debug { "Workflow execution ran successfully" }
+                break
+            } catch (e: WorkflowException) {
+                val tryInstance = e.catching
+                // the error was not caught
+                if (tryInstance == null) {
+                    // the workflow is faulted
+                    status = WorkflowStatus.FAULTED
+                    // and stopped there
+                    current = e.raising
+                    error(e) { "Workflow execution faulted" }
                     break
-                } catch (e: WorkflowException) {
-                    val tryInstance = e.catching
-                    // the error was not caught
-                    if (tryInstance == null) {
-                        logger.warn(e) { "Uncaught workflow exception: ${e.error}" }
-                        // the workflow is faulted
-                        status = WorkflowStatus.FAULTED
-                        // and stopped there
-                        current = e.raising
-                        // Update node position after exception
-                        updateNodePosition(current.node.position.toString())
-                        logger.error { "Workflow execution faulted" }
-                        break
-                    }
-
-                    logger.info { "Caught workflow exception: ${e.error}" }
-
-                    if (tryInstance.delay != null) {
-                        // reinit childIndex, as we are going to retry
-                        tryInstance.childIndex = -1
-                        // current being a TryInstance, implies that it should be retried
-                        current = tryInstance
-                        // Update node position after setting retry
-                        updateNodePosition(current.node.position.toString())
-                        logger.info { "Scheduling retry with delay: ${tryInstance.delay}" }
-                        break
-                    }
-
-                    // continue with the catch node if any, or just continue if none
-                    current = tryInstance.catchDoInstance?.also { 
-                        it.rawInput = tryInstance.transformedInput
-                        // Update node position after setting catch handler
-                        updateNodePosition(it.node.position.toString())
-                        logger.debug { "Continuing with catch handler" }
-                    } ?: tryInstance.then().also {
-                        if (it != null) {
-                            // Update node position after moving to next node
-                            updateNodePosition(it.node.position.toString())
-                        }
-                        logger.debug { "No catch handler, continuing with next node" }
-                    } ?: rootInstance
                 }
-            } while (true)
 
-            // Update node position one last time before setting currentNodeInstance
-            updateNodePosition(current.node.position.toString())
-            currentNodeInstance = current
-            logger.debug { "Workflow status: $status, current position: ${current.node.position}" }
-        }
+                info { "Caught workflow exception: ${e.error}" }
+
+                if (tryInstance.delay != null) {
+                    // reinit childIndex, as we are going to retry
+                    tryInstance.childIndex = -1
+                    // current being a TryInstance, implies that it should be retried
+                    current = tryInstance
+                    // Update node position after setting retry
+                    info { "Scheduling retry with delay: ${tryInstance.delay}" }
+                    break
+                }
+
+                // continue with the catch node if any, or just continue if none
+                current = tryInstance.catchDoInstance?.also {
+                    it.rawInput = tryInstance.transformedInput
+                    debug { "Continuing with catch handler: ${it.node.position}" }
+                } ?: tryInstance.then().also {
+                    debug { "No catch handler, continuing with next node: ${it?.node?.position}" }
+                }
+            }
+        } while (current != null)
+
+        debug { "Workflow status: $status, current position: $currentPosition" }
     }
 
-    private suspend fun NodeInstance<*>.run(): NodeInstance<*> {
+    private suspend fun tryRun() {
 
         // Possible cases when starting here:
         // - starting a workflow
         // - continuing right after an activity execution (before transformedOutput is set)
         // - restarting a TryInstance
 
-        var next = when (rawOutput == null || this is TryInstance) {
-            // current node position is not completed (start or retry)
-            true -> this
-            // current node position is completed, go to next
-            false -> then()
+        current = when (current!!.rawOutput == null || current is TryInstance) {
+            // the current node position is not completed (start or retry)
+            true -> current
+            // the current node position is completed, go to next
+            false -> current?.then()
         }
 
         // find and execute the next activity
         while (true) {
+            val current = current ?: break
             // get transformed Input for this node
-            next = when (next?.shouldStart()) {
-                // reached workflow's end
-                null -> break
+            this.current = when (current.shouldStart()) {
                 true -> {
                     // if next is an activity, then break
-                    if (next.node.isActivity()) break
+                    if (current.node.isActivity()) break
                     // execute current NodeInstance flow node
-                    next.execute()
+                    current.execute()
                     // continue flow node
-                    next.`continue`()
+                    current.`continue`()
                 }
 
-                false -> next.parent?.`continue`()
+                false -> current.parent?.`continue`()
             }
         }
 
-        return when (next) {
-            null -> rootInstance.also { status = WorkflowStatus.COMPLETED }
+        when (current) {
+            null -> status = WorkflowStatus.COMPLETED
 
             // execute the activity
-            else -> next.also {
-                next.execute()
-                if (next is WaitInstance) status = WorkflowStatus.WAITING
+            else -> {
+                current?.execute()
+                if (current is WaitInstance) status = WorkflowStatus.WAITING
             }
         }
     }

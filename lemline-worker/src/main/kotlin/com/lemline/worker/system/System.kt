@@ -12,7 +12,7 @@ internal object System {
     }
 
     /**
-     * Retrieves the currentNodeInstance environment variables as a map.
+     * Retrieves the current environment variables as a map.
      *
      * @return a map of environment variable names to their values.
      */

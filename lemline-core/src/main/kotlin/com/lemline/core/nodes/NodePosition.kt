@@ -17,9 +17,11 @@ data class NodePosition(
     /**
      * Json pointer representation. (e.g., "/do/0/do")
      */
-    val jsonPointer = when (path.isEmpty()) {
-        true -> JsonPointer.root
-        else -> JsonPointer("/${path.joinToString("/")}")
+    val jsonPointer by lazy {
+        when (path.isEmpty()) {
+            true -> JsonPointer.root
+            else -> JsonPointer("/${path.joinToString("/")}")
+        }
     }
 
     /**

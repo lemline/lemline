@@ -16,8 +16,8 @@ import kotlinx.serialization.json.JsonElement
  *
  * @property name The name of the workflow.
  * @property version The version of the workflow.
- * @property states A map of the internal initialStates (per initialPosition) of the workflow initialPosition.
- * @property position The currentNodeInstance active initialPosition
+ * @property states A map of the internal initial states (per position).
+ * @property position The current active initial position
  */
 @Serializable
 data class WorkflowMessage(
