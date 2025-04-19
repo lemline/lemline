@@ -56,7 +56,7 @@ object Workflows {
     fun getRootNode(workflow: Workflow): Node<RootTask> = rootNodesCache.getOrPut(workflow.index) {
         Node(
             position = NodePosition.root,
-            task = RootTask(workflow.`do`, workflow.use).also {
+            task = RootTask(workflow.document, workflow.`do`, workflow.use).also {
                 it.output = workflow.output
                 it.input = workflow.input
             },

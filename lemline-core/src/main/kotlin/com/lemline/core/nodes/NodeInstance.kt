@@ -1,7 +1,6 @@
 package com.lemline.core.nodes
 
-import com.lemline.common.info
-import com.lemline.common.logger
+import com.lemline.common.*
 import com.lemline.core.errors.WorkflowError
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.*
@@ -29,6 +28,31 @@ abstract class NodeInstance<T : TaskBase>(
     open val parent: NodeInstance<*>?
 ) {
     private val logger = logger()
+
+    private fun <T> withWorkflowContext(
+        block: () -> T
+    ) = withWorkflowContext(
+        workflowId = rootInstance.workflowDescriptor.id,
+        workflowName = rootInstance.node.task.document.name,
+        workflowVersion = rootInstance.node.task.document.version,
+        nodePosition = node.position.toString(),
+        block = block
+    )
+
+    /**
+     * Local debug function that sets the workflow context each time it's called
+     */
+    internal fun debug(e: Throwable? = null, message: () -> String) = withWorkflowContext { logger.debug(e, message) }
+
+    /**
+     * Local info function that sets the workflow context each time it's called
+     */
+    internal fun info(e: Throwable? = null, message: () -> String) = withWorkflowContext { logger.info(e, message) }
+
+    /**
+     * Local error function that sets the workflow context each time it's called
+     */
+    internal fun error(e: Throwable? = null, message: () -> String) = withWorkflowContext { logger.error(e, message) }
 
     /**
      * Node internal initialStates
@@ -277,14 +301,14 @@ abstract class NodeInstance<T : TaskBase>(
     internal fun start(): JsonElement {
         startedAt = Clock.System.now()
 
-        logger.info { "Entering node ${node.name} (${node.task::class.simpleName})" }
-        logger.info { "      rawInput         = $rawInput" }
-        logger.info { "      scope            = $scope" }
+        debug { "Entering node ${node.name} (${node.task::class.simpleName})" }
+        debug { "      rawInput         = $rawInput" }
+        debug { "      scope            = $scope" }
 
         // Validate rawInput using schema if provided
         node.task.input?.schema?.let { schema -> validate(rawInput, schema) }
 
-        logger.info { "      transformedInput = $transformedInput" }
+        debug { "      transformedInput = $transformedInput" }
 
         return transformedInput
     }
@@ -323,10 +347,10 @@ abstract class NodeInstance<T : TaskBase>(
      * @throws WorkflowException with EXPRESSION error type if export.as doesn't evaluate to an object
      */
     private fun complete() {
-        logger.info { "Leaving node ${node.name} (${node.task::class.simpleName})" }
-        logger.info { "      rawOutput        = $rawOutput" }
-        logger.info { "      scope            = $scope" }
-        logger.info { "      transformedOutput = $transformedOutput" }
+        debug { "Leaving node ${node.name} (${node.task::class.simpleName})" }
+        debug { "      rawOutput        = $rawOutput" }
+        debug { "      scope            = $scope" }
+        debug { "      transformedOutput = $transformedOutput" }
 
         // Validate transformedOutput using schema if provided
         node.task.output?.schema?.let { schema -> validate(transformedOutput, schema) }
