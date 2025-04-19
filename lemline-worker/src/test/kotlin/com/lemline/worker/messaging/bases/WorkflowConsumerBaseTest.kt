@@ -80,7 +80,7 @@ abstract class WorkflowConsumerBaseTest {
                     call: http
                     with:
                       method: get
-                      endpoint: https://swapi.dev/api/people
+                      endpoint: https://jsonplaceholder.typicode.com/posts/1
                     then: exit
                 - waitCase:
                     wait:

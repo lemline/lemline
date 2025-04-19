@@ -47,7 +47,7 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerBaseTest() {
         )
         producer = KafkaProducer(producerProps)
 
-        // Setup Kafka consumer
+        // Set up Kafka consumer
         val consumerProps = mapOf(
             ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrapServers,
             ConsumerConfig.GROUP_ID_CONFIG to "test-group",

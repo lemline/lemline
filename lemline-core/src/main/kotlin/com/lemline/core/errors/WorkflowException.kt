@@ -17,4 +17,8 @@ class WorkflowException(
     val raising: NodeInstance<*>,
     val catching: TryInstance?,
     val error: WorkflowError,
-) : RuntimeException()
+) : RuntimeException() {
+
+    override fun toString() =
+        "WorkflowException(raising=${raising.node.name}:${raising.node.position}, catching=${catching?.node?.name}:${catching?.node?.position}, error=$error)"
+}
