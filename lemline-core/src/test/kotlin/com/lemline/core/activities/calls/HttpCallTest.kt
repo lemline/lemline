@@ -56,7 +56,7 @@ class HttpCallTest {
         val result = httpCall.execute(
             method = "GET",
             endpoint = "https://example.com/api",
-            headers = mapOf("Content-Type" to JsonPrimitive("application/json")),
+            headers = mapOf("Content-Type" to "application/json"),
             body = null
         ) as JsonObject
 
@@ -87,7 +87,7 @@ class HttpCallTest {
         val result = httpCall.execute(
             method = "POST",
             endpoint = "https://example.com/api/create",
-            headers = mapOf("Content-Type" to JsonPrimitive("application/json")),
+            headers = mapOf("Content-Type" to "application/json"),
             body = requestBody
         ) as JsonObject
 
@@ -118,7 +118,7 @@ class HttpCallTest {
         val result = httpCall.execute(
             method = "PUT",
             endpoint = "https://example.com/api/update/123",
-            headers = mapOf("Content-Type" to JsonPrimitive("application/json")),
+            headers = mapOf("Content-Type" to "application/json"),
             body = requestBody
         ) as JsonObject
 
@@ -150,7 +150,7 @@ class HttpCallTest {
         val result = httpCall.execute(
             method = "DELETE",
             endpoint = "https://example.com/api/delete/123",
-            headers = mapOf("Content-Type" to JsonPrimitive("application/json")),
+            headers = mapOf("Content-Type" to "application/json"),
             body = null
         ) as JsonObject
 
@@ -186,7 +186,7 @@ class HttpCallTest {
             endpoint = "https://example.com/api/search",
             headers = emptyMap(),
             body = null,
-            query = mapOf("q" to JsonPrimitive("test"), "page" to JsonPrimitive(1))
+            query = mapOf("q" to "test", "page" to "1")
         ) as JsonObject
 
         // Verify

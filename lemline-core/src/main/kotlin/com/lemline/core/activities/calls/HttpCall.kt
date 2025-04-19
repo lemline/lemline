@@ -62,9 +62,9 @@ class HttpCall {
     suspend fun execute(
         method: String,
         endpoint: String,
-        headers: Map<String, JsonPrimitive>,
+        headers: Map<String, String>,
         body: JsonElement?,
-        query: Map<String, JsonPrimitive> = emptyMap(),
+        query: Map<String, String> = emptyMap(),
         output: String = "content",
         redirect: Boolean = false
     ): JsonElement {
@@ -73,11 +73,10 @@ class HttpCall {
             val urlBuilder = URLBuilder(endpoint)
 
             // Add query parameters
-            query.forEach { (key, value) -> urlBuilder.parameters.append(key, value.content) }
+            query.forEach { (key, value) -> urlBuilder.parameters.append(key, value) }
 
             // Create a new client configuration for this specific request with the redirect setting
             val response: HttpResponse = client.config {
-                // In Ktor 3.x, followRedirects is a property of the HttpClient
                 followRedirects = redirect
             }.request(urlBuilder.build()) {
                 // Set the HTTP method
@@ -90,7 +89,7 @@ class HttpCall {
                 }
             
                 // Set headers
-                headers.forEach { (key, value) -> header(key, value.content) }
+                headers.forEach { (key, value) -> header(key, value) }
 
                 // Set the content type for requests with the body
                 if (body != null && (method.uppercase() == "POST" || method.uppercase() == "PUT")) {

@@ -11,7 +11,6 @@ import io.serverlessworkflow.api.types.Endpoint
 import io.serverlessworkflow.api.types.EndpointConfiguration
 import io.serverlessworkflow.api.types.UriTemplate
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 import java.net.URI
 
 class CallHttpInstance(
@@ -35,13 +34,13 @@ class CallHttpInstance(
         val endpoint = extractEndpointUrl(httpArgs.endpoint)
 
         // Extract headers
-        val headers = LemlineJson.encodeToPrimitive(httpArgs.headers)
+        val headers = LemlineJson.encodeToString(httpArgs.headers)
 
         // Extract body
         val body: JsonElement? = httpArgs.body?.let { with(LemlineJson) { it.toJsonElement() } }
 
         // Extract query parameters
-        val query: Map<String, JsonPrimitive> = LemlineJson.encodeToPrimitive(httpArgs.query)
+        val query: Map<String, String> = LemlineJson.encodeToString(httpArgs.query)
 
         // Extract output format
         val output: String = httpArgs.output?.value() ?: "content"

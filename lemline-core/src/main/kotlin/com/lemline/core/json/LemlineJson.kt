@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.serverlessworkflow.api.types.*
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
@@ -94,16 +93,16 @@ object LemlineJson {
     fun encodeToElement(outputAs: OutputAs) = outputAs.get().toJsonElement()
 
     /**
-     * Encodes an `HTTPQuery` object into a `Map<String, JsonPrimitive>`.
+     * Encodes an `HTTPQuery` object into a `Map<String, String>`.
      */
-    fun encodeToPrimitive(httpQuery: HTTPQuery?) =
-        httpQuery?.additionalProperties?.mapValues { it.value.toJsonPrimitive() } ?: emptyMap()
+    fun encodeToString(httpQuery: HTTPQuery?): Map<String, String> =
+        httpQuery?.additionalProperties?.mapValues { it.value.toJsonPrimitive().content } ?: emptyMap()
 
     /**
-     * Encodes an `HTTPHeaders` object into a `Map<String, JsonPrimitive>`.
+     * Encodes an `HTTPHeaders` object into a `Map<String, String>`.
      */
-    fun encodeToPrimitive(httpHeaders: HTTPHeaders?): Map<String, JsonPrimitive> {
-        return httpHeaders?.additionalProperties?.mapValues { it.value.toJsonPrimitive() } ?: emptyMap()
+    fun encodeToString(httpHeaders: HTTPHeaders?): Map<String, String> {
+        return httpHeaders?.additionalProperties?.mapValues { it.value.toJsonPrimitive().content } ?: emptyMap()
     }
 
     /**

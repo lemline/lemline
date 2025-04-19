@@ -99,9 +99,9 @@ class CallHttpInstanceTest {
             mockHttpCall.execute(
                 method = "GET",
                 endpoint = "https://example.com/api",
-                headers = mapOf("Content-Type" to JsonPrimitive("application/json")),
+                headers = mapOf("Content-Type" to "application/json"),
                 body = null,
-                query = mapOf("param" to JsonPrimitive("value")),
+                query = mapOf("param" to "value"),
                 output = "content",
                 redirect = false
             )
@@ -115,9 +115,9 @@ class CallHttpInstanceTest {
             mockHttpCall.execute(
                 method = "GET",
                 endpoint = "https://example.com/api",
-                headers = mapOf("Content-Type" to JsonPrimitive("application/json")),
+                headers = mapOf("Content-Type" to "application/json"),
                 body = null,
-                query = mapOf("param" to JsonPrimitive("value")),
+                query = mapOf("param" to "value"),
                 output = "content",
                 redirect = false
             )
