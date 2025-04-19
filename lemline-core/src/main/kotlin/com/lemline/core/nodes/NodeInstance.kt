@@ -448,7 +448,7 @@ abstract class NodeInstance<T : TaskBase>(
         return JsonObject(mergedMap)
     }
 
-    protected fun error(
+    internal fun error(
         type: WorkflowErrorType,
         title: String?,
         details: String? = null,

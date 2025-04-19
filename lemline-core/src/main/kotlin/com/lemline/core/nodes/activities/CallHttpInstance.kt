@@ -6,12 +6,9 @@ import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
+import com.lemline.core.utils.toUrl
 import io.serverlessworkflow.api.types.CallHTTP
-import io.serverlessworkflow.api.types.Endpoint
-import io.serverlessworkflow.api.types.EndpointConfiguration
-import io.serverlessworkflow.api.types.UriTemplate
 import kotlinx.serialization.json.JsonElement
-import java.net.URI
 
 class CallHttpInstance(
     override val node: Node<CallHTTP>,
@@ -31,7 +28,7 @@ class CallHttpInstance(
         val method = httpArgs.method
 
         // Extract endpoint URL
-        val endpoint = extractEndpointUrl(httpArgs.endpoint)
+        val endpoint = toUrl(httpArgs.endpoint)
 
         // Extract headers
         val headers = LemlineJson.encodeToString(httpArgs.headers)
@@ -72,6 +69,13 @@ class CallHttpInstance(
                     e.stackTraceToString()
                 )
 
+                in 300..399 -> error(
+                    COMMUNICATION,
+                    "Redirection error: $statusCode",
+                    e.message,
+                    statusCode
+                )
+
                 in 400..499 -> error(
                     COMMUNICATION,
                     "Client error: $statusCode",
@@ -99,58 +103,6 @@ class CallHttpInstance(
                 COMMUNICATION,
                 "HTTP call failed: ${e.message}",
                 e.stackTraceToString()
-            )
-        }
-    }
-
-    private fun extractEndpointUrl(endpoint: Endpoint): String {
-        return when (val value = endpoint.get()) {
-            is UriTemplate -> {
-                when (val templateValue = value.get()) {
-                    is URI -> templateValue.toString()
-                    is String -> templateValue
-                    else -> error(
-                        com.lemline.core.errors.WorkflowErrorType.EXPRESSION,
-                        "Unsupported UriTemplate type: ${templateValue?.javaClass?.name}"
-                    )
-                }
-            }
-
-            is EndpointConfiguration -> {
-                val uri = value.uri
-                when (val uriValue = uri.get()) {
-                    is UriTemplate -> {
-                        when (val templateValue = uriValue.get()) {
-                            is URI -> templateValue.toString()
-                            is String -> templateValue
-                            else -> error(
-                                com.lemline.core.errors.WorkflowErrorType.EXPRESSION,
-                                "Unsupported UriTemplate type: ${templateValue?.javaClass?.name}"
-                            )
-                        }
-                    }
-
-                    is String -> uriValue
-                    else -> error(
-                        com.lemline.core.errors.WorkflowErrorType.EXPRESSION,
-                        "Unsupported EndpointUri type: ${uriValue?.javaClass?.name}"
-                    )
-                }
-            }
-
-            is String -> {
-                if (value.matches(Regex("^\\s*\\$\\{.+}\\s*$"))) {
-                    // This is a runtime expression, evaluate it
-                    val expr = value.trim().substring(2, value.length - 1)
-                    evalString(transformedInput, expr, "EndPoint")
-                } else {
-                    value
-                }
-            }
-
-            else -> error(
-                com.lemline.core.errors.WorkflowErrorType.EXPRESSION,
-                "Unsupported Endpoint type: ${value?.javaClass?.name}"
             )
         }
     }
