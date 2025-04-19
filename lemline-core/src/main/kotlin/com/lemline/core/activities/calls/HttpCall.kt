@@ -16,13 +16,22 @@ import kotlinx.serialization.json.JsonPrimitive
 
 class HttpCall {
 
+    // Client configured to handle the HTTP requests
     private val client = HttpClient(CIO) {
-        install(ContentNegotiation) { json(LemlineJson.json) }
+        install(ContentNegotiation) { 
+            json(LemlineJson.json)
+        }
         // Configure timeout settings
         install(HttpTimeout) {
             requestTimeoutMillis = 30000 // 30 seconds
             connectTimeoutMillis = 15000 // 15 seconds
             socketTimeoutMillis = 30000 // 30 seconds
+        }
+        // Install HttpRedirect plugin to allow redirect following
+        install(HttpRedirect) {
+            // We will control whether to follow redirects based on the redirect parameter
+            checkHttpMethod = false // Allow redirects between different HTTP methods
+            allowHttpsDowngrade = true // Allow redirects from HTTPS to HTTP if needed
         }
     }
 
@@ -38,9 +47,16 @@ class HttpCall {
      * @param body The request body (for POST and PUT requests)
      * @param query Query parameters to include in the URL
      * @param output The format of the output (raw, content, response)
-     * @param redirect Whether to follow redirects
+     * @param redirect Specifies whether redirection status codes (300-399) should be treated as errors,
+     *                 and whether HTTP redirects should be followed.
+     *                 If set to false (default):
+     *                 - HTTP redirects will not be followed
+     *                 - An error will be raised for status codes outside the 200-299 range
+     *                 If set to true:
+     *                 - HTTP redirects will be automatically followed
+     *                 - An error will be raised for status codes outside the 200-399 range
      * @return A JsonNode containing the response
-     * @throws RuntimeException if the HTTP status code is not in the 2xx range
+     * @throws RuntimeException if the HTTP status code is outside the acceptable range based on redirect parameter
      * @throws IllegalArgumentException if the method or output format is not supported
      */
     suspend fun execute(
@@ -56,14 +72,14 @@ class HttpCall {
             // Build the URL with query parameters
             val urlBuilder = URLBuilder(endpoint)
 
-            // Add redirect parameter
-            urlBuilder.parameters.append("redirect", redirect.toString())
-
             // Add query parameters
             query.forEach { (key, value) -> urlBuilder.parameters.append(key, value.content) }
 
-            // Create the request
-            val response: HttpResponse = client.request(urlBuilder.build()) {
+            // Create a new client configuration for this specific request with the redirect setting
+            val response: HttpResponse = client.config {
+                // In Ktor 3.x, followRedirects is a property of the HttpClient
+                followRedirects = redirect
+            }.request(urlBuilder.build()) {
                 // Set the HTTP method
                 this.method = when (method.uppercase()) {
                     "POST" -> HttpMethod.Post
@@ -72,7 +88,7 @@ class HttpCall {
                     "DELETE" -> HttpMethod.Delete
                     else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
                 }
-
+            
                 // Set headers
                 headers.forEach { (key, value) -> header(key, value.content) }
 
@@ -83,8 +99,8 @@ class HttpCall {
                 }
             }
 
-            // Check for HTTP errors
-            if (!response.status.isSuccess()) {
+            // Check for HTTP errors based on the redirect parameter
+            if (!isAcceptableStatus(response.status, redirect)) {
                 throw RuntimeException("HTTP error: ${response.status.value}, ${response.bodyAsText()}")
             }
 
@@ -121,6 +137,24 @@ class HttpCall {
         } catch (e: Exception) {
             // Handle other exceptions (connection errors, etc.)
             throw RuntimeException("HTTP call failed: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Determines if a given HTTP status code is acceptable based on the redirect parameter.
+     *
+     * @param status The HTTP status code to check
+     * @param redirect Whether to accept redirection status codes (300-399)
+     * @return true if the status code is within the acceptable range, false otherwise
+     */
+    private fun isAcceptableStatus(status: HttpStatusCode, redirect: Boolean): Boolean {
+        val statusValue = status.value
+        return if (redirect) {
+            // If redirect is true, accept 200-399 range
+            statusValue in 200..399
+        } else {
+            // If redirect is false, only accept 200-299 range
+            statusValue in 200..299
         }
     }
 }
