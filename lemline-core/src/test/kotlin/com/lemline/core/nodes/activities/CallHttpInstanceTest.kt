@@ -185,6 +185,8 @@ class CallHttpInstanceTest {
         every { endpointConfig.uri } returns endpointUri
         every { endpointUri.get() } returns uriTemplate
         every { uriTemplate.get() } returns "https://example.com/api/config"
+        // Mock authentication to return null for this endpoint
+        every { endpointConfig.authentication } returns null
 
         // Mock headers and query params
         every { mockHeaders.additionalProperties } returns emptyMap()
@@ -500,6 +502,76 @@ class CallHttpInstanceTest {
         // Execute and verify
         assertFailsWith<RuntimeException> {
             callHttpInstance.execute()
+        }
+    }
+
+    @Test
+    fun `test execute with authentication`() = runTest {
+        // Setup
+        val endpointConfig = mockk<EndpointConfiguration>()
+        val endpointUri = mockk<EndpointUri>()
+        val uriTemplate = mockk<UriTemplate>()
+        val jsonResponse = JsonObject(mapOf("result" to JsonPrimitive("success")))
+        
+        // Create the proper AuthenticationPolicy object
+        val basicAuthProps = BasicAuthenticationProperties().apply {
+            username = "testuser"
+            password = "testpass"
+        }
+        val basicAuthConfig = BasicAuthenticationPolicyConfiguration().apply {
+            basicAuthenticationProperties = basicAuthProps
+        }
+        val basicAuthPolicy = BasicAuthenticationPolicy().apply {
+            setBasic(basicAuthConfig) // Use setter for union type
+        }
+        
+        // Mock the ReferenceableAuthenticationPolicy to hold the basic policy
+        val mockAuthPolicyUnion = mockk<AuthenticationPolicyUnion>()
+        every { mockAuthPolicyUnion.get() } returns basicAuthPolicy // Return the specific policy
+        val mockRefAuthPolicy = mockk<ReferenceableAuthenticationPolicy>()
+        every { mockRefAuthPolicy.get() } returns mockAuthPolicyUnion // Return the union
+
+        // Mock endpoint resolution with authentication
+        every { mockEndpoint.get() } returns endpointConfig
+        every { endpointConfig.uri } returns endpointUri
+        every { endpointUri.get() } returns uriTemplate
+        every { uriTemplate.get() } returns "https://example.com/api/secure"
+        // Mock the authentication property on EndpointConfiguration
+        every { endpointConfig.authentication } returns mockRefAuthPolicy
+        
+        // Mock headers and query params
+        every { mockHeaders.additionalProperties } returns emptyMap()
+        every { mockQuery.additionalProperties } returns emptyMap()
+
+        // Mock HttpCall execution including authentication
+        coEvery {
+            mockHttpCall.execute(
+                method = "GET",
+                endpoint = "https://example.com/api/secure",
+                headers = emptyMap(),
+                body = null,
+                query = emptyMap(),
+                output = "content",
+                redirect = false,
+                authentication = basicAuthPolicy // Use the correct policy object
+            )
+        } returns jsonResponse
+
+        // Execute
+        callHttpInstance.execute()
+
+        // Verify
+        coVerify {
+            mockHttpCall.execute(
+                method = "GET",
+                endpoint = "https://example.com/api/secure",
+                headers = emptyMap(),
+                body = null,
+                query = emptyMap(),
+                output = "content",
+                redirect = false,
+                authentication = basicAuthPolicy // Use the correct policy object
+            )
         }
     }
 }

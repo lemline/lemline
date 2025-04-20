@@ -448,6 +448,9 @@ abstract class NodeInstance<T : TaskBase>(
         return JsonObject(mergedMap)
     }
 
+    /**
+     * Create an error and raise it
+     */
     internal fun error(
         type: WorkflowErrorType,
         title: String?,
@@ -465,6 +468,9 @@ abstract class NodeInstance<T : TaskBase>(
         raise(error)
     }
 
+    /**
+     * Raise an error and propagate it to the parent
+     */
     protected fun raise(error: WorkflowError): Nothing {
         // get catching try if any reset initialStates up to it
         val catching: TryInstance? = getTry(error)?.also { resetUpTo(it) }
@@ -477,14 +483,6 @@ abstract class NodeInstance<T : TaskBase>(
         )
     }
 
-    /**
-     * Get the try parent (if any)
-     */
-    internal fun getTry(error: WorkflowError): TryInstance? = when (this) {
-        is TryInstance -> if (isCatching(error)) this else parent.getTry(error)
-        else -> parent?.getTry(error)
-    }
-
     private fun resetUpTo(node: TryInstance) {
         reset()
         parent?.let {
@@ -493,5 +491,13 @@ abstract class NodeInstance<T : TaskBase>(
                 else -> it.resetUpTo(node)
             }
         }
+    }
+
+    /**
+     * Get the try parent (if any)
+     */
+    private fun getTry(error: WorkflowError): TryInstance? = when (this) {
+        is TryInstance -> if (isCatching(error)) this else parent.getTry(error)
+        else -> parent?.getTry(error)
     }
 }

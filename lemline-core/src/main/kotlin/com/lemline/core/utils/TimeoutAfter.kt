@@ -9,6 +9,9 @@ import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
+/**
+ * Converts a TimeoutAfter object to a Duration.
+ */
 internal fun TimeoutAfter.toDuration() =
     when (val da = get()) {
         is String -> Duration.parse(da)

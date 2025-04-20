@@ -1,42 +1,46 @@
 package com.lemline.core.utils
 
-import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
+import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
+import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.NodeInstance
-import io.serverlessworkflow.api.types.Endpoint
-import io.serverlessworkflow.api.types.EndpointConfiguration
-import io.serverlessworkflow.api.types.UriTemplate
-import io.serverlessworkflow.impl.expressions.ExpressionUtils
-import java.net.URI
+import io.serverlessworkflow.api.types.*
 
-internal fun NodeInstance<*>.toUrl(endpoint: Endpoint): String = when (val value = endpoint.get()) {
-    is UriTemplate -> {
-        when (val templateValue = value.get()) {
-            is URI -> templateValue.toString()
-            is String -> templateValue
-            else -> error(EXPRESSION, "Unsupported UriTemplate type: ${templateValue?.javaClass?.name}")
-        }
+/**
+ * Get a URL string from an Endpoint
+ */
+internal fun NodeInstance<*>.toUrl(endpointUnion: Endpoint): String = when (val endpoint = endpointUnion.get()) {
+    is UriTemplate -> toUrl(endpoint)
+
+    is EndpointConfiguration -> when (val uriValue = endpoint.uri.get()) {
+        is UriTemplate -> toUrl(uriValue)
+        is String -> toUrl(uriValue)
+        else -> error(RUNTIME, "Unsupported EndpointUri type: ${uriValue?.javaClass?.name}")
     }
 
-    is EndpointConfiguration -> {
-        val uri = value.uri
-        when (val uriValue = uri.get()) {
-            is UriTemplate -> {
-                when (val templateValue = uriValue.get()) {
-                    is URI -> templateValue.toString()
-                    is String -> templateValue
-                    else -> error(EXPRESSION, "Unsupported UriTemplate type: ${templateValue?.javaClass?.name}")
-                }
-            }
+    is String -> toUrl(endpoint)
+    else -> error(RUNTIME, "Unsupported Endpoint type: ${endpoint?.javaClass?.name}")
+}
 
-            is String -> uriValue
-            else -> error(EXPRESSION, "Unsupported EndpointUri type: ${uriValue?.javaClass?.name}")
-        }
+/**
+ * Extracts authentication information from the endpoint configuration if available.
+ * Handles both direct EndpointConfiguration objects and named reference.
+ */
+internal fun NodeInstance<*>.toAuthenticationPolicy(endpointUnion: Endpoint): AuthenticationPolicy? {
+    val authPolicyUnion: ReferenceableAuthenticationPolicy? = when (val endpoint = endpointUnion.get()) {
+        // EndpointConfiguration object
+        is EndpointConfiguration -> endpoint.authentication
+        // Direct String or another unsupported type
+        else -> null
     }
 
-    is String -> when (ExpressionUtils.isExpr(value)) {
-        true -> evalString(transformedInput, ExpressionUtils.trimExpr(value), "EndPoint")
-        false -> value
-    }
+    return when (val authPolicy = authPolicyUnion?.get()) {
+        null -> null
+        is AuthenticationPolicyReference ->
+            rootInstance.node.task.use?.authentications?.additionalProperties?.get(authPolicy.use)
+                ?: error(CONFIGURATION, "Named authentification not found: ${authPolicy.use}")
 
-    else -> error(EXPRESSION, "Unsupported Endpoint type: ${value?.javaClass?.name}")
+        is AuthenticationPolicyUnion -> authPolicy
+
+        else -> error(RUNTIME, "Unsupported AuthenticationPolicy type: ${authPolicy.javaClass.name}")
+    }?.get()
 }

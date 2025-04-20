@@ -19,11 +19,17 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
 
     // Ktor client for native Kotlin HTTP client with coroutine support
-    implementation("io.ktor:ktor-client-core:3.1.2")
-    implementation("io.ktor:ktor-client-cio:3.1.2")
-    implementation("io.ktor:ktor-client-content-negotiation:3.1.2")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.1.2")
+    implementation(platform("io.ktor:ktor-bom:3.1.2"))
+    implementation("io.ktor:ktor-client-core")
+    implementation("io.ktor:ktor-client-cio")
+    implementation("io.ktor:ktor-client-content-negotiation")
+    implementation("io.ktor:ktor-serialization-kotlinx-json")
+    implementation("io.ktor:ktor-client-auth")
 
+//    implementation("io.jsonwebtoken:jjwt-api:0.11.5")
+//    implementation("io.jsonwebtoken:jjwt-impl:0.11.5")
+//    implementation("io.jsonwebtoken:jjwt-jackson:0.11.5") // For JSON serialization
+    implementation("com.auth0:java-jwt:4.4.0")
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))

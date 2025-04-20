@@ -3,9 +3,11 @@ package com.lemline.core.nodes.activities
 import com.lemline.common.logger
 import com.lemline.core.activities.calls.HttpCall
 import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
+import com.lemline.core.errors.WorkflowException
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
+import com.lemline.core.utils.toAuthenticationPolicy
 import com.lemline.core.utils.toUrl
 import io.serverlessworkflow.api.types.CallHTTP
 import kotlinx.serialization.json.JsonElement
@@ -15,20 +17,22 @@ class CallHttpInstance(
     override val parent: NodeInstance<*>,
 ) : NodeInstance<CallHTTP>(node, parent) {
 
-    private val httpCall = HttpCall()
+    private val httpCall = HttpCall(this)
     private val logger = logger()
 
     override suspend fun execute() {
         logger.info("Executing HTTP call: ${node.name}")
 
-        val callHttp = node.task
-        val httpArgs = callHttp.with
+        val httpArgs = node.task.with
 
         // Extract method
         val method = httpArgs.method
 
-        // Extract endpoint URL
+        // Extract endpoint URL and authentication if available
         val endpoint = toUrl(httpArgs.endpoint)
+
+        // Extract authentication from the endpoint
+        val authentication = toAuthenticationPolicy(httpArgs.endpoint)
 
         // Extract headers
         val headers = LemlineJson.encodeToString(httpArgs.headers)
@@ -45,6 +49,10 @@ class CallHttpInstance(
         // Extract redirect flag
         val redirect = httpArgs.isRedirect
 
+        // --- DEBUGGING START ---
+        logger.info("Passing authentication object to HttpCall.execute: $authentication")
+        // --- DEBUGGING END ---
+
         // Execute the HTTP call and get the result
         try {
             // Execute the HTTP call directly using the suspendable function
@@ -55,8 +63,12 @@ class CallHttpInstance(
                 body = body,
                 query = query,
                 output = output,
-                redirect = redirect
+                redirect = redirect,
+                authentication = authentication
             )
+        } catch (e: WorkflowException) {
+            // rethrow the WorkflowException without catching them
+            throw e
         } catch (e: RuntimeException) {
             val statusCode = e.message
                 ?.substringAfter("HTTP error: ")

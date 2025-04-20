@@ -356,4 +356,199 @@ class HttpWorkflowTest {
         println(output)
         assertTrue(output.contains("{\"type\":\"https://serverlessworkflow.io/spec/1.0.0/errors/communication\",\"status\":500,\"instance\":\"/do/0/tryConnectToNonExistentHost/try/0/connectToNonExistentHost\""))
     }
+
+    /**
+     * Tests HTTP Basic Authentication using httpbin.org.
+     *
+     * This test verifies that HTTP Basic Authentication works correctly by making a request to
+     * httpbin.org/basic-auth which requires basic authentication and returns the authenticated
+     * user information if successful.
+     */
+    @Test
+    fun `test HTTP Basic Authentication`() = runTest {
+        val workflowYaml = """
+            do:
+              - authCall:
+                    call: http
+                    with:
+                      method: GET
+                      endpoint:
+                        uri: https://httpbin.org/basic-auth/testuser/testpass
+                        authentication:
+                          basic:
+                            username: testuser
+                            password: testpass
+        """
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+
+        // Run the task
+        instance.run()
+
+        // Verify there was no Error
+        instance.status shouldBe WorkflowStatus.RUNNING
+
+        // check output
+        val rawOutput = instance.current?.rawOutput.toString()
+        assertTrue(rawOutput.contains("authenticated") || rawOutput.contains("user"))
+    }
+
+    /**
+     * Tests HTTP Bearer Token Authentication using httpbin.org.
+     *
+     * This test verifies that HTTP Bearer Token Authentication works correctly by making a request to
+     * httpbin.org/bearer which requires a bearer token and returns the token information if successful.
+     */
+    @Test
+    fun `test HTTP Bearer Token Authentication`() = runTest {
+        val workflowYaml = """
+            do:
+              - testBearerAuth:
+                    call: http
+                    with:
+                      method: GET
+                      endpoint:
+                        uri: https://httpbin.org/bearer
+                        authentication:
+                          bearer:
+                            token: test-token-12345
+        """
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+
+        // Run the task
+        instance.run()
+
+        // Verify there was no Error
+        instance.status shouldBe WorkflowStatus.RUNNING
+
+        // Verify call completed normally (no error was caught)
+        val rawOutput = instance.current?.state?.rawOutput.toString()
+        assertTrue(rawOutput.contains("token") || rawOutput.contains("authenticated"))
+    }
+
+    /**
+     * Tests HTTP Authentication with headers as an alternative.
+     *
+     * This test shows that authentication can also be implemented using custom headers
+     * directly in the request, which is useful for APIs that don't follow standard
+     * authentication patterns.
+     */
+    @Test
+    fun `test HTTP Authentication with custom headers`() = runTest {
+        val workflowYaml = """
+            do:
+              - testCustomHeaderAuth:
+                  call: http
+                  with:
+                    method: GET
+                    endpoint: https://httpbin.org/headers
+                    headers:
+                      X-API-Key: api-key-12345
+                      Authorization: Bearer custom-token-12345
+        """
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+
+        // Run the task
+        instance.run()
+
+        // Verify there was no Error
+        instance.status shouldBe WorkflowStatus.RUNNING
+
+        // The response should contain at least one of our custom headers, case-insensitive
+        val outputStr = instance.current?.state?.rawOutput.toString()
+        assertTrue(
+            outputStr.contains("x-api-key", ignoreCase = true) ||
+                    outputStr.contains("authorization", ignoreCase = true)
+        )
+    }
+
+    /**
+     * Tests HTTP Authentication using a named authentication policy.
+     *
+     * This test demonstrates using a named authentication policy defined in the
+     * workflow's authentication section and referenced in the endpoint configuration.
+     * NOTE: Currently uses direct headers as a workaround.
+     */
+    @Test
+    fun `test HTTP Authentication with named policy`() = runTest {
+        val workflowYaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: auth-test
+              version: '0.1.0'
+            use:
+              authentications:
+                httpBinAuth:
+                  basic:
+                    username: testuser
+                    password: testpass
+            do:
+              - testNamedAuth:
+                    call: http
+                    with:
+                      method: GET
+                      endpoint:
+                        uri: https://httpbin.org/basic-auth/testuser/testpass
+                        authentication:
+                          use: httpBinAuth
+        """
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+
+        // Run the task
+        instance.run()
+
+        // Verify there was no Error
+        instance.status shouldBe WorkflowStatus.RUNNING
+
+        // If there's an error caught, it will contain "errorCaught":true
+        val rawOutput = instance.current?.state?.rawOutput.toString()
+        assertTrue(rawOutput.contains("authenticated") || rawOutput.contains("user"))
+    }
+
+    /**
+     * Tests authentication failure handling.
+     *
+     * This test verifies that authentication failures are properly caught and handled
+     * using the Try-Catch mechanism as described in the Serverless Workflow specification.
+     */
+    @Test
+    fun `test authentication failure handling`() = runTest {
+        val workflowYaml = """
+            do:
+              - tryAuthFailure:
+                  try:
+                    - authFailure:
+                        call: http
+                        with:
+                          method: GET
+                          endpoint:
+                            uri: https://httpbin.org/basic-auth/testuser/testpass
+                            authentication:
+                              basic:
+                                username: wrong-user
+                                password: wrong-pass
+                  catch:
+                    errors:
+                      with:
+                        type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+                    as: authError
+                    do:
+                      - handleError:
+                          set:
+                            errorCaught: true
+                            error: @{ @authError }
+        """
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+
+        // Run the workflow
+        instance.run()
+
+        // Verify the workflow completed successfully (error was caught)
+        instance.status shouldBe WorkflowStatus.COMPLETED
+
+        // Verify the error was caught and handled
+        val output = instance.rootInstance.transformedOutput.toString()
+        println("Auth Failure test output: $output")
+        assertTrue(output.contains("\"errorCaught\":true"))
+    }
 }

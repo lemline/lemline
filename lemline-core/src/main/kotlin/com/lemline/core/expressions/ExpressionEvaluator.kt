@@ -16,6 +16,15 @@ internal interface ExpressionEvaluator {
         eval(input.toJsonNode(), expr, scope.toJsonNode() as ObjectNode).toJsonElement()
     }
 
+    /**
+     * Evaluates an expression against a given JSON element within a specified scope.
+     *
+     * @param data The JSON element to evaluate the expression against.
+     * @param expr The JQ expression to evaluate.
+     * @param scope The scope in which to evaluate the expression.
+     * @param force If true, forces evaluation of the expression even if it is not a string.
+     * @return The result of the evaluation as a JsonElement.
+     */
     fun eval(data: JsonElement, expr: JsonElement, scope: JsonObject, force: Boolean): JsonElement = when (expr) {
         is JsonNull -> data
 

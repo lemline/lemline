@@ -102,7 +102,12 @@ with a checkbox that can be checked off when completed.
 - [ ] Implement workflow and task timeouts
 - [ ] Implement workflow scheduling
 - [ ] Implement lifecycle events for workflows and tasks
-- [ ] Complete authentication method implementations (Basic, Bearer, Certificate, Digest, OAUTH2, OpenIdConnect)
+- [x] Complete Basic authentication method implementations
+- [x] Complete Bearer authentication method implementations
+- [x] Complete Certificate authentication method implementations
+- [x] Complete Digest authentication method implementations
+- [x] Complete OAUTH2 authentication method implementations
+- [x] Complete OpenIdConnect authentication method implementations
 - [ ] Implement catalog functionality
 - [ ] Implement extension functionality
 
