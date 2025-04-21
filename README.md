@@ -1,6 +1,8 @@
 # Lemline
 
-<img src="images/lemly.png" alt="Lemly Logo" width="256"/>
+<div align="center">
+  <img src="images/lemly.png" alt="Lemly Logo" width="256"/>
+</div>
 
 
 [![License](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE.md)
