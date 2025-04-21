@@ -1,5 +1,8 @@
 # Lemline
 
+<img src="images/lemly.png" alt="Lemly Logo" width="256"/>
+
+
 [![License](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE.md)
 
 > **⚠️ Warning: Active Development**
