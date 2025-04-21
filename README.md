@@ -89,8 +89,6 @@ the [lemline-worker README](lemline-worker/README.md).
 
 * **Serverless Workflow DSL Specification:
   ** [Official Specification](https://github.com/serverlessworkflow/specification)
-* **Lemline DSL Reference:** See the `references/dsl.md` and `references/dsl-reference.md` files for the specific
-  version and details implemented in this project.
 * **Worker Configuration:** See `lemline-worker/README.md` (if it exists or needs creation) for detailed configuration
   options.
 
