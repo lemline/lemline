@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.json
 
 import com.fasterxml.jackson.databind.JsonNode
@@ -136,6 +137,3 @@ object LemlineJson {
             else -> JsonPrimitive(toString())
         }
 }
-
-
-

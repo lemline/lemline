@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.messaging.bases
 
 import com.lemline.core.json.LemlineJson
@@ -279,4 +280,4 @@ abstract class WorkflowConsumerBaseTest {
             "Messages were stored in wait repository:  ${waitMessages.map { LemlineJson.encodeToPrettyString(it) }}"
         )
     }
-} 
+}

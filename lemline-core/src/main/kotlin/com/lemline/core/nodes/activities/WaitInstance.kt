@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes.activities
 
 import com.lemline.core.nodes.Node
@@ -16,4 +17,4 @@ class WaitInstance(
      * Examples: "PT15S" (15 seconds), "PT1H" (1 hour), "P1D" (1 day) */
     val delay by lazy { node.task.wait.toDuration() }
 
-} 
+}

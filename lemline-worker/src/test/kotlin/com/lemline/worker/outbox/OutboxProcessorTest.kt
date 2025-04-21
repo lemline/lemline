@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.outbox
 
 import io.kotest.core.spec.style.FunSpec
@@ -56,4 +57,4 @@ internal data class TestMessage(
     override var attemptCount: Int,
     override var lastError: String?,
     override var delayedUntil: Instant
-) : OutboxMessage 
+) : OutboxMessage

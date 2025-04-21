@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
 import com.lemline.common.*
@@ -219,7 +220,7 @@ class WorkflowInstance(
 
     /**
      * Executes the workflow until completion, error, or waiting state.
-     * 
+     *
      * This method implements the main workflow execution loop with error handling:
      * 1. Sets the workflow status to RUNNING
      * 2. Executes the workflow nodes using tryRun() until completion or error
@@ -285,7 +286,7 @@ class WorkflowInstance(
 
     /**
      * Core workflow execution algorithm that processes nodes until an activity is reached or workflow completes.
-     * 
+     *
      * This method implements the main workflow execution algorithm:
      * 1. Determines the next node to execute based on current state
      * 2. Executes flow nodes (non-activity nodes) in sequence until an activity node is reached

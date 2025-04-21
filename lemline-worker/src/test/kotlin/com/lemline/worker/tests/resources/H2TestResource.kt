@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.tests.resources
 
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
@@ -32,4 +33,4 @@ class H2TestResource : QuarkusTestResourceLifecycleManager {
         System.clearProperty("quarkus.datasource.username")
         System.clearProperty("quarkus.datasource.password")
     }
-} 
+}

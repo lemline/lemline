@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory

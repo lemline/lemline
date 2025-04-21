@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
 
-import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import kotlinx.serialization.Serializable
 
@@ -38,11 +38,7 @@ data class WorkflowError(
         details = details
     )
 
-    internal fun toJson() = LemlineJson.encodeToString(this)
-
     companion object {
         private const val URI_BASE = "https://serverlessworkflow.io/spec/1.0.0/errors"
-
-        internal fun fromJson(json: String) = LemlineJson.decodeFromString<WorkflowError>(json)
     }
 }

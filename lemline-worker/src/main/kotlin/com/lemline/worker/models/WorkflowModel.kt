@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.models
 
 import com.lemline.worker.repositories.UuidV7Entity
@@ -22,4 +23,4 @@ class WorkflowModel : UuidV7Entity() {
     @Version
     @Column(name = "version_number")
     var versionNumber: Long = 0
-} 
+}

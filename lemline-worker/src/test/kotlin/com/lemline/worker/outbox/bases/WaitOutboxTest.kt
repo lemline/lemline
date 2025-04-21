@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.outbox.bases
 
 import com.lemline.worker.models.WaitModel

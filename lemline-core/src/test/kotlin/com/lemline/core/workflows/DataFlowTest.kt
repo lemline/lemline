@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
 import com.lemline.core.getWorkflowInstance
@@ -56,7 +57,7 @@ class DataFlowTest {
     fun `check workflow input-from (yaml)`() = runTest {
         val doYaml = """
             input:
-              from: 
+              from:
                 in: .
             do:
               - first:
@@ -129,7 +130,7 @@ class DataFlowTest {
                   set:
                     value: @{ . }
             output:
-              as: 
+              as:
                 out: .value
         """
         val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
@@ -222,7 +223,7 @@ class DataFlowTest {
             do:
               - first:
                   input:
-                    from: 
+                    from:
                         in: .
                   set:
                     value: "@{ .in }"
@@ -294,7 +295,7 @@ class DataFlowTest {
                   set:
                     value: "@{ . }"
                   output:
-                    as: 
+                    as:
                       out: .value
         """
         val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
@@ -447,24 +448,24 @@ class DataFlowTest {
             do:
               - first:
                   input:
-                    from: 
+                    from:
                       in1: .in
                   set:
                     value: @{ .in1 }
                   output:
-                    as: 
+                    as:
                       out1: .value
               - second:
                   input:
-                    from: 
+                    from:
                       in2: .out1
                   set:
                     value: @{ .in2 }
                   output:
-                    as: 
+                    as:
                       out2: .value
             output:
-              as: 
+              as:
                 out: .out2
         """
         val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))

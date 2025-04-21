@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
 import com.lemline.core.getWorkflowInstance
@@ -843,4 +844,4 @@ class TryCatchTest {
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.COMPLETED
     }
-} 
+}

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.json
 
 import org.junit.jupiter.api.Test
@@ -63,4 +64,4 @@ class UUIDSerializerTest {
             LemlineJson.decodeFromString<UUID>(malformedJson)
         }
     }
-} 
+}

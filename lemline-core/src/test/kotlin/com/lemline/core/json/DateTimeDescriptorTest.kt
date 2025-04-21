@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.json
 
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
@@ -33,4 +34,4 @@ class DateTimeDescriptorTest {
             "JSON should contain correct milliseconds value"
         )
     }
-} 
+}

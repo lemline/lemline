@@ -1,8 +1,34 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
 import com.lemline.core.json.LemlineJson
-import com.lemline.core.nodes.Token.*
-import io.serverlessworkflow.api.types.*
+import com.lemline.core.nodes.Token.BRANCHES
+import com.lemline.core.nodes.Token.CATCH
+import com.lemline.core.nodes.Token.DO
+import com.lemline.core.nodes.Token.FOREACH
+import com.lemline.core.nodes.Token.FORK
+import com.lemline.core.nodes.Token.SUBSCRIPTION
+import com.lemline.core.nodes.Token.TRY
+import com.lemline.core.nodes.Token.WITH
+import io.serverlessworkflow.api.types.CallAsyncAPI
+import io.serverlessworkflow.api.types.CallFunction
+import io.serverlessworkflow.api.types.CallGRPC
+import io.serverlessworkflow.api.types.CallHTTP
+import io.serverlessworkflow.api.types.CallOpenAPI
+import io.serverlessworkflow.api.types.CallTask
+import io.serverlessworkflow.api.types.DoTask
+import io.serverlessworkflow.api.types.EmitTask
+import io.serverlessworkflow.api.types.ForTask
+import io.serverlessworkflow.api.types.ForkTask
+import io.serverlessworkflow.api.types.ListenTask
+import io.serverlessworkflow.api.types.RaiseTask
+import io.serverlessworkflow.api.types.RunTask
+import io.serverlessworkflow.api.types.SetTask
+import io.serverlessworkflow.api.types.SwitchTask
+import io.serverlessworkflow.api.types.TaskBase
+import io.serverlessworkflow.api.types.TaskItem
+import io.serverlessworkflow.api.types.TryTask
+import io.serverlessworkflow.api.types.WaitTask
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -76,7 +102,7 @@ data class Node<T : TaskBase>(
         val nodes = mutableSetOf<String>()
         val edges = mutableSetOf<String>()
 
-        fun processNode(node: Node<*>, parentId: com.lemline.core.nodes.JsonPointer? = null) {
+        fun processNode(node: Node<*>, parentId: JsonPointer? = null) {
             val taskType = node.task.javaClass.simpleName
             val nodeId = node.position.jsonPointer
 

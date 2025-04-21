@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
 
 import kotlinx.serialization.KSerializer
@@ -29,4 +30,4 @@ object WorkflowErrorTypeSerializer : KSerializer<WorkflowErrorType> {
         return WorkflowErrorType.entries.firstOrNull { it.type == typeString }
             ?: throw IllegalArgumentException("Unknown WorkflowErrorType type: $typeString")
     }
-} 
+}

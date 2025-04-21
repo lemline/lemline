@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes.flows
 
 import com.lemline.core.errors.WorkflowError
@@ -50,4 +51,4 @@ class RaiseInstance(
         is Error -> error
         else -> error(RUNTIME, "Unknown Error '$error'")
     }
-} 
+}

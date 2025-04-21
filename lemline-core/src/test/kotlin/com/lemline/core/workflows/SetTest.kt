@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
 import com.lemline.core.getWorkflowInstance
@@ -17,7 +18,7 @@ class SetTest {
            do:
              - first:
                 set:
-                  counter: 0 
+                  counter: 0
         """
         val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
 
@@ -80,7 +81,7 @@ class SetTest {
            do:
              - first:
                 set:
-                  counter:  
+                  counter:
                     a: 0
                     b: @{ . }
         """

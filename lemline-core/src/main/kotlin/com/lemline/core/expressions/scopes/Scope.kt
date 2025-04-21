@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions.scopes
 
 import com.lemline.core.RuntimeDescriptor

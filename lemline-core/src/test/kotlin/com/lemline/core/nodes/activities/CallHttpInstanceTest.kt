@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes.activities
 
 import com.lemline.core.activities.calls.HttpCall
@@ -512,7 +513,7 @@ class CallHttpInstanceTest {
         val endpointUri = mockk<EndpointUri>()
         val uriTemplate = mockk<UriTemplate>()
         val jsonResponse = JsonObject(mapOf("result" to JsonPrimitive("success")))
-        
+
         // Create the proper AuthenticationPolicy object
         val basicAuthProps = BasicAuthenticationProperties().apply {
             username = "testuser"
@@ -524,7 +525,7 @@ class CallHttpInstanceTest {
         val basicAuthPolicy = BasicAuthenticationPolicy().apply {
             setBasic(basicAuthConfig) // Use setter for union type
         }
-        
+
         // Mock the ReferenceableAuthenticationPolicy to hold the basic policy
         val mockAuthPolicyUnion = mockk<AuthenticationPolicyUnion>()
         every { mockAuthPolicyUnion.get() } returns basicAuthPolicy // Return the specific policy
@@ -538,7 +539,7 @@ class CallHttpInstanceTest {
         every { uriTemplate.get() } returns "https://example.com/api/secure"
         // Mock the authentication property on EndpointConfiguration
         every { endpointConfig.authentication } returns mockRefAuthPolicy
-        
+
         // Mock headers and query params
         every { mockHeaders.additionalProperties } returns emptyMap()
         every { mockQuery.additionalProperties } returns emptyMap()

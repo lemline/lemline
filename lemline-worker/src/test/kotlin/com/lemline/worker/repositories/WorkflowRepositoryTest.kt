@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.repositories
 
 import com.lemline.worker.tests.resources.PostgresTestResource
@@ -65,4 +66,4 @@ class WorkflowRepositoryTest {
         Assertions.assertEquals(version, result?.version)
         Assertions.assertEquals("test definition", result?.definition)
     }
-} 
+}

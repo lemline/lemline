@@ -1,11 +1,8 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.config
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.mockk.every
-import io.mockk.mockk
-import io.quarkus.test.junit.QuarkusTest
-import org.junit.jupiter.api.Test
 
 class DatabaseConfigTest : StringSpec({
     "isPostgreSQL should return true when database type is postgresql" {
@@ -43,4 +40,4 @@ class DatabaseConfigTest : StringSpec({
         config.databaseType = "postgresql"
         config.isMySQL() shouldBe false
     }
-}) 
+})

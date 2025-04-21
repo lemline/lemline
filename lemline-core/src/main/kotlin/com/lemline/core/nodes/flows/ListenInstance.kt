@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes.flows
 
 import com.lemline.core.nodes.Node
@@ -9,4 +10,4 @@ class ListenInstance(
     override val parent: NodeInstance<*>,
 ) : NodeInstance<ListenTask>(node, parent) {
 
-} 
+}

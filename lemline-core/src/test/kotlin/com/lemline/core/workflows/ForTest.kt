@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
 import com.lemline.core.getWorkflowInstance
@@ -16,13 +17,13 @@ class ForTest {
            do:
              - sumAll:
                  for:
-                   in: .input 
+                   in: .input
                  do:
                    - accumulate:
                        set:
                          counter: @{ .counter + @item }
                  output:
-                   as:  .counter 
+                   as:  .counter
         """
         val instance = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(1, 2, 3))))
 

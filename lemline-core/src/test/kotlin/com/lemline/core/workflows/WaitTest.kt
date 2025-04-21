@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
 import com.lemline.core.getWorkflowInstance
@@ -21,7 +22,7 @@ class WaitTest {
             do:
               - wait_step:
                   wait:
-                    days: 1    
+                    days: 1
                     hours: 2
                     minutes: 30
                     seconds: 15
@@ -48,7 +49,7 @@ class WaitTest {
         val workflowYaml = """
             do:
               - wait_step:
-                  wait: P1DT2H30M15S 
+                  wait: P1DT2H30M15S
         """
         val instance = getWorkflowInstance(workflowYaml, JsonNull)
 
@@ -69,4 +70,4 @@ class WaitTest {
     }
 
 
-} 
+}

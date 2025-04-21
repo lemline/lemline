@@ -1,20 +1,9 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.common
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
-
-/**
- * Logging levels used throughout the application.
- * - TRACE: Very detailed information, useful for debugging complex issues
- * - DEBUG: Detailed information on the flow through the system
- * - INFO: Interesting runtime events (startup/shutdown, configuration changes)
- * - WARN: Potentially harmful situations that might lead to errors
- * - ERROR: Error events that might still allow the application to continue running
- */
-enum class LogLevel {
-    TRACE, DEBUG, INFO, WARN, ERROR
-}
 
 /**
  * Standard context keys used in MDC for consistent logging.
@@ -26,7 +15,6 @@ object LogContext {
     const val NODE_POSITION = "nodePosition"
     const val CORRELATION_ID = "correlationId"
     const val REQUEST_ID = "requestId"
-    const val USER_ID = "userId"
 }
 
 /**
@@ -166,14 +154,4 @@ fun updateLoggingContext(key: String, value: String?) {
     } else {
         MDC.remove(key)
     }
-}
-
-/**
- * Updates the node position in the current thread's logging context.
- * This is useful for tracking the current position in a workflow as it evolves.
- *
- * @param nodePosition The current node position
- */
-fun updateNodePosition(nodePosition: String?) {
-    updateLoggingContext(LogContext.NODE_POSITION, nodePosition)
 }

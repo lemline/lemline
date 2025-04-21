@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes.flows
 
 import com.lemline.core.nodes.Node
@@ -26,4 +27,4 @@ class SwitchInstance(
     }
 
     private fun evalCase(`when`: String, name: String) = evalBoolean(transformedInput, `when`, name)
-} 
+}

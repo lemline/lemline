@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes.flows
 
 import com.lemline.core.errors.WorkflowError
@@ -188,4 +189,4 @@ class TryInstance(
 
         return if (delay > Duration.ZERO) delay.also { this.delay = it } else null
     }
-} 
+}

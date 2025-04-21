@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.repositories
 
 import io.quarkus.hibernate.orm.panache.kotlin.PanacheEntityBase

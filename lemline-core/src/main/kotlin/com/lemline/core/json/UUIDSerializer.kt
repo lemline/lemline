@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.json
 
 import kotlinx.serialization.KSerializer
@@ -18,4 +19,4 @@ internal object UUIDSerializer : KSerializer<UUID> {
     override fun deserialize(decoder: Decoder): UUID {
         return UUID.fromString(decoder.decodeString())
     }
-} 
+}

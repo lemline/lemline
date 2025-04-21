@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
 import com.lemline.core.json.NodePositionSerializer
@@ -56,7 +57,7 @@ data class NodePosition(
      * @param token The property name to add
      * @return A new Position with the added property
      */
-    fun addToken(token: com.lemline.core.nodes.Token): NodePosition =
+    fun addToken(token: Token): NodePosition =
         NodePosition(path + token.token)
 
     /**
@@ -75,15 +76,6 @@ data class NodePosition(
      */
     val parent: NodePosition?
         get() = if (path.isEmpty()) null else NodePosition(path.dropLast(1))
-
-    /**
-     * Checks if this path is a child of the given parent path.
-     *
-     * @param parent The potential parent path
-     * @return true if this path is a child of the given parent path
-     */
-    fun isChildOf(parent: NodePosition): Boolean =
-        path.size > parent.path.size && path.take(parent.path.size) == parent.path
 
     companion object {
         val root = com.lemline.core.nodes.JsonPointer.root.toPosition()

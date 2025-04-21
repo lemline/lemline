@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.repositories
 
 import com.lemline.worker.models.WAIT_TABLE
@@ -33,11 +34,11 @@ class WaitRepository : UuidV7Repository<WaitModel>, OutboxRepository<WaitModel> 
     override fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) = getEntityManager()
         .createNativeQuery(
             """
-            SELECT * FROM $WAIT_TABLE 
-            WHERE status = ?1 
-            AND delayed_until <= ?2 
-            AND attempt_count < ?3 
-            ORDER BY delayed_until ASC 
+            SELECT * FROM $WAIT_TABLE
+            WHERE status = ?1
+            AND delayed_until <= ?2
+            AND attempt_count < ?3
+            ORDER BY delayed_until ASC
             LIMIT ?4
             FOR UPDATE SKIP LOCKED
             """.trimIndent(), WaitModel::class.java
@@ -52,10 +53,10 @@ class WaitRepository : UuidV7Repository<WaitModel>, OutboxRepository<WaitModel> 
     override fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) = getEntityManager()
         .createNativeQuery(
             """
-            SELECT * FROM $WAIT_TABLE 
-            WHERE status = ?1 
-            AND delayed_until < ?2 
-            ORDER BY delayed_until ASC 
+            SELECT * FROM $WAIT_TABLE
+            WHERE status = ?1
+            AND delayed_until < ?2
+            ORDER BY delayed_until ASC
             LIMIT ?3
             FOR UPDATE SKIP LOCKED
             """.trimIndent(), WaitModel::class.java

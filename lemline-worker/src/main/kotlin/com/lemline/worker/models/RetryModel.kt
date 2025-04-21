@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.models
 
 import com.lemline.worker.outbox.OutBoxStatus

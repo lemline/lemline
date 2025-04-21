@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
 import com.lemline.core.RuntimeDescriptor
@@ -67,7 +68,7 @@ class ExpressionTest {
                   set:
                     foo: 42
                   export:
-                    as: 
+                    as:
                       ctx: .
               - second:
                   set:

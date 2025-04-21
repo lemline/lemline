@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.repositories.bases
 
 import com.lemline.worker.models.WaitModel
@@ -424,4 +425,4 @@ abstract class AbstractWaitRepositoryTest {
             "No message should be both processed and deleted"
         )
     }
-} 
+}

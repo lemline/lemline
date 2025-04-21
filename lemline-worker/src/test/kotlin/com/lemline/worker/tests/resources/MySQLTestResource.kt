@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.tests.resources
 
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
@@ -44,4 +45,4 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
             System.clearProperty("quarkus.datasource.password")
         }
     }
-} 
+}

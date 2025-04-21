@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.json
 
 import com.lemline.core.nodes.JsonPointer
@@ -28,4 +29,4 @@ internal object NodePositionSerializer : KSerializer<NodePosition> {
         val jsonPointerString = decoder.decodeString()
         return JsonPointer(jsonPointerString).toPosition()
     }
-} 
+}

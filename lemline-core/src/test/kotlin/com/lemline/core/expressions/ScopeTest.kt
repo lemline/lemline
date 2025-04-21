@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions
 
 import com.lemline.core.RuntimeDescriptor
@@ -93,4 +94,4 @@ class ScopeTest : StringSpec({
         // Compare individual components retrieved from the map
         deserializedScope shouldBe originalScope
     }
-}) 
+})

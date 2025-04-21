@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.outbox.bases
 
 import com.lemline.core.json.LemlineJson
@@ -318,4 +319,4 @@ abstract class AbstractOutboxTest<T> where T : OutboxMessage {
         // Then
         verify(exactly = 150) { emitter.send(any()) }
     }
-} 
+}

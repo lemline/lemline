@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.messaging
 
 import com.lemline.worker.messaging.bases.WorkflowConsumerBaseTest
@@ -81,4 +82,4 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerBaseTest() {
         val records = consumer.poll(Duration.ofMillis(unit.toMillis(timeout)))
         return records.firstOrNull()?.value()
     }
-} 
+}

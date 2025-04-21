@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.repositories.bases
 
 import com.lemline.worker.models.WorkflowModel
@@ -103,4 +104,4 @@ abstract class AbstractWorkflowModelRepositoryTest {
         entityManager.flush()
         return model
     }
-} 
+}

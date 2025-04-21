@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.config
 
 import com.lemline.common.logger
@@ -42,4 +43,4 @@ class DatabaseConfig {
      * Checks if MySQL is the selected database.
      */
     fun isMySQL(): Boolean = databaseType.lowercase() == "mysql"
-} 
+}

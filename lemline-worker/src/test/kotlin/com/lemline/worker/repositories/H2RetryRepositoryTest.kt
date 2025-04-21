@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.repositories
 
 import com.lemline.worker.repositories.bases.AbstractRetryRepositoryTest
@@ -15,4 +16,4 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
 @Tag("h2")
-class H2RetryRepositoryTest : AbstractRetryRepositoryTest() 
+class H2RetryRepositoryTest : AbstractRetryRepositoryTest()
