@@ -33,6 +33,10 @@ articles/
 
 ### cursor rules
 .cursorrules
+.cursor
+
+### junie
+.junie
 
 ### Gradle ###
 .gradle

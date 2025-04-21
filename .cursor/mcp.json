@@ -1,7 +1,0 @@
-{
-    "mcpServers": {
-        "serverlessWorkflowMcp": {
-            "url": "http://swcheck.onrender.com/sse"
-        }
-    }
-}
