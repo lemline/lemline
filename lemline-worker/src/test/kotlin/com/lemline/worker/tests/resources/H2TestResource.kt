@@ -16,12 +16,12 @@ class H2TestResource : QuarkusTestResourceLifecycleManager {
         // DB_CLOSE_DELAY=-1 keeps the database alive until the JVM exits
         System.setProperty("quarkus.datasource.jdbc.url", "jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1")
         System.setProperty("quarkus.datasource.username", "sa") // Default H2 user
-        System.setProperty("quarkus.datasource.password", "")   // Default H2 password is empty
+        System.setProperty("quarkus.datasource.password", "") // Default H2 password is empty
 
         // Return profile and custom property
         return mapOf(
             "quarkus.profile" to "h2",
-            "lemline.database.type" to "h2"
+            "lemline.database.type" to "h2",
             // No need to set flyway locations for H2 with drop-and-create
         )
     }

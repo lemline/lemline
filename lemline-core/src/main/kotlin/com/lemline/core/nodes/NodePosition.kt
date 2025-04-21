@@ -12,9 +12,7 @@ import kotlinx.serialization.Serializable
  * @property path The list of path components.
  */
 @Serializable(with = NodePositionSerializer::class)
-data class NodePosition(
-    private val path: List<String> = listOf(),
-) {
+data class NodePosition(private val path: List<String> = listOf()) {
     /**
      * Json pointer representation. (e.g., "/do/0/do")
      */
@@ -57,8 +55,7 @@ data class NodePosition(
      * @param token The property name to add
      * @return A new Position with the added property
      */
-    fun addToken(token: Token): NodePosition =
-        NodePosition(path + token.token)
+    fun addToken(token: Token): NodePosition = NodePosition(path + token.token)
 
     /**
      * Adds an childIndex to the path.
@@ -66,8 +63,7 @@ data class NodePosition(
      * @param index The numeric childIndex to add
      * @return A new Position with the added childIndex
      */
-    fun addIndex(index: Int): NodePosition =
-        NodePosition(path + index.toString())
+    fun addIndex(index: Int): NodePosition = NodePosition(path + index.toString())
 
     /**
      * Gets the parent path by removing the last component.

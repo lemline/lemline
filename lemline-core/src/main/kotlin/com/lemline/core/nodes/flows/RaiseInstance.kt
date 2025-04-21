@@ -12,15 +12,12 @@ import io.serverlessworkflow.api.types.RaiseTaskError
 import io.serverlessworkflow.api.types.UriTemplate
 import java.net.URI
 
-class RaiseInstance(
-    override val node: Node<RaiseTask>,
-    override val parent: NodeInstance<*>,
-) : NodeInstance<RaiseTask>(node, parent) {
+class RaiseInstance(override val node: Node<RaiseTask>, override val parent: NodeInstance<*>) :
+    NodeInstance<RaiseTask>(node, parent) {
 
     private val error by lazy { node.task.raise.error.getError() }
 
     override suspend fun execute() {
-
         val error = WorkflowError(
             type = error.getErrorType(),
             status = error.status,

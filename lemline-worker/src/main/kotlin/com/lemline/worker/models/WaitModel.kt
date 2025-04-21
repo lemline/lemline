@@ -15,10 +15,12 @@ const val WAIT_TABLE = "waits"
 @Table(
     name = WAIT_TABLE,
     // Combined index for our main query pattern: status + delayed_until + attempt_count
-    indexes = [Index(name = "idx_wait_ready", columnList = "status, delayed_until, attempt_count")]
+    indexes = [Index(name = "idx_wait_ready", columnList = "status, delayed_until, attempt_count")],
 )
 @Serializable
-class WaitModel : UuidV7Entity(), OutboxMessage {
+class WaitModel :
+    UuidV7Entity(),
+    OutboxMessage {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     override lateinit var message: String
@@ -46,7 +48,7 @@ class WaitModel : UuidV7Entity(), OutboxMessage {
             delayedUntil: Instant = Instant.now(),
             attemptCount: Int = 0,
             lastError: Exception? = null,
-            status: OutBoxStatus = OutBoxStatus.PENDING
+            status: OutBoxStatus = OutBoxStatus.PENDING,
         ) = WaitModel().apply {
             this.message = message
             this.delayedUntil = delayedUntil

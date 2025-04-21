@@ -29,17 +29,17 @@ class JQExpressionTest {
 
         assertEquals(
             JsonPrimitive("value"),
-            JQExpression.eval(rawInput, fromNode, scope, true)
+            JQExpression.eval(rawInput, fromNode, scope, true),
         )
 
         assertEquals(
             fromNode,
-            JQExpression.eval(rawInput, fromNode, scope, false)
+            JQExpression.eval(rawInput, fromNode, scope, false),
         )
 
         assertEquals(
             JsonPrimitive("value"),
-            JQExpression.eval(rawInput, JsonPrimitive("\${.key}"), scope, false)
+            JQExpression.eval(rawInput, JsonPrimitive("\${.key}"), scope, false),
         )
     }
 

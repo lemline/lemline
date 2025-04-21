@@ -10,7 +10,9 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 
 @ApplicationScoped
-class RetryRepository : UuidV7Repository<RetryModel>, OutboxRepository<RetryModel> {
+class RetryRepository :
+    UuidV7Repository<RetryModel>,
+    OutboxRepository<RetryModel> {
 
     @Transactional
     fun save(retry: RetryModel) {
@@ -41,7 +43,8 @@ class RetryRepository : UuidV7Repository<RetryModel>, OutboxRepository<RetryMode
             ORDER BY delayed_until ASC
             LIMIT ?4
             FOR UPDATE SKIP LOCKED
-            """.trimIndent(), RetryModel::class.java
+            """.trimIndent(),
+            RetryModel::class.java,
         )
         .setParameter(1, OutBoxStatus.PENDING.name)
         .setParameter(2, Instant.now())
@@ -59,7 +62,8 @@ class RetryRepository : UuidV7Repository<RetryModel>, OutboxRepository<RetryMode
             ORDER BY delayed_until ASC
             LIMIT ?3
             FOR UPDATE SKIP LOCKED
-            """.trimIndent(), RetryModel::class.java
+            """.trimIndent(),
+            RetryModel::class.java,
         )
         .setParameter(1, OutBoxStatus.SENT.name)
         .setParameter(2, cutoffDate)

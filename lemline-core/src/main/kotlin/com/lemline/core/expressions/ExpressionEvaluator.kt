@@ -38,5 +38,4 @@ internal interface ExpressionEvaluator {
 
         is JsonArray -> JsonArray(expr.map { value -> eval(data, value, scope, force) })
     }
-
 }

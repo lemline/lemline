@@ -24,7 +24,7 @@ abstract class WaitOutboxTest : AbstractOutboxTest<WaitModel>() {
             batchSize = 100,
             cleanupBatchSize = 500,
             cleanupAfterDays = 7,
-            retryInitialDelaySeconds = 5
+            retryInitialDelaySeconds = 5,
         )
     }
 

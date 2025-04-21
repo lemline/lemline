@@ -24,20 +24,15 @@ import kotlinx.serialization.json.*
  * Base class for all task instances.
  * Task instances maintain the initialStates of a task during execution.
  */
-abstract class NodeInstance<T : TaskBase>(
-    open val node: Node<T>,
-    open val parent: NodeInstance<*>?
-) {
+abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val parent: NodeInstance<*>?) {
     private val logger = logger()
 
-    private fun <T> withWorkflowContext(
-        block: () -> T
-    ) = withWorkflowContext(
+    private fun <T> withWorkflowContext(block: () -> T) = withWorkflowContext(
         workflowId = rootInstance.workflowDescriptor.id,
         workflowName = rootInstance.node.task.document.name,
         workflowVersion = rootInstance.node.task.document.version,
         nodePosition = node.position.toString(),
-        block = block
+        block = block,
     )
 
     /**
@@ -71,8 +66,9 @@ abstract class NodeInstance<T : TaskBase>(
     internal val rootInstance: RootInstance by lazy {
         when (this) {
             is RootInstance -> this
-            else -> parent?.rootInstance
-                ?: error(RUNTIME, "$this is not root, but does not have a parent")
+            else ->
+                parent?.rootInstance
+                    ?: error(RUNTIME, "$this is not root, but does not have a parent")
         }
     }
 
@@ -140,7 +136,6 @@ abstract class NodeInstance<T : TaskBase>(
     internal val transformedOutput: JsonElement
         get() = _transformedOutput ?: eval(rawOutput!!, node.task.output?.`as`).also { _transformedOutput = it }
 
-
     /**
      * Reset the internal state of this instance
      */
@@ -174,7 +169,7 @@ abstract class NodeInstance<T : TaskBase>(
                     task = taskDescriptor,
                     input = rawInput,
                     output = rawOutput,
-                ).toJsonObject()
+                ).toJsonObject(),
             )
             // recursively merge with parent scope
             .merge(parent?.scope)
@@ -463,7 +458,7 @@ abstract class NodeInstance<T : TaskBase>(
             title = title ?: "Unknown Error",
             details = details,
             status = status,
-            position = node.position
+            position = node.position,
         )
 
         raise(error)
@@ -480,7 +475,7 @@ abstract class NodeInstance<T : TaskBase>(
         throw WorkflowException(
             raising = this,
             catching = catching,
-            error = error
+            error = error,
         )
     }
 

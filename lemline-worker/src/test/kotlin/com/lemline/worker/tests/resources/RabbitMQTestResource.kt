@@ -31,7 +31,7 @@ class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
             "rabbitmq-host" to rabbitmq.host,
             "rabbitmq-port" to rabbitmq.getMappedPort(5672).toString(),
             "rabbitmq-username" to rabbitmq.adminUsername,
-            "rabbitmq-password" to rabbitmq.adminPassword
+            "rabbitmq-password" to rabbitmq.adminPassword,
         )
     }
 

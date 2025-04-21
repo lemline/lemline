@@ -48,7 +48,7 @@ open class WorkflowConsumer(
         // Use logging context for all logs in this message processing
         withLoggingContext(
             LogContext.REQUEST_ID to requestId,
-            LogContext.CORRELATION_ID to requestId // Use same ID for correlation until we extract a better one
+            LogContext.CORRELATION_ID to requestId, // Use same ID for correlation until we extract a better one
         ) {
             logger.debug { "Received message for processing" }
 
@@ -73,7 +73,7 @@ open class WorkflowConsumer(
                 LogContext.WORKFLOW_ID to workflowId,
                 LogContext.WORKFLOW_NAME to workflowMessage.name,
                 LogContext.WORKFLOW_VERSION to workflowMessage.version,
-                LogContext.NODE_POSITION to workflowMessage.position.toString()
+                LogContext.NODE_POSITION to workflowMessage.position.toString(),
             ) {
                 try {
                     logger.info { "Processing workflow message" }
@@ -116,7 +116,7 @@ open class WorkflowConsumer(
             version = workflowMessage.version,
             states = workflowMessage.states,
             position = workflowMessage.position,
-            secrets = Secrets.get(workflow)
+            secrets = Secrets.get(workflow),
         )
 
         instance.run()
@@ -144,8 +144,8 @@ open class WorkflowConsumer(
                 message = this@saveMsgAsFailed,
                 delayedUntil = Instant.now(),
                 lastError = e,
-                status = OutBoxStatus.FAILED
-            )
+                status = OutBoxStatus.FAILED,
+            ),
         )
         // for testing, set the CompletableFuture to failed
         processingMessages.remove(this)?.completeExceptionally(e)
@@ -181,8 +181,8 @@ open class WorkflowConsumer(
         retryRepository.save(
             RetryModel.create(
                 message = msg.toJsonString(),
-                delayedUntil = delayedUntil
-            )
+                delayedUntil = delayedUntil,
+            ),
         )
 
         // Stop here instance, the outbox will process it later
@@ -198,8 +198,8 @@ open class WorkflowConsumer(
         waitRepository.save(
             WaitModel.create(
                 message = msg.toJsonString(),
-                delayedUntil = delayedUntil
-            )
+                delayedUntil = delayedUntil,
+            ),
         )
         // Stop here instance, the outbox will process it later
         return null

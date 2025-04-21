@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.calls
 
-import com.lemline.core.errors.WorkflowErrorType.*
+import com.lemline.core.errors.WorkflowErrorType.AUTHENTICATION
+import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
+import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.activities.CallHttpInstance
 import com.lemline.core.utils.toSecret
@@ -18,9 +20,30 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
-import io.serverlessworkflow.api.types.*
-import io.serverlessworkflow.api.types.OAuth2AutenthicationData.OAuth2AutenthicationDataGrant.*
-import io.serverlessworkflow.api.types.OAuth2AutenthicationDataClient.ClientAuthentication.*
+import io.serverlessworkflow.api.types.AuthenticationPolicy
+import io.serverlessworkflow.api.types.BasicAuthenticationPolicy
+import io.serverlessworkflow.api.types.BasicAuthenticationProperties
+import io.serverlessworkflow.api.types.BearerAuthenticationPolicy
+import io.serverlessworkflow.api.types.BearerAuthenticationProperties
+import io.serverlessworkflow.api.types.DigestAuthenticationPolicy
+import io.serverlessworkflow.api.types.DigestAuthenticationProperties
+import io.serverlessworkflow.api.types.OAuth2AutenthicationData
+import io.serverlessworkflow.api.types.OAuth2AutenthicationData.OAuth2AutenthicationDataGrant.AUTHORIZATION_CODE
+import io.serverlessworkflow.api.types.OAuth2AutenthicationData.OAuth2AutenthicationDataGrant.CLIENT_CREDENTIALS
+import io.serverlessworkflow.api.types.OAuth2AutenthicationData.OAuth2AutenthicationDataGrant.PASSWORD
+import io.serverlessworkflow.api.types.OAuth2AutenthicationData.OAuth2AutenthicationDataGrant.REFRESH_TOKEN
+import io.serverlessworkflow.api.types.OAuth2AutenthicationData.OAuth2AutenthicationDataGrant.URN_IETF_PARAMS_OAUTH_GRANT_TYPE_TOKEN_EXCHANGE
+import io.serverlessworkflow.api.types.OAuth2AutenthicationDataClient.ClientAuthentication.CLIENT_SECRET_BASIC
+import io.serverlessworkflow.api.types.OAuth2AutenthicationDataClient.ClientAuthentication.CLIENT_SECRET_JWT
+import io.serverlessworkflow.api.types.OAuth2AutenthicationDataClient.ClientAuthentication.CLIENT_SECRET_POST
+import io.serverlessworkflow.api.types.OAuth2AutenthicationDataClient.ClientAuthentication.NONE
+import io.serverlessworkflow.api.types.OAuth2AutenthicationDataClient.ClientAuthentication.PRIVATE_KEY_JWT
+import io.serverlessworkflow.api.types.OAuth2AuthenticationPolicy
+import io.serverlessworkflow.api.types.OAuth2AuthenticationPolicyConfiguration
+import io.serverlessworkflow.api.types.OAuth2AuthenticationPropertiesEndpoints
+import io.serverlessworkflow.api.types.OAuth2TokenDefinition
+import io.serverlessworkflow.api.types.OpenIdConnectAuthenticationPolicy
+import io.serverlessworkflow.api.types.SecretBasedAuthenticationPolicy
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -36,9 +59,7 @@ import java.util.concurrent.ConcurrentHashMap
  * It supports GET, POST, PUT, and DELETE methods, with various options
  * for handling response formats and authentication.
  */
-class HttpCall(
-    private val nodeInstance: CallHttpInstance
-) {
+class HttpCall(private val nodeInstance: CallHttpInstance) {
 
     // Client configured to handle the HTTP requests
     private val client = HttpClient(CIO) {
@@ -56,8 +77,8 @@ class HttpCall(
             // Default configuration for the HttpRedirect plugin
             // The actual redirect behavior will be controlled by the `followRedirects` setting
             // in each request's client configuration
-            checkHttpMethod = false  // Allow redirects between different HTTP methods
-            allowHttpsDowngrade = true  // Allow redirects from HTTPS to HTTP if needed
+            checkHttpMethod = false // Allow redirects between different HTTP methods
+            allowHttpsDowngrade = true // Allow redirects from HTTPS to HTTP if needed
         }
         // Disable the following redirect behavior by default - will be enabled per request if needed
         followRedirects = false
@@ -96,7 +117,7 @@ class HttpCall(
         query: Map<String, String> = emptyMap(),
         output: String = "content",
         redirect: Boolean = false,
-        authentication: AuthenticationPolicy? = null
+        authentication: AuthenticationPolicy? = null,
     ): JsonElement {
         try {
             // Build the URL with query parameters
@@ -156,7 +177,9 @@ class HttpCall(
                     response.body<JsonElement>()
                 }
 
-                else -> throw IllegalArgumentException("Unsupported output format: $output. Must be one of: raw, content, response")
+                else -> throw IllegalArgumentException(
+                    "Unsupported output format: $output. Must be one of: raw, content, response",
+                )
             }
         } catch (e: CancellationException) {
             // Propagate cancellation exceptions to allow proper coroutine cancellation
@@ -196,7 +219,7 @@ class HttpCall(
      */
     private fun HttpClientConfig<*>.applyAuthentication(
         authentication: AuthenticationPolicy,
-        fromUse: Boolean = false
+        fromUse: Boolean = false,
     ) = when (authentication) {
         is BasicAuthenticationPolicy -> when (val auth = authentication.basic.get()) {
             is BasicAuthenticationProperties -> applyBasicAuth(auth)
@@ -236,7 +259,7 @@ class HttpCall(
      */
     private fun HttpClientConfig<*>.applySecretBasedAuth(
         secretBasedAuthenticationPolicy: SecretBasedAuthenticationPolicy,
-        fromUse: Boolean
+        fromUse: Boolean,
     ) {
         val name = secretBasedAuthenticationPolicy.use
         // Check if the authentication is circular
@@ -261,7 +284,7 @@ class HttpCall(
                 credentials {
                     DigestAuthCredentials(
                         username = username,
-                        password = password
+                        password = password,
                     )
                 }
             }
@@ -306,7 +329,9 @@ class HttpCall(
     /**
      * Applies OAuth2 authentication to the HTTP client configuration.
      */
-    private fun HttpClientConfig<*>.applyOauth2Auth(oauth2AuthenticationPolicyConfiguration: OAuth2AuthenticationPolicyConfiguration) {
+    private fun HttpClientConfig<*>.applyOauth2Auth(
+        oauth2AuthenticationPolicyConfiguration: OAuth2AuthenticationPolicyConfiguration,
+    ) {
         val authData = oauth2AuthenticationPolicyConfiguration.getoAuth2AutenthicationData()
         val endpoints = oauth2AuthenticationPolicyConfiguration.getoAuth2ConnectAuthenticationProperties().endpoints
 
@@ -315,7 +340,7 @@ class HttpCall(
 
     private fun HttpClientConfig<*>.applyOauth2Auth(
         authData: OAuth2AutenthicationData,
-        endpoints: OAuth2AuthenticationPropertiesEndpoints
+        endpoints: OAuth2AuthenticationPropertiesEndpoints,
     ) {
         install(Auth) {
             bearer {
@@ -323,7 +348,7 @@ class HttpCall(
                     val tokenResponse = requestOAuth2TokenWithCache(client, authData, endpoints)
                     BearerTokens(
                         accessToken = tokenResponse.accessToken,
-                        refreshToken = tokenResponse.refreshToken ?: ""
+                        refreshToken = tokenResponse.refreshToken ?: "",
                     )
                 }
                 refreshTokens {
@@ -334,7 +359,7 @@ class HttpCall(
                     val tokenResponse = requestOAuth2Token(client, refreshData, endpoints)
                     BearerTokens(
                         accessToken = tokenResponse.accessToken,
-                        refreshToken = tokenResponse.refreshToken ?: ""
+                        refreshToken = tokenResponse.refreshToken ?: "",
                     )
                 }
             }
@@ -354,13 +379,13 @@ class HttpCall(
         @SerialName("expires_in") val expiresIn: Int,
         @SerialName("refresh_token") val refreshToken: String? = null,
         @SerialName("id_token") val idToken: String? = null,
-        val scope: String? = null
+        val scope: String? = null,
     )
 
     private suspend fun requestOAuth2Token(
         client: HttpClient,
         authData: OAuth2AutenthicationData,
-        endpoints: OAuth2AuthenticationPropertiesEndpoints
+        endpoints: OAuth2AuthenticationPropertiesEndpoints,
     ): OAuthTokenResponse {
         val authority = authData.authority?.let { nodeInstance.toUrl(it) }
             ?: nodeInstance.error(CONFIGURATION, "Authority is missing for OAuth2 authentification")
@@ -387,8 +412,9 @@ class HttpCall(
                     clientSecret ?: nodeInstance.error(CONFIGURATION, "client.secret $authMethodError")
                     headers {
                         append(
-                            HttpHeaders.Authorization, "Basic " + Base64.getEncoder()
-                                .encodeToString("$clientId:$clientSecret".toByteArray())
+                            HttpHeaders.Authorization,
+                            "Basic " + Base64.getEncoder()
+                                .encodeToString("$clientId:$clientSecret".toByteArray()),
                         )
                     }
                 }
@@ -463,7 +489,7 @@ class HttpCall(
 
         return client.submitForm(
             url = tokenUrl,
-            formParameters = params
+            formParameters = params,
         ).body()
     }
 
@@ -478,7 +504,7 @@ class HttpCall(
     data class CachedOAuthToken(
         val token: OAuthTokenResponse,
         val expirationTime: Long, // epoch millis
-        val refreshable: Boolean
+        val refreshable: Boolean,
     ) {
         fun isExpired(): Boolean = System.currentTimeMillis() > expirationTime - 30_000 // 30 sec early
     }
@@ -491,7 +517,7 @@ class HttpCall(
     private suspend fun requestOAuth2TokenWithCache(
         client: HttpClient,
         authData: OAuth2AutenthicationData,
-        endpoints: OAuth2AuthenticationPropertiesEndpoints
+        endpoints: OAuth2AuthenticationPropertiesEndpoints,
     ): OAuthTokenResponse {
         val key = cacheKey(authData)
         val lock = tokenLocks.computeIfAbsent(key) { Mutex() }
@@ -507,7 +533,7 @@ class HttpCall(
             if (cached?.refreshable == true && cached.token.refreshToken != null) {
                 val refreshData = authData.copyWith(
                     grant = REFRESH_TOKEN,
-                    subject = OAuth2TokenDefinition().apply { token = cached.token.refreshToken }
+                    subject = OAuth2TokenDefinition().apply { token = cached.token.refreshToken },
                 )
 
                 try {
@@ -515,7 +541,7 @@ class HttpCall(
                     tokenCache[key] = CachedOAuthToken(
                         token = refreshed,
                         expirationTime = System.currentTimeMillis() + (refreshed.expiresIn * 1000L),
-                        refreshable = refreshed.refreshToken != null
+                        refreshable = refreshed.refreshToken != null,
                     )
                     return@withLock refreshed
                 } catch (e: Exception) {
@@ -523,7 +549,7 @@ class HttpCall(
                     nodeInstance.error(
                         AUTHENTICATION,
                         "Failed to refresh OAuth2 token: ${e.message}",
-                        e.stackTraceToString()
+                        e.stackTraceToString(),
                     )
                 }
             }
@@ -533,7 +559,7 @@ class HttpCall(
             tokenCache[key] = CachedOAuthToken(
                 token = newToken,
                 expirationTime = System.currentTimeMillis() + (newToken.expiresIn * 1000L),
-                refreshable = newToken.refreshToken != null
+                refreshable = newToken.refreshToken != null,
             )
             return@withLock newToken
         }
@@ -543,21 +569,19 @@ class HttpCall(
      * Generates a cache key for the OAuth2 token based on the authentication data.
      * The key is a hash of the authority, client ID, grant type, scopes, audiences, username, and subject token.
      */
-    private fun cacheKey(authData: OAuth2AutenthicationData): Int =
-        Objects.hash(
-            authData.authority,
-            authData.client?.id,
-            authData.grant,
-            authData.scopes,
-            authData.audiences,
-            authData.username,
-            authData.subject?.token
-        )
-
+    private fun cacheKey(authData: OAuth2AutenthicationData): Int = Objects.hash(
+        authData.authority,
+        authData.client?.id,
+        authData.grant,
+        authData.scopes,
+        authData.audiences,
+        authData.username,
+        authData.subject?.token,
+    )
 
     private fun OAuth2AutenthicationData.copyWith(
         grant: OAuth2AutenthicationData.OAuth2AutenthicationDataGrant? = this.grant,
-        subject: OAuth2TokenDefinition? = this.subject
+        subject: OAuth2TokenDefinition? = this.subject,
     ): OAuth2AutenthicationData {
         val copy = OAuth2AutenthicationData()
 

@@ -23,19 +23,17 @@ object Secrets {
      * @return A map of secret names to their JsonNode values from environment variables
      * @throws IllegalStateException if a required secret is not found in environment variables
      */
-    fun get(workflow: Workflow): Map<String, JsonElement> =
-        secretsCache.getOrPut(workflow.index) {
-            workflow.use?.secrets?.associateWith { secretName ->
-                val value = System.getEnv(secretName)
-                    ?: error("Required secret '$secretName' not found in environment variables")
-                try {
-                    Json.decodeFromString<JsonObject>(value)
-                } catch (e: Exception) {
-                    JsonPrimitive(value)
-                }
-            } ?: emptyMap()
-        }
+    fun get(workflow: Workflow): Map<String, JsonElement> = secretsCache.getOrPut(workflow.index) {
+        workflow.use?.secrets?.associateWith { secretName ->
+            val value = System.getEnv(secretName)
+                ?: error("Required secret '$secretName' not found in environment variables")
+            try {
+                Json.decodeFromString<JsonObject>(value)
+            } catch (e: Exception) {
+                JsonPrimitive(value)
+            }
+        } ?: emptyMap()
+    }
 
     fun error(message: String): Nothing = throw IllegalStateException(message)
-
 }

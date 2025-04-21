@@ -104,7 +104,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = mapOf("param" to "value"),
                 output = "content",
-                redirect = false
+                redirect = false,
             )
         } returns jsonResponse
 
@@ -120,7 +120,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = mapOf("param" to "value"),
                 output = "content",
-                redirect = false
+                redirect = false,
             )
         }
 
@@ -152,7 +152,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = emptyMap(),
                 output = "content",
-                redirect = false
+                redirect = false,
             )
         } returns jsonResponse
 
@@ -168,7 +168,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = emptyMap(),
                 output = "content",
-                redirect = false
+                redirect = false,
             )
         }
     }
@@ -202,7 +202,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = emptyMap(),
                 output = "content",
-                redirect = false
+                redirect = false,
             )
         } returns jsonResponse
 
@@ -218,7 +218,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = emptyMap(),
                 output = "content",
-                redirect = false
+                redirect = false,
             )
         }
     }
@@ -251,7 +251,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = emptyMap(),
                 output = "content",
-                redirect = false
+                redirect = false,
             )
         } returns jsonResponse
 
@@ -267,7 +267,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = emptyMap(),
                 output = "content",
-                redirect = false
+                redirect = false,
             )
         }
 
@@ -301,7 +301,7 @@ class CallHttpInstanceTest {
                 body = any(),
                 query = emptyMap(),
                 output = "content",
-                redirect = false
+                redirect = false,
             )
         } returns jsonResponse
 
@@ -317,7 +317,7 @@ class CallHttpInstanceTest {
                 body = any(),
                 query = emptyMap(),
                 output = "content",
-                redirect = false
+                redirect = false,
             )
         }
     }
@@ -350,7 +350,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = emptyMap(),
                 output = "raw",
-                redirect = false
+                redirect = false,
             )
         } returns jsonResponse
 
@@ -366,7 +366,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = emptyMap(),
                 output = "raw",
-                redirect = false
+                redirect = false,
             )
         }
     }
@@ -397,7 +397,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = emptyMap(),
                 output = "content",
-                redirect = true
+                redirect = true,
             )
         } returns jsonResponse
 
@@ -413,7 +413,7 @@ class CallHttpInstanceTest {
                 body = null,
                 query = emptyMap(),
                 output = "content",
-                redirect = true
+                redirect = true,
             )
         }
     }
@@ -496,7 +496,7 @@ class CallHttpInstanceTest {
                 body = any(),
                 query = any(),
                 output = any(),
-                redirect = any()
+                redirect = any(),
             )
         } throws RuntimeException("HTTP call failed")
 
@@ -554,7 +554,7 @@ class CallHttpInstanceTest {
                 query = emptyMap(),
                 output = "content",
                 redirect = false,
-                authentication = basicAuthPolicy // Use the correct policy object
+                authentication = basicAuthPolicy, // Use the correct policy object
             )
         } returns jsonResponse
 
@@ -571,7 +571,7 @@ class CallHttpInstanceTest {
                 query = emptyMap(),
                 output = "content",
                 redirect = false,
-                authentication = basicAuthPolicy // Use the correct policy object
+                authentication = basicAuthPolicy, // Use the correct policy object
             )
         }
     }

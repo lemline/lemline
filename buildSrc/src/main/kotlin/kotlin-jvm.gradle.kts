@@ -20,6 +20,7 @@ spotless {
         targetExclude("**/bin/**")
         trimTrailingWhitespace()
         endWithNewline()
+        ktlint()
     }
 }
 

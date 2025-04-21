@@ -132,13 +132,13 @@ inline fun <T> withWorkflowContext(
     workflowName: String? = null,
     workflowVersion: String? = null,
     nodePosition: String? = null,
-    block: () -> T
+    block: () -> T,
 ): T = withLoggingContext(
     LogContext.WORKFLOW_ID to workflowId,
     LogContext.WORKFLOW_NAME to workflowName,
     LogContext.WORKFLOW_VERSION to workflowVersion,
     LogContext.NODE_POSITION to nodePosition,
-    block = block
+    block = block,
 )
 
 /**

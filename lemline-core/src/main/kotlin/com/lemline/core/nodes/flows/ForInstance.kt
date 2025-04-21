@@ -8,10 +8,8 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-class ForInstance(
-    override val node: Node<ForTask>,
-    override val parent: NodeInstance<*>,
-) : NodeInstance<ForTask>(node, parent) {
+class ForInstance(override val node: Node<ForTask>, override val parent: NodeInstance<*>) :
+    NodeInstance<ForTask>(node, parent) {
 
     /**
      * The collection to enumerate (calculated)
@@ -58,8 +56,8 @@ class ForInstance(
         variables = JsonObject(
             mapOf(
                 forEach to forIn[forIndex],
-                forAt to JsonPrimitive(forIndex)
-            )
+                forAt to JsonPrimitive(forIndex),
+            ),
         )
 
         // test the while directive

@@ -25,15 +25,10 @@ data class WorkflowMessage(
     @SerialName("n") val name: String,
     @SerialName("v") val version: String,
     @SerialName("s") val states: Map<NodePosition, NodeState>,
-    @SerialName("p") val position: NodePosition
+    @SerialName("p") val position: NodePosition,
 ) {
     companion object {
-        fun newInstance(
-            name: String,
-            version: String,
-            id: String,
-            input: JsonElement,
-        ) = WorkflowMessage(
+        fun newInstance(name: String, version: String, id: String, input: JsonElement) = WorkflowMessage(
             name = name,
             version = version,
             states = mapOf(
@@ -41,9 +36,9 @@ data class WorkflowMessage(
                     workflowId = id,
                     rawInput = input,
                     startedAt = Clock.System.now(),
-                )
+                ),
             ),
-            position = NodePosition.root
+            position = NodePosition.root,
         )
 
         fun fromJsonString(json: String): WorkflowMessage = LemlineJson.decodeFromString(json)

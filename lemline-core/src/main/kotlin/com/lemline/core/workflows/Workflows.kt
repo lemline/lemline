@@ -9,7 +9,6 @@ import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
 import java.util.concurrent.ConcurrentHashMap
 
-
 object Workflows {
 
     private val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()

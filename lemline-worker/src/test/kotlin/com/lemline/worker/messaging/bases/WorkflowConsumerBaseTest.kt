@@ -139,7 +139,7 @@ abstract class WorkflowConsumerBaseTest {
             name = "test-workflow",
             version = "1.0.0",
             id = "test-id",
-            input = JsonPrimitive("task")
+            input = JsonPrimitive("task"),
         )
         val messageJson = LemlineJson.encodeToString(workflowMessage)
 
@@ -158,7 +158,7 @@ abstract class WorkflowConsumerBaseTest {
         assertTrue(retryMessages.isEmpty(), "Messages found in retry repository")
         assertTrue(
             waitMessages.isEmpty(),
-            "Messages found in wait repository:\n${waitMessages.map { LemlineJson.encodeToPrettyString(it) }}"
+            "Messages found in wait repository:\n${waitMessages.map { LemlineJson.encodeToPrettyString(it) }}",
         )
     }
 
@@ -181,7 +181,7 @@ abstract class WorkflowConsumerBaseTest {
         val waitMessages = waitRepository.listAll()
         assertTrue(
             waitMessages.isEmpty(),
-            "Messages found in wait repository:\n${waitMessages.map { LemlineJson.encodeToPrettyString(it) }}"
+            "Messages found in wait repository:\n${waitMessages.map { LemlineJson.encodeToPrettyString(it) }}",
         )
     }
 
@@ -192,7 +192,7 @@ abstract class WorkflowConsumerBaseTest {
             "test-workflow",
             "1.0.0",
             "test-id",
-            JsonPrimitive("retry")
+            JsonPrimitive("retry"),
         )
         val messageJson = LemlineJson.encodeToString(workflowMessage)
 
@@ -217,7 +217,7 @@ abstract class WorkflowConsumerBaseTest {
             "test-workflow",
             "1.0.0",
             "test-id",
-            JsonPrimitive("wait")
+            JsonPrimitive("wait"),
         )
         val messageJson = LemlineJson.encodeToString(workflowMessage)
 
@@ -240,8 +240,8 @@ abstract class WorkflowConsumerBaseTest {
         val actualDelay = waitMessages[0].delayedUntil
         assertTrue(
             actualDelay.isAfter(expectedDelay.minus(1, ChronoUnit.SECONDS)) &&
-                    actualDelay.isBefore(expectedDelay.plus(1, ChronoUnit.SECONDS)),
-            "Wait message delay is not set correctly"
+                actualDelay.isBefore(expectedDelay.plus(1, ChronoUnit.SECONDS)),
+            "Wait message delay is not set correctly",
         )
     }
 
@@ -252,7 +252,7 @@ abstract class WorkflowConsumerBaseTest {
             "test-workflow",
             "1.0.0",
             "test-id",
-            JsonPrimitive("completed")
+            JsonPrimitive("completed"),
         )
         val messageJson = LemlineJson.encodeToString(workflowMessage)
 
@@ -270,14 +270,14 @@ abstract class WorkflowConsumerBaseTest {
         assertEquals(
             0,
             retryMessages.size,
-            "Messages were stored in retry repository: ${retryMessages.map { LemlineJson.encodeToPrettyString(it) }}"
+            "Messages were stored in retry repository: ${retryMessages.map { LemlineJson.encodeToPrettyString(it) }}",
         )
 
         val waitMessages = waitRepository.listAll()
         assertEquals(
             0,
             waitMessages.size,
-            "Messages were stored in wait repository:  ${waitMessages.map { LemlineJson.encodeToPrettyString(it) }}"
+            "Messages were stored in wait repository:  ${waitMessages.map { LemlineJson.encodeToPrettyString(it) }}",
         )
     }
 }

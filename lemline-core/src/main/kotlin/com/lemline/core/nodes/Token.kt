@@ -18,7 +18,8 @@ enum class Token(val token: String) {
     CATCH("catch"),
     WAIT("wait"),
     CALL("call"),
-    EMIT("emit");
+    EMIT("emit"),
+    ;
 
     override fun toString() = token
 }

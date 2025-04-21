@@ -30,7 +30,7 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
         // Only return the profile setting
         return mapOf(
             "quarkus.profile" to "postgresql",
-            "lemline.database.type" to "postgresql"
+            "lemline.database.type" to "postgresql",
         )
     }
 

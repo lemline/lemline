@@ -36,9 +36,11 @@ object SchemaValidator {
         val report = jsonSchemaFactory.getSchema(schema).validate(node)
         if (report.isNotEmpty()) {
             val sb = StringBuilder("There are JsonSchema validation errors:")
-            report.forEach(Consumer { m: ValidationMessage ->
-                sb.append(System.lineSeparator()).append(m.message)
-            })
+            report.forEach(
+                Consumer { m: ValidationMessage ->
+                    sb.append(System.lineSeparator()).append(m.message)
+                },
+            )
             throw IllegalArgumentException(sb.toString())
         }
     }

@@ -29,13 +29,13 @@ data class WorkflowError(
         status: Int = errorType.defaultStatus,
         position: NodePosition,
         title: String? = null,
-        details: String? = null
+        details: String? = null,
     ) : this(
         type = "$URI_BASE/${errorType.type}",
         status = status,
         instance = position.jsonPointer.toString(),
         title = title,
-        details = details
+        details = details,
     )
 
     companion object {

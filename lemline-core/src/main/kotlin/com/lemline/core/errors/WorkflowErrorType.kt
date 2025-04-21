@@ -20,5 +20,5 @@ enum class WorkflowErrorType(val type: String, val defaultStatus: Int) {
     AUTHORIZATION("authorization", 403),
     TIMEOUT("timeout", 408),
     COMMUNICATION("communication", 500),
-    RUNTIME("runtime", 500);
+    RUNTIME("runtime", 500),
 }

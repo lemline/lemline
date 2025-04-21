@@ -50,7 +50,7 @@ class WorkflowInstance(
             version: String,
             id: String,
             rawInput: JsonElement,
-            secrets: Map<String, JsonElement> = emptyMap()
+            secrets: Map<String, JsonElement> = emptyMap(),
         ) = WorkflowInstance(
             name = name,
             version = version,
@@ -59,10 +59,10 @@ class WorkflowInstance(
                     workflowId = id,
                     rawInput = rawInput,
                     startedAt = Clock.System.now(),
-                )
+                ),
             ),
             position = NodePosition.root,
-            secrets = secrets
+            secrets = secrets,
         )
     }
 
@@ -75,7 +75,7 @@ class WorkflowInstance(
         workflowId = id,
         workflowName = name,
         workflowVersion = version,
-        nodePosition = currentPosition.toString()
+        nodePosition = currentPosition.toString(),
     ) {
         logger.debug(e, message)
     }
@@ -87,7 +87,7 @@ class WorkflowInstance(
         workflowId = id,
         workflowName = name,
         workflowVersion = version,
-        nodePosition = currentPosition.toString()
+        nodePosition = currentPosition.toString(),
     ) {
         logger.info(e, message)
     }
@@ -100,7 +100,7 @@ class WorkflowInstance(
             workflowId = id,
             workflowName = name,
             workflowVersion = version,
-            nodePosition = currentPosition.toString()
+            nodePosition = currentPosition.toString(),
         ) {
             logger.error(e, message)
         }
@@ -167,7 +167,7 @@ class WorkflowInstance(
             id = id,
             definition = LemlineJson.encodeToElement(workflow),
             input = rawInput,
-            startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant()))
+            startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant())),
         )
 
         // init nodes instance
@@ -313,7 +313,6 @@ class WorkflowInstance(
      * - Activity nodes may perform I/O operations and should be designed for efficiency
      */
     private suspend fun tryRun() {
-
         // Possible cases when starting here:
         // - starting a workflow
         // - continuing right after an activity execution (before transformedOutput is set)
@@ -380,7 +379,7 @@ class WorkflowInstance(
     @Suppress("UNCHECKED_CAST")
     private fun Node<*>.createInstance(
         initialStates: Map<NodePosition, NodeState>,
-        parent: NodeInstance<*>?
+        parent: NodeInstance<*>?,
     ): NodeInstance<*> = when (task) {
         is RootTask -> RootInstance(this as Node<RootTask>)
         is DoTask -> DoInstance(this as Node<DoTask>, parent!!)
@@ -410,5 +409,4 @@ class WorkflowInstance(
 
     private fun error(message: Any): Nothing =
         throw IllegalStateException("Workflow $name (version $version): $message")
-
 }

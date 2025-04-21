@@ -24,5 +24,5 @@ data class TaskDescriptor(
     val definition: JsonObject,
     val input: JsonElement?,
     var output: JsonElement?,
-    val startedAt: JsonObject?
+    val startedAt: JsonObject?,
 )

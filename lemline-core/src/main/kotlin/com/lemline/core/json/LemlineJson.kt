@@ -102,9 +102,9 @@ object LemlineJson {
     /**
      * Encodes an `HTTPHeaders` object into a `Map<String, String>`.
      */
-    fun encodeToString(httpHeaders: HTTPHeaders?): Map<String, String> {
-        return httpHeaders?.additionalProperties?.mapValues { it.value.toJsonPrimitive().content } ?: emptyMap()
-    }
+    fun encodeToString(httpHeaders: HTTPHeaders?): Map<String, String> = httpHeaders?.additionalProperties?.mapValues {
+        it.value.toJsonPrimitive().content
+    } ?: emptyMap()
 
     /**
      * Encodes a `DateTimeDescriptor` object into a `JsonObject`.
@@ -115,25 +115,23 @@ object LemlineJson {
 
     fun JsonNode.toJsonElement(): JsonElement = decodeFromString(toString())
 
-    internal fun Any?.toJsonElement(): JsonElement =
-        when (this) {
-            null -> JsonNull
-            is JsonElement -> this
-            is Number -> JsonPrimitive(this)
-            is String -> JsonPrimitive(this)
-            is Boolean -> JsonPrimitive(this)
-            is Map<*, *> -> buildJsonObject {
-                this@toJsonElement.forEach { (key, value) -> put(key as String, value.toJsonElement()) }
-            }
-
-            is DateTimeDescriptor -> decodeFromString(jacksonMapper.writeValueAsString(this))
-
-            else -> throw IllegalArgumentException("Unsupported type: ${this::class}")
+    internal fun Any?.toJsonElement(): JsonElement = when (this) {
+        null -> JsonNull
+        is JsonElement -> this
+        is Number -> JsonPrimitive(this)
+        is String -> JsonPrimitive(this)
+        is Boolean -> JsonPrimitive(this)
+        is Map<*, *> -> buildJsonObject {
+            this@toJsonElement.forEach { (key, value) -> put(key as String, value.toJsonElement()) }
         }
 
-    private fun Any?.toJsonPrimitive(): JsonPrimitive =
-        when (val element = this.toJsonElement()) {
-            is JsonPrimitive -> element
-            else -> JsonPrimitive(toString())
-        }
+        is DateTimeDescriptor -> decodeFromString(jacksonMapper.writeValueAsString(this))
+
+        else -> throw IllegalArgumentException("Unsupported type: ${this::class}")
+    }
+
+    private fun Any?.toJsonPrimitive(): JsonPrimitive = when (val element = this.toJsonElement()) {
+        is JsonPrimitive -> element
+        else -> JsonPrimitive(toString())
+    }
 }

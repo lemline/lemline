@@ -30,7 +30,7 @@ internal class WaitOutbox(
     val cleanupAfterDays: Int,
 
     @ConfigProperty(name = "wait.cleanup.batch-size", defaultValue = "500")
-    val cleanupBatchSize: Int
+    val cleanupBatchSize: Int,
 ) {
     private val logger = logger()
 

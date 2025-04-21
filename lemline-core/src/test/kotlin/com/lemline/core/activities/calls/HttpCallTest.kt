@@ -79,7 +79,7 @@ class HttpCallTest {
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -88,7 +88,7 @@ class HttpCallTest {
             method = "GET",
             endpoint = "https://example.com/api",
             headers = mapOf("Content-Type" to "application/json"),
-            body = null
+            body = null,
         ) as JsonObject
 
         // Verify
@@ -110,7 +110,7 @@ class HttpCallTest {
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.Created,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -119,7 +119,7 @@ class HttpCallTest {
             method = "POST",
             endpoint = "https://example.com/api/create",
             headers = mapOf("Content-Type" to "application/json"),
-            body = requestBody
+            body = requestBody,
         ) as JsonObject
 
         // Verify
@@ -141,7 +141,7 @@ class HttpCallTest {
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -150,7 +150,7 @@ class HttpCallTest {
             method = "PUT",
             endpoint = "https://example.com/api/update/123",
             headers = mapOf("Content-Type" to "application/json"),
-            body = requestBody
+            body = requestBody,
         ) as JsonObject
 
         // Verify
@@ -173,7 +173,7 @@ class HttpCallTest {
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -182,7 +182,7 @@ class HttpCallTest {
             method = "DELETE",
             endpoint = "https://example.com/api/delete/123",
             headers = mapOf("Content-Type" to "application/json"),
-            body = null
+            body = null,
         ) as JsonObject
 
         // Verify
@@ -207,7 +207,7 @@ class HttpCallTest {
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -217,7 +217,7 @@ class HttpCallTest {
             endpoint = "https://example.com/api/search",
             headers = emptyMap(),
             body = null,
-            query = mapOf("q" to "test", "page" to "1")
+            query = mapOf("q" to "test", "page" to "1"),
         ) as JsonObject
 
         // Verify
@@ -234,7 +234,7 @@ class HttpCallTest {
             respond(
                 content = responseText,
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -244,7 +244,7 @@ class HttpCallTest {
             endpoint = "https://example.com/api",
             headers = emptyMap(),
             body = null,
-            output = "raw"
+            output = "raw",
         )
 
         // Verify
@@ -264,7 +264,7 @@ class HttpCallTest {
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -274,7 +274,7 @@ class HttpCallTest {
             endpoint = "https://example.com/api",
             headers = emptyMap(),
             body = null,
-            output = "response"
+            output = "response",
         ) as JsonObject
 
         // Verify
@@ -289,7 +289,7 @@ class HttpCallTest {
             respond(
                 content = "Not Found",
                 status = HttpStatusCode.NotFound,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Plain.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Text.Plain.toString()),
             )
         }
 
@@ -299,7 +299,7 @@ class HttpCallTest {
                 method = "GET",
                 endpoint = "https://example.com/api/nonexistent",
                 headers = emptyMap(),
-                body = null
+                body = null,
             )
         }
 
@@ -315,7 +315,7 @@ class HttpCallTest {
             respond(
                 content = "",
                 status = HttpStatusCode.Found,
-                headers = headersOf(HttpHeaders.Location, "https://example.com/new-location")
+                headers = headersOf(HttpHeaders.Location, "https://example.com/new-location"),
             )
         }
 
@@ -326,7 +326,7 @@ class HttpCallTest {
                 endpoint = "https://example.com/api/redirect",
                 headers = emptyMap(),
                 body = null,
-                redirect = false
+                redirect = false,
             )
         }
 
@@ -353,8 +353,9 @@ class HttpCallTest {
                     content = "",
                     status = HttpStatusCode.Found,
                     headers = headersOf(
-                        HttpHeaders.Location, "https://example.com/redirected"
-                    )
+                        HttpHeaders.Location,
+                        "https://example.com/redirected",
+                    ),
                 )
             } else {
                 // Second request (after redirect) - verify we're at the new URL and return content
@@ -362,7 +363,7 @@ class HttpCallTest {
                 respond(
                     content = finalJsonResponse.toString(),
                     status = HttpStatusCode.OK,
-                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                 )
             }
         }
@@ -373,7 +374,7 @@ class HttpCallTest {
             endpoint = "https://example.com/api/original",
             headers = emptyMap(),
             body = null,
-            redirect = true
+            redirect = true,
         ) as JsonObject
 
         // Verify both requests were made (the redirect was followed)
@@ -389,7 +390,7 @@ class HttpCallTest {
             respond(
                 content = "{}",
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -399,7 +400,7 @@ class HttpCallTest {
                 method = "PATCH", // Not supported in the implementation
                 endpoint = "https://example.com/api",
                 headers = emptyMap(),
-                body = null
+                body = null,
             )
         }
 
@@ -415,7 +416,7 @@ class HttpCallTest {
             respond(
                 content = "{}",
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -426,7 +427,7 @@ class HttpCallTest {
                 endpoint = "https://example.com/api",
                 headers = emptyMap(),
                 body = null,
-                output = "invalid" // Not supported
+                output = "invalid", // Not supported
             )
         }
 
@@ -452,7 +453,7 @@ class HttpCallTest {
             respond(
                 content = buildJsonObject { put("result", "success") }.toString(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -461,7 +462,7 @@ class HttpCallTest {
             method = "GET",
             endpoint = "https://example.com/api/secure",
             headers = mapOf("Authorization" to expectedAuthHeader),
-            body = null
+            body = null,
         ) as JsonObject
 
         // Verify the Authorization header was passed through correctly
@@ -484,7 +485,7 @@ class HttpCallTest {
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -506,7 +507,7 @@ class HttpCallTest {
             endpoint = "https://example.com/api/secure",
             headers = emptyMap(),
             body = null,
-            authentication = basicAuth
+            authentication = basicAuth,
         ) as JsonObject
 
         // Verify the response was processed correctly
@@ -538,7 +539,7 @@ class HttpCallTest {
             respond(
                 content = buildJsonObject { put("result", "success") }.toString(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -547,7 +548,7 @@ class HttpCallTest {
             method = "GET",
             endpoint = "https://example.com/api/secure",
             headers = mapOf("Authorization" to expectedAuthHeader),
-            body = null
+            body = null,
         ) as JsonObject
 
         // Verify the Authorization header was passed through correctly
@@ -584,7 +585,7 @@ class HttpCallTest {
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -594,7 +595,7 @@ class HttpCallTest {
             endpoint = "https://example.com/api/secure",
             headers = emptyMap(),
             body = null,
-            authentication = bearerAuth
+            authentication = bearerAuth,
         ) as JsonObject
 
         // Verify
@@ -630,7 +631,7 @@ class HttpCallTest {
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
             )
         }
 
@@ -640,7 +641,7 @@ class HttpCallTest {
             endpoint = "https://example.com/api/secure",
             headers = emptyMap(),
             body = null,
-            authentication = oauth2AuthAsBearer
+            authentication = oauth2AuthAsBearer,
         ) as JsonObject
 
         // Verify
@@ -685,14 +686,14 @@ class HttpCallTest {
                         }
                     """.trimIndent(),
                     status = HttpStatusCode.OK,
-                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                 )
             } else {
                 // For API requests (with the token), return a normal response
                 respond(
                     content = """{"result": "success"}""",
                     status = HttpStatusCode.OK,
-                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString())
+                    headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
                 )
             }
         }
@@ -720,7 +721,7 @@ class HttpCallTest {
             endpoint = "https://example.com/api/secure",
             headers = emptyMap(),
             body = null,
-            authentication = oauth2AuthPolicy
+            authentication = oauth2AuthPolicy,
         ) as JsonObject
 
         // If we get here, the OAuth2 authentication used the provided mock token

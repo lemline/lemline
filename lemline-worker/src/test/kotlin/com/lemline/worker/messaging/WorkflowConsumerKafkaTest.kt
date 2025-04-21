@@ -44,7 +44,7 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerBaseTest() {
         val producerProps = mapOf(
             ProducerConfig.BOOTSTRAP_SERVERS_CONFIG to bootstrapServers,
             ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java.name,
-            ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java.name
+            ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG to StringSerializer::class.java.name,
         )
         producer = KafkaProducer(producerProps)
 
@@ -56,7 +56,7 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerBaseTest() {
             ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG to StringDeserializer::class.java.name,
             ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG to StringDeserializer::class.java.name,
             // Disable auto commit and rely on explicit commit
-            ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG to "false"
+            ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG to "false",
         )
         consumer = KafkaConsumer(consumerProps)
         consumer.subscribe(listOf(topicOut))

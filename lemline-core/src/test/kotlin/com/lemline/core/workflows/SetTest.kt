@@ -13,7 +13,6 @@ class SetTest {
 
     @Test
     fun `set task sets output`() = runTest {
-
         val doYaml = """
            do:
              - first:
@@ -27,14 +26,13 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("counter" to 0)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("counter" to 0)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `set task does not use expression by default`() = runTest {
-
         val doYaml = """
            do:
              - first:
@@ -48,14 +46,13 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("counter" to ".")),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("counter" to ".")), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `set task can use expression`() = runTest {
-
         val doYaml = """
            do:
              - first:
@@ -69,14 +66,13 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("counter" to 2)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("counter" to 2)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `set value can be nested`() = runTest {
-
         val doYaml = """
            do:
              - first:
@@ -92,8 +88,8 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("counter" to mapOf("a" to 0, "b" to 1))),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("counter" to mapOf("a" to 0, "b" to 1))), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -120,8 +116,8 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("123"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("123"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -153,8 +149,8 @@ class SetTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("12a2b3"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("12a2b3"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 }

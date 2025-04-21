@@ -7,7 +7,7 @@ import jakarta.persistence.*
 @Entity
 @Table(
     name = "workflows",
-    uniqueConstraints = [UniqueConstraint(name = "uk_workflows_name_version", columnNames = ["name", "version"])]
+    uniqueConstraints = [UniqueConstraint(name = "uk_workflows_name_version", columnNames = ["name", "version"])],
 )
 class WorkflowModel : UuidV7Entity() {
 

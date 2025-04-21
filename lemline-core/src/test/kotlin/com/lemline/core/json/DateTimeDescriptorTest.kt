@@ -19,19 +19,19 @@ class DateTimeDescriptorTest {
         // Test the presence of required fields rather than exact string matching
         assertTrue(
             jsonString.contains("\"iso8601\":\"2023-11-15T08:30:05.987Z\""),
-            "JSON should contain ISO8601 date"
+            "JSON should contain ISO8601 date",
         )
         assertTrue(
             jsonString.contains("\"epoch\":{"),
-            "JSON should contain epoch information"
+            "JSON should contain epoch information",
         )
         assertTrue(
             jsonString.contains("\"seconds\":1700037005"),
-            "JSON should contain correct seconds value"
+            "JSON should contain correct seconds value",
         )
         assertTrue(
             jsonString.contains("\"milliseconds\":1700037005987"),
-            "JSON should contain correct milliseconds value"
+            "JSON should contain correct milliseconds value",
         )
     }
 }

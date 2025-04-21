@@ -28,8 +28,10 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
 
         // Return only the bootstrap servers configuration
         return mapOf(
-            "kafka.bootstrap.servers" to (kafka.bootstrapServers
-                ?: throw RuntimeException("Failed to start Kafka container"))
+            "kafka.bootstrap.servers" to (
+                kafka.bootstrapServers
+                    ?: throw RuntimeException("Failed to start Kafka container")
+                ),
         )
     }
 

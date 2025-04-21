@@ -13,10 +13,8 @@ import com.lemline.core.utils.toUrl
 import io.serverlessworkflow.api.types.CallHTTP
 import kotlinx.serialization.json.JsonElement
 
-class CallHttpInstance(
-    override val node: Node<CallHTTP>,
-    override val parent: NodeInstance<*>,
-) : NodeInstance<CallHTTP>(node, parent) {
+class CallHttpInstance(override val node: Node<CallHTTP>, override val parent: NodeInstance<*>) :
+    NodeInstance<CallHTTP>(node, parent) {
 
     private val httpCall = HttpCall(this)
     private val logger = logger()
@@ -65,7 +63,7 @@ class CallHttpInstance(
                 query = query,
                 output = output,
                 redirect = redirect,
-                authentication = authentication
+                authentication = authentication,
             )
         } catch (e: WorkflowException) {
             // rethrow the WorkflowException without catching them
@@ -79,35 +77,35 @@ class CallHttpInstance(
                 null -> error(
                     COMMUNICATION,
                     "Unexpected HTTP error: ${e.message}",
-                    e.stackTraceToString()
+                    e.stackTraceToString(),
                 )
 
                 in 300..399 -> error(
                     COMMUNICATION,
                     "Redirection error: $statusCode",
                     e.message,
-                    statusCode
+                    statusCode,
                 )
 
                 in 400..499 -> error(
                     COMMUNICATION,
                     "Client error: $statusCode",
                     e.message,
-                    statusCode
+                    statusCode,
                 )
 
                 in 500..599 -> error(
                     COMMUNICATION,
                     "Server error: $statusCode",
                     e.message,
-                    statusCode
+                    statusCode,
                 )
 
                 else -> error(
                     COMMUNICATION,
                     "Unexpected HTTP error: $statusCode",
                     e.message,
-                    statusCode
+                    statusCode,
                 )
             }
         } catch (e: Exception) {
@@ -115,7 +113,7 @@ class CallHttpInstance(
             error(
                 COMMUNICATION,
                 "HTTP call failed: ${e.message}",
-                e.stackTraceToString()
+                e.stackTraceToString(),
             )
         }
     }

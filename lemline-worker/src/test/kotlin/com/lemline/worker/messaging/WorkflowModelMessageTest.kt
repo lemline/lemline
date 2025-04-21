@@ -19,7 +19,7 @@ class WorkflowModelMessageTest {
             name = "test-workflow",
             version = "1.0.0",
             states = mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive(""))),
-            position = NodePosition.root
+            position = NodePosition.root,
         )
 
         // When
@@ -36,7 +36,7 @@ class WorkflowModelMessageTest {
             name = "test-workflow",
             version = "1.0.0",
             states = mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive(""))),
-            position = NodePosition.root
+            position = NodePosition.root,
         )
 
         // When
@@ -55,9 +55,9 @@ class WorkflowModelMessageTest {
                     workflowId = "test-id",
                     rawInput = JsonObject(mapOf("test" to JsonPrimitive("value"))),
                     startedAt = Clock.System.now(),
-                )
+                ),
             ),
-            position = NodePosition.root
+            position = NodePosition.root,
         )
 
         // When
@@ -77,8 +77,8 @@ class WorkflowModelMessageTest {
         val input = JsonObject(
             mapOf(
                 "key1" to JsonPrimitive("value1"),
-                "key2" to JsonPrimitive("value2")
-            )
+                "key2" to JsonPrimitive("value2"),
+            ),
         )
 
         // When
@@ -89,8 +89,8 @@ class WorkflowModelMessageTest {
             NodePosition.root to NodeState(
                 workflowId = id,
                 rawInput = input,
-                startedAt = message.states[NodePosition.root]!!.startedAt
-            )
+                startedAt = message.states[NodePosition.root]!!.startedAt,
+            ),
         )
 
         assertEquals(name, message.name)

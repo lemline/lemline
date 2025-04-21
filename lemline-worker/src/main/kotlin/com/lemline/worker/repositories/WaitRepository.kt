@@ -10,7 +10,9 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 
 @ApplicationScoped
-class WaitRepository : UuidV7Repository<WaitModel>, OutboxRepository<WaitModel> {
+class WaitRepository :
+    UuidV7Repository<WaitModel>,
+    OutboxRepository<WaitModel> {
 
     @Transactional
     fun save(wait: WaitModel) {
@@ -41,7 +43,8 @@ class WaitRepository : UuidV7Repository<WaitModel>, OutboxRepository<WaitModel> 
             ORDER BY delayed_until ASC
             LIMIT ?4
             FOR UPDATE SKIP LOCKED
-            """.trimIndent(), WaitModel::class.java
+            """.trimIndent(),
+            WaitModel::class.java,
         )
         .setParameter(1, OutBoxStatus.PENDING.name)
         .setParameter(2, Instant.now())
@@ -59,7 +62,8 @@ class WaitRepository : UuidV7Repository<WaitModel>, OutboxRepository<WaitModel> 
             ORDER BY delayed_until ASC
             LIMIT ?3
             FOR UPDATE SKIP LOCKED
-            """.trimIndent(), WaitModel::class.java
+            """.trimIndent(),
+            WaitModel::class.java,
         )
         .setParameter(1, OutBoxStatus.SENT.name)
         .setParameter(2, cutoffDate)

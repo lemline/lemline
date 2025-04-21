@@ -33,8 +33,8 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("123"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("123"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -67,8 +67,8 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("12a2b3"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("12a2b3"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -96,8 +96,8 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("12"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("12"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -125,8 +125,8 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("12"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("12"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -159,8 +159,8 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("12a"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("12a"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -188,8 +188,8 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("12"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("12"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -217,8 +217,8 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("12"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("12"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -251,8 +251,8 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("12a3"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("12a3"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -280,8 +280,8 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("13"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("13"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -317,8 +317,8 @@ class FlowDirectiveTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("12a2c3"),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive("12a2c3"), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 }

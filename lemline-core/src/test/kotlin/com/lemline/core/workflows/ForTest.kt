@@ -12,7 +12,6 @@ class ForTest {
 
     @Test
     fun `test for`() = runTest {
-
         val doYaml = """
            do:
              - sumAll:
@@ -32,14 +31,13 @@ class ForTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive(6),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive(6), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test for with while`() = runTest {
-
         val doYaml = """
            do:
              - sumAll:
@@ -60,14 +58,13 @@ class ForTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive(3),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive(3), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test for with named each`() = runTest {
-
         val doYaml = """
            do:
              - sumAll:
@@ -88,14 +85,13 @@ class ForTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive(6),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive(6), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test index`() = runTest {
-
         val doYaml = """
            do:
              - sumAll:
@@ -115,14 +111,13 @@ class ForTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive(3),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive(3), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test with named index`() = runTest {
-
         val doYaml = """
            do:
              - sumAll:
@@ -143,9 +138,8 @@ class ForTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive(3),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            JsonPrimitive(3), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
-
 }

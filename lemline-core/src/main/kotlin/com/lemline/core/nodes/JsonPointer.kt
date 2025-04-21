@@ -28,7 +28,7 @@ value class JsonPointer(private val path: String) {
     fun toPosition() = NodePosition(
         path.trim()
             .split("/")
-            .filter { it.isNotEmpty() }
+            .filter { it.isNotEmpty() },
     )
 
     companion object {

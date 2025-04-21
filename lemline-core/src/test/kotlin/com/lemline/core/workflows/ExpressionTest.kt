@@ -33,7 +33,7 @@ class ExpressionTest {
 
         assertEquals(
             LemlineJson.encodeToElement(mapOf("number" to 42)),
-            instance.rootInstance.transformedOutput
+            instance.rootInstance.transformedOutput,
         )
     }
 
@@ -56,7 +56,7 @@ class ExpressionTest {
 
         assertEquals(
             LemlineJson.encodeToElement(mapOf("number" to 42)),
-            instance.rootInstance.transformedOutput
+            instance.rootInstance.transformedOutput,
         )
     }
 
@@ -80,7 +80,7 @@ class ExpressionTest {
 
         assertEquals(
             LemlineJson.encodeToElement(mapOf("number" to 42)),
-            instance.rootInstance.transformedOutput
+            instance.rootInstance.transformedOutput,
         )
     }
 
@@ -103,7 +103,7 @@ class ExpressionTest {
             definition = JsonObject(mapOf()),
             input = JsonPrimitive(0),
             output = null,
-            startedAt = null
+            startedAt = null,
         )
         val actual = (instance.rootInstance.transformedOutput as JsonObject)["taskFromScope"] as JsonObject
         assertEquals(JsonPrimitive(expected.name), actual["name"])
@@ -151,5 +151,4 @@ class ExpressionTest {
         val actual = (instance.rootInstance.transformedOutput as JsonObject)["runtimeFromScope"] as JsonObject
         assertEquals(actual, LemlineJson.encodeToElement(RuntimeDescriptor))
     }
-
 }

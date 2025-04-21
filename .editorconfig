@@ -17,6 +17,8 @@ ij_kotlin_packages_to_use_import_on_demand = java.util.*, io.ktor.**
 
 ktlint_code_style = intellij_idea
 ktlint_standard_backing-property-naming = disabled
+ktlint_standard_string-template-indent = disabled
+ktlint_standard_no-wildcard-imports = enabled
 
 [*.kts]
 # Always use wildcard imports in scripts

@@ -17,7 +17,5 @@ internal object InstantSerializer : KSerializer<Instant> {
         encoder.encodeString(value.toString())
     }
 
-    override fun deserialize(decoder: Decoder): Instant {
-        return Instant.parse(decoder.decodeString())
-    }
+    override fun deserialize(decoder: Decoder): Instant = Instant.parse(decoder.decodeString())
 }

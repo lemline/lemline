@@ -179,8 +179,8 @@ class HttpWorkflowTest {
         // With raw output, we should get a base64 encoded string
         val outputStr = instance.current?.state?.rawOutput.toString()
         // The output should be a base64 encoded string
-        assertTrue(outputStr.contains("ew"))  // Base64 encoded JSON typically starts with "ew"
-        assertTrue(outputStr.contains("=="))  // Base64 encoded strings often end with "=="
+        assertTrue(outputStr.contains("ew")) // Base64 encoded JSON typically starts with "ew"
+        assertTrue(outputStr.contains("==")) // Base64 encoded strings often end with "=="
     }
 
     /**
@@ -222,7 +222,11 @@ class HttpWorkflowTest {
 
         // Verify the error was caught and handled
         val output = instance.rootInstance.transformedOutput.toString()
-        assertTrue(output.contains("{\"type\":\"https://serverlessworkflow.io/spec/1.0.0/errors/communication\",\"status\":404,\"instance\":\"/do/0/tryGetNonExistentResource/try/0/getNotFound\""))
+        assertTrue(
+            output.contains(
+                "{\"type\":\"https://serverlessworkflow.io/spec/1.0.0/errors/communication\",\"status\":404,\"instance\":\"/do/0/tryGetNonExistentResource/try/0/getNotFound\"",
+            ),
+        )
     }
 
     /**
@@ -310,7 +314,11 @@ class HttpWorkflowTest {
 
         // Verify the error was caught and handled
         val output = instance.rootInstance.transformedOutput.toString()
-        assertTrue(output.contains("{\"type\":\"https://serverlessworkflow.io/spec/1.0.0/errors/communication\",\"status\":500,\"instance\":\"/do/0/tryGetHttpStatError/try/0/getHttpStatError\""))
+        assertTrue(
+            output.contains(
+                "{\"type\":\"https://serverlessworkflow.io/spec/1.0.0/errors/communication\",\"status\":500,\"instance\":\"/do/0/tryGetHttpStatError/try/0/getHttpStatError\"",
+            ),
+        )
     }
 
     /**
@@ -355,7 +363,11 @@ class HttpWorkflowTest {
         // Verify the error was caught and handled
         val output = instance.rootInstance.transformedOutput.toString()
         println(output)
-        assertTrue(output.contains("{\"type\":\"https://serverlessworkflow.io/spec/1.0.0/errors/communication\",\"status\":500,\"instance\":\"/do/0/tryConnectToNonExistentHost/try/0/connectToNonExistentHost\""))
+        assertTrue(
+            output.contains(
+                "{\"type\":\"https://serverlessworkflow.io/spec/1.0.0/errors/communication\",\"status\":500,\"instance\":\"/do/0/tryConnectToNonExistentHost/try/0/connectToNonExistentHost\"",
+            ),
+        )
     }
 
     /**
@@ -458,7 +470,7 @@ class HttpWorkflowTest {
         val outputStr = instance.current?.state?.rawOutput.toString()
         assertTrue(
             outputStr.contains("x-api-key", ignoreCase = true) ||
-                    outputStr.contains("authorization", ignoreCase = true)
+                outputStr.contains("authorization", ignoreCase = true),
         )
     }
 

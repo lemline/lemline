@@ -12,7 +12,6 @@ import java.io.Serializable
  */
 @Suppress("unused")
 class TimeOrderedUuidGenerator : IdentifierGenerator {
-    override fun generate(session: SharedSessionContractImplementor, obj: Any): Serializable {
-        return UuidCreator.getTimeOrderedEpoch().toString()
-    }
+    override fun generate(session: SharedSessionContractImplementor, obj: Any): Serializable =
+        UuidCreator.getTimeOrderedEpoch().toString()
 }

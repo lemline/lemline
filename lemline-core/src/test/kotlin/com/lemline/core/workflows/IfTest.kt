@@ -11,7 +11,6 @@ class IfTest {
 
     @Test
     fun `test without if`() = runTest {
-
         val doYaml = """
            do:
              - a:
@@ -31,14 +30,13 @@ class IfTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("in" to 6)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("in" to 6)), // expected
+            high.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test first if false`() = runTest {
-
         val doYaml = """
            do:
              - a:
@@ -59,14 +57,13 @@ class IfTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("in" to 5)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("in" to 5)), // expected
+            high.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test first if true`() = runTest {
-
         val doYaml = """
            do:
              - a:
@@ -87,14 +84,13 @@ class IfTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("in" to 6)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("in" to 6)), // expected
+            high.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test with subsequent if`() = runTest {
-
         val doYaml = """
            do:
              - a:
@@ -116,14 +112,13 @@ class IfTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("in" to 3)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("in" to 3)), // expected
+            high.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test with second if`() = runTest {
-
         val doYaml = """
            do:
              - a:
@@ -144,14 +139,13 @@ class IfTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("in" to 4)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("in" to 4)), // expected
+            high.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test with last if`() = runTest {
-
         val doYaml = """
            do:
              - a:
@@ -172,14 +166,13 @@ class IfTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("in" to 3)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("in" to 3)), // expected
+            high.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test nested without if`() = runTest {
-
         val doYaml = """
            do:
              - a:
@@ -207,14 +200,13 @@ class IfTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("in" to 15)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("in" to 15)), // expected
+            high.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test nested with if`() = runTest {
-
         val doYaml = """
            do:
              - a:
@@ -243,14 +235,13 @@ class IfTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("in" to 6)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("in" to 6)), // expected
+            high.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test nested with nested if`() = runTest {
-
         val doYaml = """
            do:
              - a:
@@ -279,9 +270,8 @@ class IfTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("in" to 13)),  // expected
-            high.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("in" to 13)), // expected
+            high.rootInstance.transformedOutput, // actual
         )
     }
-
 }

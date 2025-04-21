@@ -788,7 +788,6 @@ class TryCatchTest {
         instance.status shouldBe WorkflowStatus.COMPLETED
     }
 
-
     @Test
     fun `non targeted flow error is not caught`() = runTest {
         val workflowYaml = """

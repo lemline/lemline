@@ -15,10 +15,8 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
 
-class TryInstance(
-    override val node: Node<TryTask>,
-    override val parent: NodeInstance<*>,
-) : NodeInstance<TryTask>(node, parent) {
+class TryInstance(override val node: Node<TryTask>, override val parent: NodeInstance<*>) :
+    NodeInstance<TryTask>(node, parent) {
 
     private val errorAs = node.task.catch.`as` ?: "error"
 

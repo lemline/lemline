@@ -68,6 +68,4 @@ class WaitTest {
         // Assert that the elapsed time is at least the wait duration
         instance.status shouldBe WorkflowStatus.COMPLETED
     }
-
-
 }

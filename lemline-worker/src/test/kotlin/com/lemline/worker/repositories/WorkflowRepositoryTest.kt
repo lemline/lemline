@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.repositories
 
-import com.lemline.worker.tests.resources.PostgresTestResource
 import com.lemline.worker.models.WorkflowModel
+import com.lemline.worker.tests.resources.PostgresTestResource
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject

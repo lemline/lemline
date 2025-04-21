@@ -14,7 +14,7 @@ import java.time.temporal.ChronoUnit
 enum class OutBoxStatus {
     PENDING,
     SENT,
-    FAILED
+    FAILED,
 }
 
 interface OutboxMessage {
@@ -93,7 +93,9 @@ class OutboxProcessor<T : OutboxMessage>(
                             val nextDelay =
                                 calculateNextRetryDelay(message.attemptCount, retryInitialDelaySeconds * 1000)
                             message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.MILLIS)
-                            logger.debug { "Message ${message.id} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})" }
+                            logger.debug {
+                                "Message ${message.id} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})"
+                            }
                         }
                     }
                 }
@@ -133,7 +135,9 @@ class OutboxProcessor<T : OutboxMessage>(
             }
 
             if (totalDeleted > 0) {
-                logger.info { "Completed cleanup of $totalDeleted messages in $chunkNumber chunks (older than $cutoffDate)" }
+                logger.info {
+                    "Completed cleanup of $totalDeleted messages in $chunkNumber chunks (older than $cutoffDate)"
+                }
             }
         } catch (e: Exception) {
             logger.error(e) { "Error during cleanup of delayed messages: ${e.message}" }

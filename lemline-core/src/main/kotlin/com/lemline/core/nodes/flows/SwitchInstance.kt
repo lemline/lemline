@@ -7,10 +7,8 @@ import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.SwitchItem
 import io.serverlessworkflow.api.types.SwitchTask
 
-class SwitchInstance(
-    override val node: Node<SwitchTask>,
-    override val parent: NodeInstance<*>,
-) : NodeInstance<SwitchTask>(node, parent) {
+class SwitchInstance(override val node: Node<SwitchTask>, override val parent: NodeInstance<*>) :
+    NodeInstance<SwitchTask>(node, parent) {
 
     override fun `continue`(): NodeInstance<*>? {
         var then: FlowDirective? = null

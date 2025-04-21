@@ -12,9 +12,7 @@ import io.serverlessworkflow.api.types.RetryPolicy
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
-class RootInstance(
-    override val node: Node<RootTask>,
-) : NodeInstance<RootTask>(node, null) {
+class RootInstance(override val node: Node<RootTask>) : NodeInstance<RootTask>(node, null) {
 
     internal var context: JsonObject
         get() = state.context

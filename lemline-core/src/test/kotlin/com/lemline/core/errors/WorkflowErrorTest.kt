@@ -14,7 +14,7 @@ class WorkflowErrorTest {
             title = "Invalid_input",
             status = 400,
             details = "The_input_data_does_not_match_the_required_schema",
-            position = JsonPointer("/do/0").toPosition()
+            position = JsonPointer("/do/0").toPosition(),
         )
 
         val json = LemlineJson.encodeToString(error)
@@ -74,5 +74,4 @@ class WorkflowErrorTest {
 
         assertEquals(expected, json)
     }
-
 }

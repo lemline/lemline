@@ -11,7 +11,6 @@ class SwitchTest {
 
     @Test
     fun `test switch with name`() = runTest {
-
         val doYaml = """
           do:
             - test:
@@ -46,8 +45,8 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("high1"),  // expected
-            high.rootInstance.transformedOutput  // actual
+            JsonPrimitive("high1"), // expected
+            high.rootInstance.transformedOutput, // actual
         )
 
         val low = getWorkflowInstance(doYaml, JsonPrimitive("low"))
@@ -57,8 +56,8 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("low2"),  // expected
-            low.rootInstance.transformedOutput  // actual
+            JsonPrimitive("low2"), // expected
+            low.rootInstance.transformedOutput, // actual
         )
 
         val none = getWorkflowInstance(doYaml, JsonPrimitive("none"))
@@ -68,14 +67,13 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("none3"),  // expected
-            none.rootInstance.transformedOutput  // actual
+            JsonPrimitive("none3"), // expected
+            none.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test switch with FlowDirectiveEnum`() = runTest {
-
         val doYaml = """
           do:
             - test:
@@ -110,8 +108,8 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("high1"),  // expected
-            high.rootInstance.transformedOutput  // actual
+            JsonPrimitive("high1"), // expected
+            high.rootInstance.transformedOutput, // actual
         )
 
         val low = getWorkflowInstance(doYaml, JsonPrimitive("low"))
@@ -121,8 +119,8 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("low"),  // expected
-            low.rootInstance.transformedOutput  // actual
+            JsonPrimitive("low"), // expected
+            low.rootInstance.transformedOutput, // actual
         )
 
         val none = getWorkflowInstance(doYaml, JsonPrimitive("none"))
@@ -132,14 +130,13 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("none"),  // expected
-            none.rootInstance.transformedOutput  // actual
+            JsonPrimitive("none"), // expected
+            none.rootInstance.transformedOutput, // actual
         )
     }
 
     @Test
     fun `test switch without matching should continue`() = runTest {
-
         val doYaml = """
           do:
             - test:
@@ -173,9 +170,8 @@ class SwitchTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            JsonPrimitive("none1"),  // expected
-            none.rootInstance.transformedOutput  // actual
+            JsonPrimitive("none1"), // expected
+            none.rootInstance.transformedOutput, // actual
         )
     }
-
 }

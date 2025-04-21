@@ -27,8 +27,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("value" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("value" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -48,8 +48,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("value" to "foo")),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("value" to "foo")), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -70,8 +70,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("value" to "foo")),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("value" to "foo")), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -93,8 +93,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -116,8 +116,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -140,8 +140,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -165,8 +165,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -188,8 +188,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("value" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("value" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -211,8 +211,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("value" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("value" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -235,8 +235,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("value" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("value" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -258,8 +258,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -281,8 +281,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -305,8 +305,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -330,8 +330,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -362,8 +362,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out2" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out2" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -398,8 +398,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -434,8 +434,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 
@@ -475,8 +475,8 @@ class DataFlowTest {
 
         // Assert the output matches our expected transformed value
         assertEquals(
-            LemlineJson.encodeToElement(mapOf("out" to str)),  // expected
-            instance.rootInstance.transformedOutput  // actual
+            LemlineJson.encodeToElement(mapOf("out" to str)), // expected
+            instance.rootInstance.transformedOutput, // actual
         )
     }
 }

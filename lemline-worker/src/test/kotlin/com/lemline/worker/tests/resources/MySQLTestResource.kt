@@ -31,7 +31,7 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
         // Only return the profile setting
         return mapOf(
             "quarkus.profile" to "mysql",
-            "lemline.database.type" to "mysql"
+            "lemline.database.type" to "mysql",
         )
     }
 

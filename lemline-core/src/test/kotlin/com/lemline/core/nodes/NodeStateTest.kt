@@ -139,7 +139,7 @@ class NodeStateTest {
 
             assertEquals(
                 """{"i":1,"wid":"test-workflow"}""",
-                LemlineJson.encodeToString(state)
+                LemlineJson.encodeToString(state),
             )
         }
     }

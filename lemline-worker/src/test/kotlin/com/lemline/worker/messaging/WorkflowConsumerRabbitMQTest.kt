@@ -54,7 +54,9 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerBaseTest() {
         channel = connection.createChannel()
 
         // Declare queues and exchange, then bind for test consumer
-        require(queueIn != queueOut) { "For RabbitMQ *testing*, queues In ($queueIn) and Out ($queueOut) must be different" }
+        require(queueIn != queueOut) {
+            "For RabbitMQ *testing*, queues In ($queueIn) and Out ($queueOut) must be different"
+        }
 
         // Declare the incoming queue
         channel.queueDeclare(queueIn, true, false, false, null)

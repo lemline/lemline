@@ -80,17 +80,15 @@ abstract class AbstractWaitRepositoryTest {
         repository.findAndLockReadyToProcess(limit = limit, maxAttempts = maxAttempts)
 
     @Transactional
-    protected fun findAndProcess(limit: Int, maxAttempts: Int) =
-        findAndLockReadyToProcess(limit, maxAttempts)
-            .onEach { it.status = OutBoxStatus.SENT }
+    protected fun findAndProcess(limit: Int, maxAttempts: Int) = findAndLockReadyToProcess(limit, maxAttempts)
+        .onEach { it.status = OutBoxStatus.SENT }
 
     private fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) =
         repository.findAndLockForDeletion(cutoffDate, limit)
 
     @Transactional
-    protected fun findAndDelete(cutoffDate: Instant, limit: Int) =
-        findAndLockForDeletion(cutoffDate, limit)
-            .onEach { it.delete() }
+    protected fun findAndDelete(cutoffDate: Instant, limit: Int) = findAndLockForDeletion(cutoffDate, limit)
+        .onEach { it.delete() }
 
     @Test
     @Transactional
@@ -409,12 +407,12 @@ abstract class AbstractWaitRepositoryTest {
         Assertions.assertEquals(
             allProcessedMessages.size,
             uniqueProcessedMessages.size,
-            "No duplicate messages in processing"
+            "No duplicate messages in processing",
         )
         Assertions.assertEquals(
             allDeletedMessages.size,
             uniqueDeletedMessages.size,
-            "No duplicate messages in deletion"
+            "No duplicate messages in deletion",
         )
 
         // Verify no overlap between processed and deleted messages
@@ -422,7 +420,7 @@ abstract class AbstractWaitRepositoryTest {
         val deletedIds = allDeletedMessages.map { it.id }.toSet()
         Assertions.assertTrue(
             processedIds.intersect(deletedIds).isEmpty(),
-            "No message should be both processed and deleted"
+            "No message should be both processed and deleted",
         )
     }
 }

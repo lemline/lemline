@@ -46,7 +46,6 @@ abstract class AbstractOutboxTest<T> where T : OutboxMessage {
      */
     protected abstract val entity: Class<T>
 
-
     abstract val repository: OutboxRepository<out T>
 
     /**
@@ -63,7 +62,6 @@ abstract class AbstractOutboxTest<T> where T : OutboxMessage {
      * Create a new model instance of the appropriate type for testing
      */
     private fun createModel(): T = entity.newInstance()
-
 
     /**
      * Find a model by ID
@@ -93,7 +91,10 @@ abstract class AbstractOutboxTest<T> where T : OutboxMessage {
     }
 
     protected open fun getWorkflowMessage() = WorkflowMessage.newInstance(
-        "test-workflow", "1.0.0", "ID", JsonPrimitive("description")
+        "test-workflow",
+        "1.0.0",
+        "ID",
+        JsonPrimitive("description"),
     )
 
     private fun getWorkflowMessageJson(): String {
@@ -102,17 +103,17 @@ abstract class AbstractOutboxTest<T> where T : OutboxMessage {
     }
 
     private fun getBasicWorkflowMessage() = WorkflowMessage(
-        "test-workflow", "1.0.0", emptyMap(), NodePosition(listOf())
+        "test-workflow",
+        "1.0.0",
+        emptyMap(),
+        NodePosition(listOf()),
     )
 
-    private fun getPastInstant(minutes: Long = 1): Instant =
-        Instant.now().minus(minutes, ChronoUnit.MINUTES)
+    private fun getPastInstant(minutes: Long = 1): Instant = Instant.now().minus(minutes, ChronoUnit.MINUTES)
 
-    private fun getFutureInstant(minutes: Long = 1): Instant =
-        Instant.now().plus(minutes, ChronoUnit.MINUTES)
+    private fun getFutureInstant(minutes: Long = 1): Instant = Instant.now().plus(minutes, ChronoUnit.MINUTES)
 
-    private fun getPastInstantDays(days: Long = 1): Instant =
-        Instant.now().minus(days, ChronoUnit.DAYS)
+    private fun getPastInstantDays(days: Long = 1): Instant = Instant.now().minus(days, ChronoUnit.DAYS)
 
     @Test
     @Transactional
@@ -176,7 +177,7 @@ abstract class AbstractOutboxTest<T> where T : OutboxMessage {
             message = "invalid json"
             status = OutBoxStatus.PENDING
             delayedUntil = getPastInstant()
-            attemptCount = maxAttempts - 1  // One more attempt will exceed max attempts
+            attemptCount = maxAttempts - 1 // One more attempt will exceed max attempts
         }
         entityManager.persist(message)
         entityManager.flush()
@@ -255,12 +256,12 @@ abstract class AbstractOutboxTest<T> where T : OutboxMessage {
         assertEquals(
             1,
             remainingMessages.size,
-            "Remaining messages is not recentMessage: ${remainingMessages.size}"
+            "Remaining messages is not recentMessage: ${remainingMessages.size}",
         )
         assertEquals(
             recentMessage.id,
             remainingMessages[0].id,
-            "Remaining message ID doesn't match"
+            "Remaining message ID doesn't match",
         )
     }
 
