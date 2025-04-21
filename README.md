@@ -112,11 +112,11 @@ Contributions are welcome! Please follow standard practices:
 
 This project is licensed under the [Business Source License 1.1](LICENSE.md).
 
-## 💻 Current development
+## 💻 Development
 
 Currently implemented features are:
 
-### Tasks:
+### Tasks
 
 - [x] Switch
 - [x] Set
@@ -149,7 +149,7 @@ Currently implemented features are:
     - [x] OAUTH2
     - [x] OpenIdConnect
 
-### Flow:
+### Control & Data Flow
 
 - [x] Status
 
@@ -177,13 +177,14 @@ Currently implemented features are:
 
 - [ ] Schedule
 
-### Lifecycle events:
+### Lifecycle events
 
 - [ ] Workflow
 - [ ] Tasks
 
-### [ ] Catalog
+### Others
 
-### [ ] Extensions
+- [ ] Catalog
+- [ ] Extensions
 
 
