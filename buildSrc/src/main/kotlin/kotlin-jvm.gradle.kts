@@ -5,8 +5,18 @@ package buildsrc.convention
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 plugins {
+    id("com.diffplug.spotless")
     // Apply the Kotlin JVM plugin to add support for Kotlin in JVM projects.
     kotlin("jvm")
+}
+
+spotless {
+    kotlin {
+        target("src/**/*.kt")
+        licenseHeaderFile(rootProject.file("spotless.license"))
+        trimTrailingWhitespace()
+        endWithNewline()
+    }
 }
 
 kotlin {
