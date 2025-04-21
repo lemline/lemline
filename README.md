@@ -7,25 +7,27 @@
 
 [![License](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE.md)
 
-> **⚠️ Warning: Active Development**
+> **⚠️ Active Development**
 > Lemline is currently under active development and should be considered alpha software.
 > It is **not yet recommended for production use**. APIs and functionality may change without notice.
 
-Lemline is a modern runtime for the [Serverless Workflow DSL](https://github.com/serverlessworkflow/specification),
-enabling the execution of complex workflows defined in YAML or JSON on top of your existing infrastructure. It leverages
+Lemline is a modern runtime for the [Serverless Workflow DSL](https://github.com/serverlessworkflow/specification)
+version 1.0,
+enabling the execution of complex workflows defined in YAML or JSON **on top of your existing infrastructure**. It
+leverages
 modern best practices for performance, reliability, and extensibility.
 
 ## 🎯 Objectives
 
-Lemline aims to be a highly efficient orchestration engine. It implements an event-driven orchestration pattern able to
-operate on a messaging system but without relying on a database most of the time.
+Lemline is designed to be an extremely fast and efficient workflow orchestrator.
+It uses an event-driven approach, primarily communicating via messages
+rather than constantly reading from and writing to a database.
+This allows Lemline to orchestrate business processes that would typically be implemented through choreography
+(peer-to-peer communication between services) without needing a database for every interaction.
 
-The state of a workflow instance is compressed and transported within events. The database is only used on limited cases
-when stricly needed, e.g. for managing:
-
-- delays
-- retries
-- fan-in
+To achieve this, Lemline compresses the workflow's current state and includes it within the event messages.
+The database is only used when necessary, such as when dealing with time delays, retrying failed tasks,
+or managing fan-in scenarios (waiting for multiple parallel tasks to complete).
 
 ## ✨ Features
 
@@ -35,12 +37,12 @@ when stricly needed, e.g. for managing:
   runtime.
 * **Asynchronous Processing:** Leverages Kotlin Coroutines and reactive principles for high-throughput, non-blocking
   task execution.
-* **Database Integration:** Supports persistent workflow state and data using Hibernate Panache.
-    * *Note: While Quarkus + Hibernate Panache allows compatibility with numerous relational databases, Lemline is
+* **Database Integration:** Supports persistent workflow data using Hibernate Panache.
+    * *While Quarkus + Hibernate Panache allows compatibility with numerous relational databases, Lemline is
       currently tested with PostgreSQL and MySQL.*
 * **Event-Driven:** Built on Quarkus's reactive messaging capabilities (SmallRye Reactive Messaging) for seamless
   integration with event streams.
-    * *Note: While SmallRye Reactive Messaging supports various brokers (Kafka, AMQP, MQTT, etc.), Lemline is currently
+    * *While SmallRye Reactive Messaging supports various brokers (Kafka, AMQP, MQTT, etc.), Lemline is currently
       tested with Kafka and RabbitMQ.*
 
 ## 📦 Modules
@@ -57,7 +59,7 @@ when stricly needed, e.g. for managing:
 
 * Java Development Kit (JDK) 17+
 * A running instance of a supported database (e.g., PostgreSQL, MySQL)
-* A message broker like Kafka or RabbitMQ
+* A running instance of a supported message broker (e.g. Kafka, RabbitMQ)
 
 ### Building
 
@@ -110,9 +112,9 @@ Contributions are welcome! Please follow standard practices:
 
 This project is licensed under the [Business Source License 1.1](LICENSE.md).
 
-## Current development
+## 💻 Current development
 
-Currently supporting:
+Currently implemented features are:
 
 ### Tasks:
 
@@ -129,16 +131,23 @@ Currently supporting:
     - [x] Catch
 - [x] Raise
 - [x] Wait
-- Call:
-    - [x] HTTP
-    - [ ] OpenAPI
-    - [ ] gRPC
-    - [ ] AsyncAPI
 - Run:
     - [ ] Container
     - [ ] Script
     - [ ] Shell
     - [ ] Workflow
+- Call:
+    - [x] HTTP
+    - [ ] OpenAPI
+    - [ ] gRPC
+    - [ ] AsyncAPI
+- With authentication:
+    - [x] Basic
+    - [x] Bearer
+    - [ ] Certificate
+    - [x] Digest
+    - [x] OAUTH2
+    - [x] OpenIdConnect
 
 ### Flow:
 
@@ -173,19 +182,8 @@ Currently supporting:
 - [ ] Workflow
 - [ ] Tasks
 
-### Others
+### [ ] Catalog
 
-#### Authentication:
-
-- [x] Basic
-- [x] Bearer
-- [ ] Certificate
-- [x] Digest
-- [x] OAUTH2
-- [x] OpenIdConnect
-
-#### [ ] Catalog:
-
-#### [ ] Extension
+### [ ] Extensions
 
 
