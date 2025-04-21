@@ -14,8 +14,13 @@ spotless {
     kotlin {
         target("src/**/*.kt")
         licenseHeaderFile(rootProject.file("spotless.license"))
+        targetExclude("lemline-docs/**")
+        targetExclude("**/generated/**")
+        targetExclude("**/build/**")
+        targetExclude("**/bin/**")
         trimTrailingWhitespace()
         endWithNewline()
+        ktlint()
     }
 }
 

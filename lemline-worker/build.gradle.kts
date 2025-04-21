@@ -78,10 +78,6 @@ java {
     targetCompatibility = JavaVersion.VERSION_17
 }
 
-quarkus {
-    this
-}
-
 kotlin {
     jvmToolchain(17)
 }

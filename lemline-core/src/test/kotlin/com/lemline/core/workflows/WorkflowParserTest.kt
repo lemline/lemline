@@ -1,5 +1,5 @@
-//package com.lemline.core.workflows
-//
+package com.lemline.core.workflows
+
 //import com.lemline.core.load
 //import com.lemline.core.loadWorkflowFromYaml
 //import com.lemline.worker.repositories.WorkflowDefinitionRepository
