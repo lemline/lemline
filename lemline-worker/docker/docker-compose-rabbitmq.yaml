@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  rabbitmq:
+    image: rabbitmq:3.9-management # Or your preferred version with management plugin
+    container_name: lemline-rabbitmq
+    environment:
+      # Default user/pass is guest/guest, you can change them here if needed
+      # RABBITMQ_DEFAULT_USER: user
+      # RABBITMQ_DEFAULT_PASS: password
+      RABBITMQ_DEFAULT_VHOST: /
+    ports:
+      - "5672:5672"  # AMQP port
+      - "15672:15672" # Management UI port
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq/
+    networks:
+      - lemline-net
+
+volumes:
+  rabbitmq_data:
+
+networks:
+  lemline-net:
+    driver: bridge 

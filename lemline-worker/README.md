@@ -1,154 +1,181 @@
 # Lemline Worker
 
-This module contains the core workflow runtime for the Lemline project.
+This module provides the runtime engine for Lemline, responsible for executing workflows on an underlying
+infrastructure. It listens for triggers (e.g., messages), orchestrates task execution according to the workflow
+definition, interacts with databases for state persistence, and emits lifecycle events.
 
-## Database Configuration
+## ⚙️ Configuration
 
-The Lemline Worker supports both PostgreSQL (default) and MySQL databases. You can configure the database through the application properties.
+The primary configuration for the worker is managed through `src/main/resources/application.properties`. Quarkus
+profiles (dev, test, prod) can be used for environment-specific settings.
 
-### Using PostgreSQL (Default)
+### Core Configuration Properties
 
-PostgreSQL is configured by default. To explicitly use PostgreSQL, ensure the following settings in your `application.properties`:
+Lemline uses custom properties to easily switch between supported backing services:
+
+* `lemline.database.type`: Set to `postgresql` or `mysql` to select the database.
+* `lemline.messaging.type`: Set to `kafka` or `rabbitmq` to select the message broker.
+
+Based on these properties, the worker activates the corresponding Quarkus configuration for datasources and messaging
+connectors.
+
+### Database Configuration
+
+The worker requires a database to store workflow state and related data. PostgreSQL and MySQL are currently supported.
+
+**1. Select Database Type:**
+
+Set `lemline.database.type` in `application.properties`:
 
 ```properties
-# Database selection
+# Choose 'postgresql' or 'mysql'
 lemline.database.type=postgresql
+```
 
-# PostgreSQL configuration
+**2. Configure Quarkus Datasource:**
+
+Ensure the corresponding Quarkus datasource properties are configured.
+
+**For PostgreSQL (Default):**
+
+```properties
 quarkus.datasource.db-kind=postgresql
 quarkus.datasource.username=postgres
 quarkus.datasource.password=postgres
-quarkus.datasource.jdbc.url=jdbc:postgresql://localhost:5432/postgres
+quarkus.datasource.jdbc.url=jdbc:postgresql://localhost:5432/lemline_db # Example URL
+# Add any other necessary Quarkus datasource properties (pool size, etc.)
 ```
 
-### Using MySQL
-
-To use MySQL instead of PostgreSQL, follow these steps:
-
-1. Start the MySQL container using the provided Docker Compose file:
-
-```bash
-docker-compose -f mysql-docker-compose.yaml up -d
-```
-
-2. Update your `application.properties` to use MySQL:
+**For MySQL:**
 
 ```properties
-# Database selection
-lemline.database.type=mysql
-
-# MySQL configuration
 quarkus.datasource.db-kind=mysql
-quarkus.datasource.username=mysql
-quarkus.datasource.password=mysql
-quarkus.datasource.jdbc.url=jdbc:mysql://localhost:3306/lemline
+quarkus.datasource.username=mysql_user # Example user
+quarkus.datasource.password=mysql_pwd # Example password
+quarkus.datasource.jdbc.url=jdbc:mysql://localhost:3306/lemline_db # Example URL
+# Add any other necessary Quarkus datasource properties
 ```
 
-3. Comment out the PostgreSQL configuration if it exists:
+**Database Migrations:**
+
+Flyway migrations are located in `src/main/resources/db/migration/`. Database-specific migrations can be placed in
+subdirectories (e.g., `postgresql/`, `mysql/`) if needed. Migrations are applied automatically on startup based on the
+configured `quarkus.datasource.db-kind`.
+
+### Messaging Configuration
+
+The worker uses a message broker to receive workflow triggers and potentially publish events. Kafka and RabbitMQ are
+currently supported.
+
+**1. Select Messaging Type:**
+
+Set `lemline.messaging.type` in `application.properties`:
 
 ```properties
-# PostgreSQL configuration (disabled)
-#quarkus.datasource.db-kind=postgresql
-#quarkus.datasource.username=postgres
-#quarkus.datasource.password=postgres
-#quarkus.datasource.jdbc.url=jdbc:postgresql://localhost:5432/postgres
-```
-
-### Database Migration Structure
-
-The database migrations are organized in database-specific folders:
-
-- `src/main/resources/db/migration/postgresql/` - Contains PostgreSQL-specific migrations
-- `src/main/resources/db/migration/mysql/` - Contains MySQL-specific migrations
-
-The appropriate migrations are applied automatically based on the selected database type.
-
-## Messaging Configuration
-
-The Lemline Worker supports Kafka (default) and RabbitMQ for messaging. Configure the broker through the application properties.
-
-### Using Kafka (Default)
-
-Kafka is configured by default.
-
-1. Start the Kafka container using the provided Docker Compose file:
-
-```bash
-docker-compose -f kafka-docker-compose.yaml up -d
-```
-
-2. To explicitly use Kafka, ensure the following settings in your `application.properties`:
-
-```properties
-# Messaging selection
+# Choose 'kafka' or 'rabbitmq'
 lemline.messaging.type=kafka
-
-# Kafka configuration
-quarkus.kafka.bootstrap.servers=localhost:9092
-
-# RabbitMQ configuration (disabled)
-# lemaline.messaging.type=rabbitmq
-# quarkus.rabbitmq.hosts=localhost
-# quarkus.rabbitmq.port=5672
-# quarkus.rabbitmq.username=guest
-# quarkus.rabbitmq.password=guest
 ```
 
-### Using RabbitMQ
+**2. Configure Quarkus Messaging Connector:**
 
-To use RabbitMQ instead of Kafka:
+Ensure the corresponding Quarkus messaging properties are configured.
 
-1. Start the RabbitMQ container using the provided Docker Compose file:
-
-```bash
-docker-compose -f rabbitmq-docker-compose.yaml up -d
-```
-
-2. Update your `application.properties` to use RabbitMQ:
+**For Kafka (Default):**
 
 ```properties
-# Messaging selection
-lemline.messaging.type=rabbitmq
+# --- Core Kafka Connection ---
+quarkus.kafka.bootstrap.servers=localhost:9092 # Example: Comma-separated list of brokers
+# --- Add other Kafka properties as needed ---
+# e.g., security.protocol, sasl.mechanism, etc.
+```
 
-# RabbitMQ configuration
-quarkus.rabbitmq.hosts=localhost
+**For RabbitMQ:**
+
+```properties
+quarkus.rabbitmq.hosts=localhost # Example host
 quarkus.rabbitmq.port=5672
-quarkus.rabbitmq.username=guest
-quarkus.rabbitmq.password=guest
-
-# Kafka configuration (disabled)
-# lemaline.messaging.type=kafka
-# quarkus.kafka.bootstrap.servers=localhost:9092
+quarkus.rabbitmq.username=guest # Example user
+quarkus.rabbitmq.password=guest # Example password
+# Add any other necessary RabbitMQ properties (vhost, ssl, etc.)
+# Configure incoming/outgoing channels (e.g., mp.messaging.incoming.workflows...)
 ```
 
-## Running Tests
+### Local Development Setup (Docker Examples)
 
-The tests are organized to run against both PostgreSQL and MySQL. By default, only PostgreSQL tests are run.
+For local development, you can use Docker Compose to quickly start database and message broker instances. Example files
+might be provided in the project root or `/docker` directory (e.g., `docker-compose-postgres.yaml`,
+`docker-compose-kafka.yaml`).
 
-### Running PostgreSQL Tests
-
-PostgreSQL tests run by default:
+*Example commands (adjust paths as needed):*
 
 ```bash
-./gradlew lemline-worker:test
+# Start PostgreSQL
+docker-compose -f ./docker/docker-compose-postgres.yaml up -d
+
+# Start Kafka
+docker-compose -f ./docker/docker-compose-kafka.yaml up -d
 ```
 
+Remember to align the connection details in `application.properties` with your running Docker containers.
 
-## Development Mode
+## ▶️ Running the Worker
 
-You can run your application in dev mode that enables live coding using:
+### Development Mode
+
+Run the worker in Quarkus dev mode for live coding and quick feedback:
 
 ```bash
-./gradlew lemline-worker:quarkusDev
+./gradlew :lemline-worker:quarkusDev
 ```
 
-## Packaging and Running the Application
+The worker will start, connect to the configured database and message broker, apply migrations, and begin listening for
+workflow triggers.
 
-The application can be packaged using:
+### Packaging and Running the Application
+
+Build the application into a runnable JAR:
 
 ```bash
-./gradlew lemline-worker:build
+./gradlew :lemline-worker:build
 ```
 
-It produces the `quarkus-run.jar` file in the `build/quarkus-app/` directory.
-Be aware that it's not an _über-jar_ as the dependencies are copied into the `build/quarkus-app/lib/` directory. 
+This produces the `quarkus-run.jar` file in the `build/quarkus-app/` directory. Run it using:
+
+```bash
+java -jar build/quarkus-app/quarkus-run.jar
+```
+
+Ensure the environment where you run the JAR has access to the configured database and message broker.
+
+## ✅ Testing
+
+The test suite aims to ensure compatibility with all supported databases and messaging systems.
+
+### Running Tests
+
+Execute the test suite using:
+
+```bash
+./gradlew :lemline-worker:test
+```
+
+By default, tests might run using a specific configuration profile (often defined in
+`src/test/resources/application.properties` or via system properties/environment variables set by the build). Check the
+project's test setup for details on how to run tests against different configurations (e.g., MySQL vs PostgreSQL).
+Often, this involves activating specific Quarkus test profiles:
+
+```bash
+# Example: Running tests with a specific profile (adjust profile name)
+./gradlew :lemline-worker:test -Dquarkus.test.profile=mysql-test
+```
+
+Refer to the `build.gradle.kts` and test configuration files for the exact profile names and setup.
+
+## 🔗 Dependencies
+
+* **`lemline-core`:** Provides the Serverless Workflow DSL models and core logic used by the worker.
+* **Quarkus:** The runtime framework.
+* **Hibernate/Panache:** For database interaction.
+* **SmallRye Reactive Messaging:** For Kafka/RabbitMQ integration.
+* **Flyway:** For database migrations.
+* **Kotlin Coroutines:** For asynchronous operations. 

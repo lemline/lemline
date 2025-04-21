@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.0.1 # Or your preferred version
+    container_name: lemline-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - lemline-net
+
+  kafka:
+    image: confluentinc/cp-kafka:7.0.1 # Or your preferred version
+    container_name: lemline-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # You might need to adjust KAFKA_ADVERTISED_LISTENERS if connecting from outside docker
+      # e.g., PLAINTEXT://localhost:9092, PLAINTEXT_INTERNAL://kafka:19092
+    networks:
+      - lemline-net
+
+networks:
+  lemline-net:
+    driver: bridge 

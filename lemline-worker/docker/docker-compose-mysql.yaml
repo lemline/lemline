@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0 # Or your preferred version
+    container_name: lemline-mysql
+    environment:
+      MYSQL_DATABASE: lemline_db
+      MYSQL_USER: mysql_user
+      MYSQL_PASSWORD: mysql_pwd
+      MYSQL_ROOT_PASSWORD: root_password # Change this for security
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - lemline-net
+    # Optional: Add healthcheck if needed
+    # healthcheck:
+    #   test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u$${MYSQL_USER}", "-p$${MYSQL_PASSWORD}"]
+    #   interval: 10s
+    #   timeout: 5s
+    #   retries: 5
+
+volumes:
+  mysql_data:
+
+networks:
+  lemline-net:
+    driver: bridge 
