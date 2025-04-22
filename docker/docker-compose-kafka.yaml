@@ -28,7 +28,7 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
-      # You might need to adjust KAFKA_ADVERTISED_LISTENERS if connecting from outside docker
+      # You might need to adjust KAFKA_ADVERTISED_LISTENERS if connecting from inside docker
       # e.g., PLAINTEXT://localhost:9092, PLAINTEXT_INTERNAL://kafka:19092
     networks:
       - lemline-net
