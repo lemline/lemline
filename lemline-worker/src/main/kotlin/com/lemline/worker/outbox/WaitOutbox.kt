@@ -23,11 +23,11 @@ internal class WaitOutbox(
     @ConfigProperty(name = "wait.outbox.max-attempts", defaultValue = "5")
     val retryMaxAttempts: Int,
 
-    @ConfigProperty(name = "wait.outbox.initial-delay-seconds", defaultValue = "10")
-    val retryInitialDelaySeconds: Int,
+    @ConfigProperty(name = "wait.outbox.initial-delay", defaultValue = "10s")
+    val initialDelay: java.time.Duration,
 
-    @ConfigProperty(name = "wait.cleanup.after-days", defaultValue = "7")
-    val cleanupAfterDays: Int,
+    @ConfigProperty(name = "wait.cleanup.after", defaultValue = "7d")
+    val cleanupAfter: java.time.Duration,
 
     @ConfigProperty(name = "wait.cleanup.batch-size", defaultValue = "500")
     val cleanupBatchSize: Int,
@@ -40,13 +40,13 @@ internal class WaitOutbox(
         processor = { waitMessage -> emitter.send(waitMessage.message) },
     )
 
-    @Scheduled(every = "{wait.outbox.schedule}", concurrentExecution = SKIP)
+    @Scheduled(every = "{wait.outbox.every}", concurrentExecution = SKIP)
     fun processOutbox() {
-        outboxProcessor.process(batchSize, retryMaxAttempts, retryInitialDelaySeconds)
+        outboxProcessor.process(batchSize, retryMaxAttempts, initialDelay.toSeconds().toInt())
     }
 
-    @Scheduled(every = "{wait.cleanup.schedule}", concurrentExecution = SKIP)
+    @Scheduled(every = "{wait.cleanup.every}", concurrentExecution = SKIP)
     fun cleanupOutbox() {
-        outboxProcessor.cleanup(cleanupAfterDays, cleanupBatchSize)
+        outboxProcessor.cleanup(cleanupAfter.toDays().toInt(), cleanupBatchSize)
     }
 }

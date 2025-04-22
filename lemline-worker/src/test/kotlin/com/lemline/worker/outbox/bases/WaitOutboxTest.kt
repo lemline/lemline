@@ -23,8 +23,8 @@ abstract class WaitOutboxTest : AbstractOutboxTest<WaitModel>() {
             retryMaxAttempts = 3,
             batchSize = 100,
             cleanupBatchSize = 500,
-            cleanupAfterDays = 7,
-            retryInitialDelaySeconds = 5,
+            cleanupAfter = java.time.Duration.ofDays(7),
+            initialDelay = java.time.Duration.ofSeconds(5),
         )
     }
 
