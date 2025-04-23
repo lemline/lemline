@@ -2,11 +2,11 @@
 package com.lemline.worker.messaging
 
 import com.lemline.worker.messaging.bases.WorkflowConsumerBaseTest
-import com.lemline.worker.tests.profiles.KafkaTestProfile
 import com.lemline.worker.tests.resources.KafkaTestResource
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
-import io.quarkus.test.junit.TestProfile
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
@@ -16,22 +16,19 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
-import java.time.Duration
-import java.util.concurrent.TimeUnit
 
 @QuarkusTest
 @QuarkusTestResource(KafkaTestResource::class)
-@TestProfile(KafkaTestProfile::class)
 @Tag("integration")
 internal class WorkflowConsumerKafkaTest : WorkflowConsumerBaseTest() {
 
     @ConfigProperty(name = "kafka.bootstrap.servers")
     lateinit var bootstrapServers: String
 
-    @ConfigProperty(name = "mp.messaging.incoming.workflows-in.topic")
+    @ConfigProperty(name = "lemline.messaging.kafka.topic-in")
     lateinit var topicIn: String
 
-    @ConfigProperty(name = "mp.messaging.outgoing.workflows-out.topic")
+    @ConfigProperty(name = "lemline.messaging.kafka.topic-out")
     lateinit var topicOut: String
 
     private lateinit var producer: KafkaProducer<String, String>

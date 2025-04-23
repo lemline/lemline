@@ -14,17 +14,18 @@ import io.kotest.matchers.shouldBe
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
-import kotlinx.serialization.json.JsonPrimitive
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeUnit.SECONDS
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.serialization.json.JsonPrimitive
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 abstract class WorkflowConsumerBaseTest {
 
@@ -147,12 +148,12 @@ abstract class WorkflowConsumerBaseTest {
         val future = sendMessageFuture(messageJson)
 
         // Then
-        // Wait for message to be processed
-        println("output = ${future.get()}")
+        // Wait for the message to be processed
+        println("output = ${future.get(5, SECONDS)}")
         val outputMessage = receiveMessage(5, TimeUnit.SECONDS)
         assertNotNull(outputMessage, "No messages received from output topic")
 
-        // Verify no message were stored in repositories
+        // Verify that no message was stored in repositories
         val retryMessages = retryRepository.listAll()
         val waitMessages = waitRepository.listAll()
         assertTrue(retryMessages.isEmpty(), "Messages found in retry repository")
@@ -170,14 +171,14 @@ abstract class WorkflowConsumerBaseTest {
         // When
         val future = sendMessageFuture(invalidMessage)
 
-        // This message can not be processed
+        // This message cannot be processed
         shouldThrowAny { future.get() }
 
         val retryMessages = retryRepository.listAll()
         retryMessages[0].message shouldBe invalidMessage
         retryMessages[0].status shouldBe OutBoxStatus.FAILED
 
-        // Verify no message were stored in wait repository
+        // Verify no message was stored in the wait repository
         val waitMessages = waitRepository.listAll()
         assertTrue(
             waitMessages.isEmpty(),
@@ -199,10 +200,10 @@ abstract class WorkflowConsumerBaseTest {
         // When
         val future = sendMessageFuture(messageJson)
 
-        // Wait for message to be processed
-        future.get()
+        // Wait for the message to be processed
+        future.get(5, SECONDS)
 
-        // Verify message was stored in retry repository
+        // Verify a message was stored in the retry repository
         val retryMessages = retryRepository.listAll()
 
         assertTrue(retryMessages.isNotEmpty(), "No messages found in retry repository")
@@ -225,10 +226,10 @@ abstract class WorkflowConsumerBaseTest {
         val future = sendMessageFuture(messageJson)
 
         // Then
-        // Wait for message to be processed
-        future.get()
+        // Wait for the message to be processed
+        future.get(5, SECONDS)
 
-        // Verify message was stored in wait repository
+        // Verify that no message was stored in the wait repository
         val waitMessages = waitRepository.listAll()
 
         assertTrue(waitMessages.isNotEmpty(), "No messages found in wait repository")
@@ -260,12 +261,13 @@ abstract class WorkflowConsumerBaseTest {
         val future = sendMessageFuture(messageJson)
 
         // Then
-        // Wait for message to be processed
-        future.get()
+        // Wait for the message to be processed
+        future.get(5, SECONDS)
+
         val outputMessage = receiveMessage(1, TimeUnit.SECONDS)
         assertTrue(outputMessage == null, "Messages were sent to output topic: $outputMessage")
 
-        // Verify no messages were stored in repositories
+        // Verify no message was stored in repositories
         val retryMessages = retryRepository.listAll()
         assertEquals(
             0,

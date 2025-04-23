@@ -18,7 +18,7 @@ dependencies {
     implementation(libs.bundles.kotlinxEcosystem)
 
     // Enforce Quarkus platform versions
-    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.0"))
+    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.2"))
 
     // Quarkus
     implementation("io.quarkus:quarkus-kotlin")
@@ -32,6 +32,7 @@ dependencies {
     implementation("io.quarkus:quarkus-scheduler")          // Scheduler
     implementation("io.quarkus:quarkus-jdbc-postgresql")    // Postgres Database driver
     implementation("io.quarkus:quarkus-jdbc-mysql")         // MySQL Database driver
+    implementation("io.quarkus:quarkus-arc")
 
     // Serverless Workflow SDK
     implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")

@@ -2,21 +2,24 @@
 package com.lemline.worker.messaging
 
 import com.lemline.worker.messaging.bases.WorkflowConsumerBaseTest
-import com.lemline.worker.tests.profiles.RabbitMQTestProfile
 import com.lemline.worker.tests.resources.RabbitMQTestResource
-import com.rabbitmq.client.*
+import com.rabbitmq.client.CancelCallback
+import com.rabbitmq.client.Channel
+import com.rabbitmq.client.Connection
+import com.rabbitmq.client.ConnectionFactory
+import com.rabbitmq.client.DeliverCallback
+import com.rabbitmq.client.Delivery
+import com.rabbitmq.client.MessageProperties
 import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
-import io.quarkus.test.junit.TestProfile
-import org.eclipse.microprofile.config.inject.ConfigProperty
-import org.junit.jupiter.api.Tag
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import org.eclipse.microprofile.config.inject.ConfigProperty
+import org.junit.jupiter.api.Tag
 
 @QuarkusTest
 @QuarkusTestResource(RabbitMQTestResource::class)
-@TestProfile(RabbitMQTestProfile::class)
 @Tag("integration")
 internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerBaseTest() {
 
@@ -32,10 +35,10 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerBaseTest() {
     @ConfigProperty(name = "rabbitmq-password")
     lateinit var rabbitmqPassword: String
 
-    @ConfigProperty(name = "mp.messaging.incoming.workflows-in.queue.name")
+    @ConfigProperty(name = "lemline.messaging.rabbitmq.queue-in")
     lateinit var queueIn: String
 
-    @ConfigProperty(name = "mp.messaging.outgoing.workflows-out.queue.name")
+    @ConfigProperty(name = "lemline.messaging.rabbitmq.queue-out")
     lateinit var queueOut: String
 
     private lateinit var connection: Connection

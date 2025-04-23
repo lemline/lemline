@@ -20,28 +20,20 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
 
         postgres.start()
 
-        // Set system properties for datasource config - Quarkus will pick these up
-        System.setProperty("quarkus.datasource.db-kind", "postgresql")
-        System.setProperty("quarkus.datasource.jdbc.url", postgres.jdbcUrl)
-        System.setProperty("quarkus.datasource.username", postgres.username)
-        System.setProperty("quarkus.datasource.password", postgres.password)
-        // Do NOT set flyway locations dynamically
-
-        // Only return the profile setting
+        // Properties passed here are picked up by LemlineConfigSourceFactory
         return mapOf(
-            "quarkus.profile" to "postgresql",
             "lemline.database.type" to "postgresql",
+            "lemline.database.postgresql.host" to postgres.host,
+            "lemline.database.postgresql.port" to postgres.firstMappedPort.toString(),
+            "lemline.database.postgresql.name" to postgres.databaseName,
+            "lemline.database.postgresql.username" to postgres.username,
+            "lemline.database.postgresql.password" to postgres.password
         )
     }
 
     override fun stop() {
         if (::postgres.isInitialized) {
             postgres.stop()
-            // Clean up system properties
-            System.clearProperty("quarkus.datasource.db-kind")
-            System.clearProperty("quarkus.datasource.jdbc.url")
-            System.clearProperty("quarkus.datasource.username")
-            System.clearProperty("quarkus.datasource.password")
         }
     }
 }

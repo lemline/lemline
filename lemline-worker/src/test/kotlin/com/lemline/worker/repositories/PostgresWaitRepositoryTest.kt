@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.TestInstance
 
 /**
- * PostgreSQL-specific implementation of WaitRepositoryTest.
+ * Postgres-specific implementation of WaitRepositoryTest.
  */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource::class)

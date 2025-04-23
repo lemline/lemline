@@ -16,4 +16,4 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
 @Tag("h2")
-class H2RetryOutboxTest : RetryOutboxTest()
+internal class H2RetryOutboxTest : RetryOutboxTest()

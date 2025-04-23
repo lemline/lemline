@@ -16,6 +16,9 @@ import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.util.concurrent.CompletableFuture
 import kotlinx.serialization.json.JsonPrimitive
 import org.eclipse.microprofile.reactive.messaging.Emitter
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -23,9 +26,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import java.time.Instant
-import java.time.temporal.ChronoUnit
-import java.util.concurrent.CompletableFuture
 
 /**
  * Abstract base class for outbox tests that works with both PostgreSQL and MySQL.
@@ -34,7 +34,7 @@ import java.util.concurrent.CompletableFuture
 @QuarkusTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-abstract class AbstractOutboxTest<T> where T : OutboxMessage {
+internal abstract class AbstractOutboxTest<T> where T : OutboxMessage {
 
     @Inject
     protected lateinit var entityManager: EntityManager

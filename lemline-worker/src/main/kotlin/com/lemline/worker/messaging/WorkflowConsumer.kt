@@ -1,7 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.messaging
 
-import com.lemline.common.*
+import com.lemline.common.LogContext
+import com.lemline.common.debug
+import com.lemline.common.error
+import com.lemline.common.info
+import com.lemline.common.logger
+import com.lemline.common.trace
+import com.lemline.common.withLoggingContext
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.activities.WaitInstance
 import com.lemline.core.nodes.flows.TryInstance
@@ -17,18 +23,18 @@ import com.lemline.worker.secrets.Secrets
 import io.serverlessworkflow.impl.WorkflowStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.transaction.Transactional
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.future.future
-import org.eclipse.microprofile.reactive.messaging.Incoming
-import org.eclipse.microprofile.reactive.messaging.Outgoing
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration
 import kotlin.time.toJavaDuration
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.future.future
+import org.eclipse.microprofile.reactive.messaging.Incoming
+import org.eclipse.microprofile.reactive.messaging.Outgoing
 
 @ApplicationScoped
 open class WorkflowConsumer(
@@ -48,7 +54,7 @@ open class WorkflowConsumer(
         // Use logging context for all logs in this message processing
         withLoggingContext(
             LogContext.REQUEST_ID to requestId,
-            LogContext.CORRELATION_ID to requestId, // Use same ID for correlation until we extract a better one
+            LogContext.CORRELATION_ID to requestId, // Use the same ID for correlation until we extract a better one
         ) {
             logger.debug { "Received message for processing" }
 
@@ -65,7 +71,7 @@ open class WorkflowConsumer(
                 throw e
             }
 
-            // Extract workflow ID from root state if available
+            // Extract workflow ID from the root state if available
             val workflowId = workflowMessage.states[NodePosition.root]?.workflowId
 
             // Add workflow context information once we have it
@@ -89,7 +95,7 @@ open class WorkflowConsumer(
                 } catch (e: Exception) {
                     logger.error(e) { "Failed to process workflow message" }
                     msg.saveMsgAsFailed(e)
-                    // Send message to dead letter queue
+                    // Send the message to dead letter queue
                     // NOTE - we MUST set mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
                     // If not, Quarkus will stop consuming messages
                     throw e
@@ -194,7 +200,7 @@ open class WorkflowConsumer(
         val delay: Duration = (this.current as WaitInstance).delay
         val delayedUntil = Instant.now().plus(delay.toJavaDuration())
 
-        // Save message to the wait table
+        // Save the message to the wait table
         waitRepository.save(
             WaitModel.create(
                 message = msg.toJsonString(),

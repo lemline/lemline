@@ -21,28 +21,20 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
 
         mysql.start()
 
-        // Set system properties for datasource config - Quarkus will pick these up
-        System.setProperty("quarkus.datasource.db-kind", "mysql")
-        System.setProperty("quarkus.datasource.jdbc.url", mysql.jdbcUrl)
-        System.setProperty("quarkus.datasource.username", mysql.username)
-        System.setProperty("quarkus.datasource.password", mysql.password)
-        // Do NOT set flyway locations dynamically
-
-        // Only return the profile setting
+        // Return the profile setting
         return mapOf(
-            "quarkus.profile" to "mysql",
             "lemline.database.type" to "mysql",
+            "lemline.database.mysql.host" to mysql.host,
+            "lemline.database.mysql.port" to mysql.firstMappedPort.toString(),
+            "lemline.database.mysql.name" to mysql.databaseName,
+            "lemline.database.mysql.username" to mysql.username,
+            "lemline.database.mysql.password" to mysql.password,
         )
     }
 
     override fun stop() {
         if (::mysql.isInitialized) {
             mysql.stop()
-            // Clean up system properties
-            System.clearProperty("quarkus.datasource.db-kind")
-            System.clearProperty("quarkus.datasource.jdbc.url")
-            System.clearProperty("quarkus.datasource.username")
-            System.clearProperty("quarkus.datasource.password")
         }
     }
 }

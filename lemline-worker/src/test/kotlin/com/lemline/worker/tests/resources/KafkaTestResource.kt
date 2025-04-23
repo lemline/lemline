@@ -15,7 +15,7 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
         // Create a network for Kafka
         network = Network.newNetwork()
 
-        // Create and configure Kafka container
+        // Create and configure a Kafka container
         kafka = KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.3.0"))
             .withNetwork(network)
             .withNetworkAliases("kafka")

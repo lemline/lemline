@@ -16,4 +16,4 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
 @Tag("mysql")
-class MySQLRetryOutboxTest : RetryOutboxTest()
+internal class MySQLRetryOutboxTest : RetryOutboxTest()

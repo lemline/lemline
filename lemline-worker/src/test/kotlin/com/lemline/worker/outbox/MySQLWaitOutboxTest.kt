@@ -16,4 +16,4 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
 @Tag("mysql")
-class MySQLWaitOutboxTest : WaitOutboxTest()
+internal class MySQLWaitOutboxTest : WaitOutboxTest()

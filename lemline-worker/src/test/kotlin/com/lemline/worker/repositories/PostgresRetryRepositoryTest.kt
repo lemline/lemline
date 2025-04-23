@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.TestInstance
 
 /**
- * PostgreSQL-specific implementation of RetryRepositoryTest.
+ * Postgres-specific implementation of RetryRepositoryTest.
  */
 @QuarkusTest
 @QuarkusTestResource(PostgresTestResource::class)

@@ -16,4 +16,4 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
 @Tag("postgresql")
-class PostgresRetryOutboxTest : RetryOutboxTest()
+internal class PostgresRetryOutboxTest : RetryOutboxTest()
