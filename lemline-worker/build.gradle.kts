@@ -34,6 +34,12 @@ dependencies {
     implementation("io.quarkus:quarkus-jdbc-mysql")         // MySQL Database driver
     implementation("io.quarkus:quarkus-arc")
 
+    implementation("io.quarkus:quarkus-hibernate-reactive")
+    implementation("io.quarkus:quarkus-reactive-mysql-client")
+    implementation("io.quarkus:quarkus-reactive-pg-client")
+    implementation("io.smallrye.reactive:mutiny-kotlin-coroutines")
+
+
     // Serverless Workflow SDK
     implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
     implementation("io.serverlessworkflow:serverlessworkflow-impl-core:7.0.0.Final")

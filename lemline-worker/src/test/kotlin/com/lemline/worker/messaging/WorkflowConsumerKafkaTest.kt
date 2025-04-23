@@ -2,9 +2,9 @@
 package com.lemline.worker.messaging
 
 import com.lemline.worker.messaging.bases.WorkflowConsumerBaseTest
-import com.lemline.worker.tests.resources.KafkaTestResource
-import io.quarkus.test.common.QuarkusTestResource
+import com.lemline.worker.tests.profiles.H2KafkaProfile
 import io.quarkus.test.junit.QuarkusTest
+import io.quarkus.test.junit.TestProfile
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -18,7 +18,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
 
 @QuarkusTest
-@QuarkusTestResource(KafkaTestResource::class)
+@TestProfile(H2KafkaProfile::class)
 @Tag("integration")
 internal class WorkflowConsumerKafkaTest : WorkflowConsumerBaseTest() {
 

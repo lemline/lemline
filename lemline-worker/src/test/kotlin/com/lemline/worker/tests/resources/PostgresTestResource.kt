@@ -22,7 +22,6 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
 
         // Properties passed here are picked up by LemlineConfigSourceFactory
         return mapOf(
-            "lemline.database.type" to "postgresql",
             "lemline.database.postgresql.host" to postgres.host,
             "lemline.database.postgresql.port" to postgres.firstMappedPort.toString(),
             "lemline.database.postgresql.name" to postgres.databaseName,

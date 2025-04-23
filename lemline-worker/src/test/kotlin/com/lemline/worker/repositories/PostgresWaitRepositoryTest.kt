@@ -2,18 +2,15 @@
 package com.lemline.worker.repositories
 
 import com.lemline.worker.repositories.bases.AbstractWaitRepositoryTest
-import com.lemline.worker.tests.resources.PostgresTestResource
-import io.quarkus.test.common.QuarkusTestResource
+import com.lemline.worker.tests.profiles.PostgresProfile
 import io.quarkus.test.junit.QuarkusTest
-import org.junit.jupiter.api.Tag
+import io.quarkus.test.junit.TestProfile
 import org.junit.jupiter.api.TestInstance
 
 /**
  * Postgres-specific implementation of WaitRepositoryTest.
  */
 @QuarkusTest
-@QuarkusTestResource(PostgresTestResource::class)
+@TestProfile(PostgresProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@Tag("integration")
-@Tag("postgresql")
 class PostgresWaitRepositoryTest : AbstractWaitRepositoryTest()

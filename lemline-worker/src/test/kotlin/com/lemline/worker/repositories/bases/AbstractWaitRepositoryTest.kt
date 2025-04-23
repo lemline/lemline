@@ -8,9 +8,6 @@ import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
 import jakarta.transaction.UserTransaction
-import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.CountDownLatch
@@ -19,6 +16,14 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaDuration
+import kotlinx.coroutines.joinAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 
 /**
  * Abstract base class for wait repository tests.
@@ -250,7 +255,7 @@ abstract class AbstractWaitRepositoryTest {
     }
 
     @Test
-    fun `findAndLockReadyToProcess should not return same messages to concurrent requests`() {
+    fun `findAndLockReadyToProcess should not return same messages to concurrent requests`() = runTest {
         // Given
         val messageCount = 100
         val concurrentRequests = 5
@@ -261,28 +266,17 @@ abstract class AbstractWaitRepositoryTest {
 
         // When
         val results = mutableListOf<List<WaitModel>>()
-        val latch = CountDownLatch(concurrentRequests)
-        val executor = Executors.newFixedThreadPool(concurrentRequests)
-
-        // Submit concurrent requests
-        repeat(concurrentRequests) {
-            executor.submit {
-                try {
-                    val result = findAndProcess(limit = limit, maxAttempts = 3)
-                    synchronized(results) { results.add(result) }
-                } finally {
-                    latch.countDown()
-                }
+        val mutex = Mutex()
+        val jobs = List(concurrentRequests) {
+            launch {
+                val result = findAndProcess(limit = limit, maxAttempts = 3)
+                mutex.withLock { results.add(result) }
             }
         }
-
-        // Wait for all requests to complete
-        latch.await(2, TimeUnit.SECONDS)
-        executor.shutdown()
-        executor.awaitTermination(2, TimeUnit.SECONDS)
+        jobs.joinAll()
 
         // Then
-        // Verify total number of messages processed
+        // Verify the total number of messages processed
         val totalProcessed = results.sumOf { it.size }
         Assertions.assertEquals(messageCount, totalProcessed, "All messages should be processed")
 
@@ -293,7 +287,7 @@ abstract class AbstractWaitRepositoryTest {
     }
 
     @Test
-    fun `findAndLockForDeletion should handle concurrent deletion requests`() {
+    fun `findAndLockForDeletion should handle concurrent deletion requests`() = runTest {
         // Given
         val messageCount = 100
         val concurrentRequests = 5
@@ -304,29 +298,18 @@ abstract class AbstractWaitRepositoryTest {
 
         // When
         val results = mutableListOf<List<WaitModel>>()
-        val latch = CountDownLatch(concurrentRequests)
-        val executor = Executors.newFixedThreadPool(concurrentRequests)
-
-        // Submit concurrent requests
-        repeat(concurrentRequests) {
-            executor.submit {
-                try {
-                    val cutoffDate = Instant.now().minus(1L, ChronoUnit.DAYS)
-                    val result = findAndDelete(cutoffDate, limit = limit)
-                    synchronized(results) { results.add(result) }
-                } finally {
-                    latch.countDown()
-                }
+        val mutex = Mutex()
+        val jobs = List(concurrentRequests) {
+            launch {
+                val cutoffDate = Instant.now().minus(1L, ChronoUnit.DAYS)
+                val result = findAndDelete(cutoffDate, limit = limit)
+                mutex.withLock { results.add(result) }
             }
         }
-
-        // Wait for all requests to complete
-        latch.await(2, TimeUnit.SECONDS)
-        executor.shutdown()
-        executor.awaitTermination(2, TimeUnit.SECONDS)
+        jobs.joinAll()
 
         // Then
-        // Verify total number of messages processed
+        // Verify the total number of messages processed
         val totalProcessed = results.sumOf { it.size }
         Assertions.assertEquals(messageCount, totalProcessed, "All messages should be processed")
 

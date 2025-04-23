@@ -46,7 +46,11 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                 // Create a ConfigSource with the generated properties and a specific ordinal
                 PropertiesConfigSource(generatedProps, "LemlineGeneratedConfigSource", configOrdinal)
             ).also {
-                log.debug { "Generated properties: $generatedProps" }
+                log.debug {
+                    "Generated properties:\n${
+                        generatedProps.map { "${it.key}=${it.value}" }.joinToString("\n")
+                    }"
+                }
             }
         }
     }
@@ -65,44 +69,43 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         try {
             val dbTypeKey = "lemline.database.type"
-            if (lemlineProps.containsKey(dbTypeKey)) {
-                val dbType = requireProp(dbTypeKey).lowercase()
-                props["quarkus.datasource.db-kind"] = dbType
 
-                when (dbType) {
-                    "postgresql" -> {
-                        val prefix = "lemline.database.postgresql"
-                        val pgHost = requireProp("$prefix.host")
-                        val pgPort = requireProp("$prefix.port")
-                        val pgDbName = requireProp("$prefix.name")
-                        props["quarkus.datasource.jdbc.url"] = "jdbc:postgresql://$pgHost:$pgPort/$pgDbName"
-                        props["quarkus.datasource.username"] = requireProp("$prefix.username")
-                        props["quarkus.datasource.password"] = requireProp("$prefix.password")
-                        props["quarkus.flyway.locations"] = "classpath:db/migration/postgresql"
-                    }
+            val dbType = getProp(dbTypeKey) ?: "h2" // default to H2 if not specified
+            props["quarkus.datasource.db-kind"] = dbType
 
-                    "mysql" -> {
-                        val prefix = "lemline.database.mysql"
-                        val mysqlHost = requireProp("$prefix.host")
-                        val mysqlPort = requireProp("$prefix.port")
-                        val mysqlDbName = requireProp("$prefix.name")
-                        props["quarkus.datasource.jdbc.url"] =
-                            "jdbc:mysql://$mysqlHost:$mysqlPort/$mysqlDbName?useSSL=false&allowPublicKeyRetrieval=true"
-                        props["quarkus.datasource.username"] = requireProp("$prefix.username")
-                        props["quarkus.datasource.password"] = requireProp("$prefix.password")
-                        props["quarkus.flyway.locations"] = "classpath:db/migration/mysql"
-                    }
-
-                    "h2" -> {
-                        val prefix = "lemline.database.h2"
-                        val h2DbName = getProp("$prefix.name") ?: "testdb"
-                        props["quarkus.datasource.jdbc.url"] = "jdbc:h2:mem:$h2DbName;DB_CLOSE_DELAY=-1"
-                        props["quarkus.datasource.username"] = getProp("$prefix.username") ?: "sa"
-                        props["quarkus.datasource.password"] = getProp("$prefix.password") ?: ""
-                    }
-
-                    else -> log.warn { "Unsupported lemline.database.type: '$dbType'. DB properties not generated." }
+            when (dbType) {
+                "postgresql" -> {
+                    val prefix = "lemline.database.postgresql"
+                    val pgHost = requireProp("$prefix.host")
+                    val pgPort = requireProp("$prefix.port")
+                    val pgDbName = requireProp("$prefix.name")
+                    props["quarkus.datasource.jdbc.url"] = "jdbc:postgresql://$pgHost:$pgPort/$pgDbName"
+                    props["quarkus.datasource.username"] = requireProp("$prefix.username")
+                    props["quarkus.datasource.password"] = requireProp("$prefix.password")
+                    props["quarkus.flyway.locations"] = "classpath:db/migration/postgresql"
                 }
+
+                "mysql" -> {
+                    val prefix = "lemline.database.mysql"
+                    val mysqlHost = requireProp("$prefix.host")
+                    val mysqlPort = requireProp("$prefix.port")
+                    val mysqlDbName = requireProp("$prefix.name")
+                    props["quarkus.datasource.jdbc.url"] =
+                        "jdbc:mysql://$mysqlHost:$mysqlPort/$mysqlDbName?useSSL=false&allowPublicKeyRetrieval=true"
+                    props["quarkus.datasource.username"] = requireProp("$prefix.username")
+                    props["quarkus.datasource.password"] = requireProp("$prefix.password")
+                    props["quarkus.flyway.locations"] = "classpath:db/migration/mysql"
+                }
+
+                "h2" -> {
+                    val prefix = "lemline.database.h2"
+                    val h2DbName = getProp("$prefix.name") ?: "testdb"
+                    props["quarkus.datasource.jdbc.url"] = "jdbc:h2:mem:$h2DbName;DB_CLOSE_DELAY=-1"
+                    props["quarkus.datasource.username"] = getProp("$prefix.username") ?: "sa"
+                    props["quarkus.datasource.password"] = getProp("$prefix.password") ?: ""
+                }
+
+                else -> log.warn { "Unsupported lemline.database.type: '$dbType'. DB properties not generated." }
             }
         } catch (e: NoSuchElementException) {
             log.warn(e) { "Incomplete database configuration: ${e.message}" }

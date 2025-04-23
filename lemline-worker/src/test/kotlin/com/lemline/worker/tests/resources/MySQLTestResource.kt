@@ -23,7 +23,6 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
 
         // Return the profile setting
         return mapOf(
-            "lemline.database.type" to "mysql",
             "lemline.database.mysql.host" to mysql.host,
             "lemline.database.mysql.port" to mysql.firstMappedPort.toString(),
             "lemline.database.mysql.name" to mysql.databaseName,

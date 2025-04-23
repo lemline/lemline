@@ -2,7 +2,7 @@
 package com.lemline.worker.messaging
 
 import com.lemline.worker.messaging.bases.WorkflowConsumerBaseTest
-import com.lemline.worker.tests.resources.RabbitMQTestResource
+import com.lemline.worker.tests.profiles.H2RabbitMQProfile
 import com.rabbitmq.client.CancelCallback
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
@@ -10,8 +10,8 @@ import com.rabbitmq.client.ConnectionFactory
 import com.rabbitmq.client.DeliverCallback
 import com.rabbitmq.client.Delivery
 import com.rabbitmq.client.MessageProperties
-import io.quarkus.test.common.QuarkusTestResource
 import io.quarkus.test.junit.QuarkusTest
+import io.quarkus.test.junit.TestProfile
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -19,7 +19,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
 
 @QuarkusTest
-@QuarkusTestResource(RabbitMQTestResource::class)
+@TestProfile(H2RabbitMQProfile::class)
 @Tag("integration")
 internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerBaseTest() {
 

@@ -19,7 +19,7 @@ interface LemlineConfiguration {
 
 @ConfigMapping(prefix = "lemline.database")
 interface DatabaseConfig {
-    fun type(): String // "postgresql" or "mysql"
+    fun type(): Optional<String> // "postgresql" or "mysql"
 
     // Common ORM and Migration settings
     fun migrateAtStart(): Optional<Boolean> // Use Optional for properties with framework defaults we might not want to force
@@ -28,7 +28,7 @@ interface DatabaseConfig {
     fun formatSql(): Optional<Boolean>
     fun generation(): Optional<String>
 
-    // DB Specific settings
+    // DB-Specific settings
     fun postgresql(): PostgreSQLConfig
     fun mysql(): MySQLConfig
 }
@@ -53,7 +53,7 @@ interface MySQLConfig {
 
 @ConfigMapping(prefix = "lemline.messaging")
 interface MessagingConfig {
-    fun type(): String // "kafka" or "rabbitmq"
+    fun type(): Optional<String> // "kafka" or "rabbitmq"
 
     // Broker Specific settings
     fun kafka(): KafkaConfig
