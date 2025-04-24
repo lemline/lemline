@@ -12,7 +12,13 @@ import org.junit.jupiter.api.Test
 
 /**
  * Abstract base class for workflow repository tests.
- * This provides common test implementation that can be reused by database-specific test classes.
+ * This provides a common test implementation that can be reused by database-specific test classes.
+ *
+ * The tests cover:
+ * 1. Basic CRUD operations (Create, Read, Update)
+ * 2. Workflow model persistence and retrieval
+ * 3. Handling of non-existent workflows
+ * 4. Workflow definition updates
  */
 abstract class AbstractWorkflowModelRepositoryTest {
 
@@ -22,15 +28,24 @@ abstract class AbstractWorkflowModelRepositoryTest {
     @Inject
     protected lateinit var entityManager: EntityManager
 
+    /**
+     * Cleans up the database before each test to ensure a clean state.
+     * This is crucial for maintaining test isolation and reliability.
+     */
     @BeforeEach
     @Transactional
     fun setupTest() {
-        // Clear the database before each test
         repository.deleteAll()
     }
 
+    /**
+     * Tests the complete workflow model lifecycle:
+     * - Persistence of a new workflow model
+     * - Retrieval of the saved model
+     * - Verification of all model properties
+     */
     @Test
-    fun `should persist and retrieve workflow model`() {
+    fun `should successfully persist and retrieve a complete workflow model with all properties`() {
         // Given
         val workflowModel = WorkflowModel().apply {
             name = "test-workflow"
@@ -62,8 +77,12 @@ abstract class AbstractWorkflowModelRepositoryTest {
         Assertions.assertTrue(retrievedModel?.definition?.contains("Hello, World!") ?: false)
     }
 
+    /**
+     * Tests the repository's behavior when querying for a non-existent workflow.
+     * Verifies that the repository correctly returns null instead of throwing an exception.
+     */
     @Test
-    fun `should return null when workflow with given name and version does not exist`() {
+    fun `should return null when querying for a non-existent workflow name and version combination`() {
         // When
         val result = repository.findByNameAndVersion("non-existent", "1.0.0")
 
@@ -71,9 +90,16 @@ abstract class AbstractWorkflowModelRepositoryTest {
         Assertions.assertNull(result)
     }
 
+    /**
+     * Tests the update functionality of the workflow repository.
+     * Verifies that:
+     * - An existing workflow can be retrieved
+     * - Its definition can be modified
+     * - The changes are persisted correctly
+     */
     @Test
     @Transactional
-    fun `should update existing workflow`() {
+    fun `should successfully update an existing workflow's definition while preserving other properties`() {
         // Given
         val workflowModel = WorkflowModel().apply {
             name = "updatable-workflow"
@@ -98,6 +124,10 @@ abstract class AbstractWorkflowModelRepositoryTest {
         Assertions.assertEquals("updated definition", updatedModel?.definition)
     }
 
+    /**
+     * Helper method to persist and flush a workflow model in a transaction.
+     * Ensures that the model is properly saved to the database before proceeding.
+     */
     @Transactional
     protected fun persistAndFlush(model: WorkflowModel): WorkflowModel {
         entityManager.persist(model)

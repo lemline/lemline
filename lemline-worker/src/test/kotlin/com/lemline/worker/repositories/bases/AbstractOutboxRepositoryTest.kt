@@ -15,28 +15,48 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.toJavaDuration
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
-
 /**
- * Abstract base class for retry repository tests.
+ * Abstract base class for testing outbox repository implementations.
+ * This class provides a comprehensive test suite for verifying the behavior of outbox repositories,
+ * including message processing, deletion, and concurrent operations.
+ *
+ * The tests cover:
+ * 1. Basic message processing and deletion
+ * 2. Message filtering with various parameters (max attempts, cutoff dates)
+ * 3. Concurrent operations to ensure thread safety
+ * 4. Mixed concurrent operations (processing and deletion)
+ *
+ * @param T The type of OutboxModel being tested
  */
 internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
 
+    /** The repository implementation being tested */
     internal abstract val repository: OutboxRepository<T>
 
+    /** Factory method to create a new instance of the model being tested */
     internal abstract fun createModel(): T
 
+    /**
+     * Cleans up the database before each test to ensure a clean state.
+     * This is crucial for maintaining test isolation and reliability.
+     */
     @BeforeEach
     @Transactional
     fun setupTest() {
-        // Clear the database before each test
         repository.deleteAll()
     }
 
+    /**
+     * Filters a list of messages to find those that are ready to be processed.
+     * A message is ready to process if:
+     * - It has PENDING status
+     * - Its delayedUntil time has passed
+     * - It hasn't exceeded maxAttempts
+     */
     private fun List<T>.filterToProcess(
         now: Instant = Instant.now(),
         maxAttempts: Int = Int.MAX_VALUE
@@ -45,22 +65,34 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
             .filter { it.delayedUntil <= now }
             .filter { it.attemptCount < maxAttempts }
 
+    /**
+     * Filters a list of messages to find those that are ready to be deleted.
+     * A message is ready to delete if:
+     * - It has SENT status
+     * - Its delayedUntil time is before the cutoff date
+     */
     private fun List<T>.filterToDelete(cutoffDate: Instant = Instant.now()): List<T> =
         filter { it.status == OutBoxStatus.SENT }
             .filter { it.delayedUntil < cutoffDate }
 
     /**
-     * Generates a random non-zero integer between -n and n.
+     * Generates a random non-zero integer for testing purposes.
+     * Used to create varied test scenarios with different delay durations.
      */
     private fun randomNonZero(n: Int): Int {
         val r = Random.nextInt(-n, n - 1)
         return if (r >= 0) r + 1 else r
     }
 
+    /**
+     * Compares two lists of messages by their IDs.
+     * Used to verify that the correct messages are returned by repository operations.
+     */
     private fun List<T>.equalTo(other: List<T>): Boolean {
         return this.map { it.id }.toSet() == other.map { it.id }.toSet()
     }
 
+    // Test configuration constants
     private val messageCount = 1000
     private val concurrentRequests = 5
     private val limit = 100
@@ -68,12 +100,16 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
     private val cutoffDate = Instant.now().minus(7, ChronoUnit.DAYS)
 
     /**
-     * Creates a list of test messages with random data.
+     * Creates a batch of test messages with randomized properties.
+     * Each message has:
+     * - Random status (PENDING, SENT, or FAILED)
+     * - Random delay duration
+     * - Random attempt count
+     * - Sequential message content
      */
     @Transactional
     protected fun createMessages(count: Int): List<T> {
         val now = Instant.now()
-        // Create test messages in a transaction
         val messages = List(count) { i ->
             val duration = randomNonZero(1000).hours.toJavaDuration()
             val status = when (Random.nextInt(0, 2)) {
@@ -91,13 +127,13 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
             }
         }
         repository.persist(messages)
-
         return messages
     }
 
     /**
-     * Finds and locks messages ready to process.
-     * Updates the status of the messages to FAILED and persists them for not to be processed again.
+     * Finds and locks messages that are ready to be processed.
+     * After finding the messages, marks them as FAILED to prevent reprocessing.
+     * This simulates a real-world scenario where messages are processed and their status is updated.
      */
     @Transactional
     protected open fun findAndLockReadyToProcess(
@@ -111,8 +147,9 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
         }
 
     /**
-     * Finds and locks messages for deletion.
-     * Updates the status of the messages to FAILED and persists them for not to be processed again.
+     * Finds and locks messages that are ready to be deleted.
+     * After finding the messages, marks them as FAILED to prevent reprocessing.
+     * This simulates a real-world scenario where messages are deleted after processing.
      */
     @Transactional
     protected open fun findAndLockForDeletion(
@@ -125,33 +162,43 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
             repository.flush()
         }
 
+    /**
+     * Tests that findAndLockReadyToProcess returns the correct messages for processing.
+     * Verifies that the repository correctly identifies messages that are:
+     * - In PENDING status
+     * - Past their delay time
+     * - Within attempt limits
+     */
     @Test
-    fun `findAndLockReadyToProcess should return messages ready to process`() {
+    fun `findAndLockReadyToProcess should return all eligible pending messages that are ready for processing`() {
         val messages = createMessages(messageCount)
-
-        // test request
         val expected = findAndLockReadyToProcess()
         val actual = messages.filterToProcess()
         println("expected for processing: ${expected.size}")
         expected.equalTo(actual) shouldBe true
     }
 
+    /**
+     * Tests that findAndLockReadyToProcess respects the maxAttempts parameter.
+     * Verifies that messages exceeding the attempt limit are not returned.
+     */
     @Test
-    fun `findAndLockReadyToProcess should return messages ready to process with maxAttempts`() {
+    fun `findAndLockReadyToProcess should exclude messages that have exceeded maxAttempts`() {
         val messages = createMessages(messageCount)
-
-        // test request with max attempts
         val expected = findAndLockReadyToProcess(maxAttempts = maxAttempts)
         val actual = messages.filterToProcess(maxAttempts = maxAttempts)
         println("expected for processing with maxAttempts: ${expected.size}")
         expected.equalTo(actual) shouldBe true
     }
 
+    /**
+     * Tests that findAndLockReadyToProcess respects the limit parameter.
+     * Verifies that the number of returned messages does not exceed the limit
+     * and that all returned messages are valid candidates for processing.
+     */
     @Test
-    fun `findAndLockReadyToProcess should return messages ready to process with limit`() {
+    fun `findAndLockReadyToProcess should respect the limit parameter and only return valid candidates`() {
         val messages = createMessages(messageCount)
-
-        // test request with limit
         val actual = findAndLockReadyToProcess(limit = limit)
         val expected = messages.filterToProcess()
 
@@ -160,56 +207,66 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
         actual.filter { it.id !in expectedIds }.size shouldBe 0
     }
 
-
+    /**
+     * Tests that findAndLockForDeletion returns the correct messages for deletion.
+     * Verifies that the repository correctly identifies messages that are:
+     * - In SENT status
+     * - Past their cutoff date
+     */
     @Test
-    fun `findAndLockForDeletion should return messages ready for deletion`() {
+    fun `findAndLockForDeletion should return all sent messages that are past their cutoff date`() {
         val messages = createMessages(messageCount)
-
-        // test request
         val expected = messages.filterToDelete()
         val actual = findAndLockForDeletion()
         println("expected for deletion: ${expected.size}")
         expected.equalTo(actual) shouldBe true
     }
 
+    /**
+     * Tests that findAndLockForDeletion respects the cutoffDate parameter.
+     * Verifies that only messages older than the cutoff date are returned.
+     */
     @Test
-    fun `findAndLockForDeletion should return messages ready for deletion with cutoffDate`() {
+    fun `findAndLockForDeletion should only return messages older than the specified cutoff date`() {
         val messages = createMessages(messageCount)
-
-        // test request with cutoffDate
         val expected = messages.filterToDelete(cutoffDate = cutoffDate)
         val actual = findAndLockForDeletion(cutoffDate = cutoffDate)
         println("expected for deletion with cutoffDate: ${expected.size}")
         expected.equalTo(actual) shouldBe true
     }
 
+    /**
+     * Tests that findAndLockForDeletion respects the limit parameter.
+     * Verifies that the number of returned messages does not exceed the limit
+     * and that all returned messages are valid candidates for deletion.
+     */
     @Test
-    fun `findAndLockForDeletion should return messages ready for deletion with Limit`() {
+    fun `findAndLockForDeletion should respect the limit parameter and only return valid candidates`() {
         val messages = createMessages(messageCount)
-
-        // test request with limit
         val actual = findAndLockForDeletion(limit = limit)
         val expected = messages.filterToDelete()
 
-        // results should be limited to the limit
         actual.size shouldBeLessThanOrEqualTo limit
-
-        // results should be part of the expected
         val expectedIds = expected.map { it.id }
         actual.filter { it.id !in expectedIds }.size shouldBe 0
     }
 
+    /**
+     * Tests concurrent message processing to ensure thread safety.
+     * Verifies that:
+     * - No message is processed more than once
+     * - All eligible messages are eventually processed
+     * - The operation completes within a reasonable time
+     */
     @Test
-    fun `findAndLockReadyToProcess should not return same messages to concurrent requests`() {
+    fun `findAndLockReadyToProcess should handle concurrent requests without duplicate processing`() {
         val messages = createMessages(messageCount)
-
         val expectedProcessed = messages.filterToProcess(maxAttempts = maxAttempts).size
         println("expected processedMessages: $expectedProcessed")
 
-        // Submit concurrent requests
         val processedMessages = mutableListOf<T>()
         val executor = Executors.newFixedThreadPool(concurrentRequests)
-        val timeout = Instant.now().plus(5, ChronoUnit.SECONDS) // Set a 5-second timeout
+        val timeout = Instant.now().plus(5, ChronoUnit.SECONDS)
         do {
             val latch = CountDownLatch(concurrentRequests)
             repeat(concurrentRequests) {
@@ -228,25 +285,27 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
         } while (processedMessages.size != expectedProcessed && Instant.now().isBefore(timeout))
         executor.shutdown()
 
-        // Verify the results
         processedMessages.size shouldBe expectedProcessed
-        // Verify there is no duplicate
         val processIds = processedMessages.map { it.id }
         processIds.toSet().size shouldBe processIds.size
     }
 
+    /**
+     * Tests concurrent message deletion to ensure thread safety.
+     * Verifies that:
+     * - No message is deleted more than once
+     * - All eligible messages are eventually deleted
+     * - The operation completes within a reasonable time
+     */
     @Test
-    fun `findAndLockForDeletion should handle concurrent deletion requests`() = runTest {
-        // Create test messages
+    fun `findAndLockForDeletion should handle concurrent requests without duplicate deletion`() {
         val messages = createMessages(messageCount)
-
         val expectedDeleted = messages.filterToDelete(cutoffDate).size
         println("expected deletedMessages: $expectedDeleted")
 
-        // Submit concurrent requests
         val deletedMessages = mutableListOf<T>()
         val executor = Executors.newFixedThreadPool(concurrentRequests)
-        val timeout = Instant.now().plus(5, ChronoUnit.SECONDS) // Set a 5-second timeout
+        val timeout = Instant.now().plus(5, ChronoUnit.SECONDS)
         do {
             val latch = CountDownLatch(concurrentRequests)
             repeat(concurrentRequests) {
@@ -265,41 +324,42 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
         } while (deletedMessages.size != expectedDeleted && Instant.now().isBefore(timeout))
         executor.shutdown()
 
-        // Verify the results
         deletedMessages.size shouldBe expectedDeleted
-        // Verify there is no duplicate
         val processIds = deletedMessages.map { it.id }
         processIds.toSet().size shouldBe processIds.size
     }
 
+    /**
+     * Tests mixed concurrent operations (processing and deletion) to ensure thread safety.
+     * Verifies that:
+     * - No message is processed or deleted more than once
+     * - All eligible messages are eventually processed or deleted
+     * - No message is both processed and deleted
+     * - The operation completes within a reasonable time
+     */
     @Test
-    fun `should handle mixed concurrent operations`() {
-        // Create test messages
+    fun `should handle mixed concurrent processing and deletion operations without conflicts`() {
         val messages = createMessages(messageCount)
-
         val expectedProcessed = messages.filterToProcess(maxAttempts = maxAttempts).size
         val expectedDeleted = messages.filterToDelete(cutoffDate).size
         println("expected processedMessages: $expectedProcessed")
         println("expected deletedMessages: $expectedDeleted")
 
-        // When
         val processedMessages = mutableListOf<T>()
         val deletedMessages = mutableListOf<T>()
         val executor = Executors.newFixedThreadPool(concurrentRequests)
-        // Submit concurrent requests until all messages are processed and deleted
-        val timeout = Instant.now().plus(5, ChronoUnit.SECONDS) // Set a 5-second timeout
+        val timeout = Instant.now().plus(5, ChronoUnit.SECONDS)
         do {
             val latch = CountDownLatch(concurrentRequests)
             repeat(concurrentRequests) {
                 executor.submit {
                     try {
                         when (Random.nextInt(0, 2)) {
-                            // Process messages
                             0 -> {
                                 val results = findAndLockReadyToProcess(limit = limit, maxAttempts = maxAttempts)
                                 synchronized(processedMessages) { processedMessages.addAll(results) }
                             }
-                            // Delete messages
+
                             1 -> {
                                 val results = findAndLockForDeletion(cutoffDate, limit = limit)
                                 synchronized(deletedMessages) { deletedMessages.addAll(results) }
@@ -320,17 +380,13 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
         )
         executor.shutdown()
 
-        // Verify the results
         processedMessages.size shouldBe expectedProcessed
         deletedMessages.size shouldBe expectedDeleted
-        // Verify there is no duplicate
         val deletedIds = deletedMessages.map { it.id }
         deletedIds.toSet().size shouldBe deletedIds.size
-        // Verify there is no duplicate
         val processedIds = processedMessages.map { it.id }
         processedIds.toSet().size shouldBe processedIds.size
 
-        // Verify no overlap between processed and deleted messages
         Assertions.assertTrue(
             processedIds.toSet().intersect(deletedIds.toSet()).isEmpty(),
             "No message should be both processed and deleted",
