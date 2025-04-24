@@ -24,10 +24,10 @@ internal abstract class RetryOutboxTest : AbstractOutboxTest<RetryModel>() {
         get() = outbox.outboxProcessor
 
     override fun processOutbox() {
-        outbox.processOutbox()
+        outbox.outbox()
     }
 
     override fun cleanupOutbox() {
-        outbox.cleanupOutbox()
+        outbox.cleanup()
     }
 }

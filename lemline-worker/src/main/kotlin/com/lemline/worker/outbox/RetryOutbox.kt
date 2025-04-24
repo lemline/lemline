@@ -14,13 +14,30 @@ import jakarta.inject.Inject
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
+/**
+ * RetryOutbox is responsible for processing and managing retry messages in the system.
+ * It handles two main operations:
+ * 1. Processing pending retry messages and sending them to the workflow output channel
+ * 2. Cleaning up old sent messages to prevent database bloat
+ *
+ * The class uses a scheduled approach with configurable intervals for both operations.
+ * It ensures thread safety by using SKIP concurrent execution strategy, preventing
+ * multiple instances of the same operation from running simultaneously.
+ *
+ * Configuration is managed through LemlineConfiguration, allowing for flexible tuning of:
+ * - Processing batch size
+ * - Maximum retry attempts
+ * - Initial delay between retries
+ * - Cleanup retention period
+ *
+ * @see OutboxProcessor for the core message processing logic
+ * @see RetryConfig for configuration details
+ */
 @ApplicationScoped
 internal class RetryOutbox @Inject constructor(
     repository: RetryRepository,
     lemlineConfig: LemlineConfiguration,
-
-    @Channel("workflows-out")
-    val emitter: Emitter<String>,
+    @Channel("workflows-out") emitter: Emitter<String>,
 ) {
     private val logger = logger()
 
@@ -33,14 +50,23 @@ internal class RetryOutbox @Inject constructor(
     )
 
     /**
-     * Retry outbox processing
-     * Every {}, this method is called
-     * - select messages from the outbox table that are not yet sent
-     * - send them with the emitter
+     * Processes pending retry messages from the outbox table.
+     * This method is scheduled to run at configurable intervals.
+     *
+     * For each batch of messages:
+     * 1. Retrieves messages that are ready to process (status = PENDING)
+     * 2. Attempts to send each message using the emitter
+     * 3. Updates message status to SENT on success
+     * 4. Handles retries on failure with exponential backoff
+     *
+     * The operation is transactional and thread-safe, ensuring that:
+     * - Messages are processed exactly once
+     * - Failed messages are properly tracked and retried
+     * - Concurrent processing is prevented
      */
     @Scheduled(every = "{lemline.retry.outbox.every}", concurrentExecution = SKIP)
-    fun processOutbox() {
-        val outboxConf: OutboxConfig = retryConfig.outbox()
+    fun outbox() {
+        val outboxConf = retryConfig.outbox()
         outboxProcessor.process(
             outboxConf.batchSize(),
             outboxConf.maxAttempts(),
@@ -49,14 +75,23 @@ internal class RetryOutbox @Inject constructor(
     }
 
     /**
-     * Retry outbox cleanup
-     * Every {}, this method is called
-     * - select messages from the outbox table that are sent
-     * - delete them
+     * Cleans up old sent messages from the outbox table.
+     * This method is scheduled to run at configurable intervals.
+     *
+     * For each batch of messages:
+     * 1. Identifies messages that are:
+     *    - Marked as SENT
+     *    - Older than the configured retention period
+     * 2. Deletes these messages in batches to prevent database locks
+     *
+     * The operation is transactional and thread-safe, ensuring that:
+     * - Only sent messages are deleted
+     * - Cleanup doesn't interfere with active message processing
+     * - Database performance is maintained through batch processing
      */
     @Scheduled(every = "{lemline.retry.cleanup.every}", concurrentExecution = SKIP)
-    fun cleanupOutbox() {
-        val cleanupConf: CleanupConfig = retryConfig.cleanup()
+    fun cleanup() {
+        val cleanupConf = retryConfig.cleanup()
         outboxProcessor.cleanup(
             cleanupConf.after().toDays().toInt(),
             cleanupConf.batchSize(),

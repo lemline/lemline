@@ -11,6 +11,29 @@ import java.time.temporal.ChronoUnit
 import org.jetbrains.annotations.VisibleForTesting
 import org.slf4j.Logger
 
+/**
+ * OutboxProcessor is a generic processor for handling outbox pattern operations.
+ * It provides a reusable implementation for processing and managing messages in an outbox table,
+ * supporting both wait and retry scenarios.
+ *
+ * The processor implements the outbox pattern to ensure reliable message delivery by:
+ * 1. Storing messages in a database before attempting to send them
+ * 2. Processing messages in batches with configurable sizes
+ * 3. Implementing retry logic with exponential backoff
+ * 4. Cleaning up successfully processed messages
+ *
+ * Key features:
+ * - Thread-safe batch processing
+ * - Configurable retry strategies
+ * - Transactional message handling
+ * - Automatic cleanup of processed messages
+ * - Detailed logging and error tracking
+ *
+ * @param logger Logger instance for tracking operations
+ * @param repository Repository for accessing the outbox table
+ * @param processor Function that processes individual messages
+ * @param T Type of the message entity (must implement OutboxModel interface)
+ */
 internal class OutboxProcessor<T : OutboxModel>(
     private val logger: Logger,
     private val repository: OutboxRepository<T>,
@@ -34,27 +57,50 @@ internal class OutboxProcessor<T : OutboxModel>(
     }
 
     /**
-     * Processes messages in the outbox table in batches.
-     * Each message is processed by the provided processor function.
-     * If processing fails, the message is updated with the error and will be retried later.
-     * If processing succeeds, the message status is updated to SENT.
+     * Processes messages from the outbox table in batches.
+     * This method implements the core outbox pattern logic:
      *
-     * @param batchSize The number of messages to process in each batch.
-     * @param retryMaxAttempts The maximum number of retry attempts for each message.
-     * @param retryInitialDelaySeconds The initial delay in seconds for retrying failed messages.
+     * 1. Retrieves a batch of pending messages
+     * 2. For each message:
+     *    - Attempts to process it using the provided processor
+     *    - On success, marks the message as sent
+     *    - On failure, implements retry logic with exponential backoff
+     * 3. Handles concurrent processing safely
+     *
+     * The method uses exponential backoff for retries:
+     * - Initial delay is configurable
+     * - Each retry doubles the previous delay
+     * - Maximum retry attempts are configurable
+     *
+     * Transaction Type: REQUIRES_NEW
+     * - Creates a new transaction for each batch of messages
+     * - Ensures that message processing is isolated from any existing transaction
+     * - If the processor fails, only the current batch is rolled back
+     * - Prevents long-running transactions that could block other operations
+     * - Allows for independent retry of failed messages
+     *
+     * @param batchSize Maximum number of messages to process in one batch
+     * @param maxAttempts Maximum number of retry attempts before giving up
+     * @param initialDelay Initial delay in seconds before first retry
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    fun process(batchSize: Int, retryMaxAttempts: Int, retryInitialDelaySeconds: Int) {
+    fun process(batchSize: Int, maxAttempts: Int, initialDelay: Int) {
         try {
             var totalProcessed = 0
             var batchNumber = 0
+            var consecutiveEmptyBatches = 0
+            val maxConsecutiveEmptyBatches = 3 // Prevent infinite loops
 
-            while (true) {
+            while (consecutiveEmptyBatches < maxConsecutiveEmptyBatches) {
                 // Find and lock messages ready to process
-                val messages = repository.findAndLockReadyToProcess(batchSize, retryMaxAttempts)
+                val messages = repository.findAndLockReadyToProcess(batchSize, maxAttempts)
 
-                if (messages.isEmpty()) break
+                if (messages.isEmpty()) {
+                    consecutiveEmptyBatches++
+                    continue
+                }
 
+                consecutiveEmptyBatches = 0
                 batchNumber++
                 logger.debug { "Processing batch $batchNumber with ${messages.size} messages" }
 
@@ -73,13 +119,13 @@ internal class OutboxProcessor<T : OutboxModel>(
                         message.attemptCount++
                         message.lastError = e.message ?: "Unknown error"
 
-                        if (message.attemptCount >= retryMaxAttempts) {
+                        if (message.attemptCount >= maxAttempts) {
                             message.status = OutBoxStatus.FAILED
                             logger.error { "Message ${message.id} has reached maximum retry attempts" }
                         } else {
                             // Calculate next retry time using exponential backoff
                             val nextDelay =
-                                calculateNextRetryDelay(message.attemptCount, retryInitialDelaySeconds * 1000)
+                                calculateNextRetryDelay(message.attemptCount, initialDelay * 1000)
                             message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.MILLIS)
                             logger.debug {
                                 "Message ${message.id} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})"
@@ -100,25 +146,45 @@ internal class OutboxProcessor<T : OutboxModel>(
     }
 
     /**
-     * Cleans up old messages from the outbox table that are older than the specified number of days.
-     * Messages are deleted in chunks to avoid locking the entire table.
+     * Cleans up old sent messages from the outbox table.
+     * This method helps prevent database bloat by removing messages that:
+     * 1. Have been successfully processed (status = SENT)
+     * 2. Are older than the specified retention period
      *
-     * @param cleanupAfterDays The number of days after which messages should be cleaned up.
-     * @param cleanupBatchSize The number of messages to delete in each batch.
+     * The cleanup is performed in batches to:
+     * - Prevent long-running transactions
+     * - Avoid database locks
+     * - Maintain system performance
+     *
+     * Transaction Type: REQUIRES_NEW
+     * - Creates a new transaction for each cleanup batch
+     * - Ensures cleanup operations are isolated from other transactions
+     * - If cleanup fails, only the current batch is rolled back
+     * - Prevents long-running transactions during cleanup
+     * - Allows for independent retry of failed cleanup operations
+     *
+     * @param afterDays Number of days after which sent messages should be deleted
+     * @param batchSize Maximum number of messages to delete in one batch
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    fun cleanup(cleanupAfterDays: Int, cleanupBatchSize: Int) {
+    fun cleanup(afterDays: Int, batchSize: Int) {
         try {
-            val cutoffDate = Instant.now().minusSeconds(cleanupAfterDays * 24 * 60 * 60L)
+            val cutoffDate = Instant.now().minusSeconds(afterDays * 24 * 60 * 60L)
             var totalDeleted = 0
             var chunkNumber = 0
+            var consecutiveEmptyChunks = 0
+            val maxConsecutiveEmptyChunks = 3 // Prevent infinite loops
 
-            while (true) {
+            while (consecutiveEmptyChunks < maxConsecutiveEmptyChunks) {
                 // Find and lock a chunk of messages for deletion
-                val messagesToDelete = repository.findAndLockForDeletion(cutoffDate, cleanupBatchSize)
+                val messagesToDelete = repository.findAndLockReadyToDelete(cutoffDate, batchSize)
 
-                if (messagesToDelete.isEmpty()) break
+                if (messagesToDelete.isEmpty()) {
+                    consecutiveEmptyChunks++
+                    continue
+                }
 
+                consecutiveEmptyChunks = 0
                 chunkNumber++
                 val chunkDeleted = messagesToDelete.size
 

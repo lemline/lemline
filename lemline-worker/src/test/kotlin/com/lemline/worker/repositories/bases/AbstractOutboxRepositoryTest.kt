@@ -155,7 +155,7 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
     protected open fun findAndLockForDeletion(
         cutoffDate: Instant = Instant.now(),
         limit: Int = Int.MAX_VALUE
-    ): List<T> = repository.findAndLockForDeletion(cutoffDate = cutoffDate, limit = limit)
+    ): List<T> = repository.findAndLockReadyToDelete(cutoffDate = cutoffDate, limit = limit)
         .also { messages ->
             messages.forEach { it.status = OutBoxStatus.FAILED }
             repository.persist(messages)
