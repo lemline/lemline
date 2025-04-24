@@ -6,9 +6,9 @@ import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.doubles.shouldBeLessThanOrEqual
 import io.kotest.matchers.shouldBe
 import io.mockk.mockk
-import org.slf4j.Logger
 import java.time.Instant
 import kotlin.math.absoluteValue
+import org.slf4j.Logger
 
 internal class OutboxProcessorTest :
     FunSpec({
@@ -52,10 +52,10 @@ internal class OutboxProcessorTest :
     })
 
 internal data class TestMessage(
-    override var id: String?,
+    override var id: String,
     override var message: String,
     override var status: OutBoxStatus,
     override var attemptCount: Int,
     override var lastError: String?,
     override var delayedUntil: Instant,
-) : OutboxMessage
+) : OutboxModel()

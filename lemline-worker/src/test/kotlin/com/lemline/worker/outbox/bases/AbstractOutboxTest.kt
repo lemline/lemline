@@ -5,7 +5,7 @@ import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.worker.messaging.WorkflowMessage
 import com.lemline.worker.outbox.OutBoxStatus
-import com.lemline.worker.outbox.OutboxMessage
+import com.lemline.worker.outbox.OutboxModel
 import com.lemline.worker.outbox.OutboxProcessor
 import com.lemline.worker.outbox.OutboxRepository
 import io.mockk.clearMocks
@@ -34,12 +34,12 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @Tag("integration")
-internal abstract class AbstractOutboxTest<T> where T : OutboxMessage {
+internal abstract class AbstractOutboxTest<T> where T : OutboxModel {
 
     @Inject
     protected lateinit var entityManager: EntityManager
 
-    protected val emitter = mockk<Emitter<String>>()
+    protected val emitter: Emitter<String> = mockk<Emitter<String>>()
 
     /**
      * Entity class name to use for cleanup queries
@@ -189,7 +189,7 @@ internal abstract class AbstractOutboxTest<T> where T : OutboxMessage {
         processOutbox()
 
         // Then
-        // Verify message was marked as failed
+        // Verify that the message was marked as failed
         val updatedMessage = findModel(message.id)
         assertEquals(OutBoxStatus.FAILED, updatedMessage.status)
         assertEquals(maxAttempts, updatedMessage.attemptCount)

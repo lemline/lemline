@@ -6,34 +6,12 @@ import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.warn
 import jakarta.transaction.Transactional
-import org.jetbrains.annotations.VisibleForTesting
-import org.slf4j.Logger
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import org.jetbrains.annotations.VisibleForTesting
+import org.slf4j.Logger
 
-enum class OutBoxStatus {
-    PENDING,
-    SENT,
-    FAILED,
-}
-
-interface OutboxMessage {
-    var id: String?
-    var message: String
-    var status: OutBoxStatus
-    var attemptCount: Int
-    var lastError: String?
-    var delayedUntil: Instant
-}
-
-interface OutboxRepository<T : OutboxMessage> {
-    fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int): List<T>
-    fun findAndLockForDeletion(cutoffDate: Instant, limit: Int): List<T>
-    fun delete(entity: T)
-    fun count(query: String, vararg params: Any?): Long
-}
-
-class OutboxProcessor<T : OutboxMessage>(
+internal class OutboxProcessor<T : OutboxModel>(
     private val logger: Logger,
     private val repository: OutboxRepository<T>,
     private val processor: (T) -> Unit,
@@ -55,6 +33,16 @@ class OutboxProcessor<T : OutboxMessage>(
         return (baseDelay + jitter).toLong().coerceAtLeast(100) // Ensure we never return less than .1 second (100ms)
     }
 
+    /**
+     * Processes messages in the outbox table in batches.
+     * Each message is processed by the provided processor function.
+     * If processing fails, the message is updated with the error and will be retried later.
+     * If processing succeeds, the message status is updated to SENT.
+     *
+     * @param batchSize The number of messages to process in each batch.
+     * @param retryMaxAttempts The maximum number of retry attempts for each message.
+     * @param retryInitialDelaySeconds The initial delay in seconds for retrying failed messages.
+     */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     fun process(batchSize: Int, retryMaxAttempts: Int, retryInitialDelaySeconds: Int) {
         try {
@@ -111,6 +99,13 @@ class OutboxProcessor<T : OutboxMessage>(
         }
     }
 
+    /**
+     * Cleans up old messages from the outbox table that are older than the specified number of days.
+     * Messages are deleted in chunks to avoid locking the entire table.
+     *
+     * @param cleanupAfterDays The number of days after which messages should be cleaned up.
+     * @param cleanupBatchSize The number of messages to delete in each batch.
+     */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     fun cleanup(cleanupAfterDays: Int, cleanupBatchSize: Int) {
         try {

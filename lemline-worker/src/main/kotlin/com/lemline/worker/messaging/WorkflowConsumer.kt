@@ -151,7 +151,7 @@ open class WorkflowConsumer(
                 delayedUntil = Instant.now(),
                 lastError = e,
                 status = OutBoxStatus.FAILED,
-            ),
+            )
         )
         // for testing, set the CompletableFuture to failed
         processingMessages.remove(this)?.completeExceptionally(e)

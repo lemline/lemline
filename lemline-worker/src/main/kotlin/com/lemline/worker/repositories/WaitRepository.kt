@@ -19,19 +19,6 @@ class WaitRepository :
         wait.persist()
     }
 
-    override fun delete(entity: WaitModel) {
-        super.delete(entity)
-    }
-
-    override fun count(query: String, vararg params: Any?): Long = getEntityManager()
-        .createQuery("SELECT COUNT(w) FROM WaitModel w WHERE $query", Long::class.java)
-        .apply {
-            params.forEachIndexed { index, param ->
-                setParameter(index + 1, param)
-            }
-        }
-        .singleResult
-
     @Suppress("UNCHECKED_CAST")
     override fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) = getEntityManager()
         .createNativeQuery(

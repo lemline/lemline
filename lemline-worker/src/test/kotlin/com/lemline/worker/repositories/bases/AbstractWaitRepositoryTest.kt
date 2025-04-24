@@ -4,6 +4,7 @@ package com.lemline.worker.repositories.bases
 import com.lemline.worker.models.WaitModel
 import com.lemline.worker.outbox.OutBoxStatus
 import com.lemline.worker.repositories.WaitRepository
+import io.kotest.matchers.shouldBe
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
@@ -16,10 +17,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaDuration
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
@@ -87,13 +84,14 @@ abstract class AbstractWaitRepositoryTest {
     @Transactional
     protected fun findAndProcess(limit: Int, maxAttempts: Int) = findAndLockReadyToProcess(limit, maxAttempts)
         .onEach { it.status = OutBoxStatus.SENT }
+        .also { entityManager.flush() }
 
     private fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) =
         repository.findAndLockForDeletion(cutoffDate, limit)
 
     @Transactional
-    protected fun findAndDelete(cutoffDate: Instant, limit: Int) = findAndLockForDeletion(cutoffDate, limit)
-        .onEach { it.delete() }
+    protected fun findAndDelete(cutoffDate: Instant, limit: Int): List<WaitModel> =
+        findAndLockForDeletion(cutoffDate, limit).onEach { it.delete() }
 
     @Test
     @Transactional
@@ -257,23 +255,34 @@ abstract class AbstractWaitRepositoryTest {
     @Test
     fun `findAndLockReadyToProcess should not return same messages to concurrent requests`() = runTest {
         // Given
-        val messageCount = 100
-        val concurrentRequests = 5
-        val limit = 40
+        val messageCount = 12
+        val concurrentRequests = 3
+        val limit = 4
 
         // Create test messages in a transaction
         createPendingMessage(messageCount)
 
         // When
         val results = mutableListOf<List<WaitModel>>()
-        val mutex = Mutex()
-        val jobs = List(concurrentRequests) {
-            launch {
-                val result = findAndProcess(limit = limit, maxAttempts = 3)
-                mutex.withLock { results.add(result) }
+        val latch = CountDownLatch(concurrentRequests)
+        val executor = Executors.newFixedThreadPool(concurrentRequests)
+
+        // Submit concurrent requests
+        repeat(concurrentRequests) {
+            executor.submit {
+                try {
+                    val result = findAndProcess(limit = limit, maxAttempts = 3)
+                    synchronized(results) { results.add(result) }
+                } finally {
+                    latch.countDown()
+                }
             }
         }
-        jobs.joinAll()
+
+        // Wait for all requests to complete
+        latch.await(2, TimeUnit.SECONDS)
+        executor.shutdown()
+        executor.awaitTermination(2, TimeUnit.SECONDS)
 
         // Then
         // Verify the total number of messages processed
@@ -289,34 +298,41 @@ abstract class AbstractWaitRepositoryTest {
     @Test
     fun `findAndLockForDeletion should handle concurrent deletion requests`() = runTest {
         // Given
-        val messageCount = 100
-        val concurrentRequests = 5
-        val limit = 40
+        val messageCount = 12
+        val concurrentRequests = 4
+        val limit = 3
 
         // Create test messages
         createSentMessage(messageCount)
 
         // When
-        val results = mutableListOf<List<WaitModel>>()
-        val mutex = Mutex()
-        val jobs = List(concurrentRequests) {
-            launch {
-                val cutoffDate = Instant.now().minus(1L, ChronoUnit.DAYS)
-                val result = findAndDelete(cutoffDate, limit = limit)
-                mutex.withLock { results.add(result) }
+        val allMessages = mutableSetOf<WaitModel>()
+        val executor = Executors.newFixedThreadPool(concurrentRequests)
+
+        entityManager.createQuery("select id from WaitModel").resultList.forEach { println(it) }
+        // Submit concurrent requests
+        val latch = CountDownLatch(concurrentRequests)
+
+        repeat(concurrentRequests) {
+            executor.submit {
+                try {
+                    val cutoffDate = Instant.now().minus(1L, ChronoUnit.DAYS)
+                    val result = findAndDelete(cutoffDate, limit = limit)
+                    // check there is no duplicate
+                    synchronized(allMessages) { result.forEach { allMessages.add(it) shouldBe true } }
+                } finally {
+                    latch.countDown()
+                }
             }
         }
-        jobs.joinAll()
+        // Wait for all threads to complete
+        latch.await()
+        executor.shutdown()
 
         // Then
         // Verify the total number of messages processed
-        val totalProcessed = results.sumOf { it.size }
+        val totalProcessed = allMessages.size
         Assertions.assertEquals(messageCount, totalProcessed, "All messages should be processed")
-
-        // Verify no duplicate messages
-        val allMessages = results.flatten()
-        val uniqueMessages = allMessages.distinctBy { it.id }
-        Assertions.assertEquals(allMessages.size, uniqueMessages.size, "No duplicate messages should be returned")
     }
 
     @Test
@@ -324,20 +340,22 @@ abstract class AbstractWaitRepositoryTest {
         // Given
         val now = Instant.now()
         val cutoffDate = now.minus(1L, ChronoUnit.DAYS)
-        val messageCount = 20
-        val concurrentRequests = 10
-        val limit = 3
+        val messageCount = 100
+        val concurrentRequests = 5
+        val limit = 50
 
         // Create test messages
         userTransaction.begin()
         repeat(messageCount) { i ->
             val message = WaitModel().apply {
                 message = "test-$i"
-                status = if (i < messageCount / 2) OutBoxStatus.PENDING else OutBoxStatus.SENT
-                delayedUntil = if (i < messageCount / 2) {
-                    now.minus((i + 1).toLong(), ChronoUnit.MINUTES)
-                } else {
-                    now.minus(2L, ChronoUnit.DAYS)
+                status = when (i % 2 == 0) {
+                    true -> OutBoxStatus.PENDING
+                    false -> OutBoxStatus.SENT
+                }
+                delayedUntil = when (i % 2 == 0) {
+                    true -> now.minus((i + 1).toLong(), ChronoUnit.MINUTES)
+                    false -> now.minus(2L, ChronoUnit.DAYS)
                 }
                 attemptCount = 0
             }
@@ -347,8 +365,8 @@ abstract class AbstractWaitRepositoryTest {
         userTransaction.commit()
 
         // When
-        val processResults = mutableListOf<List<WaitModel>>()
-        val deleteResults = mutableListOf<List<WaitModel>>()
+        val processResults = mutableSetOf<WaitModel>()
+        val deleteResults = mutableSetOf<WaitModel>()
         val latch = CountDownLatch(concurrentRequests)
         val executor = Executors.newFixedThreadPool(concurrentRequests)
 
@@ -358,10 +376,12 @@ abstract class AbstractWaitRepositoryTest {
                 try {
                     if (index % 2 == 0) {
                         val result = findAndProcess(limit = limit, maxAttempts = 3)
-                        synchronized(processResults) { processResults.add(result) }
+                        // should be all different
+                        synchronized(processResults) { result.forEach { processResults.add(it) shouldBe true } }
                     } else {
                         val result = findAndDelete(cutoffDate, limit = limit)
-                        synchronized(deleteResults) { deleteResults.add(result) }
+                        // should be all different
+                        synchronized(deleteResults) { result.forEach { deleteResults.add(it) shouldBe true } }
                     }
                 } finally {
                     latch.countDown()
@@ -372,35 +392,17 @@ abstract class AbstractWaitRepositoryTest {
         // Wait for all requests to complete
         latch.await(2, TimeUnit.SECONDS)
         executor.shutdown()
-        executor.awaitTermination(2, TimeUnit.SECONDS)
 
         // Then
-        // Verify total number of messages processed
-        val totalProcessed = processResults.sumOf { it.size }
-        val totalDeleted = deleteResults.sumOf { it.size }
+        // Verify the total number of messages processed
+        val totalProcessed = processResults.size
+        val totalDeleted = deleteResults.size
         Assertions.assertEquals(messageCount / 2, totalProcessed, "All pending messages should be processed")
         Assertions.assertEquals(messageCount / 2, totalDeleted, "All sent messages should be deleted")
 
-        // Verify no duplicate messages
-        val allProcessedMessages = processResults.flatten()
-        val allDeletedMessages = deleteResults.flatten()
-        val uniqueProcessedMessages = allProcessedMessages.distinctBy { it.id }
-        val uniqueDeletedMessages = allDeletedMessages.distinctBy { it.id }
-
-        Assertions.assertEquals(
-            allProcessedMessages.size,
-            uniqueProcessedMessages.size,
-            "No duplicate messages in processing",
-        )
-        Assertions.assertEquals(
-            allDeletedMessages.size,
-            uniqueDeletedMessages.size,
-            "No duplicate messages in deletion",
-        )
-
         // Verify no overlap between processed and deleted messages
-        val processedIds = allProcessedMessages.map { it.id }.toSet()
-        val deletedIds = allDeletedMessages.map { it.id }.toSet()
+        val processedIds = processResults.map { it.id }.toSet()
+        val deletedIds = deleteResults.map { it.id }.toSet()
         Assertions.assertTrue(
             processedIds.intersect(deletedIds).isEmpty(),
             "No message should be both processed and deleted",

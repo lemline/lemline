@@ -2,12 +2,17 @@
 package com.lemline.worker.models
 
 import com.lemline.worker.outbox.OutBoxStatus
-import com.lemline.worker.outbox.OutboxMessage
-import com.lemline.worker.repositories.UuidV7Entity
-import jakarta.persistence.*
+import com.lemline.worker.outbox.OutboxModel
+import jakarta.persistence.Column
+import jakarta.persistence.Entity
+import jakarta.persistence.EnumType
+import jakarta.persistence.Enumerated
+import jakarta.persistence.Index
+import jakarta.persistence.Table
+import jakarta.persistence.Version
+import java.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import java.time.Instant
 
 const val WAIT_TABLE = "waits"
 
@@ -18,9 +23,7 @@ const val WAIT_TABLE = "waits"
     indexes = [Index(name = "idx_wait_ready", columnList = "status, delayed_until, attempt_count")],
 )
 @Serializable
-class WaitModel :
-    UuidV7Entity(),
-    OutboxMessage {
+class WaitModel : OutboxModel() {
 
     @Column(nullable = false, columnDefinition = "TEXT")
     override lateinit var message: String

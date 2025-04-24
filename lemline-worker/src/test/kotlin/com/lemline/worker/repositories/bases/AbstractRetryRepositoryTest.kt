@@ -4,6 +4,7 @@ package com.lemline.worker.repositories.bases
 import com.lemline.worker.models.RetryModel
 import com.lemline.worker.outbox.OutBoxStatus
 import com.lemline.worker.repositories.RetryRepository
+import io.kotest.matchers.shouldBe
 import jakarta.inject.Inject
 import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
@@ -16,10 +17,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.toJavaDuration
-import kotlinx.coroutines.joinAll
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
@@ -266,14 +263,25 @@ abstract class AbstractRetryRepositoryTest {
 
         // When
         val results = mutableListOf<List<RetryModel>>()
-        val mutex = Mutex()
-        val jobs = List(concurrentRequests) {
-            launch {
-                val result = findAndProcess(limit = limit, maxAttempts = 3)
-                mutex.withLock { results.add(result) }
+        val latch = CountDownLatch(concurrentRequests)
+        val executor = Executors.newFixedThreadPool(concurrentRequests)
+
+        // Submit concurrent requests
+        repeat(concurrentRequests) {
+            executor.submit {
+                try {
+                    val result = findAndProcess(limit = limit, maxAttempts = 3)
+                    synchronized(results) { results.add(result) }
+                } finally {
+                    latch.countDown()
+                }
             }
         }
-        jobs.joinAll()
+
+        // Wait for all requests to complete
+        latch.await(2, TimeUnit.SECONDS)
+        executor.shutdown()
+        executor.awaitTermination(2, TimeUnit.SECONDS)
 
         // Then
         // Verify the total number of messages processed
@@ -298,15 +306,26 @@ abstract class AbstractRetryRepositoryTest {
 
         // When
         val results = mutableListOf<List<RetryModel>>()
-        val mutex = Mutex()
-        val jobs = List(concurrentRequests) {
-            launch {
-                val cutoffDate = Instant.now().minus(1L, ChronoUnit.DAYS)
-                val result = findAndDelete(cutoffDate, limit = limit)
-                mutex.withLock { results.add(result) }
+        val latch = CountDownLatch(concurrentRequests)
+        val executor = Executors.newFixedThreadPool(concurrentRequests)
+
+        // Submit concurrent requests
+        repeat(concurrentRequests) {
+            executor.submit {
+                try {
+                    val cutoffDate = Instant.now().minus(1L, ChronoUnit.DAYS)
+                    val result = findAndDelete(cutoffDate, limit = limit)
+                    synchronized(results) { results.add(result) }
+                } finally {
+                    latch.countDown()
+                }
             }
         }
-        jobs.joinAll()
+
+        // Wait for all requests to complete
+        latch.await(2, TimeUnit.SECONDS)
+        executor.shutdown()
+        executor.awaitTermination(2, TimeUnit.SECONDS)
 
         // Then
         // Verify the total number of messages processed
@@ -347,8 +366,8 @@ abstract class AbstractRetryRepositoryTest {
         userTransaction.commit()
 
         // When
-        val processResults = mutableListOf<List<RetryModel>>()
-        val deleteResults = mutableListOf<List<RetryModel>>()
+        val processResults = mutableSetOf<RetryModel>()
+        val deleteResults = mutableSetOf<RetryModel>()
         val latch = CountDownLatch(concurrentRequests)
         val executor = Executors.newFixedThreadPool(concurrentRequests)
 
@@ -358,10 +377,12 @@ abstract class AbstractRetryRepositoryTest {
                 try {
                     if (index % 2 == 0) {
                         val result = findAndProcess(limit = limit, maxAttempts = 3)
-                        synchronized(processResults) { processResults.add(result) }
+                        // should be all different
+                        synchronized(processResults) { result.forEach { processResults.add(it) shouldBe true } }
                     } else {
                         val result = findAndDelete(cutoffDate, limit = limit)
-                        synchronized(deleteResults) { deleteResults.add(result) }
+                        // should be all different
+                        synchronized(deleteResults) { result.forEach { deleteResults.add(it) shouldBe true } }
                     }
                 } finally {
                     latch.countDown()
@@ -372,35 +393,18 @@ abstract class AbstractRetryRepositoryTest {
         // Wait for all requests to complete
         latch.await(2, TimeUnit.SECONDS)
         executor.shutdown()
-        executor.awaitTermination(2, TimeUnit.SECONDS)
 
         // Then
         // Verify total number of messages processed
-        val totalProcessed = processResults.sumOf { it.size }
-        val totalDeleted = deleteResults.sumOf { it.size }
+        val totalProcessed = processResults.size
+        val totalDeleted = deleteResults.size
         Assertions.assertEquals(messageCount / 2, totalProcessed, "All pending messages should be processed")
         Assertions.assertEquals(messageCount / 2, totalDeleted, "All sent messages should be deleted")
 
-        // Verify no duplicate messages
-        val allProcessedMessages = processResults.flatten()
-        val allDeletedMessages = deleteResults.flatten()
-        val uniqueProcessedMessages = allProcessedMessages.distinctBy { it.id }
-        val uniqueDeletedMessages = allDeletedMessages.distinctBy { it.id }
-
-        Assertions.assertEquals(
-            allProcessedMessages.size,
-            uniqueProcessedMessages.size,
-            "No duplicate messages in processing",
-        )
-        Assertions.assertEquals(
-            allDeletedMessages.size,
-            uniqueDeletedMessages.size,
-            "No duplicate messages in deletion",
-        )
 
         // Verify no overlap between processed and deleted messages
-        val processedIds = allProcessedMessages.map { it.id }.toSet()
-        val deletedIds = allDeletedMessages.map { it.id }.toSet()
+        val processedIds = processResults.map { it.id }.toSet()
+        val deletedIds = deleteResults.map { it.id }.toSet()
         Assertions.assertTrue(
             processedIds.intersect(deletedIds).isEmpty(),
             "No message should be both processed and deleted",

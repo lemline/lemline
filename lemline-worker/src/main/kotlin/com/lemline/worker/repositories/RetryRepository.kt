@@ -10,27 +10,12 @@ import jakarta.transaction.Transactional
 import java.time.Instant
 
 @ApplicationScoped
-class RetryRepository :
-    UuidV7Repository<RetryModel>,
-    OutboxRepository<RetryModel> {
+class RetryRepository : OutboxRepository<RetryModel> {
 
     @Transactional
     fun save(retry: RetryModel) {
         retry.persist()
     }
-
-    override fun delete(entity: RetryModel) {
-        super.delete(entity)
-    }
-
-    override fun count(query: String, vararg params: Any?): Long = getEntityManager()
-        .createQuery("SELECT COUNT(r) FROM RetryModel r WHERE $query", Long::class.java)
-        .apply {
-            params.forEachIndexed { index, param ->
-                setParameter(index + 1, param)
-            }
-        }
-        .singleResult
 
     @Suppress("UNCHECKED_CAST")
     override fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) = getEntityManager()

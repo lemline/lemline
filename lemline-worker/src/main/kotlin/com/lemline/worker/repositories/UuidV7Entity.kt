@@ -15,7 +15,7 @@ abstract class UuidV7Entity : PanacheEntityBase {
     @GeneratedValue(generator = "uuid7")
     @GenericGenerator(name = "uuid7", strategy = "com.lemline.worker.repositories.TimeOrderedUuidGenerator")
     @Column(name = "id", length = 36)
-    var id: String? = null
+    lateinit var id: String
 }
 
 internal interface UuidV7Repository<T : UuidV7Entity> : PanacheRepositoryBase<T, String>
