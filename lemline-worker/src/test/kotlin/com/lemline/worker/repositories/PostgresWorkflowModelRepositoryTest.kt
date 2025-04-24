@@ -13,4 +13,4 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(PostgresProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class PostgresWorkflowModelRepositoryTest : AbstractWorkflowModelRepositoryTest()
+internal class PostgresWorkflowModelRepositoryTest : AbstractWorkflowModelRepositoryTest()

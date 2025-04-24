@@ -6,6 +6,8 @@ import com.lemline.worker.models.RetryModel
 import com.lemline.worker.outbox.OutBoxStatus
 import com.lemline.worker.outbox.OutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
+import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
 import java.time.Instant
 
@@ -17,8 +19,12 @@ class RetryRepository : OutboxRepository<RetryModel> {
         retry.persist()
     }
 
+    @Inject
+    private lateinit var entityManager: EntityManager
+
     @Suppress("UNCHECKED_CAST")
-    override fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) = getEntityManager()
+    @Transactional
+    override fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) = entityManager
         .createNativeQuery(
             """
             SELECT * FROM $RETRY_TABLE
@@ -38,7 +44,8 @@ class RetryRepository : OutboxRepository<RetryModel> {
         .resultList as List<RetryModel>
 
     @Suppress("UNCHECKED_CAST")
-    override fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) = getEntityManager()
+    @Transactional
+    override fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) = entityManager
         .createNativeQuery(
             """
             SELECT * FROM $RETRY_TABLE

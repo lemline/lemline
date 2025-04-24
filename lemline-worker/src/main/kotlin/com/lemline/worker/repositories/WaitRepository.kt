@@ -6,21 +6,25 @@ import com.lemline.worker.models.WaitModel
 import com.lemline.worker.outbox.OutBoxStatus
 import com.lemline.worker.outbox.OutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
+import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
 import java.time.Instant
 
 @ApplicationScoped
-class WaitRepository :
-    UuidV7Repository<WaitModel>,
-    OutboxRepository<WaitModel> {
+class WaitRepository : OutboxRepository<WaitModel> {
 
     @Transactional
     fun save(wait: WaitModel) {
         wait.persist()
     }
 
+    @Inject
+    private lateinit var entityManager: EntityManager
+
     @Suppress("UNCHECKED_CAST")
-    override fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) = getEntityManager()
+    @Transactional
+    override fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int) = entityManager
         .createNativeQuery(
             """
             SELECT * FROM $WAIT_TABLE
@@ -40,7 +44,8 @@ class WaitRepository :
         .resultList as List<WaitModel>
 
     @Suppress("UNCHECKED_CAST")
-    override fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) = getEntityManager()
+    @Transactional
+    override fun findAndLockForDeletion(cutoffDate: Instant, limit: Int) = entityManager
         .createNativeQuery(
             """
             SELECT * FROM $WAIT_TABLE

@@ -26,7 +26,7 @@ abstract class AbstractWorkflowModelRepositoryTest {
     @Transactional
     fun setupTest() {
         // Clear the database before each test
-        entityManager.createQuery("DELETE FROM WorkflowModel").executeUpdate()
+        repository.deleteAll()
     }
 
     @Test

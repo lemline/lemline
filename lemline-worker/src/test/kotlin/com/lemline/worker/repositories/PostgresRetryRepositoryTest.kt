@@ -13,4 +13,4 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(PostgresProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class PostgresRetryRepositoryTest : AbstractRetryRepositoryTest()
+internal class PostgresRetryRepositoryTest : AbstractRetryRepositoryTest()

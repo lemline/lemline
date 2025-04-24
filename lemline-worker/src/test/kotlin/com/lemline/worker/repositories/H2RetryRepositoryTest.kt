@@ -13,4 +13,4 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(H2KafkaProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class H2RetryRepositoryTest : AbstractRetryRepositoryTest()
+internal class H2RetryRepositoryTest : AbstractRetryRepositoryTest()

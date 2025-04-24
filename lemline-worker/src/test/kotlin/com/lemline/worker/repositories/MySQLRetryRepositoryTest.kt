@@ -13,4 +13,4 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(MySQLProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class MySQLRetryRepositoryTest : AbstractRetryRepositoryTest()
+internal class MySQLRetryRepositoryTest : AbstractRetryRepositoryTest()

@@ -13,4 +13,4 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(H2Profile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-class H2WaitRepositoryTest : AbstractWaitRepositoryTest()
+internal class H2WaitRepositoryTest : AbstractWaitRepositoryTest()
