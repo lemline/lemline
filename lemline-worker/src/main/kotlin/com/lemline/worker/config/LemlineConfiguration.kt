@@ -72,9 +72,9 @@ interface DatabaseConfig {
 
     /**
      * Whether to run database migrations at startup
-     * Default: true
+     * Default: false
      */
-    @WithDefault("true")
+    @WithDefault("false")
     fun migrateAtStart(): Boolean
 
     /**
@@ -111,7 +111,7 @@ interface DatabaseConfig {
 }
 
 /**
- * PostgreSQL-specific configuration.
+ * PostgresSQL-specific configuration.
  * Required when database.type is "postgresql".
  */
 @ConfigMapping(prefix = "lemline.database.postgresql")

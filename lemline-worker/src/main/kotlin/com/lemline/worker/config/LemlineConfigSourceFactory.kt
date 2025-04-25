@@ -149,7 +149,11 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
             false -> listOf(
                 // Create a ConfigSource with the generated properties and a specific ordinal
-                PropertiesConfigSource(generatedProps, LemlineConfigConstants.CONFIG_SOURCE_NAME, LemlineConfigConstants.CONFIG_ORDINAL)
+                PropertiesConfigSource(
+                    generatedProps,
+                    LemlineConfigConstants.CONFIG_SOURCE_NAME,
+                    LemlineConfigConstants.CONFIG_ORDINAL
+                )
             ).also {
                 log.debug {
                     "Generated properties:\n${
@@ -247,14 +251,13 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         val pgHost = requireProp("$prefix.host", lemlineProps)
         val pgPort = requireProp("$prefix.port", lemlineProps)
         val pgDbName = requireProp("$prefix.name", lemlineProps)
-
         // Validate port number
         validatePort(pgPort.toInt())
-
+        // set values
+        props["quarkus.flyway.locations"] = "classpath:db/migration/postgresql"
         props["quarkus.datasource.jdbc.url"] = "jdbc:postgresql://$pgHost:$pgPort/$pgDbName"
         props["quarkus.datasource.username"] = requireProp("$prefix.username", lemlineProps)
         props["quarkus.datasource.password"] = requireProp("$prefix.password", lemlineProps)
-        props["quarkus.flyway.locations"] = "classpath:db/migration/postgresql"
     }
 
     private fun configureMySQL(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
@@ -262,23 +265,27 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         val mysqlHost = requireProp("$prefix.host", lemlineProps)
         val mysqlPort = requireProp("$prefix.port", lemlineProps)
         val mysqlDbName = requireProp("$prefix.name", lemlineProps)
-
         // Validate port number
         validatePort(mysqlPort.toInt())
-
+        // set values
+        props["quarkus.flyway.locations"] = "classpath:db/migration/mysql"
         props["quarkus.datasource.jdbc.url"] =
             "jdbc:mysql://$mysqlHost:$mysqlPort/$mysqlDbName?useSSL=false&allowPublicKeyRetrieval=true"
         props["quarkus.datasource.username"] = requireProp("$prefix.username", lemlineProps)
         props["quarkus.datasource.password"] = requireProp("$prefix.password", lemlineProps)
-        props["quarkus.flyway.locations"] = "classpath:db/migration/mysql"
     }
 
     private fun configureH2(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
         val prefix = "lemline.database.h2"
-        val h2DbName = getProp("$prefix.name", lemlineProps) ?: LemlineConfigConstants.DEFAULT_H2_DB_NAME
+        val h2DbName = getProp("$prefix.name", lemlineProps)
+            ?: LemlineConfigConstants.DEFAULT_H2_DB_NAME
+        // set values
+        props["quarkus.flyway.locations"] = "classpath:db/migration/h2"
         props["quarkus.datasource.jdbc.url"] = "jdbc:h2:mem:$h2DbName;DB_CLOSE_DELAY=-1"
-        props["quarkus.datasource.username"] = getProp("$prefix.username", lemlineProps) ?: LemlineConfigConstants.DEFAULT_H2_USERNAME
-        props["quarkus.datasource.password"] = getProp("$prefix.password", lemlineProps) ?: LemlineConfigConstants.DEFAULT_H2_PASSWORD
+        props["quarkus.datasource.username"] = getProp("$prefix.username", lemlineProps)
+            ?: LemlineConfigConstants.DEFAULT_H2_USERNAME
+        props["quarkus.datasource.password"] = getProp("$prefix.password", lemlineProps)
+            ?: LemlineConfigConstants.DEFAULT_H2_PASSWORD
     }
 
     private fun configureKafka(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
@@ -299,14 +306,19 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         // outgoing
         props["$outgoing.connector"] = LemlineConfigConstants.KAFKA_CONNECTOR
-        props["$outgoing.topic"] = getProp("$prefix.topic-out", lemlineProps) ?: requireProp("$prefix.topic-in", lemlineProps)
+        props["$outgoing.topic"] =
+            getProp("$prefix.topic-out", lemlineProps) ?: requireProp("$prefix.topic-in", lemlineProps)
         props["$outgoing.merge"] = "true"
 
         // optional security settings
         configureKafkaSecurity(props, lemlineProps, prefix)
     }
 
-    private fun configureKafkaSecurity(props: MutableMap<String, String>, lemlineProps: Map<String, String>, prefix: String) {
+    private fun configureKafkaSecurity(
+        props: MutableMap<String, String>,
+        lemlineProps: Map<String, String>,
+        prefix: String
+    ) {
         fun getProp(key: String): String? = lemlineProps[key]?.takeIf { !it.startsWith("#") }
 
         getProp("$prefix.security-protocol")?.let { props["kafka.security.protocol"] = it }
@@ -350,7 +362,8 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         // outgoing
         props["$outgoing.connector"] = LemlineConfigConstants.RABBITMQ_CONNECTOR
-        props["$outgoing.queue.name"] = getProp("$prefix.queue-out", lemlineProps) ?: requireProp("$prefix.queue-in", lemlineProps)
+        props["$outgoing.queue.name"] =
+            getProp("$prefix.queue-out", lemlineProps) ?: requireProp("$prefix.queue-in", lemlineProps)
         props["$outgoing.serializer"] = "java.lang.String"
         props["$outgoing.merge"] = "true"
     }
