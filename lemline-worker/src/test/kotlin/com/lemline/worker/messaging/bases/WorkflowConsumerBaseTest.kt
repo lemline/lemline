@@ -27,7 +27,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
-abstract class WorkflowConsumerBaseTest {
+internal abstract class WorkflowConsumerBaseTest {
 
     @Inject
     lateinit var entityManager: EntityManager

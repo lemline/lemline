@@ -37,7 +37,7 @@ import org.eclipse.microprofile.reactive.messaging.Incoming
 import org.eclipse.microprofile.reactive.messaging.Outgoing
 
 @ApplicationScoped
-open class WorkflowConsumer(
+internal class WorkflowConsumer(
     private val workflowRepository: WorkflowRepository,
     private val retryRepository: RetryRepository,
     private val waitRepository: WaitRepository,
