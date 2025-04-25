@@ -105,7 +105,7 @@ internal class WorkflowConsumer(
     }
 
     @Transactional
-    open suspend fun process(workflowMessage: WorkflowMessage): String? {
+    suspend fun process(workflowMessage: WorkflowMessage): String? {
         val name = workflowMessage.name
         val version = workflowMessage.version
         // Get workflow definition from cache or load it from the database

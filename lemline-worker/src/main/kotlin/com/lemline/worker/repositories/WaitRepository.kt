@@ -5,7 +5,6 @@ import com.lemline.worker.models.WAIT_TABLE
 import com.lemline.worker.models.WaitModel
 import com.lemline.worker.outbox.OutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.transaction.Transactional
 
 /**
  * Repository for managing wait messages in the outbox pattern.
@@ -22,7 +21,7 @@ import jakarta.transaction.Transactional
  * @see OutboxProcessor for the processing logic
  */
 @ApplicationScoped
-internal class WaitRepository : OutboxRepository<WaitModel>() {
+internal class WaitRepository : OutboxRepository<WaitModel> {
     override val tableName: String = WAIT_TABLE
     override val entityClass: Class<WaitModel> = WaitModel::class.java
 }

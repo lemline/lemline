@@ -42,18 +42,18 @@ import java.time.Instant
  * @see OutboxModel for the base message model
  * @see OutboxProcessor for the processing logic
  */
-internal abstract class OutboxRepository<T : OutboxModel> : PanacheRepositoryBase<T, String> {
+internal interface OutboxRepository<T : OutboxModel> : PanacheRepositoryBase<T, String> {
     /**
      * Gets the table name for this repository.
      * This is used in the native SQL queries.
      */
-    protected abstract val tableName: String
+    val tableName: String
 
     /**
      * Gets the entity class for this repository.
      * This is used to map query results to entities.
      */
-    protected abstract val entityClass: Class<T>
+    val entityClass: Class<T>
 
     /**
      * Saves a message to the database.

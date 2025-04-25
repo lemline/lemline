@@ -5,9 +5,9 @@ plugins {
     // Apply Kotlin Serialization plugin from `gradle/libs.versions.toml`.
     alias(libs.plugins.kotlinPluginSerialization)
 
-    kotlin("plugin.allopen") version "2.1.20"
-    kotlin("plugin.jpa") version "2.1.20"
-    id("io.quarkus") version "3.21.2"
+    kotlin("plugin.allopen") version "2.0.21"
+    kotlin("plugin.jpa") version "2.0.21"
+    id("io.quarkus") version "3.21.4"
 }
 
 dependencies {
@@ -18,7 +18,7 @@ dependencies {
     implementation(libs.bundles.kotlinxEcosystem)
 
     // Enforce Quarkus platform versions
-    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.2"))
+    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.4"))
 
     // Quarkus
     implementation("io.quarkus:quarkus-kotlin")
@@ -67,11 +67,11 @@ group = "com.lemline.worker"
 version = "0.0.1-SNAPSHOT"
 
 allOpen {
-    // Allows Hibernate to work with Kotlin classes by marking classes annotated with @Entity as open for extension.
+    annotation("jakarta.ws.rs.Path")
+    annotation("jakarta.enterprise.context.ApplicationScoped")
+    annotation("jakarta.inject.Singleton")
     annotation("jakarta.persistence.Entity")
-    // Marks classes annotated with @MappedSuperclass as open for extension, enabling inheritance in JPA entities.
     annotation("jakarta.persistence.MappedSuperclass")
-    // Marks classes annotated with @Embeddable as open for extension, allowing embeddable types in JPA.
     annotation("jakarta.persistence.Embeddable")
 }
 

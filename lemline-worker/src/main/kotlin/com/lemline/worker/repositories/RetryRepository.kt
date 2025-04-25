@@ -21,7 +21,7 @@ import jakarta.enterprise.context.ApplicationScoped
  * @see OutboxProcessor for the processing logic
  */
 @ApplicationScoped
-internal class RetryRepository : OutboxRepository<RetryModel>() {
+internal class RetryRepository : OutboxRepository<RetryModel> {
     override val tableName: String = RETRY_TABLE
     override val entityClass: Class<RetryModel> = RetryModel::class.java
 }

@@ -55,7 +55,7 @@ import org.eclipse.microprofile.config.spi.ConfigSource
  *      lemline.database.postgresql.host=localhost
  *      # ... other database properties
  *      ```
- * 
+ *
  * 2. Manual Migration Control:
  *    - Disable automatic migration: quarkus.flyway.migrate-at-start=false
  *    - Create a StartupEvent observer to run migration after configuration:
@@ -64,7 +64,7 @@ import org.eclipse.microprofile.config.spi.ConfigSource
  *    class FlywayMigration {
  *        @Inject
  *        lateinit var flyway: Flyway
- *        
+ *
  *        fun onStart(@Observes event: StartupEvent) {
  *            flyway.migrate()
  *        }
@@ -78,7 +78,7 @@ import org.eclipse.microprofile.config.spi.ConfigSource
  * - drop-and-create: Drops and recreates schema on startup
  * - update: Updates schema if needed
  * - validate: Validates schema against entities
- * 
+ *
  * Best Practices:
  * - Always use 'none' when using Flyway (including in tests)
  * - Never mix Flyway with Hibernate schema generation

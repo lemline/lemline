@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test
 
 /**
  * Abstract base class for testing workflow repository implementations.
- * 
+ *
  * This class provides a common test implementation that can be reused by database-specific test classes.
  * It verifies the core functionality of the WorkflowRepository, ensuring that workflow models can be
  * properly stored, retrieved, and updated in the database.

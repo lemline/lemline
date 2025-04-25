@@ -3,7 +3,7 @@
 # https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
 
 [versions]
-kotlin = "2.1.10"
+kotlin = "2.0.21"
 kotlinxDatetime = "0.6.1"
 kotlinxSerializationJSON = "1.7.2"
 kotlinxCoroutines = "1.8.1"
