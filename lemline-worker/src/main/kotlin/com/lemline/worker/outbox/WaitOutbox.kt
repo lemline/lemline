@@ -4,6 +4,7 @@ package com.lemline.worker.outbox
 import com.lemline.common.logger
 import com.lemline.worker.config.LemlineConfiguration
 import com.lemline.worker.config.LemlineConfiguration.WaitConfig
+import com.lemline.worker.config.toDuration
 import com.lemline.worker.messaging.WORKFLOW_OUT
 import com.lemline.worker.repositories.WaitRepository
 import io.quarkus.scheduler.Scheduled
@@ -69,7 +70,7 @@ internal class WaitOutbox @Inject constructor(
         outboxProcessor.process(
             outboxConf.batchSize(),
             outboxConf.maxAttempts(),
-            outboxConf.initialDelay().toSeconds().toInt(),
+            outboxConf.initialDelay().toDuration(),
         )
     }
 
@@ -92,7 +93,7 @@ internal class WaitOutbox @Inject constructor(
     fun cleanup() {
         val cleanupConf = waitConfig.cleanup()
         outboxProcessor.cleanup(
-            cleanupConf.after().toDays().toInt(),
+            cleanupConf.after().toDuration(),
             cleanupConf.batchSize(),
         )
     }

@@ -6,6 +6,7 @@ import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.warn
 import jakarta.transaction.Transactional
+import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import org.jetbrains.annotations.VisibleForTesting
@@ -41,13 +42,13 @@ internal class OutboxProcessor<T : OutboxModel>(
 ) {
 
     @VisibleForTesting
-    internal fun calculateNextRetryDelay(attemptCount: Int, retryInitialDelayMillis: Int): Long {
+    internal fun calculateNextRetryDelay(attemptCount: Int, initialDelay: Duration): Long {
         // Exponential backoff: initialDelay * 2^(attemptCount-1)
         // e.g., with initialDelay=1000ms (10s):
         // attempt 1: 1000ms * 2^0 = 1000ms +/- 20%
         // attempt 2: 1000ms * 2^1 = 2000ms +/- 20%
         // attempt 3: 1000ms * 2^2 = 4000ms +/- 20%
-        val baseDelay = retryInitialDelayMillis * (1L shl (attemptCount - 1))
+        val baseDelay = initialDelay.toMillis() * (1L shl (attemptCount - 1))
 
         // Add jitter of ±20%
         val jitterRange = baseDelay * 0.2 // 20% of base delay
@@ -84,7 +85,7 @@ internal class OutboxProcessor<T : OutboxModel>(
      * @param initialDelay Initial delay in seconds before first retry
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    fun process(batchSize: Int, maxAttempts: Int, initialDelay: Int) {
+    fun process(batchSize: Int, maxAttempts: Int, initialDelay: Duration) {
         try {
             var totalProcessed = 0
             var batchNumber = 0
@@ -125,7 +126,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                         } else {
                             // Calculate next retry time using exponential backoff
                             val nextDelay =
-                                calculateNextRetryDelay(message.attemptCount, initialDelay * 1000)
+                                calculateNextRetryDelay(message.attemptCount, initialDelay)
                             message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.MILLIS)
                             logger.debug {
                                 "Message ${message.id} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})"
@@ -163,13 +164,13 @@ internal class OutboxProcessor<T : OutboxModel>(
      * - Prevents long-running transactions during cleanup
      * - Allows for independent retry of failed cleanup operations
      *
-     * @param afterDays Number of days after which sent messages should be deleted
+     * @param afterDelay Delay after which sent messages should be deleted
      * @param batchSize Maximum number of messages to delete in one batch
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
-    fun cleanup(afterDays: Int, batchSize: Int) {
+    fun cleanup(afterDelay: Duration, batchSize: Int) {
         try {
-            val cutoffDate = Instant.now().minusSeconds(afterDays * 24 * 60 * 60L)
+            val cutoffDate = Instant.now().minusMillis(afterDelay.toMillis())
             var totalDeleted = 0
             var chunkNumber = 0
             var consecutiveEmptyChunks = 0

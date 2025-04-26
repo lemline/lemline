@@ -70,8 +70,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     // Default test configuration (can be overridden by subclasses if needed)
     protected open val batchSize = 10
     protected open val maxAttempts = 3
-    protected open val initialDelaySeconds = 1 // 1 second
-    protected open val initialDelayMillis = initialDelaySeconds * 1000L
+    protected open val initialDelay: Duration = Duration.ofSeconds(1) // 1 second
 
     @BeforeEach
     @Transactional // Keep transaction for setup actions like deleteAll
@@ -89,7 +88,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     // --- Test methods --- //
 
     /**
-     * **Scenario:** Tests the happy path where a single message is successfully processed.
+     * **Scenario: **Tests the happy path where a single message is successfully processed.
      *
      * **Arrange:**
      * - Creates a single test entity using `createTestModel`.
@@ -113,7 +112,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         testRepository.persist(message)
 
         // Act
-        outboxProcessor.process(batchSize, maxAttempts, initialDelaySeconds)
+        outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
         // Verify the mock was called (at least once, type checked by any())
@@ -127,7 +126,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     }
 
     /**
-     * **Scenario:** Tests the retry mechanism: initial failure, delay, successful retry.
+     * **Scenario: **Tests the retry mechanism: initial failure, delay, successful retry.
      *
      * **Arrange:**
      * - Creates and persists a test entity.
@@ -166,7 +165,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         every { mockProcessorFunction(any(modelClass)) } throws failureException
 
         // Act: First process call (fails)
-        outboxProcessor.process(batchSize, maxAttempts, initialDelaySeconds)
+        outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: First attempt failed - Check DB state
         verify(exactly = 1) { mockProcessorFunction(any(modelClass)) } // Verify it was called once
@@ -179,15 +178,15 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         capturedFailedMessage.delayedUntil shouldBeAfter initialDelayedUntil
 
         val delayMillis = Duration.between(Instant.now(), capturedFailedMessage.delayedUntil).toMillis()
-        val tolerance = initialDelayMillis * 0.3
-        delayMillis.toDouble() shouldBe (initialDelayMillis.toDouble() plusOrMinus tolerance)
+        val tolerance = initialDelay.toMillis() * 0.3
+        delayMillis.toDouble() shouldBe (initialDelay.toMillis().toDouble() plusOrMinus tolerance)
 
         // Arrange: Setup mock to succeed on subsequent calls
         every { mockProcessorFunction(any(modelClass)) } just Runs
 
         // Act: Second process call (should succeed now)
         if (delayMillis > 0) Thread.sleep(delayMillis + 300) else Thread.sleep(300)
-        outboxProcessor.process(batchSize, maxAttempts, initialDelaySeconds)
+        outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: Second attempt succeeded - Check DB state
         verify(exactly = 2) { mockProcessorFunction(any(modelClass)) } // Verify it was called again
@@ -200,7 +199,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     }
 
     /**
-     * **Scenario:** Tests that an entity reaches FAILED status after max retry attempts.
+     * **Scenario: **Tests that an entity reaches FAILED status after max retry attempts.
      *
      * **Arrange:**
      * - Creates and persists a test entity.
@@ -225,14 +224,13 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         val initialDelayedUntil = message.delayedUntil
 
         val failureException = RuntimeException("Persistent failure!")
-        // Setup mock to always fail
+        // Set up the mock to always fail
         every { mockProcessorFunction(any(modelClass)) } throws failureException
 
         // Act & Assert intermediate attempts by checking DB state
-        var lastAttemptDelayMillis = 0L
         var lastDelayedUntil = initialDelayedUntil
         for (attempt in 1..maxAttempts) {
-            outboxProcessor.process(batchSize, maxAttempts, initialDelaySeconds)
+            outboxProcessor.process(batchSize, maxAttempts, initialDelay)
             val intermediateMessage = testRepository.findById(message.id)
             intermediateMessage shouldNotBe null
             val capturedIntermediate = intermediateMessage!!
@@ -243,8 +241,9 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
                 capturedIntermediate.lastError shouldBe failureException.message
                 capturedIntermediate.delayedUntil shouldBeAfter lastDelayedUntil
                 lastDelayedUntil = capturedIntermediate.delayedUntil
-                lastAttemptDelayMillis = Duration.between(Instant.now(), capturedIntermediate.delayedUntil).toMillis()
-                val expectedMinDelay = initialDelayMillis * (1L shl (attempt - 1)) * 0.7
+                val lastAttemptDelayMillis =
+                    Duration.between(Instant.now(), capturedIntermediate.delayedUntil).toMillis()
+                val expectedMinDelay = initialDelay.toMillis() * (1L shl (attempt - 1)) * 0.7
                 lastAttemptDelayMillis shouldBeGreaterThan (expectedMinDelay.toLong() - 200)
                 if (lastAttemptDelayMillis > 0) Thread.sleep(lastAttemptDelayMillis + 300)
             } else { // Final attempt check
@@ -263,7 +262,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     }
 
     /**
-     * **Scenario**: Tests processing a batch of multiple entities successfully.
+     * **Scenario: **Tests processing a batch of multiple entities successfully.
      *
      * **Arrange:**
      * - Creates and persists a list of 5 test entities.
@@ -286,7 +285,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         val messageIds = messages.map { it.id }
 
         // Act
-        outboxProcessor.process(batchSize, maxAttempts, initialDelaySeconds)
+        outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
         verify(exactly = 5) { mockProcessorFunction(any(modelClass)) }
@@ -299,7 +298,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     }
 
     /**
-     * **Scenario:** Tests the cleanup logic removes old SENT entities, retaining others.
+     * **Scenario: **Tests the cleanup logic removes old SENT entities, retaining others.
      *
      * **Arrange:**
      * - Creates and persists entities with different statuses (SENT, PENDING, FAILED).
@@ -316,8 +315,8 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     @Transactional
     fun `cleanup should remove old SENT messages`() {
         // Arrange
-        val retentionDays = 7
-        val cutoff = Instant.now().minus((retentionDays + 1).toLong(), ChronoUnit.DAYS)
+        val retentionDelay = Duration.ofDays(7)
+        val cutoff = Instant.now().minusSeconds(retentionDelay.toSeconds() + 24 * 60 * 60)
         val wayBeforeCutoff = cutoff.minus(1, ChronoUnit.DAYS)
 
         // Create messages using abstract factory
@@ -349,7 +348,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         val failedId = failedMessage.id
 
         // Act
-        outboxProcessor.cleanup(retentionDays, 2) // Use small batch size for testing
+        outboxProcessor.cleanup(retentionDelay, 2) // Use small batch size for testing
 
         // Assert
         testRepository.findById(oldSentId) shouldBe null // Should be deleted
@@ -359,7 +358,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     }
 
     /**
-     * **Scenario:** Tests `process()` behaviour when the outbox table is empty.
+     * **Scenario: **Tests `process()` behaviour when the outbox table is empty.
      *
      * **Arrange:**
      * - Ensures the repository is empty (via setup's `deleteAll`).
@@ -377,7 +376,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Arrange: No messages persisted (due to setup)
 
         // Act
-        outboxProcessor.process(batchSize, maxAttempts, initialDelaySeconds)
+        outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
         verify(exactly = 0) { mockProcessorFunction(any(modelClass)) }
@@ -385,7 +384,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     }
 
     /**
-     * **Scenario:** Tests `cleanup()` behaviour when the outbox table is empty.
+     * **Scenario: **Tests `cleanup()` behaviour when the outbox table is empty.
      *
      * **Arrange:**
      * - Ensures the repository is empty (via setup's `deleteAll`).
@@ -400,10 +399,10 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     @Transactional
     fun `cleanup should do nothing when outbox is empty`() {
         // Arrange: No messages persisted (due to setup)
-        val retentionDays = 7
+        val retentionDelay = Duration.ofDays(7)
 
         // Act
-        outboxProcessor.cleanup(retentionDays, batchSize)
+        outboxProcessor.cleanup(retentionDelay, batchSize)
 
         // Assert
         testRepository.count() shouldBe 0
