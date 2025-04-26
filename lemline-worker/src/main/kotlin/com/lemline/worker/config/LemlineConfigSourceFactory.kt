@@ -5,15 +5,13 @@ import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
-import com.lemline.common.warn
-import com.lemline.worker.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.worker.config.LemlineConfigConstants.DB_TYPE_MYSQL
-import com.lemline.worker.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
-import com.lemline.worker.messaging.WORKFLOW_IN
-import com.lemline.worker.messaging.WORKFLOW_OUT
+import com.lemline.worker.config.LemlineConfiguration.DatabaseConfig
+import com.lemline.worker.config.LemlineConfiguration.MessagingConfig
+import io.quarkus.runtime.annotations.RegisterForReflection
 import io.smallrye.config.ConfigSourceContext
 import io.smallrye.config.ConfigSourceFactory
 import io.smallrye.config.PropertiesConfigSource
+import io.smallrye.config.SmallRyeConfigBuilder
 import java.util.*
 import org.eclipse.microprofile.config.spi.ConfigSource
 
@@ -23,10 +21,8 @@ import org.eclipse.microprofile.config.spi.ConfigSource
  *
  * Configuration Transformation Process:
  * 1. Collects all properties starting with "lemline."
- * 2. Transforms them into framework-specific properties:
- *    - Database properties (quarkus.datasource.*)
- *    - Messaging properties (kafka.*, rabbitmq.*)
- * 3. Provides default values and validation
+ * 2. Creates a type-safe configuration using SmallRyeConfig
+ * 3. Uses companion object methods to generate Quarkus-specific properties
  *
  * Configuration Sources:
  * - Ordinal: 275 (higher than default sources)
@@ -113,8 +109,10 @@ import org.eclipse.microprofile.config.spi.ConfigSource
  * - Default values for optional properties
  *
  * @see LemlineConfiguration for type-safe configuration mapping
+ * @see LemlineConfigTransformer for property transformation
  * @see https://quarkus.io/guides/config-reference for Quarkus configuration details
  */
+@RegisterForReflection
 class LemlineConfigSourceFactory : ConfigSourceFactory {
 
     private val log = logger()
@@ -125,8 +123,9 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
      *
      * Process:
      * 1. Collects all lemline.* properties
-     * 2. Generates framework-specific properties
-     * 3. Creates a ConfigSource with the transformed properties
+     * 2. Creates a type-safe configuration using SmallRyeConfig
+     * 3. Uses companion object methods to generate Quarkus-specific properties
+     * 4. Creates a ConfigSource with the transformed properties
      *
      * @param context The configuration context containing all available properties
      * @return An iterable of ConfigSource instances
@@ -144,17 +143,26 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         }
         log.debug { "Lemline properties found: $lemlineProps" }
 
-        // Generate framework-specific properties based on the collected lemline properties
-        val generatedProps = generateFrameworkProperties(lemlineProps)
+        if (lemlineProps.isEmpty()) {
+            log.info { "No Lemline properties found, skipping configuration transformation" }
+            return emptyList()
+        }
 
-        // Return the appropriate ConfigSource based on whether generatedProps is empty or not
-        return when (generatedProps.isEmpty()) {
-            true -> emptyList<ConfigSource>().also {
-                log.info { "No framework properties were generated." }
-            }
+        try {
+            // Create a SmallRyeConfig instance with the collected properties
+            val config = SmallRyeConfigBuilder()
+                .withSources(PropertiesConfigSource(lemlineProps, "LemlineProperties", 100))
+                .build()
 
-            false -> listOf(
-                // Create a ConfigSource with the generated properties and a specific ordinal
+            // Create a type-safe configuration
+            val lemlineConfig = config.getConfigMapping(LemlineConfiguration::class.java)
+
+            // Generate Quarkus properties using companion object methods
+            val generatedProps = mutableMapOf<String, String>()
+            generatedProps.putAll(DatabaseConfig.toQuarkusProperties(lemlineConfig.database()))
+            generatedProps.putAll(MessagingConfig.toQuarkusProperties(lemlineConfig.messaging()))
+
+            return listOf(
                 PropertiesConfigSource(
                     generatedProps,
                     LemlineConfigConstants.CONFIG_SOURCE_NAME,
@@ -167,6 +175,9 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                     }"
                 }
             }
+        } catch (e: Exception) {
+            log.error(e) { "Error transforming Lemline configuration" }
+            throw e
         }
     }
 
@@ -193,197 +204,197 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
      * @param lemlineProps Map of Lemline-specific properties
      * @return Map of framework-specific properties
      */
-    private fun generateFrameworkProperties(lemlineProps: Map<String, String>): Map<String, String> {
-        if (lemlineProps.isEmpty()) return emptyMap()
-
-        val props = mutableMapOf<String, String>()
-
-        // Get the value of a property, ignoring comments
-        fun getProp(key: String): String? = lemlineProps[key]?.split("#")?.first()?.trim()
-
-        // Get the value of a property, throwing an exception if not found
-        fun requireProp(key: String): String = getProp(key)
-            ?: throw NoSuchElementException("Required lemline property not found in context: $key")
-
-        try {
-            val dbTypeKey = "lemline.database.type"
-            val dbType = requireProp(dbTypeKey).trim().lowercase()
-
-            // Validate database type
-            props["quarkus.datasource.db-kind"] = when (dbType) {
-                DB_TYPE_IN_MEMORY -> "h2"
-                DB_TYPE_POSTGRESQL -> "postgresql"
-                DB_TYPE_MYSQL -> "mysql"
-                else -> throw IllegalArgumentException("Unsupported database type: $dbType. Supported types: ${LemlineConfigConstants.SUPPORTED_DB_TYPES}")
-            }
-
-            when (dbType) {
-                DB_TYPE_IN_MEMORY -> configureH2(props, lemlineProps)
-                DB_TYPE_POSTGRESQL -> configurePostgreSQL(props, lemlineProps)
-                DB_TYPE_MYSQL -> configureMySQL(props, lemlineProps)
-            }
-        } catch (e: NoSuchElementException) {
-            log.warn(e) { "Incomplete database configuration: ${e.message}" }
-            throw e // Fail fast for required configuration
-        } catch (e: Exception) {
-            log.error(e) { "Error processing database configuration" }
-            throw e
-        }
-
-        try {
-            val msgTypeKey = "lemline.messaging.type"
-
-            // Validate messaging type
-            when (val msgType = requireProp(msgTypeKey).trim().lowercase()) {
-                LemlineConfigConstants.MSG_TYPE_KAFKA -> configureKafka(props, lemlineProps)
-                LemlineConfigConstants.MSG_TYPE_RABBITMQ -> configureRabbitMQ(props, lemlineProps)
-                LemlineConfigConstants.MSG_TYPE_IN_MEMORY -> configureInMemory(props)
-                else -> throw IllegalArgumentException("Unsupported messaging type: $msgType. Supported types: ${LemlineConfigConstants.SUPPORTED_MSG_TYPES}")
-            }
-        } catch (e: NoSuchElementException) {
-            log.warn(e) { "Incomplete messaging configuration: ${e.message}" }
-            throw e // Fail fast for required configuration
-        } catch (e: Exception) {
-            log.error(e) { "Error processing messaging configuration" }
-            throw e
-        }
-
-        return Collections.unmodifiableMap(props)
-    }
-
-    private fun configurePostgreSQL(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
-        val prefix = "lemline.database.postgresql"
-        val pgHost = requireProp("$prefix.host", lemlineProps)
-        val pgPort = requireProp("$prefix.port", lemlineProps)
-        val pgDbName = requireProp("$prefix.name", lemlineProps)
-        // set values
-        props["quarkus.flyway.locations"] = "classpath:db/migration/postgresql"
-        props["quarkus.datasource.jdbc.url"] = "jdbc:postgresql://$pgHost:$pgPort/$pgDbName"
-        props["quarkus.datasource.username"] = requireProp("$prefix.username", lemlineProps)
-        props["quarkus.datasource.password"] = requireProp("$prefix.password", lemlineProps)
-    }
-
-    private fun configureMySQL(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
-        val prefix = "lemline.database.mysql"
-        val mysqlHost = requireProp("$prefix.host", lemlineProps)
-        val mysqlPort = requireProp("$prefix.port", lemlineProps)
-        val mysqlDbName = requireProp("$prefix.name", lemlineProps)
-        // set values
-        props["quarkus.flyway.locations"] = "classpath:db/migration/mysql"
-        props["quarkus.datasource.jdbc.url"] =
-            "jdbc:mysql://$mysqlHost:$mysqlPort/$mysqlDbName?useSSL=false&allowPublicKeyRetrieval=true"
-        props["quarkus.datasource.username"] = requireProp("$prefix.username", lemlineProps)
-        props["quarkus.datasource.password"] = requireProp("$prefix.password", lemlineProps)
-    }
-
-    private fun configureH2(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
-        val prefix = "lemline.database.h2"
-        val h2DbName = lemlineProps["$prefix.name"]
-            ?: LemlineConfigConstants.DEFAULT_H2_DB_NAME
-        // set values
-        props["quarkus.flyway.locations"] = "classpath:db/migration/h2"
-        props["quarkus.datasource.jdbc.url"] = "jdbc:h2:mem:$h2DbName;DB_CLOSE_DELAY=-1"
-        props["quarkus.datasource.username"] = lemlineProps["$prefix.username"]
-            ?: LemlineConfigConstants.DEFAULT_H2_USERNAME
-        props["quarkus.datasource.password"] = lemlineProps["$prefix.password"]
-            ?: LemlineConfigConstants.DEFAULT_H2_PASSWORD
-    }
-
-    private fun configureKafka(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
-        val prefix = "lemline.messaging.kafka"
-        val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
-        val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
-
-        // server
-        props["kafka.bootstrap.servers"] = requireProp("$prefix.brokers", lemlineProps)
-
-        // incoming
-        props["$incoming.connector"] = LemlineConfigConstants.KAFKA_CONNECTOR
-        props["$incoming.topic"] = requireProp("$prefix.topic", lemlineProps)
-        props["$incoming.group.id"] = requireProp("$prefix.group-id", lemlineProps)
-        props["$incoming.auto.offset.reset"] = requireProp("$prefix.offset-reset", lemlineProps)
-        props["$incoming.failure-strategy"] = "dead-letter-queue"
-        props["$incoming.dead-letter-queue.topic"] = lemlineProps["$prefix.topic-dlq"]
-            ?: (props["$incoming.topic"] + "-dlq")
-
-        // outgoing
-        props["$outgoing.connector"] = LemlineConfigConstants.KAFKA_CONNECTOR
-        props["$outgoing.topic"] = lemlineProps["$prefix.topic-out"] ?: props["$incoming.topic"]!!
-        props["$outgoing.merge"] = "true"
-
-        // optional security settings
-        configureKafkaSecurity(props, lemlineProps, prefix)
-    }
-
-    private fun configureKafkaSecurity(
-        props: MutableMap<String, String>,
-        lemlineProps: Map<String, String>,
-        prefix: String
-    ) {
-        fun getProp(key: String): String? = lemlineProps[key]?.takeIf { !it.startsWith("#") }
-
-        getProp("$prefix.security-protocol")?.let { props["kafka.security.protocol"] = it }
-        getProp("$prefix.sasl-mechanism")?.let { props["kafka.sasl.mechanism"] = it }
-
-        val saslUser = getProp("$prefix.sasl-username")
-        val saslPass = getProp("$prefix.sasl-password")
-
-        if (saslUser != null && saslPass != null) {
-            props["kafka.sasl.jaas.config"] =
-                "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"$saslUser\" password=\"$saslPass\";"
-            // Set the default mechanism to PLAIN if SASL user/pass are provided, but the mechanism isn't explicitly set
-            if (!props.containsKey("kafka.sasl.mechanism")) {
-                props["kafka.sasl.mechanism"] = "PLAIN"
-            }
-        }
-    }
-
-    private fun configureRabbitMQ(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
-        val prefix = "lemline.messaging.rabbitmq"
-        val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
-        val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
-
-        // server
-        props["rabbitmq-host"] = requireProp("$prefix.hostname", lemlineProps)
-        val port = requireProp("$prefix.port", lemlineProps)
-        validatePort(port.toInt())
-        props["rabbitmq-port"] = port
-        props["rabbitmq-username"] = requireProp("$prefix.username", lemlineProps)
-        props["rabbitmq-password"] = requireProp("$prefix.password", lemlineProps)
-
-        // incoming
-        props["$incoming.connector"] = LemlineConfigConstants.RABBITMQ_CONNECTOR
-        props["$incoming.queue.name"] = requireProp("$prefix.queue", lemlineProps)
-        props["$incoming.queue.durable"] = "true"
-        props["$incoming.auto-ack"] = "false"
-        props["$incoming.deserializer"] = "java.lang.String"
-        props["$incoming.queue.arguments.x-dead-letter-exchange"] = "dlx"
-        props["$incoming.queue.arguments.x-dead-letter-routing-key"] = lemlineProps["$prefix.queue-dlq"]
-            ?: (props["$incoming.queue.name"]!! + "-dlq")
-
-        // outgoing
-        props["$outgoing.connector"] = LemlineConfigConstants.RABBITMQ_CONNECTOR
-        props["$outgoing.queue.name"] = lemlineProps["$prefix.queue-out"]
-            ?: props["$incoming.queue.name"]!!
-        props["$outgoing.serializer"] = "java.lang.String"
-        props["$outgoing.merge"] = "true"
-    }
-
-    private fun configureInMemory(props: MutableMap<String, String>) {
-        val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
-        val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
-
-        // Configure in-memory channels
-        props["$incoming.connector"] = LemlineConfigConstants.IN_MEMORY_CONNECTOR
-        props["$outgoing.connector"] = LemlineConfigConstants.IN_MEMORY_CONNECTOR
-    }
-
-    private fun validatePort(port: Int) {
-        if (port < LemlineConfigConstants.MIN_PORT || port > LemlineConfigConstants.MAX_PORT) {
-            throw IllegalArgumentException("Port number must be between ${LemlineConfigConstants.MIN_PORT} and ${LemlineConfigConstants.MAX_PORT}")
-        }
-    }
-
-    private fun requireProp(key: String, lemlineProps: Map<String, String>): String = lemlineProps[key]
-        ?: throw NoSuchElementException("Required lemline property not found in context: $key")
+//    private fun generateFrameworkProperties(lemlineProps: Map<String, String>): Map<String, String> {
+//        if (lemlineProps.isEmpty()) return emptyMap()
+//
+//        val props = mutableMapOf<String, String>()
+//
+//        // Get the value of a property, ignoring comments
+//        fun getProp(key: String): String? = lemlineProps[key]?.split("#")?.first()?.trim()
+//
+//        // Get the value of a property, throwing an exception if not found
+//        fun requireProp(key: String): String = getProp(key)
+//            ?: throw NoSuchElementException("Required lemline property not found in context: $key")
+//
+//        try {
+//            val dbTypeKey = "lemline.database.type"
+//            val dbType = requireProp(dbTypeKey).trim().lowercase()
+//
+//            // Validate database type
+//            props["quarkus.datasource.db-kind"] = when (dbType) {
+//                DB_TYPE_IN_MEMORY -> "h2"
+//                DB_TYPE_POSTGRESQL -> "postgresql"
+//                DB_TYPE_MYSQL -> "mysql"
+//                else -> throw IllegalArgumentException("Unsupported database type: $dbType. Supported types: ${LemlineConfigConstants.SUPPORTED_DB_TYPES}")
+//            }
+//
+//            when (dbType) {
+//                DB_TYPE_IN_MEMORY -> configureH2(props, lemlineProps)
+//                DB_TYPE_POSTGRESQL -> configurePostgreSQL(props, lemlineProps)
+//                DB_TYPE_MYSQL -> configureMySQL(props, lemlineProps)
+//            }
+//        } catch (e: NoSuchElementException) {
+//            log.warn(e) { "Incomplete database configuration: ${e.message}" }
+//            throw e // Fail fast for required configuration
+//        } catch (e: Exception) {
+//            log.error(e) { "Error processing database configuration" }
+//            throw e
+//        }
+//
+//        try {
+//            val msgTypeKey = "lemline.messaging.type"
+//
+//            // Validate messaging type
+//            when (val msgType = requireProp(msgTypeKey).trim().lowercase()) {
+//                LemlineConfigConstants.MSG_TYPE_KAFKA -> configureKafka(props, lemlineProps)
+//                LemlineConfigConstants.MSG_TYPE_RABBITMQ -> configureRabbitMQ(props, lemlineProps)
+//                LemlineConfigConstants.MSG_TYPE_IN_MEMORY -> configureInMemory(props)
+//                else -> throw IllegalArgumentException("Unsupported messaging type: $msgType. Supported types: ${LemlineConfigConstants.SUPPORTED_MSG_TYPES}")
+//            }
+//        } catch (e: NoSuchElementException) {
+//            log.warn(e) { "Incomplete messaging configuration: ${e.message}" }
+//            throw e // Fail fast for required configuration
+//        } catch (e: Exception) {
+//            log.error(e) { "Error processing messaging configuration" }
+//            throw e
+//        }
+//
+//        return Collections.unmodifiableMap(props)
+//    }
+//
+//    private fun configurePostgreSQL(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
+//        val prefix = "lemline.database.postgresql"
+//        val pgHost = requireProp("$prefix.host", lemlineProps)
+//        val pgPort = requireProp("$prefix.port", lemlineProps)
+//        val pgDbName = requireProp("$prefix.name", lemlineProps)
+//        // set values
+//        props["quarkus.flyway.locations"] = "classpath:db/migration/postgresql"
+//        props["quarkus.datasource.jdbc.url"] = "jdbc:postgresql://$pgHost:$pgPort/$pgDbName"
+//        props["quarkus.datasource.username"] = requireProp("$prefix.username", lemlineProps)
+//        props["quarkus.datasource.password"] = requireProp("$prefix.password", lemlineProps)
+//    }
+//
+//    private fun configureMySQL(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
+//        val prefix = "lemline.database.mysql"
+//        val mysqlHost = requireProp("$prefix.host", lemlineProps)
+//        val mysqlPort = requireProp("$prefix.port", lemlineProps)
+//        val mysqlDbName = requireProp("$prefix.name", lemlineProps)
+//        // set values
+//        props["quarkus.flyway.locations"] = "classpath:db/migration/mysql"
+//        props["quarkus.datasource.jdbc.url"] =
+//            "jdbc:mysql://$mysqlHost:$mysqlPort/$mysqlDbName?useSSL=false&allowPublicKeyRetrieval=true"
+//        props["quarkus.datasource.username"] = requireProp("$prefix.username", lemlineProps)
+//        props["quarkus.datasource.password"] = requireProp("$prefix.password", lemlineProps)
+//    }
+//
+//    private fun configureH2(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
+//        val prefix = "lemline.database.h2"
+//        val h2DbName = lemlineProps["$prefix.name"]
+//            ?: LemlineConfigConstants.DEFAULT_H2_DB_NAME
+//        // set values
+//        props["quarkus.flyway.locations"] = "classpath:db/migration/h2"
+//        props["quarkus.datasource.jdbc.url"] = "jdbc:h2:mem:$h2DbName;DB_CLOSE_DELAY=-1"
+//        props["quarkus.datasource.username"] = lemlineProps["$prefix.username"]
+//            ?: LemlineConfigConstants.DEFAULT_H2_USERNAME
+//        props["quarkus.datasource.password"] = lemlineProps["$prefix.password"]
+//            ?: LemlineConfigConstants.DEFAULT_H2_PASSWORD
+//    }
+//
+//    private fun configureKafka(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
+//        val prefix = "lemline.messaging.kafka"
+//        val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
+//        val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
+//
+//        // server
+//        props["kafka.bootstrap.servers"] = requireProp("$prefix.brokers", lemlineProps)
+//
+//        // incoming
+//        props["$incoming.connector"] = LemlineConfigConstants.KAFKA_CONNECTOR
+//        props["$incoming.topic"] = requireProp("$prefix.topic", lemlineProps)
+//        props["$incoming.group.id"] = requireProp("$prefix.group-id", lemlineProps)
+//        props["$incoming.auto.offset.reset"] = requireProp("$prefix.offset-reset", lemlineProps)
+//        props["$incoming.failure-strategy"] = "dead-letter-queue"
+//        props["$incoming.dead-letter-queue.topic"] = lemlineProps["$prefix.topic-dlq"]
+//            ?: (props["$incoming.topic"] + "-dlq")
+//
+//        // outgoing
+//        props["$outgoing.connector"] = LemlineConfigConstants.KAFKA_CONNECTOR
+//        props["$outgoing.topic"] = lemlineProps["$prefix.topic-out"] ?: props["$incoming.topic"]!!
+//        props["$outgoing.merge"] = "true"
+//
+//        // optional security settings
+//        configureKafkaSecurity(props, lemlineProps, prefix)
+//    }
+//
+//    private fun configureKafkaSecurity(
+//        props: MutableMap<String, String>,
+//        lemlineProps: Map<String, String>,
+//        prefix: String
+//    ) {
+//        fun getProp(key: String): String? = lemlineProps[key]?.takeIf { !it.startsWith("#") }
+//
+//        getProp("$prefix.security-protocol")?.let { props["kafka.security.protocol"] = it }
+//        getProp("$prefix.sasl-mechanism")?.let { props["kafka.sasl.mechanism"] = it }
+//
+//        val saslUser = getProp("$prefix.sasl-username")
+//        val saslPass = getProp("$prefix.sasl-password")
+//
+//        if (saslUser != null && saslPass != null) {
+//            props["kafka.sasl.jaas.config"] =
+//                "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"$saslUser\" password=\"$saslPass\";"
+//            // Set the default mechanism to PLAIN if SASL user/pass are provided, but the mechanism isn't explicitly set
+//            if (!props.containsKey("kafka.sasl.mechanism")) {
+//                props["kafka.sasl.mechanism"] = "PLAIN"
+//            }
+//        }
+//    }
+//
+//    private fun configureRabbitMQ(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
+//        val prefix = "lemline.messaging.rabbitmq"
+//        val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
+//        val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
+//
+//        // server
+//        props["rabbitmq-host"] = requireProp("$prefix.hostname", lemlineProps)
+//        val port = requireProp("$prefix.port", lemlineProps)
+//        validatePort(port.toInt())
+//        props["rabbitmq-port"] = port
+//        props["rabbitmq-username"] = requireProp("$prefix.username", lemlineProps)
+//        props["rabbitmq-password"] = requireProp("$prefix.password", lemlineProps)
+//
+//        // incoming
+//        props["$incoming.connector"] = LemlineConfigConstants.RABBITMQ_CONNECTOR
+//        props["$incoming.queue.name"] = requireProp("$prefix.queue", lemlineProps)
+//        props["$incoming.queue.durable"] = "true"
+//        props["$incoming.auto-ack"] = "false"
+//        props["$incoming.deserializer"] = "java.lang.String"
+//        props["$incoming.queue.arguments.x-dead-letter-exchange"] = "dlx"
+//        props["$incoming.queue.arguments.x-dead-letter-routing-key"] = lemlineProps["$prefix.queue-dlq"]
+//            ?: (props["$incoming.queue.name"]!! + "-dlq")
+//
+//        // outgoing
+//        props["$outgoing.connector"] = LemlineConfigConstants.RABBITMQ_CONNECTOR
+//        props["$outgoing.queue.name"] = lemlineProps["$prefix.queue-out"]
+//            ?: props["$incoming.queue.name"]!!
+//        props["$outgoing.serializer"] = "java.lang.String"
+//        props["$outgoing.merge"] = "true"
+//    }
+//
+//    private fun configureInMemory(props: MutableMap<String, String>) {
+//        val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
+//        val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
+//
+//        // Configure in-memory channels
+//        props["$incoming.connector"] = LemlineConfigConstants.IN_MEMORY_CONNECTOR
+//        props["$outgoing.connector"] = LemlineConfigConstants.IN_MEMORY_CONNECTOR
+//    }
+//
+//    private fun validatePort(port: Int) {
+//        if (port < LemlineConfigConstants.MIN_PORT || port > LemlineConfigConstants.MAX_PORT) {
+//            throw IllegalArgumentException("Port number must be between ${LemlineConfigConstants.MIN_PORT} and ${LemlineConfigConstants.MAX_PORT}")
+//        }
+//    }
+//
+//    private fun requireProp(key: String, lemlineProps: Map<String, String>): String = lemlineProps[key]
+//        ?: throw NoSuchElementException("Required lemline property not found in context: $key")
 }

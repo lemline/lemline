@@ -30,6 +30,7 @@ dependencies {
     implementation("io.quarkus:quarkus-jdbc-mysql")         // MySQL Database driver
     implementation("io.quarkus:quarkus-jdbc-h2")            // H2 Database driver
     implementation("io.quarkus:quarkus-arc")                // Dependency Injection
+    implementation("io.quarkus:quarkus-config-yaml")        // Configuration support
     implementation("io.smallrye.reactive:smallrye-reactive-messaging-in-memory:4.27.0")
 
     // Serverless Workflow SDK

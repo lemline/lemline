@@ -3,7 +3,7 @@ package com.lemline.worker.outbox
 
 import com.lemline.common.logger
 import com.lemline.worker.config.LemlineConfiguration
-import com.lemline.worker.config.RetryConfig
+import com.lemline.worker.config.LemlineConfiguration.RetryConfig
 import com.lemline.worker.messaging.WORKFLOW_OUT
 import com.lemline.worker.repositories.RetryRepository
 import io.quarkus.scheduler.Scheduled

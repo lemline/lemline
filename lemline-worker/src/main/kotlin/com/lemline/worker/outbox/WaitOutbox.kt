@@ -3,7 +3,7 @@ package com.lemline.worker.outbox
 
 import com.lemline.common.logger
 import com.lemline.worker.config.LemlineConfiguration
-import com.lemline.worker.config.WaitConfig
+import com.lemline.worker.config.LemlineConfiguration.WaitConfig
 import com.lemline.worker.messaging.WORKFLOW_OUT
 import com.lemline.worker.repositories.WaitRepository
 import io.quarkus.scheduler.Scheduled
