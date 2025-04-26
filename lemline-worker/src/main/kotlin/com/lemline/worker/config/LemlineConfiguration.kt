@@ -184,9 +184,9 @@ interface MessagingConfig {
 interface KafkaConfig {
     fun brokers(): String
     fun topic(): String
-    fun topicOut(): String
-    fun topicDlq(): String
     fun groupId(): String
+    fun topicDlq(): Optional<String>
+    fun topicOut(): Optional<String>
 
     /**
      * Offset reset strategy. Must be one of: earliest, latest
@@ -222,7 +222,8 @@ interface RabbitMQConfig {
 
     fun virtualHost(): String
     fun queue(): String
-    fun queueOut(): String
+    fun queueDlq(): Optional<String>
+    fun queueOut(): Optional<String>
     fun exchangeName(): Optional<String>
     fun sslEnabled(): Optional<Boolean>
 }

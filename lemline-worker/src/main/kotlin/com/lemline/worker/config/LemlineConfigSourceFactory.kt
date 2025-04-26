@@ -198,7 +198,10 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         val props = mutableMapOf<String, String>()
 
-        fun getProp(key: String): String? = lemlineProps[key]
+        // Get the value of a property, ignoring comments
+        fun getProp(key: String): String? = lemlineProps[key]?.split("#")?.first()?.trim()
+
+        // Get the value of a property, throwing an exception if not found
         fun requireProp(key: String): String = getProp(key)
             ?: throw NoSuchElementException("Required lemline property not found in context: $key")
 
@@ -253,8 +256,6 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         val pgHost = requireProp("$prefix.host", lemlineProps)
         val pgPort = requireProp("$prefix.port", lemlineProps)
         val pgDbName = requireProp("$prefix.name", lemlineProps)
-        // Validate port number
-        validatePort(pgPort.toInt())
         // set values
         props["quarkus.flyway.locations"] = "classpath:db/migration/postgresql"
         props["quarkus.datasource.jdbc.url"] = "jdbc:postgresql://$pgHost:$pgPort/$pgDbName"
@@ -267,8 +268,6 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         val mysqlHost = requireProp("$prefix.host", lemlineProps)
         val mysqlPort = requireProp("$prefix.port", lemlineProps)
         val mysqlDbName = requireProp("$prefix.name", lemlineProps)
-        // Validate port number
-        validatePort(mysqlPort.toInt())
         // set values
         props["quarkus.flyway.locations"] = "classpath:db/migration/mysql"
         props["quarkus.datasource.jdbc.url"] =
@@ -279,14 +278,14 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
     private fun configureH2(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
         val prefix = "lemline.database.h2"
-        val h2DbName = getProp("$prefix.name", lemlineProps)
+        val h2DbName = lemlineProps["$prefix.name"]
             ?: LemlineConfigConstants.DEFAULT_H2_DB_NAME
         // set values
         props["quarkus.flyway.locations"] = "classpath:db/migration/h2"
         props["quarkus.datasource.jdbc.url"] = "jdbc:h2:mem:$h2DbName;DB_CLOSE_DELAY=-1"
-        props["quarkus.datasource.username"] = getProp("$prefix.username", lemlineProps)
+        props["quarkus.datasource.username"] = lemlineProps["$prefix.username"]
             ?: LemlineConfigConstants.DEFAULT_H2_USERNAME
-        props["quarkus.datasource.password"] = getProp("$prefix.password", lemlineProps)
+        props["quarkus.datasource.password"] = lemlineProps["$prefix.password"]
             ?: LemlineConfigConstants.DEFAULT_H2_PASSWORD
     }
 
@@ -304,12 +303,12 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         props["$incoming.group.id"] = requireProp("$prefix.group-id", lemlineProps)
         props["$incoming.auto.offset.reset"] = requireProp("$prefix.offset-reset", lemlineProps)
         props["$incoming.failure-strategy"] = "dead-letter-queue"
-        props["$incoming.dead-letter-queue.topic"] = requireProp("$prefix.topic-dlq", lemlineProps)
+        props["$incoming.dead-letter-queue.topic"] = lemlineProps["$prefix.topic-dlq"]
+            ?: (props["$incoming.topic"] + "-dlq")
 
         // outgoing
         props["$outgoing.connector"] = LemlineConfigConstants.KAFKA_CONNECTOR
-        props["$outgoing.topic"] =
-            getProp("$prefix.topic-out", lemlineProps) ?: requireProp("$prefix.topic", lemlineProps)
+        props["$outgoing.topic"] = lemlineProps["$prefix.topic-out"] ?: props["$incoming.topic"]!!
         props["$outgoing.merge"] = "true"
 
         // optional security settings
@@ -359,13 +358,13 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         props["$incoming.auto-ack"] = "false"
         props["$incoming.deserializer"] = "java.lang.String"
         props["$incoming.queue.arguments.x-dead-letter-exchange"] = "dlx"
-        props["$incoming.queue.arguments.x-dead-letter-routing-key"] =
-            requireProp("$prefix.queue", lemlineProps) + "-dlq"
+        props["$incoming.queue.arguments.x-dead-letter-routing-key"] = lemlineProps["$prefix.queue-dlq"]
+            ?: (props["$incoming.queue.name"]!! + "-dlq")
 
         // outgoing
         props["$outgoing.connector"] = LemlineConfigConstants.RABBITMQ_CONNECTOR
-        props["$outgoing.queue.name"] =
-            getProp("$prefix.queue-out", lemlineProps) ?: requireProp("$prefix.queue", lemlineProps)
+        props["$outgoing.queue.name"] = lemlineProps["$prefix.queue-out"]
+            ?: props["$incoming.queue.name"]!!
         props["$outgoing.serializer"] = "java.lang.String"
         props["$outgoing.merge"] = "true"
     }
@@ -385,7 +384,6 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         }
     }
 
-    private fun getProp(key: String, lemlineProps: Map<String, String>): String? = lemlineProps[key]
-    private fun requireProp(key: String, lemlineProps: Map<String, String>): String = getProp(key, lemlineProps)
+    private fun requireProp(key: String, lemlineProps: Map<String, String>): String = lemlineProps[key]
         ?: throw NoSuchElementException("Required lemline property not found in context: $key")
 }
