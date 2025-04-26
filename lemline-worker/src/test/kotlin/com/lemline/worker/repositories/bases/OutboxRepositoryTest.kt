@@ -32,7 +32,7 @@ import org.junit.jupiter.api.Test
  *
  * @param T The type of OutboxModel being tested
  */
-internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
+internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
     /** The repository implementation being tested */
     internal abstract val repository: OutboxRepository<T>
@@ -136,10 +136,10 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
      * This simulates a real-world scenario where messages are processed and their status is updated.
      */
     @Transactional
-    protected open fun findAndLockReadyToProcess(
+    protected open fun findMessagesToProcess(
         limit: Int = Int.MAX_VALUE,
         maxAttempts: Int = Int.MAX_VALUE
-    ): List<T> = repository.findAndLockReadyToProcess(limit = limit, maxAttempts = maxAttempts)
+    ): List<T> = repository.findMessagesToProcess(limit = limit, maxAttempts = maxAttempts)
         .also { messages ->
             messages.forEach { it.status = OutBoxStatus.FAILED }
             repository.persist(messages)
@@ -152,10 +152,10 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
      * This simulates a real-world scenario where messages are deleted after processing.
      */
     @Transactional
-    protected open fun findAndLockForDeletion(
+    protected open fun findMessagesToDelete(
         cutoffDate: Instant = Instant.now(),
         limit: Int = Int.MAX_VALUE
-    ): List<T> = repository.findAndLockReadyToDelete(cutoffDate = cutoffDate, limit = limit)
+    ): List<T> = repository.findMessagesToDelete(cutoffDate = cutoffDate, limit = limit)
         .also { messages ->
             messages.forEach { it.status = OutBoxStatus.FAILED }
             repository.persist(messages)
@@ -163,43 +163,43 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
         }
 
     /**
-     * Tests that findAndLockReadyToProcess returns the correct messages for processing.
+     * Tests that findMessagesToProcess returns the correct messages for processing.
      * Verifies that the repository correctly identifies messages that are:
      * - In PENDING status
      * - Past their delay time
      * - Within attempt limits
      */
     @Test
-    fun `findAndLockReadyToProcess should return all eligible pending messages that are ready for processing`() {
+    fun `findMessagesToProcess should return all eligible pending messages that are ready for processing`() {
         val messages = createMessages(messageCount)
-        val expected = findAndLockReadyToProcess()
+        val expected = findMessagesToProcess()
         val actual = messages.filterToProcess()
         println("expected for processing: ${expected.size}")
         expected.equalTo(actual) shouldBe true
     }
 
     /**
-     * Tests that findAndLockReadyToProcess respects the maxAttempts parameter.
+     * Tests that findMessagesToProcess respects the maxAttempts parameter.
      * Verifies that messages exceeding the attempt limit are not returned.
      */
     @Test
-    fun `findAndLockReadyToProcess should exclude messages that have exceeded maxAttempts`() {
+    fun `findMessagesToProcess should exclude messages that have exceeded maxAttempts`() {
         val messages = createMessages(messageCount)
-        val expected = findAndLockReadyToProcess(maxAttempts = maxAttempts)
+        val expected = findMessagesToProcess(maxAttempts = maxAttempts)
         val actual = messages.filterToProcess(maxAttempts = maxAttempts)
         println("expected for processing with maxAttempts: ${expected.size}")
         expected.equalTo(actual) shouldBe true
     }
 
     /**
-     * Tests that findAndLockReadyToProcess respects the limit parameter.
+     * Tests that findMessagesToProcess respects the limit parameter.
      * Verifies that the number of returned messages does not exceed the limit
      * and that all returned messages are valid candidates for processing.
      */
     @Test
-    fun `findAndLockReadyToProcess should respect the limit parameter and only return valid candidates`() {
+    fun `findMessagesToProcess should respect the limit parameter and only return valid candidates`() {
         val messages = createMessages(messageCount)
-        val actual = findAndLockReadyToProcess(limit = limit)
+        val actual = findMessagesToProcess(limit = limit)
         val expected = messages.filterToProcess()
 
         actual.size shouldBeLessThanOrEqualTo limit
@@ -208,42 +208,42 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
     }
 
     /**
-     * Tests that findAndLockForDeletion returns the correct messages for deletion.
+     * Tests that findMessagesToDelete returns the correct messages for deletion.
      * Verifies that the repository correctly identifies messages that are:
      * - In SENT status
      * - Past their cutoff date
      */
     @Test
-    fun `findAndLockForDeletion should return all sent messages that are past their cutoff date`() {
+    fun `findMessagesToDelete should return all sent messages that are past their cutoff date`() {
         val messages = createMessages(messageCount)
         val expected = messages.filterToDelete()
-        val actual = findAndLockForDeletion()
+        val actual = findMessagesToDelete()
         println("expected for deletion: ${expected.size}")
         expected.equalTo(actual) shouldBe true
     }
 
     /**
-     * Tests that findAndLockForDeletion respects the cutoffDate parameter.
+     * Tests that findMessagesToDelete respects the cutoffDate parameter.
      * Verifies that only messages older than the cutoff date are returned.
      */
     @Test
-    fun `findAndLockForDeletion should only return messages older than the specified cutoff date`() {
+    fun `findMessagesToDelete should only return messages older than the specified cutoff date`() {
         val messages = createMessages(messageCount)
         val expected = messages.filterToDelete(cutoffDate = cutoffDate)
-        val actual = findAndLockForDeletion(cutoffDate = cutoffDate)
+        val actual = findMessagesToDelete(cutoffDate = cutoffDate)
         println("expected for deletion with cutoffDate: ${expected.size}")
         expected.equalTo(actual) shouldBe true
     }
 
     /**
-     * Tests that findAndLockForDeletion respects the limit parameter.
+     * Tests that findMessagesToDelete respects the limit parameter.
      * Verifies that the number of returned messages does not exceed the limit
      * and that all returned messages are valid candidates for deletion.
      */
     @Test
-    fun `findAndLockForDeletion should respect the limit parameter and only return valid candidates`() {
+    fun `findMessagesToDelete should respect the limit parameter and only return valid candidates`() {
         val messages = createMessages(messageCount)
-        val actual = findAndLockForDeletion(limit = limit)
+        val actual = findMessagesToDelete(limit = limit)
         val expected = messages.filterToDelete()
 
         actual.size shouldBeLessThanOrEqualTo limit
@@ -259,7 +259,7 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
      * - The operation completes within a reasonable time
      */
     @Test
-    fun `findAndLockReadyToProcess should handle concurrent requests without duplicate processing`() {
+    fun `findMessagesToProcess should handle concurrent requests without duplicate processing`() {
         val messages = createMessages(messageCount)
         val expectedProcessed = messages.filterToProcess(maxAttempts = maxAttempts).size
         println("expected processedMessages: $expectedProcessed")
@@ -272,7 +272,7 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
             repeat(concurrentRequests) {
                 executor.submit {
                     try {
-                        val results = findAndLockReadyToProcess(limit = limit, maxAttempts = maxAttempts)
+                        val results = findMessagesToProcess(limit = limit, maxAttempts = maxAttempts)
                         synchronized(processedMessages) { processedMessages.addAll(results) }
                     } catch (e: Exception) {
                         println(e.printStackTrace())
@@ -298,7 +298,7 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
      * - The operation completes within a reasonable time
      */
     @Test
-    fun `findAndLockForDeletion should handle concurrent requests without duplicate deletion`() {
+    fun `findMessagesToDelete should handle concurrent requests without duplicate deletion`() {
         val messages = createMessages(messageCount)
         val expectedDeleted = messages.filterToDelete(cutoffDate).size
         println("expected deletedMessages: $expectedDeleted")
@@ -311,7 +311,7 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
             repeat(concurrentRequests) {
                 executor.submit {
                     try {
-                        val results = findAndLockForDeletion(cutoffDate = cutoffDate, limit = limit)
+                        val results = findMessagesToDelete(cutoffDate = cutoffDate, limit = limit)
                         synchronized(deletedMessages) { deletedMessages.addAll(results) }
                     } catch (e: Exception) {
                         println(e.printStackTrace())
@@ -356,12 +356,12 @@ internal abstract class AbstractOutboxRepositoryTest<T : OutboxModel> {
                     try {
                         when (Random.nextInt(0, 2)) {
                             0 -> {
-                                val results = findAndLockReadyToProcess(limit = limit, maxAttempts = maxAttempts)
+                                val results = findMessagesToProcess(limit = limit, maxAttempts = maxAttempts)
                                 synchronized(processedMessages) { processedMessages.addAll(results) }
                             }
 
                             1 -> {
-                                val results = findAndLockForDeletion(cutoffDate, limit = limit)
+                                val results = findMessagesToDelete(cutoffDate, limit = limit)
                                 synchronized(deletedMessages) { deletedMessages.addAll(results) }
                             }
                         }

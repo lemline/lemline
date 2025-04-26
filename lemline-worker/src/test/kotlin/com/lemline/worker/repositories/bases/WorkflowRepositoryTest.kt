@@ -31,7 +31,7 @@ import org.junit.jupiter.api.Test
  * @see WorkflowRepository
  * @see WorkflowModel
  */
-abstract class AbstractWorkflowModelRepositoryTest {
+abstract class WorkflowRepositoryTest {
 
     /** The repository implementation being tested */
     @Inject

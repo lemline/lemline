@@ -8,7 +8,7 @@ import jakarta.inject.Inject
 /**
  * Abstract base class for wait repository tests.
  */
-internal abstract class AbstractWaitRepositoryTest : AbstractOutboxRepositoryTest<WaitModel>() {
+internal abstract class WaitRepositoryTest : OutboxRepositoryTest<WaitModel>() {
 
     @Inject
     override lateinit var repository: WaitRepository

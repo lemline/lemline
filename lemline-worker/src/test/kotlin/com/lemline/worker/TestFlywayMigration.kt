@@ -8,6 +8,16 @@ import jakarta.inject.Inject
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.flywaydb.core.Flyway
 
+/**
+ * Ensures that Flyway database migrations are applied during application startup
+ * After applying the LemlineConfigSourceFactory,
+ * specifically when running in the 'test' profile.
+ *
+ * This is crucial for integration tests that rely on the database schema being
+ * up-to-date. By observing the `StartupEvent` and checking if the profile is 'test',
+ * it triggers `flyway.migrate()` to execute any pending migrations before tests run.
+ * This guarantees a consistent database state for testing purposes.
+ */
 @ApplicationScoped
 class TestFlywayMigration(
     @ConfigProperty(name = "quarkus.profile", defaultValue = "dev")

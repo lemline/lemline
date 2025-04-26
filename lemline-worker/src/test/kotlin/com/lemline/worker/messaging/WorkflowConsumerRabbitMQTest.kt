@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.messaging
 
-import com.lemline.worker.messaging.bases.WorkflowConsumerBaseTest
+import com.lemline.worker.messaging.bases.WorkflowConsumerTest
 import com.lemline.worker.tests.profiles.H2RabbitMQProfile
 import com.rabbitmq.client.CancelCallback
 import com.rabbitmq.client.Channel
@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Tag
 @QuarkusTest
 @TestProfile(H2RabbitMQProfile::class)
 @Tag("integration")
-internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerBaseTest() {
+internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 
     @ConfigProperty(name = "rabbitmq-host")
     lateinit var rabbitmqHost: String

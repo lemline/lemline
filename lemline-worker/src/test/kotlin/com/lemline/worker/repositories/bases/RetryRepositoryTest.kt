@@ -9,7 +9,7 @@ import jakarta.inject.Inject
 /**
  * Abstract base class for retry repository tests.
  */
-internal abstract class AbstractRetryRepositoryTest : AbstractOutboxRepositoryTest<RetryModel>() {
+internal abstract class RetryRepositoryTest : OutboxRepositoryTest<RetryModel>() {
 
     @Inject
     override lateinit var repository: RetryRepository

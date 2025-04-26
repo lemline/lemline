@@ -80,7 +80,7 @@ internal class OutboxProcessor<T : OutboxModel>(
      * - Allows for independent retry of failed messages
      *
      * @param batchSize Maximum number of messages to process in one batch
-     * @param maxAttempts Maximum number of retry attempts before giving up
+     * @param maxAttempts Maximum number of attempts before giving up (>=1)
      * @param initialDelay Initial delay in seconds before first retry
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
@@ -93,7 +93,7 @@ internal class OutboxProcessor<T : OutboxModel>(
 
             while (consecutiveEmptyBatches < maxConsecutiveEmptyBatches) {
                 // Find and lock messages ready to process
-                val messages = repository.findAndLockReadyToProcess(batchSize, maxAttempts)
+                val messages = repository.findMessagesToProcess(batchSize, maxAttempts)
 
                 if (messages.isEmpty()) {
                     consecutiveEmptyBatches++
@@ -106,6 +106,8 @@ internal class OutboxProcessor<T : OutboxModel>(
 
                 for (message in messages) {
                     try {
+                        // Increment attempt count
+                        message.attemptCount++
                         // Process the message
                         processor(message)
 
@@ -115,8 +117,6 @@ internal class OutboxProcessor<T : OutboxModel>(
                         totalProcessed++
                     } catch (e: Exception) {
                         logger.warn(e) { "Failed to process message ${message.id}: ${e.message}" }
-                        // Update status to PENDING and increment attempt count in the same transaction
-                        message.attemptCount++
                         message.lastError = e.message ?: "Unknown error"
 
                         if (message.attemptCount >= maxAttempts) {
@@ -177,7 +177,7 @@ internal class OutboxProcessor<T : OutboxModel>(
 
             while (consecutiveEmptyChunks < maxConsecutiveEmptyChunks) {
                 // Find and lock a chunk of messages for deletion
-                val messagesToDelete = repository.findAndLockReadyToDelete(cutoffDate, batchSize)
+                val messagesToDelete = repository.findMessagesToDelete(cutoffDate, batchSize)
 
                 if (messagesToDelete.isEmpty()) {
                     consecutiveEmptyChunks++

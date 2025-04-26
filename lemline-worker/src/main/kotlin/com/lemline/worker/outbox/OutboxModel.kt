@@ -6,7 +6,7 @@ import java.time.Instant
 
 /**
  * Base class for outbox pattern message models.
- * This abstract class defines the common structure for messages stored in the outbox table,
+ * This abstract class defines the common structure for messages stored in an outbox table,
  * implementing the outbox pattern to ensure reliable message delivery.
  *
  * The outbox pattern works by:
@@ -21,17 +21,17 @@ import java.time.Instant
 abstract class OutboxModel : UuidV7Entity() {
     /**
      * The actual message content to be processed.
-     * This is typically a serialized representation of the message payload.
-     * The format depends on the specific implementation (e.g., JSON, XML, etc.).
+     * This is typically a JSON serialized representation of the message payload.
      */
     abstract var message: String
 
     /**
-     * Current status of the message in the outbox.
-     * Possible values:
+     * Current status of the message in the outbox. Possible values:
      * - PENDING: Message is ready to be processed
      * - SENT: Message has been successfully processed
-     * - FAILED: Message has failed after maximum retry attempts
+     * - FAILED: Message has failed to be processed after maximum retry attempts
+     *
+     * Messages with FAILED status are not processed, neither deleted, and must be manually handled
      *
      * @see OutBoxStatus for possible status values
      */
@@ -57,8 +57,6 @@ abstract class OutboxModel : UuidV7Entity() {
     /**
      * Timestamp indicating when the message should be processed next.
      * Used for implementing retry delays with exponential backoff.
-     * For new messages, this is typically set to the current time.
-     * For failed messages, this is calculated based on the retry strategy.
      *
      * @see OutboxProcessor.calculateNextRetryDelay for delay calculation
      */

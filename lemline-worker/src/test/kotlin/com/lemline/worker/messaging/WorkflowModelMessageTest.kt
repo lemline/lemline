@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
-class WorkflowModelMessageTest {
+internal class WorkflowModelMessageTest {
 
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {

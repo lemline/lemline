@@ -95,7 +95,7 @@ internal interface OutboxRepository<T : OutboxModel> : PanacheRepositoryBase<T, 
      */
     @Suppress("UNCHECKED_CAST")
     @Transactional
-    fun findAndLockReadyToProcess(limit: Int, maxAttempts: Int): List<T> = getEntityManager()
+    fun findMessagesToProcess(limit: Int, maxAttempts: Int): List<T> = getEntityManager()
         .createNativeQuery(
             """
             SELECT * FROM $tableName
@@ -141,7 +141,7 @@ internal interface OutboxRepository<T : OutboxModel> : PanacheRepositoryBase<T, 
      */
     @Suppress("UNCHECKED_CAST")
     @Transactional
-    fun findAndLockReadyToDelete(cutoffDate: Instant, limit: Int): List<T> = getEntityManager()
+    fun findMessagesToDelete(cutoffDate: Instant, limit: Int): List<T> = getEntityManager()
         .createNativeQuery(
             """
             SELECT * FROM $tableName

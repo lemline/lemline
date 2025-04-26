@@ -95,6 +95,7 @@ import org.eclipse.microprofile.config.spi.ConfigSource
  *     quarkus.datasource.username=sa
  *     quarkus.datasource.password=
  *     ```
+ *   - The `TestFlywayMigration` class ensures migrations are automatically run for the `test` profile by observing the `StartupEvent`, complementing the `application-test.properties` settings.
  * - For production/development with custom configuration:
  *   - Use migrate-at-start=false
  *   - Manually trigger migration after configuration
@@ -206,6 +207,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
             }
 
             props["quarkus.datasource.db-kind"] = dbType
+            props["quarkus.flyway.migrate-at-start"] = getProp("lemline.database.migrate-at-start") ?: "false"
 
             when (dbType) {
                 LemlineConfigConstants.DB_TYPE_POSTGRESQL -> configurePostgreSQL(props, lemlineProps)

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.messaging
 
-import com.lemline.worker.messaging.bases.WorkflowConsumerBaseTest
+import com.lemline.worker.messaging.bases.WorkflowConsumerTest
 import com.lemline.worker.tests.profiles.H2KafkaProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Tag
 @QuarkusTest
 @TestProfile(H2KafkaProfile::class)
 @Tag("integration")
-internal class WorkflowConsumerKafkaTest : WorkflowConsumerBaseTest() {
+internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 
     @ConfigProperty(name = "kafka.bootstrap.servers")
     lateinit var bootstrapServers: String
