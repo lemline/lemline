@@ -16,11 +16,9 @@ dependencies {
 
     // Apply the kotlinx bundle of dependencies from the version catalog (`gradle/libs.versions.toml`).
     implementation(libs.bundles.kotlinxEcosystem)
-
-    // Enforce Quarkus platform versions
-    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.4"))
-
+    
     // Quarkus
+    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.4"))
     implementation("io.quarkus:quarkus-kotlin")
     implementation("io.quarkus:quarkus-flyway")             // DB migration
     implementation("io.quarkus:quarkus-messaging")

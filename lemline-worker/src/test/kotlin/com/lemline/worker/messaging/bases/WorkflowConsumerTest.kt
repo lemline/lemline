@@ -211,7 +211,7 @@ internal abstract class WorkflowConsumerTest {
         val future = sendMessageFuture(invalidMessage)
 
         // This message cannot be processed
-        shouldThrowAny { future.get() }
+        shouldThrowAny { future.get(1, SECONDS) }
 
         val retryMessages = retryRepository.listAll()
         retryMessages[0].message shouldBe invalidMessage
@@ -255,7 +255,7 @@ internal abstract class WorkflowConsumerTest {
         val future = sendMessageFuture(messageJson)
 
         // Wait for the message to be processed
-        future.get(5, SECONDS)
+        future.get(1, SECONDS)
 
         // Verify a message was stored in the retry repository
         val retryMessages = retryRepository.listAll()
@@ -297,7 +297,7 @@ internal abstract class WorkflowConsumerTest {
 
         // Then
         // Wait for the message to be processed
-        future.get(5, SECONDS)
+        future.get(1, SECONDS)
 
         // Verify that no message was stored in the wait repository
         val waitMessages = waitRepository.listAll()

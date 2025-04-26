@@ -237,6 +237,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                 when (msgType) {
                     LemlineConfigConstants.MSG_TYPE_KAFKA -> configureKafka(props, lemlineProps)
                     LemlineConfigConstants.MSG_TYPE_RABBITMQ -> configureRabbitMQ(props, lemlineProps)
+                    LemlineConfigConstants.MSG_TYPE_IN_MEMORY -> configureInMemory(props, lemlineProps)
                 }
             }
         } catch (e: NoSuchElementException) {
@@ -370,6 +371,15 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
             getProp("$prefix.queue-out", lemlineProps) ?: requireProp("$prefix.queue", lemlineProps)
         props["$outgoing.serializer"] = "java.lang.String"
         props["$outgoing.merge"] = "true"
+    }
+
+    private fun configureInMemory(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
+        val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
+        val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
+
+        // Configure in-memory channels
+        props["$incoming.connector"] = LemlineConfigConstants.IN_MEMORY_CONNECTOR
+        props["$outgoing.connector"] = LemlineConfigConstants.IN_MEMORY_CONNECTOR
     }
 
     private fun validatePort(port: Int) {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.config
 
+import com.lemline.worker.config.LemlineConfigConstants.DEFAULT_MSG_TYPE
 import io.quarkus.runtime.annotations.ConfigRoot
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithDefault
@@ -167,10 +168,12 @@ interface MySQLConfig {
 @ConfigMapping(prefix = "lemline.messaging")
 interface MessagingConfig {
     /**
-     * Messaging type. Must be one of: kafka, rabbitmq
+     * Messaging type. Must be one of: in-memory, kafka, rabbitmq
+     * Default: in-memory
      */
-    @Pattern(regexp = "kafka|rabbitmq")
-    fun type(): Optional<String>
+    @WithDefault(DEFAULT_MSG_TYPE)
+    @Pattern(regexp = "in-memory|kafka|rabbitmq")
+    fun type(): String
 
     // Broker Specific settings
     fun kafka(): KafkaConfig
