@@ -22,4 +22,4 @@ class InMemoryProfile : QuarkusTestProfile {
             "lemline.messaging.type" to "in-memory"
         )
     }
-} 
+}

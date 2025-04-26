@@ -69,4 +69,4 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
         // Get the first message from the sink
         return sink.received().firstOrNull()?.payload
     }
-} 
+}
