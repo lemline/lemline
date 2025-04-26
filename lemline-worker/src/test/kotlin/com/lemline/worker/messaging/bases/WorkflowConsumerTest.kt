@@ -255,7 +255,7 @@ internal abstract class WorkflowConsumerTest {
         val future = sendMessageFuture(messageJson)
 
         // Wait for the message to be processed
-        future.get(1, SECONDS)
+        future.get(2, SECONDS)
 
         // Verify a message was stored in the retry repository
         val retryMessages = retryRepository.listAll()

@@ -5,53 +5,52 @@ import com.lemline.worker.messaging.bases.WorkflowConsumerTest
 import com.lemline.worker.tests.profiles.H2InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
-import java.util.concurrent.LinkedBlockingQueue
+import io.smallrye.reactive.messaging.memory.InMemoryConnector
+import io.smallrye.reactive.messaging.memory.InMemorySink
+import io.smallrye.reactive.messaging.memory.InMemorySource
+import jakarta.enterprise.inject.Any
+import jakarta.inject.Inject
 import java.util.concurrent.TimeUnit
 import org.junit.jupiter.api.Tag
 
 /**
  * In-memory implementation of [WorkflowConsumerTest] for local testing.
  *
- * This test class uses simple in-memory queues to simulate message passing between
+ * This test class uses SmallRye's in-memory connector to simulate message passing between
  * the workflow consumer and its test environment. It's particularly useful for:
  * - Quick local development testing without external dependencies
  * - CI/CD pipelines where external message brokers might not be available
  * - Fast feedback during development
- *
- * The implementation uses [LinkedBlockingQueue] to provide thread-safe message passing
- * and blocking operations for message sending and receiving.
  */
 @QuarkusTest
 @TestProfile(H2InMemoryProfile::class)
 @Tag("integration")
 internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
 
-    // In-memory queues for message passing
-    private val inputQueue = LinkedBlockingQueue<String>()
-    private val outputQueue = LinkedBlockingQueue<String>()
+    @Inject
+    @Any
+    private lateinit var connector: InMemoryConnector
+
+    private lateinit var source: InMemorySource<String>
+    private lateinit var sink: InMemorySink<String>
 
     /**
      * Sets up the in-memory messaging infrastructure.
      *
      * This implementation:
-     * 1. Clears any existing messages from the queues
-     * 2. Initializes the queues for fresh testing
+     * 1. Gets the source and sink channels
+     * 2. Initializes the channels for fresh testing
      */
     override fun setupMessaging() {
-        // Clear any existing messages
-        inputQueue.clear()
-        outputQueue.clear()
+        source = connector.source(WORKFLOW_IN)
+        sink = connector.sink(WORKFLOW_OUT)
     }
 
     /**
      * Cleans up the in-memory messaging infrastructure.
-     *
-     * In this implementation, we simply clear the queues to ensure
-     * no messages remain between test runs.
      */
     override fun cleanupMessaging() {
-        inputQueue.clear()
-        outputQueue.clear()
+        // No cleanup needed for in-memory channels
     }
 
     /**
@@ -60,8 +59,7 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      * @param message The message to send
      */
     override fun sendMessage(message: String) {
-        // Add the message to the input queue
-        inputQueue.put(message)
+        source.send(message)
     }
 
     /**
@@ -72,6 +70,9 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      * @return The received message, or null if no message was received within the timeout
      */
     override fun receiveMessage(timeout: Long, unit: TimeUnit): String? {
-        return outputQueue.poll(timeout, unit)
+        // Wait for the message to be processed
+        Thread.sleep(5)
+        // Get the first message from the sink
+        return sink.received().firstOrNull()?.payload
     }
 } 
