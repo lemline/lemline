@@ -6,6 +6,9 @@ import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.common.warn
+import com.lemline.worker.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
+import com.lemline.worker.config.LemlineConfigConstants.DB_TYPE_MYSQL
+import com.lemline.worker.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.worker.messaging.WORKFLOW_IN
 import com.lemline.worker.messaging.WORKFLOW_OUT
 import io.smallrye.config.ConfigSourceContext
@@ -201,20 +204,20 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         try {
             val dbTypeKey = "lemline.database.type"
-            val dbType = getProp(dbTypeKey) ?: LemlineConfigConstants.DEFAULT_DB_TYPE
+            val dbType = requireProp(dbTypeKey).trim().lowercase()
 
             // Validate database type
-            if (dbType !in LemlineConfigConstants.SUPPORTED_DB_TYPES) {
-                throw IllegalArgumentException("Unsupported database type: $dbType. Supported types: ${LemlineConfigConstants.SUPPORTED_DB_TYPES}")
+            props["quarkus.datasource.db-kind"] = when (dbType) {
+                DB_TYPE_IN_MEMORY -> "h2"
+                DB_TYPE_POSTGRESQL -> "postgresql"
+                DB_TYPE_MYSQL -> "mysql"
+                else -> throw IllegalArgumentException("Unsupported database type: $dbType. Supported types: ${LemlineConfigConstants.SUPPORTED_DB_TYPES}")
             }
 
-            props["quarkus.datasource.db-kind"] = dbType
-            props["quarkus.flyway.migrate-at-start"] = getProp("lemline.database.migrate-at-start") ?: "false"
-
             when (dbType) {
-                LemlineConfigConstants.DB_TYPE_POSTGRESQL -> configurePostgreSQL(props, lemlineProps)
-                LemlineConfigConstants.DB_TYPE_MYSQL -> configureMySQL(props, lemlineProps)
-                LemlineConfigConstants.DB_TYPE_H2 -> configureH2(props, lemlineProps)
+                DB_TYPE_IN_MEMORY -> configureH2(props, lemlineProps)
+                DB_TYPE_POSTGRESQL -> configurePostgreSQL(props, lemlineProps)
+                DB_TYPE_MYSQL -> configureMySQL(props, lemlineProps)
             }
         } catch (e: NoSuchElementException) {
             log.warn(e) { "Incomplete database configuration: ${e.message}" }
@@ -226,19 +229,13 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         try {
             val msgTypeKey = "lemline.messaging.type"
-            if (lemlineProps.containsKey(msgTypeKey)) {
-                val msgType = requireProp(msgTypeKey).trim().lowercase()
 
-                // Validate messaging type
-                if (msgType !in LemlineConfigConstants.SUPPORTED_MSG_TYPES) {
-                    throw IllegalArgumentException("Unsupported messaging type: $msgType. Supported types: ${LemlineConfigConstants.SUPPORTED_MSG_TYPES}")
-                }
-
-                when (msgType) {
-                    LemlineConfigConstants.MSG_TYPE_KAFKA -> configureKafka(props, lemlineProps)
-                    LemlineConfigConstants.MSG_TYPE_RABBITMQ -> configureRabbitMQ(props, lemlineProps)
-                    LemlineConfigConstants.MSG_TYPE_IN_MEMORY -> configureInMemory(props, lemlineProps)
-                }
+            // Validate messaging type
+            when (val msgType = requireProp(msgTypeKey).trim().lowercase()) {
+                LemlineConfigConstants.MSG_TYPE_KAFKA -> configureKafka(props, lemlineProps)
+                LemlineConfigConstants.MSG_TYPE_RABBITMQ -> configureRabbitMQ(props, lemlineProps)
+                LemlineConfigConstants.MSG_TYPE_IN_MEMORY -> configureInMemory(props)
+                else -> throw IllegalArgumentException("Unsupported messaging type: $msgType. Supported types: ${LemlineConfigConstants.SUPPORTED_MSG_TYPES}")
             }
         } catch (e: NoSuchElementException) {
             log.warn(e) { "Incomplete messaging configuration: ${e.message}" }
@@ -373,7 +370,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         props["$outgoing.merge"] = "true"
     }
 
-    private fun configureInMemory(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
+    private fun configureInMemory(props: MutableMap<String, String>) {
         val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
         val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
 

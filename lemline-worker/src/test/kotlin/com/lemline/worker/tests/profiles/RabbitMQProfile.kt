@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.tests.profiles
 
+import com.lemline.worker.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
+import com.lemline.worker.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
 import com.lemline.worker.tests.resources.RabbitMQTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 import io.quarkus.test.junit.QuarkusTestProfile.TestResourceEntry
@@ -23,10 +25,10 @@ class RabbitMQProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
             // Database configuration
-            "lemline.database.type" to "h2",
+            "lemline.database.type" to DB_TYPE_IN_MEMORY,
 
             // Messaging configuration
-            "lemline.messaging.type" to "rabbitmq"
+            "lemline.messaging.type" to MSG_TYPE_RABBITMQ
         )
     }
 
@@ -42,6 +44,6 @@ class RabbitMQProfile : QuarkusTestProfile {
      * Specifies tags for this profile (optional).
      */
     override fun tags(): Set<String> {
-        return setOf("h2", "rabbitmq", "integration")
+        return setOf(MSG_TYPE_RABBITMQ)
     }
 }

@@ -11,13 +11,12 @@ object LemlineConfigConstants {
     const val CONFIG_SOURCE_NAME = "LemlineConfigSource"
 
     // Database types
+    const val DB_TYPE_IN_MEMORY = "in-memory"
     const val DB_TYPE_POSTGRESQL = "postgresql"
     const val DB_TYPE_MYSQL = "mysql"
-    const val DB_TYPE_H2 = "h2"
-    val SUPPORTED_DB_TYPES = setOf(DB_TYPE_POSTGRESQL, DB_TYPE_MYSQL, DB_TYPE_H2)
-    const val DEFAULT_DB_TYPE = DB_TYPE_H2
+    val SUPPORTED_DB_TYPES = setOf(DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL, DB_TYPE_MYSQL)
 
-    // Default values
+    // H2 Default values
     const val DEFAULT_H2_DB_NAME = "lemline"
     const val DEFAULT_H2_USERNAME = "sa"
     const val DEFAULT_H2_PASSWORD = ""
@@ -27,7 +26,6 @@ object LemlineConfigConstants {
     const val MSG_TYPE_KAFKA = "kafka"
     const val MSG_TYPE_RABBITMQ = "rabbitmq"
     val SUPPORTED_MSG_TYPES = setOf(MSG_TYPE_IN_MEMORY, MSG_TYPE_KAFKA, MSG_TYPE_RABBITMQ)
-    const val DEFAULT_MSG_TYPE = MSG_TYPE_IN_MEMORY
 
     // Messaging connectors
     const val IN_MEMORY_CONNECTOR = "smallrye-in-memory"

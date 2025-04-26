@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.config
 
-import com.lemline.worker.config.LemlineConfigConstants.DEFAULT_MSG_TYPE
 import io.quarkus.runtime.annotations.ConfigRoot
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithDefault
@@ -64,11 +63,9 @@ interface LemlineConfiguration {
 @ConfigMapping(prefix = "lemline.database")
 interface DatabaseConfig {
     /**
-     * Database type. Must be one of: postgresql, mysql, h2
-     * Default: h2
+     * Database type. Must be one of: in-memory, postgresql, mysql
      */
-    @WithDefault(LemlineConfigConstants.DEFAULT_DB_TYPE)
-    @Pattern(regexp = "postgresql|mysql|h2")
+    @Pattern(regexp = "in-memory|postgresql|mysql")
     fun type(): String
 
     /**
@@ -171,7 +168,6 @@ interface MessagingConfig {
      * Messaging type. Must be one of: in-memory, kafka, rabbitmq
      * Default: in-memory
      */
-    @WithDefault(DEFAULT_MSG_TYPE)
     @Pattern(regexp = "in-memory|kafka|rabbitmq")
     fun type(): String
 

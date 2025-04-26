@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.worker.tests.profiles
 
+import com.lemline.worker.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
+import com.lemline.worker.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import com.lemline.worker.tests.resources.PostgresTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -22,10 +24,10 @@ class PostgresProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
             // Database configuration
-            "lemline.database.type" to "postgresql",
+            "lemline.database.type" to DB_TYPE_POSTGRESQL,
 
             // Messaging configuration
-            "lemline.messaging.type" to "in-memory"
+            "lemline.messaging.type" to MSG_TYPE_IN_MEMORY
         )
     }
 
@@ -41,6 +43,6 @@ class PostgresProfile : QuarkusTestProfile {
      * Specifies tags for this profile (optional).
      */
     override fun tags(): Set<String> {
-        return setOf("postgres", "integration")
+        return setOf(DB_TYPE_POSTGRESQL)
     }
 }
