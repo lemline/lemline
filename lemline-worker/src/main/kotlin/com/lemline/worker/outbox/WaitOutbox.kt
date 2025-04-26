@@ -4,6 +4,7 @@ package com.lemline.worker.outbox
 import com.lemline.common.logger
 import com.lemline.worker.config.LemlineConfiguration
 import com.lemline.worker.config.WaitConfig
+import com.lemline.worker.messaging.WORKFLOW_OUT
 import com.lemline.worker.repositories.WaitRepository
 import io.quarkus.scheduler.Scheduled
 import io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP
@@ -35,7 +36,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
 internal class WaitOutbox @Inject constructor(
     repository: WaitRepository,
     lemlineConfig: LemlineConfiguration,
-    @Channel("workflows-out") emitter: Emitter<String>,
+    @Channel(WORKFLOW_OUT) emitter: Emitter<String>,
 ) {
     private val logger = logger()
 

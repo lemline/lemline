@@ -6,6 +6,8 @@ import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.common.warn
+import com.lemline.worker.messaging.WORKFLOW_IN
+import com.lemline.worker.messaging.WORKFLOW_OUT
 import io.smallrye.config.ConfigSourceContext
 import io.smallrye.config.ConfigSourceFactory
 import io.smallrye.config.PropertiesConfigSource
@@ -292,15 +294,15 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
     private fun configureKafka(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
         val prefix = "lemline.messaging.kafka"
-        val incoming = "mp.messaging.incoming.workflows-in"
-        val outgoing = "mp.messaging.outgoing.workflows-out"
+        val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
+        val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
 
         // server
         props["kafka.bootstrap.servers"] = requireProp("$prefix.brokers", lemlineProps)
 
         // incoming
         props["$incoming.connector"] = LemlineConfigConstants.KAFKA_CONNECTOR
-        props["$incoming.topic"] = requireProp("$prefix.topic-in", lemlineProps)
+        props["$incoming.topic"] = requireProp("$prefix.topic", lemlineProps)
         props["$incoming.group.id"] = requireProp("$prefix.group-id", lemlineProps)
         props["$incoming.auto.offset.reset"] = requireProp("$prefix.offset-reset", lemlineProps)
         props["$incoming.failure-strategy"] = "dead-letter-queue"
@@ -309,7 +311,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         // outgoing
         props["$outgoing.connector"] = LemlineConfigConstants.KAFKA_CONNECTOR
         props["$outgoing.topic"] =
-            getProp("$prefix.topic-out", lemlineProps) ?: requireProp("$prefix.topic-in", lemlineProps)
+            getProp("$prefix.topic-out", lemlineProps) ?: requireProp("$prefix.topic", lemlineProps)
         props["$outgoing.merge"] = "true"
 
         // optional security settings
@@ -341,8 +343,8 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
     private fun configureRabbitMQ(props: MutableMap<String, String>, lemlineProps: Map<String, String>) {
         val prefix = "lemline.messaging.rabbitmq"
-        val incoming = "mp.messaging.incoming.workflows-in"
-        val outgoing = "mp.messaging.outgoing.workflows-out"
+        val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
+        val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
 
         // server
         props["rabbitmq-host"] = requireProp("$prefix.hostname", lemlineProps)
@@ -354,18 +356,18 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         // incoming
         props["$incoming.connector"] = LemlineConfigConstants.RABBITMQ_CONNECTOR
-        props["$incoming.queue.name"] = requireProp("$prefix.queue-in", lemlineProps)
+        props["$incoming.queue.name"] = requireProp("$prefix.queue", lemlineProps)
         props["$incoming.queue.durable"] = "true"
         props["$incoming.auto-ack"] = "false"
         props["$incoming.deserializer"] = "java.lang.String"
         props["$incoming.queue.arguments.x-dead-letter-exchange"] = "dlx"
         props["$incoming.queue.arguments.x-dead-letter-routing-key"] =
-            requireProp("$prefix.queue-in", lemlineProps) + "-dlq"
+            requireProp("$prefix.queue", lemlineProps) + "-dlq"
 
         // outgoing
         props["$outgoing.connector"] = LemlineConfigConstants.RABBITMQ_CONNECTOR
         props["$outgoing.queue.name"] =
-            getProp("$prefix.queue-out", lemlineProps) ?: requireProp("$prefix.queue-in", lemlineProps)
+            getProp("$prefix.queue-out", lemlineProps) ?: requireProp("$prefix.queue", lemlineProps)
         props["$outgoing.serializer"] = "java.lang.String"
         props["$outgoing.merge"] = "true"
     }

@@ -12,7 +12,6 @@ import com.rabbitmq.client.Delivery
 import com.rabbitmq.client.MessageProperties
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
-import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import org.eclipse.microprofile.config.inject.ConfigProperty
@@ -35,15 +34,15 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
     @ConfigProperty(name = "rabbitmq-password")
     lateinit var rabbitmqPassword: String
 
-    @ConfigProperty(name = "lemline.messaging.rabbitmq.queue-in")
+    @ConfigProperty(name = "mp.messaging.incoming.$WORKFLOW_IN.queue.name")
     lateinit var queueIn: String
 
-    @ConfigProperty(name = "lemline.messaging.rabbitmq.queue-out")
+    @ConfigProperty(name = "mp.messaging.outgoing.$WORKFLOW_OUT.queue.name")
     lateinit var queueOut: String
 
     private lateinit var connection: Connection
     private lateinit var channel: Channel
-    private val deliveries: BlockingQueue<Delivery> = LinkedBlockingQueue()
+    private val deliveries = LinkedBlockingQueue<Delivery>()
 
     override fun setupMessaging() {
         // Setup RabbitMQ connection
@@ -56,7 +55,7 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         connection = factory.newConnection()
         channel = connection.createChannel()
 
-        // Declare queues and exchange, then bind for test consumer
+        // In testing, queues In and Out must be different
         require(queueIn != queueOut) {
             "For RabbitMQ *testing*, queues In ($queueIn) and Out ($queueOut) must be different"
         }
@@ -65,14 +64,14 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         channel.queueDeclare(queueIn, true, false, false, null)
 
         // Explicitly declare the exchange that SmallRye will default to
-        channel.exchangeDeclare(queueOut, "topic", true) // Exchange name = queueOut, type=topic, durable=true
+        channel.exchangeDeclare(WORKFLOW_OUT, "topic", true)
 
         // Declare the outgoing queue (where this test consumes)
         channel.queueDeclare(queueOut, true, false, false, null)
 
         // Bind the outgoing queue to the exchange with an EMPTY routing key,
         // matching the default behavior observed in the logs.
-        channel.queueBind(queueOut, queueOut, "") // routingKey = ""
+        channel.queueBind(queueOut, WORKFLOW_OUT, "") // routingKey = ""
 
         // Purge queues
         channel.queuePurge(queueIn)

@@ -2,10 +2,9 @@
 package com.lemline.worker.outbox
 
 import com.lemline.common.logger
-import com.lemline.worker.config.CleanupConfig
 import com.lemline.worker.config.LemlineConfiguration
-import com.lemline.worker.config.OutboxConfig
 import com.lemline.worker.config.RetryConfig
+import com.lemline.worker.messaging.WORKFLOW_OUT
 import com.lemline.worker.repositories.RetryRepository
 import io.quarkus.scheduler.Scheduled
 import io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP
@@ -37,7 +36,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
 internal class RetryOutbox @Inject constructor(
     repository: RetryRepository,
     lemlineConfig: LemlineConfiguration,
-    @Channel("workflows-out") emitter: Emitter<String>,
+    @Channel(WORKFLOW_OUT) emitter: Emitter<String>,
 ) {
     private val logger = logger()
 

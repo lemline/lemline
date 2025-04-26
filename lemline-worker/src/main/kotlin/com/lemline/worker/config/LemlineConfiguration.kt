@@ -161,7 +161,7 @@ interface MySQLConfig {
  *     type: kafka
  *     kafka:
  *       brokers: localhost:9092
- *       topic-in: workflows-in
+ *       topic: workflows-in
  * ```
  */
 @ConfigMapping(prefix = "lemline.messaging")
@@ -184,7 +184,7 @@ interface MessagingConfig {
 @ConfigMapping(prefix = "lemline.messaging.kafka")
 interface KafkaConfig {
     fun brokers(): String
-    fun topicIn(): String
+    fun topic(): String
     fun topicOut(): String
     fun topicDlq(): String
     fun groupId(): String
@@ -222,7 +222,7 @@ interface RabbitMQConfig {
     fun getPassword(): String
 
     fun virtualHost(): String
-    fun queueIn(): String
+    fun queue(): String
     fun queueOut(): String
     fun exchangeName(): Optional<String>
     fun sslEnabled(): Optional<Boolean>

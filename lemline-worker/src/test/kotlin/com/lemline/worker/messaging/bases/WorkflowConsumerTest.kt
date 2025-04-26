@@ -12,7 +12,6 @@ import com.lemline.worker.repositories.WorkflowRepository
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.matchers.shouldBe
 import jakarta.inject.Inject
-import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -27,11 +26,25 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
+/**
+ * Abstract base class for testing the [WorkflowConsumer].
+ *
+ * This class sets up a common test environment including repositories (Retry, Wait, Workflow)
+ * and provides helper methods for sending messages and waiting for processing.
+ * Concrete subclasses must implement:
+ *  - `setupMessaging()`: To configure the specific messaging infrastructure (e.g., Kafka, in-memory) for the test.
+ *  - `cleanupMessaging()`: To tear down the messaging infrastructure after the test.
+ *  - `sendMessage(String)`: To send a raw message string to the consumer's input channel.
+ *  - `receiveMessage(Long, TimeUnit)`: To receive a raw message string from the consumer's output channel.
+ *
+ * It defines tests covering various workflow execution scenarios:
+ * - Successful task execution.
+ * - Handling of invalid input messages.
+ * - Storing instances requiring retry logic.
+ * - Storing instances requiring a wait state.
+ * - Handling workflows that complete without further output.
+ */
 internal abstract class WorkflowConsumerTest {
-
-    @Inject
-    lateinit var entityManager: EntityManager
-
     @Inject
     lateinit var retryRepository: RetryRepository
 
@@ -48,10 +61,9 @@ internal abstract class WorkflowConsumerTest {
     @Transactional
     fun setup() {
         // Clear the database
-        entityManager.createQuery("DELETE FROM RetryModel").executeUpdate()
-        entityManager.createQuery("DELETE FROM WaitModel").executeUpdate()
-        entityManager.createQuery("DELETE FROM WorkflowModel").executeUpdate()
-        entityManager.flush()
+        workflowRepository.deleteAll()
+        retryRepository.deleteAll()
+        waitRepository.deleteAll()
 
         // Create test workflow definition
         val workflowModel = WorkflowModel().apply {
@@ -108,7 +120,6 @@ internal abstract class WorkflowConsumerTest {
             """.trimIndent().replace("@", "$")
         }
         with(workflowRepository) { workflowModel.save() }
-        entityManager.flush()
 
         setupMessaging()
     }
@@ -133,6 +144,20 @@ internal abstract class WorkflowConsumerTest {
         return future
     }
 
+    /**
+     * **Scenario: **Tests the successful processing of a valid workflow message that results in a task execution.
+     *
+     * **Arrange:**
+     * - Creates a `WorkflowMessage` instructing the test workflow to execute the 'task' path.
+     * - Encodes the message to JSON.
+     *
+     * **Act:**
+     * - Sends the message to the consumer using `sendMessageFuture` and waits for processing completion.
+     *
+     * **Assert:**
+     * - Asserts that a message is received on the output topic within the timeout.
+     * - Verifies that *no* messages were stored in the retry or wait repositories, as the workflow executed directly.
+     */
     @Test
     fun `should process valid workflow message and send to output topic`() {
         // Given
@@ -149,8 +174,8 @@ internal abstract class WorkflowConsumerTest {
 
         // Then
         // Wait for the message to be processed
-        println("output = ${future.get(5, SECONDS)}")
-        val outputMessage = receiveMessage(5, TimeUnit.SECONDS)
+        println("output = ${future.get(1, SECONDS)}")
+        val outputMessage = receiveMessage(1, SECONDS)
         assertNotNull(outputMessage, "No messages received from output topic")
 
         // Verify that no message was stored in repositories
@@ -163,6 +188,20 @@ internal abstract class WorkflowConsumerTest {
         )
     }
 
+    /**
+     * **Scenario: **Tests how the consumer handles a fundamentally invalid message (e.g., non-JSON string).
+     *
+     * **Arrange:**
+     * - Defines an invalid message string.
+     *
+     * **Act:**
+     * - Sends the invalid message using `sendMessageFuture`.
+     *
+     * **Assert:**
+     * - Asserts that waiting for the processing future throws an exception (as processing fails).
+     * - Verifies that the invalid message is stored in the *retry* repository with a status of `FAILED`.
+     * - Verifies that the wait repository remains empty.
+     */
     @Test
     fun `invalid message should be stored in retry table as Failed`() {
         // Given
@@ -186,6 +225,21 @@ internal abstract class WorkflowConsumerTest {
         )
     }
 
+    /**
+     * **Scenario: **Tests the case where workflow execution leads to a state requiring a retry.
+     *
+     * **Arrange:**
+     * - Creates a `WorkflowMessage` instructing the test workflow to execute the 'retry' path.
+     * - Encodes the message to JSON.
+     *
+     * **Act:**
+     * - Sends the message using `sendMessageFuture` and waits for processing.
+     *
+     * **Assert:**
+     * - Verifies that a message corresponding to the workflow instance is stored in the *retry* repository.
+     * - Asserts the status of the stored message is `PENDING` (awaiting retry attempt).
+     * - Asserts the attempt count is 0 initially.
+     */
     @Test
     fun `should store instance with retry in retry repository`() {
         // Given
@@ -211,6 +265,22 @@ internal abstract class WorkflowConsumerTest {
         assertEquals(0, retryMessages[0].attemptCount, "Retry message attempt count is not 0")
     }
 
+    /**
+     * **Scenario: **Tests the case where workflow execution leads to a scheduled wait state.
+     *
+     * **Arrange:**
+     * - Creates a `WorkflowMessage` instructing the test workflow to execute the 'wait' path.
+     * - Encodes the message to JSON.
+     *
+     * **Act:**
+     * - Sends the message using `sendMessageFuture` and waits for processing.
+     *
+     * **Assert:**
+     * - Verifies that a message corresponding to the workflow instance is stored in the *wait* repository.
+     * - Asserts the status of the stored message is `PENDING`.
+     * - Asserts the attempt count is 0.
+     * - Asserts that the `delayedUntil` timestamp is set correctly (approximately 30 seconds in the future, based on the test workflow definition).
+     */
     @Test
     fun `should store waiting instance in wait repository`() {
         // Given
@@ -246,6 +316,20 @@ internal abstract class WorkflowConsumerTest {
         )
     }
 
+    /**
+     * **Scenario: **Tests the case where the workflow completes its execution upon receiving the message, without needing further steps or output.
+     *
+     * **Arrange:**
+     * - Creates a `WorkflowMessage` instructing the test workflow to execute the 'completed' path (which leads directly to exit).
+     * - Encodes the message to JSON.
+     *
+     * **Act:**
+     * - Sends the message using `sendMessageFuture` and waits for processing.
+     *
+     * **Assert:**
+     * - Asserts that *no* message is received on the output topic (returns null).
+     * - Verifies that both the retry and wait repositories remain empty.
+     */
     @Test
     fun `should handle completed workflow without sending message`() {
         // Given
@@ -262,9 +346,9 @@ internal abstract class WorkflowConsumerTest {
 
         // Then
         // Wait for the message to be processed
-        future.get(5, SECONDS)
+        future.get(1, SECONDS)
 
-        val outputMessage = receiveMessage(1, TimeUnit.SECONDS)
+        val outputMessage = receiveMessage(1, SECONDS)
         assertTrue(outputMessage == null, "Messages were sent to output topic: $outputMessage")
 
         // Verify no message was stored in repositories

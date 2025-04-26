@@ -36,6 +36,9 @@ import kotlinx.coroutines.future.future
 import org.eclipse.microprofile.reactive.messaging.Incoming
 import org.eclipse.microprofile.reactive.messaging.Outgoing
 
+internal const val WORKFLOW_IN = "workflows-in"
+internal const val WORKFLOW_OUT = "workflows-out"
+
 @ApplicationScoped
 internal class WorkflowConsumer(
     private val workflowRepository: WorkflowRepository,
@@ -45,8 +48,8 @@ internal class WorkflowConsumer(
     private val logger = logger()
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    @Incoming("workflows-in")
-    @Outgoing("workflows-out")
+    @Incoming(WORKFLOW_IN)
+    @Outgoing(WORKFLOW_OUT)
     fun consume(msg: String): CompletionStage<String?> = scope.future {
         // Generate a unique request ID for this message processing
         val requestId = java.util.UUID.randomUUID().toString()

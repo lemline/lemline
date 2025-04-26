@@ -25,10 +25,10 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
     @ConfigProperty(name = "kafka.bootstrap.servers")
     lateinit var bootstrapServers: String
 
-    @ConfigProperty(name = "lemline.messaging.kafka.topic-in")
+    @ConfigProperty(name = "mp.messaging.incoming.$WORKFLOW_IN.topic")
     lateinit var topicIn: String
 
-    @ConfigProperty(name = "lemline.messaging.kafka.topic-out")
+    @ConfigProperty(name = "mp.messaging.outgoing.$WORKFLOW_OUT.topic")
     lateinit var topicOut: String
 
     private lateinit var producer: KafkaProducer<String, String>
