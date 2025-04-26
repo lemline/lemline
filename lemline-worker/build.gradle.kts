@@ -23,16 +23,16 @@ dependencies {
     // Quarkus
     implementation("io.quarkus:quarkus-kotlin")
     implementation("io.quarkus:quarkus-flyway")             // DB migration
-    implementation("io.quarkus:quarkus-rest-jackson")       // Rest Server with Json serialization
     implementation("io.quarkus:quarkus-messaging")
     implementation("io.quarkus:quarkus-messaging-kafka")    // Kafka Messaging
     implementation("io.quarkus:quarkus-messaging-rabbitmq") // RabbitMQ Messaging
-    implementation("io.quarkus:quarkus-mutiny")             // Reactive programming
-    implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin") // ORM With Hibernate / Panache
     implementation("io.quarkus:quarkus-scheduler")          // Scheduler
+    implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin") // ORM With Hibernate / Panache
     implementation("io.quarkus:quarkus-jdbc-postgresql")    // Postgres Database driver
     implementation("io.quarkus:quarkus-jdbc-mysql")         // MySQL Database driver
-    implementation("io.quarkus:quarkus-arc")
+    implementation("io.quarkus:quarkus-jdbc-h2")            // H2 Database driver
+    implementation("io.quarkus:quarkus-arc")                // Dependency Injection
+    implementation("io.smallrye.reactive:smallrye-reactive-messaging-in-memory:4.27.0")
 
     // Serverless Workflow SDK
     implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
@@ -43,15 +43,13 @@ dependencies {
 
     // Testing
     testImplementation(kotlin("test"))
-
-    testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.quarkus:quarkus-jdbc-h2")
+    testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")
     testImplementation("io.kotest:kotest-framework-api")
     testImplementation("io.mockk:mockk:1.13.9")
-    testImplementation("io.smallrye.reactive:smallrye-reactive-messaging-in-memory:4.27.0")
 
     // Testcontainers
     testImplementation("org.testcontainers:testcontainers-bom:1.20.6")

@@ -37,4 +37,4 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryModel>() {
             delayedUntil = Instant.now() // Ensure ready for processing
         )
     }
-} 
+}

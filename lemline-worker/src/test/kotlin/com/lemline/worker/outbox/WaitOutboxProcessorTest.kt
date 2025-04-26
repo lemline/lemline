@@ -34,4 +34,4 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitModel>() {
         message = "Test Wait Message: $payload",
         delayedUntil = Instant.now() // Ensure ready for processing
     )
-} 
+}
