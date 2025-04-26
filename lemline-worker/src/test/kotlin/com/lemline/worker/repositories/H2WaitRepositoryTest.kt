@@ -2,15 +2,15 @@
 package com.lemline.worker.repositories
 
 import com.lemline.worker.repositories.bases.WaitRepositoryTest
-import com.lemline.worker.tests.profiles.H2Profile
+import com.lemline.worker.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import org.junit.jupiter.api.TestInstance
 
 /**
- * Runs the AbstractWaitRepositoryTest suite against an H2 database.
+ * Runs the WaitRepositoryTest suite against an H2 database.
  */
 @QuarkusTest
-@TestProfile(H2Profile::class)
+@TestProfile(InMemoryProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class H2WaitRepositoryTest : WaitRepositoryTest()

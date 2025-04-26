@@ -2,7 +2,7 @@
 package com.lemline.worker.messaging
 
 import com.lemline.worker.messaging.bases.WorkflowConsumerTest
-import com.lemline.worker.tests.profiles.H2InMemoryProfile
+import com.lemline.worker.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import io.smallrye.reactive.messaging.memory.InMemoryConnector
@@ -14,16 +14,10 @@ import java.util.concurrent.TimeUnit
 import org.junit.jupiter.api.Tag
 
 /**
- * In-memory implementation of [WorkflowConsumerTest] for local testing.
- *
- * This test class uses SmallRye's in-memory connector to simulate message passing between
- * the workflow consumer and its test environment. It's particularly useful for:
- * - Quick local development testing without external dependencies
- * - CI/CD pipelines where external message brokers might not be available
- * - Fast feedback during development
+ * Runs the WorkflowConsumerTest suite against an in-memory broker.
  */
 @QuarkusTest
-@TestProfile(H2InMemoryProfile::class)
+@TestProfile(InMemoryProfile::class)
 @Tag("integration")
 internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
 

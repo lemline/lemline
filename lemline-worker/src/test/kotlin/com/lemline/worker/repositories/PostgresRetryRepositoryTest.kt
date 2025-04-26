@@ -8,7 +8,7 @@ import io.quarkus.test.junit.TestProfile
 import org.junit.jupiter.api.TestInstance
 
 /**
- * Postgres-specific implementation of RetryRepositoryTest.
+ * Runs the RetryRepositoryTest suite against a PostgresSQL database.
  */
 @QuarkusTest
 @TestProfile(PostgresProfile::class)

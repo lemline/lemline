@@ -4,17 +4,18 @@ package com.lemline.worker.tests.profiles
 import io.quarkus.test.junit.QuarkusTestProfile
 
 /**
- * Test profile for in-memory messaging testing.
+ * Test profile for in memory testing.
  *
  * This profile configures:
- * 1. H2 in-memory database for persistence (handled by LemlineConfigSourceFactory)
- * 2. In-memory channels for messaging
- * 3. Disables Kafka and RabbitMQ connectors
+ * - an H2 (in memory) database for persistence
+ * - In-memory channels for messaging
+ *
+ * All corresponding Quarkus properties are set by LemlineConfigSourceFactory.
  */
-class H2InMemoryProfile : QuarkusTestProfile {
+class InMemoryProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
-            // Database configuration (handled by LemlineConfigSourceFactory)
+            // Database configuration
             "lemline.database.type" to "h2",
 
             // Messaging configuration

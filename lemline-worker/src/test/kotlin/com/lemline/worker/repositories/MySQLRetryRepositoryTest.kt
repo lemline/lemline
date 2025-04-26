@@ -8,7 +8,7 @@ import io.quarkus.test.junit.TestProfile
 import org.junit.jupiter.api.TestInstance
 
 /**
- * MySQL-specific implementation of RetryRepositoryTest.
+ * Runs the RetryRepositoryTest suite against a MySQL database.
  */
 @QuarkusTest
 @TestProfile(MySQLProfile::class)

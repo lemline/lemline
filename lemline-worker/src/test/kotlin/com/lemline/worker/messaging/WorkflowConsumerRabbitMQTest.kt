@@ -2,7 +2,7 @@
 package com.lemline.worker.messaging
 
 import com.lemline.worker.messaging.bases.WorkflowConsumerTest
-import com.lemline.worker.tests.profiles.H2RabbitMQProfile
+import com.lemline.worker.tests.profiles.RabbitMQProfile
 import com.rabbitmq.client.CancelCallback
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
@@ -17,8 +17,12 @@ import java.util.concurrent.TimeUnit
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
 
+
+/**
+ * Runs the WorkflowConsumerTest suite against a RabbitMQ broker.
+ */
 @QuarkusTest
-@TestProfile(H2RabbitMQProfile::class)
+@TestProfile(RabbitMQProfile::class)
 @Tag("integration")
 internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 

@@ -2,15 +2,15 @@
 package com.lemline.worker.repositories
 
 import com.lemline.worker.repositories.bases.RetryRepositoryTest
-import com.lemline.worker.tests.profiles.H2KafkaProfile
+import com.lemline.worker.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import org.junit.jupiter.api.TestInstance
 
 /**
- * Runs the AbstractRetryRepositoryTest suite against an H2 database.
+ * Runs the RetryRepositoryTest suite against an H2 database.
  */
 @QuarkusTest
-@TestProfile(H2KafkaProfile::class)
+@TestProfile(InMemoryProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 internal class H2RetryRepositoryTest : RetryRepositoryTest()

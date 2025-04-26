@@ -8,7 +8,7 @@ import io.quarkus.test.junit.TestProfile
 import org.junit.jupiter.api.TestInstance
 
 /**
- * MySQL-specific implementation of WorkflowModelRepositoryTest.
+ * Runs the WorkflowRepositoryTest suite against a MySQL database.
  */
 @QuarkusTest
 @TestProfile(MySQLProfile::class)

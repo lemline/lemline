@@ -2,7 +2,7 @@
 package com.lemline.worker.messaging
 
 import com.lemline.worker.messaging.bases.WorkflowConsumerTest
-import com.lemline.worker.tests.profiles.H2KafkaProfile
+import com.lemline.worker.tests.profiles.KafkaProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import java.time.Duration
@@ -17,8 +17,11 @@ import org.apache.kafka.common.serialization.StringSerializer
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
 
+/**
+ * Runs the WorkflowConsumerTest suite against a Kafka broker.
+ */
 @QuarkusTest
-@TestProfile(H2KafkaProfile::class)
+@TestProfile(KafkaProfile::class)
 @Tag("integration")
 internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 

@@ -15,6 +15,8 @@ class LemlineConfigurationTest {
 
     @Test
     fun testConfigurationValues() {
+        // Check the default values of the configuration
+        assertEquals(5, lemlineConfig.retry().outbox().maxAttempts())
         assertEquals(100, lemlineConfig.retry().outbox().batchSize())
         assertEquals(Duration.ofSeconds(10), lemlineConfig.retry().outbox().initialDelay())
         assertEquals(Duration.ofHours(1), lemlineConfig.wait().cleanup().every())

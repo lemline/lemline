@@ -5,7 +5,13 @@ import com.lemline.worker.tests.resources.MySQLTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
 /**
- * Quarkus Test Profile to configure the application for PostgreSQL database tests.
+ * Test profile for MySQL database testing.
+ *
+ * This profile configures:
+ * - MySQL database for persistence
+ * - In-memory channels for messaging
+ *
+ * All corresponding Quarkus properties are set by LemlineConfigSourceFactory.
  */
 class MySQLProfile : QuarkusTestProfile {
 
@@ -14,7 +20,13 @@ class MySQLProfile : QuarkusTestProfile {
      * Sets the database type to PostgresSQL.
      */
     override fun getConfigOverrides(): Map<String, String> {
-        return mapOf("lemline.database.type" to "mysql")
+        return mapOf(
+            // Database configuration
+            "lemline.database.type" to "mysql",
+
+            // Messaging configuration
+            "lemline.messaging.type" to "in-memory"
+        )
     }
 
     /**

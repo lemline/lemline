@@ -6,9 +6,15 @@ import io.quarkus.test.junit.QuarkusTestProfile
 import io.quarkus.test.junit.QuarkusTestProfile.TestResourceEntry
 
 /**
- * Quarkus Test Profile to configure the application for H2 database tests.
+ * Test profile for Kafka messaging testing.
+ *
+ * This profile configures:
+ * - an H2 (in memory) database for persistence
+ * - Kafka channels for messaging
+ *
+ *  All corresponding Quarkus properties are set by LemlineConfigSourceFactory.
  */
-class H2KafkaProfile : QuarkusTestProfile {
+class KafkaProfile : QuarkusTestProfile {
 
     /**
      * Overrides configuration properties for this profile.
@@ -16,8 +22,11 @@ class H2KafkaProfile : QuarkusTestProfile {
      */
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
+            // Database configuration
             "lemline.database.type" to "h2",
-            "lemline.messaging.type" to "kafka",
+
+            // Messaging configuration
+            "lemline.messaging.type" to "kafka"
         )
     }
 
