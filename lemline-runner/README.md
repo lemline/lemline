@@ -6,8 +6,48 @@ definition, interacts with databases for state persistence, and emits lifecycle 
 
 ## ⚙️ Configuration
 
-The primary configuration for the runner is managed through `src/main/resources/application.properties`. Quarkus
-profiles (dev, test, prod) can be used for environment-specific settings.
+### Getting Started with Configuration
+
+An example configuration file (`application.yaml.example`) is provided to help you get started. This file contains:
+
+1. A complete example configuration with all available options
+2. Detailed comments explaining each setting
+3. Environment variable placeholders for sensitive values
+4. Example profiles for different environments
+
+To use it:
+
+1. Copy `application.yaml.example` to your desired location
+2. Rename it to `application.yaml`
+3. Configure it according to your environment
+4. Use it when running the runner (see "Running the Worker" section below)
+
+The example file includes:
+
+- Database configuration for PostgreSQL and MySQL
+- Messaging configuration for Kafka and RabbitMQ
+- Service settings for wait and retry operations
+- Profile-specific configurations
+- Security best practices and recommendations
+
+The runner can be configured using a YAML configuration file. You can provide your configuration in one of these ways:
+
+Create an `application.yaml` file in the same directory as the Lemline binary, or use the `-Dquarkus.config.locations`
+system property to specify the path to your configuration file
+
+Quarkus profiles (dev, test, prod) can be used for environment-specific settings.
+
+In the JVM:
+
+```bash
+QUARKUS_CONFIG_LOCATIONS=application.yml java  -jar lemline-runner/build/quarkus-app/quarkus-run.jar
+```
+
+With the native runner:
+
+```bash
+QUARKUS_CONFIG_LOCATIONS=application.yml  ./lemline-runner/build/lemline-runner-0.0.1-SNAPSHOT-runner 
+```
 
 ### Core Configuration Properties
 
@@ -25,80 +65,167 @@ The runner requires a database to store workflow state and related data. Postgre
 
 **1. Select Database Type:**
 
-Set `lemline.database.type` in `application.properties`:
+Set `lemline.database.type` in your configuration file:
 
-```properties
-# Choose 'postgresql' or 'mysql'
-lemline.database.type=postgresql
+```yaml
+lemline:
+    database:
+        type: ${LEMLINE_DB_TYPE:postgresql}  # Can be overridden by LEMLINE_DB_TYPE env var
 ```
 
-**2. Configure Quarkus Datasource:**
-
-Ensure the corresponding Quarkus datasource properties are configured.
+**2. Configure Database Connection:**
 
 **For PostgreSQL (Default):**
 
-```properties
-quarkus.datasource.db-kind=postgresql
-quarkus.datasource.username=postgres
-quarkus.datasource.password=postgres
-quarkus.datasource.jdbc.url=jdbc:postgresql://localhost:5432/lemline_db # Example URL
-# Add any other necessary Quarkus datasource properties (pool size, etc.)
+```yaml
+lemline:
+    database:
+        type: postgresql
+        postgresql:
+            host: ${LEMLINE_PG_HOST:localhost}
+            port: ${LEMLINE_PG_PORT:5432}
+            username: ${LEMLINE_PG_USER:postgres}
+            password: ${LEMLINE_PG_PASSWORD:postgres}  # RECOMMENDED: Set via LEMLINE_PG_PASSWORD env var!
+            name: ${LEMLINE_PG_DB_NAME:lemline}
 ```
 
 **For MySQL:**
 
-```properties
-quarkus.datasource.db-kind=mysql
-quarkus.datasource.username=mysql_user # Example user
-quarkus.datasource.password=mysql_pwd # Example password
-quarkus.datasource.jdbc.url=jdbc:mysql://localhost:3306/lemline_db # Example URL
-# Add any other necessary Quarkus datasource properties
+```yaml
+lemline:
+    database:
+        type: mysql
+        mysql:
+            host: ${LEMLINE_MYSQL_HOST:localhost}
+            port: ${LEMLINE_MYSQL_PORT:3306}
+            username: ${LEMLINE_MYSQL_USER:root}
+            password: ${LEMLINE_MYSQL_PASSWORD:password}  # RECOMMENDED: Set via LEMLINE_MYSQL_PASSWORD env var!
+            name: ${LEMLINE_MYSQL_DB_NAME:lemline}
 ```
 
 **Database Migrations:**
 
-Flyway migrations are located in `src/main/resources/db/migration/`. Database-specific migrations can be placed in
-subdirectories (e.g., `postgresql/`, `mysql/`) if needed. Migrations are applied automatically on startup based on the
-configured `quarkus.datasource.db-kind`.
+Flyway migrations are included in the application and can be applied automatically on startup. By default, migrations
+are not applied. To enable automatic migration, add these settings to your configuration:
+
+```yaml
+lemline:
+    database:
+        # Create the schema history table if it doesn't exist
+        baseline-on-migrate: true
+
+        # Apply database migrations at startup
+        migrate-at-start: true
+```
+
+When enabled, migrations will be applied based on the configured database type. The migrations are versioned and will be
+applied in order, ensuring your database schema is up to date.
 
 ### Messaging Configuration
 
-The runner uses a message broker to receive workflow triggers and potentially publish events. Kafka and RabbitMQ are
-currently supported.
+The runner uses a message broker to receive workflow triggers and potentially publish events.
+Kafka and RabbitMQ are currently supported.
 
 **1. Select Messaging Type:**
 
-Set `lemline.messaging.type` in `application.properties`:
+Set `lemline.messaging.type` in your configuration file:
 
-```properties
-# Choose 'kafka' or 'rabbitmq'
-lemline.messaging.type=kafka
+```yaml
+lemline:
+    messaging:
+        type: ${LEMLINE_MESSAGING_TYPE:kafka}
 ```
 
-**2. Configure Quarkus Messaging Connector:**
-
-Ensure the corresponding Quarkus messaging properties are configured.
+**2. Configure Message Broker:**
 
 **For Kafka (Default):**
 
-```properties
-# --- Core Kafka Connection ---
-quarkus.kafka.bootstrap.servers=localhost:9092 # Example: Comma-separated list of brokers
-# --- Add other Kafka properties as needed ---
-# e.g., security.protocol, sasl.mechanism, etc.
+```yaml
+lemline:
+    messaging:
+        type: kafka
+        kafka:
+            brokers: ${LEMLINE_KAFKA_BROKERS:localhost:9092}
+            topic: ${LEMLINE_KAFKA_TOPIC:lemline}
+            topic-dlq: ${LEMLINE_KAFKA_TOPIC_DLQ:lemline-dlq}
+            group-id: ${LEMLINE_KAFKA_GROUP_ID:lemline-worker-group}
+            # Optional security settings:
+            # security-protocol: SASL_SSL
+            # sasl-mechanism: PLAIN
+            # sasl-username: ${LEMLINE_KAFKA_USER}
+            # sasl-password: ${LEMLINE_KAFKA_PASSWORD}
 ```
 
 **For RabbitMQ:**
 
-```properties
-quarkus.rabbitmq.hosts=localhost # Example host
-quarkus.rabbitmq.port=5672
-quarkus.rabbitmq.username=guest # Example user
-quarkus.rabbitmq.password=guest # Example password
-# Add any other necessary RabbitMQ properties (vhost, ssl, etc.)
-# Configure incoming/outgoing channels (e.g., mp.messaging.incoming.workflows...)
+```yaml
+lemline:
+    messaging:
+        type: rabbitmq
+        rabbitmq:
+            hostname: ${LEMLINE_RABBITMQ_HOST:localhost}
+            port: ${LEMLINE_RABBITMQ_PORT:5672}
+            username: ${LEMLINE_RABBITMQ_USER:guest}
+            password: ${LEMLINE_RABBITMQ_PASSWORD:guest}  # RECOMMENDED: Set via LEMLINE_RABBITMQ_PASSWORD env var!
+            virtual-host: ${LEMLINE_RABBITMQ_VHOST:/}
+            queue: ${LEMLINE_RABBITMQ_QUEUE_IN:workflows}
 ```
+
+### Service Settings
+
+The runner includes configurable service settings for task scheduling and cleanup:
+
+```yaml
+lemline:
+    # Wait Service Settings
+    wait:
+        outbox:
+            every: "10s"
+            batch-size: 1000
+            initial-delay: "30s"
+            max-attempts: 5
+        cleanup:
+            every: "1h"
+            after: "7d"
+            batch-size: 1000
+
+    # Retry Service Settings
+    retry:
+        outbox:
+            every: "10s"
+            batch-size: 1000
+            initial-delay: "30s"
+            max-attempts: 5
+        cleanup:
+            every: "1h"
+            after: "7d"
+            batch-size: 1000
+```
+
+### Profile-Specific Configuration
+
+You can override settings for specific Quarkus profiles (e.g., prod, dev, test) by adding profile-specific sections:
+
+```yaml
+'%prod':
+    quarkus:
+        log:
+            level: WARN
+            category:
+                "com.lemline":
+                    level: INFO
+
+    lemline:
+        database:
+            type: postgresql
+            postgresql:
+                host: prod-db.example.com
+                username: ${LEMLINE_PROD_PG_USER}
+                password: ${LEMLINE_PROD_PG_PASSWORD}
+                name: lemline_production_db
+```
+
+Activate a profile by starting Lemline with the system property: `-Dquarkus.profile=prod`
 
 ### Local Development Setup (Docker Examples)
 
@@ -116,7 +243,7 @@ docker-compose -f ./docker/docker-compose-postgres.yaml up -d
 docker-compose -f ./docker/docker-compose-kafka.yaml up -d
 ```
 
-Remember to align the connection details in `application.properties` with your running Docker containers.
+Remember to align the connection details in your configuration file with your running Docker containers.
 
 ## ▶️ Running the Worker
 
@@ -142,7 +269,14 @@ Build the application into a runnable JAR:
 This produces the `quarkus-run.jar` file in the `build/quarkus-app/` directory. Run it using:
 
 ```bash
+# Run with default configuration
 java -jar build/quarkus-app/quarkus-run.jar
+
+# Run with custom configuration file
+java -Dquarkus.config.locations=/path/to/your/application.yaml -jar build/quarkus-app/quarkus-run.jar
+
+# Run with specific profile
+java -Dquarkus.profile=prod -jar build/quarkus-app/quarkus-run.jar
 ```
 
 Ensure the environment where you run the JAR has access to the configured database and message broker.
@@ -159,10 +293,8 @@ Execute the test suite using:
 ./gradlew :lemline-runner:test
 ```
 
-By default, tests might run using a specific configuration profile (often defined in
-`src/test/resources/application.properties` or via system properties/environment variables set by the build). Check the
-project's test setup for details on how to run tests against different configurations (e.g., MySQL vs PostgreSQL).
-Often, this involves activating specific Quarkus test profiles:
+By default, tests run using a specific configuration profile defined in the test resources. You can run tests against
+different configurations by activating specific Quarkus test profiles:
 
 ```bash
 # Example: Running tests with a specific profile (adjust profile name)
