@@ -16,7 +16,7 @@ dependencies {
 
     // Apply the kotlinx bundle of dependencies from the version catalog (`gradle/libs.versions.toml`).
     implementation(libs.bundles.kotlinxEcosystem)
-    
+
     // Quarkus
     implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.4"))
     implementation("io.quarkus:quarkus-kotlin")
@@ -30,7 +30,6 @@ dependencies {
     implementation("io.quarkus:quarkus-jdbc-mysql")         // MySQL Database driver
     implementation("io.quarkus:quarkus-jdbc-h2")            // H2 Database driver
     implementation("io.quarkus:quarkus-arc")                // Dependency Injection
-    implementation("io.quarkus:quarkus-config-yaml")        // Configuration support
     implementation("io.smallrye.reactive:smallrye-reactive-messaging-in-memory:4.27.0")
 
     // Serverless Workflow SDK
@@ -42,7 +41,7 @@ dependencies {
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("io.quarkus:quarkus-junit5")
+    implementation("io.quarkus:quarkus-junit5") // Needed for QuarkusRun ???
     testImplementation("io.quarkus:quarkus-jdbc-h2")
     testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
     testImplementation("io.kotest:kotest-runner-junit5")
@@ -84,3 +83,4 @@ kotlin {
 tasks.withType<Test> {
     useJUnitPlatform()
 }
+

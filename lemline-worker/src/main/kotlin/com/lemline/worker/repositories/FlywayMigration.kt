@@ -5,7 +5,6 @@ import com.lemline.worker.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import io.quarkus.runtime.StartupEvent
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.event.Observes
-import jakarta.inject.Inject
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.flywaydb.core.Flyway
 
@@ -27,14 +26,34 @@ class FlywayMigration(
     @ConfigProperty(name = "lemline.database.type")
     val db: String,
 
-    @ConfigProperty(name = "lemline.database.migrate-at-start")
-    val migrateAtStart: Boolean
+    @ConfigProperty(name = "quarkus.datasource.jdbc.url")
+    val dbUrl: String,
+
+    @ConfigProperty(name = "quarkus.datasource.username")
+    val dbUser: String,
+
+    @ConfigProperty(name = "quarkus.datasource.password")
+    val dbPassword: String,
+
+    @ConfigProperty(name = "quarkus.flyway.migrate-at-start")
+    val migrateAtStart: Boolean,
+
+    @ConfigProperty(name = "quarkus.flyway.baseline-on-migrate")
+    val baselineOnMigrate: Boolean,
+
+    @ConfigProperty(name = "quarkus.flyway.locations")
+    val locations: String,
 ) {
-    @Inject
-    lateinit var flyway: Flyway
 
     fun onStart(@Observes event: StartupEvent) {
         if (profile == "test" || db == DB_TYPE_IN_MEMORY || migrateAtStart) {
+            // flyway is rebuilt with the right values that may be different that during boot time
+            val flyway = Flyway.configure()
+                .dataSource(dbUrl, dbUser, dbPassword)
+                .locations(locations)
+                .baselineOnMigrate(baselineOnMigrate)
+                .load()
+
             flyway.migrate()
         }
     }

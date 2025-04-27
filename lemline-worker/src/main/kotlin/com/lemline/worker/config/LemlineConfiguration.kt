@@ -123,9 +123,8 @@ interface LemlineConfiguration {
                         props["quarkus.datasource.password"] = mysqlConfig.getPassword()
                     }
                 }
-
                 props["quarkus.flyway.baseline-on-migrate"] = config.baselineOnMigrate().toString()
-                // Note: migrate-at-start is managed by FlywayMigration
+                props["quarkus.flyway.migrate-at-start"] = config.migrateAtStart().toString()
 
                 return props
             }

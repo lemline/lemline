@@ -18,7 +18,7 @@ object LemlineConfigConstants {
     // H2 Default values
     const val DEFAULT_H2_DB_NAME = "lemline"
     const val DEFAULT_H2_USERNAME = "sa"
-    const val DEFAULT_H2_PASSWORD = ""
+    const val DEFAULT_H2_PASSWORD = "sa"
 
     // Messaging types
     const val MSG_TYPE_IN_MEMORY = "in-memory"
