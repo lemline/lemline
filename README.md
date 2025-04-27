@@ -48,7 +48,7 @@ or managing fan-in scenarios (waiting for multiple parallel tasks to complete).
 ## 📦 Modules
 
 * **`lemline-core`:** Contains the core implementation of the Serverless Workflow DSL types and logic.
-* **`lemline-worker`:** Provides the Quarkus-based runtime environment. It uses reactive messaging to read and publish
+* **`lemline-runner`:** Provides the Quarkus-based runtime environment. It uses reactive messaging to read and publish
   events, manages workflow state, and interacts with databases.
 * **`lemline-docs`:** (Planned/Included) Documentation for the project and potentially the DSL nuances specific to
   Lemline.
@@ -70,16 +70,16 @@ or managing fan-in scenarios (waiting for multiple parallel tasks to complete).
 ### Running the Worker (Development Mode)
 
 Ensure your database and message broker (if needed) are configured in
-`lemline-worker/src/main/resources/application.properties`.
+`lemline-runner/src/main/resources/application.properties`.
 
 ```bash
-./gradlew :lemline-worker:quarkusDev
+./gradlew :lemline-runner:quarkusDev
 ```
 
-The worker will start, connect to the database/broker, and begin processing workflows.
+The runner will start, connect to the database/broker, and begin processing workflows.
 
 You can find more information about database and message broker configuration in
-the [lemline-worker README](lemline-worker/README.md).
+the [lemline-runner README](lemline-runner/README.md).
 
 ### Running Tests
 
@@ -91,7 +91,7 @@ the [lemline-worker README](lemline-worker/README.md).
 
 * **Serverless Workflow DSL Specification:
   ** [Official Specification](https://github.com/serverlessworkflow/specification)
-* **Worker Configuration:** See `lemline-worker/README.md` (if it exists or needs creation) for detailed configuration
+* **Worker Configuration:** See `lemline-runner/README.md` (if it exists or needs creation) for detailed configuration
   options.
 
 ## 🤝 Contributing
@@ -112,7 +112,26 @@ Contributions are welcome! Please follow standard practices:
 
 This project is licensed under the [Business Source License 1.1](LICENSE.md).
 
-## 💻 Development
+## 💻 Native Image
+
+To produce a native image of the runner, you need to have GraalVM installed in your environment.
+We recommend using 24.1.2.r23-mandrel for this purpose.
+
+To build a linux native image (on Docker), run the following command:
+
+```bash
+./gradlew :lemline-runner:build -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -Dquarkus.native.container-build=true 
+```
+
+On a macOS system, you can use the following command to build a macOS native image:
+
+```bash
+./gradlew :lemline-runner:build -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false
+```
+
+The binary will be created in `lemline-runner/build/lemline-runner-$version-runner`
+
+## 👨‍Development
 
 Currently implemented features are:
 

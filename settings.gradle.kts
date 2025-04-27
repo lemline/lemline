@@ -19,6 +19,6 @@ plugins {
 // Include subprojects in the build.
 include(":lemline-common")
 include(":lemline-core")
-include(":lemline-worker")
+include(":lemline-runner")
 
 rootProject.name = "lemline"

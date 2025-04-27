@@ -1,10 +1,12 @@
 # Lemline Unified Logging Strategy
 
-This document outlines the unified logging strategy for the Lemline project, providing guidelines for consistent logging across all modules.
+This document outlines the unified logging strategy for the Lemline project, providing guidelines for consistent logging
+across all modules.
 
 ## Overview
 
-The Lemline project uses a unified logging approach based on SLF4J with Quarkus configuration. The logging strategy is designed to:
+The Lemline project uses a unified logging approach based on SLF4J with Quarkus configuration. The logging strategy is
+designed to:
 
 1. Provide consistent log formats across all modules
 2. Include contextual information in logs for better traceability
@@ -15,17 +17,18 @@ The Lemline project uses a unified logging approach based on SLF4J with Quarkus 
 
 The following log levels are used throughout the application:
 
-| Level | Purpose | Example Usage |
-|-------|---------|---------------|
-| TRACE | Very detailed information, useful for debugging complex issues | Detailed method entry/exit, variable values |
-| DEBUG | Detailed information on the flow through the system | Method execution, decision points |
-| INFO | Interesting runtime events | Workflow started/completed, service startup |
-| WARN | Potentially harmful situations that might lead to errors | Caught exceptions, retries |
-| ERROR | Error events that might still allow the application to continue running | Uncaught exceptions, service failures |
+| Level | Purpose                                                                 | Example Usage                               |
+|-------|-------------------------------------------------------------------------|---------------------------------------------|
+| TRACE | Very detailed information, useful for debugging complex issues          | Detailed method entry/exit, variable values |
+| DEBUG | Detailed information on the flow through the system                     | Method execution, decision points           |
+| INFO  | Interesting runtime events                                              | Workflow started/completed, service startup |
+| WARN  | Potentially harmful situations that might lead to errors                | Caught exceptions, retries                  |
+| ERROR | Error events that might still allow the application to continue running | Uncaught exceptions, service failures       |
 
 ## Contextual Logging
 
-The logging utility provides context-aware logging through MDC (Mapped Diagnostic Context). This allows including contextual information in all log messages without explicitly adding it to each log statement.
+The logging utility provides context-aware logging through MDC (Mapped Diagnostic Context). This allows including
+contextual information in all log messages without explicitly adding it to each log statement.
 
 ### Standard Context Keys
 
@@ -78,13 +81,15 @@ The log format is configured in `application.properties` and includes:
 - Exception (if present)
 
 Example:
+
 ```
 2023-06-15 10:15:30.123 INFO [req123,wf456,corr789] [WorkflowConsumer] (main) Processing workflow message
 ```
 
 ## JSON Logging for Production
 
-For production environments, JSON logging can be enabled for better log analysis. This is configured in `application.properties` but commented out by default:
+For production environments, JSON logging can be enabled for better log analysis. This is configured in
+`application.properties` but commented out by default:
 
 ```properties
 # JSON logging for production environments
@@ -100,7 +105,8 @@ For production environments, JSON logging can be enabled for better log analysis
 ## Best Practices
 
 1. **Use the appropriate log level**: Choose the log level based on the importance and audience of the message.
-2. **Use lambda for log messages**: Always use the lambda syntax for log messages to avoid string concatenation when the log level is disabled.
+2. **Use lambda for log messages**: Always use the lambda syntax for log messages to avoid string concatenation when the
+   log level is disabled.
    ```kotlin
    // Good
    logger.debug { "Processing item $itemId" }
@@ -109,7 +115,8 @@ For production environments, JSON logging can be enabled for better log analysis
    logger.debug("Processing item " + itemId)
    ```
 3. **Include context information**: Use the context-aware logging functions to include contextual information in logs.
-4. **Be concise but informative**: Log messages should be concise but provide enough information to understand what's happening.
+4. **Be concise but informative**: Log messages should be concise but provide enough information to understand what's
+   happening.
 5. **Log at entry and exit points**: Log at the beginning and end of important methods to track execution flow.
 6. **Include relevant data**: Include relevant data in log messages, but be careful not to log sensitive information.
 7. **Use structured logging in production**: Enable JSON logging in production environments for better log analysis.
@@ -118,8 +125,8 @@ For production environments, JSON logging can be enabled for better log analysis
 
 The logging configuration is defined in `application.properties` files:
 
-- Main configuration: `/lemline-worker/src/main/resources/application.properties`
-- Test configuration: `/lemline-worker/src/test/resources/application.properties`
+- Main configuration: `/lemline-runner/src/main/resources/application.properties`
+- Test configuration: `/lemline-runner/src/test/resources/application.properties`
 
 These files define the log levels, format, and other logging-related settings.
 
