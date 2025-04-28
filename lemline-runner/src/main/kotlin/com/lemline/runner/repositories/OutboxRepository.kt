@@ -162,7 +162,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
             it.prepareStatement(sql).use { stmt ->
                 stmt.apply {
                     setString(1, PENDING.name)
-                    setObject(2, Instant.now())
+                    setTimestamp(2, java.sql.Timestamp.from(Instant.now()))
                     setInt(3, maxAttempts)
                     setInt(4, limit)
                 }
@@ -195,7 +195,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
             it.prepareStatement(sql).use { stmt ->
                 stmt.apply {
                     setString(1, SENT.name)
-                    setObject(2, cutoffDate)
+                    setTimestamp(2, java.sql.Timestamp.from(cutoffDate))
                     setInt(3, limit)
                 }
 

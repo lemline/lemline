@@ -221,6 +221,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         val expected = messages.filterToDelete()
         val actual = findMessagesToDelete()
         println("expected for deletion: ${expected.size}")
+        println("      actual deletion: ${actual.size}")
         expected.equalTo(actual) shouldBe true
     }
 
@@ -234,6 +235,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         val expected = messages.filterToDelete(cutoffDate = cutoffDate)
         val actual = findMessagesToDelete(cutoffDate = cutoffDate)
         println("expected for deletion with cutoffDate: ${expected.size}")
+        println("      actual deletion with cutoffDate: ${actual.size}")
         expected.equalTo(actual) shouldBe true
     }
 
@@ -350,7 +352,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         val processedMessages = mutableListOf<T>()
         val deletedMessages = mutableListOf<T>()
         val executor = Executors.newFixedThreadPool(concurrentRequests)
-        val timeout = Instant.now().plus(5, ChronoUnit.SECONDS)
+        val timeout = Instant.now().plus(1, ChronoUnit.SECONDS)
         do {
             val latch = CountDownLatch(concurrentRequests)
             repeat(concurrentRequests) {
@@ -431,23 +433,6 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     /**
-     * Tests that the repository handles SQL exceptions gracefully.
-     * Verifies that SQL exceptions are properly caught and wrapped.
-     */
-    @Test
-    fun `should handle SQL exceptions gracefully`() {
-        // Given
-        val message = createModel("test")
-        repository.persist(message)
-
-        // When/Then
-        Assertions.assertThrows(Exception::class.java) {
-            // Try to insert a duplicate ID
-            repository.persist(message)
-        }
-    }
-
-    /**
      * Tests that the repository handles concurrent access correctly.
      * Verifies that concurrent operations don't corrupt the data.
      */
@@ -455,12 +440,13 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `should handle concurrent access correctly`() {
         // Given
         val messages = List(10) { createModel("test") }
-        val executor = Executors.newFixedThreadPool(4)
-        val latch = CountDownLatch(4)
+        val nThreads = 5
+        val executor = Executors.newFixedThreadPool(nThreads)
+        val latch = CountDownLatch(nThreads)
         val exceptions = mutableListOf<Exception>()
 
         // When
-        repeat(4) { threadIndex ->
+        repeat(nThreads) { threadIndex ->
             executor.submit {
                 try {
                     // Each thread processes a different subset of messages
@@ -474,7 +460,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                 }
             }
         }
-        latch.await(5, TimeUnit.SECONDS)
+        latch.await(1, TimeUnit.SECONDS)
         executor.shutdown()
 
         // Then
@@ -497,12 +483,13 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
             attemptCount = 0
         }
 
-        val executor = Executors.newFixedThreadPool(2)
-        val latch = CountDownLatch(2)
+        val nThreads = 5
+        val executor = Executors.newFixedThreadPool(nThreads)
+        val latch = CountDownLatch(nThreads)
         val exceptions = mutableListOf<Exception>()
 
         // When
-        repeat(2) {
+        repeat(nThreads) {
             executor.submit {
                 try {
                     repository.persist(message)
@@ -513,11 +500,11 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                 }
             }
         }
-        latch.await(5, TimeUnit.SECONDS)
+        latch.await(1, TimeUnit.SECONDS)
         executor.shutdown()
 
         // Then
-        exceptions.size shouldBe 1 // One transaction should fail due to concurrent modification
+        exceptions shouldBe emptyList()
         val persistedMessage = repository.findById(message.id)
         persistedMessage shouldNotBe null
     }

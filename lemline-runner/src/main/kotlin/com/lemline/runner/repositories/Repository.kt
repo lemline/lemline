@@ -44,8 +44,9 @@ abstract class Repository<T : UuidV7Entity> {
         """.trimIndent()
 
         DB_TYPE_IN_MEMORY -> """
-            INSERT INTO $tableName ($columns)
-            VALUES ($values)
+            MERGE INTO $tableName (${columns.split(", ").joinToString()})
+            KEY (id)
+            VALUES (${values.split(", ").joinToString()})
         """.trimIndent()
 
         else -> throw IllegalStateException("Unsupported database type '${databaseManager.dbType}'")
@@ -208,7 +209,7 @@ abstract class Repository<T : UuidV7Entity> {
     }
 
     protected fun <R> withConnection(block: (Connection) -> R): R {
-        val connection = databaseManager.resolveUserSelectedDatasource().connection
+        val connection = databaseManager.datasource.connection
         return block(connection)
     }
 }
