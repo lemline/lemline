@@ -5,6 +5,8 @@ import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.warn
+import com.lemline.runner.models.OutboxModel
+import com.lemline.runner.repositories.OutboxRepository
 import jakarta.transaction.Transactional
 import java.time.Duration
 import java.time.Instant
@@ -190,7 +192,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                 val chunkDeleted = messagesToDelete.size
 
                 // Delete the chunk
-                messagesToDelete.forEach { repository.delete(it) }
+                repository.delete(messagesToDelete)
                 totalDeleted += chunkDeleted
 
                 logger.info { "Cleaned up chunk $chunkNumber: $chunkDeleted messages (total: $totalDeleted)" }

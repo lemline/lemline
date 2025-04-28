@@ -3,6 +3,7 @@ package com.lemline.runner.outbox
 
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
+import com.lemline.runner.repositories.OutboxRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest

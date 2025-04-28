@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
+import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
-import com.lemline.runner.outbox.OutboxModel
-import com.lemline.runner.outbox.OutboxRepository
+import com.lemline.runner.repositories.OutboxRepository
 import io.kotest.matchers.comparables.shouldBeLessThanOrEqualTo
 import io.kotest.matchers.shouldBe
 import jakarta.transaction.Transactional

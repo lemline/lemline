@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.outbox
+package com.lemline.runner.models
 
-import com.lemline.runner.repositories.UuidV7Entity
+import com.lemline.runner.outbox.OutBoxStatus
 import java.time.Instant
 
 /**
@@ -23,7 +23,7 @@ abstract class OutboxModel : UuidV7Entity() {
      * The actual message content to be processed.
      * This is typically a JSON serialized representation of the message payload.
      */
-    abstract var message: String
+    abstract val message: String
 
     /**
      * Current status of the message in the outbox. Possible values:

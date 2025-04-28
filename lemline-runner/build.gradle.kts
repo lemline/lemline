@@ -25,7 +25,6 @@ dependencies {
     implementation("io.quarkus:quarkus-messaging-kafka")    // Kafka Messaging
     implementation("io.quarkus:quarkus-messaging-rabbitmq") // RabbitMQ Messaging
     implementation("io.quarkus:quarkus-scheduler")          // Scheduler
-    implementation("io.quarkus:quarkus-hibernate-orm-panache-kotlin") // ORM With Hibernate / Panache
     implementation("io.quarkus:quarkus-jdbc-postgresql")    // Postgres Database driver
     implementation("io.quarkus:quarkus-jdbc-mysql")         // MySQL Database driver
     implementation("io.quarkus:quarkus-jdbc-h2")            // H2 Database driver

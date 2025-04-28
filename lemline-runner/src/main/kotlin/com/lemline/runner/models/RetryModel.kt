@@ -1,49 +1,28 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.github.f4b6a3.uuid.UuidCreator
 import com.lemline.runner.outbox.OutBoxStatus
-import com.lemline.runner.outbox.OutboxModel
-import jakarta.persistence.Column
-import jakarta.persistence.Entity
-import jakarta.persistence.EnumType
-import jakarta.persistence.Enumerated
-import jakarta.persistence.Index
-import jakarta.persistence.Table
-import jakarta.persistence.Version
 import java.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
 const val RETRY_TABLE = "retries"
 
-@Entity
-@Table(
-    name = RETRY_TABLE,
-    // Combined index for our main query pattern: status + delayed_until + attempt_count
-    indexes = [Index(name = "idx_retry_ready", columnList = "status, delayed_until, attempt_count")],
-)
 @Serializable
-class RetryModel : OutboxModel() {
+data class RetryModel(
+    override val id: String = UuidCreator.getTimeOrderedEpoch().toString(),
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    override lateinit var message: String
+    override val message: String,
 
-    @Column(nullable = false, length = 20)
-    @Enumerated(EnumType.STRING)
-    override var status: OutBoxStatus = OutBoxStatus.PENDING
+    override var status: OutBoxStatus = OutBoxStatus.PENDING,
 
-    @Column(name = "delayed_until", nullable = false)
-    override lateinit var delayedUntil: @Contextual Instant
+    override var delayedUntil: @Contextual Instant,
 
-    @Column(name = "attempt_count", nullable = false)
-    override var attemptCount: Int = 0
+    override var attemptCount: Int = 0,
 
-    @Column(name = "last_error", columnDefinition = "TEXT")
-    override var lastError: String? = null
-
-    @Version
-    @Column(name = "version")
-    var version: Long = 0
+    override var lastError: String? = null,
+) : OutboxModel() {
 
     companion object {
         fun create(
@@ -52,12 +31,12 @@ class RetryModel : OutboxModel() {
             attemptCount: Int = 0,
             lastError: Exception? = null,
             status: OutBoxStatus = OutBoxStatus.PENDING,
-        ) = RetryModel().apply {
-            this.message = message
-            this.delayedUntil = delayedUntil
-            this.attemptCount = attemptCount
-            this.lastError = lastError?.message
-            this.status = status
-        }
+        ) = RetryModel(
+            message = message,
+            delayedUntil = delayedUntil,
+            attemptCount = attemptCount,
+            lastError = lastError?.message,
+            status = status,
+        )
     }
 }

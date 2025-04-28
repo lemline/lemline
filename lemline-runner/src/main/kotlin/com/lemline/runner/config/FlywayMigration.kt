@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.repositories
+package com.lemline.runner.config
 
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import io.quarkus.runtime.StartupEvent

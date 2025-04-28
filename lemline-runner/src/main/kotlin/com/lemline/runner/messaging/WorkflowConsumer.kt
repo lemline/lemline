@@ -148,7 +148,7 @@ internal class WorkflowConsumer(
 
     private fun String.saveMsgAsFailed(e: Exception?) {
         // Store the message in retry in failed state (for information)
-        retryRepository.save(
+        retryRepository.persist(
             RetryModel.create(
                 message = this@saveMsgAsFailed,
                 delayedUntil = Instant.now(),
@@ -187,7 +187,7 @@ internal class WorkflowConsumer(
         val delayedUntil = Instant.now().plus(delay?.toJavaDuration() ?: error("No delay set in for $this"))
 
         // Save message to the retry table
-        retryRepository.save(
+        retryRepository.persist(
             RetryModel.create(
                 message = msg.toJsonString(),
                 delayedUntil = delayedUntil,
@@ -204,7 +204,7 @@ internal class WorkflowConsumer(
         val delayedUntil = Instant.now().plus(delay.toJavaDuration())
 
         // Save the message to the wait table
-        waitRepository.save(
+        waitRepository.persist(
             WaitModel.create(
                 message = msg.toJsonString(),
                 delayedUntil = delayedUntil,

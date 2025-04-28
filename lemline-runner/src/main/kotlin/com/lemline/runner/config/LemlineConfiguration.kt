@@ -87,44 +87,43 @@ interface LemlineConfiguration {
             fun toQuarkusProperties(config: DatabaseConfig): Map<String, String> {
                 val props = mutableMapOf<String, String>()
 
-                // Set the database type
-                props["quarkus.datasource.db-kind"] = when (config.type()) {
-                    LemlineConfigConstants.DB_TYPE_IN_MEMORY -> "h2"
-                    LemlineConfigConstants.DB_TYPE_POSTGRESQL -> "postgresql"
-                    LemlineConfigConstants.DB_TYPE_MYSQL -> "mysql"
-                    else -> throw IllegalArgumentException("Unsupported database type: ${config.type()}")
-                }
-
-                // Configure specific database type
                 when (config.type()) {
                     LemlineConfigConstants.DB_TYPE_IN_MEMORY -> {
+                        props["quarkus.datasource.active"] = "true"
                         props["quarkus.flyway.locations"] = "classpath:db/migration/h2"
-                        props["quarkus.datasource.jdbc.url"] =
-                            "jdbc:h2:mem:${LemlineConfigConstants.DEFAULT_H2_DB_NAME};DB_CLOSE_DELAY=-1"
                         props["quarkus.datasource.username"] = LemlineConfigConstants.DEFAULT_H2_USERNAME
                         props["quarkus.datasource.password"] = LemlineConfigConstants.DEFAULT_H2_PASSWORD
+                        props["quarkus.datasource.jdbc.url"] =
+                            "jdbc:h2:mem:${LemlineConfigConstants.DEFAULT_H2_DB_NAME};DB_CLOSE_DELAY=-1"
+                        props["quarkus.flyway.baseline-on-migrate"] = config.baselineOnMigrate().toString()
+                        props["quarkus.flyway.migrate-at-start"] = config.migrateAtStart().toString()
                     }
 
                     LemlineConfigConstants.DB_TYPE_POSTGRESQL -> {
                         val pgConfig = config.postgresql()
-                        props["quarkus.flyway.locations"] = "classpath:db/migration/postgresql"
-                        props["quarkus.datasource.jdbc.url"] =
+                        props["quarkus.datasource.postgresql.active"] = "true"
+                        props["quarkus.flyway.postgresql.locations"] = "classpath:db/migration/postgresql"
+                        props["quarkus.datasource.postgresql.username"] = pgConfig.username()
+                        props["quarkus.datasource.postgresql.password"] = pgConfig.getPassword()
+                        props["quarkus.datasource.postgresql.jdbc.url"] =
                             "jdbc:postgresql://${pgConfig.host()}:${pgConfig.port()}/${pgConfig.name()}"
-                        props["quarkus.datasource.username"] = pgConfig.username()
-                        props["quarkus.datasource.password"] = pgConfig.getPassword()
+                        props["quarkus.flyway.postgresql.baseline-on-migrate"] = config.baselineOnMigrate().toString()
+                        props["quarkus.flyway.postgresql.migrate-at-start"] = config.migrateAtStart().toString()
                     }
 
                     LemlineConfigConstants.DB_TYPE_MYSQL -> {
                         val mysqlConfig = config.mysql()
-                        props["quarkus.flyway.locations"] = "classpath:db/migration/mysql"
-                        props["quarkus.datasource.jdbc.url"] =
+                        props["quarkus.datasource.mysql.active"] = "true"
+                        props["quarkus.datasource.active"] = "false"
+                        props["quarkus.flyway.mysql.locations"] = "classpath:db/migration/mysql"
+                        props["quarkus.datasource.mysql.username"] = mysqlConfig.username()
+                        props["quarkus.datasource.mysql.password"] = mysqlConfig.getPassword()
+                        props["quarkus.datasource.mysql.jdbc.url"] =
                             "jdbc:mysql://${mysqlConfig.host()}:${mysqlConfig.port()}/${mysqlConfig.name()}?useSSL=false&allowPublicKeyRetrieval=true"
-                        props["quarkus.datasource.username"] = mysqlConfig.username()
-                        props["quarkus.datasource.password"] = mysqlConfig.getPassword()
+                        props["quarkus.flyway.mysql.baseline-on-migrate"] = config.baselineOnMigrate().toString()
+                        props["quarkus.flyway.mysql.migrate-at-start"] = config.migrateAtStart().toString()
                     }
                 }
-                props["quarkus.flyway.baseline-on-migrate"] = config.baselineOnMigrate().toString()
-                props["quarkus.flyway.migrate-at-start"] = config.migrateAtStart().toString()
 
                 return props
             }

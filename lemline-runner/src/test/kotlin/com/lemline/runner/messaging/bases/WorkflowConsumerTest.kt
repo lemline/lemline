@@ -66,9 +66,9 @@ internal abstract class WorkflowConsumerTest {
         waitRepository.deleteAll()
 
         // Create test workflow definition
-        val workflowModel = WorkflowModel().apply {
-            name = "test-workflow"
-            version = "1.0.0"
+        val workflowModel = WorkflowModel(
+            name = "test-workflow",
+            version = "1.0.0",
             definition = """
             document:
                 dsl: '1.0.0'
@@ -118,8 +118,8 @@ internal abstract class WorkflowConsumerTest {
                             set:
                               caught: true
             """.trimIndent().replace("@", "$")
-        }
-        with(workflowRepository) { workflowModel.save() }
+        )
+        workflowRepository.persist(workflowModel)
 
         setupMessaging()
     }

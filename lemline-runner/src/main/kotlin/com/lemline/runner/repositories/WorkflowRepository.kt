@@ -1,18 +1,162 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.runner.config.DatabaseManager
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.models.WorkflowModel
-import io.quarkus.hibernate.orm.panache.kotlin.PanacheRepositoryBase
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
 import jakarta.transaction.Transactional
+import java.sql.ResultSet
 
 @ApplicationScoped
-class WorkflowRepository : PanacheRepositoryBase<WorkflowModel, String> {
-    fun findByNameAndVersion(name: String, version: String): WorkflowModel? =
-        find("name = ?1 and version = ?2", name, version).firstResult()
+class WorkflowRepository : Repository<WorkflowModel>() {
 
+    @Inject
+    override lateinit var databaseManager: DatabaseManager
+
+    override val tableName = "workflows"
+
+    /**
+     * Creates a model instance from a ResultSet.
+     * Maps the database columns to the workflow model properties.
+     *
+     * @param rs The ResultSet containing the current row
+     * @return A new workflow model instance populated with data from the ResultSet
+     */
+    override fun createModel(rs: ResultSet): WorkflowModel = WorkflowModel(
+        id = rs.getString("id"),
+        name = rs.getString("name"),
+        version = rs.getString("version"),
+        definition = rs.getString("definition")
+    )
+
+    /**
+     * Finds a workflow by its name and version.
+     * This method uses a native SQL query to retrieve the workflow from the database.
+     *
+     * @param name The name of the workflow
+     * @param version The version of the workflow
+     * @return The workflow model if found, null otherwise
+     */
     @Transactional
-    fun WorkflowModel.save() {
-        persist(this)
+    fun findByNameAndVersion(name: String, version: String): WorkflowModel? {
+        val sql = """
+            SELECT * FROM $tableName
+            WHERE name = ?
+            AND version = ?
+            LIMIT 1
+        """.trimIndent()
+
+        return withConnection {
+            it.prepareStatement(sql).use { stmt ->
+                stmt.apply {
+                    setString(1, name)
+                    setString(2, version)
+                }
+                stmt.executeQuery().use { rs ->
+                    if (rs.next()) createModel(rs) else null
+                }
+            }
+        }
+    }
+
+    /**
+     * Persists a workflow to the database.
+     * This method is transactional and uses native SQL for optimal performance.
+     *
+     * @param workflow The workflow to persist
+     */
+    @Transactional
+    override fun persist(workflow: WorkflowModel) {
+        val sql = when (val type = databaseManager.dbType) {
+            DB_TYPE_POSTGRESQL -> """
+                INSERT INTO $tableName (id, name, version, definition)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (id) DO UPDATE
+                SET name = EXCLUDED.name,
+                    version = EXCLUDED.version,
+                    definition = EXCLUDED.definition
+            """.trimIndent()
+
+            DB_TYPE_MYSQL -> """
+                INSERT INTO $tableName (id, name, version, definition)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                name = VALUES(name),
+                version = VALUES(version),
+                definition = VALUES(definition)
+            """.trimIndent()
+
+            DB_TYPE_IN_MEMORY -> """
+                INSERT INTO $tableName (id, name, version, definition)
+                VALUES (?, ?, ?, ?)
+            """.trimIndent()
+
+            else -> throw IllegalStateException("Unsupported database type '$type'")
+        }
+
+        withConnection {
+            it.prepareStatement(sql).use { stmt ->
+                stmt.setString(1, workflow.id)
+                stmt.setString(2, workflow.name)
+                stmt.setString(3, workflow.version)
+                stmt.setString(4, workflow.definition)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    /**
+     * Persists multiple workflows to the database in a single batch operation.
+     * This method uses database-specific batch operations for optimal performance.
+     *
+     * @param workflows The list of workflows to persist
+     */
+    @Transactional
+    override fun persist(workflows: List<WorkflowModel>) {
+        if (workflows.isEmpty()) return
+
+        val sql = when (val type = databaseManager.dbType) {
+            DB_TYPE_POSTGRESQL -> """
+                INSERT INTO $tableName (id, name, version, definition)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT (id) DO UPDATE
+                SET name = EXCLUDED.name,
+                    version = EXCLUDED.version,
+                    definition = EXCLUDED.definition
+            """.trimIndent()
+
+            DB_TYPE_MYSQL -> """
+                INSERT INTO $tableName (id, name, version, definition)
+                VALUES (?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE
+                name = VALUES(name),
+                version = VALUES(version),
+                definition = VALUES(definition)
+            """.trimIndent()
+
+            DB_TYPE_IN_MEMORY -> """
+                INSERT INTO $tableName (id, name, version, definition)
+                VALUES (?, ?, ?, ?)
+            """.trimIndent()
+
+            else -> throw IllegalStateException("Unsupported database type '$type'")
+        }
+
+        withConnection {
+            it.prepareStatement(sql).use { stmt ->
+                for (workflow in workflows) {
+                    stmt.setString(1, workflow.id)
+                    stmt.setString(2, workflow.name)
+                    stmt.setString(3, workflow.version)
+                    stmt.setString(4, workflow.definition)
+                    stmt.addBatch()
+                }
+                stmt.executeBatch()
+            }
+        }
     }
 }
