@@ -4,7 +4,6 @@ package com.lemline.runner.repositories.bases
 import com.lemline.runner.models.WorkflowModel
 import com.lemline.runner.repositories.WorkflowRepository
 import jakarta.inject.Inject
-import jakarta.persistence.EntityManager
 import jakarta.transaction.Transactional
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.BeforeEach
@@ -37,10 +36,6 @@ abstract class WorkflowRepositoryTest {
     @Inject
     protected lateinit var repository: WorkflowRepository
 
-    /** Entity manager for direct database operations */
-    @Inject
-    protected lateinit var entityManager: EntityManager
-
     /**
      * Cleans up the database before each test to ensure a clean state.
      * This is crucial for maintaining test isolation and reliability.
@@ -66,9 +61,9 @@ abstract class WorkflowRepositoryTest {
     @Test
     fun `should successfully persist and retrieve a complete workflow model with all properties`() {
         // Given
-        val workflowModel = WorkflowModel().apply {
-            name = "test-workflow"
-            version = "1.0.0"
+        val workflowModel = WorkflowModel(
+            name = "test-workflow",
+            version = "1.0.0",
             definition = """
                 document:
                   dsl: '1.0.0'
@@ -82,15 +77,15 @@ abstract class WorkflowRepositoryTest {
                       script: >
                         ${'$'}merge([${'$'}input, {'greeting': 'Hello, World!'}])
             """.trimIndent()
-        }
+        )
 
         // When
-        val savedModel = persistAndFlush(workflowModel)
+        repository.persist(workflowModel)
 
         // Then
         val retrievedModel = repository.findByNameAndVersion("test-workflow", "1.0.0")
         Assertions.assertNotNull(retrievedModel)
-        Assertions.assertEquals(savedModel.id, retrievedModel?.id)
+        Assertions.assertEquals(workflowModel.id, retrievedModel?.id)
         Assertions.assertEquals("test-workflow", retrievedModel?.name)
         Assertions.assertEquals("1.0.0", retrievedModel?.version)
         Assertions.assertTrue(retrievedModel?.definition?.contains("Hello, World!") ?: false)
@@ -130,40 +125,150 @@ abstract class WorkflowRepositoryTest {
     @Transactional
     fun `should successfully update an existing workflow's definition while preserving other properties`() {
         // Given
-        val workflowModel = WorkflowModel().apply {
-            name = "updatable-workflow"
-            version = "1.0.0"
+        val workflowModel = WorkflowModel(
+            name = "updatable-workflow",
+            version = "1.0.0",
             definition = "original definition"
-        }
-        persistAndFlush(workflowModel)
+        )
+        repository.persist(workflowModel)
 
         // When
         val retrievedModel = repository.findByNameAndVersion("updatable-workflow", "1.0.0")
-        retrievedModel?.apply {
-            definition = "updated definition"
-        }
-        if (retrievedModel != null) {
-            entityManager.merge(retrievedModel)
-            entityManager.flush()
-        }
+        val updatedModel = retrievedModel?.copy(definition = "updated definition")
+        if (updatedModel != null) repository.persist(updatedModel)
 
         // Then
-        val updatedModel = repository.findByNameAndVersion("updatable-workflow", "1.0.0")
-        Assertions.assertNotNull(updatedModel)
-        Assertions.assertEquals("updated definition", updatedModel?.definition)
+        val finalModel = repository.findByNameAndVersion("updatable-workflow", "1.0.0")
+        Assertions.assertNotNull(finalModel)
+        Assertions.assertEquals("updated definition", finalModel?.definition)
     }
 
     /**
-     * Helper method to persist and flush a workflow model in a transaction.
-     * Ensures that the model is properly saved to the database before proceeding.
-     *
-     * @param model The workflow model to persist
-     * @return The persisted model with its ID set
+     * Tests batch persistence of multiple workflows.
+     * Verifies that:
+     * - Multiple workflows can be persisted in a single operation
+     * - All workflows are correctly stored and can be retrieved
+     * - Properties of each workflow are preserved
      */
-    @Transactional
-    protected fun persistAndFlush(model: WorkflowModel): WorkflowModel {
-        entityManager.persist(model)
-        entityManager.flush()
-        return model
+    @Test
+    fun `should successfully persist and retrieve multiple workflows in batch`() {
+        // Given
+        val workflows = List(5) { i ->
+            WorkflowModel(
+                name = "batch-workflow-$i",
+                version = "1.0.0",
+                definition = "definition-$i"
+            )
+        }
+
+        // When
+        repository.persist(workflows)
+
+        // Then
+        workflows.forEach { workflow ->
+            val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version)
+            Assertions.assertNotNull(retrieved)
+            Assertions.assertEquals(workflow.id, retrieved?.id)
+            Assertions.assertEquals(workflow.name, retrieved?.name)
+            Assertions.assertEquals(workflow.version, retrieved?.version)
+            Assertions.assertEquals(workflow.definition, retrieved?.definition)
+        }
+    }
+
+    /**
+     * Tests retrieval of a workflow by its ID.
+     * Verifies that:
+     * - A workflow can be retrieved using its ID
+     * - All properties are correctly preserved
+     */
+    @Test
+    fun `should retrieve workflow by ID`() {
+        // Given
+        val workflow = WorkflowModel(
+            name = "id-test-workflow",
+            version = "1.0.0",
+            definition = "test definition"
+        )
+        repository.persist(workflow)
+
+        // When
+        val retrieved = repository.findById(workflow.id)
+
+        // Then
+        Assertions.assertNotNull(retrieved)
+        Assertions.assertEquals(workflow.id, retrieved?.id)
+        Assertions.assertEquals(workflow.name, retrieved?.name)
+        Assertions.assertEquals(workflow.version, retrieved?.version)
+        Assertions.assertEquals(workflow.definition, retrieved?.definition)
+    }
+
+    /**
+     * Tests retrieval of all workflows.
+     * Verifies that:
+     * - All workflows can be retrieved
+     * - The list contains the correct number of workflows
+     * - All properties of each workflow are preserved
+     */
+    @Test
+    fun `should retrieve all workflows`() {
+        // Given
+        val workflows = List(3) { i ->
+            WorkflowModel(
+                name = "list-workflow-$i",
+                version = "1.0.0",
+                definition = "definition-$i"
+            )
+        }
+        repository.persist(workflows)
+
+        // When
+        val retrieved = repository.listAll()
+
+        // Then
+        Assertions.assertEquals(workflows.size, retrieved.size)
+        workflows.forEach { workflow ->
+            val found = retrieved.find { it.id == workflow.id }
+            Assertions.assertNotNull(found)
+            Assertions.assertEquals(workflow.name, found?.name)
+            Assertions.assertEquals(workflow.version, found?.version)
+            Assertions.assertEquals(workflow.definition, found?.definition)
+        }
+    }
+
+    /**
+     * Tests concurrent access to the repository.
+     * Verifies that:
+     * - Multiple threads can safely access the repository
+     * - No data corruption occurs during concurrent operations
+     */
+    @Test
+    fun `should handle concurrent access safely`() {
+        // Given
+        val threadCount = 5
+        val workflowsPerThread = 10
+        val threads = List(threadCount) { threadIndex ->
+            Thread {
+                List(workflowsPerThread) { i ->
+                    WorkflowModel(
+                        name = "concurrent-workflow-$threadIndex-$i",
+                        version = "1.0.0",
+                        definition = "definition-$threadIndex-$i"
+                    )
+                }.forEach { workflow ->
+                    repository.persist(workflow)
+                    val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version)
+                    Assertions.assertNotNull(retrieved)
+                    Assertions.assertEquals(workflow.id, retrieved?.id)
+                }
+            }
+        }
+
+        // When
+        threads.forEach { it.start() }
+        threads.forEach { it.join() }
+
+        // Then
+        val allWorkflows = repository.listAll()
+        Assertions.assertEquals(threadCount * workflowsPerThread, allWorkflows.size)
     }
 }

@@ -2,9 +2,6 @@
 package com.lemline.runner.repositories
 
 import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.models.WorkflowModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -18,6 +15,9 @@ class WorkflowRepository : Repository<WorkflowModel>() {
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = "workflows"
+
+    override val columns: String = "id, name, version, definition"
+    override val values: String = "?, ?, ?, ?"
 
     /**
      * Creates a model instance from a ResultSet.
@@ -67,43 +67,18 @@ class WorkflowRepository : Repository<WorkflowModel>() {
      * Persists a workflow to the database.
      * This method is transactional and uses native SQL for optimal performance.
      *
-     * @param workflow The workflow to persist
+     * @param entity The workflow to persist
      */
     @Transactional
-    override fun persist(workflow: WorkflowModel) {
-        val sql = when (val type = databaseManager.dbType) {
-            DB_TYPE_POSTGRESQL -> """
-                INSERT INTO $tableName (id, name, version, definition)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (id) DO UPDATE
-                SET name = EXCLUDED.name,
-                    version = EXCLUDED.version,
-                    definition = EXCLUDED.definition
-            """.trimIndent()
-
-            DB_TYPE_MYSQL -> """
-                INSERT INTO $tableName (id, name, version, definition)
-                VALUES (?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                name = VALUES(name),
-                version = VALUES(version),
-                definition = VALUES(definition)
-            """.trimIndent()
-
-            DB_TYPE_IN_MEMORY -> """
-                INSERT INTO $tableName (id, name, version, definition)
-                VALUES (?, ?, ?, ?)
-            """.trimIndent()
-
-            else -> throw IllegalStateException("Unsupported database type '$type'")
-        }
+    override fun persist(entity: WorkflowModel) {
+        val sql = getUpsertSql()
 
         withConnection {
             it.prepareStatement(sql).use { stmt ->
-                stmt.setString(1, workflow.id)
-                stmt.setString(2, workflow.name)
-                stmt.setString(3, workflow.version)
-                stmt.setString(4, workflow.definition)
+                stmt.setString(1, entity.id)
+                stmt.setString(2, entity.name)
+                stmt.setString(3, entity.version)
+                stmt.setString(4, entity.definition)
                 stmt.executeUpdate()
             }
         }
@@ -113,42 +88,17 @@ class WorkflowRepository : Repository<WorkflowModel>() {
      * Persists multiple workflows to the database in a single batch operation.
      * This method uses database-specific batch operations for optimal performance.
      *
-     * @param workflows The list of workflows to persist
+     * @param entities The list of workflows to persist
      */
     @Transactional
-    override fun persist(workflows: List<WorkflowModel>) {
-        if (workflows.isEmpty()) return
+    override fun persist(entities: List<WorkflowModel>) {
+        if (entities.isEmpty()) return
 
-        val sql = when (val type = databaseManager.dbType) {
-            DB_TYPE_POSTGRESQL -> """
-                INSERT INTO $tableName (id, name, version, definition)
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT (id) DO UPDATE
-                SET name = EXCLUDED.name,
-                    version = EXCLUDED.version,
-                    definition = EXCLUDED.definition
-            """.trimIndent()
-
-            DB_TYPE_MYSQL -> """
-                INSERT INTO $tableName (id, name, version, definition)
-                VALUES (?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE
-                name = VALUES(name),
-                version = VALUES(version),
-                definition = VALUES(definition)
-            """.trimIndent()
-
-            DB_TYPE_IN_MEMORY -> """
-                INSERT INTO $tableName (id, name, version, definition)
-                VALUES (?, ?, ?, ?)
-            """.trimIndent()
-
-            else -> throw IllegalStateException("Unsupported database type '$type'")
-        }
+        val sql = getUpsertSql()
 
         withConnection {
             it.prepareStatement(sql).use { stmt ->
-                for (workflow in workflows) {
+                for (workflow in entities) {
                     stmt.setString(1, workflow.id)
                     stmt.setString(2, workflow.name)
                     stmt.setString(3, workflow.version)

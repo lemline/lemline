@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
@@ -11,40 +8,6 @@ import com.lemline.runner.outbox.OutBoxStatus.SENT
 import jakarta.transaction.Transactional
 import java.sql.ResultSet
 import java.time.Instant
-
-private const val COLUMNS = "id, message, status, delayed_until, attempt_count, last_error"
-private const val VALUES = "?, ?, ?, ?, ?, ?"
-
-private fun getUpsertSql(tableName: String, type: String): String = when (type) {
-    DB_TYPE_POSTGRESQL -> """
-        INSERT INTO $tableName ($COLUMNS)
-        VALUES ($VALUES)
-        ON CONFLICT (id) DO UPDATE SET
-            message = EXCLUDED.message,
-            status = EXCLUDED.status,
-            delayed_until = EXCLUDED.delayed_until,
-            attempt_count = EXCLUDED.attempt_count,
-            last_error = EXCLUDED.last_error
-    """.trimIndent()
-
-    DB_TYPE_MYSQL -> """
-        INSERT INTO $tableName ($COLUMNS)
-        VALUES ($VALUES)
-        ON DUPLICATE KEY UPDATE
-            message = VALUES(message),
-            status = VALUES(status),
-            delayed_until = VALUES(delayed_until),
-            attempt_count = VALUES(attempt_count),
-            last_error = VALUES(last_error)
-    """.trimIndent()
-
-    DB_TYPE_IN_MEMORY -> """
-        INSERT INTO $tableName ($COLUMNS)
-        VALUES ($VALUES)
-    """.trimIndent()
-
-    else -> throw IllegalStateException("Unsupported database type '$type'")
-}
 
 /**
  * Base interface for outbox pattern repositories.
@@ -84,6 +47,9 @@ private fun getUpsertSql(tableName: String, type: String): String = when (type) 
  * @see OutboxProcessor for the processing logic
  */
 abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
+
+    override val columns: String = "id, message, status, delayed_until, attempt_count, last_error"
+    override val values: String = "?, ?, ?, ?, ?, ?"
 
     /**
      * Creates a model instance from a ResultSet.
@@ -129,7 +95,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      */
     @Transactional
     override fun persist(message: T) {
-        val sql = getUpsertSql(tableName, databaseManager.dbType)
+        val sql = getUpsertSql()
 
         withConnection {
             it.prepareStatement(sql).use { stmt ->
@@ -154,7 +120,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
     override fun persist(messages: List<T>) {
         if (messages.isEmpty()) return
 
-        val sql = getUpsertSql(tableName, databaseManager.dbType)
+        val sql = getUpsertSql()
 
         withConnection {
             it.prepareStatement(sql).use { stmt ->

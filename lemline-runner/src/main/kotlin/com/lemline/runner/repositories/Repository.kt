@@ -2,6 +2,9 @@
 package com.lemline.runner.repositories
 
 import com.lemline.runner.config.DatabaseManager
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.models.UuidV7Entity
 import jakarta.transaction.Transactional
 import java.sql.Connection
@@ -12,6 +15,41 @@ abstract class Repository<T : UuidV7Entity> {
     abstract val databaseManager: DatabaseManager
 
     abstract val tableName: String
+
+    /**
+     * Returns the column names for the table, comma-separated.
+     * This should include all columns that are part of the upsert operation.
+     */
+    protected abstract val columns: String
+
+    /**
+     * Returns the value placeholders for the columns, comma-separated.
+     * This should match the number of columns in [columns].
+     */
+    protected abstract val values: String
+
+    protected fun getUpsertSql(): String = when (databaseManager.dbType) {
+        DB_TYPE_POSTGRESQL -> """
+            INSERT INTO $tableName ($columns)
+            VALUES ($values)
+            ON CONFLICT (id) DO UPDATE SET
+                ${columns.split(", ").filter { it != "id" }.joinToString() { "$it = EXCLUDED.$it" }}
+        """.trimIndent()
+
+        DB_TYPE_MYSQL -> """
+            INSERT INTO $tableName ($columns)
+            VALUES ($values)
+            ON DUPLICATE KEY UPDATE
+                ${columns.split(", ").filter { it != "id" }.joinToString() { "$it = VALUES($it)" }}
+        """.trimIndent()
+
+        DB_TYPE_IN_MEMORY -> """
+            INSERT INTO $tableName ($columns)
+            VALUES ($values)
+        """.trimIndent()
+
+        else -> throw IllegalStateException("Unsupported database type '${databaseManager.dbType}'")
+    }
 
     /**
      * Persists an entity to the database.
@@ -91,7 +129,7 @@ abstract class Repository<T : UuidV7Entity> {
      * @param rs The ResultSet containing the current row
      * @return A new model instance populated with data from the ResultSet
      */
-    protected abstract fun createModel(rs: ResultSet): T
+    internal abstract fun createModel(rs: ResultSet): T
 
     /**
      * Creates a list of model instances from a ResultSet.
@@ -146,6 +184,25 @@ abstract class Repository<T : UuidV7Entity> {
                     stmt.addBatch()
                 }
                 stmt.executeBatch().sum()
+            }
+        }
+    }
+
+    /**
+     * Counts the total number of records in the table.
+     * This method uses a native SQL query to count all records.
+     *
+     * @return The total number of records in the table
+     */
+    @Transactional
+    fun count(): Long {
+        val sql = "SELECT COUNT(*) FROM $tableName"
+
+        return withConnection {
+            it.prepareStatement(sql).use { stmt ->
+                stmt.executeQuery().use { rs ->
+                    if (rs.next()) rs.getLong(1) else 0L
+                }
             }
         }
     }

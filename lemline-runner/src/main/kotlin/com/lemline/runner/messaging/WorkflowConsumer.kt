@@ -149,10 +149,10 @@ internal class WorkflowConsumer(
     private fun String.saveMsgAsFailed(e: Exception?) {
         // Store the message in retry in failed state (for information)
         retryRepository.persist(
-            RetryModel.create(
+            RetryModel(
                 message = this@saveMsgAsFailed,
                 delayedUntil = Instant.now(),
-                lastError = e,
+                lastError = e?.stackTraceToString(),
                 status = OutBoxStatus.FAILED,
             )
         )
@@ -188,7 +188,7 @@ internal class WorkflowConsumer(
 
         // Save message to the retry table
         retryRepository.persist(
-            RetryModel.create(
+            RetryModel(
                 message = msg.toJsonString(),
                 delayedUntil = delayedUntil,
             ),
@@ -205,7 +205,7 @@ internal class WorkflowConsumer(
 
         // Save the message to the wait table
         waitRepository.persist(
-            WaitModel.create(
+            WaitModel(
                 message = msg.toJsonString(),
                 delayedUntil = delayedUntil,
             ),

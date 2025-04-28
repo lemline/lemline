@@ -17,26 +17,9 @@ data class RetryModel(
 
     override var status: OutBoxStatus = OutBoxStatus.PENDING,
 
-    override var delayedUntil: @Contextual Instant,
+    override var delayedUntil: @Contextual Instant = Instant.now(),
 
     override var attemptCount: Int = 0,
 
     override var lastError: String? = null,
-) : OutboxModel() {
-
-    companion object {
-        fun create(
-            message: String,
-            delayedUntil: Instant = Instant.now(),
-            attemptCount: Int = 0,
-            lastError: Exception? = null,
-            status: OutBoxStatus = OutBoxStatus.PENDING,
-        ) = RetryModel(
-            message = message,
-            delayedUntil = delayedUntil,
-            attemptCount = attemptCount,
-            lastError = lastError?.message,
-            status = status,
-        )
-    }
-}
+) : OutboxModel()

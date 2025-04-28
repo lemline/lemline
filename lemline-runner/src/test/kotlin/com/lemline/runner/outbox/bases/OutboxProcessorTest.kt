@@ -18,7 +18,6 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
-import io.quarkus.panache.common.Parameters
 import jakarta.transaction.Transactional
 import java.time.Duration
 import java.time.Instant
@@ -289,7 +288,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert
         verify(exactly = 5) { mockProcessorFunction(any(modelClass)) }
-        val processedMessages = testRepository.list("id in :ids", Parameters.with("ids", messageIds))
+        val processedMessages = testRepository.listAll()
         processedMessages shouldHaveSize 5
         processedMessages.forEach { msg ->
             msg.status shouldBe SENT
@@ -330,17 +329,10 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Manually update the 'delayedUntil' timestamp for the old messages *after* persisting
         // to simulate them being older than the cutoff for cleanup purposes.
-        testRepository.update("delayedUntil = ?1 WHERE id = ?2", wayBeforeCutoff, oldSentMessage.id)
-        testRepository.update(
-            "delayedUntil = ?1 WHERE id = ?2",
-            wayBeforeCutoff,
-            pendingMessage.id
-        ) // Also make pending old
-        testRepository.update(
-            "delayedUntil = ?1 WHERE id = ?2",
-            wayBeforeCutoff,
-            failedMessage.id
-        ) // Also make failed old
+        oldSentMessage.delayedUntil = wayBeforeCutoff
+        pendingMessage.delayedUntil = wayBeforeCutoff
+        failedMessage.delayedUntil = wayBeforeCutoff
+        testRepository.persist(listOf(oldSentMessage, pendingMessage, failedMessage))
 
         val oldSentId = oldSentMessage.id
         val recentSentId = recentSentMessage.id

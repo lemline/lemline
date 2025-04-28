@@ -13,5 +13,5 @@ internal abstract class WaitRepositoryTest : OutboxRepositoryTest<WaitModel>() {
     @Inject
     override lateinit var repository: WaitRepository
 
-    override fun createModel() = WaitModel()
+    override fun createModel(message: String) = WaitModel(message = message)
 }

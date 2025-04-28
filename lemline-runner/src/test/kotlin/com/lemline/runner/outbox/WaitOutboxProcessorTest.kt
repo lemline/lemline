@@ -30,7 +30,7 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitModel>() {
     override val modelClass: KClass<WaitModel> = WaitModel::class
 
     // Implement the abstract factory method
-    override fun createTestModel(payload: String) = WaitModel.create(
+    override fun createTestModel(payload: String) = WaitModel(
         message = "Test Wait Message: $payload",
         delayedUntil = Instant.now() // Ensure ready for processing
     )

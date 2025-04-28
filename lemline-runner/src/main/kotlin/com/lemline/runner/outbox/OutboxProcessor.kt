@@ -136,6 +136,8 @@ internal class OutboxProcessor<T : OutboxModel>(
                         }
                     }
                 }
+                // save the messages in the same transaction
+                repository.persist(messages)
             }
 
             if (totalProcessed > 0) {

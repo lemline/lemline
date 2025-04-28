@@ -32,7 +32,7 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryModel>() {
     // Implement the abstract factory method
     override fun createTestModel(payload: String): RetryModel {
         // Use the RetryModel companion object factory method
-        return RetryModel.create(
+        return RetryModel(
             message = "Test Retry Message: $payload",
             delayedUntil = Instant.now() // Ensure ready for processing
         )

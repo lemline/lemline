@@ -14,5 +14,5 @@ internal abstract class RetryRepositoryTest : OutboxRepositoryTest<RetryModel>()
     @Inject
     override lateinit var repository: RetryRepository
 
-    override fun createModel() = RetryModel()
+    override fun createModel(message: String) = RetryModel(message = message)
 }
