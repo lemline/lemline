@@ -12,4 +12,3 @@ data class WorkflowModel(
 
     val definition: String
 ) : UuidV7Entity()
-
