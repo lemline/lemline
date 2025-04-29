@@ -7,8 +7,7 @@ CREATE TABLE IF NOT EXISTS retries
     attempt_count  INTEGER NOT NULL DEFAULT 0,
     last_error     TEXT,
     version_number BIGINT NOT NULL DEFAULT 0
-) WITH (
-    ENCODING = 'UTF8'  -- PostgreSQL UTF8 supports full Unicode (up to 4 bytes)
 );
+
 -- Create index for efficient querying on status and delayed_until
-CREATE INDEX IF NOT EXISTS idx_retries_status_delayed ON retries (status, delayed_until);
+CREATE INDEX idx_retries_status_delayed_until ON retries (status, delayed_until);

@@ -129,7 +129,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
      * 4. Creates a ConfigSource with the transformed properties
      *
      * @param context The configuration context containing all available properties
-     * @return An iterable of ConfigSource instances
+     * @return iterable of ConfigSource instances
      */
     override fun getConfigSources(context: ConfigSourceContext): Iterable<ConfigSource> {
 

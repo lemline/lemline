@@ -6,8 +6,6 @@ CREATE TABLE workflows
     version        VARCHAR(255) NOT NULL,
     definition     TEXT NOT NULL,  -- PostgreSQL TEXT has unlimited size
     CONSTRAINT uk_workflows_name_version UNIQUE (name, version)
-) WITH (
-    ENCODING = 'UTF8'  -- PostgreSQL UTF8 supports full Unicode (up to 4 bytes)
 );
 
 -- Create index for efficient querying on name and version

@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
+import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
+import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
+import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
+import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
+import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_CONNECTOR
 import com.lemline.runner.messaging.WORKFLOW_IN
 import com.lemline.runner.messaging.WORKFLOW_OUT
 import io.smallrye.config.ConfigMapping
@@ -62,7 +71,7 @@ interface LemlineConfiguration {
          * Database type. Must be one of: in-memory, postgresql, mysql
          */
         @Pattern(regexp = "in-memory|postgresql|mysql")
-        @WithDefault("in-memory")
+        @WithDefault(DB_TYPE_IN_MEMORY)
         fun type(): String
 
         /**
@@ -88,14 +97,14 @@ interface LemlineConfiguration {
                 val props = mutableMapOf<String, String>()
 
                 when (config.type()) {
-                    LemlineConfigConstants.DB_TYPE_IN_MEMORY -> {
+                    DB_TYPE_IN_MEMORY -> {
                         props["quarkus.datasource.username"] = LemlineConfigConstants.DEFAULT_H2_USERNAME
                         props["quarkus.datasource.password"] = LemlineConfigConstants.DEFAULT_H2_PASSWORD
                         props["quarkus.datasource.jdbc.url"] =
                             "jdbc:h2:mem:${LemlineConfigConstants.DEFAULT_H2_DB_NAME};DB_CLOSE_DELAY=-1"
                     }
 
-                    LemlineConfigConstants.DB_TYPE_POSTGRESQL -> {
+                    DB_TYPE_POSTGRESQL -> {
                         val pgConfig = config.postgresql()
                         props["quarkus.datasource.postgresql.username"] = pgConfig.username()
                         props["quarkus.datasource.postgresql.password"] = pgConfig.getPassword()
@@ -103,7 +112,7 @@ interface LemlineConfiguration {
                             "jdbc:postgresql://${pgConfig.host()}:${pgConfig.port()}/${pgConfig.name()}"
                     }
 
-                    LemlineConfigConstants.DB_TYPE_MYSQL -> {
+                    DB_TYPE_MYSQL -> {
                         val mysqlConfig = config.mysql()
                         props["quarkus.datasource.mysql.username"] = mysqlConfig.username()
                         props["quarkus.datasource.mysql.password"] = mysqlConfig.getPassword()
@@ -200,18 +209,18 @@ interface LemlineConfiguration {
                 props["$outgoing.merge"] = "true"
 
                 when (config.type()) {
-                    LemlineConfigConstants.MSG_TYPE_IN_MEMORY -> {
-                        props["$incoming.connector"] = LemlineConfigConstants.IN_MEMORY_CONNECTOR
-                        props["$outgoing.connector"] = LemlineConfigConstants.IN_MEMORY_CONNECTOR
+                    MSG_TYPE_IN_MEMORY -> {
+                        props["$incoming.connector"] = IN_MEMORY_CONNECTOR
+                        props["$outgoing.connector"] = IN_MEMORY_CONNECTOR
                     }
 
-                    LemlineConfigConstants.MSG_TYPE_KAFKA -> {
+                    MSG_TYPE_KAFKA -> {
                         val kafkaConfig = config.kafka()
                         // Server configuration
                         props["kafka.bootstrap.servers"] = kafkaConfig.brokers()
 
                         // Incoming channel
-                        props["$incoming.connector"] = LemlineConfigConstants.KAFKA_CONNECTOR
+                        props["$incoming.connector"] = KAFKA_CONNECTOR
                         props["$incoming.topic"] = kafkaConfig.topic()
                         props["$incoming.group.id"] = kafkaConfig.groupId()
                         props["$incoming.auto.offset.reset"] = kafkaConfig.offsetReset()
@@ -220,7 +229,7 @@ interface LemlineConfiguration {
                             kafkaConfig.topicDlq().orElse("${kafkaConfig.topic()}-dlq")
 
                         // Outgoing channel
-                        props["$outgoing.connector"] = LemlineConfigConstants.KAFKA_CONNECTOR
+                        props["$outgoing.connector"] = KAFKA_CONNECTOR
                         props["$outgoing.topic"] = kafkaConfig.topicOut().orElse(kafkaConfig.topic())
 
                         // Security settings
@@ -239,7 +248,7 @@ interface LemlineConfiguration {
                         }
                     }
 
-                    LemlineConfigConstants.MSG_TYPE_RABBITMQ -> {
+                    MSG_TYPE_RABBITMQ -> {
                         val rabbitConfig = config.rabbitmq()
                         // Server configuration
                         props["rabbitmq-host"] = rabbitConfig.hostname()
@@ -249,7 +258,7 @@ interface LemlineConfiguration {
                         rabbitConfig.virtualHost().let { props["rabbitmq-virtual-host"] = it }
 
                         // Incoming channel
-                        props["$incoming.connector"] = LemlineConfigConstants.RABBITMQ_CONNECTOR
+                        props["$incoming.connector"] = RABBITMQ_CONNECTOR
                         props["$incoming.queue.name"] = rabbitConfig.queue()
                         props["$incoming.queue.durable"] = "true"
                         props["$incoming.auto-ack"] = "false"
@@ -259,7 +268,7 @@ interface LemlineConfiguration {
                             rabbitConfig.queueDlq().orElse("${rabbitConfig.queue()}-dlq")
 
                         // Outgoing channel
-                        props["$outgoing.connector"] = LemlineConfigConstants.RABBITMQ_CONNECTOR
+                        props["$outgoing.connector"] = RABBITMQ_CONNECTOR
                         props["$outgoing.queue.name"] = rabbitConfig.queueOut().orElse(rabbitConfig.queue())
                         props["$outgoing.serializer"] = "java.lang.String"
 

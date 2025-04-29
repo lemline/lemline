@@ -51,4 +51,5 @@ webHelpDOCS2-all.zip
 webHelpDOCS2-all/
 
 ### Local configuration files
-application.yml
+/application.yaml
+/application.properties
