@@ -115,7 +115,7 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 ## 💻 Native Image
 
 To produce a native image of the runner, you need to have GraalVM installed in your environment.
-We recommend using 24.1.2.r23-mandrel for this purpose.
+We recommend using 24.1.2.r23-mandrel.
 
 To build a linux native image (on Docker), run the following command:
 
@@ -134,6 +134,24 @@ The binary will be created in `lemline-runner/build/lemline-runner-$version-runn
 ## 👨‍Development
 
 Currently implemented features are:
+
+### Databases
+
+- [x] PostgreSQL
+- [x] MySQL
+- [ ] MariaDB
+- [ ] Oracle
+- [ ] SQL Server
+
+### Message Brokers
+
+- [x] Kafka
+- [x] RabbitMQ
+- [ ] Pulsar
+- [ ] MQTT
+- [ ] Amazon SQS
+- [ ] Google Pub/Sub
+- [ ] Azure Service Bus
 
 ### Tasks
 
