@@ -46,6 +46,7 @@ import java.util.*
  */
 @ConfigMapping(prefix = "lemline")
 interface LemlineConfiguration {
+    fun config(): Optional<Config>
     fun database(): DatabaseConfig
     fun messaging(): MessagingConfig
     fun wait(): WaitConfig
@@ -67,6 +68,7 @@ interface LemlineConfiguration {
      * ```
      */
     interface DatabaseConfig {
+
         /**
          * Database type. Must be one of: in-memory, postgresql, mysql
          */
@@ -124,6 +126,13 @@ interface LemlineConfiguration {
                 return props
             }
         }
+    }
+
+    /**
+     * Config locations
+     */
+    interface Config {
+        fun locations(): List<String>
     }
 
     /**

@@ -5,7 +5,6 @@ import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.WorkflowModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import jakarta.transaction.Transactional
 import java.sql.ResultSet
 
 @ApplicationScoped
@@ -16,8 +15,7 @@ class WorkflowRepository : Repository<WorkflowModel>() {
 
     override val tableName = "workflows"
 
-    override val columns: String = "id, name, version, definition"
-    override val values: String = "?, ?, ?, ?"
+    override val columns = listOf("id", "name", "version", "definition")
 
     /**
      * Creates a model instance from a ResultSet.
@@ -41,7 +39,6 @@ class WorkflowRepository : Repository<WorkflowModel>() {
      * @param version The version of the workflow
      * @return The workflow model if found, null otherwise
      */
-    @Transactional
     fun findByNameAndVersion(name: String, version: String): WorkflowModel? {
         val sql = """
             SELECT * FROM $tableName
@@ -69,7 +66,6 @@ class WorkflowRepository : Repository<WorkflowModel>() {
      *
      * @param entity The workflow to persist
      */
-    @Transactional
     override fun persist(entity: WorkflowModel) {
         val sql = getUpsertSql()
 
@@ -90,7 +86,6 @@ class WorkflowRepository : Repository<WorkflowModel>() {
      *
      * @param entities The list of workflows to persist
      */
-    @Transactional
     override fun persist(entities: List<WorkflowModel>) {
         if (entities.isEmpty()) return
 

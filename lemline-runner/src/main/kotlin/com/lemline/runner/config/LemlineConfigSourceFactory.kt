@@ -5,6 +5,7 @@ import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
+import com.lemline.common.warn
 import com.lemline.runner.config.LemlineConfiguration.DatabaseConfig
 import com.lemline.runner.config.LemlineConfiguration.MessagingConfig
 import io.quarkus.runtime.annotations.ConfigPhase
@@ -143,16 +144,33 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                 context.getValue(name)?.value?.let { lemlineProps[name] = it.split("#").first().trim() }
             }
         }
-        log.debug { "Lemline properties found: $lemlineProps" }
+
+        // Override properties from the lemline.config.locations, if any
+        val configUri = context.getValue("lemline.config.locations").value
+        log.debug { "lemline.config.locations=$configUri" }
+        ExtraFileConfigFactory().getConfigSources(configUri)
+            .forEach { configSource ->
+                configSource.properties.forEach { (name, value) ->
+                    if (name.startsWith("lemline.")) {
+                        lemlineProps[name] = value.split("#").first().trim()
+                    } else {
+                        log.warn { "Skipping not lemline property $name." }
+                    }
+                }
+            }
 
         if (lemlineProps.isEmpty()) {
             log.info { "No Lemline properties found, skipping configuration transformation" }
             return emptyList()
+        } else {
+            log.debug { "Lemline properties found: $lemlineProps" }
         }
 
         try {
             // Create a SmallRyeConfig instance with the collected properties
             val config = SmallRyeConfigBuilder()
+                .addDefaultInterceptors()
+                .addDiscoveredInterceptors()
                 .withSources(PropertiesConfigSource(lemlineProps, "LemlineProperties", 100))
                 .withMapping(LemlineConfiguration::class.java) // 👈 explicit registration
                 .build()
@@ -165,19 +183,19 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
             generatedProps.putAll(DatabaseConfig.toQuarkusProperties(lemlineConfig.database()))
             generatedProps.putAll(MessagingConfig.toQuarkusProperties(lemlineConfig.messaging()))
 
+            log.debug {
+                "Generated properties:\n${
+                    generatedProps.map { "${it.key}=${it.value}" }.joinToString("\n")
+                }"
+            }
+
             return listOf(
                 PropertiesConfigSource(
                     generatedProps,
                     LemlineConfigConstants.CONFIG_SOURCE_NAME,
                     LemlineConfigConstants.CONFIG_ORDINAL
                 )
-            ).also {
-                log.debug {
-                    "Generated properties:\n${
-                        generatedProps.map { "${it.key}=${it.value}" }.joinToString("\n")
-                    }"
-                }
-            }
+            )
         } catch (e: Exception) {
             log.error(e) { "Error transforming Lemline configuration" }
             throw e

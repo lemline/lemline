@@ -111,12 +111,12 @@ internal class WorkflowConsumer(
     suspend fun process(workflowMessage: WorkflowMessage): String? {
         val name = workflowMessage.name
         val version = workflowMessage.version
-        // Get workflow definition from cache or load it from the database
+        // Get workflow definition from the cache or load it from the database
         val workflow = Workflows.getOrNull(name, version) ?: run {
-            // Load workflow definition from database
+            // Load workflow definition from the database
             val workflowDefinition = workflowRepository.findByNameAndVersion(name, version)
                 ?: error("Workflow $name:$version not found")
-            // validate workflow definition and put it in cache
+            // validate the workflow definition and put it in cache
             Workflows.parseAndPut(workflowDefinition.definition)
         }
 
@@ -147,7 +147,7 @@ internal class WorkflowConsumer(
     }
 
     private fun String.saveMsgAsFailed(e: Exception?) {
-        // Store the message in retry in failed state (for information)
+        // Store the message in retry in a failed state (for information)
         retryRepository.persist(
             RetryModel(
                 message = this@saveMsgAsFailed,
@@ -156,7 +156,7 @@ internal class WorkflowConsumer(
                 status = OutBoxStatus.FAILED,
             )
         )
-        // for testing, set the CompletableFuture to failed
+        // for testing, set the CompletableFuture to a failed state
         processingMessages.remove(this)?.completeExceptionally(e)
     }
 
@@ -186,7 +186,7 @@ internal class WorkflowConsumer(
         val delay = (current as TryInstance).delay
         val delayedUntil = Instant.now().plus(delay?.toJavaDuration() ?: error("No delay set in for $this"))
 
-        // Save message to the retry table
+        // Save the message to the retry table
         retryRepository.persist(
             RetryModel(
                 message = msg.toJsonString(),

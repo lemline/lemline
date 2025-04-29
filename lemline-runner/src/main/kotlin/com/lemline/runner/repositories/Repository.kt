@@ -6,13 +6,13 @@ import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.models.UuidV7Entity
-import jakarta.transaction.Transactional
 import java.sql.Connection
 import java.sql.ResultSet
+import java.time.Instant
 
 abstract class Repository<T : UuidV7Entity> {
 
-    abstract val databaseManager: DatabaseManager
+    protected abstract val databaseManager: DatabaseManager
 
     abstract val tableName: String
 
@@ -20,36 +20,54 @@ abstract class Repository<T : UuidV7Entity> {
      * Returns the column names for the table, comma-separated.
      * This should include all columns that are part of the upsert operation.
      */
-    protected abstract val columns: String
+    protected abstract val columns: List<String>
 
     /**
-     * Returns the value placeholders for the columns, comma-separated.
-     * This should match the number of columns in [columns].
+     * Helper that returns the dialect-specific quoting of an SQL identifier.
+     * Feel free to extend when you add new RDBMS types.
      */
-    protected abstract val values: String
+    private fun q(id: String): String = when (databaseManager.dbType) {
+        DB_TYPE_POSTGRESQL -> "\"$id\""          // → "status"
+        DB_TYPE_MYSQL -> "`$id`"            // → `status`
+        DB_TYPE_IN_MEMORY -> id                 // H2: bare identifiers are fine
+        else -> id
+    }
 
-    protected fun getUpsertSql(): String = when (databaseManager.dbType) {
-        DB_TYPE_POSTGRESQL -> """
-            INSERT INTO $tableName ($columns)
-            VALUES ($values)
-            ON CONFLICT (id) DO UPDATE SET
-                ${columns.split(", ").filter { it != "id" }.joinToString() { "$it = EXCLUDED.$it" }}
+    /**
+     * Build an UPSERT / MERGE statement suited to the current RDBMS.
+     * Assumes `columns` is a *List* declared in each concrete repository, e.g.
+     *
+     *     override val columns = listOf("id", "message", "status", …)
+     */
+    protected fun getUpsertSql(): String {
+        // id column is never updated on conflict
+        val nonIdCols = columns.filterNot { it == "id" }
+        val colsCsv = columns.joinToString { q(it) }            // "id","message",…
+        val valsCsv = columns.joinToString { "?" }              // ?,?,?
+        val updates = nonIdCols.joinToString { "${q(it)} = EXCLUDED.${q(it)}" }
+        val updatesMy = nonIdCols.joinToString { "${q(it)} = VALUES(${q(it)})" }
+
+        return when (databaseManager.dbType) {
+            DB_TYPE_POSTGRESQL -> """
+            INSERT INTO $tableName ($colsCsv)
+            VALUES ($valsCsv)
+            ON CONFLICT (${q("id")}) DO UPDATE SET $updates
         """.trimIndent()
 
-        DB_TYPE_MYSQL -> """
-            INSERT INTO $tableName ($columns)
-            VALUES ($values)
-            ON DUPLICATE KEY UPDATE
-                ${columns.split(", ").filter { it != "id" }.joinToString() { "$it = VALUES($it)" }}
+            DB_TYPE_MYSQL -> """
+            INSERT INTO $tableName ($colsCsv)
+            VALUES ($valsCsv)
+            ON DUPLICATE KEY UPDATE $updatesMy
         """.trimIndent()
 
-        DB_TYPE_IN_MEMORY -> """
-            MERGE INTO $tableName (${columns.split(", ").joinToString()})
-            KEY (id)
-            VALUES (${values.split(", ").joinToString()})
+            DB_TYPE_IN_MEMORY -> """
+            MERGE INTO $tableName ($colsCsv)
+            KEY (${q("id")})
+            VALUES ($valsCsv)
         """.trimIndent()
 
-        else -> throw IllegalStateException("Unsupported database type '${databaseManager.dbType}'")
+            else -> error("Unsupported database type '${databaseManager.dbType}'")
+        }
     }
 
     /**
@@ -60,7 +78,6 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @param entity The entity to persist
      */
-    @Transactional
     abstract fun persist(entity: T)
 
     /**
@@ -70,7 +87,6 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @param entities The list of entities to persist
      */
-    @Transactional
     abstract fun persist(entities: List<T>)
 
     /**
@@ -80,7 +96,6 @@ abstract class Repository<T : UuidV7Entity> {
      * @param id The ID of the entity to find
      * @return The entity if found, null otherwise
      */
-    @Transactional
     fun findById(id: String): T? {
         val sql = """
             SELECT * FROM $tableName
@@ -105,7 +120,6 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return List of all entities in the table
      */
-    @Transactional
     fun listAll(): List<T> {
         val sql = "SELECT * FROM $tableName"
 
@@ -153,7 +167,6 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The number of workflows deleted
      */
-    @Transactional
     fun deleteAll(): Int {
         val sql = "DELETE FROM $tableName"
 
@@ -172,7 +185,6 @@ abstract class Repository<T : UuidV7Entity> {
      * @param messages The list of messages to delete
      * @return The number of messages successfully deleted
      */
-    @Transactional
     fun delete(messages: List<T>): Int {
         if (messages.isEmpty()) return 0
 
@@ -195,7 +207,6 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The total number of records in the table
      */
-    @Transactional
     fun count(): Long {
         val sql = "SELECT COUNT(*) FROM $tableName"
 
@@ -208,8 +219,11 @@ abstract class Repository<T : UuidV7Entity> {
         }
     }
 
-    protected fun <R> withConnection(block: (Connection) -> R): R {
-        val connection = databaseManager.datasource.connection
-        return block(connection)
-    }
+    protected fun <R> withConnection(block: (Connection) -> R): R =
+        databaseManager.datasource.connection.use { conn ->
+            block(conn)
+        }
+
+    // 1️⃣ define an extension for clarity
+    protected fun ResultSet.getInstant(column: String): Instant = getTimestamp(column).toInstant()
 }

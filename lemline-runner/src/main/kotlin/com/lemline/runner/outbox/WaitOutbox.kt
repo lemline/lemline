@@ -40,8 +40,9 @@ internal class WaitOutbox @Inject constructor(
     @Channel(WORKFLOW_OUT) emitter: Emitter<String>,
 ) {
     private val logger = logger()
-
-    private val waitConfig: WaitConfig = lemlineConfig.wait()
+    
+    val outboxConf = lemlineConfig.wait().outbox()
+    val cleanupConf = lemlineConfig.wait().cleanup()
 
     internal val outboxProcessor = OutboxProcessor(
         logger = logger,
@@ -66,7 +67,6 @@ internal class WaitOutbox @Inject constructor(
      */
     @Scheduled(every = "{lemline.wait.outbox.every}", concurrentExecution = SKIP)
     fun outbox() {
-        val outboxConf = waitConfig.outbox()
         outboxProcessor.process(
             outboxConf.batchSize(),
             outboxConf.maxAttempts(),
@@ -91,7 +91,6 @@ internal class WaitOutbox @Inject constructor(
      */
     @Scheduled(every = "{lemline.wait.cleanup.every}", concurrentExecution = SKIP)
     fun cleanup() {
-        val cleanupConf = waitConfig.cleanup()
         outboxProcessor.cleanup(
             cleanupConf.after().toDuration(),
             cleanupConf.batchSize(),

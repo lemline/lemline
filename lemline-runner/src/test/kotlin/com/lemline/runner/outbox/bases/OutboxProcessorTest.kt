@@ -281,7 +281,6 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Arrange
         val messages = List(5) { createTestModel("batch_$it") }
         testRepository.persist(messages)
-        val messageIds = messages.map { it.id }
 
         // Act
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
@@ -395,6 +394,48 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Act
         outboxProcessor.cleanup(retentionDelay, batchSize)
+
+        // Assert
+        testRepository.count() shouldBe 0
+    }
+
+    /**
+     * **Scenario: **Tests that cleanup processes all messages, even if it requires more than 3 chunks.
+     *
+     * **Arrange:**
+     * - Creates and persists a large number of SENT messages (more than 3 chunks worth)
+     * - Sets all messages to be older than the retention cutoff
+     *
+     * **Act:**
+     * - Calls `outboxProcessor.cleanup()` with a small batch size
+     *
+     * **Assert:**
+     * - Verifies that all SENT messages were deleted
+     * - Verifies that the cleanup process continued until all messages were processed
+     */
+    @Test
+    @Transactional
+    fun `cleanup should process all messages even if it requires more than 3 chunks`() {
+        // Arrange
+        val afterDelay = Duration.ofDays(7)
+        val cutoff = Instant.now().minusSeconds(afterDelay.toSeconds() + 24 * 60 * 60)
+        val wayBeforeCutoff = cutoff.minus(1, ChronoUnit.DAYS)
+
+        // Create more messages than can be processed in 3 chunks
+        val batchSize = 10 // Small batch size to ensure multiple chunks
+        val totalMessages = batchSize * 50 // More than 3 chunks worth of messages
+        val messages = List(totalMessages) { index ->
+            createTestModel("message_$index").apply {
+                status = SENT
+                delayedUntil = wayBeforeCutoff
+            }
+        }
+
+        // Persist all messages
+        testRepository.persist(messages)
+
+        // Act
+        outboxProcessor.cleanup(afterDelay, batchSize)
 
         // Assert
         testRepository.count() shouldBe 0

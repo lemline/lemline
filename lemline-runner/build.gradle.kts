@@ -18,7 +18,7 @@ dependencies {
     implementation(libs.bundles.kotlinxEcosystem)
 
     // Quarkus
-    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.21.4"))
+    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.22.0"))
     implementation("io.quarkus:quarkus-kotlin")
     implementation("io.quarkus:quarkus-flyway")             // DB migration
     implementation("io.quarkus:quarkus-messaging")

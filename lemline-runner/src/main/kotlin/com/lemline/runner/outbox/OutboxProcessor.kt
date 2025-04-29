@@ -42,23 +42,6 @@ internal class OutboxProcessor<T : OutboxModel>(
     private val repository: OutboxRepository<T>,
     private val processor: (T) -> Unit,
 ) {
-
-    @VisibleForTesting
-    internal fun calculateNextRetryDelay(attemptCount: Int, initialDelay: Duration): Long {
-        // Exponential backoff: initialDelay * 2^(attemptCount-1)
-        // e.g., with initialDelay=1000ms (10s):
-        // attempt 1: 1000ms * 2^0 = 1000ms +/- 20%
-        // attempt 2: 1000ms * 2^1 = 2000ms +/- 20%
-        // attempt 3: 1000ms * 2^2 = 4000ms +/- 20%
-        val baseDelay = initialDelay.toMillis() * (1L shl (attemptCount - 1))
-
-        // Add jitter of ±20%
-        val jitterRange = baseDelay * 0.2 // 20% of base delay
-        val jitter = (Math.random() - 0.5) * 2 * jitterRange // Random value between -1 and 1, multiplied by range
-
-        return (baseDelay + jitter).toLong().coerceAtLeast(100) // Ensure we never return less than .1 second (100ms)
-    }
-
     /**
      * Processes messages from the outbox table in batches.
      * This method implements the core outbox pattern logic:
@@ -128,7 +111,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                         } else {
                             // Calculate next retry time using exponential backoff
                             val nextDelay =
-                                calculateNextRetryDelay(message.attemptCount, initialDelay)
+                                calculateNextAttemptDelay(message.attemptCount, initialDelay)
                             message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.MILLIS)
                             logger.debug {
                                 "Message ${message.id} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})"
@@ -183,6 +166,7 @@ internal class OutboxProcessor<T : OutboxModel>(
             while (consecutiveEmptyChunks < maxConsecutiveEmptyChunks) {
                 // Find and lock a chunk of messages for deletion
                 val messagesToDelete = repository.findMessagesToDelete(cutoffDate, batchSize)
+                logger.info { "Cleaned up chunk $chunkNumber: retrieved ${messagesToDelete.size} messages to delete" }
 
                 if (messagesToDelete.isEmpty()) {
                     consecutiveEmptyChunks++
@@ -210,5 +194,22 @@ internal class OutboxProcessor<T : OutboxModel>(
             // Don't throw the exception to prevent scheduler from stopping
             // The next scheduled run will try again
         }
+    }
+
+    @VisibleForTesting
+    internal fun calculateNextAttemptDelay(attemptCount: Int, initialDelay: Duration): Long {
+        // Exponential backoff: initialDelay * 2^(attemptCount-1)
+        // e.g., with initialDelay=1000ms (10s):
+        // attempt 1: 1000ms * 2^0 = 1000ms +/- 20%
+        // attempt 2: 1000ms * 2^1 = 2000ms +/- 20%
+        // attempt 3: 1000ms * 2^2 = 4000ms +/- 20%
+        val baseDelay = initialDelay.toMillis() * (1L shl (attemptCount - 1))
+
+        // Add jitter of ±20%
+        val jitterRange = baseDelay * 0.2 // 20% of base delay
+        val jitter = (Math.random() - 0.5) * 2 * jitterRange // Random value between -1 and 1, multiplied by range
+
+        // Ensure we never return less than .1 second (100ms)
+        return (baseDelay + jitter).toLong().coerceAtLeast(100)
     }
 }

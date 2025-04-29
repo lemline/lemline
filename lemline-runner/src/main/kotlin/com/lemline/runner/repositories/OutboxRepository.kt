@@ -5,7 +5,6 @@ import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
-import jakarta.transaction.Transactional
 import java.sql.ResultSet
 import java.time.Instant
 
@@ -48,8 +47,7 @@ import java.time.Instant
  */
 abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
 
-    override val columns: String = "id, message, status, delayed_until, attempt_count, last_error"
-    override val values: String = "?, ?, ?, ?, ?, ?"
+    override val columns = listOf("id", "message", "status", "delayed_until", "attempt_count", "last_error")
 
     /**
      * Creates a model instance from a ResultSet.
@@ -62,7 +60,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         id = rs.getString("id"),
         message = rs.getString("message"),
         status = OutBoxStatus.valueOf(rs.getString("status")),
-        delayedUntil = rs.getTimestamp("delayed_until").toInstant(),
+        delayedUntil = rs.getInstant("delayed_until"),
         attemptCount = rs.getInt("attempt_count"),
         lastError = rs.getString("last_error"),
     )
@@ -93,7 +91,6 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      *
      * @param message The message to persist
      */
-    @Transactional
     override fun persist(message: T) {
         val sql = getUpsertSql()
 
@@ -114,17 +111,16 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      * Persists multiple messages to the database in a single batch operation.
      * This method uses database-specific batch operations for optimal performance.
      *
-     * @param messages The list of messages to persist
+     * @param entities The list of messages to persist
      */
-    @Transactional
-    override fun persist(messages: List<T>) {
-        if (messages.isEmpty()) return
+    override fun persist(entities: List<T>) {
+        if (entities.isEmpty()) return
 
         val sql = getUpsertSql()
 
         withConnection {
             it.prepareStatement(sql).use { stmt ->
-                for (message in messages) {
+                for (message in entities) {
                     stmt.setString(1, message.id)
                     stmt.setString(2, message.message)
                     stmt.setString(3, message.status.name)
@@ -146,7 +142,6 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      * @param maxAttempts Maximum number of retry attempts allowed
      * @return List of locked messages ready for processing
      */
-    @Transactional
     fun findMessagesToProcess(limit: Int, maxAttempts: Int): List<T> {
         val sql = """
             SELECT * FROM $tableName
@@ -180,7 +175,6 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      * @param limit Maximum number of messages to retrieve
      * @return List of locked messages ready for deletion
      */
-    @Transactional
     fun findMessagesToDelete(cutoffDate: Instant, limit: Int): List<T> {
         val sql = """
             SELECT * FROM $tableName
@@ -213,7 +207,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
                     status = OutBoxStatus.valueOf(getString("status")),
                     attemptCount = getInt("attempt_count"),
                     lastError = getString("last_error"),
-                    delayedUntil = getTimestamp("delayed_until").toInstant(),
+                    delayedUntil = getInstant("delayed_until"),
                 )
             )
         }
