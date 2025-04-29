@@ -8,5 +8,5 @@ CREATE TABLE IF NOT EXISTS workflows
     CONSTRAINT uk_workflows_name_version UNIQUE (name, version)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Create index for efficient querying on name and version
-CREATE INDEX idx_workflows_name_version ON workflows (name, version); 
+-- Create an index for efficient querying on name and version
+CREATE INDEX idx_workflows_name_version ON workflows (name, version);
