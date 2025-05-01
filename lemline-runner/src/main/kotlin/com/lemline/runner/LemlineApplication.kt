@@ -49,6 +49,26 @@ class LemlineApplication : QuarkusApplication {
         fun main(args: Array<String>) {
 
             // --- Pre-parse Arguments Before Quarkus Init ---
+
+            // define lemline config locations
+            getConfigLocations(args)?.let { System.setProperty("lemline.config.locations", it) }
+
+            // Check for debug flags
+            if (args.contains("--debug") || args.contains("-d")) {
+                System.setProperty("quarkus.log.level", "DEBUG")
+                System.setProperty("quarkus.log.console.level", "DEBUG")
+                System.setProperty("quarkus.log.category.\"com.lemline\".level", "DEBUG")
+                System.setProperty("quarkus.log.category.\"io.quarkus\".level", "DEBUG")
+                System.setProperty("quarkus.log.category.\"org.flywaydb\".level", "DEBUG")
+                System.setProperty("quarkus.log.category.\"io.smallrye\".level", "DEBUG")
+                System.setProperty("quarkus.log.category.\"io.agroal\".level", "DEBUG")
+            }
+
+            // --- Launch Quarkus ---
+            Quarkus.run(LemlineApplication::class.java, *args)
+        }
+
+        private fun getConfigLocations(args: Array<String>): String? {
             val configLocations = args.foldIndexed(mutableListOf<String>()) { i, acc, arg ->
                 when {
                     arg.startsWith("--file=") -> {
@@ -72,37 +92,25 @@ class LemlineApplication : QuarkusApplication {
                 acc
             }
 
-            if (configLocations.isNotEmpty()) {
-                // checking the files all exist
-                configLocations.firstOrNull {
-                    val path = Paths.get(it)
-                    !Files.exists(path) || !Files.isRegularFile(path)
-                }?.let {
-                    System.err.println(
-                        "ERROR: Specified configuration file does not exist or is not a regular file: ${
-                            Paths.get(it).toAbsolutePath()
-                        }"
-                    )
-                    exitProcess(1)
+            return when (configLocations.size) {
+                0 -> null
+                else -> {
+                    // check that all files exist
+                    configLocations.firstOrNull {
+                        val path = Paths.get(it)
+                        !Files.exists(path) || !Files.isRegularFile(path)
+                    }?.let {
+                        System.err.println(
+                            "ERROR: Specified configuration file does not exist or is not a regular file: ${
+                                Paths.get(it).toAbsolutePath()
+                            }"
+                        )
+                        exitProcess(1)
+                    }
+
+                    configLocations.joinToString(",")
                 }
-
-                val locationsString = configLocations.joinToString(",")
-                System.setProperty("lemline.config.locations", locationsString)
             }
-
-            // Check for debug flags
-            if (args.contains("--debug") || args.contains("-d")) {
-                System.setProperty("quarkus.log.level", "DEBUG")
-                System.setProperty("quarkus.log.console.level", "DEBUG")
-                System.setProperty("quarkus.log.category.\"com.lemline\".level", "DEBUG")
-                System.setProperty("quarkus.log.category.\"io.quarkus\".level", "DEBUG")
-                System.setProperty("quarkus.log.category.\"org.flywaydb\".level", "DEBUG")
-                System.setProperty("quarkus.log.category.\"io.smallrye\".level", "DEBUG")
-                System.setProperty("quarkus.log.category.\"io.agroal\".level", "DEBUG")
-            }
-
-            // --- Launch Quarkus ---
-            Quarkus.run(LemlineApplication::class.java, *args)
         }
     }
 } 
