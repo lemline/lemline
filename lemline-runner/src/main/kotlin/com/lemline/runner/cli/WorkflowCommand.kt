@@ -1,7 +1,6 @@
 package com.lemline.runner.cli
 
 import io.quarkus.arc.Unremovable
-import jakarta.enterprise.context.ApplicationScoped
 import java.io.File
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
@@ -17,7 +16,6 @@ enum class WorkflowAction {
 }
 
 @Unremovable
-@ApplicationScoped
 @Command(name = "workflow", description = ["Manage workflows"])
 class WorkflowCommand : Runnable {
     @Parameters(index = "0", description = ["Action to perform (LIST, SHOW, CREATE, UPDATE, DELETE, VALIDATE)"])
