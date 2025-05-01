@@ -10,6 +10,8 @@ import org.eclipse.microprofile.config.Config
 import picocli.CommandLine.Command
 import picocli.CommandLine.ITypeConverter
 import picocli.CommandLine.Option
+import picocli.CommandLine.ParentCommand
+
 
 @Unremovable
 @Command(
@@ -38,10 +40,16 @@ class ConfigCommand : Runnable {
     )
     var all: Boolean = false
 
+    @ParentCommand
+    lateinit var parent: MainCommand
+
     @Inject
     lateinit var config: Config
 
     override fun run() {
+        // Stop after this command
+        parent.daemon = false
+
         val properties = config.propertyNames.asSequence()
             .filter { all || it.startsWith("lemline.") }
             .filter { it.isNotBlank() } // Skip empty property names

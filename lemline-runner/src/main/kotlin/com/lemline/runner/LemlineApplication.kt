@@ -6,6 +6,9 @@ import io.quarkus.runtime.Quarkus
 import io.quarkus.runtime.QuarkusApplication
 import io.quarkus.runtime.annotations.QuarkusMain
 import jakarta.inject.Inject
+import java.nio.file.Files
+import java.nio.file.Paths
+import kotlin.system.exitProcess
 import org.jboss.logging.Logger
 import picocli.CommandLine
 import picocli.CommandLine.IFactory
@@ -31,7 +34,7 @@ class LemlineApplication : QuarkusApplication {
         val commandLine = CommandLine(mainCommand, factory)
         val exitCode = commandLine.execute(*args)
 
-        if (mainCommand.stop || exitCode != 0) {
+        if (!mainCommand.daemon || exitCode != 0) {
             log.info("Command execution completed with exit code: $exitCode")
             return exitCode
         }
@@ -44,6 +47,50 @@ class LemlineApplication : QuarkusApplication {
     companion object {
         @JvmStatic
         fun main(args: Array<String>) {
+
+            // --- Pre-parse Arguments Before Quarkus Init ---
+            val configLocations = args.foldIndexed(mutableListOf<String>()) { i, acc, arg ->
+                when {
+                    arg.startsWith("--file=") -> {
+                        val locations = arg.substringAfter("--file=").takeIf { it.isNotEmpty() }
+                            ?: run {
+                                System.err.println("ERROR: --file= argument requires a value.")
+                                exitProcess(1)
+                            }
+                        acc.addAll(locations.split(',').map(String::trim).filter(String::isNotEmpty))
+                    }
+
+                    arg == "-f" -> {
+                        val locations = args.getOrNull(i + 1)?.takeIf { it.isNotEmpty() }
+                            ?: run {
+                                System.err.println("ERROR: -f argument requires a location value.")
+                                exitProcess(1)
+                            }
+                        acc.addAll(locations.split(',').map(String::trim).filter(String::isNotEmpty))
+                    }
+                }
+                acc
+            }
+
+            if (configLocations.isNotEmpty()) {
+                // checking the files all exist
+                configLocations.firstOrNull {
+                    val path = Paths.get(it)
+                    !Files.exists(path) || !Files.isRegularFile(path)
+                }?.let {
+                    System.err.println(
+                        "ERROR: Specified configuration file does not exist or is not a regular file: ${
+                            Paths.get(it).toAbsolutePath()
+                        }"
+                    )
+                    exitProcess(1)
+                }
+
+                val locationsString = configLocations.joinToString(",")
+                System.setProperty("lemline.config.locations", locationsString)
+            }
+
+            // Check for debug flags
             if (args.contains("--debug") || args.contains("-d")) {
                 System.setProperty("quarkus.log.level", "DEBUG")
                 System.setProperty("quarkus.log.console.level", "DEBUG")
@@ -53,6 +100,8 @@ class LemlineApplication : QuarkusApplication {
                 System.setProperty("quarkus.log.category.\"io.smallrye\".level", "DEBUG")
                 System.setProperty("quarkus.log.category.\"io.agroal\".level", "DEBUG")
             }
+
+            // --- Launch Quarkus ---
             Quarkus.run(LemlineApplication::class.java, *args)
         }
     }

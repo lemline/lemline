@@ -33,8 +33,19 @@ class MainCommand : Runnable {
     @Option(names = ["-d", "--debug"], description = ["Enable debug logging"])
     var debug: Boolean = false
 
-    @Option(names = ["-s", "--stop"], description = ["Stop after command"])
-    var stop: Boolean = false
+    // Add option for Picocli recognition, even though logic is handled pre-startup
+    @Option(
+        names = ["-f", "--file"],
+        description = ["Specify configuration file location"],
+        paramLabel = "<location>"
+    )
+    var configFile: String? = null // Dummy variable, value not used by Picocli execution
+
+    /**
+     * Flag to indicate if the application should stop after executing a command.
+     * The default behavior for the main command (without subcommands) is to run in daemon mode.
+     */
+    var daemon: Boolean = true
 
     override fun run() {
         // Do nothing
