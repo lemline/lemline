@@ -20,16 +20,16 @@ dependencies {
     // Quarkus
     implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.22.0"))
     implementation("io.quarkus:quarkus-kotlin")
-    implementation("io.quarkus:quarkus-flyway")             // DB migration
-    implementation("io.quarkus:quarkus-messaging")
-    implementation("io.quarkus:quarkus-messaging-kafka")    // Kafka Messaging
-    implementation("io.quarkus:quarkus-messaging-rabbitmq") // RabbitMQ Messaging
+    implementation("io.quarkus:quarkus-picocli")            // CLI
     implementation("io.quarkus:quarkus-scheduler")          // Scheduler
+    implementation("io.quarkus:quarkus-arc")                // Dependency Injection
+    implementation("io.quarkus:quarkus-config-yaml")        // Reading YAML configuration file
+    implementation("io.quarkus:quarkus-flyway")             // DB migration
     implementation("io.quarkus:quarkus-jdbc-postgresql")    // Postgres Database driver
     implementation("io.quarkus:quarkus-jdbc-mysql")         // MySQL Database driver
     implementation("io.quarkus:quarkus-jdbc-h2")            // H2 Database driver
-    implementation("io.quarkus:quarkus-arc")                // Dependency Injection
-    implementation("io.quarkus:quarkus-config-yaml")        // Reading YAML configuration file
+    implementation("io.quarkus:quarkus-messaging-kafka")    // Kafka Messaging
+    implementation("io.quarkus:quarkus-messaging-rabbitmq") // RabbitMQ Messaging
     implementation("io.smallrye.reactive:smallrye-reactive-messaging-in-memory:4.27.0")
 
     // Serverless Workflow SDK

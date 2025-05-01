@@ -67,7 +67,7 @@ or managing fan-in scenarios (waiting for multiple parallel tasks to complete).
 ./gradlew build
 ```
 
-### Running the Worker (Development Mode)
+### Running the Runner (Development Mode)
 
 Ensure your database and message broker (if needed) are configured in
 `lemline-runner/src/main/resources/application.properties`.
@@ -89,24 +89,14 @@ the [lemline-runner README](lemline-runner/README.md).
 
 ## 📚 Documentation
 
-* **Serverless Workflow DSL Specification:
-  ** [Official Specification](https://github.com/serverlessworkflow/specification)
-* **Worker Configuration:** See `lemline-runner/README.md` (if it exists or needs creation) for detailed configuration
-  options.
+* **Serverless Workflow DSL Specification:**
+  See the [Offficial Specification](https://github.com/serverlessworkflow/specification)
+* **Runner Configuration:** See [lemline-runner/README.md](./lemline-runner/README.md)
+  for detailed configuration options.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow standard practices:
-
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature-name`).
-3. Make your changes.
-4. Write tests for your changes.
-5. Ensure all tests pass (`./gradlew test`).
-6. Format your code according to Kotlin conventions.
-7. Commit your changes (`git commit -m 'Add some feature'`).
-8. Push to the branch (`git push origin feature/your-feature-name`).
-9. Open a Pull Request.
+Contributions are welcome! Please follow the guidelines in our [CONTRIBUTING.md](CONTRIBUTING.md) file.
 
 ## 📜 License
 

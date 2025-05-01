@@ -1,10 +1,12 @@
 # Lemline CLI Strategy
 
-This document outlines the proposed command-line interface (CLI) strategy for Lemline, focusing on user experience, consistency, and extensibility.
+This document outlines the proposed command-line interface (CLI) strategy for Lemline, focusing on user experience,
+consistency, and extensibility.
 
 ## Overview
 
-The Lemline CLI provides a unified interface for managing workflows and interacting with the Lemline runtime. It follows modern CLI design principles and provides both interactive and non-interactive modes.
+The Lemline CLI provides a unified interface for managing workflows and interacting with the Lemline runtime. It follows
+modern CLI design principles and provides both interactive and non-interactive modes.
 
 ## Command Structure
 
@@ -33,16 +35,16 @@ These options are available for all commands:
 
 ```bash
 # List available workflows
-lemline workflow list [--format json|yaml|table]
+lemline workflow list [--format json|yaml]
 
 # Show workflow details
 lemline workflow show <workflow-id> [--format json|yaml|table]
 
 # Create a new workflow
-lemline workflow create <workflow-file> [--name <name>] [--description <description>]
+lemline workflow create [--file <name>] 
 
 # Update an existing workflow
-lemline workflow update <workflow-id> <workflow-file>
+lemline workflow update [--file <name>] [--force]
 
 # Delete a workflow
 lemline workflow delete <workflow-id> [--force]
@@ -93,13 +95,7 @@ lemline instance logs <instance-id> [--follow] [--tail <lines>]
 
 ```bash
 # Show current configuration
-lemline config show [--format json|yaml|table]
-
-# Validate configuration
-lemline config validate [<config-file>]
-
-# Generate configuration template
-lemline config generate [--type <type>] [--output <file>]
+lemline config [--format json|yaml|properties]
 ```
 
 ## Interactive Mode
@@ -111,6 +107,7 @@ lemline interactive
 ```
 
 In interactive mode:
+
 - Commands are presented in a menu-driven interface
 - Context-sensitive help is available
 - Command history is maintained
@@ -120,6 +117,7 @@ In interactive mode:
 ## Output Formats
 
 The CLI supports multiple output formats:
+
 - `table`: Human-readable table format (default for interactive use)
 - `json`: JSON format for programmatic use
 - `yaml`: YAML format for configuration files
@@ -173,53 +171,53 @@ lemline config validate prod.yaml
 ## Implementation Guidelines
 
 1. **Command Structure**
-   - Use a consistent verb-noun pattern
-   - Group related commands under common prefixes
-   - Provide clear, concise command names
+    - Use a consistent verb-noun pattern
+    - Group related commands under common prefixes
+    - Provide clear, concise command names
 
 2. **Error Handling**
-   - Provide clear, actionable error messages
-   - Include error codes for programmatic handling
-   - Suggest solutions for common errors
+    - Provide clear, actionable error messages
+    - Include error codes for programmatic handling
+    - Suggest solutions for common errors
 
 3. **Help System**
-   - Include examples in help text
-   - Provide context-sensitive help
-   - Document all options and arguments
+    - Include examples in help text
+    - Provide context-sensitive help
+    - Document all options and arguments
 
 4. **Output Formatting**
-   - Support multiple output formats
-   - Ensure consistent formatting
-   - Provide clear headers and separators
+    - Support multiple output formats
+    - Ensure consistent formatting
+    - Provide clear headers and separators
 
 5. **Configuration**
-   - Support both file-based and environment-based configuration
-   - Allow configuration overrides via command line
-   - Validate configuration before use
+    - Support both file-based and environment-based configuration
+    - Allow configuration overrides via command line
+    - Validate configuration before use
 
 6. **Extensibility**
-   - Design for easy addition of new commands
-   - Support plugins for additional functionality
-   - Maintain backward compatibility
+    - Design for easy addition of new commands
+    - Support plugins for additional functionality
+    - Maintain backward compatibility
 
 ## Future Considerations
 
 1. **Plugin System**
-   - Allow third-party plugins
-   - Provide plugin management commands
-   - Support plugin-specific configuration
+    - Allow third-party plugins
+    - Provide plugin management commands
+    - Support plugin-specific configuration
 
 2. **API Integration**
-   - Add commands for API key management
-   - Support remote operation
-   - Enable API documentation generation
+    - Add commands for API key management
+    - Support remote operation
+    - Enable API documentation generation
 
 3. **Advanced Features**
-   - Add support for workflow templates
-   - Implement workflow versioning
-   - Add support for workflow dependencies
+    - Add support for workflow templates
+    - Implement workflow versioning
+    - Add support for workflow dependencies
 
 4. **Monitoring and Debugging**
-   - Add performance monitoring commands
-   - Implement debugging tools
-   - Add support for tracing 
+    - Add performance monitoring commands
+    - Implement debugging tools
+    - Add support for tracing 
