@@ -130,6 +130,7 @@ class ConfigCommand : Runnable {
                 // Keep quotes for keys containing dots
                 val next = currentMap.getOrPut(part) { mutableMapOf<String, Any>() }
                 if (next is MutableMap<*, *>) {
+                    @Suppress("UNCHECKED_CAST")
                     currentMap = next as MutableMap<String, Any>
                 } else {
                     val newMap = mutableMapOf<String, Any>()
