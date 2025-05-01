@@ -154,7 +154,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                     if (name.startsWith("lemline.")) {
                         lemlineProps[name] = value.split("#").first().trim()
                     } else {
-                        log.warn { "Skipping not lemline property $name." }
+                        log.warn { "Skipping not lemline property $name" }
                     }
                 }
             }
@@ -183,15 +183,18 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
             generatedProps.putAll(DatabaseConfig.toQuarkusProperties(lemlineConfig.database()))
             generatedProps.putAll(MessagingConfig.toQuarkusProperties(lemlineConfig.messaging()))
 
-            log.debug {
-                "Generated properties:\n${
-                    generatedProps.map { "${it.key}=${it.value}" }.joinToString("\n")
-                }"
+            log.debug { 
+                "Generated properties: ${generatedProps.map { "${it.key}=${it.value}" }.joinToString()}" 
             }
+
+            // Combine both generated Quarkus properties and original Lemline properties
+            val allProps = mutableMapOf<String, String>()
+            allProps.putAll(generatedProps)
+            allProps.putAll(lemlineProps)
 
             return listOf(
                 PropertiesConfigSource(
-                    generatedProps,
+                    allProps,
                     LemlineConfigConstants.CONFIG_SOURCE_NAME,
                     LemlineConfigConstants.CONFIG_ORDINAL
                 )
