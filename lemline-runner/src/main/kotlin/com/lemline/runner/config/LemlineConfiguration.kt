@@ -103,7 +103,7 @@ interface LemlineConfiguration {
                         props["quarkus.datasource.username"] = LemlineConfigConstants.DEFAULT_H2_USERNAME
                         props["quarkus.datasource.password"] = LemlineConfigConstants.DEFAULT_H2_PASSWORD
                         props["quarkus.datasource.jdbc.url"] =
-                            "jdbc:h2:mem:${LemlineConfigConstants.DEFAULT_H2_DB_NAME};DB_CLOSE_DELAY=-1"
+                            "jdbc:h2:mem:${LemlineConfigConstants.DEFAULT_H2_DB_NAME};DB_CLOSE_DELAY=-1;MODE=PostgreSQL"
                     }
 
                     DB_TYPE_POSTGRESQL -> {

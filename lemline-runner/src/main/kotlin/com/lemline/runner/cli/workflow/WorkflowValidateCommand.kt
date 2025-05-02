@@ -1,7 +1,8 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.workflow
 
 // TODO: Inject appropriate validation service/component
-// import com.lemline.core.WorkflowValidator 
+// import com.lemline.core.WorkflowValidator
 import io.quarkus.arc.Unremovable
 import java.io.File
 import picocli.CommandLine.Command
@@ -13,7 +14,7 @@ import picocli.CommandLine.ParentCommand
 class WorkflowValidateCommand : Runnable {
 
     // @Inject // Uncomment if injecting a validator service
-    // lateinit var validator: WorkflowValidator 
+    // lateinit var validator: WorkflowValidator
 
     @Parameters(index = "0", description = ["Path to the workflow definition file to validate."])
     lateinit var workflowFile: File
@@ -40,7 +41,7 @@ class WorkflowValidateCommand : Runnable {
         //    println("Validation successful.")
         // } else {
         //    System.err.println("Validation failed:")
-        //    validationResult.errors.forEach { System.err.println("- $it") } 
+        //    validationResult.errors.forEach { System.err.println("- $it") }
         // }
         println("Workflow validation logic not fully implemented.")
     }

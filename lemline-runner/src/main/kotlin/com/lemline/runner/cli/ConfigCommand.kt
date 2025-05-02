@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -141,4 +142,4 @@ class ConfigCommand : Runnable {
     class FormatConverter : ITypeConverter<Format> {
         override fun convert(value: String) = Format.valueOf(value.uppercase())
     }
-} 
+}

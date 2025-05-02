@@ -50,6 +50,26 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
 
     override val columns = listOf("id", "message", "status", "delayed_until", "attempt_count", "last_error")
 
+    override val keyColumns: List<String> = listOf("id")
+
+    override fun PreparedStatement.bindUpdateWith(entity: T) = apply {
+        setString(1, entity.message) // Sets the message content
+        setString(2, entity.status.name) // Sets the status as a string
+        setTimestamp(3, java.sql.Timestamp.from(entity.delayedUntil)) // Sets the delayed until timestamp
+        setInt(4, entity.attemptCount) // Sets the attempt count
+        setString(5, entity.lastError) // Sets the last error message, if any
+        setString(6, entity.id) // Sets the last error message, if any
+    }
+
+    override fun PreparedStatement.bindInsertWith(entity: T) = apply {
+        setString(1, entity.id) // Sets the ID of the entity
+        setString(2, entity.message) // Sets the message content
+        setString(3, entity.status.name) // Sets the status as a string
+        setTimestamp(4, java.sql.Timestamp.from(entity.delayedUntil)) // Sets the delayed until timestamp
+        setInt(5, entity.attemptCount) // Sets the attempt count
+        setString(6, entity.lastError) // Sets the last error message, if any
+    }
+
     /**
      * Creates a model instance from a ResultSet.
      * Maps the database columns to the outbox model properties.
@@ -85,23 +105,6 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         attemptCount: Int,
         lastError: String?,
     ): T
-
-    /**
-     * Populates the `PreparedStatement` with the values from the given entity.
-     * This method maps the entity's properties to the corresponding SQL parameters
-     * in the prepared statement.
-     *
-     * @param entity The entity containing the values to set in the statement
-     * @return The `PreparedStatement` with the populated values
-     */
-    override fun PreparedStatement.with(entity: T): PreparedStatement = apply {
-        setString(1, entity.id) // Sets the ID of the entity
-        setString(2, entity.message) // Sets the message content
-        setString(3, entity.status.name) // Sets the status as a string
-        setTimestamp(4, java.sql.Timestamp.from(entity.delayedUntil)) // Sets the delayed until timestamp
-        setInt(5, entity.attemptCount) // Sets the attempt count
-        setString(6, entity.lastError) // Sets the last error message, if any
-    }
 
     /**
      * Finds and locks messages that are ready to be processed.

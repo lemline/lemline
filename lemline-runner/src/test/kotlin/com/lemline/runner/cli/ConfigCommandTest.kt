@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli
 
 import com.lemline.runner.tests.profiles.InMemoryProfile
@@ -149,4 +150,4 @@ class ConfigCommandTest {
             assertFalse(output.startsWith("{") || output.startsWith("-"), "Text output should resemble text format")
         }
     }
-} 
+}

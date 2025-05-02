@@ -22,6 +22,8 @@ import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import kotlin.reflect.KClass
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
@@ -71,7 +73,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     protected open val initialDelay: Duration = Duration.ofSeconds(1) // 1 second
 
     @BeforeEach
-    fun setUp() {
+    fun setUp() = runTest {
         // Reset mock before each test, default to success
         every { mockProcessorFunction(any(modelClass)) } just Runs
         outboxProcessor = OutboxProcessor(
@@ -80,6 +82,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
             processor = mockProcessorFunction,
         )
         testRepository.deleteAll()
+        delay(100)
     }
 
     // --- Test methods --- //
@@ -274,7 +277,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun `process should handle batch processing correctly`() {
         // Arrange
         val messages = List(5) { createTestModel("batch_$it") }
-        testRepository.upsert(messages)
+        testRepository.insert(messages)
 
         // Act
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
@@ -317,14 +320,14 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         val failedMessage = createTestModel("failed").apply { status = FAILED }
 
         // Persist all messages
-        testRepository.upsert(listOf(oldSentMessage, recentSentMessage, pendingMessage, failedMessage))
+        testRepository.insert(listOf(oldSentMessage, recentSentMessage, pendingMessage, failedMessage))
 
         // Manually update the 'delayedUntil' timestamp for the old messages *after* persisting
         // to simulate them being older than the cutoff for cleanup purposes.
         oldSentMessage.delayedUntil = wayBeforeCutoff
         pendingMessage.delayedUntil = wayBeforeCutoff
         failedMessage.delayedUntil = wayBeforeCutoff
-        testRepository.upsert(listOf(oldSentMessage, pendingMessage, failedMessage))
+        testRepository.insert(listOf(oldSentMessage, pendingMessage, failedMessage))
 
         val oldSentId = oldSentMessage.id
         val recentSentId = recentSentMessage.id
@@ -422,7 +425,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         }
 
         // Persist all messages
-        testRepository.upsert(messages)
+        testRepository.insert(messages)
 
         // Act
         outboxProcessor.cleanup(afterDelay, batchSize)

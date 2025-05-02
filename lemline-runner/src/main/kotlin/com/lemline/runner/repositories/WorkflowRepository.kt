@@ -16,7 +16,9 @@ class WorkflowRepository : Repository<WorkflowModel>() {
 
     override val tableName = "workflows"
 
-    override val columns = listOf("id", "name", "version", "definition")
+    override val columns = listOf("id", "definition", "name", "version")
+
+    override val keyColumns: List<String> = listOf("name", "version")
 
     /**
      * Populates the `PreparedStatement` with the values from the given workflow entity.
@@ -26,11 +28,17 @@ class WorkflowRepository : Repository<WorkflowModel>() {
      * @param entity The workflow model containing the values to set in the statement
      * @return The `PreparedStatement` with the populated values
      */
-    override fun PreparedStatement.with(entity: WorkflowModel) = apply {
-        setString(1, entity.id) // Sets the workflow ID
+    override fun PreparedStatement.bindUpdateWith(entity: WorkflowModel) = apply {
+        setString(1, entity.definition) // Sets the workflow definition
         setString(2, entity.name) // Sets the workflow name
         setString(3, entity.version) // Sets the workflow version
-        setString(4, entity.definition) // Sets the workflow definition
+    }
+
+    override fun PreparedStatement.bindInsertWith(entity: WorkflowModel) = apply {
+        setString(1, entity.id) // Sets the workflow definition
+        setString(2, entity.definition) // Sets the workflow definition
+        setString(3, entity.name) // Sets the workflow name
+        setString(4, entity.version) // Sets the workflow version
     }
 
     /**

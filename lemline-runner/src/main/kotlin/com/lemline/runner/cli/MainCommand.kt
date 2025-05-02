@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli
 
 import com.lemline.runner.cli.workflow.WorkflowCommand
@@ -49,4 +50,4 @@ class MainCommand : Runnable {
     override fun run() {
         // Do nothing
     }
-} 
+}

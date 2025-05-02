@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.workflow
 
 import com.lemline.runner.cli.MainCommand
@@ -23,4 +24,4 @@ class WorkflowCommand {
     // Container class
     @ParentCommand
     lateinit var parent: MainCommand
-} 
+}

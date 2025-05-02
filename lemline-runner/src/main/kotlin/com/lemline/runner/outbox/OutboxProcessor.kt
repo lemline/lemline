@@ -7,6 +7,7 @@ import com.lemline.common.info
 import com.lemline.common.warn
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.OutboxRepository
+import jakarta.transaction.Transactional
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -61,6 +62,7 @@ internal class OutboxProcessor<T : OutboxModel>(
      * @param maxAttempts Maximum number of attempts before giving up (>=1)
      * @param initialDelay Initial delay in seconds before first retry
      */
+    @Transactional
     fun process(batchSize: Int, maxAttempts: Int, initialDelay: Duration) {
         try {
             var totalProcessed = 0
@@ -109,8 +111,8 @@ internal class OutboxProcessor<T : OutboxModel>(
                         }
                     }
                 }
-                // save the messages in the same transaction
-                repository.upsert(messages)
+                // update the messages in the same transaction
+                repository.update(messages)
             }
 
             if (totalProcessed > 0) {
@@ -137,6 +139,7 @@ internal class OutboxProcessor<T : OutboxModel>(
      * @param afterDelay Delay after which sent messages should be deleted
      * @param batchSize Maximum number of messages to delete in one batch
      */
+    @Transactional
     fun cleanup(afterDelay: Duration, batchSize: Int) {
         try {
             val cutoffDate = Instant.now().minusMillis(afterDelay.toMillis())

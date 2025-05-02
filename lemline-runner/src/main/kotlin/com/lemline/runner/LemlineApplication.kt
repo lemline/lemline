@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner
 
 import com.lemline.runner.cli.MainCommand
@@ -113,4 +114,4 @@ class LemlineApplication : QuarkusApplication {
             }
         }
     }
-} 
+}

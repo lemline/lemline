@@ -40,7 +40,7 @@ internal class WaitOutbox @Inject constructor(
     @Channel(WORKFLOW_OUT) emitter: Emitter<String>,
 ) {
     private val logger = logger()
-    
+
     val outboxConf = lemlineConfig.wait().outbox()
     val cleanupConf = lemlineConfig.wait().cleanup()
 

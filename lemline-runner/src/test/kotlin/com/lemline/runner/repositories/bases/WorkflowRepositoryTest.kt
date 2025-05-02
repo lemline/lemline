@@ -4,14 +4,13 @@ package com.lemline.runner.repositories.bases
 import com.lemline.runner.models.WorkflowModel
 import com.lemline.runner.repositories.WorkflowRepository
 import io.kotest.assertions.throwables.shouldNotThrowAny
-import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import jakarta.inject.Inject
-import jakarta.transaction.Transactional
-import java.sql.SQLException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -48,9 +47,9 @@ abstract class WorkflowRepositoryTest {
      * The cleanup is performed within a transaction to ensure atomicity.
      */
     @BeforeEach
-    @Transactional
-    fun setupTest() {
+    fun setupTest() = runTest {
         repository.deleteAll()
+        delay(100)
     }
 
     /**
@@ -65,7 +64,6 @@ abstract class WorkflowRepositoryTest {
      * 3. All properties (id, name, version, definition) are preserved
      */
     @Test
-    @Transactional
     fun `should successfully persist and retrieve a complete workflow model with all properties`() {
         // Given
         val workflowModel = WorkflowModel(
@@ -96,7 +94,6 @@ abstract class WorkflowRepositoryTest {
      * 3. The correct null response is returned
      */
     @Test
-    @Transactional
     fun `should return null when querying for a non-existent workflow name and version combination`() {
         // When
         val result = repository.findByNameAndVersion("non-existent", "1.0.0")
@@ -118,7 +115,6 @@ abstract class WorkflowRepositoryTest {
      * 3. Other properties remain unchanged
      */
     @Test
-    @Transactional
     fun `should successfully insert a new workflow version`() {
         // Given
         val original = WorkflowModel(
@@ -146,7 +142,6 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    @Transactional
     fun `should successfully updating an existing workflow definition`() {
         // Given
         val original = WorkflowModel(
@@ -160,13 +155,12 @@ abstract class WorkflowRepositoryTest {
         val updated = original.copy(definition = "updated definition")
 
         // Then
-        shouldNotThrowAny { repository.upsert(updated) }
+        shouldNotThrowAny { repository.update(updated) }
         repository.findById(original.id)?.definition shouldBe "updated definition"
         repository.count() shouldBe 1L
     }
 
     @Test
-    @Transactional
     fun `should fail inserting a new workflow with same name and version`() {
         // Given
         val original = WorkflowModel(
@@ -184,7 +178,7 @@ abstract class WorkflowRepositoryTest {
         )
 
         // Then
-        shouldThrow<SQLException> { repository.insert(updated) }
+        repository.insert(updated) shouldBe 0
 
         repository.findById(original.id) shouldNotBe null
         repository.findById(updated.id) shouldBe null
@@ -193,7 +187,6 @@ abstract class WorkflowRepositoryTest {
 
 
     @Test
-    @Transactional
     fun `should successfully insert a batch of workflows`() {
         // Given
         val workflows = List(5) { i ->
@@ -205,7 +198,7 @@ abstract class WorkflowRepositoryTest {
         }
 
         // When
-        repository.upsert(workflows)
+        repository.insert(workflows)
 
         // Then
         workflows.forEach { workflow ->
@@ -220,7 +213,6 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    @Transactional
     fun `should successfully update a batch of workflows`() {
         // Given
         val originals = List(5) { i ->
@@ -230,65 +222,21 @@ abstract class WorkflowRepositoryTest {
                 definition = "definition-$i"
             )
         }
-        repository.upsert(originals)
+        repository.insert(originals)
 
         // When
         val updated = originals.mapIndexed { i, model -> model.copy(definition = "updated definition-$i") }
 
         // Then
-        shouldNotThrowAny { repository.upsert(updated) }
+        shouldNotThrowAny { repository.update(updated) }
         originals.forEachIndexed { i, model ->
             repository.findById(model.id)?.definition shouldBe "updated definition-$i"
         }
         repository.count() shouldBe originals.size.toLong()
     }
 
-//    @Test
-//    fun `should fail insert a batch of workflows if at least one should be an upsert`() {
-//        // Given
-//        val originals = List(5) { i ->
-//            WorkflowModel(
-//                name = " original-$i",
-//                version = "1.0.0",
-//                definition = "original-$i"
-//            )
-//        }
-//        repository.upsert(originals)
-//
-//        // When
-//        val newWorkflows = MutableList(4) { i ->
-//            WorkflowModel(
-//                name = "different-$i",
-//                version = "1.0.0",
-//                definition = "different-$i"
-//            )
-//        }
-//        newWorkflows.add(
-//            WorkflowModel(
-//                name = originals[4].name,
-//                version = originals[4].version,
-//                definition = "different-4"
-//            )
-//        )
-//
-//        // When
-//        shouldThrow<SQLException> { repository.insert(newWorkflows) }
-//
-//        // Then the insert should have failed all together
-//        repository.count() shouldBe originals.size.toLong()
-//        originals.forEach { original ->
-//            val retrieved = repository.findByNameAndVersion(original.name, original.version)
-//            retrieved shouldNotBe null
-//            retrieved?.id shouldBe original.id
-//            retrieved?.name shouldBe original.name
-//            retrieved?.version shouldBe original.version
-//            retrieved?.definition shouldBe original.definition
-//        }
-//    }
-
     @Test
-    @Transactional
-    fun `should successfully upsert a batch of workflows, mixing existing and not`() {
+    fun `should successfully update a batch of workflows, returning the number of success`() {
         // Given
         val originals = List(5) { i ->
             WorkflowModel(
@@ -297,18 +245,18 @@ abstract class WorkflowRepositoryTest {
                 definition = "original-$i"
             )
         }
-        repository.upsert(originals)
+        repository.insert(originals)
 
         // When
         val newWorkflows = MutableList(5) { i ->
-            if (i == 3) {
-                WorkflowModel(
+            when (i) {
+                1, 3 -> WorkflowModel(
                     name = originals[i].name,
                     version = originals[i].version,
                     definition = "different-$i"
                 )
-            } else {
-                WorkflowModel(
+
+                else -> WorkflowModel(
                     name = "different-$i",
                     version = "1.0.0",
                     definition = "different-$i"
@@ -317,10 +265,44 @@ abstract class WorkflowRepositoryTest {
         }
 
         // When
-        shouldNotThrowAny { repository.upsert(newWorkflows) }
+        repository.update(newWorkflows) shouldBe 2
 
         // Then the insert should have failed all together
-        repository.count() shouldBe originals.size.toLong() + newWorkflows.size.toLong() - 1
+        repository.count() shouldBe originals.size.toLong()
+    }
+
+    @Test
+    fun `should successfully insert a batch of workflows, returning the number of success`() {
+        // Given
+        val originals = List(5) { i ->
+            WorkflowModel(
+                name = " original-$i",
+                version = "1.0.0",
+                definition = "original-$i"
+            )
+        }
+        repository.insert(originals)
+
+        // When
+        val newWorkflows = MutableList(5) { i ->
+            when (i) {
+                1, 3 -> WorkflowModel(
+                    name = originals[i].name,
+                    version = originals[i].version,
+                    definition = "different-$i"
+                )
+
+                else -> WorkflowModel(
+                    name = "different-$i",
+                    version = "1.0.0",
+                    definition = "different-$i"
+                )
+            }
+        }
+
+        // Then
+        repository.insert(newWorkflows) shouldBe 3
+        repository.count() shouldBe 8
     }
 
     /**
@@ -330,7 +312,6 @@ abstract class WorkflowRepositoryTest {
      * - All properties are correctly preserved
      */
     @Test
-    @Transactional
     fun `should retrieve workflow by ID`() {
         // Given
         val workflow = WorkflowModel(
@@ -359,7 +340,6 @@ abstract class WorkflowRepositoryTest {
      * - All properties of each workflow are preserved
      */
     @Test
-    @Transactional
     fun `should retrieve all workflows`() {
         // Given
         val workflows = List(3) { i ->
@@ -369,7 +349,7 @@ abstract class WorkflowRepositoryTest {
                 definition = "definition-$i"
             )
         }
-        repository.upsert(workflows)
+        repository.insert(workflows)
 
         // When
         val retrieved = repository.listAll()
@@ -392,7 +372,6 @@ abstract class WorkflowRepositoryTest {
      * - No data corruption occurs during concurrent operations
      */
     @Test
-    @Transactional
     fun `should handle concurrent access safely`() {
         // Given
         val threadCount = 5
@@ -406,7 +385,7 @@ abstract class WorkflowRepositoryTest {
                         definition = "definition-$threadIndex-$i"
                     )
                 }
-                repository.upsert(workflowsToPersist)
+                repository.insert(workflowsToPersist)
 
                 workflowsToPersist.forEach { workflow ->
                     val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version!!)

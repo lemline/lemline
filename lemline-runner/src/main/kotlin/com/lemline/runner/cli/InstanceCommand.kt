@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli
 
 import io.quarkus.arc.Unremovable
@@ -37,4 +38,4 @@ class InstanceCommand : Runnable {
         }
         println("Instance action: $instanceAction")
     }
-} 
+}

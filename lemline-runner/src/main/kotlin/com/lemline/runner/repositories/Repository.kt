@@ -6,12 +6,9 @@ import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.models.UuidV7Entity
-import java.sql.BatchUpdateException
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
-import java.sql.SQLException
-import java.sql.Statement
 import java.time.Instant
 
 abstract class Repository<T : UuidV7Entity> {
@@ -32,6 +29,13 @@ abstract class Repository<T : UuidV7Entity> {
     protected abstract val columns: List<String>
 
     /**
+     * Defines the columns that constitute the primary or unique key for the entity.
+     * Used for UPSERT's ON CONFLICT clause and UPDATE's WHERE clause.
+     * Defaults to `listOf("id")`.
+     */
+    protected abstract val keyColumns: List<String>
+
+    /**
      * Populates the `PreparedStatement` with the values from the given entity.
      * This method must be implemented by concrete repositories to map the entity's properties
      * to the corresponding SQL parameters in the prepared statement.
@@ -39,7 +43,10 @@ abstract class Repository<T : UuidV7Entity> {
      * @param entity The entity containing the values to set in the statement
      * @return The `PreparedStatement` with the populated values
      */
-    protected abstract fun PreparedStatement.with(entity: T): PreparedStatement
+    protected abstract fun PreparedStatement.bindUpdateWith(entity: T): PreparedStatement
+
+
+    protected abstract fun PreparedStatement.bindInsertWith(entity: T): PreparedStatement
 
     /**
      * Creates a model instance from a ResultSet.
@@ -52,42 +59,96 @@ abstract class Repository<T : UuidV7Entity> {
     internal abstract fun createModel(rs: ResultSet): T
 
     /**
-     * Inserts a new entity into the database.
-     * This method inserts the entity if it does not exist or fails it if it already exists.
+     * Inserts a new entity
      *
      * @param entity The entity to insert
      */
-    fun insert(entity: T) = persist(entity, false)
+    fun insert(entity: T): Int {
+        val sql = getInsertSql()
+        var updated = 0
+
+        withConnection { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.bindInsertWith(entity)
+                updated += stmt.executeUpdate()
+            }
+        }
+
+        return updated
+    }
 
     /**
-     * Performs an upsert operation for a single entity.
-     * This method inserts the entity if it does not exist or updates it if it already exists.
+     * Updates an existing entity.
      *
      * @param entity The entity to upsert
      */
-    fun upsert(entity: T) = persist(entity, true)
+    fun update(entity: T): Int {
+        val sql = getUpdateSql()
+        var updated = 0
+
+        withConnection {
+            it.prepareStatement(sql).use { stmt ->
+                stmt.bindUpdateWith(entity)
+                updated += stmt.executeUpdate()
+            }
+        }
+
+        return updated
+    }
 
     /**
-     *
-     * NOTE: this method is deactivated because not used AND have consistency issues between databases
-     * as PostgreSQL always runs statements in an implicit transaction,
-     *
-     * Inserts a list of entities into the database.
-     * This method inserts the entities if they do not exist and fails if they already exist.
+     * Inserts a list of new entities
      *
      * @param entities The list of entities to insert
      */
-    //fun insert(entities: List<T>) = persist(entities, false)
+    fun insert(entities: List<T>): Int {
+        if (entities.isEmpty()) return 0
+        val sql = getInsertSql()
+        var updated = 0
+
+        withConnection { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                for (entity in entities) {
+                    stmt.bindInsertWith(entity)
+                    stmt.addBatch()
+                }
+                // execute once, receive one update‑count per row
+                val counts = stmt.executeBatch()
+                // JDBC spec: 0 → row not found, ≥1 → row(s) modified
+                updated += counts.count { it > 0 }
+            }
+        }
+
+        return updated
+    }
 
     /**
-     * Performs an upsert operation for a list of entities.
-     * This method inserts the entities if they do not exist or updates them if they already exist.
+     * Updates a list of existing entities.
      *
      * Warning: this method does not throw but returns the number of successful requests
      *
      * @param entities The list of entities to upsert
      */
-    fun upsert(entities: List<T>) = persist(entities, true)
+    fun update(entities: List<T>): Int {
+        if (entities.isEmpty()) return 0
+        val sql = getUpdateSql()
+        var updated = 0
+
+        withConnection { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                for (entity in entities) {
+                    stmt.bindUpdateWith(entity)
+                    stmt.addBatch()
+                }
+                // execute once, receive one update‑count per row
+                val counts: IntArray = stmt.executeBatch()
+                // JDBC spec: 0 → row not found, ≥1 → row(s) modified
+                updated += counts.count { it > 0 }
+            }
+        }
+
+        return updated
+    }
 
     /**
      * Retrieves an entity by its ID.
@@ -198,7 +259,7 @@ abstract class Repository<T : UuidV7Entity> {
      * @return The total number of records in the table
      */
     fun count(): Long {
-        val sql = "SELECT COUNT(*) FROM $tableName"
+        val sql = "SELECT COUNT(id) FROM $tableName"
 
         return withConnection {
             it.prepareStatement(sql).use { stmt ->
@@ -209,35 +270,15 @@ abstract class Repository<T : UuidV7Entity> {
         }
     }
 
-    private fun getUpsertSql(): String {
-        val colsCsv = columns.joinToString { q(it) }  // Comma-separated column names, e.g., "id","message",…
-        val valsCsv = columns.joinToString { "?" }    // Comma-separated placeholders, e.g., ?,?,?
+    private fun getUpdateSql(): String {
+        val setClause = columns.filterNot { it in (keyColumns + "id") }.joinToString { "${q(it)} = ?" }
+        val whereClause = keyColumns.joinToString(separator = " AND ") { "${q(it)} = ?" }
 
-        val nonIdCols = columns.filterNot { it == "id" }
-        val updates = nonIdCols.joinToString { "${q(it)} = EXCLUDED.${q(it)}" } // For PostgreSQL
-        val updatesMy = nonIdCols.joinToString { "${q(it)} = VALUES(${q(it)})" } // For MySQL
-
-        return when (databaseManager.dbType) {
-            DB_TYPE_POSTGRESQL -> """
-                    INSERT INTO $tableName ($colsCsv)
-                    VALUES ($valsCsv)
-                    ON CONFLICT (${q("id")}) DO UPDATE SET $updates
-                """.trimIndent()
-
-            DB_TYPE_MYSQL -> """
-                    INSERT INTO $tableName ($colsCsv)
-                    VALUES ($valsCsv)
-                    ON DUPLICATE KEY UPDATE $updatesMy
-                """.trimIndent()
-
-            DB_TYPE_IN_MEMORY -> """
-                    MERGE INTO $tableName ($colsCsv)
-                    KEY (${q("id")})
-                    VALUES ($valsCsv)
-                """.trimIndent()
-
-            else -> error("Unsupported database type '${databaseManager.dbType}'")
-        }
+        return """
+            UPDATE $tableName
+            SET $setClause
+            WHERE $whereClause
+        """.trimIndent()
     }
 
     private fun getInsertSql(): String {
@@ -245,20 +286,16 @@ abstract class Repository<T : UuidV7Entity> {
         val valsCsv = columns.joinToString { "?" }    // Comma-separated placeholders, e.g., ?,?,?
 
         return when (databaseManager.dbType) {
-            DB_TYPE_POSTGRESQL -> """
-                INSERT INTO $tableName ($colsCsv)
-                VALUES ($valsCsv)
-            """.trimIndent()
+            DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> """
+                    INSERT INTO $tableName ($colsCsv)
+                    VALUES ($valsCsv)
+                    ON CONFLICT DO NOTHING
+                """.trimIndent()
 
             DB_TYPE_MYSQL -> """
-                INSERT INTO $tableName ($colsCsv)
-                VALUES ($valsCsv)
-            """.trimIndent()
-
-            DB_TYPE_IN_MEMORY -> """
-                INSERT INTO $tableName ($colsCsv)
-                VALUES ($valsCsv)
-            """.trimIndent()
+                    INSERT IGNORE INTO $tableName ($colsCsv)
+                    VALUES ($valsCsv)
+                """.trimIndent()
 
             else -> error("Unsupported database type '${databaseManager.dbType}'")
         }
@@ -266,63 +303,10 @@ abstract class Repository<T : UuidV7Entity> {
 
     // Helper that returns the dialect-specific quoting of an SQL identifier.
     private fun q(id: String): String = when (databaseManager.dbType) {
-        DB_TYPE_POSTGRESQL -> "\"$id\""          // → "status"
+        DB_TYPE_POSTGRESQL -> "\"$id\""     // → "status"
         DB_TYPE_MYSQL -> "`$id`"            // → `status`
-        DB_TYPE_IN_MEMORY -> id                 // H2: bare identifiers are fine
+        DB_TYPE_IN_MEMORY -> id             // H2: bare identifiers are fine
         else -> id
-    }
-
-    private fun persist(entity: T, force: Boolean) {
-        val sql = if (force) getUpsertSql() else getInsertSql()
-
-        withConnection {
-            it.prepareStatement(sql).use { stmt ->
-                stmt.with(entity)
-                stmt.executeUpdate()
-            }
-        }
-    }
-
-    private fun persist(entities: List<T>, force: Boolean): Int {
-        if (entities.isEmpty()) return 0
-        val sql = if (force) getUpsertSql() else getInsertSql()
-
-        val failed = mutableListOf<Pair<T, Exception>>()
-
-        withConnection {
-            it.prepareStatement(sql).use { stmt ->
-                try {
-                    // ── fast path ── batch everything
-                    for (entity in entities) {
-                        stmt.with(entity)
-                        stmt.addBatch()
-                    }
-                    val counts = stmt.executeBatch()
-
-                    // no exception, but look for failures
-                    counts.forEachIndexed { index, i ->
-                        if (i == Statement.EXECUTE_FAILED) {
-                            failed += entities[index] to BatchUpdateException()
-                        }
-                    }
-
-                } catch (batchEx: SQLException) {
-                    // ── slow path ── clear batch and retry row‑by‑row
-                    stmt.clearBatch()
-
-                    for (entity in entities) {
-                        try {
-                            stmt.with(entity)
-                            stmt.executeUpdate()
-                        } catch (e: SQLException) {
-                            failed += entity to e                // remember the bad one
-                        }
-                    }
-                }
-            }
-        }
-
-        return entities.size - failed.size
     }
 
     /**
