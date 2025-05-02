@@ -6,9 +6,12 @@ import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.models.UuidV7Entity
+import java.sql.BatchUpdateException
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
+import java.sql.SQLException
+import java.sql.Statement
 import java.time.Instant
 
 abstract class Repository<T : UuidV7Entity> {
@@ -79,6 +82,8 @@ abstract class Repository<T : UuidV7Entity> {
     /**
      * Performs an upsert operation for a list of entities.
      * This method inserts the entities if they do not exist or updates them if they already exist.
+     *
+     * Warning: this method does not throw but returns the number of successful requests
      *
      * @param entities The list of entities to upsert
      */
@@ -278,19 +283,46 @@ abstract class Repository<T : UuidV7Entity> {
         }
     }
 
-    private fun persist(entities: List<T>, force: Boolean) {
-        if (entities.isEmpty()) return
+    private fun persist(entities: List<T>, force: Boolean): Int {
+        if (entities.isEmpty()) return 0
         val sql = if (force) getUpsertSql() else getInsertSql()
+
+        val failed = mutableListOf<Pair<T, Exception>>()
 
         withConnection {
             it.prepareStatement(sql).use { stmt ->
-                for (entity in entities) {
-                    stmt.with(entity)
-                    stmt.addBatch()
+                try {
+                    // ── fast path ── batch everything
+                    for (entity in entities) {
+                        stmt.with(entity)
+                        stmt.addBatch()
+                    }
+                    val counts = stmt.executeBatch()
+
+                    // no exception, but look for failures
+                    counts.forEachIndexed { index, i ->
+                        if (i == Statement.EXECUTE_FAILED) {
+                            failed += entities[index] to BatchUpdateException()
+                        }
+                    }
+
+                } catch (batchEx: SQLException) {
+                    // ── slow path ── clear batch and retry row‑by‑row
+                    stmt.clearBatch()
+
+                    for (entity in entities) {
+                        try {
+                            stmt.with(entity)
+                            stmt.executeUpdate()
+                        } catch (e: SQLException) {
+                            failed += entity to e                // remember the bad one
+                        }
+                    }
                 }
-                stmt.executeBatch()
             }
         }
+
+        return entities.size - failed.size
     }
 
     /**

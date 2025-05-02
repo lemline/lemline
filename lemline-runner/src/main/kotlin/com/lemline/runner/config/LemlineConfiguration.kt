@@ -119,7 +119,11 @@ interface LemlineConfiguration {
                         props["quarkus.datasource.mysql.username"] = mysqlConfig.username()
                         props["quarkus.datasource.mysql.password"] = mysqlConfig.getPassword()
                         props["quarkus.datasource.mysql.jdbc.url"] =
-                            "jdbc:mysql://${mysqlConfig.host()}:${mysqlConfig.port()}/${mysqlConfig.name()}?useSSL=false&allowPublicKeyRetrieval=true"
+                            "jdbc:mysql://${mysqlConfig.host()}:${mysqlConfig.port()}/${mysqlConfig.name()}" +
+                                "?useSSL=false" +
+                                "&allowPublicKeyRetrieval=true" +
+                                "&sessionVariables=sql_mode='STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'" +
+                                "&continueBatchOnError=false"
                     }
                 }
 

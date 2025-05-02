@@ -10,6 +10,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import jakarta.inject.Inject
+import jakarta.transaction.Transactional
 import java.sql.SQLException
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -47,6 +48,7 @@ abstract class WorkflowRepositoryTest {
      * The cleanup is performed within a transaction to ensure atomicity.
      */
     @BeforeEach
+    @Transactional
     fun setupTest() {
         repository.deleteAll()
     }
@@ -63,6 +65,7 @@ abstract class WorkflowRepositoryTest {
      * 3. All properties (id, name, version, definition) are preserved
      */
     @Test
+    @Transactional
     fun `should successfully persist and retrieve a complete workflow model with all properties`() {
         // Given
         val workflowModel = WorkflowModel(
@@ -93,6 +96,7 @@ abstract class WorkflowRepositoryTest {
      * 3. The correct null response is returned
      */
     @Test
+    @Transactional
     fun `should return null when querying for a non-existent workflow name and version combination`() {
         // When
         val result = repository.findByNameAndVersion("non-existent", "1.0.0")
@@ -114,6 +118,7 @@ abstract class WorkflowRepositoryTest {
      * 3. Other properties remain unchanged
      */
     @Test
+    @Transactional
     fun `should successfully insert a new workflow version`() {
         // Given
         val original = WorkflowModel(
@@ -141,6 +146,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
+    @Transactional
     fun `should successfully updating an existing workflow definition`() {
         // Given
         val original = WorkflowModel(
@@ -160,6 +166,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
+    @Transactional
     fun `should fail inserting a new workflow with same name and version`() {
         // Given
         val original = WorkflowModel(
@@ -186,6 +193,7 @@ abstract class WorkflowRepositoryTest {
 
 
     @Test
+    @Transactional
     fun `should successfully insert a batch of workflows`() {
         // Given
         val workflows = List(5) { i ->
@@ -212,6 +220,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
+    @Transactional
     fun `should successfully update a batch of workflows`() {
         // Given
         val originals = List(5) { i ->
@@ -277,6 +286,43 @@ abstract class WorkflowRepositoryTest {
 //        }
 //    }
 
+    @Test
+    @Transactional
+    fun `should successfully upsert a batch of workflows, mixing existing and not`() {
+        // Given
+        val originals = List(5) { i ->
+            WorkflowModel(
+                name = " original-$i",
+                version = "1.0.0",
+                definition = "original-$i"
+            )
+        }
+        repository.upsert(originals)
+
+        // When
+        val newWorkflows = MutableList(5) { i ->
+            if (i == 3) {
+                WorkflowModel(
+                    name = originals[i].name,
+                    version = originals[i].version,
+                    definition = "different-$i"
+                )
+            } else {
+                WorkflowModel(
+                    name = "different-$i",
+                    version = "1.0.0",
+                    definition = "different-$i"
+                )
+            }
+        }
+
+        // When
+        shouldNotThrowAny { repository.upsert(newWorkflows) }
+
+        // Then the insert should have failed all together
+        repository.count() shouldBe originals.size.toLong() + newWorkflows.size.toLong() - 1
+    }
+
     /**
      * Tests retrieval of a workflow by its ID.
      * Verifies that:
@@ -284,6 +330,7 @@ abstract class WorkflowRepositoryTest {
      * - All properties are correctly preserved
      */
     @Test
+    @Transactional
     fun `should retrieve workflow by ID`() {
         // Given
         val workflow = WorkflowModel(
@@ -312,6 +359,7 @@ abstract class WorkflowRepositoryTest {
      * - All properties of each workflow are preserved
      */
     @Test
+    @Transactional
     fun `should retrieve all workflows`() {
         // Given
         val workflows = List(3) { i ->
@@ -344,6 +392,7 @@ abstract class WorkflowRepositoryTest {
      * - No data corruption occurs during concurrent operations
      */
     @Test
+    @Transactional
     fun `should handle concurrent access safely`() {
         // Given
         val threadCount = 5

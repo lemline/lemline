@@ -5,6 +5,7 @@ import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.OutboxRepository
 import io.kotest.assertions.throwables.shouldNotThrow
+import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -13,6 +14,7 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.every
 import io.mockk.mockk
+import jakarta.transaction.Transactional
 import java.sql.ResultSet
 import java.sql.SQLException
 import java.sql.Timestamp
@@ -56,6 +58,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * This is crucial for maintaining test isolation and reliability.
      */
     @BeforeEach
+    @Transactional
     fun setupTest() {
         repository.deleteAll()
     }
@@ -117,7 +120,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - Random attempt count
      * - Sequential message content
      */
-    protected fun createMessages(count: Int): List<T> {
+    private fun createMessages(count: Int): List<T> {
         val now = Instant.now()
         val messages = List(count) { i ->
             val duration = randomNonZero(1000).hours.toJavaDuration()
@@ -143,6 +146,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * After finding the messages, marks them as FAILED to prevent reprocessing.
      * This simulates a real-world scenario where messages are processed and their status is updated.
      */
+    @Transactional
     protected open fun findMessagesToProcess(
         limit: Int = Int.MAX_VALUE,
         maxAttempts: Int = Int.MAX_VALUE
@@ -159,6 +163,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * After finding the messages, marks them as FAILED to prevent reprocessing.
      * This simulates a real-world scenario where messages are deleted after processing.
      */
+    @Transactional
     protected open fun findMessagesToDelete(
         cutoffDate: Instant = Instant.now(),
         limit: Int = Int.MAX_VALUE
@@ -178,6 +183,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - Within attempt limits
      */
     @Test
+    @Transactional
     fun `findMessagesToProcess should return all eligible pending messages that are ready for processing`() {
         val messages = createMessages(messageCount)
         val expected = messages.filterToProcess()
@@ -191,6 +197,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that messages exceeding the attempt limit are not returned.
      */
     @Test
+    @Transactional
     fun `findMessagesToProcess should exclude messages that have exceeded maxAttempts`() {
         val messages = createMessages(messageCount)
         val expected = messages.filterToProcess(maxAttempts = maxAttempts)
@@ -205,6 +212,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * and that all returned messages are valid candidates for processing.
      */
     @Test
+    @Transactional
     fun `findMessagesToProcess should respect the limit parameter and only return valid candidates`() {
         val messages = createMessages(messageCount)
         val expected = messages.filterToProcess()
@@ -222,6 +230,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - Past their cutoff date
      */
     @Test
+    @Transactional
     fun `findMessagesToDelete should return all sent messages that are past their cutoff date`() {
         val messages = createMessages(messageCount)
         val expected = messages.filterToDelete()
@@ -236,6 +245,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that only messages older than the cutoff date are returned.
      */
     @Test
+    @Transactional
     fun `findMessagesToDelete should only return messages older than the specified cutoff date`() {
         val messages = createMessages(messageCount)
         val expected = messages.filterToDelete(cutoffDate = cutoffDate)
@@ -251,6 +261,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * and that all returned messages are valid candidates for deletion.
      */
     @Test
+    @Transactional
     fun `findMessagesToDelete should respect the limit parameter and only return valid candidates`() {
         val messages = createMessages(messageCount)
         val actual = findMessagesToDelete(limit = limit)
@@ -269,6 +280,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - The operation completes within a reasonable time
      */
     @Test
+    @Transactional
     fun `findMessagesToProcess should handle concurrent requests without duplicate processing`() {
         val messages = createMessages(messageCount)
         val expectedProcessed = messages.filterToProcess(maxAttempts = maxAttempts).size
@@ -308,6 +320,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - The operation completes within a reasonable time
      */
     @Test
+    @Transactional
     fun `findMessagesToDelete should handle concurrent requests without duplicate deletion`() {
         val messages = createMessages(messageCount)
         val expectedDeleted = messages.filterToDelete(cutoffDate).size
@@ -348,6 +361,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - The operation completes within a reasonable time
      */
     @Test
+    @Transactional
     fun `should handle mixed concurrent processing and deletion operations without conflicts`() {
         val messages = createMessages(messageCount)
         val expectedProcessed = messages.filterToProcess(maxAttempts = maxAttempts).size
@@ -405,6 +419,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that all fields are properly mapped and converted.
      */
     @Test
+    @Transactional
     fun `createModel should correctly map ResultSet data to model properties`() {
         // Given
         val expectedId = "test-id"
@@ -440,6 +455,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that concurrent operations don't corrupt the data.
      */
     @Test
+    @Transactional
     fun `should handle concurrent access correctly`() {
         // Given
         val messages = List(10) { createModel("test") }
@@ -477,6 +493,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that the repository properly handles concurrent transactions.
      */
     @Test
+    @Transactional
     fun `should handle concurrent transactions correctly`() {
         // Given
         val message = createModel().apply {
@@ -516,6 +533,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that the count matches the number of persisted messages.
      */
     @Test
+    @Transactional
     fun `count should return the correct number of records`() {
         // Given
         val messages = createMessages(10)
@@ -532,6 +550,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that the count is correct when no messages exist.
      */
     @Test
+    @Transactional
     fun `count should return 0 for an empty table`() {
         // When
         val count = repository.count()
@@ -545,6 +564,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that the count matches the number of records returned by listAll.
      */
     @Test
+    @Transactional
     fun `count should be consistent with listAll`() {
         // Given
         val messages = createMessages(5)
@@ -562,6 +582,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that the count decreases when messages are deleted.
      */
     @Test
+    @Transactional
     fun `count should be accurate after deletions`() {
         // Given
         val messages = createMessages(10)
@@ -580,6 +601,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that the count remains the same when messages are updated.
      */
     @Test
+    @Transactional
     fun `count should be accurate after updates`() {
         // Given
         val messages = createMessages(5)
@@ -599,6 +621,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     // --- Tests for persist(entity, force) ---
 
     @Test
+    @Transactional
     fun `persist single entity with force=true should insert new`() {
         val newEntity = createModel("msg-new-force-true")
         shouldNotThrow<Exception> { repository.upsert(newEntity) }
@@ -608,8 +631,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
+    @Transactional
     fun `persist single entity with force=true should update existing`() {
-        val existingEntity = createAndPersistOutboxEntity("msg-update-force-true") // Persist first
+        val existingEntity = insertWithMessage("msg-update-force-true") // Persist first
         val updatedEntity = copyModel(existingEntity, message = "Updated Message")
 
         shouldNotThrow<Exception> { repository.upsert(updatedEntity) }
@@ -620,6 +644,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
+    @Transactional
     fun `persist single entity with force=false should insert new`() {
         val newEntity = createModel("msg-new-force-false")
         shouldNotThrow<Exception> { repository.insert(newEntity) }
@@ -629,8 +654,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
+    @Transactional
     fun `persist single entity with force=false should fail on existing`() {
-        val existingEntity = createAndPersistOutboxEntity("msg-fail-force-false") // Persist first
+        val existingEntity = insertWithMessage("msg-fail-force-false") // Persist first
         // Attempt to persist the same entity again with force=false
         shouldThrow<SQLException> {
             repository.insert(existingEntity)
@@ -644,8 +670,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     // --- Tests for persist(entities, force) ---
 
     @Test
+    @Transactional
     fun `persist list with force=true should insert new and update existing`() {
-        val existingEntity = createAndPersistOutboxEntity("batch-existing-force-true")
+        val existingEntity = insertWithMessage("batch-existing-force-true")
         val updatedEntity = copyModel(existingEntity, message = "Batch Updated")
         val newEntity1 = createModel("batch-new1-force-true")
         val newEntity2 = createModel("batch-new2-force-true")
@@ -666,18 +693,19 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         repository.count() shouldBe 3L
     }
 
-//    @Test
-//    fun `persist list with force=false should insert new only`() {
-//        val newEntity1 = createModel("batch-new1-force-false")
-//        val newEntity2 = createModel("batch-new2-force-false")
-//        val entitiesToPersist = listOf(newEntity1, newEntity2)
-//
-//        shouldNotThrow<Exception> { repository.insert(entitiesToPersist) }
-//
-//        repository.findById(newEntity1.id) shouldNotBe null
-//        repository.findById(newEntity2.id) shouldNotBe null
-//        repository.count() shouldBe 2L
-//    }
+    @Test
+    @Transactional
+    fun `should successfully upsert list`() {
+        val newEntity1 = createModel("batch-new1-force-false")
+        val newEntity2 = createModel("batch-new2-force-false")
+        val entitiesToPersist = listOf(newEntity1, newEntity2)
+
+        shouldNotThrow<Exception> { repository.upsert(entitiesToPersist) }
+
+        repository.findById(newEntity1.id) shouldNotBe null
+        repository.findById(newEntity2.id) shouldNotBe null
+        repository.count() shouldBe 2L
+    }
 //
 //    @Test
 //    fun `persist list with force=false should fail if any existing`() {
@@ -694,10 +722,24 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 //        repository.count() shouldBe 1L
 //    }
 
+    @Test
+    @Transactional
+    fun `should successfully upsert list - existing or not`() {
+        val existingEntity = insertWithMessage("original1")
+        val newEntity1 = createModel("new1")
+        val newEntity2 = createModel("new2")
+        val entitiesToPersist = listOf(newEntity1, existingEntity, newEntity2) // Contains duplicate
+
+        shouldNotThrowAny { repository.upsert(entitiesToPersist) }
+
+        // Verify state: original entity might still be there, new ones are added
+        repository.count() shouldBe 3L
+    }
+
     // --- Helper to persist an entity for setup ---
-    private fun createAndPersistOutboxEntity(message: String): T {
+    private fun insertWithMessage(message: String): T {
         val entity = createModel(message)
-        repository.upsert(entity) // Use force=true for setup to ensure it exists
+        repository.insert(entity)
         return entity
     }
 }
