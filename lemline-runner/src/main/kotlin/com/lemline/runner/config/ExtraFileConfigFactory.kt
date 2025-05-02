@@ -27,12 +27,10 @@ class ExtraFileConfigFactory : AbstractLocationConfigSourceLoader() {
      * Build the list of additional ConfigSources, or an empty list
      * if custom.config.uri isn't defined.
      */
-    fun getConfigSources(uri: String?): Iterable<ConfigSource> {
-        return if (uri.isNullOrBlank()) {
-            emptyList()
-        } else {
-            loadConfigSources(uri, 275, Thread.currentThread().contextClassLoader)
-        }
+    fun getConfigSources(uri: String?): List<ConfigSource> = if (uri.isNullOrBlank()) {
+        emptyList()
+    } else {
+        loadConfigSources(uri, 275, Thread.currentThread().contextClassLoader)
     }
 
     override fun loadConfigSource(url: URL, ordinal: Int): ConfigSource =

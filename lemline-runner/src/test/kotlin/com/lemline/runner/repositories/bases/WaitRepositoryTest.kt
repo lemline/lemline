@@ -14,4 +14,6 @@ internal abstract class WaitRepositoryTest : OutboxRepositoryTest<WaitModel>() {
     override lateinit var repository: WaitRepository
 
     override fun createModel(message: String) = WaitModel(message = message)
+
+    override fun copyModel(model: WaitModel, message: String) = model.copy(message = message)
 }

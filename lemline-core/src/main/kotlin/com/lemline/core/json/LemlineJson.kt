@@ -3,16 +3,35 @@ package com.lemline.core.json
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import io.serverlessworkflow.api.types.*
+import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
+import io.serverlessworkflow.api.types.ExportAs
+import io.serverlessworkflow.api.types.HTTPHeaders
+import io.serverlessworkflow.api.types.HTTPQuery
+import io.serverlessworkflow.api.types.InputFrom
+import io.serverlessworkflow.api.types.OutputAs
+import io.serverlessworkflow.api.types.SetTaskConfiguration
+import io.serverlessworkflow.api.types.TaskBase
+import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
 
 object LemlineJson {
     // Expose Jackson ObjectMapper - configure as needed
-    val jacksonMapper: ObjectMapper = ObjectMapper()
+    val jacksonMapper = ObjectMapper()
 
+    // Expose Jackson YAMLMapper - configure as needed
+    val yamlMapper = YAMLMapper()
+
+    // simply create a new JsonObject
     val jsonObject: JsonObject get() = JsonObject(emptyMap())
 
     // Define the serializers module
@@ -22,7 +41,7 @@ object LemlineJson {
         // Potentially add other contextual serializers here
     }
 
-    // Configure kotlinx.serialization Json instances with the module
+    // Configure a kotlinx.serialization.Json instance with the module
     val json = Json {
         ignoreUnknownKeys = true
         isLenient = true

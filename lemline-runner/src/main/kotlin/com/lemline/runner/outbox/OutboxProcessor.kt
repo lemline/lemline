@@ -7,7 +7,6 @@ import com.lemline.common.info
 import com.lemline.common.warn
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.OutboxRepository
-import jakarta.transaction.Transactional
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -58,18 +57,10 @@ internal class OutboxProcessor<T : OutboxModel>(
      * - Each retry doubles the previous delay
      * - Maximum retry attempts are configurable
      *
-     * Transaction Type: REQUIRES_NEW
-     * - Creates a new transaction for each batch of messages
-     * - Ensures that message processing is isolated from any existing transaction
-     * - If the processor fails, only the current batch is rolled back
-     * - Prevents long-running transactions that could block other operations
-     * - Allows for independent retry of failed messages
-     *
      * @param batchSize Maximum number of messages to process in one batch
      * @param maxAttempts Maximum number of attempts before giving up (>=1)
      * @param initialDelay Initial delay in seconds before first retry
      */
-    @Transactional(Transactional.TxType.REQUIRES_NEW)
     fun process(batchSize: Int, maxAttempts: Int, initialDelay: Duration) {
         try {
             var totalProcessed = 0
@@ -110,8 +101,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                             logger.error { "Message ${message.id} has reached maximum retry attempts" }
                         } else {
                             // Calculate next retry time using exponential backoff
-                            val nextDelay =
-                                calculateNextAttemptDelay(message.attemptCount, initialDelay)
+                            val nextDelay = calculateNextAttemptDelay(message.attemptCount, initialDelay)
                             message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.MILLIS)
                             logger.debug {
                                 "Message ${message.id} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})"
@@ -120,7 +110,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                     }
                 }
                 // save the messages in the same transaction
-                repository.persist(messages)
+                repository.upsert(messages)
             }
 
             if (totalProcessed > 0) {
@@ -144,17 +134,9 @@ internal class OutboxProcessor<T : OutboxModel>(
      * - Avoid database locks
      * - Maintain system performance
      *
-     * Transaction Type: REQUIRES_NEW
-     * - Creates a new transaction for each cleanup batch
-     * - Ensures cleanup operations are isolated from other transactions
-     * - If cleanup fails, only the current batch is rolled back
-     * - Prevents long-running transactions during cleanup
-     * - Allows for independent retry of failed cleanup operations
-     *
      * @param afterDelay Delay after which sent messages should be deleted
      * @param batchSize Maximum number of messages to delete in one batch
      */
-    @Transactional(Transactional.TxType.REQUIRES_NEW)
     fun cleanup(afterDelay: Duration, batchSize: Int) {
         try {
             val cutoffDate = Instant.now().minusMillis(afterDelay.toMillis())

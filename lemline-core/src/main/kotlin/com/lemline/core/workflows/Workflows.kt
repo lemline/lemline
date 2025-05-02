@@ -15,6 +15,23 @@ object Workflows {
     private val rootNodesCache = ConcurrentHashMap<WorkflowIndex, Node<RootTask>>()
 
     /**
+     * Parses a workflow definition string into a `Workflow` object.
+     *
+     * This method attempts to parse the provided workflow definition in YAML format first.
+     * If parsing in YAML format fails, it falls back to JSON format.
+     *
+     * @param definition The workflow definition as a string.
+     * @return The parsed `Workflow` object.
+     * @throws Exception if the workflow definition cannot be parsed in either format.
+     */
+    @JvmStatic
+    fun parse(definition: String): Workflow = try {
+        validation().read(definition, WorkflowFormat.YAML)
+    } catch (e: Exception) {
+        validation().read(definition, WorkflowFormat.JSON)
+    }
+
+    /**
      * Adds a workflow definition to the cache.
      *
      * This method parses the provided workflow definition in YAML format, validates it,

@@ -5,6 +5,7 @@ import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.WorkflowModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.PreparedStatement
 import java.sql.ResultSet
 
 @ApplicationScoped
@@ -16,6 +17,21 @@ class WorkflowRepository : Repository<WorkflowModel>() {
     override val tableName = "workflows"
 
     override val columns = listOf("id", "name", "version", "definition")
+
+    /**
+     * Populates the `PreparedStatement` with the values from the given workflow entity.
+     * This method maps the workflow model's properties to the corresponding SQL parameters
+     * in the prepared statement.
+     *
+     * @param entity The workflow model containing the values to set in the statement
+     * @return The `PreparedStatement` with the populated values
+     */
+    override fun PreparedStatement.with(entity: WorkflowModel) = apply {
+        setString(1, entity.id) // Sets the workflow ID
+        setString(2, entity.name) // Sets the workflow name
+        setString(3, entity.version) // Sets the workflow version
+        setString(4, entity.definition) // Sets the workflow definition
+    }
 
     /**
      * Creates a model instance from a ResultSet.
@@ -56,51 +72,6 @@ class WorkflowRepository : Repository<WorkflowModel>() {
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) createModel(rs) else null
                 }
-            }
-        }
-    }
-
-    /**
-     * Persists a workflow to the database.
-     * This method is transactional and uses native SQL for optimal performance.
-     *
-     * @param entity The workflow to persist
-     */
-    override fun persist(entity: WorkflowModel) {
-        val sql = getUpsertSql()
-
-        withConnection {
-            it.prepareStatement(sql).use { stmt ->
-                stmt.setString(1, entity.id)
-                stmt.setString(2, entity.name)
-                stmt.setString(3, entity.version)
-                stmt.setString(4, entity.definition)
-                stmt.executeUpdate()
-            }
-        }
-    }
-
-    /**
-     * Persists multiple workflows to the database in a single batch operation.
-     * This method uses database-specific batch operations for optimal performance.
-     *
-     * @param entities The list of workflows to persist
-     */
-    override fun persist(entities: List<WorkflowModel>) {
-        if (entities.isEmpty()) return
-
-        val sql = getUpsertSql()
-
-        withConnection {
-            it.prepareStatement(sql).use { stmt ->
-                for (workflow in entities) {
-                    stmt.setString(1, workflow.id)
-                    stmt.setString(2, workflow.name)
-                    stmt.setString(3, workflow.version)
-                    stmt.setString(4, workflow.definition)
-                    stmt.addBatch()
-                }
-                stmt.executeBatch()
             }
         }
     }

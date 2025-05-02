@@ -22,7 +22,6 @@ import com.lemline.runner.repositories.WorkflowRepository
 import com.lemline.runner.secrets.Secrets
 import io.serverlessworkflow.impl.WorkflowStatus
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.transaction.Transactional
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
@@ -107,7 +106,6 @@ internal class WorkflowConsumer(
         }
     }
 
-    @Transactional
     suspend fun process(workflowMessage: WorkflowMessage): String? {
         val name = workflowMessage.name
         val version = workflowMessage.version
@@ -148,7 +146,7 @@ internal class WorkflowConsumer(
 
     private fun String.saveMsgAsFailed(e: Exception?) {
         // Store the message in retry in a failed state (for information)
-        retryRepository.persist(
+        retryRepository.insert(
             RetryModel(
                 message = this@saveMsgAsFailed,
                 delayedUntil = Instant.now(),
@@ -187,7 +185,7 @@ internal class WorkflowConsumer(
         val delayedUntil = Instant.now().plus(delay?.toJavaDuration() ?: error("No delay set in for $this"))
 
         // Save the message to the retry table
-        retryRepository.persist(
+        retryRepository.insert(
             RetryModel(
                 message = msg.toJsonString(),
                 delayedUntil = delayedUntil,
@@ -204,7 +202,7 @@ internal class WorkflowConsumer(
         val delayedUntil = Instant.now().plus(delay.toJavaDuration())
 
         // Save the message to the wait table
-        waitRepository.persist(
+        waitRepository.insert(
             WaitModel(
                 message = msg.toJsonString(),
                 delayedUntil = delayedUntil,

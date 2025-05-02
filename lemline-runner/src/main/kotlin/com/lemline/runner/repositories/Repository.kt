@@ -7,6 +7,7 @@ import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.models.UuidV7Entity
 import java.sql.Connection
+import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.time.Instant
 
@@ -14,7 +15,12 @@ abstract class Repository<T : UuidV7Entity> {
 
     protected abstract val databaseManager: DatabaseManager
 
-    abstract val tableName: String
+    /**
+     * The name of the database table associated with this repository.
+     * This property must be implemented by concrete repositories to specify
+     * the table name used for database operations.
+     */
+    internal abstract val tableName: String
 
     /**
      * Returns the column names for the table, comma-separated.
@@ -23,71 +29,60 @@ abstract class Repository<T : UuidV7Entity> {
     protected abstract val columns: List<String>
 
     /**
-     * Helper that returns the dialect-specific quoting of an SQL identifier.
-     * Feel free to extend when you add new RDBMS types.
-     */
-    private fun q(id: String): String = when (databaseManager.dbType) {
-        DB_TYPE_POSTGRESQL -> "\"$id\""          // → "status"
-        DB_TYPE_MYSQL -> "`$id`"            // → `status`
-        DB_TYPE_IN_MEMORY -> id                 // H2: bare identifiers are fine
-        else -> id
-    }
-
-    /**
-     * Build an UPSERT / MERGE statement suited to the current RDBMS.
-     * Assumes `columns` is a *List* declared in each concrete repository, e.g.
+     * Populates the `PreparedStatement` with the values from the given entity.
+     * This method must be implemented by concrete repositories to map the entity's properties
+     * to the corresponding SQL parameters in the prepared statement.
      *
-     *     override val columns = listOf("id", "message", "status", …)
+     * @param entity The entity containing the values to set in the statement
+     * @return The `PreparedStatement` with the populated values
      */
-    protected fun getUpsertSql(): String {
-        // id column is never updated on conflict
-        val nonIdCols = columns.filterNot { it == "id" }
-        val colsCsv = columns.joinToString { q(it) }            // "id","message",…
-        val valsCsv = columns.joinToString { "?" }              // ?,?,?
-        val updates = nonIdCols.joinToString { "${q(it)} = EXCLUDED.${q(it)}" }
-        val updatesMy = nonIdCols.joinToString { "${q(it)} = VALUES(${q(it)})" }
-
-        return when (databaseManager.dbType) {
-            DB_TYPE_POSTGRESQL -> """
-            INSERT INTO $tableName ($colsCsv)
-            VALUES ($valsCsv)
-            ON CONFLICT (${q("id")}) DO UPDATE SET $updates
-        """.trimIndent()
-
-            DB_TYPE_MYSQL -> """
-            INSERT INTO $tableName ($colsCsv)
-            VALUES ($valsCsv)
-            ON DUPLICATE KEY UPDATE $updatesMy
-        """.trimIndent()
-
-            DB_TYPE_IN_MEMORY -> """
-            MERGE INTO $tableName ($colsCsv)
-            KEY (${q("id")})
-            VALUES ($valsCsv)
-        """.trimIndent()
-
-            else -> error("Unsupported database type '${databaseManager.dbType}'")
-        }
-    }
+    protected abstract fun PreparedStatement.with(entity: T): PreparedStatement
 
     /**
-     * Persists an entity to the database.
+     * Creates a model instance from a ResultSet.
      * This method must be implemented by concrete repositories to handle
-     * the specific persistence logic for their entity type.
-     * The implementation should handle both insert and update operations.
+     * the specific mapping of database columns to model properties.
      *
-     * @param entity The entity to persist
+     * @param rs The ResultSet containing the current row
+     * @return A new model instance populated with data from the ResultSet
      */
-    abstract fun persist(entity: T)
+    internal abstract fun createModel(rs: ResultSet): T
 
     /**
-     * Persists multiple entities to the database in a single transaction.
-     * This method uses batch operations for better performance.
-     * The implementation should handle both insert and update operations.
+     * Inserts a new entity into the database.
+     * This method inserts the entity if it does not exist or fails it if it already exists.
      *
-     * @param entities The list of entities to persist
+     * @param entity The entity to insert
      */
-    abstract fun persist(entities: List<T>)
+    fun insert(entity: T) = persist(entity, false)
+
+    /**
+     * Performs an upsert operation for a single entity.
+     * This method inserts the entity if it does not exist or updates it if it already exists.
+     *
+     * @param entity The entity to upsert
+     */
+    fun upsert(entity: T) = persist(entity, true)
+
+    /**
+     *
+     * NOTE: this method is deactivated because not used AND have consistency issues between databases
+     * as PostgreSQL always runs statements in an implicit transaction,
+     *
+     * Inserts a list of entities into the database.
+     * This method inserts the entities if they do not exist and fails if they already exist.
+     *
+     * @param entities The list of entities to insert
+     */
+    //fun insert(entities: List<T>) = persist(entities, false)
+
+    /**
+     * Performs an upsert operation for a list of entities.
+     * This method inserts the entities if they do not exist or updates them if they already exist.
+     *
+     * @param entities The list of entities to upsert
+     */
+    fun upsert(entities: List<T>) = persist(entities, true)
 
     /**
      * Retrieves an entity by its ID.
@@ -135,16 +130,6 @@ abstract class Repository<T : UuidV7Entity> {
             }
         }
     }
-
-    /**
-     * Creates a model instance from a ResultSet.
-     * This method must be implemented by concrete repositories to handle
-     * the specific mapping of database columns to model properties.
-     *
-     * @param rs The ResultSet containing the current row
-     * @return A new model instance populated with data from the ResultSet
-     */
-    internal abstract fun createModel(rs: ResultSet): T
 
     /**
      * Creates a list of model instances from a ResultSet.
@@ -219,11 +204,104 @@ abstract class Repository<T : UuidV7Entity> {
         }
     }
 
+    private fun getUpsertSql(): String {
+        val colsCsv = columns.joinToString { q(it) }  // Comma-separated column names, e.g., "id","message",…
+        val valsCsv = columns.joinToString { "?" }    // Comma-separated placeholders, e.g., ?,?,?
+
+        val nonIdCols = columns.filterNot { it == "id" }
+        val updates = nonIdCols.joinToString { "${q(it)} = EXCLUDED.${q(it)}" } // For PostgreSQL
+        val updatesMy = nonIdCols.joinToString { "${q(it)} = VALUES(${q(it)})" } // For MySQL
+
+        return when (databaseManager.dbType) {
+            DB_TYPE_POSTGRESQL -> """
+                    INSERT INTO $tableName ($colsCsv)
+                    VALUES ($valsCsv)
+                    ON CONFLICT (${q("id")}) DO UPDATE SET $updates
+                """.trimIndent()
+
+            DB_TYPE_MYSQL -> """
+                    INSERT INTO $tableName ($colsCsv)
+                    VALUES ($valsCsv)
+                    ON DUPLICATE KEY UPDATE $updatesMy
+                """.trimIndent()
+
+            DB_TYPE_IN_MEMORY -> """
+                    MERGE INTO $tableName ($colsCsv)
+                    KEY (${q("id")})
+                    VALUES ($valsCsv)
+                """.trimIndent()
+
+            else -> error("Unsupported database type '${databaseManager.dbType}'")
+        }
+    }
+
+    private fun getInsertSql(): String {
+        val colsCsv = columns.joinToString { q(it) }  // Comma-separated column names, e.g., "id","message",…
+        val valsCsv = columns.joinToString { "?" }    // Comma-separated placeholders, e.g., ?,?,?
+
+        return when (databaseManager.dbType) {
+            DB_TYPE_POSTGRESQL -> """
+                INSERT INTO $tableName ($colsCsv)
+                VALUES ($valsCsv)
+            """.trimIndent()
+
+            DB_TYPE_MYSQL -> """
+                INSERT INTO $tableName ($colsCsv)
+                VALUES ($valsCsv)
+            """.trimIndent()
+
+            DB_TYPE_IN_MEMORY -> """
+                INSERT INTO $tableName ($colsCsv)
+                VALUES ($valsCsv)
+            """.trimIndent()
+
+            else -> error("Unsupported database type '${databaseManager.dbType}'")
+        }
+    }
+
+    // Helper that returns the dialect-specific quoting of an SQL identifier.
+    private fun q(id: String): String = when (databaseManager.dbType) {
+        DB_TYPE_POSTGRESQL -> "\"$id\""          // → "status"
+        DB_TYPE_MYSQL -> "`$id`"            // → `status`
+        DB_TYPE_IN_MEMORY -> id                 // H2: bare identifiers are fine
+        else -> id
+    }
+
+    private fun persist(entity: T, force: Boolean) {
+        val sql = if (force) getUpsertSql() else getInsertSql()
+
+        withConnection {
+            it.prepareStatement(sql).use { stmt ->
+                stmt.with(entity)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    private fun persist(entities: List<T>, force: Boolean) {
+        if (entities.isEmpty()) return
+        val sql = if (force) getUpsertSql() else getInsertSql()
+
+        withConnection {
+            it.prepareStatement(sql).use { stmt ->
+                for (entity in entities) {
+                    stmt.with(entity)
+                    stmt.addBatch()
+                }
+                stmt.executeBatch()
+            }
+        }
+    }
+
+    /**
+     * WARNING - this way of using the connection prevents using transactions
+     * because the connection is automatically closed after the block execution.
+     * Transactions would require the connection to remain open until explicitly committed or rolled back.
+     */
     protected fun <R> withConnection(block: (Connection) -> R): R =
         databaseManager.datasource.connection.use { conn ->
             block(conn)
         }
 
-    // 1️⃣ define an extension for clarity
     protected fun ResultSet.getInstant(column: String): Instant = getTimestamp(column).toInstant()
 }

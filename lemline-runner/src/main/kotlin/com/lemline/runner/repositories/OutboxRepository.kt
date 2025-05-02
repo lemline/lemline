@@ -5,6 +5,7 @@ import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
+import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.time.Instant
 
@@ -86,52 +87,20 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
     ): T
 
     /**
-     * Persists a message to the database.
-     * This method is transactional and uses native SQL for optimal performance.
+     * Populates the `PreparedStatement` with the values from the given entity.
+     * This method maps the entity's properties to the corresponding SQL parameters
+     * in the prepared statement.
      *
-     * @param message The message to persist
+     * @param entity The entity containing the values to set in the statement
+     * @return The `PreparedStatement` with the populated values
      */
-    override fun persist(message: T) {
-        val sql = getUpsertSql()
-
-        withConnection {
-            it.prepareStatement(sql).use { stmt ->
-                stmt.setString(1, message.id)
-                stmt.setString(2, message.message)
-                stmt.setString(3, message.status.name)
-                stmt.setTimestamp(4, java.sql.Timestamp.from(message.delayedUntil))
-                stmt.setInt(5, message.attemptCount)
-                stmt.setString(6, message.lastError)
-                stmt.executeUpdate()
-            }
-        }
-    }
-
-    /**
-     * Persists multiple messages to the database in a single batch operation.
-     * This method uses database-specific batch operations for optimal performance.
-     *
-     * @param entities The list of messages to persist
-     */
-    override fun persist(entities: List<T>) {
-        if (entities.isEmpty()) return
-
-        val sql = getUpsertSql()
-
-        withConnection {
-            it.prepareStatement(sql).use { stmt ->
-                for (message in entities) {
-                    stmt.setString(1, message.id)
-                    stmt.setString(2, message.message)
-                    stmt.setString(3, message.status.name)
-                    stmt.setTimestamp(4, java.sql.Timestamp.from(message.delayedUntil))
-                    stmt.setInt(5, message.attemptCount)
-                    stmt.setString(6, message.lastError)
-                    stmt.addBatch()
-                }
-                stmt.executeBatch()
-            }
-        }
+    override fun PreparedStatement.with(entity: T): PreparedStatement = apply {
+        setString(1, entity.id) // Sets the ID of the entity
+        setString(2, entity.message) // Sets the message content
+        setString(3, entity.status.name) // Sets the status as a string
+        setTimestamp(4, java.sql.Timestamp.from(entity.delayedUntil)) // Sets the delayed until timestamp
+        setInt(5, entity.attemptCount) // Sets the attempt count
+        setString(6, entity.lastError) // Sets the last error message, if any
     }
 
     /**

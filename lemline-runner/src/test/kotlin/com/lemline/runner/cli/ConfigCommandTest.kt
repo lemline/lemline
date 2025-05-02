@@ -136,26 +136,6 @@ class ConfigCommandTest {
     }
 
     /**
-     * Tests 'config --format json' output.
-     * Assumes JSON output is a single object with key-value pairs.
-     */
-    @Test
-    fun `test config command output format json`() {
-        val output1 = executeAndCapture("config", "--format=json")
-        val output2 = executeAndCapture("config", "-fjson")
-
-        listOf(output1, output2).forEach { output ->
-            // Basic checks for JSON format
-            assertTrue(output.startsWith("{"), "JSON output should start with '{'")
-            assertTrue(output.endsWith("}"), "JSON output should end with '}'")
-            assertTrue(
-                output.contains("{\n  \"lemline\" : {\n    \"database\" : {"),
-                "output should be in JSON format"
-            )
-        }
-    }
-
-    /**
      * Tests 'config --format text' explicitly.
      * Should be similar to the default format test.
      */

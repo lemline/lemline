@@ -12,7 +12,6 @@ import com.lemline.runner.repositories.WorkflowRepository
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.matchers.shouldBe
 import jakarta.inject.Inject
-import jakarta.transaction.Transactional
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.CompletableFuture
@@ -58,7 +57,6 @@ internal abstract class WorkflowConsumerTest {
     lateinit var workflowConsumer: WorkflowConsumer
 
     @BeforeEach
-    @Transactional
     fun setup() {
         // Clear the database
         workflowRepository.deleteAll()
@@ -119,7 +117,7 @@ internal abstract class WorkflowConsumerTest {
                               caught: true
             """.trimIndent().replace("@", "$")
         )
-        workflowRepository.persist(workflowModel)
+        workflowRepository.insert(workflowModel)
 
         setupMessaging()
     }

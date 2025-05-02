@@ -35,22 +35,32 @@ These options are available for all commands:
 
 ```bash
 # List available workflows
-lemline workflow list [--format json|yaml]
+# Print a list of workflow name + workflow version available in the database
+# format json: [{name: ..., version: [1.0, 2.0, 3.0]}]
+lemline workflow get [--format json|yaml|table]
 
 # Show workflow details
-lemline workflow show <workflow-id> [--format json|yaml|table]
+# Print the  workflow description in Yaml (default) or beautified Json format
+# if version is not provided, returns the last version
+lemline workflow get <workflow-name> [<workflow-version>] [--format json|yaml]
 
 # Create a new workflow
-lemline workflow create [--file <name>] 
+# Create a workflow, giving its description or a file name containing the description
+# Fails if the workflow already exist
+lemline workflow post [definition] [--file <file-name>]
 
 # Update an existing workflow
-lemline workflow update [--file <name>] [--force]
+# Update the definition of an existing workflow
+# should require an interactive confirmation (except if --force)
+lemline workflow put [definition] [--file <file-name>] [--force]
 
 # Delete a workflow
-lemline workflow delete <workflow-id> [--force]
+# Delete the last versions of a workflow or a specific version if provided
+# should require an interactive confirmation (except if --force)
+lemline workflow delete <workflow-name> [<workflow-version>] 
 
 # Validate a workflow definition
-lemline workflow validate <workflow-file>
+lemline workflow validate [definition] [--file <name>] 
 ```
 
 ### Runtime Management

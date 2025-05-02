@@ -75,14 +75,6 @@ import org.eclipse.microprofile.config.spi.ConfigSource
  *    }
  *    ```
  *
- * Schema Generation:
- * The quarkus.hibernate-orm.database.generation property controls Hibernate's schema generation:
- * - none: No schema generation (use with Flyway)
- * - create: Creates schema on startup, drops on shutdown
- * - drop-and-create: Drops and recreates schema on startup
- * - update: Updates schema if needed
- * - validate: Validates schema against entities
- *
  * Best Practices:
  * - Always use 'none' when using Flyway (including in tests)
  * - Never mix Flyway with Hibernate schema generation
@@ -145,7 +137,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
             }
         }
 
-        // Override properties from the lemline.config.locations, if any
+        // Override properties from the lemline.config.locations files, if any
         val configUri = context.getValue("lemline.config.locations").value
         log.debug { "lemline.config.locations=$configUri" }
         ExtraFileConfigFactory().getConfigSources(configUri)
@@ -183,8 +175,8 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
             generatedProps.putAll(DatabaseConfig.toQuarkusProperties(lemlineConfig.database()))
             generatedProps.putAll(MessagingConfig.toQuarkusProperties(lemlineConfig.messaging()))
 
-            log.debug { 
-                "Generated properties: ${generatedProps.map { "${it.key}=${it.value}" }.joinToString()}" 
+            log.debug {
+                "Generated properties: ${generatedProps.map { "${it.key}=${it.value}" }.joinToString()}"
             }
 
             // Combine both generated Quarkus properties and original Lemline properties

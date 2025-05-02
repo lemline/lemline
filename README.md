@@ -33,13 +33,12 @@ or managing fan-in scenarios (waiting for multiple parallel tasks to complete).
 
 * **Serverless Workflow DSL Execution:** Faithfully implements
   the [Serverless Workflow specification](https://serverlessworkflow.io) for defining and running workflows.
-* **Modern Tech Stack:** Utilizes Quarkus, Hibernate Panache, and SmallRye Reactive Messaging for a robust and efficient
+* **Modern Tech Stack:** Utilizes Quarkus and SmallRye Reactive Messaging for a robust and efficient
   runtime.
-* **Asynchronous Processing:** Leverages Kotlin Coroutines and reactive principles for high-throughput, non-blocking
+* **Asynchronous Processing:** Leverages reactive principles for high-throughput, non-blocking
   task execution.
-* **Database Integration:** Supports persistent workflow data using Hibernate Panache.
-    * *While Quarkus + Hibernate Panache allows compatibility with numerous relational databases, Lemline is
-      currently tested with PostgreSQL and MySQL.*
+* **Database Integration:** Supports persistent workflow data .
+    * *Lemline is currently tested with PostgreSQL and MySQL.*
 * **Event-Driven:** Built on Quarkus's reactive messaging capabilities (SmallRye Reactive Messaging) for seamless
   integration with event streams.
     * *While SmallRye Reactive Messaging supports various brokers (Kafka, AMQP, MQTT, etc.), Lemline is currently

@@ -1,10 +1,9 @@
 package com.lemline.runner.cli
 
+import com.lemline.runner.cli.workflow.WorkflowCommand
 import io.quarkus.arc.Unremovable
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import jakarta.enterprise.context.Dependent
-import jakarta.inject.Inject
-import org.jboss.logging.Logger
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 
@@ -27,19 +26,19 @@ import picocli.CommandLine.Option
 @Unremovable
 @Dependent
 class MainCommand : Runnable {
-    @Inject
-    lateinit var log: Logger
 
-    @Option(names = ["-d", "--debug"], description = ["Enable debug logging"])
+    @Option(
+        names = ["-d", "--debug"],
+        description = ["Enable debug logging"]
+    )
     var debug: Boolean = false
 
-    // Add option for Picocli recognition, even though logic is handled pre-startup
     @Option(
         names = ["-f", "--file"],
         description = ["Specify configuration file location"],
         paramLabel = "<location>"
     )
-    var configFile: String? = null // Dummy variable, value not used by Picocli execution
+    var configFile: String? = null
 
     /**
      * Flag to indicate if the application should stop after executing a command.

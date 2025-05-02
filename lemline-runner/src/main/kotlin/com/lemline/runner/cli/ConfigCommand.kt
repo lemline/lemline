@@ -3,7 +3,6 @@ package com.lemline.runner.cli
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
-import com.lemline.core.json.LemlineJson
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import org.eclipse.microprofile.config.Config
@@ -22,14 +21,13 @@ import picocli.CommandLine.ParentCommand
 class ConfigCommand : Runnable {
     enum class Format {
         PROPERTIES,
-        JSON,
         YAML,
         YML
     }
 
     @Option(
         names = ["-f", "--format"],
-        description = ["Output format (none, json, yaml, yml)"],
+        description = ["Output format (properties, yaml)"],
         converter = [FormatConverter::class]
     )
     var format: Format = Format.PROPERTIES
@@ -67,12 +65,6 @@ class ConfigCommand : Runnable {
                         .replace("\r", "\\r")
                     println("$key=$escapedValue")
                 }
-            }
-
-            Format.JSON -> {
-                val nestedProperties = createNestedStructure(properties)
-                val mapper = LemlineJson.jacksonMapper
-                println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(nestedProperties))
             }
 
             Format.YAML, Format.YML -> {
