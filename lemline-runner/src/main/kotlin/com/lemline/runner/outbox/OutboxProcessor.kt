@@ -7,7 +7,6 @@ import com.lemline.common.info
 import com.lemline.common.warn
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.OutboxRepository
-import jakarta.transaction.Transactional
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -53,6 +52,10 @@ internal class OutboxProcessor<T : OutboxModel>(
      *    - On failure, implements retry logic with exponential backoff
      * 3. Handles concurrent processing safely
      *
+     * It's crucial to run this method within a transaction to ensure data consistency.
+     * Without a transaction, another runner could process the same messages concurrently
+     * while this one is still handling the results of the `findMessagesToProcess` query.
+     *
      * The method uses exponential backoff for retries:
      * - Initial delay is configurable
      * - Each retry doubles the previous delay
@@ -62,9 +65,8 @@ internal class OutboxProcessor<T : OutboxModel>(
      * @param maxAttempts Maximum number of attempts before giving up (>=1)
      * @param initialDelay Initial delay in seconds before first retry
      */
-    @Transactional
-    fun process(batchSize: Int, maxAttempts: Int, initialDelay: Duration) {
-        try {
+    fun process(batchSize: Int, maxAttempts: Int, initialDelay: Duration) = try {
+        repository.withTransaction { connection ->
             var totalProcessed = 0
             var batchNumber = 0
             var consecutiveEmptyBatches = 0
@@ -72,7 +74,7 @@ internal class OutboxProcessor<T : OutboxModel>(
 
             while (consecutiveEmptyBatches < maxConsecutiveEmptyBatches) {
                 // Find and lock messages ready to process
-                val messages = repository.findMessagesToProcess(batchSize, maxAttempts)
+                val messages = repository.findMessagesToProcess(maxAttempts, batchSize, connection)
 
                 if (messages.isEmpty()) {
                     consecutiveEmptyBatches++
@@ -89,8 +91,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                         message.attemptCount++
                         // Process the message
                         processor(message)
-
-                        // Update status to SENT in the same transaction
+                        // Update the status to SENT in the same transaction
                         message.status = OutBoxStatus.SENT
                         logger.debug { "Successfully processed message ${message.id}" }
                         totalProcessed++
@@ -112,17 +113,17 @@ internal class OutboxProcessor<T : OutboxModel>(
                     }
                 }
                 // update the messages in the same transaction
-                repository.update(messages)
+                repository.update(messages, connection)
             }
 
             if (totalProcessed > 0) {
                 logger.info { "Completed processing $totalProcessed messages in $batchNumber batches" }
             }
-        } catch (e: Exception) {
-            logger.error(e) { "Error processing delayed messages: ${e.message}" }
-            // Don't throw the exception to prevent scheduler from stopping
-            // The next scheduled run will try again
         }
+    } catch (e: Exception) {
+        logger.error(e) { "Error processing delayed messages: ${e.message}" }
+        // Don't throw the exception to prevent scheduler from stopping
+        // The next scheduled run will try again
     }
 
     /**
@@ -139,9 +140,8 @@ internal class OutboxProcessor<T : OutboxModel>(
      * @param afterDelay Delay after which sent messages should be deleted
      * @param batchSize Maximum number of messages to delete in one batch
      */
-    @Transactional
-    fun cleanup(afterDelay: Duration, batchSize: Int) {
-        try {
+    fun cleanup(afterDelay: Duration, batchSize: Int) = try {
+        repository.withTransaction { connection ->
             val cutoffDate = Instant.now().minusMillis(afterDelay.toMillis())
             var totalDeleted = 0
             var chunkNumber = 0
@@ -150,7 +150,7 @@ internal class OutboxProcessor<T : OutboxModel>(
 
             while (consecutiveEmptyChunks < maxConsecutiveEmptyChunks) {
                 // Find and lock a chunk of messages for deletion
-                val messagesToDelete = repository.findMessagesToDelete(cutoffDate, batchSize)
+                val messagesToDelete = repository.findMessagesToDelete(cutoffDate, batchSize, connection)
                 logger.info { "Cleaned up chunk $chunkNumber: retrieved ${messagesToDelete.size} messages to delete" }
 
                 if (messagesToDelete.isEmpty()) {
@@ -163,7 +163,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                 val chunkDeleted = messagesToDelete.size
 
                 // Delete the chunk
-                repository.delete(messagesToDelete)
+                repository.delete(messagesToDelete, connection)
                 totalDeleted += chunkDeleted
 
                 logger.info { "Cleaned up chunk $chunkNumber: $chunkDeleted messages (total: $totalDeleted)" }
@@ -174,11 +174,11 @@ internal class OutboxProcessor<T : OutboxModel>(
                     "Completed cleanup of $totalDeleted messages in $chunkNumber chunks (older than $cutoffDate)"
                 }
             }
-        } catch (e: Exception) {
-            logger.error(e) { "Error during cleanup of delayed messages: ${e.message}" }
-            // Don't throw the exception to prevent scheduler from stopping
-            // The next scheduled run will try again
         }
+    } catch (e: Exception) {
+        logger.error(e) { "Error during cleanup of delayed messages: ${e.message}" }
+        // Don't throw the exception to prevent scheduler from stopping
+        // The next scheduled run will try again
     }
 
     @VisibleForTesting

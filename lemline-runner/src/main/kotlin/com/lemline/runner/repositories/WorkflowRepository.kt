@@ -5,6 +5,7 @@ import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.WorkflowModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 
@@ -63,7 +64,7 @@ class WorkflowRepository : Repository<WorkflowModel>() {
      * @param version The version of the workflow
      * @return The workflow model if found, null otherwise
      */
-    fun findByNameAndVersion(name: String, version: String): WorkflowModel? {
+    fun findByNameAndVersion(name: String, version: String, connection: Connection? = null): WorkflowModel? {
         val sql = """
             SELECT * FROM $tableName
             WHERE name = ?
@@ -71,7 +72,7 @@ class WorkflowRepository : Repository<WorkflowModel>() {
             LIMIT 1
         """.trimIndent()
 
-        return withConnection {
+        return withConnection(connection) {
             it.prepareStatement(sql).use { stmt ->
                 stmt.apply {
                     setString(1, name)

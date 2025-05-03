@@ -15,6 +15,7 @@ import jakarta.inject.Inject
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.flywaydb.core.Flyway
 
+
 @ApplicationScoped
 class DatabaseManager {
     private val log = logger()

@@ -63,6 +63,9 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     // Abstract factory method for creating test entities
     abstract fun createTestModel(payload: String = "{}"): T
 
+    // current datasource
+    private val datasource by lazy { testRepository.databaseManager.datasource }
+
     // Mock and processor using the generic type T
     protected val mockProcessorFunction = mockk<(T) -> Unit>()
     protected lateinit var outboxProcessor: OutboxProcessor<T>
@@ -186,7 +189,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         if (delayMillis > 0) Thread.sleep(delayMillis + 300) else Thread.sleep(300)
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
-        // Assert: Second attempt succeeded - Check DB state
+        // Assert: A second attempt succeeded - Check DB state
         verify(exactly = 2) { mockProcessorFunction(any(modelClass)) } // Verify it was called again
         val succeededMessage = testRepository.findById(messageId)
         succeededMessage shouldNotBe null
@@ -310,24 +313,26 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun `cleanup should remove old SENT messages`() {
         // Arrange
         val retentionDelay = Duration.ofDays(7)
-        val cutoff = Instant.now().minusSeconds(retentionDelay.toSeconds() + 24 * 60 * 60)
-        val wayBeforeCutoff = cutoff.minus(1, ChronoUnit.DAYS)
+        val wayBeforeCutoff = Instant.now().minus(8, ChronoUnit.DAYS)
 
         // Create messages using abstract factory
-        val oldSentMessage = createTestModel("old_sent").apply { status = SENT }
-        val recentSentMessage = createTestModel("recent_sent").apply { status = SENT }
-        val pendingMessage = createTestModel("pending") // Default PENDING status
-        val failedMessage = createTestModel("failed").apply { status = FAILED }
-
-        // Persist all messages
+        val oldSentMessage = createTestModel("old_sent").apply {
+            status = SENT
+            delayedUntil = wayBeforeCutoff
+        }
+        val recentSentMessage = createTestModel("recent_sent").apply {
+            status = SENT
+            delayedUntil = Instant.now()
+        }
+        val pendingMessage = createTestModel("pending").apply {
+            status = PENDING
+            delayedUntil = wayBeforeCutoff
+        }
+        val failedMessage = createTestModel("failed").apply {
+            status = FAILED
+            delayedUntil = wayBeforeCutoff
+        }
         testRepository.insert(listOf(oldSentMessage, recentSentMessage, pendingMessage, failedMessage))
-
-        // Manually update the 'delayedUntil' timestamp for the old messages *after* persisting
-        // to simulate them being older than the cutoff for cleanup purposes.
-        oldSentMessage.delayedUntil = wayBeforeCutoff
-        pendingMessage.delayedUntil = wayBeforeCutoff
-        failedMessage.delayedUntil = wayBeforeCutoff
-        testRepository.insert(listOf(oldSentMessage, pendingMessage, failedMessage))
 
         val oldSentId = oldSentMessage.id
         val recentSentId = recentSentMessage.id

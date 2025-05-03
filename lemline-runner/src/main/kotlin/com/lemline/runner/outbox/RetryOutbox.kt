@@ -41,8 +41,8 @@ internal class RetryOutbox @Inject constructor(
 ) {
     private val logger = logger()
 
-    val outboxConf = lemlineConfig.retry().outbox()
-    val cleanupConf = lemlineConfig.retry().cleanup()
+    private val outboxConf = lemlineConfig.retry().outbox()
+    private val cleanupConf = lemlineConfig.retry().cleanup()
 
     internal val outboxProcessor = OutboxProcessor(
         logger = logger,

@@ -9,8 +9,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import jakarta.inject.Inject
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -47,9 +45,8 @@ abstract class WorkflowRepositoryTest {
      * The cleanup is performed within a transaction to ensure atomicity.
      */
     @BeforeEach
-    fun setupTest() = runTest {
+    fun setupTest() {
         repository.deleteAll()
-        delay(100)
     }
 
     /**

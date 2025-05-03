@@ -5,6 +5,7 @@ import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
+import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.time.Instant
@@ -114,7 +115,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      * @param maxAttempts Maximum number of retry attempts allowed
      * @return List of locked messages ready for processing
      */
-    fun findMessagesToProcess(limit: Int, maxAttempts: Int): List<T> {
+    fun findMessagesToProcess(maxAttempts: Int, limit: Int, connection: Connection? = null): List<T> {
         val sql = """
             SELECT * FROM $tableName
             WHERE status = ?
@@ -125,7 +126,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
             FOR UPDATE SKIP LOCKED
         """.trimIndent()
 
-        return withConnection {
+        return withConnection(connection) {
             it.prepareStatement(sql).use { stmt ->
                 stmt.apply {
                     setString(1, PENDING.name)
@@ -147,7 +148,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      * @param limit Maximum number of messages to retrieve
      * @return List of locked messages ready for deletion
      */
-    fun findMessagesToDelete(cutoffDate: Instant, limit: Int): List<T> {
+    fun findMessagesToDelete(cutoffDate: Instant, limit: Int, connection: Connection? = null): List<T> {
         val sql = """
             SELECT * FROM $tableName
             WHERE status = ?
@@ -157,7 +158,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
             FOR UPDATE SKIP LOCKED
         """.trimIndent()
 
-        return withConnection {
+        return withConnection(connection) {
             it.prepareStatement(sql).use { stmt ->
                 stmt.apply {
                     setString(1, SENT.name)
