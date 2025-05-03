@@ -2,7 +2,8 @@
 package com.lemline.runner.repositories.bases
 
 import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.outbox.OutBoxStatus.FAILED
+import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
 import com.lemline.runner.repositories.OutboxRepository
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -24,8 +25,6 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.toJavaDuration
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -58,9 +57,8 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * This is crucial for maintaining test isolation and reliability.
      */
     @BeforeEach
-    fun setupTest() = runTest {
+    fun setupTest() {
         repository.deleteAll()
-        delay(100)
     }
 
     /**
@@ -73,10 +71,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     private fun List<T>.filterToProcess(
         now: Instant = Instant.now(),
         maxAttempts: Int = Int.MAX_VALUE
-    ): List<T> =
-        filter { it.status == OutBoxStatus.PENDING }
-            .filter { it.delayedUntil <= now }
-            .filter { it.attemptCount < maxAttempts }
+    ): List<T> = filter {
+        it.status == PENDING && it.delayedUntil <= now && it.attemptCount < maxAttempts
+    }
 
     /**
      * Filters a list of messages to find those that are ready to be deleted.
@@ -84,9 +81,11 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - It has SENT status
      * - Its delayedUntil time is before the cutoff date
      */
-    private fun List<T>.filterToDelete(cutoffDate: Instant = Instant.now()): List<T> =
-        filter { it.status == OutBoxStatus.SENT }
-            .filter { it.delayedUntil < cutoffDate }
+    private fun List<T>.filterToDelete(
+        cutoffDate: Instant = Instant.now()
+    ): List<T> = filter {
+        it.status == SENT && it.delayedUntil < cutoffDate
+    }
 
     /**
      * Generates a random non-zero integer for testing purposes.
@@ -438,7 +437,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         // Given
         val expectedId = "test-id"
         val expectedMessage = "test message"
-        val expectedStatus = OutBoxStatus.PENDING
+        val expectedStatus = PENDING
         val expectedDelayedUntil = Instant.now().truncatedTo(ChronoUnit.MILLIS) // Truncate for DB precision
         val expectedAttemptCount = 2
         val expectedLastError = "test error"
@@ -508,7 +507,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `insert should handle concurrent transactions correctly`() {
         // Given
         val message = createWithMessage().apply {
-            status = OutBoxStatus.PENDING
+            status = PENDING
             delayedUntil = Instant.now()
             attemptCount = 0
         }
@@ -755,9 +754,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         val messages = List(count) { i ->
             val duration = randomNonZero(1000).hours.toJavaDuration()
             val status = when (Random.nextInt(0, 2)) {
-                0 -> OutBoxStatus.PENDING
-                1 -> OutBoxStatus.SENT
-                else -> OutBoxStatus.FAILED
+                0 -> PENDING
+                1 -> SENT
+                else -> FAILED
             }
             val attemptCount = Random.nextInt(0, 5)
 
