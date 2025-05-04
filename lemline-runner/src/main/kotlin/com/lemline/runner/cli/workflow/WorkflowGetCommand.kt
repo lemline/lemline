@@ -157,7 +157,7 @@ class WorkflowGetCommand : Runnable {
         while (true) {
             val input = readlnOrNull()?.trim()
             if (input.isNullOrEmpty()) {
-                println("Selection cancelled.")
+                println("Deletion cancelled.")
                 return
             }
 
