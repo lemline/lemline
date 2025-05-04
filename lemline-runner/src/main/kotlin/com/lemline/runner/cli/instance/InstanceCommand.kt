@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.cli
+package com.lemline.runner.cli.instance
 
 import io.quarkus.arc.Unremovable
 import jakarta.enterprise.context.ApplicationScoped

@@ -12,9 +12,9 @@ import picocli.CommandLine.ParentCommand
     description = ["Manage workflows using RESTful verbs"],
     subcommands = [
         // Reference the new/updated command classes
-        WorkflowListCommand::class,
         WorkflowGetCommand::class,
         WorkflowPostCommand::class,
+        WorkflowListCommand::class,
         WorkflowUpdateCommand::class,
         WorkflowDeleteCommand::class,
         WorkflowValidateCommand::class

@@ -36,7 +36,7 @@ abstract class Repository<T : UuidV7Entity> {
     protected abstract val keyColumns: List<String>
 
     /**
-     * Populates the `PreparedStatement` with the values from the given entity.
+     * Populates the `PreparedStatement` with the values from the given entity for an update operation.
      * This method must be implemented by concrete repositories to map the entity's properties
      * to the corresponding SQL parameters in the prepared statement.
      *
@@ -46,7 +46,25 @@ abstract class Repository<T : UuidV7Entity> {
     protected abstract fun PreparedStatement.bindUpdateWith(entity: T): PreparedStatement
 
 
+    /**
+     * Populates the `PreparedStatement` with the values from the given entity for an insert operation.
+     * This method must be implemented by concrete repositories to map the entity's properties
+     * to the corresponding SQL parameters in the prepared statement.
+     *
+     * @param entity The entity containing the values to set in the statement
+     * @return The `PreparedStatement` with the populated values
+     */
     protected abstract fun PreparedStatement.bindInsertWith(entity: T): PreparedStatement
+
+    /**
+     * Populates the `PreparedStatement` with the values from the given entity for a delete operation.
+     * This method must be implemented by concrete repositories to map the entity's properties
+     * to the corresponding SQL parameters in the prepared statement.
+     *
+     * @param entity The entity containing the key values.
+     * @return The PreparedStatement with key values bound.
+     */
+    protected abstract fun PreparedStatement.bindDeleteWith(entity: T): PreparedStatement
 
     /**
      * Executes a block of code within a database transaction.
@@ -97,6 +115,7 @@ abstract class Repository<T : UuidV7Entity> {
      * Inserts a new entity
      *
      * @param entity The entity to insert
+     * @return The number of rows inserted (1 if successful, 0 if not)
      */
     fun insert(entity: T, connection: Connection? = null): Int {
         val sql = getInsertSql()
@@ -113,28 +132,10 @@ abstract class Repository<T : UuidV7Entity> {
     }
 
     /**
-     * Updates an existing entity.
-     *
-     * @param entity The entity to upsert
-     */
-    fun update(entity: T, connection: Connection? = null): Int {
-        val sql = getUpdateSql()
-        var updated = 0
-
-        withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
-                stmt.bindUpdateWith(entity)
-                updated += stmt.executeUpdate()
-            }
-        }
-
-        return updated
-    }
-
-    /**
      * Inserts a list of new entities
      *
      * @param entities The list of entities to insert
+     * @return The number of rows inserted
      */
     fun insert(entities: List<T>, connection: Connection? = null): Int {
         if (entities.isEmpty()) return 0
@@ -157,12 +158,34 @@ abstract class Repository<T : UuidV7Entity> {
         return updated
     }
 
+
+    /**
+     * Updates an existing entity.
+     *
+     * @param entity The entity to upsert
+     * @return The number of rows updated (1 if successful, 0 if not)
+     */
+    fun update(entity: T, connection: Connection? = null): Int {
+        val sql = getUpdateSql()
+        var updated = 0
+
+        withConnection(connection) {
+            it.prepareStatement(sql).use { stmt ->
+                stmt.bindUpdateWith(entity)
+                updated += stmt.executeUpdate()
+            }
+        }
+
+        return updated
+    }
+
     /**
      * Updates a list of existing entities.
      *
      * Warning: this method does not throw but returns the number of successful requests
      *
      * @param entities The list of entities to upsert
+     * @return The number of rows updated
      */
     fun update(entities: List<T>, connection: Connection? = null): Int {
         if (entities.isEmpty()) return 0
@@ -247,6 +270,56 @@ abstract class Repository<T : UuidV7Entity> {
     }
 
     /**
+     * Deletes an entity based on its key columns.
+     *
+     * @param entity The entity to delete. Key column values are used for identification.
+     * @param connection An optional existing database connection.
+     * @return The number of rows affected (0 or 1).
+     */
+    fun delete(entity: T, connection: Connection? = null): Int {
+        val sql = getDeleteSql()
+        var deleted = 0
+
+        withConnection(connection) { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.bindDeleteWith(entity)
+                deleted = stmt.executeUpdate()
+            }
+        }
+
+        return deleted
+    }
+
+    /**
+     * Deletes a list of entities based on their key columns.
+     * This method uses batch operations for better performance.
+     * The operation is transactional and will be rolled back if any deletion fails.
+     *
+     * @param entities The list of messages to delete
+     * @return The number of messages successfully deleted
+     */
+    fun delete(entities: List<T>, connection: Connection? = null): Int {
+        if (entities.isEmpty()) return 0
+
+        val sql = getDeleteSql()
+        var deleted = 0
+
+        withConnection(connection) {
+            it.prepareStatement(sql).use { stmt ->
+                for (entity in entities) {
+                    stmt.bindDeleteWith(entity)
+                    stmt.addBatch()
+                }
+                // execute once, receive one update‑count per row
+                val counts: IntArray = stmt.executeBatch()
+                // JDBC spec: 0 → row not found, ≥1 → row(s) modified
+                deleted += counts.count { it > 0 }
+            }
+        }
+        return deleted
+    }
+
+    /**
      * Deletes all workflows from the database.
      * This method is transactional and uses a native SQL query to delete all workflows.
      * Use with caution as this operation cannot be undone.
@@ -259,30 +332,6 @@ abstract class Repository<T : UuidV7Entity> {
         return withConnection(connection) {
             it.prepareStatement(sql).use { stmt ->
                 stmt.executeUpdate()
-            }
-        }
-    }
-
-    /**
-     * Deletes a list of messages from the outbox table.
-     * This method uses batch operations for better performance.
-     * The operation is transactional and will be rolled back if any deletion fails.
-     *
-     * @param messages The list of messages to delete
-     * @return The number of messages successfully deleted
-     */
-    fun delete(messages: List<T>, connection: Connection? = null): Int {
-        if (messages.isEmpty()) return 0
-
-        val sql = "DELETE FROM $tableName WHERE id = ?"
-
-        return withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
-                for (message in messages) {
-                    stmt.setString(1, message.id)
-                    stmt.addBatch()
-                }
-                stmt.executeBatch().sum()
             }
         }
     }
@@ -304,6 +353,7 @@ abstract class Repository<T : UuidV7Entity> {
             }
         }
     }
+
 
     private fun getUpdateSql(): String {
         val setClause = columns.filterNot { it in (keyColumns + "id") }.joinToString { "${q(it)} = ?" }
@@ -334,6 +384,15 @@ abstract class Repository<T : UuidV7Entity> {
 
             else -> error("Unsupported database type '${databaseManager.dbType}'")
         }
+    }
+
+    private fun getDeleteSql(): String {
+        val whereClause = keyColumns.joinToString(separator = " AND ") { "$it = ?" }
+
+        return """
+            DELETE FROM $tableName 
+            WHERE $whereClause
+        """.trimIndent()
     }
 
     // Helper that returns the dialect-specific quoting of an SQL identifier.

@@ -182,6 +182,53 @@ abstract class WorkflowRepositoryTest {
         repository.count() shouldBe 1L
     }
 
+    @Test
+    fun `listByName should return all versions for a given name`() {
+        // Given
+        val name = "multi-version-workflow"
+        val workflowV1 = WorkflowModel(name = name, version = "1.0.0", definition = "def-v1")
+        val workflowV2 = WorkflowModel(name = name, version = "2.0.0", definition = "def-v2")
+        val otherWorkflow = WorkflowModel(name = "other-workflow", version = "1.0.0", definition = "def-other")
+        repository.insert(listOf(workflowV1, workflowV2, otherWorkflow))
+
+        // When
+        val results = repository.listByName(name)
+
+        // Then
+        results shouldHaveSize 2
+        results.find { it.version == "1.0.0" }?.definition shouldBe "def-v1"
+        results.find { it.version == "2.0.0" }?.definition shouldBe "def-v2"
+    }
+
+    @Test
+    fun `listByName should return an empty list if name does not exist`() {
+        // Given
+        val existingWorkflow = WorkflowModel(name = "existing", version = "1.0.0", definition = "def")
+        repository.insert(existingWorkflow)
+
+        // When
+        val results = repository.listByName("non-existent-name")
+
+        // Then
+        results shouldHaveSize 0
+    }
+
+    @Test
+    fun `listByName should return a single item list if only one version exists for the name`() {
+        // Given
+        val name = "single-version-workflow"
+        val workflowV1 = WorkflowModel(name = name, version = "1.0.0", definition = "def-v1")
+        val otherWorkflow = WorkflowModel(name = "another-workflow", version = "1.0.0", definition = "def-other")
+        repository.insert(listOf(workflowV1, otherWorkflow))
+
+        // When
+        val results = repository.listByName(name)
+
+        // Then
+        results shouldHaveSize 1
+        results.first().version shouldBe "1.0.0"
+        results.first().definition shouldBe "def-v1"
+    }
 
     @Test
     fun `should successfully insert a batch of workflows`() {
@@ -399,5 +446,34 @@ abstract class WorkflowRepositoryTest {
         // Then
         val allWorkflows = repository.listAll()
         allWorkflows.size shouldBe (threadCount * workflowsPerThread)
+    }
+
+    @Test
+    fun `delete should remove an existing workflow`() {
+        // Given
+        val workflow = WorkflowModel(name = "to-delete", version = "1.0.0", definition = "delete-me")
+        repository.insert(workflow)
+
+        // When
+        val deletedCount = repository.delete(workflow)
+
+        // Then
+        deletedCount shouldBe 1
+        repository.findByNameAndVersion(workflow.name, workflow.version) shouldBe null
+    }
+
+    @Test
+    fun `delete should return 0 if workflow does not exist`() {
+        // Given
+        val existingWorkflow = WorkflowModel(name = "existing", version = "1.0.0", definition = "def")
+        val nonExistentWorkflow = WorkflowModel(name = "non-existent", version = "1.0.0", definition = "def")
+        repository.insert(existingWorkflow)
+
+        // When
+        val deletedCount = repository.delete(nonExistentWorkflow)
+
+        // Then
+        deletedCount shouldBe 0
+        repository.findByNameAndVersion(existingWorkflow.name, existingWorkflow.version) shouldNotBe null
     }
 }

@@ -8,23 +8,48 @@ import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import java.io.File
 import picocli.CommandLine
+import picocli.CommandLine.ArgGroup
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 import picocli.CommandLine.ParentCommand
 
 @Unremovable
-@Command(name = "post", description = ["Create a new workflow from a file"])
+@Command(name = "post", description = ["Create or update workflows from definition files."])
 class WorkflowPostCommand : Runnable {
+
+    // Define an argument group to enforce at least one source is provided
+    class FileOrDirectorySource {
+        @Option(
+            names = ["--file", "-f"],
+            description = ["Path to a single workflow definition file."]
+        )
+        var workflowFile: File? = null
+
+        @Option(
+            names = ["--directory", "-d"],
+            description = ["Path to a directory containing workflow definition files."],
+        )
+        var workflowDirectory: File? = null
+
+        @Option(
+            names = ["--recursive", "-r"],
+            description = ["Walk through folders recursively when using the -d option"],
+            defaultValue = "false"
+        )
+        var recursive: Boolean = false
+    }
+
+    @ArgGroup(multiplicity = "1..*", heading = "Workflow Source:%n") // 1..* means at least one
+    lateinit var source: FileOrDirectorySource
 
     @Inject
     lateinit var workflowRepository: WorkflowRepository
 
     @Option(
-        names = ["--file", "-f"],
-        required = true,
-        description = ["Path to the workflow definition file (YAML/JSON)."]
+        names = ["--force", "-F"],
+        description = ["Override the workflow definition if it already exists."]
     )
-    lateinit var workflowFile: File
+    var force: Boolean = false
 
     // Workflow Command class
     @ParentCommand
@@ -34,28 +59,82 @@ class WorkflowPostCommand : Runnable {
         // we stop after this command
         parent.parent.daemon = false
 
-        if (!workflowFile.exists() || !workflowFile.isFile) {
-            throw CommandLine.ParameterException(
-                CommandLine(this),
-                "ERROR: Workflow file not found or is not a regular file: ${workflowFile.absolutePath}"
-            )
+        // Process file if provided
+        source.workflowFile?.let {
+            processSingleFile(it)
         }
 
-        println("Creating (POSTing) workflow from file: ${workflowFile.name}")
-        try {
-            val content = workflowFile.readText()
-            // parse and put to
-            val workflow = Workflows.parse(content)
-            // save it to
-            workflowRepository.insert(WorkflowModel.from(workflow))
-//            val createdWorkflow = workflowRepository.create(content) // Assuming create method
-//            println("Workflow created with ID: ${createdWorkflow.id}") // Placeholder for actual ID
-        } catch (e: Exception) {
-            throw CommandLine.ExecutionException(
+        // Process directory if provided
+        source.workflowDirectory?.let {
+            processDirectory(it)
+        }
+    }
+
+    private fun processSingleFile(file: File) {
+        if (!file.exists() || !file.isFile) {
+            throw CommandLine.ParameterException(
                 CommandLine(this),
-                "ERROR creating workflow: ${e.message}",
-                e
+                "ERROR: Workflow file not found or is not a regular file: ${file.absolutePath}"
             )
+        }
+        processWorkflowFile(file)
+    }
+
+    private fun processDirectory(directory: File) {
+        if (!directory.exists() || !directory.isDirectory) {
+            throw CommandLine.ParameterException(
+                CommandLine(this),
+                "ERROR: Workflow directory not found or is not a directory: ${directory.absolutePath}"
+            )
+        }
+        println("Processing files in directory: ${directory.absolutePath}" + if (source.recursive) " (recursively)" else "")
+
+        var filesProcessed = 0
+        val filesToProcess = when (source.recursive) {
+            true -> directory.walkTopDown().filter { it.isFile }
+            false -> directory.listFiles()?.filter { it.isFile }?.asSequence() ?: emptySequence()
+        }
+
+        filesToProcess.forEach { file ->
+            processWorkflowFile(file)
+            filesProcessed++
+        }
+
+        if (filesProcessed == 0) {
+            println("No files found in directory: ${directory.absolutePath}")
+        }
+    }
+
+    /**
+     * Processes a single workflow definition file.
+     */
+    private fun processWorkflowFile(file: File) {
+        val prefix = "  ->"
+        try {
+            val content = file.readText()
+            val workflow = try {
+                Workflows.parse(content)
+            } catch (e: Exception) {
+                System.err.println("$prefix Skipping invalid workflow definition: ${file.absolutePath}")
+                return
+            }
+            val model = WorkflowModel.from(workflow)
+            val workflowName = "'${model.name}' (version '${model.version}')"
+            when (workflowRepository.insert(model)) {
+                1 -> println("$prefix Workflow successfully created: $workflowName")
+
+                0 -> when (force) {
+                    true -> when (workflowRepository.update(model)) {
+                        1 -> println("$prefix Workflow successfully updated: $workflowName")
+                        0 -> System.err.println("$prefix Failed to update workflow: $workflowName") // this should not happen
+                    }
+
+                    false -> println("$prefix Workflow already exists (use --force to overwrite): $workflowName")
+                }
+            }
+        } catch (e: Exception) {
+            // Log error for the specific file but continue if processing a directory
+            System.err.println("ERROR processing file '${file.absolutePath}': ${e.message}")
         }
     }
 }

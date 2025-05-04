@@ -71,6 +71,10 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         setString(6, entity.lastError) // Sets the last error message, if any
     }
 
+    override fun PreparedStatement.bindDeleteWith(entity: T) = apply {
+        setString(1, entity.id) // Bind id to the first parameter
+    }
+
     /**
      * Creates a model instance from a ResultSet.
      * Maps the database columns to the outbox model properties.

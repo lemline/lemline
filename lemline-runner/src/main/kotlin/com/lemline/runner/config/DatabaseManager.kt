@@ -21,30 +21,19 @@ class DatabaseManager {
     private val log = logger()
 
     @Inject
-    private lateinit var h2DataSource: Instance<AgroalDataSource>
+    @ConfigProperty(name = "lemline.database.type")
+    internal lateinit var dbType: String
 
     @Inject
-    private lateinit var h2Flyway: Instance<Flyway>
+    private lateinit var h2DataSource: Instance<AgroalDataSource>
 
     @Inject
     @DataSource("postgresql")
     private lateinit var postgresDataSource: Instance<AgroalDataSource>
 
     @Inject
-    @FlywayDataSource("postgresql")
-    private lateinit var postgresqlFlyway: Instance<Flyway>
-
-    @Inject
     @DataSource("mysql")
     private lateinit var mysqlDataSource: Instance<AgroalDataSource>
-
-    @Inject
-    @FlywayDataSource("mysql")
-    private lateinit var mysqlFlyway: Instance<Flyway>
-
-    @Inject
-    @ConfigProperty(name = "lemline.database.type")
-    internal lateinit var dbType: String
 
     val datasource: AgroalDataSource by lazy {
         log.debug { "Resolving datasource for type: $dbType" }
@@ -68,9 +57,20 @@ class DatabaseManager {
                 else throw IllegalStateException("H2 datasource is not available")
             }
 
-            else -> throw IllegalStateException("Unknown datasource '$dbType'")
+            else -> throw IllegalStateException("Unknown database type '$dbType'")
         }
     }
+
+    @Inject
+    private lateinit var h2Flyway: Instance<Flyway>
+
+    @Inject
+    @FlywayDataSource("postgresql")
+    private lateinit var postgresqlFlyway: Instance<Flyway>
+
+    @Inject
+    @FlywayDataSource("mysql")
+    private lateinit var mysqlFlyway: Instance<Flyway>
 
     val flyway: Flyway by lazy {
         log.debug { "Resolving flyway for type: $dbType" }
@@ -94,7 +94,7 @@ class DatabaseManager {
                 else throw IllegalStateException("H2 flyway is not available")
             }
 
-            else -> throw IllegalStateException("Unknown datasource '$dbType'")
+            else -> throw IllegalStateException("Unknown database type '$dbType'")
         }
     }
 }

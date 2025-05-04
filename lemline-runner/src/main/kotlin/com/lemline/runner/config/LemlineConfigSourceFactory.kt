@@ -5,7 +5,6 @@ import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
-import com.lemline.common.warn
 import com.lemline.runner.config.LemlineConfiguration.DatabaseConfig
 import com.lemline.runner.config.LemlineConfiguration.MessagingConfig
 import io.quarkus.runtime.annotations.ConfigPhase
@@ -146,7 +145,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                     if (name.startsWith("lemline.")) {
                         lemlineProps[name] = value.split("#").first().trim()
                     } else {
-                        log.warn { "Skipping not lemline property $name" }
+                        log.info { "Skipping not lemline property $name" }
                     }
                 }
             }

@@ -740,6 +740,84 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         repository.findById(newEntity2.id) shouldNotBe null
     }
 
+    @Test
+    fun `delete should remove an existing message`() {
+        // Given
+        val message = createWithMessage("to-delete")
+        repository.insert(message)
+
+        // When
+        val deletedCount = repository.delete(message)
+
+        // Then
+        deletedCount shouldBe 1
+        repository.findById(message.id) shouldBe null
+    }
+
+    @Test
+    fun `delete should return 0 if message does not exist`() {
+        // Given
+        val existingMessage = createWithMessage("existing")
+        val nonExistentMessage = createWithMessage("non-existent")
+        repository.insert(existingMessage)
+
+        // When
+        val deletedCount = repository.delete(nonExistentMessage)
+
+        // Then
+        deletedCount shouldBe 0
+        repository.findById(existingMessage.id) shouldNotBe null
+    }
+
+    @Test
+    fun `batch delete should remove multiple existing messages`() {
+        // Given
+        val messagesToDelete = List(5) { createWithMessage("delete-$it") }
+        val otherMessage = createWithMessage("keep-me")
+        repository.insert(messagesToDelete + otherMessage)
+
+        // When
+        val deletedCount = repository.delete(messagesToDelete)
+
+        // Then
+        deletedCount shouldBe 5
+        repository.findById(otherMessage.id) shouldNotBe null
+        messagesToDelete.forEach {
+            repository.findById(it.id) shouldBe null
+        }
+    }
+
+    @Test
+    fun `batch delete should return correct count when some messages do not exist`() {
+        // Given
+        val existingMessages = List(3) { createWithMessage("existing-$it") }
+        val nonExistentMessages = List(2) { createWithMessage("non-existent-$it") }
+        repository.insert(existingMessages)
+
+        val batchToDelete = existingMessages.take(2) + nonExistentMessages
+
+        // When
+        val deletedCount = repository.delete(batchToDelete)
+
+        // Then
+        deletedCount shouldBe 2 // Only the 2 existing messages should be counted as deleted
+        repository.findById(existingMessages[0].id) shouldBe null
+        repository.findById(existingMessages[1].id) shouldBe null
+        repository.findById(existingMessages[2].id) shouldNotBe null
+    }
+
+    @Test
+    fun `batch delete should return 0 for an empty list`() {
+        // Given
+        repository.insert(createWithMessage("existing"))
+        val emptyList = emptyList<T>()
+
+        // When
+        val deletedCount = repository.delete(emptyList)
+
+        // Then
+        deletedCount shouldBe 0
+    }
 
     /**
      * Creates a batch of test messages with randomized properties.

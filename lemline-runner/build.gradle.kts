@@ -39,6 +39,9 @@ dependencies {
     // UUID Creator
     implementation("com.github.f4b6a3:uuid-creator:6.0.0")
 
+    implementation("com.github.zafarkhaja:java-semver:0.10.2") // Use the latest stable version
+
+
     // Testing
     testImplementation(kotlin("test"))
     implementation("io.quarkus:quarkus-junit5") // Needed for QuarkusRun ???

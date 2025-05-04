@@ -21,14 +21,6 @@ class WorkflowRepository : Repository<WorkflowModel>() {
 
     override val keyColumns: List<String> = listOf("name", "version")
 
-    /**
-     * Populates the `PreparedStatement` with the values from the given workflow entity.
-     * This method maps the workflow model's properties to the corresponding SQL parameters
-     * in the prepared statement.
-     *
-     * @param entity The workflow model containing the values to set in the statement
-     * @return The `PreparedStatement` with the populated values
-     */
     override fun PreparedStatement.bindUpdateWith(entity: WorkflowModel) = apply {
         setString(1, entity.definition) // Sets the workflow definition
         setString(2, entity.name) // Sets the workflow name
@@ -40,6 +32,11 @@ class WorkflowRepository : Repository<WorkflowModel>() {
         setString(2, entity.definition) // Sets the workflow definition
         setString(3, entity.name) // Sets the workflow name
         setString(4, entity.version) // Sets the workflow version
+    }
+
+    override fun PreparedStatement.bindDeleteWith(entity: WorkflowModel) = apply {
+        setString(1, entity.name) // Bind name to the first parameter
+        setString(2, entity.version) // Bind version to the second parameter
     }
 
     /**
@@ -55,6 +52,36 @@ class WorkflowRepository : Repository<WorkflowModel>() {
         version = rs.getString("version"),
         definition = rs.getString("definition")
     )
+
+    /**
+     * Finds all versions of a workflow by its name.
+     * This method retrieves all workflows from the database that match the given name.
+     *
+     * @param name The name of the workflow to search for.
+     * @param connection An optional database connection. If null, a new connection will be created.
+     * @return A list of `WorkflowModel` instances matching the given name.
+     */
+    fun listByName(name: String, connection: Connection? = null): List<WorkflowModel> {
+        val sql = """
+            SELECT * FROM $tableName
+            WHERE name = ?
+        """.trimIndent()
+
+        return withConnection(connection) {
+            it.prepareStatement(sql).use { stmt ->
+                stmt.apply {
+                    setString(1, name)
+                }
+                stmt.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            add(createModel(rs))
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /**
      * Finds a workflow by its name and version.

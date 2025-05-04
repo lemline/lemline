@@ -67,13 +67,13 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     private val datasource by lazy { testRepository.databaseManager.datasource }
 
     // Mock and processor using the generic type T
-    protected val mockProcessorFunction = mockk<(T) -> Unit>()
-    protected lateinit var outboxProcessor: OutboxProcessor<T>
+    private val mockProcessorFunction = mockk<(T) -> Unit>()
+    private lateinit var outboxProcessor: OutboxProcessor<T>
 
-    // Default test configuration (can be overridden by subclasses if needed)
-    protected open val batchSize = 10
-    protected open val maxAttempts = 3
-    protected open val initialDelay: Duration = Duration.ofSeconds(1) // 1 second
+    // Default test configuration
+    private val batchSize = 10
+    private val maxAttempts = 3
+    private val initialDelay: Duration = Duration.ofSeconds(1) // 1 second
 
     @BeforeEach
     fun setUp() = runTest {
