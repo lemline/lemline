@@ -38,7 +38,7 @@ class InteractiveWorkflowSelector @Inject constructor(
             .entries
             .sortedBy { it.key } // Sort groups by name
             .associate { (name, versions) -> // Use associate for Map<String, List<WorkflowModel>>
-                name to versions.sortedWith(compareBy { runCatching { Version.valueOf(it.version) }.getOrNull() })
+                name to versions.sortedWith(compareBy { runCatching { Version.parse(it.version) }.getOrNull() })
             }
 
         // --- Manually build and print the list --- 
@@ -49,7 +49,7 @@ class InteractiveWorkflowSelector @Inject constructor(
         val versionHeader = "Version"
         val numberHeader = "#"
         // Calculate width needed for numbers (at least 1)
-        val numWidth = workflows.size.toString().length.coerceAtLeast(1) 
+        val numWidth = workflows.size.toString().length.coerceAtLeast(1)
         val paddedNumHeader = numberHeader.padStart(numWidth)
         val paddedNameHeader = nameHeader.padEnd(maxNameWidth)
 
@@ -58,22 +58,22 @@ class InteractiveWorkflowSelector @Inject constructor(
         println("${"-".repeat(numWidth)}  ${"-".repeat(maxNameWidth)}  ${"-".repeat(versionHeader.length)}")
 
         groupedAndSorted.forEach { (name, versionsList) ->
-             versionsList.forEachIndexed { index, workflow ->
-                 val versionPart = workflow.version
-                 val numberPart = currentNumber.toString().padStart(numWidth)
-                 selectionList.add(currentNumber to workflow)
-                 currentNumber++
+            versionsList.forEachIndexed { index, workflow ->
+                val versionPart = workflow.version
+                val numberPart = currentNumber.toString().padStart(numWidth)
+                selectionList.add(currentNumber to workflow)
+                currentNumber++
 
-                 val namePart = if (index == 0) name.padEnd(maxNameWidth) else " ".repeat(maxNameWidth)
-                 val prefix = when {
-                     versionsList.size == 1 -> "" 
-                     index == versionsList.size - 1 -> "└─" // Use box drawing characters
-                     index > 0 -> "├─" // Use box drawing characters
-                     else -> "" // First item in a group of more than one, no prefix needed
-                 }
-                
-                 println("$numberPart  $namePart  $prefix $versionPart")
-             }
+                val namePart = if (index == 0) name.padEnd(maxNameWidth) else " ".repeat(maxNameWidth)
+                val prefix = when {
+                    versionsList.size == 1 -> ""
+                    index == versionsList.size - 1 -> "└─" // Use box drawing characters
+                    index > 0 -> "├─" // Use box drawing characters
+                    else -> "" // First item in a group of more than one, no prefix needed
+                }
+
+                println("$numberPart  $namePart  $prefix $versionPart")
+            }
         }
         println() // Blank line after list
         // --- End of manual list building --- 

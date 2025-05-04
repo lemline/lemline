@@ -113,22 +113,25 @@ class WorkflowDeleteCommand : Runnable {
                     // Blank input: Just continue to re-prompt (list is not re-displayed)
                     continue
                 }
+
                 input.equals("q", ignoreCase = true) -> {
                     println("Exiting selection.")
                     break // Exit the loop on 'q'
                 }
+
                 input == "*" -> {
                     // Pass the current selection list
                     handleDeleteAllListed(currentSelectionList, filterName)
                     // Exit after attempting bulk action
                     break // Exit loop after handling '*'
                 }
+
                 else -> {
                     val choice = input.toIntOrNull()
                     val selectedPair = currentSelectionList.find { it.first == choice }
 
                     if (selectedPair != null) {
-                        val (num, workflowToDelete) = selectedPair // Destructure pair
+                        val (_, workflowToDelete) = selectedPair // Destructure pair
 
                         // deleteSpecificVersion handles confirmation internally since force=false
                         deleteSpecificVersion(workflowToDelete.name, workflowToDelete.version)
