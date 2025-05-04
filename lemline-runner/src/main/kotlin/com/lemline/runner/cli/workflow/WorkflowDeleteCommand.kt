@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.workflow
 
-import com.github.zafarkhaja.semver.Version // For sorting
+import com.lemline.runner.cli.common.InteractiveWorkflowSelector // Import selector
 import com.lemline.runner.models.WorkflowModel // Import model
 import com.lemline.runner.repositories.WorkflowRepository
 import io.quarkus.arc.Unremovable
@@ -31,6 +31,9 @@ class WorkflowDeleteCommand : Runnable {
     @Inject
     lateinit var workflowRepository: WorkflowRepository
 
+    @Inject // Inject the selector
+    lateinit var selector: InteractiveWorkflowSelector
+
     @Parameters(
         index = "0..*",
         arity = "0..2",
@@ -53,29 +56,95 @@ class WorkflowDeleteCommand : Runnable {
 
         try {
             if (force) {
-                // Forced mode: Use parameters to determine deletion scope
-                when (params.size) {
-                    0 -> deleteAllWorkflows()
-                    1 -> deleteAllVersionsByName(params[0])
-                    2 -> deleteSpecificVersion(params[0], params[1])
-                    // No 'else' needed due to arity = "0..2"
-                }
+                handleForcedDeletion()
             } else {
-                // Interactive / Confirmation mode:
-                when (params.size) {
-                    // No params, list all
-                    0 -> interactiveSelectAndDeleteWorkflow(filterName = null)
-                    // Name provided, list versions
-                    1 -> interactiveSelectAndDeleteWorkflow(filterName = params[0])
-                    // Both name and version provided - confirm THIS specific one
-                    2 -> deleteSpecificVersion(params[0], params[1]) // confirmDeletion inside will prompt
-                    // No 'else' needed due to arity = "0..2"
-                }
+                handleInteractiveDeletion()
             }
         } catch (e: Exception) {
-            // Catch exceptions from both interactive and forced modes
             throw ExecutionException("ERROR during workflow deletion: ${e.message}", e)
         }
+    }
+
+    private fun handleForcedDeletion() {
+        when (params.size) {
+            0 -> deleteAllWorkflows()
+            1 -> deleteAllVersionsByName(params[0])
+            2 -> deleteSpecificVersion(params[0], params[1])
+        }
+    }
+
+    private fun handleInteractiveDeletion() {
+        val filterName = if (params.isNotEmpty()) params[0] else null
+
+        // --- Prepare and display list ONCE --- 
+        val initialSelectionList = selector.prepareSelection(filterName = filterName)
+            ?: return // Exit if nothing found initially
+
+        // Use a mutable copy for the loop
+        val currentSelectionList = initialSelectionList.toMutableList()
+
+        // --- Prompt loop --- 
+        while (true) {
+            // Handle single/empty list cases based on the CURRENT list
+            if (currentSelectionList.isEmpty()) {
+                println("\nAll listed workflows have been deleted or the list is now empty.")
+                break // Exit loop if list becomes empty
+            }
+            if (currentSelectionList.size == 1) {
+                println("\nOnly one workflow remaining in the list:")
+                val (num, wf) = currentSelectionList.first()
+                println("  #${num}: Name: ${wf.name} Version: ${wf.version}")
+                print("Delete this last workflow? [y/N]: ")
+                val confirmation = readlnOrNull()?.trim()?.lowercase()
+                if (confirmation == "y") {
+                    // Pass full details to deleteSpecificVersion, which handles confirmation again
+                    deleteSpecificVersion(wf.name, wf.version)
+                }
+                println("Exiting selection.")
+                break // Exit loop after handling the last item
+            }
+
+            // Prompt only if size > 1
+            print("\nEnter # to delete, * to delete all listed, or q to quit: ")
+            val input = readlnOrNull()?.trim()
+
+            when {
+                input.isNullOrEmpty() -> {
+                    // Blank input: Just continue to re-prompt (list is not re-displayed)
+                    continue
+                }
+                input.equals("q", ignoreCase = true) -> {
+                    println("Exiting selection.")
+                    break // Exit the loop on 'q'
+                }
+                input == "*" -> {
+                    // Pass the current selection list
+                    handleDeleteAllListed(currentSelectionList, filterName)
+                    // Exit after attempting bulk action
+                    break // Exit loop after handling '*'
+                }
+                else -> {
+                    val choice = input.toIntOrNull()
+                    val selectedPair = currentSelectionList.find { it.first == choice }
+
+                    if (selectedPair != null) {
+                        val (num, workflowToDelete) = selectedPair // Destructure pair
+
+                        // deleteSpecificVersion handles confirmation internally since force=false
+                        deleteSpecificVersion(workflowToDelete.name, workflowToDelete.version)
+
+                        // Assume deletion was successful if confirmDeletion passed inside deleteSpecificVersion
+                        // (or add return value to deleteSpecificVersion if more robustness needed)
+                        // Remove the item from our local list *after* attempting deletion.
+                        currentSelectionList.remove(selectedPair)
+
+                        // Loop continues without re-displaying the list
+                    } else {
+                        print("Invalid input. ") // Re-prompt in the loop
+                    }
+                }
+            } // End of when
+        } // End of while loop
     }
 
     // --- Methods used for BOTH Forced & Confirmation Deletion --- //
@@ -129,142 +198,10 @@ class WorkflowDeleteCommand : Runnable {
         }
     }
 
-    // --- Method ONLY for INTERACTIVE Deletion --- //
+    // --- Method ONLY for INTERACTIVE Deletion (called when '*' selected) --- //
 
-    private fun interactiveSelectAndDeleteWorkflow(filterName: String?) {
-        val workflowsToDisplay = if (filterName != null) {
-            workflowRepository.listByName(filterName)
-        } else {
-            workflowRepository.listAll()
-        }
-
-        if (workflowsToDisplay.isEmpty()) {
-            println(
-                if (filterName != null) "No versions found for workflow '$filterName'."
-                else "No workflows found in the database."
-            )
-            return
-        }
-
-        // *** Add check for single result ***
-        if (workflowsToDisplay.size == 1) {
-            val singleWorkflow = workflowsToDisplay.first()
-            // Directly attempt deletion for this single workflow (will trigger confirmation)
-            deleteSpecificVersion(singleWorkflow.name, singleWorkflow.version)
-            return // Skip the list display and prompt
-        }
-
-        // --- Proceed with list display and selection only if size > 1 ---
-        val selectionMap = mutableMapOf<Int, WorkflowModel>()
-        displayWorkflowListForSelection(workflowsToDisplay, selectionMap)
-
-        // Prompt for selection
-        print("\nEnter # to delete, * to delete all listed, or leave blank to exit: ")
-        while (true) {
-            val input = readlnOrNull()?.trim()
-
-            when {
-                input.isNullOrEmpty() -> {
-                    println("Selection cancelled.") // Explicit cancel from prompt
-                    return // Exit loop only on explicit cancel
-                }
-
-                input == "*" -> {
-                    // User selected all listed workflows
-                    handleDeleteAllListed(workflowsToDisplay, filterName)
-                    // Don't return, re-prompt after handling
-                }
-
-                else -> {
-                    // User entered something else, try parsing as number
-                    val choice = input.toIntOrNull()
-                    if (choice != null && selectionMap.containsKey(choice)) {
-                        // Valid number selected
-                        val workflowToDelete = selectionMap[choice]!!
-                        val subject = "workflow '${workflowToDelete.name}' version '${workflowToDelete.version}'"
-
-                        // Confirm deletion for the selected workflow (force is false here)
-                        if (confirmDeletion(subject)) {
-                            // --- Deletion Confirmed --- 
-                            try {
-                                val deletedCount = workflowRepository.delete(workflowToDelete)
-                                if (deletedCount == 1) {
-                                    println("Successfully deleted workflow '${workflowToDelete.name}' version '${workflowToDelete.version}'.")
-                                    // Remove from selection map to prevent re-selection/errors
-                                    selectionMap.remove(choice)
-                                    // Optional: Refresh the list display here if desired, 
-                                    // or just let the user know it's gone if they try again.
-                                } else {
-                                    System.err.println("ERROR: Failed to delete selected workflow. Maybe it was deleted concurrently?")
-                                }
-                            } catch (e: Exception) {
-                                System.err.println("ERROR deleting selected workflow: ${e.message}")
-                            }
-                            // Don't return, re-prompt after action
-                        }
-                        // else: confirmDeletion returned false and printed "Deletion cancelled."
-                        // Loop will continue and re-prompt automatically.
-
-                    } else {
-                        // Invalid number input
-                        print("Invalid input. Enter #, *, or leave blank to exit: ")
-                        continue // Skip re-printing the main prompt on invalid input
-                    }
-                }
-            }
-            // Re-prompt after handling valid input (* or number)
-            print("\nEnter # to delete, * to delete all listed, or leave blank to exit: ")
-        }
-        // Loop is only exited by explicit cancel (return)
-    }
-
-    // Helper to display the numbered list
-    private fun displayWorkflowListForSelection(
-        workflowsToDisplay: List<WorkflowModel>,
-        selectionMap: MutableMap<Int, WorkflowModel>
-    ) {
-        val groupedWorkflows = workflowsToDisplay.groupBy { it.name }.toSortedMap()
-        var currentNumber = 1
-        val maxNameWidth = groupedWorkflows.keys.maxOfOrNull { it?.length ?: 0 } ?: 10
-        val nameHeader = "Name"
-        val versionHeader = "Version"
-        val numberHeader = "#"
-        val numWidth = workflowsToDisplay.size.toString().length
-        val paddedNumHeader = numberHeader.padStart(numWidth)
-        val paddedNameHeader = nameHeader.padEnd(maxNameWidth)
-
-        println()
-        println("$paddedNumHeader  $paddedNameHeader  $versionHeader")
-        println("${"-".repeat(numWidth)}  ${"-".repeat(maxNameWidth)}  ${"-".repeat(versionHeader.length)}")
-
-        groupedWorkflows.forEach { (name, versionsList) ->
-            val displayName = name ?: "<Unnamed>"
-            val sortedVersions = versionsList.sortedBy {
-                try {
-                    Version.parse(it.version)
-                } catch (e: Exception) {
-                    Version.parse("0.0.0-invalid")
-                }
-            }
-            sortedVersions.forEachIndexed { index, workflow ->
-                val versionPart = workflow.version
-                val numberPart = currentNumber.toString().padStart(numWidth)
-                selectionMap[currentNumber] = workflow // Map number to the model
-                currentNumber++
-                if (index == 0) {
-                    val namePart = displayName.padEnd(maxNameWidth)
-                    println("$numberPart  $namePart  $versionPart")
-                } else {
-                    val namePart = " ".repeat(maxNameWidth)
-                    val marker = if (index == sortedVersions.lastIndex) "└─" else "├─"
-                    println("$numberPart  $namePart  $marker $versionPart")
-                }
-            }
-        }
-    }
-
-    // Helper to handle deletion when '*' is chosen interactively
-    private fun handleDeleteAllListed(workflowsToDelete: List<WorkflowModel>, filterName: String?) {
+    private fun handleDeleteAllListed(selectionList: List<Pair<Int, WorkflowModel>>, filterName: String?) {
+        val workflowsToDelete = selectionList.map { it.second } // Extract models
         val count = workflowsToDelete.size
         val subject = if (filterName != null) {
             val versionsString = workflowsToDelete.joinToString { it.version }
@@ -283,7 +220,7 @@ class WorkflowDeleteCommand : Runnable {
                     workflowRepository.delete(workflowsToDelete)
                 }
 
-                if (deletedCount == count || (filterName == null && deletedCount >= 0)) { // deleteAll might return 0 or more
+                if (deletedCount == count || (filterName == null && deletedCount >= 0)) {
                     println("Successfully deleted $deletedCount workflow(s) as requested by '*' selection.")
                 } else {
                     System.err.println("Warning: Expected to delete $count workflow(s) via '*' selection, but repository reported $deletedCount deleted.")
@@ -303,7 +240,7 @@ class WorkflowDeleteCommand : Runnable {
         print("Are you sure you want to delete $subjectDescription? [y/N]: ")
         val confirmation = readlnOrNull()?.trim()?.lowercase()
         if (confirmation != "y") {
-            println("Selection cancelled.")
+            println("Deletion cancelled.")
             return false
         }
         return true

@@ -2,8 +2,8 @@
 package com.lemline.runner.cli.workflow
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.github.zafarkhaja.semver.Version
 import com.lemline.core.workflows.Workflows
+import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.WorkflowModel
 import com.lemline.runner.repositories.WorkflowRepository
 import io.quarkus.arc.Unremovable
@@ -15,7 +15,7 @@ import picocli.CommandLine.Parameters
 import picocli.CommandLine.ParentCommand
 
 @Unremovable
-@Command(name = "get", description = ["Get a specific workflow definition, interactively if needed."])
+@Command(name = "get", description = ["Get specific workflow definitions, interactively if needed."])
 class WorkflowGetCommand : Runnable {
 
     // Enum for validated format options (only for final output)
@@ -26,6 +26,9 @@ class WorkflowGetCommand : Runnable {
 
     @Inject
     lateinit var objectMapper: ObjectMapper
+
+    @Inject
+    lateinit var selector: InteractiveWorkflowSelector
 
     @Parameters(
         index = "0",
@@ -55,13 +58,58 @@ class WorkflowGetCommand : Runnable {
         parent.parent.daemon = false // Stop after execution
 
         try {
-            when {
-                // Direct fetch: Both name and version provided
-                nameParam != null && versionParam != null ->
-                    fetchAndDisplaySpecificWorkflow(nameParam!!, versionParam!!)
+            if (nameParam != null && versionParam != null) {
+                // Direct fetch: Both name and version provided - runs once and exits
+                val selectedWorkflow = workflowRepository.findByNameAndVersion(nameParam!!, versionParam!!)
+                if (selectedWorkflow == null) {
+                    System.err.println("ERROR: Workflow '$nameParam' version '$versionParam' not found.")
+                    return // Exit if direct fetch fails
+                }
+                displayWorkflowDefinition(selectedWorkflow)
+            } else {
+                // --- Interactive selection mode --- 
 
-                // Interactive selection
-                else -> interactiveSelectAndDisplayWorkflow(filterName = nameParam)
+                // Prepare selection (displays list if needed)
+                val selectionList = selector.prepareSelection(filterName = nameParam)
+                    ?: return // Exit if nothing found
+
+                // Handle single result directly
+                if (selectionList.size == 1) {
+                    displayWorkflowDefinition(selectionList.first().second) // Get model from the pair
+                    return // Only one option, so we exit after displaying
+                }
+
+                // --- Prompt loop if multiple results --- 
+                while (true) {
+                    print("\nEnter # to view, or q to quit: ")
+                    val input = readlnOrNull()?.trim()
+
+                    when {
+                        input.isNullOrEmpty() -> {
+                            // Blank input: Just continue to re-prompt (list is not re-displayed)
+                            continue
+                        }
+
+                        input.equals("q", ignoreCase = true) -> {
+                            println("Exiting selection.")
+                            break
+                        }
+
+                        else -> {
+                            val choice = input.toIntOrNull()
+                            val selectedPair = selectionList.find { it.first == choice }
+
+                            if (selectedPair != null) {
+                                val workflowToDisplay = selectedPair.second
+                                println("\n--- Displaying selected workflow (#${selectedPair.first}) ---")
+                                displayWorkflowDefinition(workflowToDisplay)
+                                println("--- End of definition ---")
+                            } else {
+                                print("Invalid input. ")
+                            }
+                        }
+                    }
+                }
             }
         } catch (e: Exception) {
             throw CommandLine.ExecutionException(
@@ -69,106 +117,6 @@ class WorkflowGetCommand : Runnable {
                 "ERROR retrieving workflow: ${e.message}",
                 e
             )
-        }
-    }
-
-    private fun fetchAndDisplaySpecificWorkflow(name: String, version: String) {
-        val workflowModel = workflowRepository.findByNameAndVersion(name, version)
-        if (workflowModel != null) {
-            displayWorkflowDefinition(workflowModel)
-        } else {
-            System.err.println("ERROR: Workflow '$name' version '$version' not found.")
-        }
-    }
-
-    private fun interactiveSelectAndDisplayWorkflow(filterName: String?) {
-        val workflowsToDisplay = when (filterName) {
-            null -> workflowRepository.listAll()
-            else -> workflowRepository.listByName(filterName)
-        }
-
-        if (workflowsToDisplay.isEmpty()) {
-            println(
-                if (filterName != null) "No workflow '$filterName' found in the database."
-                else "No workflows found in the database."
-            )
-            return
-        }
-
-        // If only one result after filtering/fetching, display it directly
-        if (workflowsToDisplay.size == 1) {
-            displayWorkflowDefinition(workflowsToDisplay.first())
-            return
-        }
-
-        // Group, sort, and prepare for display
-        // Grouping is still useful even if filtered by name, in case of data inconsistency (multiple names returned?)
-        // Or just use workflowsToDisplay directly if filterName != null?
-        // Let's keep grouping for consistency for now.
-        val groupedWorkflows = workflowsToDisplay.groupBy { it.name }.toSortedMap()
-        val selectionMap = mutableMapOf<Int, WorkflowModel>()
-        var currentNumber = 1
-
-        // Determine column width for alignment
-        val maxNameWidth = groupedWorkflows.keys.maxOfOrNull { it?.length ?: 0 } ?: 10 // Handle potential null keys
-        val nameHeader = "Name"
-        val versionHeader = "Version"
-        val numberHeader = "#"
-        val numWidth = workflowsToDisplay.size.toString().length // Width for number column
-        val paddedNumHeader = numberHeader.padStart(numWidth)
-        val paddedNameHeader = nameHeader.padEnd(maxNameWidth)
-
-        // Print header
-        println()
-        println("$paddedNumHeader  $paddedNameHeader  $versionHeader")
-        println("${"-".repeat(numWidth)}  ${"-".repeat(maxNameWidth)}  ${"-".repeat(versionHeader.length)}")
-
-        // Print rows and populate selection map
-        groupedWorkflows.forEach { (name, versionsList) ->
-            val displayName = name ?: "<Unnamed>" // Handle null names for display
-            val sortedVersions = versionsList.sortedBy {
-                try {
-                    Version.parse(it.version)
-                } catch (e: Exception) {
-                    Version.parse("0.0.0-invalid")
-                }
-            }
-
-            sortedVersions.forEachIndexed { index, workflow ->
-                val versionPart = workflow.version
-                val numberPart = currentNumber.toString().padStart(numWidth)
-                selectionMap[currentNumber] = workflow // Map number to the model
-                currentNumber++
-
-                if (index == 0) {
-                    val namePart = displayName.padEnd(maxNameWidth)
-                    println("$numberPart  $namePart  $versionPart")
-                } else {
-                    val namePart = " ".repeat(maxNameWidth)
-                    val marker = if (index == sortedVersions.lastIndex) "└─" else "├─"
-                    println("$numberPart  $namePart  $marker $versionPart")
-                }
-            }
-        }
-        println()
-
-        // Prompt for selection
-        print("Enter # of workflow to view (or leave blank to cancel): ")
-        while (true) {
-            val input = readlnOrNull()?.trim()
-            if (input.isNullOrEmpty()) {
-                println("Deletion cancelled.")
-                return
-            }
-
-            val choice = input.toIntOrNull()
-            if (choice != null && selectionMap.containsKey(choice)) {
-                // Valid selection - display the chosen workflow
-                displayWorkflowDefinition(selectionMap[choice]!!)
-                return // Done
-            }
-
-            print("Invalid input.\nPlease enter a number from the list, or leave blank to cancel: ")
         }
     }
 
