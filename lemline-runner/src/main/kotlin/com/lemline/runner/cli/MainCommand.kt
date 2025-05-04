@@ -36,9 +36,9 @@ class MainCommand : Runnable {
     var debug: Boolean = false
 
     @Option(
-        names = ["-f", "--file"],
+        names = ["-c", "--config"],
         description = ["Specify configuration file location"],
-        paramLabel = "<location>"
+        paramLabel = "<config>"
     )
     var configFile: String? = null
 

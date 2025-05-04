@@ -8,6 +8,7 @@ import io.quarkus.runtime.QuarkusApplication
 import io.quarkus.runtime.annotations.QuarkusMain
 import jakarta.inject.Inject
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
 import org.jboss.logging.Logger
@@ -46,13 +47,15 @@ class LemlineApplication : QuarkusApplication {
     }
 
     companion object {
+        var configPath: Path? = null
+
         @JvmStatic
         fun main(args: Array<String>) {
 
             // --- Pre-parse Arguments Before Quarkus Init ---
 
-            // define lemline config locations
-            getConfigLocations(args)?.let { System.setProperty("lemline.config.locations", it) }
+            // define lemline config location
+            setConfigPath(args)
 
             // Check for debug flags
             if (args.contains("--debug") || args.contains("-d")) {
@@ -69,49 +72,96 @@ class LemlineApplication : QuarkusApplication {
             Quarkus.run(LemlineApplication::class.java, *args)
         }
 
-        private fun getConfigLocations(args: Array<String>): String? {
-            val configLocations = args.foldIndexed(mutableListOf<String>()) { i, acc, arg ->
-                when {
-                    arg.startsWith("--file=") -> {
-                        val locations = arg.substringAfter("--file=").takeIf { it.isNotEmpty() }
-                            ?: run {
-                                System.err.println("ERROR: --file= argument requires a value.")
-                                exitProcess(1)
-                            }
-                        acc.addAll(locations.split(',').map(String::trim).filter(String::isNotEmpty))
-                    }
-
-                    arg == "-f" -> {
-                        val locations = args.getOrNull(i + 1)?.takeIf { it.isNotEmpty() }
-                            ?: run {
-                                System.err.println("ERROR: -f argument requires a location value.")
-                                exitProcess(1)
-                            }
-                        acc.addAll(locations.split(',').map(String::trim).filter(String::isNotEmpty))
-                    }
-                }
-                acc
+        private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
+            val path = filePath.normalize()
+            val fileExists = Files.exists(path)
+            val isRegularFile = Files.isRegularFile(path)
+            if (!fileExists && provided) {
+                System.err.println("ERROR: '${path.toAbsolutePath()} does not exist")
+                exitProcess(1)
             }
+            if (!isRegularFile && provided) {
+                System.err.println("ERROR: '${path.toAbsolutePath()} is not a regular file")
+                exitProcess(1)
+            }
+            if (fileExists && isRegularFile) {
+                configPath = path
+                return true
+            }
+            return false
+        }
 
-            return when (configLocations.size) {
-                0 -> null
-                else -> {
-                    // check that all files exist
-                    configLocations.firstOrNull {
-                        val path = Paths.get(it)
-                        !Files.exists(path) || !Files.isRegularFile(path)
-                    }?.let {
-                        System.err.println(
-                            "ERROR: Specified configuration file does not exist or is not a regular file: ${
-                                Paths.get(it).toAbsolutePath()
-                            }"
-                        )
+        /**
+         * Searches for the Lemline configuration file in a predefined order and returns the absolute path of the first valid file found.
+         *
+         * Search Order:
+         * 1. Command-line argument: --config=<file> or -c <file> (highest priority)
+         * 2. Environment variable: LEMLINE_CONFIG
+         * 3. Current directory: ./.lemline.yaml
+         * 4. User config directory: ~/.config/lemline/config.yaml
+         * 5. User home directory: ~/.lemline.yaml (lowest priority)
+         *
+         * @param args The command-line arguments provided to the application.
+         * @return The absolute path of the first valid configuration file found, or null if no valid file is found.
+         *         Exits the application with an error if a specified file (via CLI or ENV) does not exist or is invalid.
+         */
+        @JvmStatic
+        fun setConfigPath(args: Array<String>) {
+            // 1. Check Command Line Arguments (--config= or -c)
+            for (i in args.indices) {
+                when {
+                    args[i].startsWith("--config=") -> {
+                        val cliPath = args[i].substringAfter("--config=").trim()
+                        when (cliPath.isEmpty()) {
+                            true -> {
+                                System.err.println("ERROR: --config= argument requires a value.")
+                                exitProcess(1)
+                            }
+
+                            false -> if (checkConfigLocation(Paths.get(cliPath), true)) return
+                        }
+                    }
+
+                    args[i] == "-c" && i + 1 < args.size -> {
+                        val cliPath = args[i + 1].trim()
+                        when (cliPath.isEmpty()) {
+                            true -> {
+                                System.err.println("ERROR: -c argument requires a value.")
+                                exitProcess(1)
+                            }
+
+                            false -> if (checkConfigLocation(Paths.get(cliPath), true)) return
+                        }
+                    }
+
+                    args[i] == "-c" -> { // Handle case where -c is the last argument
+                        System.err.println("ERROR: -c argument requires a location value.")
                         exitProcess(1)
                     }
-
-                    configLocations.joinToString(",")
                 }
             }
+
+            // 2. Check Environment Variable (LEMLINE_CONFIG)
+            System.getenv("LEMLINE_CONFIG")?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                if (checkConfigLocation(Paths.get(it), true)) return
+            }
+
+            // 3. Check Current Directory (./.lemline.yaml)
+            if (checkConfigLocation(Paths.get(".lemline.yaml"), false)) return
+
+            System.getProperty("user.home")?.let {
+                // 4. Check User Config Directory (~/.config/lemline/config.yaml)
+                val xdgPath = Paths.get(it, ".config", "lemline", "config.yaml")
+                if (checkConfigLocation(xdgPath, false)) return
+
+                // 5. Check User Home Directory (~/.lemline.yaml)
+                val homePath = Paths.get(it, ".lemline.yaml")
+                if (checkConfigLocation(homePath, false)) return
+            }
+                ?: System.err.println("Warning: Could not determine user home directory. Skipping user-specific config locations.")
+
+            // No configuration file found in any standard location
+            println("No configuration file found in standard locations.")
         }
     }
 }

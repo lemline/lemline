@@ -51,5 +51,4 @@ webHelpDOCS2-all.zip
 webHelpDOCS2-all/
 
 ### Local configuration files
-/application.yaml
-/application.properties
+/.lemline.yaml

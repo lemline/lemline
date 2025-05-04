@@ -4,6 +4,7 @@ package com.lemline.runner.cli
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
+import com.lemline.runner.LemlineApplication
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import org.eclipse.microprofile.config.Config
@@ -57,6 +58,12 @@ class ConfigCommand : Runnable {
                 config.getOptionalValue(it, String::class.java).orElse("")
             }
 
+        println(
+            "Configuration (${properties.size} properties from " +
+                (LemlineApplication.configPath?.toAbsolutePath()?.let { "$it and " } ?: "") +
+                "default.)"
+        )
+        println()
         when (format) {
             Format.PROPERTIES -> {
                 properties.forEach { (key, value) ->

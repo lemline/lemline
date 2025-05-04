@@ -2,9 +2,9 @@
 package com.lemline.runner.config
 
 import io.smallrye.config.AbstractLocationConfigSourceLoader
-import io.smallrye.config.PropertiesConfigSource
 import io.smallrye.config.source.yaml.YamlConfigSource
 import java.net.URL
+import java.nio.file.Path
 import org.eclipse.microprofile.config.spi.ConfigSource
 
 /**
@@ -27,17 +27,7 @@ class ExtraFileConfigFactory : AbstractLocationConfigSourceLoader() {
      * Build the list of additional ConfigSources, or an empty list
      * if custom.config.uri isn't defined.
      */
-    fun getConfigSources(uri: String?): List<ConfigSource> = if (uri.isNullOrBlank()) {
-        emptyList()
-    } else {
-        loadConfigSources(uri, 275, Thread.currentThread().contextClassLoader)
-    }
+    fun getConfig(path: Path): ConfigSource = loadConfigSource(path.toUri().toURL(), 275)
 
-    override fun loadConfigSource(url: URL, ordinal: Int): ConfigSource =
-        when {
-            url.path.endsWith(".yaml", true) || url.path.endsWith(".yml", true) ->
-                YamlConfigSource(url, ordinal)         // uses SnakeYAML under the hood
-            else ->
-                PropertiesConfigSource(url, ordinal)   // .properties (default)
-        }
+    override fun loadConfigSource(url: URL, ordinal: Int): ConfigSource = YamlConfigSource(url, ordinal)
 }

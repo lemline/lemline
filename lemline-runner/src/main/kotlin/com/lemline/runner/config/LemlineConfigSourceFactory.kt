@@ -5,6 +5,7 @@ import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
+import com.lemline.runner.LemlineApplication
 import com.lemline.runner.config.LemlineConfiguration.DatabaseConfig
 import com.lemline.runner.config.LemlineConfiguration.MessagingConfig
 import io.quarkus.runtime.annotations.ConfigPhase
@@ -124,9 +125,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
      * @return iterable of ConfigSource instances
      */
     override fun getConfigSources(context: ConfigSourceContext): Iterable<ConfigSource> {
-
-        log.debug { "LemlineConfigSourceFactory executing..." }
-
+        
         // Collect all properties from the context that start with "lemline."
         val lemlineProps = mutableMapOf<String, String>()
         for (name in context.iterateNames()) {
@@ -136,26 +135,19 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
             }
         }
 
-        // Override properties from the lemline.config.locations files, if any
-        val configUri = context.getValue("lemline.config.locations").value
-        log.debug { "lemline.config.locations=$configUri" }
-        ExtraFileConfigFactory().getConfigSources(configUri)
-            .forEach { configSource ->
-                configSource.properties.forEach { (name, value) ->
-                    if (name.startsWith("lemline.")) {
-                        lemlineProps[name] = value.split("#").first().trim()
-                    } else {
-                        log.info { "Skipping not lemline property $name" }
-                    }
+        // Override properties from the config file, if any
+        LemlineApplication.configPath?.let {
+            log.debug { "Lemline config file location=$it" }
+            ExtraFileConfigFactory().getConfig(it).properties.forEach { (name, value) ->
+                if (name.startsWith("lemline.")) {
+                    lemlineProps[name] = value.split("#").first().trim()
+                } else {
+                    log.info { "Skipping not lemline property $name" }
                 }
             }
-
-        if (lemlineProps.isEmpty()) {
-            log.info { "No Lemline properties found, skipping configuration transformation" }
-            return emptyList()
-        } else {
-            log.debug { "Lemline properties found: $lemlineProps" }
         }
+
+        log.debug { "Lemline properties found: $lemlineProps" }
 
         try {
             // Create a SmallRyeConfig instance with the collected properties
