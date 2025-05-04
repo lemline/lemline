@@ -35,11 +35,18 @@ class WorkflowDeleteCommand : Runnable {
     lateinit var selector: InteractiveWorkflowSelector
 
     @Parameters(
-        index = "0..*",
-        arity = "0..2",
-        description = ["Optional: workflow name.", "Optional: workflow version."]
+        index = "0",
+        arity = "0..1",
+        description = ["Optional name of the workflow to get directly."]
     )
-    var params: List<String> = emptyList()
+    var name: String? = null
+
+    @Parameters(
+        index = "1",
+        arity = "0..1",
+        description = ["Optional version of the workflow (requires name)."]
+    )
+    var version: String? = null
 
     @Option(
         names = ["--force", "-F"],
@@ -66,22 +73,18 @@ class WorkflowDeleteCommand : Runnable {
     }
 
     private fun handleForcedDeletion() {
-        when (params.size) {
-            0 -> deleteAllWorkflows()
-            1 -> deleteAllVersionsByName(params[0])
-            2 -> deleteSpecificVersion(params[0], params[1])
+        when {
+            name == null -> deleteAllWorkflows()
+            version == null -> deleteAllVersionsByName(name!!)
+            else -> deleteSpecificVersion(name!!, version!!)
         }
     }
 
     private fun handleInteractiveDeletion() {
-        val filterName = if (params.isNotEmpty()) params[0] else null
 
         // --- Prepare and display list ONCE --- 
-        val initialSelectionList = selector.prepareSelection(filterName = filterName)
+        var currentSelectionList = selector.prepareSelection(filterName = name)?.toMutableList()
             ?: return // Exit if nothing found initially
-
-        // Use a mutable copy for the loop
-        val currentSelectionList = initialSelectionList.toMutableList()
 
         // --- Prompt loop --- 
         while (true) {
@@ -100,8 +103,8 @@ class WorkflowDeleteCommand : Runnable {
                     // Pass full details to deleteSpecificVersion, which handles confirmation again
                     deleteSpecificVersion(wf.name, wf.version)
                 }
-                println("Exiting selection.")
-                break // Exit loop after handling the last item
+                // Exit loop after handling the last item
+                break
             }
 
             // Prompt only if size > 1
@@ -110,20 +113,20 @@ class WorkflowDeleteCommand : Runnable {
 
             when {
                 input.isNullOrEmpty() -> {
-                    // Blank input: Just continue to re-prompt (list is not re-displayed)
+                    // Blank input: Redisplay the list and re-prompt
+                    currentSelectionList = selector.prepareSelection()?.toMutableList() ?: break
                     continue
                 }
 
                 input.equals("q", ignoreCase = true) -> {
-                    println("Exiting selection.")
                     break // Exit the loop on 'q'
                 }
 
                 input == "*" -> {
                     // Pass the current selection list
-                    handleDeleteAllListed(currentSelectionList, filterName)
+                    handleDeleteAllListed(currentSelectionList, name)
                     // Exit after attempting bulk action
-                    break // Exit loop after handling '*'
+                    break
                 }
 
                 else -> {
@@ -146,8 +149,8 @@ class WorkflowDeleteCommand : Runnable {
                         print("Invalid input. ") // Re-prompt in the loop
                     }
                 }
-            } // End of when
-        } // End of while loop
+            }
+        }
     }
 
     // --- Methods used for BOTH Forced & Confirmation Deletion --- //

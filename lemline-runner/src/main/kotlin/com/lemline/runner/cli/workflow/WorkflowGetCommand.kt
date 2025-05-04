@@ -35,14 +35,14 @@ class WorkflowGetCommand : Runnable {
         arity = "0..1",
         description = ["Optional name of the workflow to get directly."]
     )
-    var nameParam: String? = null
+    var name: String? = null
 
     @Parameters(
         index = "1",
         arity = "0..1",
         description = ["Optional version of the workflow (requires name)."]
     )
-    var versionParam: String? = null
+    var version: String? = null
 
     @Option(
         names = ["--format"],
@@ -58,19 +58,19 @@ class WorkflowGetCommand : Runnable {
         parent.parent.daemon = false // Stop after execution
 
         try {
-            if (nameParam != null && versionParam != null) {
+            if (name != null && version != null) {
                 // Direct fetch: Both name and version provided - runs once and exits
-                val selectedWorkflow = workflowRepository.findByNameAndVersion(nameParam!!, versionParam!!)
+                val selectedWorkflow = workflowRepository.findByNameAndVersion(name!!, version!!)
                 if (selectedWorkflow == null) {
-                    System.err.println("ERROR: Workflow '$nameParam' version '$versionParam' not found.")
+                    System.err.println("ERROR: Workflow '$name' version '$version' not found.")
                     return // Exit if direct fetch fails
                 }
                 displayWorkflowDefinition(selectedWorkflow)
             } else {
                 // --- Interactive selection mode --- 
 
-                // Prepare selection (displays list if needed)
-                val selectionList = selector.prepareSelection(filterName = nameParam)
+                // Prepare selection (displays the list if needed)
+                val selectionList = selector.prepareSelection(filterName = name)
                     ?: return // Exit if nothing found
 
                 // Handle single result directly
@@ -81,17 +81,18 @@ class WorkflowGetCommand : Runnable {
 
                 // --- Prompt loop if multiple results --- 
                 while (true) {
-                    print("\nEnter # to view, or q to quit: ")
+                    print("Enter # to view, or q to quit: ")
                     val input = readlnOrNull()?.trim()
 
                     when {
                         input.isNullOrEmpty() -> {
-                            // Blank input: Just continue to re-prompt (list is not re-displayed)
+                            // Blank input: Redisplay the list and re-prompt
+                            selector.prepareSelection(filterName = name) ?: break
                             continue
                         }
 
                         input.equals("q", ignoreCase = true) -> {
-                            println("Exiting selection.")
+                            // quit loop, and exit
                             break
                         }
 
@@ -101,11 +102,10 @@ class WorkflowGetCommand : Runnable {
 
                             if (selectedPair != null) {
                                 val workflowToDisplay = selectedPair.second
-                                println("\n--- Displaying selected workflow (#${selectedPair.first}) ---")
                                 displayWorkflowDefinition(workflowToDisplay)
-                                println("--- End of definition ---")
                             } else {
-                                print("Invalid input. ")
+                                println("Invalid input. ")
+                                println()
                             }
                         }
                     }
