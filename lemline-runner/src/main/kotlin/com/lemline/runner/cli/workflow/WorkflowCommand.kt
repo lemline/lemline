@@ -14,9 +14,7 @@ import picocli.CommandLine.ParentCommand
         // Reference the new/updated command classes
         WorkflowGetCommand::class,
         WorkflowPostCommand::class,
-        WorkflowUpdateCommand::class,
         WorkflowDeleteCommand::class,
-        WorkflowValidateCommand::class
     ]
 )
 class WorkflowCommand {

@@ -19,17 +19,18 @@ class WorkflowPostCommand : Runnable {
 
     // Define an argument group to enforce at least one source is provided
     class FileOrDirectorySource {
+
         @Option(
             names = ["--file", "-f"],
             description = ["Path to a single workflow definition file."]
         )
-        var workflowFile: File? = null
+        var file: File? = null
 
         @Option(
             names = ["--directory", "-d"],
             description = ["Path to a directory containing workflow definition files."],
         )
-        var workflowDirectory: File? = null
+        var directory: File? = null
 
         @Option(
             names = ["--recursive", "-r"],
@@ -60,12 +61,12 @@ class WorkflowPostCommand : Runnable {
         parent.parent.daemon = false
 
         // Process file if provided
-        source.workflowFile?.let {
+        source.file?.let {
             processSingleFile(it)
         }
 
         // Process directory if provided
-        source.workflowDirectory?.let {
+        source.directory?.let {
             processDirectory(it)
         }
     }
@@ -112,12 +113,7 @@ class WorkflowPostCommand : Runnable {
         val prefix = "  ->"
         try {
             val content = file.readText()
-            val workflow = try {
-                Workflows.parse(content)
-            } catch (e: Exception) {
-                System.err.println("$prefix Skipping invalid workflow definition: ${file.absolutePath}")
-                return
-            }
+            val workflow = Workflows.parse(content)
             val model = WorkflowModel.from(workflow)
             val workflowName = "'${model.name}' (version '${model.version}')"
             when (workflowRepository.insert(model)) {
