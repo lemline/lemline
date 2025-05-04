@@ -4,6 +4,7 @@ package com.lemline.runner.cli.workflow
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.github.zafarkhaja.semver.Version
 import com.lemline.core.workflows.Workflows
+import com.lemline.runner.models.WorkflowModel
 import com.lemline.runner.repositories.WorkflowRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
@@ -13,13 +14,11 @@ import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 import picocli.CommandLine.ParentCommand
 
-// Removed Option for format for now
-
 @Unremovable
-@Command(name = "get", description = ["Get a specific workflow definition."])
+@Command(name = "get", description = ["Get a specific workflow definition, interactively if needed."])
 class WorkflowGetCommand : Runnable {
 
-    // Enum for validated format options
+    // Enum for validated format options (only for final output)
     enum class OutputFormat { JSON, YAML }
 
     @Inject
@@ -31,65 +30,39 @@ class WorkflowGetCommand : Runnable {
     @Parameters(
         index = "0",
         arity = "0..1",
-        description = ["Optional name of the workflow to get."]
+        description = ["Optional name of the workflow to get directly."]
     )
     var nameParam: String? = null
 
     @Parameters(
         index = "1",
         arity = "0..1",
-        description = ["Optional version of the workflow to get."]
+        description = ["Optional version of the workflow (requires name)."]
     )
     var versionParam: String? = null
 
-    @Option(names = ["--format"], description = ["Output format (\${COMPLETION-CANDIDATES})."], defaultValue = "YAML")
-    var format: OutputFormat = OutputFormat.YAML // Use enum type
+    @Option(
+        names = ["--format"],
+        description = ["Output format for the definition (\${COMPLETION-CANDIDATES})."],
+        defaultValue = "YAML"
+    )
+    var format: OutputFormat = OutputFormat.YAML
 
-    // Workflow Command class
     @ParentCommand
     lateinit var parent: WorkflowCommand
 
-    // Removed format option for simplification
-
     override fun run() {
-        // we stop after this command
-        parent.parent.daemon = false
+        parent.parent.daemon = false // Stop after execution
 
         try {
-            // 1. Determine the target workflow name
-            val targetName = determineName()
-                ?: // Appropriate message already printed by determineName
-                return
+            when {
+                // Direct fetch: Both name and version provided
+                nameParam != null && versionParam != null ->
+                    fetchAndDisplaySpecificWorkflow(nameParam!!, versionParam!!)
 
-            // 2. Determine the target workflow version
-            val targetVersion = determineVersion(targetName)
-                ?: // Appropriate message already printed by determineVersion
-                return
-
-            // 3. Fetch and display the specific workflow
-            val workflowModel = workflowRepository.findByNameAndVersion(targetName, targetVersion)
-            if (workflowModel != null) {
-                // Format the output based on the selected format
-                when (format) {
-                    OutputFormat.JSON -> try {
-                        val workflow = Workflows.parse(workflowModel.definition)
-                        val workflowJson = objectMapper
-                            .writerWithDefaultPrettyPrinter()
-                            .writeValueAsString(workflow)
-                        println(workflowJson)
-                    } catch (e: Exception) {
-                        System.err.println("ERROR: Unable to parse Workflow '$targetName' version '$targetVersion' definition:\n${workflowModel.definition}")
-                    }
-
-                    // YAML is the default format in the database
-                    OutputFormat.YAML -> println(workflowModel.definition)
-                }
-            } else {
-                // Should not happen if name/version were selected from existing ones,
-                // but could happen due to race condition.
-                System.err.println("ERROR: Workflow '$targetName' version '$targetVersion' could not be retrieved.")
+                // Interactive selection
+                else -> interactiveSelectAndDisplayWorkflow(filterName = nameParam)
             }
-
         } catch (e: Exception) {
             throw CommandLine.ExecutionException(
                 CommandLine(this),
@@ -99,63 +72,125 @@ class WorkflowGetCommand : Runnable {
         }
     }
 
-    private fun determineName(): String? {
-        // Name explicitly provided
-        if (nameParam != null) return nameParam
-
-        // Name not provided, query distinct names
-        val distinctNames = workflowRepository.listAll().map { it.name }.distinct().sorted()
-
-        return when (distinctNames.size) {
-            0 -> null.also { println("No workflows found in the database.") }
-            1 -> distinctNames.first()
-            else -> promptForSelection(distinctNames, "Multiple workflow names found. Please select one:")
+    private fun fetchAndDisplaySpecificWorkflow(name: String, version: String) {
+        val workflowModel = workflowRepository.findByNameAndVersion(name, version)
+        if (workflowModel != null) {
+            displayWorkflowDefinition(workflowModel)
+        } else {
+            System.err.println("ERROR: Workflow '$name' version '$version' not found.")
         }
     }
 
-    private fun determineVersion(name: String): String? {
-        // Version explicitly provided
-        if (versionParam != null) return versionParam
+    private fun interactiveSelectAndDisplayWorkflow(filterName: String?) {
+        val workflowsToDisplay = when (filterName) {
+            null -> workflowRepository.listAll()
+            else -> workflowRepository.listByName(filterName)
+        }
 
-        // Version not provided, query available versions for the selected name
-        val availableWorkflows = workflowRepository.listByName(name)
+        if (workflowsToDisplay.isEmpty()) {
+            println(
+                if (filterName != null) "No workflow '$filterName' found in the database."
+                else "No workflows found in the database."
+            )
+            return
+        }
 
-        // Sort versions using SemVer
-        val sortedWorkflows = availableWorkflows.sortedBy {
-            try {
-                Version.parse(it.version)
-            } catch (e: Exception) {
-                Version.parse("0.0.0-invalid")
+        // If only one result after filtering/fetching, display it directly
+        if (workflowsToDisplay.size == 1) {
+            displayWorkflowDefinition(workflowsToDisplay.first())
+            return
+        }
+
+        // Group, sort, and prepare for display
+        // Grouping is still useful even if filtered by name, in case of data inconsistency (multiple names returned?)
+        // Or just use workflowsToDisplay directly if filterName != null?
+        // Let's keep grouping for consistency for now.
+        val groupedWorkflows = workflowsToDisplay.groupBy { it.name }.toSortedMap()
+        val selectionMap = mutableMapOf<Int, WorkflowModel>()
+        var currentNumber = 1
+
+        // Determine column width for alignment
+        val maxNameWidth = groupedWorkflows.keys.maxOfOrNull { it?.length ?: 0 } ?: 10 // Handle potential null keys
+        val nameHeader = "Name"
+        val versionHeader = "Version"
+        val numberHeader = "#"
+        val numWidth = workflowsToDisplay.size.toString().length // Width for number column
+        val paddedNumHeader = numberHeader.padStart(numWidth)
+        val paddedNameHeader = nameHeader.padEnd(maxNameWidth)
+
+        // Print header
+        println()
+        println("$paddedNumHeader  $paddedNameHeader  $versionHeader")
+        println("${"-".repeat(numWidth)}  ${"-".repeat(maxNameWidth)}  ${"-".repeat(versionHeader.length)}")
+
+        // Print rows and populate selection map
+        groupedWorkflows.forEach { (name, versionsList) ->
+            val displayName = name ?: "<Unnamed>" // Handle null names for display
+            val sortedVersions = versionsList.sortedBy {
+                try {
+                    Version.parse(it.version)
+                } catch (e: Exception) {
+                    Version.parse("0.0.0-invalid")
+                }
+            }
+
+            sortedVersions.forEachIndexed { index, workflow ->
+                val versionPart = workflow.version
+                val numberPart = currentNumber.toString().padStart(numWidth)
+                selectionMap[currentNumber] = workflow // Map number to the model
+                currentNumber++
+
+                if (index == 0) {
+                    val namePart = displayName.padEnd(maxNameWidth)
+                    println("$numberPart  $namePart  $versionPart")
+                } else {
+                    val namePart = " ".repeat(maxNameWidth)
+                    val marker = if (index == sortedVersions.lastIndex) "└─" else "├─"
+                    println("$numberPart  $namePart  $marker $versionPart")
+                }
             }
         }
-        val availableVersions = sortedWorkflows.map { it.version } // Extract sorted version strings
+        println()
 
-        return when (availableVersions.size) {
-            1 -> availableVersions.first()
-            else -> promptForSelection(availableVersions, "Multiple versions found for '$name'. Please select one:")
-        }
-    }
-
-    private fun promptForSelection(options: List<String>, promptMessage: String): String? {
-        println(promptMessage)
-        options.forEachIndexed { index, option ->
-            println("  ${index + 1}: $option")
-        }
-        print("Enter number (or leave blank to cancel): ")
-
+        // Prompt for selection
+        print("Enter # of workflow to view (or leave blank to cancel): ")
         while (true) {
             val input = readlnOrNull()?.trim()
             if (input.isNullOrEmpty()) {
                 println("Selection cancelled.")
-                return null
+                return
             }
 
             val choice = input.toIntOrNull()
-            if (choice != null && choice in 1..options.size) {
-                return options[choice - 1]
+            if (choice != null && selectionMap.containsKey(choice)) {
+                // Valid selection - display the chosen workflow
+                displayWorkflowDefinition(selectionMap[choice]!!)
+                return // Done
             }
 
-            print("Invalid input.\nPlease enter a number between 1 and ${options.size}, or leave blank to cancel: ")
+            print("Invalid input.\nPlease enter a number from the list, or leave blank to cancel: ")
         }
+    }
+
+    /**
+     * Displays the definition of a given workflow model according to the selected format.
+     */
+    private fun displayWorkflowDefinition(workflowModel: WorkflowModel) = when (format) {
+        // Re-parse the stored definition to ensure it's valid before serializing
+        OutputFormat.JSON -> try {
+            val workflow = Workflows.parse(workflowModel.definition)
+            val workflowJson = objectMapper
+                .writerWithDefaultPrettyPrinter()
+                .writeValueAsString(workflow)
+            println(workflowJson)
+        } catch (e: Exception) {
+            System.err.println(
+                "ERROR: Unable to parse and format Workflow '${workflowModel.name}' version '${workflowModel.version}' as JSON. Stored definition might be invalid:\n" +
+                    workflowModel.definition
+            )
+        }
+
+        // Assuming stored definition is already valid YAML
+        OutputFormat.YAML -> println(workflowModel.definition)
     }
 }
