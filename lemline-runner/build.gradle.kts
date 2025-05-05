@@ -1,3 +1,5 @@
+import io.quarkus.gradle.tasks.QuarkusBuild
+
 plugins {
     id("buildsrc.convention.kotlin-jvm")
     alias(libs.plugins.kotlinPluginSerialization)
@@ -14,7 +16,10 @@ java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
 }
-kotlin { jvmToolchain(17) }
+
+kotlin {
+    jvmToolchain(17)
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // 2) Exclude unwanted HTTP clients
@@ -28,14 +33,14 @@ configurations.configureEach {
 // 3) Dependencies
 // ────────────────────────────────────────────────────────────────────────────
 dependencies {
-    // — Our modules
+    // Our modules
     implementation(project(":lemline-common"))
     implementation(project(":lemline-core"))
 
-    // — KotlinX ecosystem
+    // KotlinX ecosystem
     implementation(libs.bundles.kotlinxEcosystem)
 
-    // — Quarkus core & extensions
+    // Quarkus core & extensions
     implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.22.1"))
     implementation("io.quarkus:quarkus-kotlin")
     implementation("io.quarkus:quarkus-picocli")
@@ -46,32 +51,34 @@ dependencies {
     implementation("io.quarkus:quarkus-jdbc-postgresql")
     implementation("io.quarkus:quarkus-jdbc-mysql")
 
-    // — Messaging
+    // Messaging
     implementation("io.quarkus:quarkus-messaging-kafka")
     implementation("io.quarkus:quarkus-messaging-rabbitmq")
     implementation("io.smallrye.reactive:smallrye-reactive-messaging-in-memory:4.27.0")
 
-    // — JTA + JMS
+    // Serverless Workflow SDK
+    implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
+    implementation("io.serverlessworkflow:serverlessworkflow-impl-core:7.0.0.Final")
+
+    // Utilities
+    implementation("com.github.f4b6a3:uuid-creator:6.0.0")
+    implementation("com.github.zafarkhaja:java-semver:0.10.2")
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Libraries below are needed for Native Compilation - DO NOT TOUCh except you know what you are doing
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // JTA + JMS
     implementation("io.quarkus:quarkus-narayana-jta") {
         exclude("org.jboss.narayana.jta", "jms")
     }
     implementation("jakarta.jms:jakarta.jms-api:3.1.0")
 
-    // — Quarkus helpers
+    // Quarkus helpers
     implementation("org.jboss:jboss-vfs:3.2.15.Final")
     implementation("org.osgi:org.osgi.framework:1.10.0")
 
-    // — Serverless Workflow SDK
-    implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
-    implementation("io.serverlessworkflow:serverlessworkflow-impl-core:7.0.0.Final")
-
-    // — Utilities
-    implementation("com.github.f4b6a3:uuid-creator:6.0.0")
-    implementation("com.github.zafarkhaja:java-semver:0.10.2")
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // AWS via Quarkiverse Amazon Services extensions (For Native Compilation)
-    // ─────────────────────────────────────────────────────────────────────────
+    // AWS
     implementation(platform("io.quarkus.platform:quarkus-amazon-services-bom:3.22.1"))  // BOM
     implementation("io.quarkiverse.amazonservices:quarkus-amazon-common")               // aws-core, signer
     implementation("io.quarkiverse.amazonservices:quarkus-amazon-s3")                   // S3 client & S3Object
@@ -113,6 +120,12 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
 
     maxHeapSize = "2g"
-    jvmArgs("-Xms512m", "-Dkotest.framework.extensions.scan.scan=false")
+    jvmArgs("-Xms512m")
 }
 
+// this is a hack to enable native compilation (bug in quarkus-amazon-crt)
+tasks.named<QuarkusBuild>("quarkusBuild") {
+    doFirst {
+        file("$buildDir/lemline-runner-$version-native-image-source-jar/libaws-crt-jni.dylib").setWritable(true)
+    }
+}
