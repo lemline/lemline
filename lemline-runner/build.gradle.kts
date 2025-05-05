@@ -44,11 +44,18 @@ dependencies {
     implementation("com.github.zafarkhaja:java-semver:0.10.2") // Use the latest stable version
 
     // Used only for Native building - we should find a way to remove this
-    implementation("io.quarkus:quarkus-narayana-jta")
+    implementation("io.quarkus:quarkus-narayana-jta") {
+        // Narayana’s JMS helper drags in jakarta.jms.* — we don’t need it
+        exclude(group = "org.jboss.narayana.jta", module = "jms")
+    }
     implementation("jakarta.jms:jakarta.jms-api:3.1.0")
+
+    // ---------- tiny AWS jars required by Flyway's AwsS3Resource ----------
     implementation(platform("software.amazon.awssdk:bom:2.25.30"))
-    implementation("software.amazon.awssdk:s3")
-    implementation("software.amazon.awssdk.crt:aws-crt:0.38.1")
+    implementation("software.amazon.awssdk:s3")            // 1.4 MB, pure Java
+    implementation("software.amazon.awssdk:http-auth-aws") //   90 kB, pure Java
+    implementation("software.amazon.awssdk.crt:aws-crt:0.38.1") // 480 kB, pure Java
+
     implementation("org.jboss:jboss-vfs:3.2.15.Final")
     implementation("org.osgi:org.osgi.framework:1.10.0")
 
@@ -74,6 +81,19 @@ dependencies {
 
 group = "com.lemline.runner"
 version = "0.0.1-SNAPSHOT"
+
+// no CRT JNI, no apache‑client, no netty, no native libs
+configurations.configureEach {
+    // we do NOT need any native JNI platform jars
+    exclude(group = "software.amazon.awssdk.crt", module = "aws-crt-linux-x86_64")
+    exclude(group = "software.amazon.awssdk.crt", module = "aws-crt-linux-aarch_64")
+    exclude(group = "software.amazon.awssdk.crt", module = "aws-crt-osx-x86_64")
+    exclude(group = "software.amazon.awssdk.crt", module = "aws-crt-osx-aarch_64")
+    exclude(group = "software.amazon.awssdk.crt", module = "aws-crt-windows-x86_64")
+    // we still don’t want the heavy Apache or Netty HTTP clients
+    exclude(group = "software.amazon.awssdk", module = "apache-client")
+    exclude(group = "software.amazon.awssdk", module = "netty-nio-client")
+}
 
 allOpen {
     annotation("jakarta.ws.rs.Path")
