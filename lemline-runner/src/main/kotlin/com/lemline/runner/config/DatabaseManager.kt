@@ -8,6 +8,7 @@ import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
+import io.quarkus.arc.profile.IfBuildProfile
 import io.quarkus.flyway.FlywayDataSource
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
@@ -25,6 +26,7 @@ class DatabaseManager {
     internal lateinit var dbType: String
 
     @Inject
+    @IfBuildProfile("test")
     private lateinit var h2DataSource: Instance<AgroalDataSource>
 
     @Inject
@@ -62,6 +64,7 @@ class DatabaseManager {
     }
 
     @Inject
+    @IfBuildProfile("test")
     private lateinit var h2Flyway: Instance<Flyway>
 
     @Inject

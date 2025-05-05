@@ -7,7 +7,7 @@ plugins {
 
     kotlin("plugin.allopen") version "2.0.21"
     kotlin("plugin.jpa") version "2.0.21"
-    id("io.quarkus") version "3.21.4"
+    id("io.quarkus") version "3.22.0"
 }
 
 dependencies {
@@ -24,10 +24,11 @@ dependencies {
     implementation("io.quarkus:quarkus-scheduler")          // Scheduler
     implementation("io.quarkus:quarkus-arc")                // Dependency Injection
     implementation("io.quarkus:quarkus-config-yaml")        // Reading YAML configuration file
-    implementation("io.quarkus:quarkus-flyway")             // DB migration
+    implementation("io.quarkus:quarkus-flyway") {
+        exclude("org.flywaydb", "flyway‑s3")
+    }
     implementation("io.quarkus:quarkus-jdbc-postgresql")    // Postgres Database driver
     implementation("io.quarkus:quarkus-jdbc-mysql")         // MySQL Database driver
-    implementation("io.quarkus:quarkus-jdbc-h2")            // H2 Database driver
     implementation("io.quarkus:quarkus-messaging-kafka")    // Kafka Messaging
     implementation("io.quarkus:quarkus-messaging-rabbitmq") // RabbitMQ Messaging
     implementation("io.smallrye.reactive:smallrye-reactive-messaging-in-memory:4.27.0")
@@ -39,13 +40,23 @@ dependencies {
     // UUID Creator
     implementation("com.github.f4b6a3:uuid-creator:6.0.0")
 
+    // Semantic Version
     implementation("com.github.zafarkhaja:java-semver:0.10.2") // Use the latest stable version
 
+    // Used only for Native building - we should find a way to remove this
+    implementation("io.quarkus:quarkus-narayana-jta")
+    implementation("jakarta.jms:jakarta.jms-api:3.1.0")
+    implementation(platform("software.amazon.awssdk:bom:2.25.30"))
+    implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk.crt:aws-crt:0.38.1")
+    implementation("org.jboss:jboss-vfs:3.2.15.Final")
+    implementation("org.osgi:org.osgi.framework:1.10.0")
 
     // Testing
     testImplementation(kotlin("test"))
     implementation("io.quarkus:quarkus-junit5") // Needed for QuarkusRun ???
     testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
+    testImplementation("io.quarkus:quarkus-jdbc-h2")            // H2 Database driver
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")
     testImplementation("io.kotest:kotest-framework-api")
