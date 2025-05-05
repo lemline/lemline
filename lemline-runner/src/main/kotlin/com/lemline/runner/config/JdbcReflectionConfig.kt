@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
 import com.arjuna.ats.internal.jdbc.ConnectionManager
@@ -49,4 +50,3 @@ import org.flywaydb.core.Flyway
     registerFullHierarchy = true
 )
 class JdbcReflectionConfig
-

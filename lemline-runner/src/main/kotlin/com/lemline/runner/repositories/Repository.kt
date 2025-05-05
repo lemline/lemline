@@ -390,7 +390,7 @@ abstract class Repository<T : UuidV7Entity> {
         val whereClause = keyColumns.joinToString(separator = " AND ") { "$it = ?" }
 
         return """
-            DELETE FROM $tableName 
+            DELETE FROM $tableName
             WHERE $whereClause
         """.trimIndent()
     }

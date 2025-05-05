@@ -25,10 +25,6 @@ dependencies {
     implementation("io.ktor:ktor-client-content-negotiation")
     implementation("io.ktor:ktor-serialization-kotlinx-json")
     implementation("io.ktor:ktor-client-auth")
-
-//    implementation("io.jsonwebtoken:jjwt-api:0.11.5")
-//    implementation("io.jsonwebtoken:jjwt-impl:0.11.5")
-//    implementation("io.jsonwebtoken:jjwt-jackson:0.11.5") // For JSON serialization
     implementation("com.auth0:java-jwt:4.4.0")
     // Testing
     testImplementation(kotlin("test"))

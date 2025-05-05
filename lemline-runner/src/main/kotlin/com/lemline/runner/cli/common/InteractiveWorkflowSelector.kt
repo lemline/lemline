@@ -103,7 +103,7 @@ class InteractiveWorkflowSelector @Inject constructor(
                 output.appendLine("$numberPart  $namePart  $prefix $versionPart")
             }
         }
-        
+
         println(output.toString())
     }
-} 
+}

@@ -82,11 +82,11 @@ class WorkflowDeleteCommand : Runnable {
 
     private fun handleInteractiveDeletion() {
 
-        // --- Prepare and display list ONCE --- 
+        // --- Prepare and display list ONCE ---
         var currentSelectionList = selector.prepareSelection(filterName = name)?.toMutableList()
             ?: return // Exit if nothing found initially
 
-        // --- Prompt loop --- 
+        // --- Prompt loop ---
         while (true) {
             // Handle single/empty list cases based on the CURRENT list
             if (currentSelectionList.isEmpty()) {
@@ -256,4 +256,3 @@ class WorkflowDeleteCommand : Runnable {
     private fun ExecutionException(message: String, cause: Throwable? = null) =
         CommandLine.ExecutionException(CommandLine(this), message, cause)
 }
-

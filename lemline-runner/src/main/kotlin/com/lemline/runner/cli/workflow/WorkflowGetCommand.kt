@@ -67,7 +67,7 @@ class WorkflowGetCommand : Runnable {
                 }
                 displayWorkflowDefinition(selectedWorkflow)
             } else {
-                // --- Interactive selection mode --- 
+                // --- Interactive selection mode ---
 
                 // Prepare selection (displays the list if needed)
                 val selectionList = selector.prepareSelection(filterName = name)
@@ -79,7 +79,7 @@ class WorkflowGetCommand : Runnable {
                     return // Only one option, so we exit after displaying
                 }
 
-                // --- Prompt loop if multiple results --- 
+                // --- Prompt loop if multiple results ---
                 while (true) {
                     print("Enter # to view, or q to quit: ")
                     val input = readlnOrNull()?.trim()

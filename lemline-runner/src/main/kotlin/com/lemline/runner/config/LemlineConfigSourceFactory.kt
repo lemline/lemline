@@ -125,7 +125,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
      * @return iterable of ConfigSource instances
      */
     override fun getConfigSources(context: ConfigSourceContext): Iterable<ConfigSource> {
-        
+
         // Collect all properties from the context that start with "lemline."
         val lemlineProps = mutableMapOf<String, String>()
         for (name in context.iterateNames()) {
