@@ -46,7 +46,7 @@ import java.util.*
  */
 @ConfigMapping(prefix = "lemline")
 interface LemlineConfiguration {
-    fun config(): Optional<Config>
+    fun config(): Optional<String>
     fun database(): DatabaseConfig
     fun messaging(): MessagingConfig
     fun wait(): WaitConfig
@@ -130,13 +130,6 @@ interface LemlineConfiguration {
                 return props
             }
         }
-    }
-
-    /**
-     * Config locations
-     */
-    interface Config {
-        fun locations(): List<String>
     }
 
     /**

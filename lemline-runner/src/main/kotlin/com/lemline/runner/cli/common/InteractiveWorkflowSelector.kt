@@ -27,7 +27,7 @@ class InteractiveWorkflowSelector @Inject constructor(
         }
 
         if (workflows.isEmpty()) {
-            println(if (filterName != null) "No workflows found matching name '$filterName'." else "No workflows found.")
+            println(filterName?.let { "No workflows found matching name '$it'." } ?: "No workflows found.")
             return null
         }
 

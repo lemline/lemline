@@ -161,7 +161,14 @@ class LemlineApplication : QuarkusApplication {
                 ?: System.err.println("Warning: Could not determine user home directory. Skipping user-specific config locations.")
 
             // No configuration file found in any standard location
-            println("No configuration file found in standard locations.")
+            System.err.println("ERROR: No valid configuration file found. Please provide one using one of the following methods:")
+            System.err.println("1. Pass the path to the file as a command-line argument (e.g., --config=<path>).")
+            System.err.println("2. Set the LEMLINE_CONFIG environment variable to the file's path.")
+            System.err.println("3. Place a .lemline.yaml file in the current directory.")
+            System.err.println("4. Place a config.yaml file in ~/.config/lemline/.")
+            System.err.println("5. Place a .lemline.yaml file in your home directory.")
+
+            exitProcess(1)
         }
     }
 }

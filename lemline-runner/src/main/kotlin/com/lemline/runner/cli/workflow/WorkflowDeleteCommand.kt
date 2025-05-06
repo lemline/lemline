@@ -91,7 +91,7 @@ class WorkflowDeleteCommand : Runnable {
             // Handle single/empty list cases based on the CURRENT list
             if (currentSelectionList.isEmpty()) {
                 println("\nAll listed workflows have been deleted or the list is now empty.")
-                break // Exit loop if list becomes empty
+                break // Exit loop if the list becomes empty
             }
             if (currentSelectionList.size == 1) {
                 println("\nOnly one workflow remaining in the list:")
@@ -114,7 +114,7 @@ class WorkflowDeleteCommand : Runnable {
             when {
                 input.isNullOrEmpty() -> {
                     // Blank input: Redisplay the list and re-prompt
-                    currentSelectionList = selector.prepareSelection()?.toMutableList() ?: break
+                    currentSelectionList = selector.prepareSelection(filterName = name)?.toMutableList() ?: break
                     continue
                 }
 
@@ -124,9 +124,9 @@ class WorkflowDeleteCommand : Runnable {
 
                 input == "*" -> {
                     // Pass the current selection list
-                    handleDeleteAllListed(currentSelectionList, name)
-                    // Exit after attempting bulk action
-                    break
+                    if (handleDeleteAllListed(currentSelectionList, filterName = name)) break
+                    // canceled the delete request
+                    continue
                 }
 
                 else -> {
@@ -137,13 +137,10 @@ class WorkflowDeleteCommand : Runnable {
                         val (_, workflowToDelete) = selectedPair // Destructure pair
 
                         // deleteSpecificVersion handles confirmation internally since force=false
-                        deleteSpecificVersion(workflowToDelete.name, workflowToDelete.version)
-
-                        // Assume deletion was successful if confirmDeletion passed inside deleteSpecificVersion
-                        // (or add return value to deleteSpecificVersion if more robustness needed)
-                        // Remove the item from our local list *after* attempting deletion.
-                        currentSelectionList.remove(selectedPair)
-
+                        if (deleteSpecificVersion(workflowToDelete.name, workflowToDelete.version)) {
+                            // Remove the item from our local list *after* attempting deletion.
+                            currentSelectionList.remove(selectedPair)
+                        }
                         // Loop continues without re-displaying the list
                     } else {
                         print("Invalid input. ") // Re-prompt in the loop
@@ -153,7 +150,7 @@ class WorkflowDeleteCommand : Runnable {
         }
     }
 
-    // --- Methods used for BOTH Forced & Confirmation Deletion --- //
+    // --- Methods used for BOTH Forced & Intercative Deletion --- //
 
     private fun deleteAllWorkflows() {
         val workflowCount = workflowRepository.count()
@@ -168,45 +165,48 @@ class WorkflowDeleteCommand : Runnable {
         println("Successfully deleted $deletedCount workflows." + if (force) " (forced)" else "")
     }
 
-    private fun deleteAllVersionsByName(name: String) {
+    private fun deleteAllVersionsByName(name: String): Boolean {
         val workflowsToDelete = workflowRepository.listByName(name)
         if (workflowsToDelete.isEmpty()) {
             println("No workflows found with name '$name'.")
-            return
+            return false
         }
         val versionsString = workflowsToDelete.joinToString { it.version }
         val subject = "all ${workflowsToDelete.size} versions ($versionsString) of workflow '$name'"
-        if (!confirmDeletion(subject)) return // confirmDeletion handles 'force'
+        if (!confirmDeletion(subject)) return false
 
         val deletedCount = workflowRepository.delete(workflowsToDelete)
         if (deletedCount == workflowsToDelete.size) {
             println("Successfully deleted $deletedCount versions of workflow '$name'." + if (force) " (forced)" else "")
+            return true
         } else {
             System.err.println("Warning: Expected to delete ${workflowsToDelete.size} workflows, but deleted $deletedCount.")
+            return false
         }
     }
 
-    private fun deleteSpecificVersion(name: String, version: String) {
+    private fun deleteSpecificVersion(name: String, version: String): Boolean {
         val workflowToDelete = workflowRepository.findByNameAndVersion(name, version)
             ?: run {
                 println("Workflow '$name' version '$version' not found.")
-                return
+                return false
             }
 
         val subject = "workflow '$name' version '$version'"
-        if (!confirmDeletion(subject)) return // confirmDeletion handles 'force'
+        if (!confirmDeletion(subject)) return false // confirmDeletion handles 'force'
 
         val deletedCount = workflowRepository.delete(workflowToDelete)
         if (deletedCount == 1) {
             println("Successfully deleted workflow '$name' version '$version'." + if (force) " (forced)" else "")
+            return true
         } else {
             System.err.println("Warning: Expected to delete '$name' version '$version'. Deleted concurrently?")
+            return false
         }
     }
 
     // --- Method ONLY for INTERACTIVE Deletion (called when '*' selected) --- //
-
-    private fun handleDeleteAllListed(selectionList: List<Pair<Int, WorkflowModel>>, filterName: String?) {
+    private fun handleDeleteAllListed(selectionList: List<Pair<Int, WorkflowModel>>, filterName: String?): Boolean {
         val workflowsToDelete = selectionList.map { it.second } // Extract models
         val count = workflowsToDelete.size
         val subject = if (filterName != null) {
@@ -226,8 +226,9 @@ class WorkflowDeleteCommand : Runnable {
                     workflowRepository.delete(workflowsToDelete)
                 }
 
-                if (deletedCount == count || (filterName == null && deletedCount >= 0)) {
+                if (deletedCount == count) {
                     println("Successfully deleted $deletedCount workflow(s) as requested by '*' selection.")
+                    return true
                 } else {
                     System.err.println("Warning: Expected to delete $count workflow(s) via '*' selection, but repository reported $deletedCount deleted.")
                 }
@@ -235,6 +236,8 @@ class WorkflowDeleteCommand : Runnable {
                 System.err.println("ERROR deleting selected workflows: ${e.message}")
             }
         }
+
+        return false
     }
 
     // --- Common Helper --- //
