@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner
 
+import com.lemline.runner.LemlineApplication.Companion.configPath
 import com.lemline.runner.cli.MainCommand
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
@@ -12,6 +13,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
 import org.jboss.logging.Logger
+import org.jboss.logging.Logger.Level
 import picocli.CommandLine
 import picocli.CommandLine.IFactory
 
@@ -52,43 +54,26 @@ class LemlineApplication : QuarkusApplication {
         @JvmStatic
         fun main(args: Array<String>) {
 
-            // --- Pre-parse Arguments Before Quarkus Init ---
+            // define logging level
+            setLoggingLevel(args)
 
             // define lemline config location
             setConfigPath(args)
-
-            // Check for debug flags
-            if (args.contains("--debug") || args.contains("-d")) {
-                System.setProperty("quarkus.log.level", "DEBUG")
-                System.setProperty("quarkus.log.console.level", "DEBUG")
-                System.setProperty("quarkus.log.category.\"com.lemline\".level", "DEBUG")
-                System.setProperty("quarkus.log.category.\"io.quarkus\".level", "DEBUG")
-                System.setProperty("quarkus.log.category.\"org.flywaydb\".level", "DEBUG")
-                System.setProperty("quarkus.log.category.\"io.smallrye\".level", "DEBUG")
-                System.setProperty("quarkus.log.category.\"io.agroal\".level", "DEBUG")
-            }
 
             // --- Launch Quarkus ---
             Quarkus.run(LemlineApplication::class.java, *args)
         }
 
-        private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
-            val path = filePath.normalize()
-            val fileExists = Files.exists(path)
-            val isRegularFile = Files.isRegularFile(path)
-            if (!fileExists && provided) {
-                System.err.println("ERROR: '${path.toAbsolutePath()} does not exist")
-                exitProcess(1)
-            }
-            if (!isRegularFile && provided) {
-                System.err.println("ERROR: '${path.toAbsolutePath()} is not a regular file")
-                exitProcess(1)
-            }
-            if (fileExists && isRegularFile) {
-                configPath = path
-                return true
-            }
-            return false
+        /**
+         * Sets the logging level for the application based on the provided command-line arguments.
+         *
+         * This function searches for a logging level argument in the form of `--log=<level>` or `-l <level>`.
+         * If a valid logging level is found, it updates the application's logging configuration accordingly.
+         *
+         * @param args The command-line arguments provided to the application.
+         */
+        private fun setLoggingLevel(args: Array<String>) {
+            getArgValue("--log=", "-l", args)?.let { setLogLevel(it) }
         }
 
         /**
@@ -105,40 +90,10 @@ class LemlineApplication : QuarkusApplication {
          * @return The absolute path of the first valid configuration file found, or null if no valid file is found.
          *         Exits the application with an error if a specified file (via CLI or ENV) does not exist or is invalid.
          */
-        @JvmStatic
-        fun setConfigPath(args: Array<String>) {
+        private fun setConfigPath(args: Array<String>) {
             // 1. Check Command Line Arguments (--config= or -c)
-            for (i in args.indices) {
-                when {
-                    args[i].startsWith("--config=") -> {
-                        val cliPath = args[i].substringAfter("--config=").trim()
-                        when (cliPath.isEmpty()) {
-                            true -> {
-                                System.err.println("ERROR: --config= argument requires a value.")
-                                exitProcess(1)
-                            }
-
-                            false -> if (checkConfigLocation(Paths.get(cliPath), true)) return
-                        }
-                    }
-
-                    args[i] == "-c" && i + 1 < args.size -> {
-                        val cliPath = args[i + 1].trim()
-                        when (cliPath.isEmpty()) {
-                            true -> {
-                                System.err.println("ERROR: -c argument requires a value.")
-                                exitProcess(1)
-                            }
-
-                            false -> if (checkConfigLocation(Paths.get(cliPath), true)) return
-                        }
-                    }
-
-                    args[i] == "-c" -> { // Handle case where -c is the last argument
-                        System.err.println("ERROR: -c argument requires a location value.")
-                        exitProcess(1)
-                    }
-                }
+            getArgValue("--config=", "-c", args)?.let {
+                if (checkConfigLocation(Paths.get(it), true)) return
             }
 
             // 2. Check Environment Variable (LEMLINE_CONFIG)
@@ -171,4 +126,65 @@ class LemlineApplication : QuarkusApplication {
             exitProcess(1)
         }
     }
+}
+
+private fun getArgValue(long: String, short: String, args: Array<String>): String? {
+    for (i in args.indices) {
+        when {
+            args[i].startsWith(long) -> {
+                val value = args[i].substringAfter(long).trim()
+                if (value.isEmpty()) error("$short argument requires a value.")
+                return value
+            }
+
+            args[i] == short && i + 1 < args.size -> {
+                val value = args[i + 1].trim()
+                if (value.isEmpty()) error("$short argument requires a value.")
+                return value
+            }
+
+            // Handle case where -c is the last argument
+            args[i] == short -> error("$short argument requires a value.")
+        }
+    }
+    return null
+}
+
+private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
+    val path = filePath.normalize()
+    val fileExists = Files.exists(path)
+    val isRegularFile = Files.isRegularFile(path)
+    if (!fileExists && provided) {
+        error("'${path.toAbsolutePath()} does not exist")
+    }
+    if (!isRegularFile && provided) {
+        error("'${path.toAbsolutePath()} is not a regular file")
+    }
+    if (fileExists && isRegularFile) {
+        configPath = path
+        return true
+    }
+    return false
+}
+
+private fun setLogLevel(arg: String) {
+    val level = try {
+        Logger.Level.valueOf(arg.uppercase()).toString()
+    } catch (e: Exception) {
+        val validLevels = Level.entries.joinToString(", ") { it.name }
+        error("Invalid log level '$arg'. Allowed values are: $validLevels")
+    }
+    System.setProperty("quarkus.log.level", level)
+    System.setProperty("quarkus.log.console.level", level)
+    System.setProperty("quarkus.log.category.\"com.lemline\".level", level)
+    System.setProperty("quarkus.log.category.\"io.quarkus\".level", level)
+    System.setProperty("quarkus.log.category.\"org.flywaydb\".level", level)
+    System.setProperty("quarkus.log.category.\"io.smallrye\".level", level)
+    System.setProperty("quarkus.log.category.\"io.agroal\".level", level)
+
+}
+
+private fun error(msg: String): Nothing {
+    System.err.println("ERROR: $msg")
+    exitProcess(1)
 }

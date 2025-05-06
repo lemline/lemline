@@ -6,7 +6,9 @@ import com.lemline.runner.cli.workflow.WorkflowCommand
 import io.quarkus.arc.Unremovable
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import jakarta.enterprise.context.Dependent
+import org.jboss.logging.Logger.Level
 import picocli.CommandLine.Command
+import picocli.CommandLine.ITypeConverter
 import picocli.CommandLine.Option
 
 /**
@@ -30,10 +32,12 @@ import picocli.CommandLine.Option
 class MainCommand : Runnable {
 
     @Option(
-        names = ["-d", "--debug"],
-        description = ["Enable debug logging"]
+        names = ["-l", "--log"],
+        description = ["Set log level (\${COMPLETION-CANDIDATES})."],
+        converter = [LogOptionConverter::class],
+        paramLabel = "<level>"
     )
-    var debug: Boolean = false
+    lateinit var logLevel: Level
 
     @Option(
         names = ["-c", "--config"],
@@ -50,5 +54,9 @@ class MainCommand : Runnable {
 
     override fun run() {
         // Do nothing
+    }
+
+    internal class LogOptionConverter : ITypeConverter<Level> {
+        override fun convert(value: String): Level = Level.valueOf(value.uppercase())
     }
 }

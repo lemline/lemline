@@ -33,7 +33,7 @@ class ConfigCommand : Runnable {
     @Option(
         names = ["-f", "--format"],
         description = ["Output format (properties, yaml)"],
-        converter = [FormatConverter::class]
+        converter = [FormatOptionConverter::class]
     )
     var format: Format = Format.PROPERTIES
 
@@ -149,7 +149,13 @@ class ConfigCommand : Runnable {
         return result
     }
 
-    class FormatConverter : ITypeConverter<Format> {
-        override fun convert(value: String) = Format.valueOf(value.uppercase())
+    private class FormatOptionConverter : ITypeConverter<Format> {
+        override fun convert(value: String): Format = try {
+            Format.valueOf(value.uppercase())
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException(
+                "Allowed values are: ${Format.entries.joinToString(", ").lowercase()}."
+            )
+        }
     }
 }
