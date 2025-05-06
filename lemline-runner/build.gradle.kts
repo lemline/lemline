@@ -129,3 +129,37 @@ tasks.named<QuarkusBuild>("quarkusBuild") {
         file("$buildDir/lemline-runner-$version-native-image-source-jar/libaws-crt-jni.dylib").setWritable(true)
     }
 }
+
+// ────────────────────────────────────────────────────────────────────────────
+// 6) Version Properties Generation for Picocli
+// ────────────────────────────────────────────────────────────────────────────
+tasks.register("generateVersionProperties") {
+    group = "build"
+    description = "Generates a properties file with the project version."
+    val outputDir = project.layout.buildDirectory.dir("generated/lemline/resources/main")
+    val versionPropsFile = outputDir.map { it.file("version.properties") }
+
+    outputs.file(versionPropsFile) // Declare the output file
+
+    doLast {
+        val propsFile = versionPropsFile.get().asFile
+        propsFile.parentFile.mkdirs()
+        propsFile.writeText("version=${project.version}\n")
+        println("Generated version.properties with version: ${project.version}")
+    }
+}
+
+// Add the generated resources to the main source set
+sourceSets.main.get().resources.srcDir(tasks.named("generateVersionProperties").map { it.outputs.files.singleFile.parentFile })
+
+// Ensure the task runs before resources are processed
+tasks.named("processResources") {
+    dependsOn("generateVersionProperties")
+}
+
+// When building a native image, we might need to ensure
+// version.properties is included in the native image resources.
+// Quarkus usually handles this automatically if it's in src/main/resources,
+// but if we face issues, we might need to add:
+// quarkus.native.resources.includes=version.properties
+// to the application.properties.

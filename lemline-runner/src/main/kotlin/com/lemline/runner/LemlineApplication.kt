@@ -36,14 +36,38 @@ class LemlineApplication : QuarkusApplication {
 
     override fun run(vararg args: String): Int {
         val commandLine = CommandLine(mainCommand, factory)
-        val exitCode = commandLine.execute(*args)
+        // mainCommand.daemon is initially false.
 
+        val exitCode = commandLine.execute(*args)
+        // - If `lemline --help` or `lemline --version` was called, Picocli handles it.
+        //   `mainCommand.run()` is NOT called, so `mainCommand.daemon` remains `false`. `exitCode` is 0.
+        // - If `lemline subcommand ...` was called, the subcommand's `run` is executed.
+        //   `mainCommand.run()` is NOT called, so `mainCommand.daemon` remains `false`. `exitCode` is from the subcommand.
+        // - If `lemline` (no subcommand, no main command help/version) was called, `mainCommand.run()` IS called,
+        //   setting `mainCommand.daemon` to `true`. `exitCode` is 0.
+
+        // After execute(), Picocli stores the parse result. We can use it to check if help/version was shown.
+        val parseResult = commandLine.parseResult
+        // This covers help/version for the main command or any subcommand.
+        if (parseResult?.isUsageHelpRequested == true || parseResult?.isVersionHelpRequested == true) {
+            // Picocli has already printed the help/version message.
+            log.info(
+                "Help or version was displayed for command '${
+                    parseResult.commandSpec().qualifiedName()
+                }'. Exiting with code $exitCode."
+            )
+            return exitCode // exitCode is typically 0 for successful help/version display
+        }
+
+        // If no help or version was displayed, proceed with existing logic.
+        // `mainCommand.daemon` will be true if MainCommand.run() was called (i.e., server mode).
+        // `mainCommand.daemon` will be false if a subcommand was run or if main command help/version was shown (already handled above).
         if (!mainCommand.daemon || exitCode != 0) {
-            log.info("Command execution completed with exit code: $exitCode")
+            log.info("Command execution completed. Exit code: $exitCode. mainCommand.daemon: ${mainCommand.daemon}. Exiting.")
             return exitCode
         }
 
-        log.info("Starting Quarkus application in server mode")
+        log.info("Starting Quarkus application in server mode (mainCommand.daemon: ${mainCommand.daemon}, exitCode: $exitCode).")
         Quarkus.waitForExit()
         return 0
     }

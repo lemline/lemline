@@ -20,6 +20,7 @@ import picocli.CommandLine.Option
 @Command(
     name = "lemline",
     mixinStandardHelpOptions = true,
+    versionProvider = VersionProvider::class,
     subcommands = [
         WorkflowCommand::class,
         RuntimeCommand::class,
@@ -48,12 +49,18 @@ class MainCommand : Runnable {
 
     /**
      * Flag to indicate if the application should stop after executing a command.
-     * The default behavior for the main command (without subcommands) is to run in daemon mode.
+     * If the main command is run without subcommands (and not for help/version),
+     * it will set this to true to enter daemon mode.
+     * Otherwise, for subcommands or help/version display, the application will exit.
      */
-    var daemon: Boolean = true
+    var daemon: Boolean = false
 
     override fun run() {
-        // Do nothing
+        // This method is called if `lemline` is run without a subcommand,
+        // and it's not a --help or --version request for the MainCommand itself
+        // (Picocli handles those before calling run()).
+        // This is the scenario where we intend to start the server.
+        this.daemon = true
     }
 
     internal class LogOptionConverter : ITypeConverter<Level> {
