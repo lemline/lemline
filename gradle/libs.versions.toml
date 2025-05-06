@@ -7,6 +7,7 @@ kotlin = "2.0.21"
 kotlinxDatetime = "0.6.1"
 kotlinxSerializationJSON = "1.7.2"
 kotlinxCoroutines = "1.8.1"
+quarkus = "3.22.1"
 
 [libraries]
 spotlessPlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version = "7.0.3" }
@@ -14,6 +15,8 @@ kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", ver
 kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinxSerialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJSON" }
 kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+quarkus-bom = { group = "io.quarkus", name = "quarkus-bom", version.ref = "quarkus" }
+quarkus-amazon-services-bom = { group = "io.quarkus.platform", name = "quarkus-amazon-services-bom", version.ref = "quarkus" }
 
 # Libraries can be bundled together for easier import
 [bundles]
@@ -21,3 +24,4 @@ kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerialization", "kotlinxCoroutine
 
 [plugins]
 kotlinPluginSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+quarkus = { id = "io.quarkus", version.ref = "quarkus" }

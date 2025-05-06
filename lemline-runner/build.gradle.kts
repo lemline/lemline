@@ -6,7 +6,7 @@ plugins {
 
     kotlin("plugin.allopen") version "2.0.21"
     kotlin("plugin.jpa") version "2.0.21"
-    id("io.quarkus") version "3.22.1"
+    alias(libs.plugins.quarkus)
 }
 
 group = "com.lemline.runner"
@@ -41,7 +41,7 @@ dependencies {
     implementation(libs.bundles.kotlinxEcosystem)
 
     // Quarkus core & extensions
-    implementation(enforcedPlatform("io.quarkus:quarkus-bom:3.22.1"))
+    implementation(enforcedPlatform(libs.quarkus.bom))
     implementation("io.quarkus:quarkus-kotlin")
     implementation("io.quarkus:quarkus-picocli")
     implementation("io.quarkus:quarkus-scheduler")
@@ -79,10 +79,10 @@ dependencies {
     implementation("org.osgi:org.osgi.framework:1.10.0")
 
     // AWS
-    implementation(platform("io.quarkus.platform:quarkus-amazon-services-bom:3.22.1"))  // BOM
-    implementation("io.quarkiverse.amazonservices:quarkus-amazon-common")               // aws-core, signer
-    implementation("io.quarkiverse.amazonservices:quarkus-amazon-s3")                   // S3 client & S3Object
-    implementation("io.quarkiverse.amazonservices:quarkus-amazon-crt")                  // aws-crt & checksum support
+    implementation(platform(libs.quarkus.amazon.services.bom))
+    implementation("io.quarkiverse.amazonservices:quarkus-amazon-common")
+    implementation("io.quarkiverse.amazonservices:quarkus-amazon-s3")
+    implementation("io.quarkiverse.amazonservices:quarkus-amazon-crt")
 
     // ─────────────────────────────────────────────────────────────────────────
     // 4) Testing
@@ -150,7 +150,8 @@ tasks.register("generateVersionProperties") {
 }
 
 // Add the generated resources to the main source set
-sourceSets.main.get().resources.srcDir(tasks.named("generateVersionProperties").map { it.outputs.files.singleFile.parentFile })
+sourceSets.main.get().resources.srcDir(
+    tasks.named("generateVersionProperties").map { it.outputs.files.singleFile.parentFile })
 
 // Ensure the task runs before resources are processed
 tasks.named("processResources") {
