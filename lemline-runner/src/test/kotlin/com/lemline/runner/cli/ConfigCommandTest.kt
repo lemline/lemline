@@ -109,12 +109,22 @@ class ConfigCommandTest {
     }
 
     /**
-     * Tests that the 'config' command can be executed with the global debug flag.
+     * Tests that the global log level option is accepted by the MainCommand.
      */
     @Test
-    fun `test config command executes with debug flag`() {
-        executeAndCapture("-d", "config")
-        executeAndCapture("--debug", "config")
+    fun `test main command accepts log level option`() {
+        // Test with various valid log levels using different option syntaxes
+        executeAndCapture("--log=DEBUG", "config")
+        executeAndCapture("-l", "INFO", "config")
+        executeAndCapture("--log=WARN", "config")
+        executeAndCapture("-l", "ERROR", "config")
+        executeAndCapture("--log=FATAL", "config")
+        // executeAndCapture("-l", "OFF", "config") // OFF is not a standard JBoss Logging Level
+        executeAndCapture("--log=TRACE", "config")
+
+        // The LogOptionConverter in MainCommand will cause an exit if the level is invalid,
+        // which would be caught by executeAndCapture's exit code check.
+        // So, successfully passing executeAndCapture means the log level was accepted.
     }
 
     // --- Format Option Tests (Assumes --format option exists in ConfigCommand) ---
