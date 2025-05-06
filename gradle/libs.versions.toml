@@ -8,17 +8,33 @@ kotlinxDatetime = "0.6.1"
 kotlinxSerializationJSON = "1.7.2"
 kotlinxCoroutines = "1.8.1"
 quarkus = "3.22.1"
+smallryeReactiveMessagingInMemory = "4.27.0"
+serverlessworkflow = "7.0.0.Final"
+uuidCreator = "6.0.0"
+javaSemver = "0.10.2"
+kotest = "5.8.1"
+mockk = "1.13.9"
+testcontainers = "1.20.6"
+spotless = "7.0.3"
 
 [libraries]
-spotlessPlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version = "7.0.3" }
+spotlessPlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
 kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 kotlinxDatetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinxDatetime" }
 kotlinxSerialization = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJSON" }
 kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 quarkus-bom = { group = "io.quarkus", name = "quarkus-bom", version.ref = "quarkus" }
 quarkus-amazon-services-bom = { group = "io.quarkus.platform", name = "quarkus-amazon-services-bom", version.ref = "quarkus" }
+smallrye-reactive-messaging-inmemory = { module = "io.smallrye.reactive:smallrye-reactive-messaging-in-memory", version.ref = "smallryeReactiveMessagingInMemory" }
+serverlessworkflow-api = { module = "io.serverlessworkflow:serverlessworkflow-api", version.ref = "serverlessworkflow" }
+serverlessworkflow-impl-core = { module = "io.serverlessworkflow:serverlessworkflow-impl-core", version.ref = "serverlessworkflow" }
+uuidCreator = { module = "com.github.f4b6a3:uuid-creator", version.ref = "uuidCreator" }
+javaSemver = { module = "com.github.zafarkhaja:java-semver", version.ref = "javaSemver" }
+kotest-bom = { module = "io.kotest:kotest-bom", version.ref = "kotest" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 
-# Libraries can be bundled together for easier import
+# Libraries bundled together for easier import
 [bundles]
 kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerialization", "kotlinxCoroutines"]
 

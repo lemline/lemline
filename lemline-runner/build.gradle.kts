@@ -4,8 +4,8 @@ plugins {
     id("buildsrc.convention.kotlin-jvm")
     alias(libs.plugins.kotlinPluginSerialization)
 
-    kotlin("plugin.allopen") version "2.0.21"
-    kotlin("plugin.jpa") version "2.0.21"
+    kotlin("plugin.allopen") version libs.versions.kotlin.get()
+    kotlin("plugin.jpa") version libs.versions.kotlin.get()
     alias(libs.plugins.quarkus)
 }
 
@@ -54,15 +54,15 @@ dependencies {
     // Messaging
     implementation("io.quarkus:quarkus-messaging-kafka")
     implementation("io.quarkus:quarkus-messaging-rabbitmq")
-    implementation("io.smallrye.reactive:smallrye-reactive-messaging-in-memory:4.27.0")
+    implementation(libs.smallrye.reactive.messaging.inmemory)
 
     // Serverless Workflow SDK
-    implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
-    implementation("io.serverlessworkflow:serverlessworkflow-impl-core:7.0.0.Final")
+    implementation(libs.serverlessworkflow.api)
+    implementation(libs.serverlessworkflow.impl.core)
 
     // Utilities
-    implementation("com.github.f4b6a3:uuid-creator:6.0.0")
-    implementation("com.github.zafarkhaja:java-semver:0.10.2")
+    implementation(libs.uuidCreator)
+    implementation(libs.javaSemver)
 
     // ─────────────────────────────────────────────────────────────────────────
     // Libraries below are needed for Native Compilation - DO NOT TOUCh except you know what you are doing
@@ -88,14 +88,14 @@ dependencies {
     // 4) Testing
     // ─────────────────────────────────────────────────────────────────────────
     testImplementation(kotlin("test"))
-    testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
+    testImplementation(enforcedPlatform(libs.kotest.bom))
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.quarkus:quarkus-jdbc-h2")
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")
     testImplementation("io.kotest:kotest-framework-api")
-    testImplementation("io.mockk:mockk:1.13.9")
-    testImplementation(platform("org.testcontainers:testcontainers-bom:1.20.6"))
+    testImplementation(libs.mockk)
+    testImplementation(platform(libs.testcontainers.bom))
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.testcontainers:postgresql")

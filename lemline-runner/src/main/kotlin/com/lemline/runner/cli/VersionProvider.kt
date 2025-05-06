@@ -20,4 +20,4 @@ class VersionProvider : CommandLine.IVersionProvider {
             arrayOf("Lemline Runner: Error reading version (see logs for details)")
         }
     }
-} 
+}
