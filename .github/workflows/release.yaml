@@ -1,0 +1,126 @@
+# File: .github/workflows/release.yml
+name: Build & Release Lemline
+
+# Triggers: version tags, nightly schedule, or manual dispatch
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch: { }
+
+env:
+  # If this run is a tag build, use the tag name; otherwise 'nightly'
+  VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'nightly' }}
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux-x86_64
+          - runner: windows-latest
+            platform: windows-x86_64
+          - runner: macos-13
+            platform: macos-x86_64
+          - runner: macos-14
+            platform: macos-arm64
+
+    steps:
+      # 1) Checkout full history & tags so we can diff and skip nightlies
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2) Skip scheduled run if lemline-runner had no changes since last version tag
+      - name: Skip nightly if lemline-runner unchanged
+        if: ${{ github.event_name == 'schedule' }}
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0)
+          tag_commit=$(git rev-list -n1 "$latest_tag")
+          echo "Last version tag: $latest_tag at $tag_commit"
+          if git diff --quiet "$tag_commit"..HEAD -- lemline-runner; then
+            echo "No changes under lemline-runner since $latest_tag; skipping nightly."
+            exit 0
+          fi
+
+      # 3) Install Mandrel 24.1.2.r23-mandrel for native-image
+      - name: Set up Mandrel 24.1.2.r23-mandrel (Java 17)
+        uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: 'mandrel'
+          java-version: '24.1.2.r23-mandrel'
+          components: 'native-image'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # 4) On Windows, ensure MSVC env is loaded
+      - name: Setup MSVC (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: cmd
+        run: '"%VSINSTALLDIR%\VC\Auxiliary\Build\vcvars64.bat"'
+
+      # 5) Build the native image (lemline-runner module)
+      # **Unix build (Linux & macOS)**
+      - name: Build native image (Unix)
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          ./gradlew  quarkusBuild -p lemline-runner  \                                                                   ─╯
+            -Dquarkus.native.enabled=true \
+            -Dquarkus.package.jar.enabled=false
+
+      # **Windows build**
+      - name: Build native image (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: cmd
+        run: |
+          gradlew.bat -p lemline-runner ^
+            quarkusBuild ^
+            -Dquarkus.native.enabled=true ^
+            -Dquarkus.package.jar.enabled=false
+
+      # 6) Package into dist/ for each platform
+      - name: Package distribution (macOS/Linux)
+        if: ${{ runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          mkdir -p dist/bin
+          # Copy & rename the runner
+          cp lemline-runner/build/*-runner dist/bin/lemline
+          chmod +x dist/bin/lemline
+          # Add docs
+          cp LICENSE README.md dist/
+          # Create tar.gz
+          tar -C dist -czf "lemline-${VERSION_NAME}-${{ matrix.platform }}.tar.gz" .
+
+      - name: Package distribution (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist\bin
+          Copy-Item lemline-runner/build\*-runner.exe dist\bin\lemline.exe
+          Copy-Item LICENSE, README.md dist\
+          Compress-Archive -Path dist\* -DestinationPath "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.zip"
+
+      # 7) Compute SHA-256 checksum
+      - name: Compute checksum
+        shell: bash
+        run: |
+          artifact=$(ls lemline-${VERSION_NAME}-${{ matrix.platform }}.*)
+          shasum -a 256 "$artifact" > "$artifact.sha256"
+
+      # 8) Upload to GitHub Releases (nightly or versioned)
+      - name: 📦 Publish to GitHub Releases
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: |
+            lemline-${{ env.VERSION_NAME }}-${{ matrix.platform }}.*
+          file_glob: true
+          tag: ${{ github.event_name == 'push' && github.ref_name || 'nightly' }}
+          release_name: ${{ github.event_name == 'push' && format('Lemline {0}', github.ref_name) || 'Nightly Build' }}
+          prerelease: ${{ github.event_name != 'push' }}
+          overwrite: true
+          make_latest: ${{ github.event_name == 'push' }}
