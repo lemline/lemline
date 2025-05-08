@@ -75,6 +75,8 @@ jobs:
           echo "JAVA_HOME=$JAVA_HOME"   >> "$GITHUB_ENV"
           echo "GRAALVM_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
           echo "$JAVA_HOME/bin"         >> "$GITHUB_PATH"
+          ## 👉 Install the Native Image component
+          "$JAVA_HOME/bin/gu" install native-image
           java -version
           native-image --version
 
