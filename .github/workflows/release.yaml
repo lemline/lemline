@@ -15,19 +15,19 @@ env:
 
 permissions:
   contents: write
-  
+
 jobs:
   build:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - runner: ubuntu-latest
-            platform: linux-x86_64
-          #          - runner: windows-latest
-          #            platform: windows-x86_64
-          - runner: macos-14
-            platform: macos-arm64
+          #          - runner: ubuntu-latest
+          #            platform: linux-x86_64
+          - runner: windows-latest
+            platform: windows-x86_64
+    #          - runner: macos-14
+    #            platform: macos-arm64
 
     steps:
       # 1) Check out the full history and tags so we can diff and skip nightlies
@@ -83,19 +83,18 @@ jobs:
           "$JAVA_HOME/bin/native-image" --version
 
       # 4) On Windows, ensure MSVC env is loaded
+      - name: Setup MSBuild
+        if: ${{ runner.os == 'Windows' }}
+        uses: microsoft/setup-msbuild@v2
+        with:
+          msbuild-architecture: x64
+
       - name: Setup MSVC (Windows)
         if: ${{ runner.os == 'Windows' }}
-        shell: cmd
-        run: |
-          rem Find the newest VS 2022/2019 that has the C++ tool‑set
-          for /f "usebackq tokens=*" %%i in ( `
-            "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" ^
-              -latest -products * ^
-              -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
-              -property installationPath
-          ` ) do set "VSPATH=%%i"
-          echo "Visual Studio found in %VSPATH%"
-          call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat"  >nul
+        uses: ilammy/msvc-dev-cmd@v1.12.1
+        with:
+          arch: x64
+
 
       # 5) Build the native image (lemline-runner module)
       # **Unix build (Linux & macOS)**
@@ -104,17 +103,18 @@ jobs:
         run: |
           ./gradlew -p lemline-runner quarkusBuild \
             -Dquarkus.native.enabled=true \
-            -Dquarkus.package.jar.enabled=false
+            -Dquarkus.package.jar.enabled=false \
+            -Dquarkus.native.native-image-xmx=6g
 
       # **Windows build**
       - name: Build native image (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: cmd
         run: |
-          gradlew.bat -p lemline-runner ^
-            quarkusBuild ^
+          gradlew.bat -p lemline-runner quarkusBuild ^
             -Dquarkus.native.enabled=true ^
-            -Dquarkus.package.jar.enabled=false
+            -Dquarkus.package.jar.enabled=false ^
+            -Dquarkus.native.native-image-xmx=6g
 
       # 6) Package into dist/ for each platform
       - name: Package distribution (macOS/Linux)
