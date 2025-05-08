@@ -1,19 +1,20 @@
-name: Build and Release Lemline
+# File: .github/workflows/release.yml
+name: Build & Release Lemline
 
+# Triggers: version tags, nightly schedule, or manual dispatch
 on:
   push:
-    tags: [ 'v*.*.*' ]        # Versioned release on tag push
+    tags: [ 'v*.*.*' ]
   schedule:
-    - cron: '0 0 * * *'     # Nightly build at 00:00 UTC daily
-  workflow_dispatch: { }     # Manual trigger
+    - cron: '0 0 * * *'
+  workflow_dispatch: { }
 
 env:
-  # Determine version name: use tag name if this is a tag event, else "nightly"
+  # If this run is a tag build, use the tag name; otherwise 'nightly'
   VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'nightly' }}
 
 jobs:
   build:
-    name: Build and Release (${{ matrix.platform }})
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -22,100 +23,104 @@ jobs:
             platform: linux-x86_64
           - runner: windows-latest
             platform: windows-x86_64
-          - runner: macos-13       # Intel macOS
+          - runner: macos-13
             platform: macos-x86_64
-          - runner: macos-14       # Apple Silicon macOS
+          - runner: macos-14
             platform: macos-arm64
 
     steps:
-      - name: 🏷️ Determine build version
-        if: ${{ github.ref_type != 'tag' }}
-        shell: bash
-        run: echo "Running nightly build for commit $GITHUB_SHA"
-
-      - name: Checkout source
+      # 1) Checkout full history & tags so we can diff and skip nightlies
+      - name: Check out source
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0     # fetch all commits & tags
+          fetch-depth: 0
 
-      - name: Skip nightly if no new commits since last version tag
+      # 2) Skip scheduled run if lemline-runner had no changes since last version tag
+      - name: Skip nightly if lemline-runner unchanged
         if: ${{ github.event_name == 'schedule' }}
         run: |
-          # find the latest tag (e.g. v1.2.0)
           latest_tag=$(git describe --tags --abbrev=0)
-          # find the commit that tag points to
-          tag_commit=$(git rev-list -n 1 "$latest_tag")
-          echo "Latest tag: $latest_tag → commit $tag_commit"
-          # if HEAD equals that commit, nothing new to build
-          if [ "$(git rev-parse HEAD)" = "$tag_commit" ]; then
-            echo "No new commits since $latest_tag. Skipping nightly build."
+          tag_commit=$(git rev-list -n1 "$latest_tag")
+          echo "Last version tag: $latest_tag at $tag_commit"
+          if git diff --quiet "$tag_commit"..HEAD -- lemline-runner; then
+            echo "No changes under lemline-runner since $latest_tag; skipping nightly."
             exit 0
           fi
 
-      - name: Set up Mandrel (Java 17) for Native Build
+      # 3) Install Mandrel 24.1.2.r23-mandrel for native-image
+      - name: Set up Mandrel 24.1.2.r23-mandrel (Java 17)
         uses: graalvm/setup-graalvm@v1
         with:
-          distribution: 'mandrel'                # use Mandrel downstream of GraalVM CE
-          java-version: '24.1.2.r23-mandrel'     # exact Mandrel version
-          components: 'native-image'             # install native-image tool
+          distribution: 'mandrel'
+          java-version: '24.1.2.r23-mandrel'
+          components: 'native-image'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # (Optional) On Windows, ensure MSVC env is loaded. Windows runners typically have it by default.
+      # 4) On Windows, ensure MSVC env is loaded
       - name: Setup MSVC (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: cmd
+        run: '"%VSINSTALLDIR%\VC\Auxiliary\Build\vcvars64.bat"'
+
+      # 5) Build the native image (lemline-runner module)
+      # **Unix build (Linux & macOS)**
+      - name: Build native image (Unix)
+        if: ${{ runner.os != 'Windows' }}
         run: |
-          "%VSINSTALLDIR%\VC\Auxiliary\Build\vcvars64.bat"
+          ./gradlew  quarkusBuild -p lemline-runner  \                                                                   ─╯
+            -Dquarkus.native.enabled=true \
+            -Dquarkus.package.jar.enabled=false
 
-      - name: Build native executable (Linux)
-        if: ${{ runner.os == 'Linux' }}
-        run: ./gradlew buildNative --docker-build=true
+      # **Windows build**
+      - name: Build native image (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: cmd
+        run: |
+          gradlew.bat -p lemline-runner ^
+            quarkusBuild ^
+            -Dquarkus.native.enabled=true ^
+            -Dquarkus.package.jar.enabled=false
 
-      - name: Build native executable (macOS/Windows)
-        if: ${{ runner.os != 'Linux' }}
-        run: ./gradlew buildNative
-
-      # Packaging the build artifacts
-      - name: Package distribution (Linux/macOS)
+      # 6) Package into dist/ for each platform
+      - name: Package distribution (macOS/Linux)
         if: ${{ runner.os != 'Windows' }}
         shell: bash
         run: |
           mkdir -p dist/bin
-          # Copy and rename the native binary to 'lemline'
-          cp build/*-runner dist/bin/lemline
+          # Copy & rename the runner
+          cp lemline-runner/build/*-runner dist/bin/lemline
+          chmod +x dist/bin/lemline
+          # Add docs
           cp LICENSE README.md dist/
-          tar -czf "lemline-${VERSION_NAME}-${{ matrix.platform }}.tar.gz" -C dist .
+          # Create tar.gz
+          tar -C dist -czf "lemline-${VERSION_NAME}-${{ matrix.platform }}.tar.gz" .
 
       - name: Package distribution (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
         run: |
-          New-Item -Type Directory -Force -Path dist\bin
-          Copy-Item .\build\*-runner.exe -Destination dist\bin\lemline.exe
-          Copy-Item .\LICENSE -Destination dist\
-          Copy-Item .\README.md -Destination dist\
-          Compress-Archive -Path dist\* -DestinationPath "lemline-${{ env.VERSION_NAME }}-${{ matrix.platform }}.zip"
+          New-Item -ItemType Directory -Force -Path dist\bin
+          Copy-Item lemline-runner/build\*-runner.exe dist\bin\lemline.exe
+          Copy-Item LICENSE, README.md dist\
+          Compress-Archive -Path dist\* -DestinationPath "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.zip"
 
+      # 7) Compute SHA-256 checksum
       - name: Compute checksum
         shell: bash
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            powershell -Command '$hash = Get-FileHash -Path "lemline-*.zip" -Algorithm SHA256; "$($hash.Hash)  $($hash.Path | Split-Path -Leaf)" | Out-File "$($hash.Path).sha256" -Encoding ASCII'
-          else
-            shasum -a 256 "lemline-${VERSION_NAME}-${{ matrix.platform }}."* > "lemline-${VERSION_NAME}-${{ matrix.platform }}.$( [[ "$RUNNER_OS" == "Linux" ]] && echo tar.gz || echo tar.gz ).sha256"
-          fi
+          artifact=$(ls lemline-${VERSION_NAME}-${{ matrix.platform }}.*)
+          shasum -a 256 "$artifact" > "$artifact.sha256"
 
-      # (Optional) Code signing steps would go here, if configured (not shown for brevity).
-
-      - name: 📦 Upload artifacts to GitHub Release
+      # 8) Upload to GitHub Releases (nightly or versioned)
+      - name: 📦 Publish to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: "lemline-${{ env.VERSION_NAME }}-${{ matrix.platform }}.*"
+          file: |
+            lemline-${{ env.VERSION_NAME }}-${{ matrix.platform }}.*
           file_glob: true
-          tag: ${{ github.ref_type == 'tag' && github.ref_name || 'nightly' }}
-          release_name: ${{ github.ref_type == 'tag' && format('Lemline {0}', github.ref_name) || 'Nightly Build' }}
-          prerelease: ${{ github.ref_type != 'tag' }}
+          tag: ${{ github.event_name == 'push' && github.ref_name || 'nightly' }}
+          release_name: ${{ github.event_name == 'push' && format('Lemline {0}', github.ref_name) || 'Nightly Build' }}
+          prerelease: ${{ github.event_name != 'push' }}
           overwrite: true
-          draft: false
-          make_latest: ${{ github.ref_type == 'tag' }}
+          make_latest: ${{ github.event_name == 'push' }}
