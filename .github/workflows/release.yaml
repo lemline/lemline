@@ -48,12 +48,12 @@ jobs:
           fi
 
       # 3) Install Mandrel 24.1.2.r23-mandrel for native-image
-      - name: Set up Mandrel 24.1.2.r23-mandrel (Java 17)
+      - name: Set up Mandrel 24.2.1.0-Final for Native Image
         uses: graalvm/setup-graalvm@v1
         with:
-          distribution: 'mandrel'
-          java-version: '24.1.2.r23-mandrel'
-          components: 'native-image'
+          distribution: mandrel
+          java-version: '24.2.1.0-Final'
+          components: native-image
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # 4) On Windows, ensure MSVC env is loaded
