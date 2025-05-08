@@ -27,13 +27,13 @@ jobs:
             platform: macos-arm64
 
     steps:
-      # 1) Checkout full history & tags so we can diff and skip nightlies
+      # 1) Check out the full history and tags so we can diff and skip nightlies
       - name: Check out source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2) Skip scheduled run if lemline-runner had no changes since last version tag
+      # 2) Skip scheduled run if lemline-runner had no changes since the last version tag
       - name: Skip nightly if lemline-runner unchanged
         if: ${{ github.event_name == 'schedule' }}
         run: |
@@ -123,7 +123,7 @@ jobs:
           cp lemline-runner/build/*-runner dist/bin/lemline
           chmod +x dist/bin/lemline
           # Add docs
-          cp LICENSE README.md dist/
+          cp LICENSE.md README.md dist/
           # Create tar.gz
           tar -C dist -czf "lemline-${VERSION_NAME}-${{ matrix.platform }}.tar.gz" .
 
@@ -133,7 +133,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path dist\bin
           Copy-Item lemline-runner/build\*-runner.exe dist\bin\lemline.exe
-          Copy-Item LICENSE, README.md dist\
+          Copy-Item LICENSE.md, README.md dist\
           Compress-Archive -Path dist\* -DestinationPath "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.zip"
 
       # 7) Compute SHA-256 checksum
