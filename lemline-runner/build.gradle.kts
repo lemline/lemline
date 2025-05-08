@@ -12,14 +12,6 @@ plugins {
 group = "com.lemline.runner"
 version = "0.0.1-SNAPSHOT"
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_23
-    targetCompatibility = JavaVersion.VERSION_23
-}
-
-kotlin {
-    jvmToolchain(23)
-}
 
 // ────────────────────────────────────────────────────────────────────────────
 // 2) Exclude unwanted HTTP clients

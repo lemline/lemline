@@ -23,11 +23,6 @@ spotless {
     }
 }
 
-kotlin {
-    // Use a specific Java version to make it easier to work in different environments.
-    jvmToolchain(23)
-}
-
 tasks.withType<Test>().configureEach {
     // Configure all test Gradle tasks to use JUnitPlatform.
     useJUnitPlatform()
