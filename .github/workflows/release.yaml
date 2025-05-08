@@ -139,11 +139,20 @@ jobs:
           Compress-Archive -Path dist\* -DestinationPath "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.zip"
 
       # 7) Compute SHA-256 checksum
-      - name: Compute checksum
+      - name: Compute checksum (macOS/Linux)
+        if: ${{ runner.os != 'Windows' }}
         shell: bash
         run: |
           artifact=$(ls lemline-${VERSION_NAME}-${{ matrix.platform }}.*)
           shasum -a 256 "$artifact" > "$artifact.sha256"
+
+      - name: Compute checksum (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $artifact = Get-ChildItem "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.*"
+          $hash = Get-FileHash $artifact -Algorithm SHA256
+          $hash.Hash | Out-File -Encoding ASCII "$($artifact.Name).sha256"
 
       # 8) Upload to GitHub Releases (nightly or versioned)
       - name: 📦 Publish to GitHub Releases
