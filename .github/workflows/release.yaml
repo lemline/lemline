@@ -206,7 +206,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: lemline-${{ env.VERSION_NAME }}-*.*   # grabs tar.gz, zip, jar, sha256
+          file: lemline-${{ env.VERSION_NAME }}*.*   # grabs tar.gz, zip, jar, sha256
           file_glob: true
           tag: ${{ github.event_name == 'push' && github.ref_name || 'nightly' }}
           release_name: ${{ github.event_name == 'push' && format('Lemline {0}', github.ref_name) || 'Nightly Build' }}
