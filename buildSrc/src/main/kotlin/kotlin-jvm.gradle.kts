@@ -20,13 +20,12 @@ spotless {
         targetExclude("**/bin/**")
         trimTrailingWhitespace()
         endWithNewline()
-        //ktlint()
     }
 }
 
 kotlin {
     // Use a specific Java version to make it easier to work in different environments.
-    jvmToolchain(17)
+    jvmToolchain(22)
 }
 
 tasks.withType<Test>().configureEach {
