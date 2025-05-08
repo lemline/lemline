@@ -44,6 +44,8 @@ import io.serverlessworkflow.api.types.OAuth2AuthenticationPropertiesEndpoints
 import io.serverlessworkflow.api.types.OAuth2TokenDefinition
 import io.serverlessworkflow.api.types.OpenIdConnectAuthenticationPolicy
 import io.serverlessworkflow.api.types.SecretBasedAuthenticationPolicy
+import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -51,8 +53,6 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
-import java.util.*
-import java.util.concurrent.ConcurrentHashMap
 
 /**
  * HttpCall is a utility class for making HTTP requests.
@@ -430,8 +430,6 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
                 NONE -> {
                     append("client_id", clientId)
                 }
-
-                else -> error("Unsupported client authentication method: $authMethod")
             }
 
             if (authData.scopes.isNotEmpty()) {

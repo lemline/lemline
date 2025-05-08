@@ -123,6 +123,9 @@ tasks.named<QuarkusBuild>("quarkusBuild") {
 
         val macLib = file("$buildDir/lemline-runner-$version-native-image-source-jar/libaws-crt-jni.dylib")
         if (macLib.exists()) macLib.setWritable(true)
+
+        val winLib = file("$buildDir/lemline-runner-$version-native-image-source-jar/aws-crt-jni.dll")
+        if (winLib.exists()) macLib.setWritable(true)
     }
 }
 
