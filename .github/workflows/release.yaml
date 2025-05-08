@@ -1,4 +1,3 @@
-# File: .github/workflows/release.yml
 name: Build & Release Lemline
 
 # Triggers: version tags, nightly schedule, or manual dispatch
@@ -22,9 +21,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - runner: ubuntu-latest
+          - runner: ubuntu-22.04
             platform: linux-x86_64
-          - runner: windows-latest
+          - runner: windows-2022
             platform: windows-x86_64
           - runner: macos-14
             platform: macos-arm64
@@ -58,19 +57,19 @@ jobs:
         uses: graalvm/setup-graalvm@v1
         with:
           distribution: mandrel
-          version: 'mandrel-24.1.2.0-Final'    # the Mandrel official version
-          java-version: '23'                   # the JDK version to install
+          version: 'mandrel-24.1.2.0-Final'    # Mandrel official version
+          java-version: '23'                   # JDK version to install
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # **🍎 MacOs (due to a bug in setup-graalvm@v1)**
-      - name: Manually install Mandrel 24.1.2.0‑Final on macOS
+      # **🍎 MacOS (manual Mandrel setup due to setup-graalvm bug)**
+      - name: Manually install Mandrel 24.1.2.0-Final on macOS
         if: runner.os == 'macOS'
         shell: bash
         run: |
           set -eo pipefail
           M_VERSION="24.1.2.0-Final"
           JDK="java23"
-          ARCH="aarch64"                       # GitHub macos‑14 is Apple‑Silicon
+          ARCH="aarch64"  # GitHub macos-14 runs on Apple Silicon
           URL="https://github.com/graalvm/mandrel/releases/download/mandrel-${M_VERSION}/mandrel-${JDK}-macos-${ARCH}-${M_VERSION}.tar.gz"
           echo "Downloading $URL"
           curl -sSL "$URL" -o mandrel.tar.gz
@@ -82,8 +81,8 @@ jobs:
           echo "JAVA_HOME=$JAVA_HOME"   >> "$GITHUB_ENV"
           echo "GRAALVM_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
           echo "$JAVA_HOME/bin"         >> "$GITHUB_PATH"
-          # Mandrel macOS archives ALREADY include native‑image; no gu needed
-          "$JAVA_HOME/bin/java"  -version
+          # Verify Mandrel installation
+          "$JAVA_HOME/bin/java" -version
           "$JAVA_HOME/bin/native-image" --version
 
       #################################
@@ -105,6 +104,13 @@ jobs:
       #################################
       # 5) Native build step
       #################################
+
+      # **☕ Build Uber-JAR**
+      - name: Build uber-jar (Linux)
+        if: ${{ matrix.platform == 'linux-x86_64' }}
+        run: |
+          ./gradlew -p lemline-runner quarkusBuild \
+          -Dquarkus.package.jar.type=uber-jar
 
       # **🐧 Linux & 🍎 MacOS**
       - name: Build native image (Unix)
@@ -135,12 +141,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist/bin
-          # Copy & rename the runner
           cp lemline-runner/build/*-runner dist/bin/lemline
           chmod +x dist/bin/lemline
-          # Add docs
           cp LICENSE.md README.md dist/
-          # Create tar.gz
           tar -C dist -czf "lemline-${VERSION_NAME}-${{ matrix.platform }}.tar.gz" .
 
       # **🪟 Windows**
@@ -152,6 +155,20 @@ jobs:
           Copy-Item lemline-runner/build\*-runner.exe dist\bin\lemline.exe
           Copy-Item LICENSE.md, README.md dist\
           Compress-Archive -Path dist\* -DestinationPath "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.zip"
+
+      # **☕ Uber-JAR**
+      - name: Package distribution (Uber JAR)
+        if: ${{ matrix.platform == 'linux-x86_64' }}
+        shell: bash
+        run: |
+          JAR=$(ls lemline-runner/build/*-runner.jar)
+          # ① plain jar
+          cp "$JAR" "lemline-${VERSION_NAME}.jar"
+          # ② jar + docs zipped
+          mkdir -p dist_jar
+          cp "$JAR" dist_jar/lemline.jar
+          cp LICENSE.md README.md dist_jar/
+          (cd dist_jar && zip -r "../lemline-${VERSION_NAME}-all.zip" .)
 
       #################################
       # 7) Checksums
@@ -168,21 +185,28 @@ jobs:
       # **🪟 Windows**
       - name: Compute checksum (Windows)
         if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          $artifact = Get-ChildItem "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.*"
+          $hash = Get-FileHash $artifact -Algorithm SHA256
+          $hash.Hash | Out-File -Encoding ASCII "$($artifact.Name).sha256"
+
+      # **☕ Uber-JAR**
+      - name: Compute checksum (Uber‑JAR)
+        if: ${{ matrix.platform == 'linux-x86_64' }}
         shell: bash
         run: |
-          artifact=$(ls lemline-${VERSION_NAME}-${{ matrix.platform }}.*)
-      
+          shasum -a 256 "lemline-${VERSION_NAME}.jar"      > "lemline-${VERSION_NAME}.jar.sha256"
+          shasum -a 256 "lemline-${VERSION_NAME}-all.zip"  > "lemline-${VERSION_NAME}-all.zip.sha256"
 
       #################################
       # 8) Release (nightly or versioned)
       #################################
-
       - name: 📦 Publish to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: |
-            lemline-${{ env.VERSION_NAME }}-${{ matrix.platform }}.*
+          file: lemline-${{ env.VERSION_NAME }}-*.*   # grabs tar.gz, zip, jar, sha256
           file_glob: true
           tag: ${{ github.event_name == 'push' && github.ref_name || 'nightly' }}
           release_name: ${{ github.event_name == 'push' && format('Lemline {0}', github.ref_name) || 'Nightly Build' }}
