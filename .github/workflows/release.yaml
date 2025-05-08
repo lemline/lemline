@@ -114,7 +114,7 @@ jobs:
           file: "lemline-${{ env.VERSION_NAME }}-${{ matrix.platform }}.*"
           file_glob: true
           tag: ${{ github.ref_type == 'tag' && github.ref_name || 'nightly' }}
-          release_name: ${{ github.ref_type == 'tag' && 'Lemline ' + github.ref_name || 'Nightly Build' }}
+          release_name: ${{ github.ref_type == 'tag' && format('Lemline {0}', github.ref_name) || 'Nightly Build' }}
           prerelease: ${{ github.ref_type != 'tag' }}
           overwrite: true
           draft: false
