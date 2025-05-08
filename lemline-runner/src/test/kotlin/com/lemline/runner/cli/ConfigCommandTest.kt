@@ -119,7 +119,6 @@ class ConfigCommandTest {
         executeAndCapture("--log=WARN", "config")
         executeAndCapture("-l", "ERROR", "config")
         executeAndCapture("--log=FATAL", "config")
-        // executeAndCapture("-l", "OFF", "config") // OFF is not a standard JBoss Logging Level
         executeAndCapture("--log=TRACE", "config")
 
         // The LogOptionConverter in MainCommand will cause an exit if the level is invalid,
