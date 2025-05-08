@@ -13,6 +13,9 @@ env:
   # If this run is a tag build, use the tag name; otherwise 'nightly'
   VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'nightly' }}
 
+permissions:
+  contents: write
+  
 jobs:
   build:
     runs-on: ${{ matrix.runner }}
