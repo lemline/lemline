@@ -13,12 +13,12 @@ group = "com.lemline.runner"
 version = "0.0.1-SNAPSHOT"
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_22
-    targetCompatibility = JavaVersion.VERSION_22
+    sourceCompatibility = JavaVersion.VERSION_23
+    targetCompatibility = JavaVersion.VERSION_23
 }
 
 kotlin {
-    jvmToolchain(22)
+    jvmToolchain(23)
 }
 
 // ────────────────────────────────────────────────────────────────────────────

@@ -53,7 +53,7 @@ jobs:
         with:
           distribution: mandrel
           version: 'mandrel-24.1.2.0-Final'
-          java-version: '22'              # the JDK version to install (Mandrel bundles native-image for you)
+          java-version: '23'              # the JDK version to install (Mandrel bundles native-image for you)
           components: native-image        # ensure the native-image tool is added
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
