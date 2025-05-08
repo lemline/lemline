@@ -71,14 +71,15 @@ jobs:
           curl -sSL "$URL" -o mandrel.tar.gz
           tar -xf mandrel.tar.gz
           # Mandrel unpacks into mandrel-java23-24.1.2.0-Final/
-          export JAVA_HOME="$PWD/mandrel-${JDK}-${M_VERSION}/Contents/Home"
+          DIR=$(tar -tf mandrel.tar.gz | head -1 | cut -d/ -f1)
+          export JAVA_HOME="$PWD/$DIR/Contents/Home"
+          export GRAALVM_HOME="$JAVA_HOME"
           echo "JAVA_HOME=$JAVA_HOME"   >> "$GITHUB_ENV"
           echo "GRAALVM_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
           echo "$JAVA_HOME/bin"         >> "$GITHUB_PATH"
-          ## 👉 Install the Native Image component
-          "$JAVA_HOME/bin/gu" install native-image
-          java -version
-          native-image --version
+          # Mandrel macOS archives ALREADY include native‑image; no gu needed
+          "$JAVA_HOME/bin/java"  -version
+          "$JAVA_HOME/bin/native-image" --version
 
       # 4) On Windows, ensure MSVC env is loaded
       - name: Setup MSVC (Windows)
