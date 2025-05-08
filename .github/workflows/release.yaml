@@ -1,0 +1,121 @@
+name: Build and Release Lemline
+
+on:
+  push:
+    tags: [ 'v*.*.*' ]        # Versioned release on tag push
+  schedule:
+    - cron: '0 0 * * *'     # Nightly build at 00:00 UTC daily
+  workflow_dispatch: { }     # Manual trigger
+
+env:
+  # Determine version name: use tag name if this is a tag event, else "nightly"
+  VERSION_NAME: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'nightly' }}
+
+jobs:
+  build:
+    name: Build and Release (${{ matrix.platform }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            platform: linux-x86_64
+          - runner: windows-latest
+            platform: windows-x86_64
+          - runner: macos-13       # Intel macOS
+            platform: macos-x86_64
+          - runner: macos-14       # Apple Silicon macOS
+            platform: macos-arm64
+
+    steps:
+      - name: 🏷️ Determine build version
+        if: ${{ github.ref_type != 'tag' }}
+        shell: bash
+        run: echo "Running nightly build for commit $GITHUB_SHA"
+
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0     # fetch all commits & tags
+
+      - name: Skip nightly if no new commits since last version tag
+        if: ${{ github.event_name == 'schedule' }}
+        run: |
+          # find the latest tag (e.g. v1.2.0)
+          latest_tag=$(git describe --tags --abbrev=0)
+          # find the commit that tag points to
+          tag_commit=$(git rev-list -n 1 "$latest_tag")
+          echo "Latest tag: $latest_tag → commit $tag_commit"
+          # if HEAD equals that commit, nothing new to build
+          if [ "$(git rev-parse HEAD)" = "$tag_commit" ]; then
+            echo "No new commits since $latest_tag. Skipping nightly build."
+            exit 0
+          fi
+
+      - name: Set up Mandrel (Java 17) for Native Build
+        uses: graalvm/setup-graalvm@v1
+        with:
+          distribution: 'mandrel'                # use Mandrel downstream of GraalVM CE
+          java-version: '24.1.2.r23-mandrel'     # exact Mandrel version
+          components: 'native-image'             # install native-image tool
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # (Optional) On Windows, ensure MSVC env is loaded. Windows runners typically have it by default.
+      - name: Setup MSVC (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: cmd
+        run: |
+          "%VSINSTALLDIR%\VC\Auxiliary\Build\vcvars64.bat"
+
+      - name: Build native executable (Linux)
+        if: ${{ runner.os == 'Linux' }}
+        run: ./gradlew buildNative --docker-build=true
+
+      - name: Build native executable (macOS/Windows)
+        if: ${{ runner.os != 'Linux' }}
+        run: ./gradlew buildNative
+
+      # Packaging the build artifacts
+      - name: Package distribution (Linux/macOS)
+        if: ${{ runner.os != 'Windows' }}
+        shell: bash
+        run: |
+          mkdir -p dist/bin
+          # Copy and rename the native binary to 'lemline'
+          cp build/*-runner dist/bin/lemline
+          cp LICENSE README.md dist/
+          tar -czf "lemline-${VERSION_NAME}-${{ matrix.platform }}.tar.gz" -C dist .
+
+      - name: Package distribution (Windows)
+        if: ${{ runner.os == 'Windows' }}
+        shell: pwsh
+        run: |
+          New-Item -Type Directory -Force -Path dist\bin
+          Copy-Item .\build\*-runner.exe -Destination dist\bin\lemline.exe
+          Copy-Item .\LICENSE -Destination dist\
+          Copy-Item .\README.md -Destination dist\
+          Compress-Archive -Path dist\* -DestinationPath "lemline-${{ env.VERSION_NAME }}-${{ matrix.platform }}.zip"
+
+      - name: Compute checksum
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            powershell -Command '$hash = Get-FileHash -Path "lemline-*.zip" -Algorithm SHA256; "$($hash.Hash)  $($hash.Path | Split-Path -Leaf)" | Out-File "$($hash.Path).sha256" -Encoding ASCII'
+          else
+            shasum -a 256 "lemline-${VERSION_NAME}-${{ matrix.platform }}."* > "lemline-${VERSION_NAME}-${{ matrix.platform }}.$( [[ "$RUNNER_OS" == "Linux" ]] && echo tar.gz || echo tar.gz ).sha256"
+          fi
+
+      # (Optional) Code signing steps would go here, if configured (not shown for brevity).
+
+      - name: 📦 Upload artifacts to GitHub Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: "lemline-${{ env.VERSION_NAME }}-${{ matrix.platform }}.*"
+          file_glob: true
+          tag: ${{ github.ref_type == 'tag' && github.ref_name || 'nightly' }}
+          release_name: ${{ github.ref_type == 'tag' && 'Lemline ' + github.ref_name || 'Nightly Build' }}
+          prerelease: ${{ github.ref_type != 'tag' }}
+          overwrite: true
+          draft: false
+          make_latest: ${{ github.ref_type == 'tag' }}
