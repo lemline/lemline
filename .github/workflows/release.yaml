@@ -21,8 +21,8 @@ jobs:
         include:
           - runner: ubuntu-latest
             platform: linux-x86_64
-          - runner: windows-latest
-            platform: windows-x86_64
+          #          - runner: windows-latest
+          #            platform: windows-x86_64
           - runner: macos-14
             platform: macos-arm64
 
