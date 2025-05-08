@@ -22,12 +22,12 @@ jobs:
     strategy:
       matrix:
         include:
-          #          - runner: ubuntu-latest
-          #            platform: linux-x86_64
+          - runner: ubuntu-latest
+            platform: linux-x86_64
           - runner: windows-latest
             platform: windows-x86_64
-    #          - runner: macos-14
-    #            platform: macos-arm64
+          - runner: macos-14
+            platform: macos-arm64
 
     steps:
       # 1) Check out the full history and tags so we can diff and skip nightlies
@@ -48,7 +48,11 @@ jobs:
             exit 0
           fi
 
-      # 3) Install Mandrel 24.1.2.r23-mandrel for native-image
+      #################################
+      # 3) Mandrel setup
+      #################################
+
+      # **🐧 Linux & 🪟 Windows**
       - name: Set up Mandrel Native Image
         if: runner.os != 'macOS'
         uses: graalvm/setup-graalvm@v1
@@ -58,6 +62,7 @@ jobs:
           java-version: '23'                   # the JDK version to install
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
+      # **🍎 MacOs (due to a bug in setup-graalvm@v1)**
       - name: Manually install Mandrel 24.1.2.0‑Final on macOS
         if: runner.os == 'macOS'
         shell: bash
@@ -81,7 +86,10 @@ jobs:
           "$JAVA_HOME/bin/java"  -version
           "$JAVA_HOME/bin/native-image" --version
 
-      # 4) On Windows, ensure MSVC env is loaded
+      #################################
+      # 4) 🪟 Windows-specific configuration
+      #################################
+
       - name: Setup MSBuild
         if: ${{ runner.os == 'Windows' }}
         uses: microsoft/setup-msbuild@v2
@@ -94,9 +102,11 @@ jobs:
         with:
           arch: x64
 
+      #################################
+      # 5) Native build step
+      #################################
 
-      # 5) Build the native image (lemline-runner module)
-      # **Unix build (Linux & macOS)**
+      # **🐧 Linux & 🍎 MacOS**
       - name: Build native image (Unix)
         if: ${{ runner.os != 'Windows' }}
         run: |
@@ -105,7 +115,7 @@ jobs:
             -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.native-image-xmx=6g
 
-      # **Windows build**
+      # **🪟 Windows**
       - name: Build native image (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: cmd
@@ -115,7 +125,11 @@ jobs:
             -Dquarkus.package.jar.enabled=false ^
             -Dquarkus.native.native-image-xmx=6g
 
-      # 6) Package into dist/ for each platform
+      #################################
+      # 6) Packaging
+      #################################
+
+      # **🐧 Linux & 🍎 MacOS**
       - name: Package distribution (macOS/Linux)
         if: ${{ runner.os != 'Windows' }}
         shell: bash
@@ -129,6 +143,7 @@ jobs:
           # Create tar.gz
           tar -C dist -czf "lemline-${VERSION_NAME}-${{ matrix.platform }}.tar.gz" .
 
+      # **🪟 Windows**
       - name: Package distribution (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: pwsh
@@ -138,7 +153,11 @@ jobs:
           Copy-Item LICENSE.md, README.md dist\
           Compress-Archive -Path dist\* -DestinationPath "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.zip"
 
-      # 7) Compute SHA-256 checksum
+      #################################
+      # 7) Checksums
+      #################################
+
+      # **🐧 Linux & 🍎 MacOS**
       - name: Compute checksum (macOS/Linux)
         if: ${{ runner.os != 'Windows' }}
         shell: bash
@@ -146,15 +165,18 @@ jobs:
           artifact=$(ls lemline-${VERSION_NAME}-${{ matrix.platform }}.*)
           shasum -a 256 "$artifact" > "$artifact.sha256"
 
+      # **🪟 Windows**
       - name: Compute checksum (Windows)
         if: ${{ runner.os == 'Windows' }}
-        shell: pwsh
+        shell: bash
         run: |
-          $artifact = Get-ChildItem "lemline-${env:VERSION_NAME}-${{ matrix.platform }}.*"
-          $hash = Get-FileHash $artifact -Algorithm SHA256
-          $hash.Hash | Out-File -Encoding ASCII "$($artifact.Name).sha256"
+          artifact=$(ls lemline-${VERSION_NAME}-${{ matrix.platform }}.*)
+      
 
-      # 8) Upload to GitHub Releases (nightly or versioned)
+      #################################
+      # 8) Release (nightly or versioned)
+      #################################
+
       - name: 📦 Publish to GitHub Releases
         uses: svenstaro/upload-release-action@v2
         with:
