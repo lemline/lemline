@@ -118,7 +118,11 @@ tasks.withType<Test>().configureEach {
 // this is a hack to enable native compilation (bug in quarkus-amazon-crt)
 tasks.named<QuarkusBuild>("quarkusBuild") {
     doFirst {
-        file("$buildDir/lemline-runner-$version-native-image-source-jar/libaws-crt-jni.dylib").setWritable(true)
+        val linuxLib = file("$buildDir/lemline-runner-$version-native-image-source-jar/libaws-crt-jni.so")
+        if (linuxLib.exists()) linuxLib.setWritable(true)
+
+        val macLib = file("$buildDir/lemline-runner-$version-native-image-source-jar/libaws-crt-jni.dylib")
+        if (macLib.exists()) macLib.setWritable(true)
     }
 }
 
