@@ -49,12 +49,34 @@ jobs:
 
       # 3) Install Mandrel 24.1.2.r23-mandrel for native-image
       - name: Set up Mandrel Native Image
+        if: runner.os != 'macOS'
         uses: graalvm/setup-graalvm@v1
         with:
           distribution: mandrel
+          version: 'mandrel-24.1.2.0-Final'
           java-version: '23'              # the JDK version to install (Mandrel bundles native-image for you)
           components: native-image        # ensure the native-image tool is added
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Manually install Mandrel 24.1.2.0‑Final on macOS
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -eo pipefail
+          M_VERSION="24.1.2.0-Final"
+          JDK="java23"
+          ARCH="aarch64"                       # GitHub macos‑14 is Apple‑Silicon
+          URL="https://github.com/graalvm/mandrel/releases/download/mandrel-${M_VERSION}/mandrel-${JDK}-macos-${ARCH}-${M_VERSION}.tar.gz"
+          echo "Downloading $URL"
+          curl -sSL "$URL" -o mandrel.tar.gz
+          tar -xf mandrel.tar.gz
+          # Mandrel unpacks into mandrel-java23-24.1.2.0-Final/
+          export JAVA_HOME="$PWD/mandrel-${JDK}-${M_VERSION}/Contents/Home"
+          echo "JAVA_HOME=$JAVA_HOME"   >> "$GITHUB_ENV"
+          echo "GRAALVM_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+          echo "$JAVA_HOME/bin"         >> "$GITHUB_PATH"
+          java -version
+          native-image --version
 
       # 4) On Windows, ensure MSVC env is loaded
       - name: Setup MSVC (Windows)
