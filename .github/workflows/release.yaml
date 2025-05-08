@@ -23,8 +23,6 @@ jobs:
             platform: linux-x86_64
           - runner: windows-latest
             platform: windows-x86_64
-          - runner: macos-13
-            platform: macos-x86_64
           - runner: macos-14
             platform: macos-arm64
 
@@ -85,7 +83,16 @@ jobs:
       - name: Setup MSVC (Windows)
         if: ${{ runner.os == 'Windows' }}
         shell: cmd
-        run: '"%VSINSTALLDIR%\VC\Auxiliary\Build\vcvars64.bat"'
+        run: |
+          rem Find the newest VS 2022/2019 that has the C++ tool‑set
+          for /f "usebackq tokens=*" %%i in ( `
+            "%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" ^
+              -latest -products * ^
+              -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 ^
+              -property installationPath
+          ` ) do set "VSPATH=%%i"
+          echo "Visual Studio found in %VSPATH%"
+          call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat"  >nul
 
       # 5) Build the native image (lemline-runner module)
       # **Unix build (Linux & macOS)**
