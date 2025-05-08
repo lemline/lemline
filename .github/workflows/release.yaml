@@ -112,14 +112,23 @@ jobs:
           ./gradlew -p lemline-runner quarkusBuild \
           -Dquarkus.package.jar.type=uber-jar
 
-      # **🐧 Linux & 🍎 MacOS**
+      # **🐧 Linux**
       - name: Build native image (Unix)
-        if: ${{ runner.os != 'Windows' }}
+        if: ${{ matrix.platform == 'linux-x86_64' }}
         run: |
           ./gradlew -p lemline-runner quarkusBuild \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
             -Dquarkus.native.native-image-xmx=6g
+
+      # **🍎 MacOS**
+      - name: Build native image (Unix)
+        if: runner.os == 'macOS'
+        run: |
+          ./gradlew -p lemline-runner quarkusBuild \
+            -Dquarkus.native.enabled=true \
+            -Dquarkus.package.jar.enabled=false \
+            -Dquarkus.native.native-image-xmx=10g   # Increased memory for macos
 
       # **🪟 Windows**
       - name: Build native image (Windows)
