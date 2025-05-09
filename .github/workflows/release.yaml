@@ -122,7 +122,7 @@ jobs:
             -Dquarkus.native.native-image-xmx=6g
 
       # **🍎 MacOS**
-      - name: Build native image (Unix)
+      - name: Build native image (MacOs)
         if: runner.os == 'macOS'
         run: |
           ./gradlew -p lemline-runner quarkusBuild \
