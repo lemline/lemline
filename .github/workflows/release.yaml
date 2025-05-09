@@ -16,7 +16,38 @@ permissions:
   contents: write
 
 jobs:
+
+  #################################
+  # 1) Check Changes
+  #################################
+  check-changes:
+    # Only run on schedule; version/tag pushes always proceed.
+    if: ${{ github.event_name == 'schedule' }}
+    runs-on: ubuntu-22.04
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changes under lemline-runner
+        id: diff
+        shell: bash
+        run: |
+          latest_tag=$(git describe --tags --abbrev=0)
+          tag_commit=$(git rev-list -n1 "$latest_tag")
+          if git diff --quiet "$tag_commit"..HEAD -- lemline-runner; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true"  >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check-changes
+    # Run on tags/manual always; on schedule only if changes detected
+    if: ${{ github.event_name != 'schedule' || needs.check-changes.outputs.changed == 'true' }}
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
@@ -29,23 +60,12 @@ jobs:
             platform: macos-arm64
 
     steps:
-      # 1) Check out the full history and tags so we can diff and skip nightlies
+      #################################
+      # 2) Checkout
+      #################################
+
       - name: Check out source
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # 2) Skip scheduled run if lemline-runner had no changes since the last version tag
-      - name: Skip nightly if lemline-runner unchanged
-        if: ${{ github.event_name == 'schedule' }}
-        run: |
-          latest_tag=$(git describe --tags --abbrev=0)
-          tag_commit=$(git rev-list -n1 "$latest_tag")
-          echo "Last version tag: $latest_tag at $tag_commit"
-          if git diff --quiet "$tag_commit"..HEAD -- lemline-runner; then
-            echo "No changes under lemline-runner since $latest_tag; skipping nightly."
-            exit 0
-          fi
 
       #################################
       # 3) Mandrel setup

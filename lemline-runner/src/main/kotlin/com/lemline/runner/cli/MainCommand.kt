@@ -61,7 +61,7 @@ class MainCommand : Runnable {
         // (Picocli handles those before calling run()).
         // This is the scenario where we intend to start the server.
         this.daemon = true
-        
+
         //
         //                       %%%                         @%%
         //                      %*****%%%                    %***%%
