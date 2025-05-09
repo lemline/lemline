@@ -177,7 +177,7 @@ jobs:
           mkdir -p dist_jar
           cp "$JAR" dist_jar/lemline.jar
           cp LICENSE.md README.md dist_jar/
-          (cd dist_jar && zip -r "../lemline-${VERSION_NAME}-all.zip" .)
+          (cd dist_jar && zip -r "../lemline-${VERSION_NAME}-jar.zip" .)
 
       #################################
       # 7) Checksums
@@ -206,7 +206,7 @@ jobs:
         shell: bash
         run: |
           shasum -a 256 "lemline-${VERSION_NAME}.jar"      > "lemline-${VERSION_NAME}.jar.sha256"
-          shasum -a 256 "lemline-${VERSION_NAME}-all.zip"  > "lemline-${VERSION_NAME}-all.zip.sha256"
+          shasum -a 256 "lemline-${VERSION_NAME}-jar.zip"  > "lemline-${VERSION_NAME}-jar.zip.sha256"
 
       #################################
       # 8) Release (nightly or versioned)
