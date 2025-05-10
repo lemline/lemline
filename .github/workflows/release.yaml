@@ -38,7 +38,7 @@ jobs:
         run: |
           latest_tag=$(git describe --tags --abbrev=0)
           tag_commit=$(git rev-list -n1 "$latest_tag")
-          if git diff --quiet "$tag_commit"..HEAD -- lemline-runner; then
+          if git diff --quiet "$tag_commit"..HEAD; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true"  >> "$GITHUB_OUTPUT"
