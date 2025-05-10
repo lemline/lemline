@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.workflow
 
-import com.lemline.runner.cli.common.InteractiveWorkflowSelector // Import selector
-import com.lemline.runner.models.WorkflowModel // Import model
+import com.lemline.runner.cli.common.InteractiveWorkflowSelector
+import com.lemline.runner.models.WorkflowModel
 import com.lemline.runner.repositories.WorkflowRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
@@ -10,7 +10,6 @@ import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
-import picocli.CommandLine.ParentCommand
 
 @Unremovable
 @Command(
@@ -55,12 +54,8 @@ class WorkflowDeleteCommand : Runnable {
     )
     var force: Boolean = false
 
-    @ParentCommand
-    lateinit var parent: WorkflowCommand
-
     override fun run() {
-        parent.parent.daemon = false
-
+        
         try {
             if (force) {
                 handleForcedDeletion()

@@ -35,10 +35,16 @@ import kotlinx.coroutines.future.future
 import org.eclipse.microprofile.reactive.messaging.Incoming
 import org.eclipse.microprofile.reactive.messaging.Outgoing
 
+
 internal const val WORKFLOW_IN = "workflows-in"
 internal const val WORKFLOW_OUT = "workflows-out"
 
+/**
+ * WorkflowConsumer is responsible for consuming workflow messages from the incoming channel,
+ * processing them, and sending the results to the outgoing channel.
+ */
 @ApplicationScoped
+//@IfBuildProfile("consumer")
 internal class WorkflowConsumer(
     private val workflowRepository: WorkflowRepository,
     private val retryRepository: RetryRepository,

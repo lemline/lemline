@@ -12,7 +12,6 @@ import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
-import picocli.CommandLine.ParentCommand
 
 @Unremovable
 @Command(name = "get", description = ["Get specific workflow definitions, interactively if needed."])
@@ -51,11 +50,7 @@ class WorkflowGetCommand : Runnable {
     )
     var format: OutputFormat = OutputFormat.YAML
 
-    @ParentCommand
-    lateinit var parent: WorkflowCommand
-
     override fun run() {
-        parent.parent.daemon = false // Stop after execution
 
         try {
             if (name != null && version != null) {
@@ -131,7 +126,7 @@ class WorkflowGetCommand : Runnable {
                 .writerWithDefaultPrettyPrinter()
                 .writeValueAsString(workflow)
             println(workflowJson)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             System.err.println(
                 "ERROR: Unable to parse and format Workflow '${workflowModel.name}' version '${workflowModel.version}' as JSON. Stored definition might be invalid:\n" +
                     workflowModel.definition

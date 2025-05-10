@@ -12,8 +12,6 @@ import org.eclipse.microprofile.config.Config
 import picocli.CommandLine.Command
 import picocli.CommandLine.ITypeConverter
 import picocli.CommandLine.Option
-import picocli.CommandLine.ParentCommand
-
 
 @Unremovable
 @Command(
@@ -45,15 +43,10 @@ class ConfigCommand : Runnable {
     )
     var all: Boolean = false
 
-    @ParentCommand
-    lateinit var parent: MainCommand
-
     @Inject
     lateinit var config: Config
 
     override fun run() {
-        // Stop after this command
-        parent.daemon = false
 
         val properties = config.propertyNames.asSequence()
             .filter { all || it.startsWith("lemline.") }
@@ -64,11 +57,10 @@ class ConfigCommand : Runnable {
             }
 
         println(
-            "Configuration (${properties.size} properties from " +
+            "# Configuration (${properties.size} properties from " +
                 (LemlineApplication.configPath?.toAbsolutePath()?.let { "$it and " } ?: "") +
                 "default.)"
         )
-        println()
         when (format) {
             Format.PROPERTIES -> {
                 properties.forEach { (key, value) ->
@@ -154,7 +146,7 @@ class ConfigCommand : Runnable {
     private class FormatOptionConverter : ITypeConverter<Format> {
         override fun convert(value: String): Format = try {
             Format.valueOf(value.uppercase())
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             throw IllegalArgumentException(
                 "Allowed values are: ${Format.entries.joinToString(", ").lowercase()}."
             )

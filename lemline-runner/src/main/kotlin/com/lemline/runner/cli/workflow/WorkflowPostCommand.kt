@@ -11,7 +11,6 @@ import picocli.CommandLine
 import picocli.CommandLine.ArgGroup
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
-import picocli.CommandLine.ParentCommand
 
 @Unremovable
 @Command(name = "post", description = ["Create or update workflows from definition files."])
@@ -52,13 +51,7 @@ class WorkflowPostCommand : Runnable {
     )
     var force: Boolean = false
 
-    // Workflow Command class
-    @ParentCommand
-    lateinit var parent: WorkflowCommand
-
     override fun run() {
-        // we stop after this command
-        parent.parent.daemon = false
 
         // Process file if provided
         source.file?.let {

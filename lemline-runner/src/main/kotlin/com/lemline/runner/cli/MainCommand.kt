@@ -9,7 +9,10 @@ import jakarta.enterprise.context.Dependent
 import org.jboss.logging.Logger.Level
 import picocli.CommandLine.Command
 import picocli.CommandLine.ITypeConverter
+import picocli.CommandLine.Model.CommandSpec
 import picocli.CommandLine.Option
+import picocli.CommandLine.ScopeType.INHERIT
+import picocli.CommandLine.Spec
 
 /**
  * Entry command for Picocli command-line parsing.
@@ -23,81 +26,90 @@ import picocli.CommandLine.Option
     versionProvider = VersionProvider::class,
     subcommands = [
         WorkflowCommand::class,
-        RuntimeCommand::class,
         InstanceCommand::class,
-        ConfigCommand::class
+        ConfigCommand::class,
+        StartCommand::class
     ]
 )
 @Unremovable
 @Dependent
 class MainCommand : Runnable {
 
+    /**
+     * The spec object is used to access the command line options and arguments.
+     * It is injected by Picocli and is used to provide help and usage information.
+     */
+    @Spec
+    lateinit var spec: CommandSpec
+
     @Option(
         names = ["-l", "--log"],
         description = ["Set log level (\${COMPLETION-CANDIDATES})."],
         converter = [LogOptionConverter::class],
-        paramLabel = "<level>"
+        paramLabel = "<level>",
+        scope = INHERIT
     )
-    lateinit var logLevel: Level
+    var logLevel: Level? = null
 
     @Option(
         names = ["-c", "--config"],
         description = ["Specify configuration file location"],
-        paramLabel = "<config>"
+        paramLabel = "<config>",
+        scope = INHERIT
     )
     var configFile: String? = null
 
-    /**
-     * Flag to indicate if the application should stop after executing a command.
-     * If the main command is run without subcommands (and not for help/version),
-     * it will set this to true to enter daemon mode.
-     * Otherwise, for subcommands or help/version display, the application will exit.
-     */
-    var daemon: Boolean = false
-
     override fun run() {
-        // This method is called if `lemline` is run without a subcommand,
-        // and it's not a --help or --version request for the MainCommand itself
-        // (Picocli handles those before calling run()).
-        // This is the scenario where we intend to start the server.
-        this.daemon = true
+        // This method is called if `lemline` is run without a recognized subcommand
+        // (e.g., workflow, start, config, instance) or if only global options for MainCommand are provided.
+        spec.commandLine().usage(System.out)
+        // By default, Picocli might exit with 0 after run.
+        // If a non-zero exit is desired to indicate a subcommand was missing,
+        // spec.commandLine().execute() in LemlineApplication will use the exit code
+        // returned by this run method or how Picocli handles "no command run".
+        // For now, printing help is the primary action.
 
-        //
-        //                       %%%                         @%%
-        //                      %*****%%%                    %***%%
-        //                      %********=%%                %******%%
-        //                      %****#%*****@%              %********%
-        //                      %*****%#%+++++@%            %*********%
-        //                      %%****#%%*%+++++@%@%%%%%%%%%%@%@*******%
-        //                       %*****%##%%=+++++%++++++++++++++*%%****%
-        //                        %*****#%##%-+++++=+++++++++++++++++@%*@@
-        //                        @%*****%#%%@++++++++++++++++++++++++++%%
-        //                         *%****#*@++++++++++++++++++++++++++++++%
-        //                           @%*##@+++%@+******==+=:%@%%@%%%@@%%@=*+=%
-        //                             @%%@@=%***%%%%%%%%%%%%%%%%%%%%%%%%%%%%+%
-        //                             %#%%##%**@%%%%%%%:@%%%%%%%%%%%%%%%%%%%*%
-        //                           %%@*%#%#@**%%%@%%%::.:%%@%%%%%@%%%@...%@*%
-        //           ::::              %%@%%%%**%%%%%%%::::*@%%%@%%%%@%%: :%%*%
-        //                    ::::      %****@@**%%%%%%@:::%%%%%%%@%%%%%::%%@*%
-        //                              @%****+%***%%%%%%%%%%%%@%%*******%%%*%
-        //        ::::                   @%**+%.:@%@+***%%%%@%**@@@......%%%@ %
-        //      :::: :::       :::-        %@#*-.....: %%@@%%%@......%%%%%...@@
-        //     :::     ::               %%%*#%%*#....................@%%@...:%
-        //     :::     ::            %%*+**+*++**#**.......................%%
-        //      :::  :::           %@+*+*++++*+*+*******:...............@%@
-        //        ::::           %@*++*++++*++++*+*+****.::::::::@%%%@@
-        //       :-            @%++**++++*++*+++*++=****......:::::%***%%
-        //       @==          %%**++++**=++++++*+***%*%...........@%******%@
-        //        ++         %@***++*+++++@++++**+++*@@..........%%*********%
-        //         @*%*     %%*++++*++**++*+%+*++**+*+%@........%%%%%*******%%
-        //          %%****##%**+**++++*++*++**%%@++*+*=%......:%
-        //             %%%%%***++***+++*+******.::@%%%@......%%
-        //                %#*++*+*++**+*++%*:::::::::.....:%%
-        //              %%***#**+**++***%::::::::: ..:::%%#
-        //             %******%%@*%%%%%%@%:::::::: %%%%
-        //            %*****%@       %%%%%##%%%
-        //           %%#@%%        *%%%###%%
-        //                         %@@%%@
+        println(
+            """
+                
+                       %%%                         @%%
+                      %*****%%%                    %***%%
+                      %********=%%                %******%%
+                      %****#%*****@%              %********%
+                      %*****%#%+++++@%            %*********%
+                      %%****#%%*%+++++@%@%%%%%%%%%%@%@*******%
+                       %*****%##%%=+++++%++++++++++++++*%%****%
+                        %*****#%##%-+++++=+++++++++++++++++@%*@@
+                        @%*****%#%%@++++++++++++++++++++++++++%%
+                         *%****#*@++++++++++++++++++++++++++++++%
+                           @%*##@+++%@+******==+=:%@%%@%%%@@%%@=*+=%
+                             @%%@@=%***%%%%%%%%%%%%%%%%%%%%%%%%%%%%+%
+                             %#%%##%**@%%%%%%%:@%%%%%%%%%%%%%%%%%%%*%
+                           %%@*%#%#@**%%%@%%%::.:%%@%%%%%@%%%@...%@*%
+           ::::              %%@%%%%**%%%%%%%::::*@%%%@%%%%@%%: :%%*%
+                    ::::      %****@@**%%%%%%@:::%%%%%%%@%%%%%::%%@*%
+                              @%****+%***%%%%%%%%%%%%@%%*******%%%*%
+        ::::                   @%**+%.:@%@+***%%%%@%**@@@......%%%@ %
+      :::: :::       :::-        %@#*-.....: %%@@%%%@......%%%%%...@@
+     :::     ::               %%%*#%%*#....................@%%@...:%
+     :::     ::            %%*+**+*++**#**.......................%%
+      :::  :::           %@+*+*++++*+*+*******:...............@%@
+        ::::           %@*++*++++*++++*+*+****.::::::::@%%%@@
+       :-            @%++**++++*++*+++*++=****......:::::%***%%
+       @==          %%**++++**=++++++*+***%*%...........@%******%@
+        ++         %@***++*+++++@++++**+++*@@..........%%*********%
+         @*%*     %%*++++*++**++*+%+*++**+*+%@........%%%%%*******%%
+          %%****##%**+**++++*++*++**%%@++*+*=%......:%
+             %%%%%***++***+++*+******.::@%%%@......%%
+                %#*++*+*++**+*++%*:::::::::.....:%%
+              %%***#**+**++***%::::::::: ..:::%%#
+             %******%%@*%%%%%%@%:::::::: %%%%
+            %*****%@       %%%%%##%%%
+           %%#@%%        *%%%###%%
+                         %@@%%@
+            """.trimIndent()
+        )
+
     }
 
     internal class LogOptionConverter : ITypeConverter<Level> {
