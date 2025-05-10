@@ -23,6 +23,10 @@ spotless {
     }
 }
 
+kotlin {
+    jvmToolchain(17)
+}
+
 tasks.withType<Test>().configureEach {
     // Configure all test Gradle tasks to use JUnitPlatform.
     useJUnitPlatform()

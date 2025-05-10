@@ -78,7 +78,7 @@ jobs:
         with:
           distribution: mandrel
           version: 'mandrel-24.1.2.0-Final'    # Mandrel official version
-          java-version: '23'                   # JDK version to install
+          java-version: '17'                   # JDK version to install
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       # **🍎 MacOS (manual Mandrel setup due to setup-graalvm bug)**
