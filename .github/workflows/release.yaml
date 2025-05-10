@@ -77,7 +77,7 @@ jobs:
           java-version: '17'                   # JDK version to install
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      # **🍎 MacOS (manual Mandrel setup due to setup-graalvm bug)**
+      # **🍎 MacOS (setup-graalvm bug that download mandrel-java23-darwin-* instead of mandrel-java23-macos-*)**
       - name: Manually install Mandrel 24.1.2.0-Final on macOS
         if: runner.os == 'macOS'
         shell: bash
