@@ -17,7 +17,7 @@ import picocli.CommandLine.Option
 class StartCommand : Runnable {
 
     @Option(
-        names = ["--mascot"],
+        names = ["-m", "--mascot"],
         description = ["Display the Lemline mascot on startup."],
         defaultValue = "true"
         )
@@ -27,7 +27,7 @@ class StartCommand : Runnable {
         if (mascot) {
             println(
                 """
-                
+
                        %%%                         @%%
                       %*****%%%                    %***%%
                       %********=%%                %******%%
@@ -66,7 +66,7 @@ class StartCommand : Runnable {
             """.trimIndent()
             )
         }
-        
+
         Quarkus.waitForExit()
     }
 }

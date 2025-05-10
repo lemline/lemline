@@ -14,6 +14,8 @@ import picocli.CommandLine.Option
 import picocli.CommandLine.ScopeType.INHERIT
 import picocli.CommandLine.Spec
 
+internal const val PROFILE_CLI = "cli"
+
 /**
  * Entry command for Picocli command-line parsing.
  * This class is annotated with @TopCommand to identify it as the main command.

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.runner.cli.PROFILE_CLI
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
@@ -10,7 +11,6 @@ import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_CONNECTOR
-import com.lemline.runner.messaging.PROFILE_CONSUMER
 import com.lemline.runner.messaging.WORKFLOW_IN
 import com.lemline.runner.messaging.WORKFLOW_OUT
 import io.smallrye.config.ConfigMapping
@@ -217,8 +217,8 @@ interface LemlineConfiguration {
 
                 // set the messaging type (only if the app is on the consumer profile)
                 val messagingType = when (System.getProperty("quarkus.profile")) {
-                    PROFILE_CONSUMER -> config.type()
-                    else -> MSG_TYPE_IN_MEMORY
+                    PROFILE_CLI -> MSG_TYPE_IN_MEMORY
+                    else -> config.type()
                 }
 
                 when (messagingType) {
