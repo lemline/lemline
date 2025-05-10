@@ -22,7 +22,6 @@ jobs:
   #################################
   check-changes:
     # Only run on schedule; version/tag pushes always proceed.
-    if: ${{ github.event_name == 'schedule' }}
     runs-on: ubuntu-22.04
     outputs:
       changed: ${{ steps.diff.outputs.changed }}
@@ -46,8 +45,6 @@ jobs:
 
   build:
     needs: check-changes
-    # Run on tags/manual always; on schedule only if changes detected
-    if: ${{ github.event_name != 'schedule' || needs.check-changes.outputs.changed == 'true' }}
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
