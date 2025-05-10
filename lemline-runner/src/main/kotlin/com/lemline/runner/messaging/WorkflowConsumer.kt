@@ -20,6 +20,7 @@ import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.repositories.WorkflowRepository
 import com.lemline.runner.secrets.Secrets
+import io.quarkus.arc.Unremovable
 import io.serverlessworkflow.impl.WorkflowStatus
 import jakarta.enterprise.context.ApplicationScoped
 import java.time.Instant
@@ -35,6 +36,7 @@ import kotlinx.coroutines.future.future
 import org.eclipse.microprofile.reactive.messaging.Incoming
 import org.eclipse.microprofile.reactive.messaging.Outgoing
 
+internal const val PROFILE_CONSUMER = "consumer"
 
 internal const val WORKFLOW_IN = "workflows-in"
 internal const val WORKFLOW_OUT = "workflows-out"
@@ -44,7 +46,6 @@ internal const val WORKFLOW_OUT = "workflows-out"
  * processing them, and sending the results to the outgoing channel.
  */
 @ApplicationScoped
-//@IfBuildProfile("consumer")
 internal class WorkflowConsumer(
     private val workflowRepository: WorkflowRepository,
     private val retryRepository: RetryRepository,

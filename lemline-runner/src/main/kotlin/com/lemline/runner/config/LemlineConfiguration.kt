@@ -10,6 +10,7 @@ import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_CONNECTOR
+import com.lemline.runner.messaging.PROFILE_CONSUMER
 import com.lemline.runner.messaging.WORKFLOW_IN
 import com.lemline.runner.messaging.WORKFLOW_OUT
 import io.smallrye.config.ConfigMapping
@@ -214,7 +215,13 @@ interface LemlineConfiguration {
                 val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
                 props["$outgoing.merge"] = "true"
 
-                when (config.type()) {
+                // set the messaging type (only if the app is on the consumer profile)
+                val messagingType = when (System.getProperty("quarkus.profile")) {
+                    PROFILE_CONSUMER -> config.type()
+                    else -> MSG_TYPE_IN_MEMORY
+                }
+
+                when (messagingType) {
                     MSG_TYPE_IN_MEMORY -> {
                         props["$incoming.connector"] = IN_MEMORY_CONNECTOR
                         props["$outgoing.connector"] = IN_MEMORY_CONNECTOR
@@ -233,10 +240,13 @@ interface LemlineConfiguration {
                         props["$incoming.failure-strategy"] = "dead-letter-queue"
                         props["$incoming.dead-letter-queue.topic"] =
                             kafkaConfig.topicDlq().orElse("${kafkaConfig.topic()}-dlq")
+                        props["$incoming.value.deserializer"] =
+                            "org.apache.kafka.common.serialization.StringDeserializer"
 
                         // Outgoing channel
                         props["$outgoing.connector"] = KAFKA_CONNECTOR
                         props["$outgoing.topic"] = kafkaConfig.topicOut().orElse(kafkaConfig.topic())
+                        props["$outgoing.value.serializer"] = "org.apache.kafka.common.serialization.StringSerializer"
 
                         // Security settings
                         kafkaConfig.securityProtocol().ifPresent { props["kafka.security.protocol"] = it }

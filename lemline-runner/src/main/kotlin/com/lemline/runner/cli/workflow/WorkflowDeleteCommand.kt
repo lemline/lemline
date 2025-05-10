@@ -15,7 +15,7 @@ import picocli.CommandLine.Parameters
 @Command(
     name = "delete",
     description = [
-        "Deletes workflows.",
+        "Deletes workflow definition.",
         "- Interactively selects one or all (*) listed workflows if name/version are omitted.",
         "- Requires confirmation unless --force is used.",
         "--force options determine scope:",
@@ -55,7 +55,7 @@ class WorkflowDeleteCommand : Runnable {
     var force: Boolean = false
 
     override fun run() {
-        
+
         try {
             if (force) {
                 handleForcedDeletion()

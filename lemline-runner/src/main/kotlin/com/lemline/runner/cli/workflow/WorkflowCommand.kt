@@ -7,7 +7,7 @@ import picocli.CommandLine.Command
 @Unremovable
 @Command(
     name = "workflow",
-    description = ["Manage workflows"],
+    description = ["Manage workflow definitions"],
     subcommands = [
         // Reference the new/updated command classes
         WorkflowGetCommand::class,

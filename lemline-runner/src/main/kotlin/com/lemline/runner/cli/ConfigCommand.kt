@@ -27,7 +27,6 @@ class ConfigCommand : Runnable {
     enum class Format {
         PROPERTIES,
         YAML,
-        YML
     }
 
     @Option(
@@ -35,7 +34,7 @@ class ConfigCommand : Runnable {
         description = ["Output format (properties, yaml)"],
         converter = [FormatOptionConverter::class]
     )
-    var format: Format = Format.PROPERTIES
+    var format: Format = Format.YAML
 
     @Option(
         names = ["-a", "--all"],
@@ -57,9 +56,9 @@ class ConfigCommand : Runnable {
             }
 
         println(
-            "# Configuration (${properties.size} properties from " +
-                (LemlineApplication.configPath?.toAbsolutePath()?.let { "$it and " } ?: "") +
-                "default.)"
+            "# Configuration from " +
+                (LemlineApplication.configPath?.toAbsolutePath()?.let { "$it + " } ?: "") +
+                "default values."
         )
         when (format) {
             Format.PROPERTIES -> {
@@ -72,14 +71,14 @@ class ConfigCommand : Runnable {
                 }
             }
 
-            Format.YAML, Format.YML -> {
+            Format.YAML -> {
                 val nestedProperties = createNestedStructure(properties)
                 val mapper = ObjectMapper(
                     YAMLFactory()
                         .disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER)
                         .enable(YAMLGenerator.Feature.MINIMIZE_QUOTES)
                 )
-                println(mapper.writeValueAsString(nestedProperties))
+                print(mapper.writeValueAsString(nestedProperties))
             }
         }
     }

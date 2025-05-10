@@ -4,6 +4,7 @@ package com.lemline.runner
 import com.lemline.runner.LemlineApplication.Companion.configPath
 import com.lemline.runner.cli.MainCommand
 import com.lemline.runner.cli.StartCommand // Required for `is StartCommand` check
+import com.lemline.runner.messaging.PROFILE_CONSUMER
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
 import io.quarkus.runtime.QuarkusApplication
@@ -66,9 +67,7 @@ class LemlineApplication : QuarkusApplication {
             val command = parseResult.commandSpec().userObject()
 
             if (command is StartCommand && !helpOrVersion) {
-                System.setProperty("quarkus.profile", "consumer")
-            } else {
-                System.setProperty("quarkus.profile", "default")
+                System.setProperty("quarkus.profile", PROFILE_CONSUMER)
             }
 
             // Set the logging level based on the command line arguments
