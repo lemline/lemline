@@ -13,25 +13,30 @@ dependencies {
     implementation(libs.bundles.kotlinxEcosystem)
 
     // Serverless Workflow SDK
-    implementation("io.serverlessworkflow:serverlessworkflow-api:7.0.0.Final")
-    implementation("io.serverlessworkflow:serverlessworkflow-impl-core:7.0.0.Final")
+    implementation(libs.serverlessworkflow.api)
+    implementation(libs.serverlessworkflow.impl.core)
 
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
+    // Jackson for JSON serialization/deserialization
+    implementation(libs.jackson.bom)
+    implementation("com.fasterxml.jackson.core:jackson-databind")
 
     // Ktor client for native Kotlin HTTP client with coroutine support
-    implementation(platform("io.ktor:ktor-bom:3.1.2"))
+    implementation(platform(libs.ktor.bom))
     implementation("io.ktor:ktor-client-core")
     implementation("io.ktor:ktor-client-cio")
     implementation("io.ktor:ktor-client-content-negotiation")
     implementation("io.ktor:ktor-serialization-kotlinx-json")
     implementation("io.ktor:ktor-client-auth")
+
+    // Auth0 for JWT token generation and validation
     implementation("com.auth0:java-jwt:4.4.0")
+    
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
+    testImplementation(enforcedPlatform(libs.kotest.bom))
     testImplementation("io.kotest:kotest-runner-junit5")
     testImplementation("io.kotest:kotest-assertions-core")
     testImplementation("io.kotest:kotest-framework-api")
-    testImplementation("io.mockk:mockk:1.13.9")
-    testImplementation("io.ktor:ktor-client-mock:3.1.2")
+    testImplementation(libs.mockk)
+    testImplementation("io.ktor:ktor-client-mock")
 }
