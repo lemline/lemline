@@ -77,7 +77,6 @@ jobs:
         uses: graalvm/setup-graalvm@v1
         with:
           distribution: mandrel
-          version: 'mandrel-24.1.2.0-Final'    # Mandrel official version
           java-version: '17'                   # JDK version to install
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
