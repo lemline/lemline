@@ -95,17 +95,18 @@ class LemlineApplication : QuarkusApplication {
         }
 
         /**
-         * This function ensures that the most specific command (or subcommand) is returned for further processing.
+         * This function collects the main parse result and any subcommand parse results into a list.
+         *
+         * @param args The command-line arguments to parse.
+         * @return A list of `ParseResult` objects representing the parsed arguments.
+         * @throws CommandLine.PicocliException If an error occurs during argument parsing.
          */
         private fun getParseResults(args: Array<String>): List<ParseResult> = try {
             val tempCli = CommandLine(MainCommand(), CommandLine.defaultFactory())
             val mainParseResult = tempCli.parseArgs(*args)
 
-            val parseResults = mutableListOf<ParseResult>(mainParseResult)
-
-            mainParseResult.subcommands().lastOrNull()?.let { parseResults.add(it) }
-
-            parseResults
+            // return mainParseResult and all subcommands parseResults
+            listOf(mainParseResult) + mainParseResult.subcommands()
         } catch (e: CommandLine.PicocliException) {
             error(e.message ?: "An unexpected error occurred during parsing.")
         }
