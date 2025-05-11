@@ -30,7 +30,7 @@ internal const val PROFILE_CLI = "cli"
         WorkflowCommand::class,
         InstanceCommand::class,
         ConfigCommand::class,
-        StartCommand::class
+        ListenCommand::class
     ]
 )
 @Unremovable

@@ -2,9 +2,9 @@
 package com.lemline.runner
 
 import com.lemline.runner.LemlineApplication.Companion.configPath
+import com.lemline.runner.cli.ListenCommand
 import com.lemline.runner.cli.MainCommand
 import com.lemline.runner.cli.PROFILE_CLI
-import com.lemline.runner.cli.StartCommand // Required for `is StartCommand` check
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
 import io.quarkus.runtime.QuarkusApplication
@@ -61,23 +61,27 @@ class LemlineApplication : QuarkusApplication {
          */
         @JvmStatic
         fun main(args: Array<String>) {
-            val parseResult = getParseResult(args)
-            val helpOrVersion = parseResult.isUsageHelpRequested || parseResult.isVersionHelpRequested
+            val parseResults = getParseResults(args)
 
-            val command = parseResult.commandSpec().userObject()
+            // Check if the command line arguments contain help or version options
+            val helpOrVersion = parseResults[0].isUsageHelpRequested || parseResults[0].isVersionHelpRequested
 
-            if (command !is StartCommand || helpOrVersion) {
+            // Set the Quarkus profile to "cli" except for a listen command (not overridden by --help or --version)
+            if (parseResults.getOrNull(1) == null ||
+                parseResults[1].commandSpec().userObject() !is ListenCommand ||
+                helpOrVersion
+            ) {
                 System.setProperty("quarkus.profile", PROFILE_CLI)
             }
 
-            // Set the logging level based on the command line arguments
-            setLoggingLevel(parseResult)
+            // Set the logging level
+            setLoggingLevel(parseResults)
 
-            // Set the config path based on the command line arguments and environment variables
-            setConfigPath(parseResult)
+            // Set the config path
+            setConfigPath(parseResults)
 
             if (configPath == null && !helpOrVersion) {
-                System.err.println("ERROR: No valid configuration file found. Please provide one using one of the following methods:")
+                System.err.println("No valid configuration file found. Please provide one, using one of the following methods:")
                 System.err.println("1. Pass the path to the file as a command-line argument (e.g., --config=<path>).")
                 System.err.println("2. Set the LEMLINE_CONFIG environment variable to the file's path.")
                 System.err.println("3. Place a .lemline.yaml file in the current directory.")
@@ -93,24 +97,28 @@ class LemlineApplication : QuarkusApplication {
         /**
          * This function ensures that the most specific command (or subcommand) is returned for further processing.
          */
-        private fun getParseResult(args: Array<String>): ParseResult {
+        private fun getParseResults(args: Array<String>): List<ParseResult> = try {
             val tempCli = CommandLine(MainCommand(), CommandLine.defaultFactory())
-            val topLevelParseResult = tempCli.parseArgs(*args)
+            val mainParseResult = tempCli.parseArgs(*args)
 
-            val subcommandsParseResults = topLevelParseResult.subcommands()
-            return when {
-                subcommandsParseResults.isEmpty() -> topLevelParseResult
-                else -> subcommandsParseResults.last()
-            }
+            val parseResults = mutableListOf<ParseResult>(mainParseResult)
+
+            mainParseResult.subcommands().lastOrNull()?.let { parseResults.add(it) }
+
+            parseResults
+        } catch (e: CommandLine.PicocliException) {
+            error(e.message ?: "An unexpected error occurred during parsing.")
         }
 
         /**
-         * Sets the logging level based on the provided parse result.
-         * It checks the command line arguments for log level options.
+         * Sets the logging level for the application based on the parsed command-line arguments.
          *
-         * @param parseResult The parse result from the command line.
+         * This function iterates through the provided `ParseResult` list and checks for the `--log` or `-l` options.
+         * If a logging level is specified, it updates the application's logging configuration accordingly.
+         *
+         * @param parseResults A list of `ParseResult` objects containing parsed command-line arguments.
          */
-        private fun setLoggingLevel(parseResult: ParseResult) {
+        private fun setLoggingLevel(parseResults: List<ParseResult>) = parseResults.forEach { parseResult ->
             val logLevelValue = parseResult.matchedOptionValue<Level>("--log", null)
                 ?: parseResult.matchedOptionValue<Level>("-l", null)
 
@@ -118,17 +126,27 @@ class LemlineApplication : QuarkusApplication {
         }
 
         /**
-         * Sets the configuration path based on the provided parse result.
-         * It checks the command line arguments, environment variables, and default locations.
+         * Sets the configuration path for the application by checking various sources in order of priority:
+         * 1. Command-line arguments (`--config` or `-c`).
+         * 2. Environment variable `LEMLINE_CONFIG`.
+         * 3. A `.lemline.yaml` file in the current directory.
+         * 4. User-specific configuration files:
+         *    - `~/.config/lemline/config.yaml`
+         *    - `~/.lemline.yaml`
          *
-         * @param parseResult The parse result from the command line.
+         * If a valid configuration file is found, it sets the `configPath` variable.
+         * If no valid configuration file is found, the application continues without setting `configPath`.
+         *
+         * @param parseResults A list of `ParseResult` objects containing parsed command-line arguments.
          */
-        private fun setConfigPath(parseResult: ParseResult) {
-            val optionPath = parseResult.matchedOptionValue<String>("--config", null)
-                ?: parseResult.matchedOptionValue<String>("-c", null)
+        private fun setConfigPath(parseResults: List<ParseResult>) {
+            parseResults.forEach { parseResult ->
+                val optionPath = parseResult.matchedOptionValue<String>("--config", null)
+                    ?: parseResult.matchedOptionValue<String>("-c", null)
 
-            optionPath?.let {
-                if (checkConfigLocation(Paths.get(it), true)) return
+                optionPath?.let {
+                    if (checkConfigLocation(Paths.get(it), true)) return
+                }
             }
 
             // If not found via CLI, or if parseResult was null, check other sources:
@@ -145,6 +163,7 @@ class LemlineApplication : QuarkusApplication {
                 if (checkConfigLocation(homePath, false)) return
             }
                 ?: System.err.println("Warning: Could not determine user home directory. Skipping user-specific config locations.")
+
         }
     }
 }
@@ -177,6 +196,6 @@ private fun setLogLevel(level: Level) = level.name.let {
 }
 
 private fun error(msg: String): Nothing {
-    System.err.println("ERROR: $msg")
+    System.err.println(msg)
     exitProcess(1)
 }
