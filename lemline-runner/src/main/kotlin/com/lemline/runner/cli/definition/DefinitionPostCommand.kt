@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.cli.workflow
+package com.lemline.runner.cli.definition
 
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.models.WorkflowModel
@@ -23,7 +23,7 @@ import picocli.CommandLine.Option
     targets = [Workflow::class],
     registerFullHierarchy = true
 )
-class WorkflowPostCommand : Runnable {
+class DefinitionPostCommand : Runnable {
 
     @Option(
         names = ["--file", "-f"],
@@ -61,7 +61,7 @@ class WorkflowPostCommand : Runnable {
         if (recursive && directories.isEmpty()) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
-                "ERROR: The --recursive option can only be used with the --directory option."
+                "The --recursive option can only be used with the --directory option."
             )
         }
 
@@ -69,7 +69,7 @@ class WorkflowPostCommand : Runnable {
         if (files.isEmpty() && directories.isEmpty()) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
-                "ERROR - You must specify at least one file (-f) or directory (-d)"
+                "You must specify at least one file (-f) or directory (-d)"
             )
         }
 
@@ -88,13 +88,13 @@ class WorkflowPostCommand : Runnable {
         if (!file.exists()) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
-                "ERROR - The specified file does not exist: ${file.absolutePath}"
+                "The specified file does not exist: ${file.absolutePath}"
             )
         }
         if (!file.isFile) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
-                "ERROR - The specified path is not a regular file: ${file.absolutePath}"
+                "The specified path is not a regular file: ${file.absolutePath}"
             )
         }
         processWorkflowFile(file)
@@ -104,13 +104,13 @@ class WorkflowPostCommand : Runnable {
         if (!directory.exists()) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
-                "ERROR - The specified directory does not exist: ${directory.absolutePath}"
+                "The specified directory does not exist: ${directory.absolutePath}"
             )
         }
         if (!directory.isDirectory) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
-                "ERROR - The specified path is not a directory: ${directory.absolutePath}"
+                "The specified path is not a directory: ${directory.absolutePath}"
             )
         }
         println("Processing files in directory: ${directory.absolutePath}" + if (recursive) " (recursively)" else "")

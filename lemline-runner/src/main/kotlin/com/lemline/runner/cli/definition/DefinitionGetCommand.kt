@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.cli.workflow
+package com.lemline.runner.cli.definition
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.core.workflows.Workflows
@@ -19,7 +19,7 @@ import picocli.CommandLine.Parameters
     description = ["Get specific workflow definitions, interactively if needed."],
     mixinStandardHelpOptions = true,
 )
-class WorkflowGetCommand : Runnable {
+class DefinitionGetCommand : Runnable {
 
     // Enum for validated format options (only for final output)
     enum class OutputFormat { JSON, YAML }
@@ -48,7 +48,7 @@ class WorkflowGetCommand : Runnable {
     var version: String? = null
 
     @Option(
-        names = ["--format"],
+        names = ["-f", "--format"],
         description = ["Output format for the definition (\${COMPLETION-CANDIDATES})."],
         defaultValue = "YAML"
     )
@@ -72,9 +72,9 @@ class WorkflowGetCommand : Runnable {
                 val selectionList = selector.prepareSelection(filterName = name)
                     ?: return // Exit if nothing found
 
-                // Handle single result directly
+                // Handle a single result directly
                 if (selectionList.size == 1) {
-                    displayWorkflowDefinition(selectionList.first().second) // Get model from the pair
+                    displayWorkflowDefinition(selectionList.first().second)
                     return // Only one option, so we exit after displaying
                 }
 

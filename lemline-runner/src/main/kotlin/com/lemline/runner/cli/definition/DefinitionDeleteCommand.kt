@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.cli.workflow
+package com.lemline.runner.cli.definition
 
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.WorkflowModel
@@ -25,7 +25,7 @@ import picocli.CommandLine.Parameters
     ],
     mixinStandardHelpOptions = true
 )
-class WorkflowDeleteCommand : Runnable {
+class DefinitionDeleteCommand : Runnable {
 
     @Inject
     lateinit var workflowRepository: WorkflowRepository

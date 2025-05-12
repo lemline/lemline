@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli
 
+import com.lemline.runner.cli.definition.DefinitionCommand
 import com.lemline.runner.cli.instance.InstanceCommand
-import com.lemline.runner.cli.workflow.WorkflowCommand
 import io.quarkus.arc.Unremovable
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import jakarta.enterprise.context.Dependent
@@ -27,7 +27,7 @@ internal const val PROFILE_CLI = "cli"
     mixinStandardHelpOptions = true,
     versionProvider = VersionProvider::class,
     subcommands = [
-        WorkflowCommand::class,
+        DefinitionCommand::class,
         InstanceCommand::class,
         ConfigCommand::class,
         ListenCommand::class
