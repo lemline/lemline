@@ -20,7 +20,7 @@ class ListenCommand : Runnable {
 
     override fun run() {
         val mascotLines = """
-                              
+
                               %%%                         @%%
                              %*****%%%                    %***%%
                              %********=%%                %******%%

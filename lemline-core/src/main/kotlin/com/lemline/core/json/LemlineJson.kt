@@ -38,7 +38,7 @@ object LemlineJson {
     private val module = SerializersModule {
         contextual(InstantSerializer)
         contextual(UUIDSerializer)
-        // Potentially add other contextual serializers here
+        // Add other contextual serializers here
     }
 
     // Configure a kotlinx.serialization.Json instance with the module
@@ -46,15 +46,15 @@ object LemlineJson {
         ignoreUnknownKeys = true
         isLenient = true
         encodeDefaults = false
-        serializersModule = module // Add the module here
+        serializersModule = module
     }
 
     val jsonPretty = Json {
         ignoreUnknownKeys = true
         isLenient = true
         encodeDefaults = false
+        serializersModule = module
         prettyPrint = true
-        serializersModule = module // Add the module here
     }
 
     /**
