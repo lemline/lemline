@@ -8,7 +8,6 @@ import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import java.io.File
 import picocli.CommandLine
-import picocli.CommandLine.ArgGroup
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 
@@ -20,31 +19,26 @@ import picocli.CommandLine.Option
 )
 class WorkflowPostCommand : Runnable {
 
-    // Define an argument group to enforce at least one source is provided
-    class FileOrDirectorySource {
+    @Option(
+        names = ["--file", "-f"],
+        description = ["Path to a workflow definition file."],
+        required = false
+    )
+    var files: List<File> = emptyList()
 
-        @Option(
-            names = ["--file", "-f"],
-            description = ["Path to a single workflow definition file."]
-        )
-        var file: File? = null
+    @Option(
+        names = ["--directory", "-d"],
+        description = ["Path to a directory containing workflow definition files."],
+        required = false
+    )
+    var directories: List<File> = emptyList()
 
-        @Option(
-            names = ["--directory", "-d"],
-            description = ["Path to a directory containing workflow definition files."],
-        )
-        var directory: File? = null
-
-        @Option(
-            names = ["--recursive", "-r"],
-            description = ["Walk through folders recursively when using the -d option"],
-            defaultValue = "false"
-        )
-        var recursive: Boolean = false
-    }
-
-    @ArgGroup(multiplicity = "1..*", heading = "Workflow Source:%n") // 1..* means at least one
-    lateinit var source: FileOrDirectorySource
+    @Option(
+        names = ["--recursive", "-r"],
+        description = ["Walk through directories recursively."],
+        defaultValue = "false"
+    )
+    var recursive: Boolean = false
 
     @Inject
     lateinit var workflowRepository: WorkflowRepository
@@ -57,14 +51,30 @@ class WorkflowPostCommand : Runnable {
 
     override fun run() {
 
-        // Process file if provided
-        source.file?.let {
-            processSingleFile(it)
+        // Validate that the recursive option is used with directories
+        if (recursive && directories.isEmpty()) {
+            throw CommandLine.ParameterException(
+                CommandLine(this),
+                "ERROR: The --recursive option can only be used with the --directory option."
+            )
         }
 
-        // Process directory if provided
-        source.directory?.let {
-            processDirectory(it)
+        // Ensure that at least one source is provided
+        if (files.isEmpty() && directories.isEmpty()) {
+            throw CommandLine.ParameterException(
+                CommandLine(this),
+                "ERROR: You must specify at least one file (-f) or directory (-d)"
+            )
+        }
+
+        // Process files if provided
+        files.forEach { file ->
+            processSingleFile(file)
+        }
+
+        // Process directories if provided
+        directories.forEach { directory ->
+            processDirectory(directory)
         }
     }
 
@@ -85,10 +95,10 @@ class WorkflowPostCommand : Runnable {
                 "ERROR: Workflow directory not found or is not a directory: ${directory.absolutePath}"
             )
         }
-        println("Processing files in directory: ${directory.absolutePath}" + if (source.recursive) " (recursively)" else "")
+        println("Processing files in directory: ${directory.absolutePath}" + if (recursive) " (recursively)" else "")
 
         var filesProcessed = 0
-        val filesToProcess = when (source.recursive) {
+        val filesToProcess = when (recursive) {
             true -> directory.walkTopDown().filter { it.isFile }
             false -> directory.listFiles()?.filter { it.isFile }?.asSequence() ?: emptySequence()
         }
