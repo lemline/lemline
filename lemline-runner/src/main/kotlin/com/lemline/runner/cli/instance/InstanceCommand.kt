@@ -18,7 +18,11 @@ enum class InstanceAction {
 
 @Unremovable
 @ApplicationScoped
-@Command(name = "instance", description = ["Manage workflow instances"])
+@Command(
+    name = "instance",
+    description = ["Manage workflow instances"],
+    mixinStandardHelpOptions = true
+)
 class InstanceCommand : Runnable {
     @Parameters(index = "0", description = ["Action to perform (LIST, SHOW, CREATE, TERMINATE, LOGS)"])
     var action: String? = null
@@ -32,7 +36,7 @@ class InstanceCommand : Runnable {
     override fun run() {
         val instanceAction = try {
             InstanceAction.valueOf(action?.uppercase() ?: "")
-        } catch (e: IllegalArgumentException) {
+        } catch (_: IllegalArgumentException) {
             println("Invalid instance action. Valid actions: ${InstanceAction.entries.joinToString()}")
             return
         }

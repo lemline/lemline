@@ -8,6 +8,7 @@ import picocli.CommandLine.Command
 @Command(
     name = "workflow",
     description = ["Manage workflow definitions"],
+    mixinStandardHelpOptions = true,
     subcommands = [
         // Reference the new/updated command classes
         WorkflowGetCommand::class,

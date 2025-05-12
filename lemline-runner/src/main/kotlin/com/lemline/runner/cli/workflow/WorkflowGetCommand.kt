@@ -14,7 +14,11 @@ import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 
 @Unremovable
-@Command(name = "get", description = ["Get specific workflow definitions, interactively if needed."])
+@Command(
+    name = "get", 
+    description = ["Get specific workflow definitions, interactively if needed."],
+    mixinStandardHelpOptions = true,
+)
 class WorkflowGetCommand : Runnable {
 
     // Enum for validated format options (only for final output)

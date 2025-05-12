@@ -13,7 +13,11 @@ import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 
 @Unremovable
-@Command(name = "post", description = ["Create or update workflows from definition files."])
+@Command(
+    name = "post",
+    description = ["Create or update workflows from definition files."],
+    mixinStandardHelpOptions = true,
+)
 class WorkflowPostCommand : Runnable {
 
     // Define an argument group to enforce at least one source is provided
