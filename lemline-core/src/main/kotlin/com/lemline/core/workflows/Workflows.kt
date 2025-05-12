@@ -27,7 +27,7 @@ object Workflows {
     @JvmStatic
     fun parse(definition: String): Workflow = try {
         validation().read(definition, WorkflowFormat.YAML)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         validation().read(definition, WorkflowFormat.JSON)
     }
 

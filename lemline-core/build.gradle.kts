@@ -16,10 +16,6 @@ dependencies {
     implementation(libs.serverlessworkflow.api)
     implementation(libs.serverlessworkflow.impl.core)
 
-    // Jackson for JSON serialization/deserialization
-    implementation(libs.jackson.bom)
-    implementation("com.fasterxml.jackson.core:jackson-databind")
-
     // Ktor client for native Kotlin HTTP client with coroutine support
     implementation(platform(libs.ktor.bom))
     implementation("io.ktor:ktor-client-core")
@@ -30,7 +26,7 @@ dependencies {
 
     // Auth0 for JWT token generation and validation
     implementation("com.auth0:java-jwt:4.4.0")
-    
+
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform(libs.kotest.bom))

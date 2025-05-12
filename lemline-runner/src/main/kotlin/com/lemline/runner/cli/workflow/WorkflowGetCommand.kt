@@ -15,7 +15,7 @@ import picocli.CommandLine.Parameters
 
 @Unremovable
 @Command(
-    name = "get", 
+    name = "get",
     description = ["Get specific workflow definitions, interactively if needed."],
     mixinStandardHelpOptions = true,
 )

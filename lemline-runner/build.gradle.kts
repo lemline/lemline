@@ -56,6 +56,11 @@ dependencies {
     implementation(libs.uuidCreator)
     implementation(libs.javaSemver)
 
+    // Jackson for JSON serialization/deserialization
+    implementation(libs.jackson.bom)
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+
     // ─────────────────────────────────────────────────────────────────────────
     // Libraries below are needed for Native Compilation - DO NOT TOUCh except you know what you are doing
     // ─────────────────────────────────────────────────────────────────────────

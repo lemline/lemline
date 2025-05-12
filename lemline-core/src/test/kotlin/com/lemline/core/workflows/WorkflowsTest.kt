@@ -354,4 +354,4 @@ class WorkflowsTest {
         // Verify the structure is parsed correctly
         workflow.`do`?.size shouldBe 3
     }
-} 
+}

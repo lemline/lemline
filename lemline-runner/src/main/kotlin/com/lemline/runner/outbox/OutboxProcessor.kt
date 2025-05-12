@@ -75,7 +75,7 @@ internal class OutboxProcessor<T : OutboxModel>(
             while (consecutiveEmptyBatches < maxConsecutiveEmptyBatches) {
                 // Find and lock messages ready to process
                 val messages = repository.findMessagesToProcess(maxAttempts, batchSize, connection)
-                
+
                 if (messages.isEmpty()) {
                     logger.info { "Empty batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
                     consecutiveEmptyBatches++

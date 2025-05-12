@@ -94,7 +94,7 @@ class WorkflowPostCommand : Runnable {
         processWorkflowFile(file)
     }
 
-    private fun processDirectory(directory: File) {
+    internal fun processDirectory(directory: File) {
         if (!directory.exists()) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
@@ -128,7 +128,7 @@ class WorkflowPostCommand : Runnable {
     /**
      * Processes a single workflow definition file.
      */
-    private fun processWorkflowFile(file: File) {
+    internal fun processWorkflowFile(file: File) {
         val prefix = "  ->"
         try {
             val content = file.readText()
@@ -150,6 +150,14 @@ class WorkflowPostCommand : Runnable {
         } catch (e: Exception) {
             // Log error for the specific file but continue if processing a directory
             System.err.println("ERROR processing file '${file.absolutePath}': ${e.message}")
+            throw e
         }
     }
+}
+
+fun main() {
+    val file = File("/Users/gilles/dev/lemline/lemline/lemline-runner/src/test/resources/examples/try-catch.yaml")
+    val content = file.readText()
+    val workflow = Workflows.parse(content)
+    println(workflow)
 }
