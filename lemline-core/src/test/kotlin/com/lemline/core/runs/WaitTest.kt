@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.workflows
+package com.lemline.core.runs
 
 import com.lemline.core.getWorkflowInstance
 import com.lemline.core.nodes.activities.WaitInstance
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.serverlessworkflow.impl.WorkflowStatus
-import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonNull
-import org.junit.jupiter.api.Test
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonNull
+import org.junit.jupiter.api.Test
 
 class WaitTest {
 

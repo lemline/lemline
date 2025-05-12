@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.workflows
+package com.lemline.core.runs
 
 import com.lemline.core.getWorkflowInstance
+import kotlin.test.assertEquals
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
 
 class FlowDirectiveTest {
 

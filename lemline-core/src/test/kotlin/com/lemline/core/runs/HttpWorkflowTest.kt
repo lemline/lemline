@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.workflows
+package com.lemline.core.runs
 
 import com.lemline.core.getWorkflowInstance
 import com.lemline.core.json.LemlineJson
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
+import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.Test
-import kotlin.test.assertTrue
 
 class HttpWorkflowTest {
 
