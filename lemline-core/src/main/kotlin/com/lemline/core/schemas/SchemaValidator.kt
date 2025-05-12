@@ -10,12 +10,15 @@ import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.impl.json.JsonUtils
 import io.serverlessworkflow.impl.resources.DefaultResourceLoaderFactory
-import kotlinx.serialization.json.JsonElement
 import java.util.function.Consumer
+import kotlinx.serialization.json.JsonElement
 
 object SchemaValidator {
     private val resourceLoader = DefaultResourceLoaderFactory.get().getResourceLoader(null)
     private val jsonSchemaFactory = JsonSchemaFactory.getInstance(VersionFlag.V7)
+
+    fun validate(node: JsonNode, schemaUnion: SchemaUnion) =
+        validateSchema(node, schemaUnionToSchema(schemaUnion))
 
     fun validate(node: JsonElement, schemaUnion: SchemaUnion) =
         validateSchema(with(LemlineJson) { node.toJsonNode() }, schemaUnionToSchema(schemaUnion))

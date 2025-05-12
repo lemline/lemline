@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli
 
-import com.lemline.runner.cli.definition.DefinitionCommand
-import com.lemline.runner.cli.instance.InstanceCommand
+import com.lemline.runner.cli.definitions.DefinitionCommand
+import com.lemline.runner.cli.instances.InstanceCommand
 import io.quarkus.arc.Unremovable
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import jakarta.enterprise.context.Dependent

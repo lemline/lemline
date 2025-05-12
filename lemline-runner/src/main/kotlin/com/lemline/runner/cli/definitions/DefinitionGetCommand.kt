@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.cli.definition
+package com.lemline.runner.cli.definitions
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.core.workflows.Workflows
