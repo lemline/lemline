@@ -82,7 +82,7 @@ internal class WorkflowModelMessageTest {
         )
 
         // When
-        val message = WorkflowMessage.newInstance(name, version, id, input)
+        val message = WorkflowMessage.newInstance(name, version, input, id)
 
         // Then
         val expectedStates = mapOf(

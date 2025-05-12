@@ -162,8 +162,8 @@ internal abstract class WorkflowConsumerTest {
         val workflowMessage = WorkflowMessage.newInstance(
             name = "test-workflow",
             version = "1.0.0",
-            id = "test-id",
             input = JsonPrimitive("task"),
+            id = "test-id",
         )
         val messageJson = LemlineJson.encodeToString(workflowMessage)
 
@@ -244,8 +244,8 @@ internal abstract class WorkflowConsumerTest {
         val workflowMessage = WorkflowMessage.newInstance(
             "test-workflow",
             "1.0.0",
-            "test-id",
             JsonPrimitive("retry"),
+            "test-id",
         )
         val messageJson = LemlineJson.encodeToString(workflowMessage)
 
@@ -285,8 +285,8 @@ internal abstract class WorkflowConsumerTest {
         val workflowMessage = WorkflowMessage.newInstance(
             "test-workflow",
             "1.0.0",
-            "test-id",
             JsonPrimitive("wait"),
+            "test-id",
         )
         val messageJson = LemlineJson.encodeToString(workflowMessage)
 
@@ -334,8 +334,8 @@ internal abstract class WorkflowConsumerTest {
         val workflowMessage = WorkflowMessage.newInstance(
             "test-workflow",
             "1.0.0",
-            "test-id",
             JsonPrimitive("completed"),
+            "test-id",
         )
         val messageJson = LemlineJson.encodeToString(workflowMessage)
 

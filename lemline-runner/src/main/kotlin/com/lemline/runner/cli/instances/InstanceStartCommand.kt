@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.instances
 
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.github.zafarkhaja.semver.Version
+import com.lemline.core.json.LemlineJson
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
+import com.lemline.runner.messaging.WORKFLOW_IN
+import com.lemline.runner.messaging.WorkflowMessage
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
+import kotlinx.serialization.json.JsonElement
+import org.eclipse.microprofile.reactive.messaging.Channel
+import org.eclipse.microprofile.reactive.messaging.Emitter
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
@@ -27,10 +31,11 @@ class InstanceStartCommand : Runnable {
     lateinit var definitionRepository: DefinitionRepository
 
     @Inject
-    lateinit var objectMapper: ObjectMapper
+    lateinit var selector: InteractiveWorkflowSelector
 
     @Inject
-    lateinit var selector: InteractiveWorkflowSelector
+    @Channel(WORKFLOW_IN)
+    lateinit var workflowEmitter: Emitter<String>
 
     @Parameters(
         index = "0",
@@ -55,14 +60,14 @@ class InstanceStartCommand : Runnable {
     override fun run() {
         if (name.isNullOrBlank()) error("Workflow name must be provided")
 
-        // Parse input JSON if provided, or use an empty object if not provided
-        val inputJsonNode = input?.let {
+        // Parse input JSON if provided, or use an empty object if not provided.
+        val inputJsonElement: JsonElement = input?.let {
             try {
-                objectMapper.readTree(it)
-            } catch (e: JsonProcessingException) {
+                LemlineJson.encodeToElement(it)
+            } catch (e: Exception) {
                 error("Invalid JSON input: ${e.message}")
             }
-        } ?: objectMapper.createObjectNode()
+        } ?: LemlineJson.jsonObject
 
         val workflowDefinition = version?.let {
             definitionRepository.findByNameAndVersion(name!!, it)
@@ -84,13 +89,18 @@ class InstanceStartCommand : Runnable {
         // Validate input against schema if the workflow has an input schema
         workflow.input?.schema?.let { schema ->
             try {
-                SchemaValidator.validate(inputJsonNode, schema)
+                SchemaValidator.validate(inputJsonElement, schema)
             } catch (e: Exception) {
                 error("Input validation failed against workflow schema: ${e.message}")
             }
         }
 
-        println("Selected workflow: ${workflowDefinition.name} version ${workflowDefinition.version}")
+        val message = WorkflowMessage.newInstance(name!!, workflowDefinition.version, inputJsonElement)
+
+        // Send the message to the workflow-in channel
+        workflowEmitter.send(message.toJsonString())
+
+        println("Started workflow: ${workflowDefinition.name} version ${workflowDefinition.version}")
     }
 
     private fun error(msg: String): Nothing {

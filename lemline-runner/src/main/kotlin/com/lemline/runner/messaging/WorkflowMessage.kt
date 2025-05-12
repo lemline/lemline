@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
+import com.github.f4b6a3.uuid.UuidCreator
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
@@ -28,7 +29,12 @@ data class WorkflowMessage(
     @SerialName("p") val position: NodePosition,
 ) {
     companion object {
-        fun newInstance(name: String, version: String, id: String, input: JsonElement) = WorkflowMessage(
+        fun newInstance(
+            name: String,
+            version: String,
+            input: JsonElement,
+            id: String = UuidCreator.getTimeOrderedEpoch().toString()
+        ) = WorkflowMessage(
             name = name,
             version = version,
             states = mapOf(
