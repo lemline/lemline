@@ -45,7 +45,7 @@ class WorkflowPostCommand : Runnable {
 
     @Option(
         names = ["--force", "-F"],
-        description = ["Override the workflow definition if it already exists."]
+        description = ["Override a workflow definition if it already exists."]
     )
     var force: Boolean = false
 
@@ -63,7 +63,7 @@ class WorkflowPostCommand : Runnable {
         if (files.isEmpty() && directories.isEmpty()) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
-                "ERROR: You must specify at least one file (-f) or directory (-d)"
+                "ERROR - You must specify at least one file (-f) or directory (-d)"
             )
         }
 
@@ -79,20 +79,32 @@ class WorkflowPostCommand : Runnable {
     }
 
     private fun processSingleFile(file: File) {
-        if (!file.exists() || !file.isFile) {
+        if (!file.exists()) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
-                "ERROR: Workflow file not found or is not a regular file: ${file.absolutePath}"
+                "ERROR - The specified file does not exist: ${file.absolutePath}"
+            )
+        }
+        if (!file.isFile) {
+            throw CommandLine.ParameterException(
+                CommandLine(this),
+                "ERROR - The specified path is not a regular file: ${file.absolutePath}"
             )
         }
         processWorkflowFile(file)
     }
 
     private fun processDirectory(directory: File) {
-        if (!directory.exists() || !directory.isDirectory) {
+        if (!directory.exists()) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
-                "ERROR: Workflow directory not found or is not a directory: ${directory.absolutePath}"
+                "ERROR - The specified directory does not exist: ${directory.absolutePath}"
+            )
+        }
+        if (!directory.isDirectory) {
+            throw CommandLine.ParameterException(
+                CommandLine(this),
+                "ERROR - The specified path is not a directory: ${directory.absolutePath}"
             )
         }
         println("Processing files in directory: ${directory.absolutePath}" + if (recursive) " (recursively)" else "")
