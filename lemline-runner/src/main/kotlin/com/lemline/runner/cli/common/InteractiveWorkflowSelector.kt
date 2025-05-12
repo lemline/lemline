@@ -2,8 +2,8 @@
 package com.lemline.runner.cli.common
 
 import com.github.zafarkhaja.semver.Version
-import com.lemline.runner.models.WorkflowModel
-import com.lemline.runner.repositories.WorkflowRepository
+import com.lemline.runner.models.DefinitionModel
+import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -11,7 +11,7 @@ import jakarta.inject.Inject
 @ApplicationScoped
 @Unremovable
 class InteractiveWorkflowSelector @Inject constructor(
-    private val workflowRepository: WorkflowRepository
+    private val definitionRepository: DefinitionRepository
 ) {
     /**
      * Fetches workflows (optionally filtered by name), sorts them, formats them into
@@ -19,11 +19,11 @@ class InteractiveWorkflowSelector @Inject constructor(
      * and returns the list of pairs (number, WorkflowModel) for selection.
      * Returns null if no workflows are found.
      */
-    fun prepareSelection(filterName: String? = null): List<Pair<Int, WorkflowModel>>? {
+    fun prepareSelection(filterName: String? = null): List<Pair<Int, DefinitionModel>>? {
         val workflows = if (filterName != null) {
-            workflowRepository.listByName(filterName)
+            definitionRepository.listByName(filterName)
         } else {
-            workflowRepository.listAll()
+            definitionRepository.listAll()
         }
 
         if (workflows.isEmpty()) {
@@ -53,8 +53,8 @@ class InteractiveWorkflowSelector @Inject constructor(
      * Builds the list of (number, WorkflowModel) pairs based on the grouped data.
      * This is separated so prepareSelection can return it while formatting happens elsewhere.
      */
-    private fun buildSelectionList(groupedData: Map<String, List<WorkflowModel>>): List<Pair<Int, WorkflowModel>> {
-        val selectionList = mutableListOf<Pair<Int, WorkflowModel>>()
+    private fun buildSelectionList(groupedData: Map<String, List<DefinitionModel>>): List<Pair<Int, DefinitionModel>> {
+        val selectionList = mutableListOf<Pair<Int, DefinitionModel>>()
         var currentNumber = 1
         groupedData.values.flatten().forEach { // Simple flatten and iterate to assign numbers
             selectionList.add(currentNumber to it)
@@ -68,8 +68,8 @@ class InteractiveWorkflowSelector @Inject constructor(
      * and prints it to the console.
      */
     private fun formatAndPrintList(
-        groupedData: Map<String, List<WorkflowModel>>,
-        selectionList: List<Pair<Int, WorkflowModel>>
+        groupedData: Map<String, List<DefinitionModel>>,
+        selectionList: List<Pair<Int, DefinitionModel>>
     ) {
         val output = StringBuilder()
         val maxNameWidth = (groupedData.keys.maxOfOrNull { it.length } ?: 10).coerceAtLeast(4)

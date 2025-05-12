@@ -4,11 +4,11 @@ package com.lemline.runner.messaging.bases
 import com.lemline.core.json.LemlineJson
 import com.lemline.runner.messaging.WorkflowConsumer
 import com.lemline.runner.messaging.WorkflowMessage
-import com.lemline.runner.models.WorkflowModel
+import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.WaitRepository
-import com.lemline.runner.repositories.WorkflowRepository
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.matchers.shouldBe
 import jakarta.inject.Inject
@@ -51,7 +51,7 @@ internal abstract class WorkflowConsumerTest {
     lateinit var waitRepository: WaitRepository
 
     @Inject
-    lateinit var workflowRepository: WorkflowRepository
+    lateinit var definitionRepository: DefinitionRepository
 
     @Inject
     lateinit var workflowConsumer: WorkflowConsumer
@@ -59,12 +59,12 @@ internal abstract class WorkflowConsumerTest {
     @BeforeEach
     fun setup() {
         // Clear the database
-        workflowRepository.deleteAll()
+        definitionRepository.deleteAll()
         retryRepository.deleteAll()
         waitRepository.deleteAll()
 
         // Create test workflow definition
-        val workflowModel = WorkflowModel(
+        val definitionModel = DefinitionModel(
             name = "test-workflow",
             version = "1.0.0",
             definition = """
@@ -117,7 +117,7 @@ internal abstract class WorkflowConsumerTest {
                               caught: true
             """.trimIndent().replace("@", "$")
         )
-        workflowRepository.insert(workflowModel)
+        definitionRepository.insert(definitionModel)
 
         setupMessaging()
     }

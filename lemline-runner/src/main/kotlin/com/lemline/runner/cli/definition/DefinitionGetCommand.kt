@@ -4,8 +4,8 @@ package com.lemline.runner.cli.definition
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
-import com.lemline.runner.models.WorkflowModel
-import com.lemline.runner.repositories.WorkflowRepository
+import com.lemline.runner.models.DefinitionModel
+import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import picocli.CommandLine
@@ -25,7 +25,7 @@ class DefinitionGetCommand : Runnable {
     enum class OutputFormat { JSON, YAML }
 
     @Inject
-    lateinit var workflowRepository: WorkflowRepository
+    lateinit var definitionRepository: DefinitionRepository
 
     @Inject
     lateinit var objectMapper: ObjectMapper
@@ -59,7 +59,7 @@ class DefinitionGetCommand : Runnable {
         try {
             if (name != null && version != null) {
                 // Direct fetch: Both name and version provided - runs once and exits
-                val selectedWorkflow = workflowRepository.findByNameAndVersion(name!!, version!!)
+                val selectedWorkflow = definitionRepository.findByNameAndVersion(name!!, version!!)
                 if (selectedWorkflow == null) {
                     System.err.println("ERROR: Workflow '$name' version '$version' not found.")
                     return // Exit if direct fetch fails
@@ -122,22 +122,22 @@ class DefinitionGetCommand : Runnable {
     /**
      * Displays the definition of a given workflow model according to the selected format.
      */
-    private fun displayWorkflowDefinition(workflowModel: WorkflowModel) = when (format) {
+    private fun displayWorkflowDefinition(definitionModel: DefinitionModel) = when (format) {
         // Re-parse the stored definition to ensure it's valid before serializing
         OutputFormat.JSON -> try {
-            val workflow = Workflows.parse(workflowModel.definition)
+            val workflow = Workflows.parse(definitionModel.definition)
             val workflowJson = objectMapper
                 .writerWithDefaultPrettyPrinter()
                 .writeValueAsString(workflow)
             println(workflowJson)
         } catch (_: Exception) {
             System.err.println(
-                "ERROR: Unable to parse and format Workflow '${workflowModel.name}' version '${workflowModel.version}' as JSON. Stored definition might be invalid:\n" +
-                    workflowModel.definition
+                "ERROR: Unable to parse and format Workflow '${definitionModel.name}' version '${definitionModel.version}' as JSON. Stored definition might be invalid:\n" +
+                    definitionModel.definition
             )
         }
 
         // Assuming stored definition is already valid YAML
-        OutputFormat.YAML -> println(workflowModel.definition)
+        OutputFormat.YAML -> println(definitionModel.definition)
     }
 }

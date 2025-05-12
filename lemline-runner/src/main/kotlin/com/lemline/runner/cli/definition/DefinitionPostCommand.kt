@@ -2,8 +2,8 @@
 package com.lemline.runner.cli.definition
 
 import com.lemline.core.workflows.Workflows
-import com.lemline.runner.models.WorkflowModel
-import com.lemline.runner.repositories.WorkflowRepository
+import com.lemline.runner.models.DefinitionModel
+import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import io.quarkus.runtime.annotations.RegisterForReflection
 import io.serverlessworkflow.api.types.Workflow
@@ -47,7 +47,7 @@ class DefinitionPostCommand : Runnable {
     var recursive: Boolean = false
 
     @Inject
-    lateinit var workflowRepository: WorkflowRepository
+    lateinit var definitionRepository: DefinitionRepository
 
     @Option(
         names = ["--force", "-F"],
@@ -139,13 +139,13 @@ class DefinitionPostCommand : Runnable {
         try {
             val content = file.readText()
             val workflow = Workflows.parse(content)
-            val model = WorkflowModel.from(workflow)
+            val model = DefinitionModel.from(workflow)
             val workflowName = "'${model.name}' (version '${model.version}')"
-            when (workflowRepository.insert(model)) {
+            when (definitionRepository.insert(model)) {
                 1 -> println("$prefix Workflow successfully created: $workflowName")
 
                 0 -> when (force) {
-                    true -> when (workflowRepository.update(model)) {
+                    true -> when (definitionRepository.update(model)) {
                         1 -> println("$prefix Workflow successfully updated: $workflowName")
                         0 -> System.err.println("$prefix Failed to update workflow: $workflowName") // this should not happen
                     }

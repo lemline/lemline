@@ -16,9 +16,9 @@ import com.lemline.core.workflows.Workflows
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.WaitRepository
-import com.lemline.runner.repositories.WorkflowRepository
 import com.lemline.runner.secrets.Secrets
 import io.serverlessworkflow.impl.WorkflowStatus
 import jakarta.enterprise.context.ApplicationScoped
@@ -44,7 +44,7 @@ internal const val WORKFLOW_OUT = "workflows-out"
  */
 @ApplicationScoped
 internal class WorkflowConsumer(
-    private val workflowRepository: WorkflowRepository,
+    private val definitionRepository: DefinitionRepository,
     private val retryRepository: RetryRepository,
     private val waitRepository: WaitRepository,
 ) {
@@ -116,7 +116,7 @@ internal class WorkflowConsumer(
         // Get workflow definition from the cache or load it from the database
         val workflow = Workflows.getOrNull(name, version) ?: run {
             // Load workflow definition from the database
-            val workflowDefinition = workflowRepository.findByNameAndVersion(name, version)
+            val workflowDefinition = definitionRepository.findByNameAndVersion(name, version)
                 ?: error("Workflow $name:$version not found")
             // validate the workflow definition and put it in cache
             Workflows.parseAndPut(workflowDefinition.definition)
