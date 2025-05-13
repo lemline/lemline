@@ -58,53 +58,71 @@ class ConfigCommandTest {
     }
 
     /**
-     * Tests that the output of the 'config' command (default format) contains Lemline properties.
+     * Tests 'config --format yaml' output.
+     * Assumes YAML output uses standard key: value pairs.
      */
     @Test
-    fun `test config command output default format contains Lemline properties`() {
-        val output = executeAndCapture("config")
+    fun `test config command with yaml format`() {
+        val output1 = executeAndCapture("config", "--format=yaml")
+        val output2 = executeAndCapture("config", "-fyaml")
 
-        // Verify essential Quarkus properties are present in the output (TEXT format assumed)
-        assertTrue(
-            output.contains("lemline.database.type="),
-            "Output should contain lemline.database.type key-value"
-        )
-        assertTrue(
-            output.contains("lemline.messaging.type="),
-            "Output should contain lemline.messaging.type key-value"
-        )
-        assertFalse(
-            output.contains("quarkus.log.level="),
-            "Output should not contain quarkus.log.level key-value"
-        )
-        // Basic check for text format (no JSON/YAML delimiters)
-        assertFalse(output.startsWith("{") || output.startsWith("-"), "Default output should resemble text format")
+        listOf(output1, output2).forEach { output ->
+            // Basic checks for YAML format
+            assertTrue(output.contains("lemline:\n  database:\n    "), "output should be in YAML format")
+            // should not contain Quarkus properties
+            assertFalse(output.contains("quarkus:"), "output should not contain Quarkus properties")
+        }
     }
 
     /**
-     * Tests that the output of the 'config' command (default format) contains known properties.
+     * Tests 'config --format text' explicitly.
+     * Should be similar to the default format test.
      */
+    @Test
+    fun `test config command with properties format`() {
+        val output1 = executeAndCapture("config", "--format=properties")
+        val output2 = executeAndCapture("config", "-fproperties")
+
+        listOf(output1, output2).forEach { output ->
+            assertTrue(output.contains("lemline.database.type="), "output should have properties format")
+            assertFalse(output.contains("quarkus.log.level="), "output should not contain Quarkus properties")
+        }
+    }
+
+    @Test
+    fun `test config command outputs format yaml by default`() {
+        val output = executeAndCapture("config") // Use helper
+
+        // Verify Lemline properties are present in the output
+        assertTrue(output.contains("lemline:\n  database:\n    "), "output should be in YAML format")
+        // Verify Quarkus properties are not present in the output
+        assertFalse(output.contains("quarkus:\n"), "output should not contain Quarkus properties")
+
+    }
+
     @Test
     fun `test config command output default format contains Quarkus properties with -a option`() {
         val output1 = executeAndCapture("config", "-a")
         val output2 = executeAndCapture("config", "--all")
 
         listOf(output1, output2).forEach { output ->
-            // Verify essential Quarkus properties are present in the output (TEXT format assumed)
-            assertTrue(
-                output.contains("lemline.database.type="),
-                "Output should contain lemline.database.type key-value"
-            )
-            assertTrue(
-                output.contains("lemline.messaging.type="),
-                "Output should contain lemline.messaging.type key-value"
-            )
-            assertTrue(
-                output.contains("quarkus.log.level="),
-                "Output should contain quarkus.log.level key-value"
-            )
-            // Basic check for text format (no JSON/YAML delimiters)
-            assertFalse(output.startsWith("{") || output.startsWith("-"), "Default output should resemble text format")
+            // Verify Lemline properties are present in the output
+            assertTrue(output.contains("lemline:\n  database:\n    "), "output should be in YAML format")
+            // Verify Quarkus properties are present in the output
+            assertTrue(output.contains("quarkus:\n"), "output should contain Quarkus properties")
+        }
+    }
+
+    @Test
+    fun `test config command with all options`() {
+        val output1 = executeAndCapture("config", "-a", "-fproperties")
+        val output2 = executeAndCapture("config", "--all", "--format=properties")
+
+        listOf(output1, output2).forEach { output ->
+            // Verify Lemline properties are present in the output
+            assertTrue(output.contains("lemline.database.type="), "output should have properties format")
+            // Verify Quarkus properties are present in the output
+            assertTrue(output.contains("quarkus.log.level="), "output should contain Quarkus properties")
         }
     }
 
@@ -127,36 +145,4 @@ class ConfigCommandTest {
     }
 
     // --- Format Option Tests (Assumes --format option exists in ConfigCommand) ---
-
-    /**
-     * Tests 'config --format yaml' output.
-     * Assumes YAML output uses standard key: value pairs.
-     */
-    @Test
-    fun `test config command output format yaml`() {
-        val output1 = executeAndCapture("config", "--format=yaml")
-        val output2 = executeAndCapture("config", "-fyaml")
-
-        listOf(output1, output2).forEach { output ->
-            // Basic checks for YAML format
-            assertTrue(output.contains("lemline:\n  database:\n    "), "output should be in YAML format")
-            // Add more specific YAML structure checks if needed (e.g., indentation, list markers)
-            assertFalse(output.startsWith("{"), "YAML output should not start with JSON object marker")
-        }
-    }
-
-    /**
-     * Tests 'config --format text' explicitly.
-     * Should be similar to the default format test.
-     */
-    @Test
-    fun `test config command output format text`() {
-        val output1 = executeAndCapture("config", "--format=properties")
-        val output2 = executeAndCapture("config", "-fproperties")
-
-        listOf(output1, output2).forEach { output ->
-            assertTrue(output.contains("lemline.database.type="), "output should have properties format")
-            assertFalse(output.startsWith("{") || output.startsWith("-"), "Text output should resemble text format")
-        }
-    }
 }

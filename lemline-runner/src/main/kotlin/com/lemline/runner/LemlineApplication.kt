@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner
 
-import com.lemline.common.logger
 import com.lemline.runner.LemlineApplication.Companion.configPath
 import com.lemline.runner.cli.ListenCommand
 import com.lemline.runner.cli.MainCommand
@@ -69,15 +68,16 @@ class LemlineApplication : QuarkusApplication {
             // Check if the command line arguments contain help or version options
             val helpOrVersion = parseResults[0].isUsageHelpRequested || parseResults[0].isVersionHelpRequested
 
-            // Set the Quarkus profile to "cli" except for a listen command (not overridden by --help or --version)
+            // for the listen command (not overridden by --help or --version)
+            // enable the consumer and producer
             if (parseResults.getOrNull(1)?.commandSpec()?.userObject() is ListenCommand && !helpOrVersion) {
-                logger().error("LISTEN")
                 System.setProperty(CONSUMER_ENABLED, "true")
                 System.setProperty(PRODUCER_ENABLED, "true")
             }
 
+            // for the start command (not overridden by --help or --version)
+            // enable the producer only
             if (parseResults.getOrNull(1)?.commandSpec()?.userObject() is InstanceStartCommand && !helpOrVersion) {
-                logger().error("START")
                 System.setProperty(PRODUCER_ENABLED, "true")
             }
 

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
+import com.lemline.runner.config.CONSUMER_ENABLED
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
+import com.lemline.runner.config.PRODUCER_ENABLED
 import com.lemline.runner.tests.resources.KafkaTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 import io.quarkus.test.junit.QuarkusTestProfile.TestResourceEntry
@@ -28,7 +30,9 @@ class KafkaProfile : QuarkusTestProfile {
             "lemline.database.type" to DB_TYPE_IN_MEMORY,
 
             // Messaging configuration
-            "lemline.messaging.type" to MSG_TYPE_KAFKA
+            "lemline.messaging.type" to MSG_TYPE_KAFKA,
+            CONSUMER_ENABLED to "true",
+            PRODUCER_ENABLED to "true",
         )
     }
 

@@ -134,8 +134,10 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
             }
         }
 
-        lemlineProps[CONSUMER_ENABLED] = System.getProperty(CONSUMER_ENABLED) ?: "false"
-        lemlineProps[PRODUCER_ENABLED] = System.getProperty(PRODUCER_ENABLED) ?: "false"
+        lemlineProps[CONSUMER_ENABLED] = System.getProperty(CONSUMER_ENABLED)
+            ?: lemlineProps[CONSUMER_ENABLED] ?: "false"
+        lemlineProps[PRODUCER_ENABLED] = System.getProperty(PRODUCER_ENABLED)
+            ?: lemlineProps[PRODUCER_ENABLED] ?: "false"
 
         // Override properties from the config file, if any
         LemlineApplication.configPath?.let {

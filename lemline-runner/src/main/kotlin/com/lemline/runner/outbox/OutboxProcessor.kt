@@ -200,6 +200,6 @@ internal class OutboxProcessor<T : OutboxModel>(
         val jitter = (Math.random() - 0.5) * 2 * jitterRange // Random value between -1 and 1, multiplied by range
 
         // Ensure we never return less than .1 second (100ms)
-        return (baseDelay + jitter).toLong().coerceAtLeast(100)
+        return (baseDelay + jitter).toLong().coerceAtLeast(100L)
     }
 }

@@ -7,7 +7,7 @@ import java.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
-const val WAIT_TABLE = "waits"
+const val WAIT_TABLE = "lemline_waits"
 
 @Serializable
 data class WaitModel(

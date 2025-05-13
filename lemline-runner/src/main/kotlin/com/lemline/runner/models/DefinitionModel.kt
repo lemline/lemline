@@ -5,6 +5,8 @@ import com.github.f4b6a3.uuid.UuidCreator
 import com.lemline.core.json.LemlineJson
 import io.serverlessworkflow.api.types.Workflow
 
+const val DEFINITION_TABLE = "lemline_definitions"
+
 data class DefinitionModel(
     override val id: String = UuidCreator.getTimeOrderedEpoch().toString(),
 

@@ -2,6 +2,7 @@
 package com.lemline.runner.repositories
 
 import com.lemline.runner.config.DatabaseManager
+import com.lemline.runner.models.DEFINITION_TABLE
 import com.lemline.runner.models.DefinitionModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -15,7 +16,7 @@ class DefinitionRepository : Repository<DefinitionModel>() {
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
-    override val tableName = "definitions"
+    override val tableName = DEFINITION_TABLE
 
     override val columns = listOf("id", "definition", "name", "version")
 
