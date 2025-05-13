@@ -10,6 +10,7 @@ import com.lemline.runner.repositories.OutboxRepository
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import kotlin.random.Random
 import org.jetbrains.annotations.VisibleForTesting
 import org.slf4j.Logger
 
@@ -79,6 +80,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                 if (messages.isEmpty()) {
                     logger.info { "Empty processing batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
                     consecutiveEmptyBatches++
+                    Thread.sleep(Random.nextLong(10, 200))
                     continue
                 }
 
@@ -157,7 +159,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                 if (messagesToDelete.isEmpty()) {
                     logger.info { "Empty cleaning batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
                     consecutiveEmptyBatches++
-                    Thread.sleep(100)
+                    Thread.sleep(Random.nextLong(10, 200))
                     continue
                 }
 

@@ -63,8 +63,12 @@ internal class MessageConsumer @Inject constructor(
 
     @PostConstruct
     fun init() {
-        logger.debug("Consumer " + if (enabled) "enabled" else "disabled")
-        if (enabled) messages.subscribe().with { consume(it) }
+        if (enabled) {
+            messages.subscribe().with { consume(it) }
+            logger.info { "✅ Consumer enabled" }
+        } else {
+            logger.info { "❌ Consumer disabled" }
+        }
     }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
