@@ -22,7 +22,7 @@ import kotlinx.serialization.json.JsonElement
  * @property position The current active initial position
  */
 @Serializable
-data class WorkflowMessage(
+data class Message(
     @SerialName("n") val name: String,
     @SerialName("v") val version: String,
     @SerialName("s") val states: Map<NodePosition, NodeState>,
@@ -34,7 +34,7 @@ data class WorkflowMessage(
             version: String,
             input: JsonElement,
             id: String = UuidCreator.getTimeOrderedEpoch().toString()
-        ) = WorkflowMessage(
+        ) = Message(
             name = name,
             version = version,
             states = mapOf(
@@ -47,7 +47,7 @@ data class WorkflowMessage(
             position = NodePosition.root,
         )
 
-        fun fromJsonString(json: String): WorkflowMessage = LemlineJson.decodeFromString(json)
+        fun fromJsonString(json: String): Message = LemlineJson.decodeFromString(json)
     }
 
     fun toJsonString(): String = LemlineJson.encodeToString(this)

@@ -16,7 +16,7 @@ import kotlinx.serialization.json.JsonElement
 object SchemaValidator {
     private val resourceLoader = DefaultResourceLoaderFactory.get().getResourceLoader(null)
     private val jsonSchemaFactory = JsonSchemaFactory.getInstance(VersionFlag.V7)
-    
+
     fun validate(node: JsonElement, schemaUnion: SchemaUnion) =
         validateSchema(with(LemlineJson) { node.toJsonNode() }, schemaUnionToSchema(schemaUnion))
 

@@ -13,6 +13,7 @@ import com.lemline.core.nodes.activities.WaitInstance
 import com.lemline.core.nodes.flows.TryInstance
 import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.Workflows
+import com.lemline.runner.config.CONSUMER_ENABLED
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.OutBoxStatus
@@ -20,8 +21,12 @@ import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.secrets.Secrets
+import io.quarkus.runtime.Startup
 import io.serverlessworkflow.impl.WorkflowStatus
+import io.smallrye.mutiny.Multi
+import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
 import java.time.Instant
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
@@ -32,8 +37,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.future.future
-import org.eclipse.microprofile.reactive.messaging.Incoming
-import org.eclipse.microprofile.reactive.messaging.Outgoing
+import org.eclipse.microprofile.config.inject.ConfigProperty
+import org.eclipse.microprofile.reactive.messaging.Channel
+import org.eclipse.microprofile.reactive.messaging.Emitter
 
 internal const val WORKFLOW_IN = "workflows-in"
 internal const val WORKFLOW_OUT = "workflows-out"
@@ -42,17 +48,27 @@ internal const val WORKFLOW_OUT = "workflows-out"
  * WorkflowConsumer is responsible for consuming workflow messages from the incoming channel,
  * processing them, and sending the results to the outgoing channel.
  */
+
+@Startup
 @ApplicationScoped
-internal class WorkflowConsumer(
+internal class MessageConsumer @Inject constructor(
+    @Channel(WORKFLOW_IN) private val messages: Multi<String>,
+    @Channel(WORKFLOW_OUT) private val emitter: Emitter<String>,
+    @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
     private val definitionRepository: DefinitionRepository,
     private val retryRepository: RetryRepository,
     private val waitRepository: WaitRepository,
 ) {
     private val logger = logger()
+
+    @PostConstruct
+    fun init() {
+        logger.debug("Consumer " + if (enabled) "enabled" else "disabled")
+        if (enabled) messages.subscribe().with { consume(it) }
+    }
+
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    @Incoming(WORKFLOW_IN)
-    @Outgoing(WORKFLOW_OUT)
     fun consume(msg: String): CompletionStage<String?> = scope.future {
         // Generate a unique request ID for this message processing
         val requestId = java.util.UUID.randomUUID().toString()
@@ -64,9 +80,9 @@ internal class WorkflowConsumer(
         ) {
             logger.debug { "Received message for processing" }
 
-            val workflowMessage = try {
+            val message = try {
                 logger.trace { "Message content: $msg" }
-                WorkflowMessage.fromJsonString(msg)
+                Message.fromJsonString(msg)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to deserialize message" }
                 // save to retry table with a status of FAILED
@@ -78,23 +94,25 @@ internal class WorkflowConsumer(
             }
 
             // Extract workflow ID from the root state if available
-            val workflowId = workflowMessage.states[NodePosition.root]?.workflowId
+            val workflowId = message.states[NodePosition.root]?.workflowId
 
             // Add workflow context information once we have it
             withLoggingContext(
                 LogContext.WORKFLOW_ID to workflowId,
-                LogContext.WORKFLOW_NAME to workflowMessage.name,
-                LogContext.WORKFLOW_VERSION to workflowMessage.version,
-                LogContext.NODE_POSITION to workflowMessage.position.toString(),
+                LogContext.WORKFLOW_NAME to message.name,
+                LogContext.WORKFLOW_VERSION to message.version,
+                LogContext.NODE_POSITION to message.position.toString(),
             ) {
                 try {
                     logger.info { "Processing workflow message" }
-                    process(workflowMessage).also { result ->
+                    process(message).also { result ->
                         if (result != null) {
                             logger.info { "Workflow processing completed with next message" }
                             logger.debug { "Next message: $result" }
+                            // Send the next message to the outgoing channel
+                            emitter.send(result)
                         } else {
-                            logger.info { "Workflow processing completed with no next message" }
+                            logger.info { "Workflow processing completed without next message" }
                         }
                         processingMessages.remove(msg)?.complete(result)
                     }
@@ -110,9 +128,9 @@ internal class WorkflowConsumer(
         }
     }
 
-    suspend fun process(workflowMessage: WorkflowMessage): String? {
-        val name = workflowMessage.name
-        val version = workflowMessage.version
+    suspend fun process(message: Message): String? {
+        val name = message.name
+        val version = message.version
         // Get workflow definition from the cache or load it from the database
         val workflow = Workflows.getOrNull(name, version) ?: run {
             // Load workflow definition from the database
@@ -123,10 +141,10 @@ internal class WorkflowConsumer(
         }
 
         val instance = WorkflowInstance(
-            name = workflowMessage.name,
-            version = workflowMessage.version,
-            states = workflowMessage.states,
-            position = workflowMessage.position,
+            name = message.name,
+            version = message.version,
+            states = message.states,
+            position = message.position,
             secrets = Secrets.get(workflow),
         )
 
@@ -169,21 +187,21 @@ internal class WorkflowConsumer(
     internal fun waitForProcessing(msg: String): CompletableFuture<String?> =
         processingMessages.computeIfAbsent(msg) { CompletableFuture() }
 
-    private fun WorkflowInstance.running(): WorkflowMessage = WorkflowMessage(
+    private fun WorkflowInstance.running(): Message = Message(
         name = this.name,
         version = this.version,
         states = this.currentNodeStates,
         position = this.currentPosition!!,
     )
 
-    private fun WorkflowInstance.faulted(): WorkflowMessage? {
+    private fun WorkflowInstance.faulted(): Message? {
         // Store the message in retry in a failed state (for information)
         toMessage().toJsonString().saveMsgAsFailed(null)
         // Stop the processing of this instance
         return null
     }
 
-    private fun WorkflowInstance.retry(): WorkflowMessage? {
+    private fun WorkflowInstance.retry(): Message? {
         val msg = this.toMessage()
         val delay = (current as TryInstance).delay
         val delayedUntil = Instant.now().plus(delay?.toJavaDuration() ?: error("No delay set in for $this"))
@@ -200,7 +218,7 @@ internal class WorkflowConsumer(
         return null
     }
 
-    private fun WorkflowInstance.waiting(): WorkflowMessage? {
+    private fun WorkflowInstance.waiting(): Message? {
         val msg = this.toMessage()
         val delay: Duration = (this.current as WaitInstance).delay
         val delayedUntil = Instant.now().plus(delay.toJavaDuration())
@@ -216,7 +234,7 @@ internal class WorkflowConsumer(
         return null
     }
 
-    private fun WorkflowInstance.toMessage() = WorkflowMessage(
+    private fun WorkflowInstance.toMessage() = Message(
         name = this.name,
         version = this.version,
         states = this.currentNodeStates,

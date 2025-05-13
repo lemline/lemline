@@ -6,8 +6,8 @@ import com.lemline.core.json.LemlineJson
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
-import com.lemline.runner.messaging.WORKFLOW_IN
-import com.lemline.runner.messaging.WorkflowMessage
+import com.lemline.runner.messaging.Message
+import com.lemline.runner.messaging.WORKFLOW_OUT
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
@@ -34,8 +34,8 @@ class InstanceStartCommand : Runnable {
     lateinit var selector: InteractiveWorkflowSelector
 
     @Inject
-    @Channel(WORKFLOW_IN)
-    lateinit var workflowEmitter: Emitter<String>
+    @Channel(WORKFLOW_OUT)
+    lateinit var emitter: Emitter<String>
 
     @Parameters(
         index = "0",
@@ -95,10 +95,10 @@ class InstanceStartCommand : Runnable {
             }
         }
 
-        val message = WorkflowMessage.newInstance(name!!, workflowDefinition.version, inputJsonElement)
+        val message = Message.newInstance(name!!, workflowDefinition.version, inputJsonElement)
 
         // Send the message to the workflow-in channel
-        workflowEmitter.send(message.toJsonString())
+        emitter.send(message.toJsonString())
 
         println("Started workflow: ${workflowDefinition.name} version ${workflowDefinition.version}")
     }

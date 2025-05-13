@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner
 
+import com.lemline.common.logger
 import com.lemline.runner.LemlineApplication.Companion.configPath
 import com.lemline.runner.cli.ListenCommand
 import com.lemline.runner.cli.MainCommand
-import com.lemline.runner.cli.PROFILE_CLI
+import com.lemline.runner.cli.instances.InstanceStartCommand
+import com.lemline.runner.config.CONSUMER_ENABLED
+import com.lemline.runner.config.PRODUCER_ENABLED
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
 import io.quarkus.runtime.QuarkusApplication
@@ -67,11 +70,15 @@ class LemlineApplication : QuarkusApplication {
             val helpOrVersion = parseResults[0].isUsageHelpRequested || parseResults[0].isVersionHelpRequested
 
             // Set the Quarkus profile to "cli" except for a listen command (not overridden by --help or --version)
-            if (parseResults.getOrNull(1) == null ||
-                parseResults[1].commandSpec().userObject() !is ListenCommand ||
-                helpOrVersion
-            ) {
-                System.setProperty("quarkus.profile", PROFILE_CLI)
+            if (parseResults.getOrNull(1)?.commandSpec()?.userObject() is ListenCommand && !helpOrVersion) {
+                logger().error("LISTEN")
+                System.setProperty(CONSUMER_ENABLED, "true")
+                System.setProperty(PRODUCER_ENABLED, "true")
+            }
+
+            if (parseResults.getOrNull(1)?.commandSpec()?.userObject() is InstanceStartCommand && !helpOrVersion) {
+                logger().error("START")
+                System.setProperty(PRODUCER_ENABLED, "true")
             }
 
             // Set the logging level

@@ -7,10 +7,13 @@ import com.lemline.runner.config.LemlineConfiguration.RetryConfig
 import com.lemline.runner.config.toDuration
 import com.lemline.runner.messaging.WORKFLOW_OUT
 import com.lemline.runner.repositories.RetryRepository
-import io.quarkus.scheduler.Scheduled
-import io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP
+import io.quarkus.runtime.Startup
+import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
@@ -33,22 +36,91 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
  * @see OutboxProcessor for the core message processing logic
  * @see RetryConfig for configuration details
  */
+@Startup
 @ApplicationScoped
 internal class RetryOutbox @Inject constructor(
     repository: RetryRepository,
     lemlineConfig: LemlineConfiguration,
-    @Channel(WORKFLOW_OUT) emitter: Emitter<String>,
+    @Channel(WORKFLOW_OUT) private val emitter: Emitter<String>,
 ) {
+
     private val logger = logger()
 
+    private val enabled = lemlineConfig.messaging().consumer().enabled()
     private val outboxConf = lemlineConfig.retry().outbox()
-    private val cleanupConf = lemlineConfig.retry().cleanup()
+    private val cleaningConf = lemlineConfig.retry().cleanup()
 
     internal val outboxProcessor = OutboxProcessor(
         logger = logger,
         repository = repository,
         processor = { retryMessage -> emitter.send(retryMessage.message) },
     )
+
+    private val outboxExecutor = Executors.newSingleThreadScheduledExecutor()
+    private val cleaningExecutor = Executors.newSingleThreadScheduledExecutor()
+    private val outboxRunning = AtomicBoolean(false)
+    private val cleaningRunning = AtomicBoolean(false)
+
+
+    @PostConstruct
+    fun init() {
+        if (enabled) {
+            val periodSeconds = outboxConf.every().toDuration().toSeconds()
+            logger.info("⏱️ Schedule outbox task every ${periodSeconds}s")
+            outboxExecutor.scheduleAtFixedRate(
+                { safeOutbox() },
+                0,
+                periodSeconds,
+                TimeUnit.SECONDS
+            )
+        } else {
+            logger.debug("🚫 Outbox disabled by config")
+        }
+
+        if (enabled) {
+            val periodSeconds = cleaningConf.every().toDuration().toSeconds()
+            logger.info("⏱️ Schedule cleaning task every ${periodSeconds}s")
+            cleaningExecutor.scheduleAtFixedRate(
+                { safeCleaning() },
+                0,
+                periodSeconds,
+                TimeUnit.SECONDS
+            )
+        } else {
+            logger.debug("🚫 Cleaning task disabled by config")
+        }
+    }
+
+    private fun safeOutbox() {
+        if (!outboxRunning.compareAndSet(false, true)) {
+            logger.warn("⏭ Skipping execution: outbox task still running")
+            return
+        }
+
+        try {
+            outbox()
+        } catch (ex: Exception) {
+            logger.error("💥 Error in outbox task", ex)
+        } finally {
+            outboxRunning.set(false)
+        }
+    }
+
+    private fun safeCleaning() {
+        if (!cleaningRunning.compareAndSet(false, true)) {
+            logger.warn("⏭ Skipping execution: cleaning task still running")
+            return
+        }
+
+        try {
+            cleanup()
+        } catch (ex: Exception) {
+            logger.error("💥 Error in cleaning task", ex)
+        } finally {
+            cleaningRunning.set(false)
+        }
+    }
+
 
     /**
      * Processes pending retry messages from the outbox table.
@@ -65,8 +137,7 @@ internal class RetryOutbox @Inject constructor(
      * - Failed messages are properly tracked and retried
      * - Concurrent processing is prevented
      */
-    @Scheduled(every = "{lemline.retry.outbox.every}", concurrentExecution = SKIP)
-    fun outbox() {
+    private fun outbox() {
         outboxProcessor.process(
             outboxConf.batchSize(),
             outboxConf.maxAttempts(),
@@ -89,11 +160,10 @@ internal class RetryOutbox @Inject constructor(
      * - Cleanup doesn't interfere with active message processing
      * - Database performance is maintained through batch processing
      */
-    @Scheduled(every = "{lemline.retry.cleanup.every}", concurrentExecution = SKIP)
-    fun cleanup() {
+    private fun cleanup() {
         outboxProcessor.cleanup(
-            cleanupConf.after().toDuration(),
-            cleanupConf.batchSize(),
+            cleaningConf.after().toDuration(),
+            cleaningConf.batchSize(),
         )
     }
 }

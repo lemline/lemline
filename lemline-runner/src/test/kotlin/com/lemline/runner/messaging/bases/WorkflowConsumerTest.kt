@@ -2,8 +2,8 @@
 package com.lemline.runner.messaging.bases
 
 import com.lemline.core.json.LemlineJson
-import com.lemline.runner.messaging.WorkflowConsumer
-import com.lemline.runner.messaging.WorkflowMessage
+import com.lemline.runner.messaging.Message
+import com.lemline.runner.messaging.MessageConsumer
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.DefinitionRepository
@@ -26,7 +26,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
- * Abstract base class for testing the [WorkflowConsumer].
+ * Abstract base class for testing the [MessageConsumer].
  *
  * This class sets up a common test environment including repositories (Retry, Wait, Workflow)
  * and provides helper methods for sending messages and waiting for processing.
@@ -54,7 +54,7 @@ internal abstract class WorkflowConsumerTest {
     lateinit var definitionRepository: DefinitionRepository
 
     @Inject
-    lateinit var workflowConsumer: WorkflowConsumer
+    lateinit var messageConsumer: MessageConsumer
 
     @BeforeEach
     fun setup() {
@@ -136,7 +136,7 @@ internal abstract class WorkflowConsumerTest {
     protected abstract fun receiveMessage(timeout: Long, unit: TimeUnit): String?
 
     private fun sendMessageFuture(messageJson: String): CompletableFuture<String?> {
-        val future = workflowConsumer.waitForProcessing(messageJson)
+        val future = messageConsumer.waitForProcessing(messageJson)
         // Send the message to the input topic
         sendMessage(messageJson)
         return future
@@ -159,13 +159,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should process valid workflow message and send to output topic`() {
         // Given
-        val workflowMessage = WorkflowMessage.newInstance(
+        val message = Message.newInstance(
             name = "test-workflow",
             version = "1.0.0",
             input = JsonPrimitive("task"),
             id = "test-id",
         )
-        val messageJson = LemlineJson.encodeToString(workflowMessage)
+        val messageJson = LemlineJson.encodeToString(message)
 
         // When
         val future = sendMessageFuture(messageJson)
@@ -241,13 +241,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should store instance with retry in retry repository`() {
         // Given
-        val workflowMessage = WorkflowMessage.newInstance(
+        val message = Message.newInstance(
             "test-workflow",
             "1.0.0",
             JsonPrimitive("retry"),
             "test-id",
         )
-        val messageJson = LemlineJson.encodeToString(workflowMessage)
+        val messageJson = LemlineJson.encodeToString(message)
 
         // When
         val future = sendMessageFuture(messageJson)
@@ -282,13 +282,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should store waiting instance in wait repository`() {
         // Given
-        val workflowMessage = WorkflowMessage.newInstance(
+        val message = Message.newInstance(
             "test-workflow",
             "1.0.0",
             JsonPrimitive("wait"),
             "test-id",
         )
-        val messageJson = LemlineJson.encodeToString(workflowMessage)
+        val messageJson = LemlineJson.encodeToString(message)
 
         // When
         val future = sendMessageFuture(messageJson)
@@ -331,13 +331,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should handle completed workflow without sending message`() {
         // Given
-        val workflowMessage = WorkflowMessage.newInstance(
+        val message = Message.newInstance(
             "test-workflow",
             "1.0.0",
             JsonPrimitive("completed"),
             "test-id",
         )
-        val messageJson = LemlineJson.encodeToString(workflowMessage)
+        val messageJson = LemlineJson.encodeToString(message)
 
         // When
         val future = sendMessageFuture(messageJson)
