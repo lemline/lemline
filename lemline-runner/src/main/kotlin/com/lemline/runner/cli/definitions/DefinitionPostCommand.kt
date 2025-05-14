@@ -5,8 +5,6 @@ import com.lemline.core.workflows.Workflows
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
-import io.quarkus.runtime.annotations.RegisterForReflection
-import io.serverlessworkflow.api.types.Workflow
 import jakarta.inject.Inject
 import java.io.File
 import picocli.CommandLine
@@ -18,10 +16,6 @@ import picocli.CommandLine.Option
     name = "post",
     description = ["Create or update workflows from definition files."],
     mixinStandardHelpOptions = true,
-)
-@RegisterForReflection(
-    targets = [Workflow::class],
-    registerFullHierarchy = true
 )
 class DefinitionPostCommand : Runnable {
 

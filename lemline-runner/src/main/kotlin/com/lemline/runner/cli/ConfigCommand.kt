@@ -6,7 +6,6 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.lemline.runner.LemlineApplication
 import io.quarkus.arc.Unremovable
-import io.quarkus.runtime.annotations.RegisterForReflection
 import jakarta.inject.Inject
 import org.eclipse.microprofile.config.Config
 import picocli.CommandLine.Command
@@ -18,10 +17,6 @@ import picocli.CommandLine.Option
     name = "config",
     description = ["Display current configuration"],
     mixinStandardHelpOptions = true
-)
-@RegisterForReflection(
-    targets = [Config::class],
-    registerFullHierarchy = true
 )
 class ConfigCommand : Runnable {
     enum class Format {
