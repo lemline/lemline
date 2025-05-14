@@ -139,6 +139,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         lemlineProps[PRODUCER_ENABLED] = System.getProperty(PRODUCER_ENABLED)
             ?: lemlineProps[PRODUCER_ENABLED] ?: "false"
 
+
         // Override properties from the config file, if any
         LemlineApplication.configPath?.let {
             log.debug { "Lemline config file location=$it" }

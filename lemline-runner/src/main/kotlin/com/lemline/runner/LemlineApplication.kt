@@ -70,14 +70,14 @@ class LemlineApplication : QuarkusApplication {
 
             // for the listen command (not overridden by --help or --version)
             // enable the consumer and producer
-            if (parseResults.getOrNull(1)?.commandSpec()?.userObject() is ListenCommand && !helpOrVersion) {
+            if (parseResults.any { it.commandSpec().userObject() is ListenCommand && !helpOrVersion }) {
                 System.setProperty(CONSUMER_ENABLED, "true")
                 System.setProperty(PRODUCER_ENABLED, "true")
             }
 
             // for the start command (not overridden by --help or --version)
             // enable the producer only
-            if (parseResults.getOrNull(1)?.commandSpec()?.userObject() is InstanceStartCommand && !helpOrVersion) {
+            if (parseResults.any { it.commandSpec().userObject() is InstanceStartCommand && !helpOrVersion }) {
                 System.setProperty(PRODUCER_ENABLED, "true")
             }
 
@@ -112,8 +112,10 @@ class LemlineApplication : QuarkusApplication {
             val tempCli = CommandLine(MainCommand(), CommandLine.defaultFactory())
             val mainParseResult = tempCli.parseArgs(*args)
 
-            // return mainParseResult and all subcommands parseResults
-            listOf(mainParseResult) + mainParseResult.subcommands()
+            fun collectAllSubcommands(pr: ParseResult): List<ParseResult> =
+                listOf(pr) + pr.subcommands().flatMap { collectAllSubcommands(it) }
+
+            collectAllSubcommands(mainParseResult)
         } catch (e: CommandLine.PicocliException) {
             error(e.message ?: "An unexpected error occurred during parsing.")
         }
@@ -201,6 +203,7 @@ private fun setLogLevel(level: Level) = level.name.let {
     System.setProperty("quarkus.log.category.\"org.flywaydb\".level", it)
     System.setProperty("quarkus.log.category.\"io.smallrye\".level", it)
     System.setProperty("quarkus.log.category.\"io.agroal\".level", it)
+    System.setProperty("quarkus.log.category.\"org.apache.kafka\".level", it)
 }
 
 private fun error(msg: String): Nothing {

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.common.info
+import com.lemline.common.logger
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
@@ -217,6 +219,8 @@ interface LemlineConfiguration {
         fun rabbitmq(): RabbitMQConfig
 
         companion object {
+            val logger = logger()
+
             fun toQuarkusProperties(
                 config: MessagingConfig
             ): Map<String, String> {
@@ -239,6 +243,7 @@ interface LemlineConfiguration {
 
                         // Incoming channel
                         if (config.consumer().enabled()) {
+                            logger.info { "✅ Consumer Kafka enabled" }
                             props["$incoming.connector"] = KAFKA_CONNECTOR
                             props["$incoming.topic"] = kafkaConfig.topic()
                             props["$incoming.group.id"] = kafkaConfig.groupId()
@@ -248,13 +253,18 @@ interface LemlineConfiguration {
                                 kafkaConfig.topicDlq().orElse("${kafkaConfig.topic()}-dlq")
                             props["$incoming.value.deserializer"] =
                                 "org.apache.kafka.common.serialization.StringDeserializer"
+                        } else {
+                            logger.info { "❌ Consumer Kafka disabled" }
                         }
                         // Outgoing channel
                         if (config.producer().enabled()) {
+                            logger.info { "✅ Producer Kafka enabled" }
                             props["$outgoing.connector"] = KAFKA_CONNECTOR
                             props["$outgoing.topic"] = kafkaConfig.topicOut().orElse(kafkaConfig.topic())
                             props["$outgoing.value.serializer"] =
                                 "org.apache.kafka.common.serialization.StringSerializer"
+                        } else {
+                            logger.info { "❌ Producer Kafka disabled" }
                         }
 
                         // Other settings
@@ -284,6 +294,7 @@ interface LemlineConfiguration {
 
                         // Incoming channel
                         if (config.consumer().enabled()) {
+                            logger.info { "✅ Consumer RabbitMQ enabled" }
                             props["$incoming.connector"] = RABBITMQ_CONNECTOR
                             props["$incoming.queue.name"] = rabbitConfig.queue()
                             props["$incoming.queue.durable"] = "true"
@@ -292,12 +303,17 @@ interface LemlineConfiguration {
                             props["$incoming.queue.arguments.x-dead-letter-exchange"] = "dlx"
                             props["$incoming.queue.arguments.x-dead-letter-routing-key"] =
                                 rabbitConfig.queueDlq().orElse("${rabbitConfig.queue()}-dlq")
+                        } else {
+                            logger.info { "❌ Consumer RabbitMQ disabled" }
                         }
                         // Outgoing channel
                         if (config.producer().enabled()) {
+                            logger.info { "✅ Producer RabbitMQ enabled" }
                             props["$outgoing.connector"] = RABBITMQ_CONNECTOR
                             props["$outgoing.queue.name"] = rabbitConfig.queueOut().orElse(rabbitConfig.queue())
                             props["$outgoing.serializer"] = "java.lang.String"
+                        } else {
+                            logger.info { "❌ Producer RabbitMQ disabled" }
                         }
 
                         // Other settings

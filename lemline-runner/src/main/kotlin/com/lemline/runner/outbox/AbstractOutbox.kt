@@ -62,15 +62,10 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
             return
         }
 
-        if (outboxProcessor == null) {
-            logger.warn("⚠️ Outbox processor not initialized, skipping scheduling")
-            return
-        }
-
         // Schedule outbox processing
         val outboxPeriodSeconds = outboxExecutionPeriod.toDuration().toSeconds()
         outboxExecutor.scheduleAtFixedRate(
-            { safeOutbox() },
+            { outbox() },
             0,
             outboxPeriodSeconds,
             TimeUnit.SECONDS
@@ -80,7 +75,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         // Schedule cleanup
         val cleanupPeriodSeconds = cleanupExecutionPeriod.toDuration().toSeconds()
         cleaningExecutor.scheduleAtFixedRate(
-            { safeCleaning() },
+            { cleanup() },
             0,
             cleanupPeriodSeconds,
             TimeUnit.SECONDS
@@ -92,14 +87,18 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      * Safely executes the outbox task while ensuring that no concurrent executions occur.
      * This method uses an `AtomicBoolean` to prevent overlapping executions.
      */
-    private fun safeOutbox() {
+    private fun outbox() {
         if (!outboxRunning.compareAndSet(false, true)) {
             logger.warn("⏭ Skipping execution: outbox task still running")
             return
         }
 
         try {
-            outbox()
+            outboxProcessor.process(
+                outboxBatchSize,
+                outboxMaxAttempts,
+                outboxInitialDelay.toDuration(),
+            )
         } catch (ex: Exception) {
             logger.error("💥 Error in outbox task", ex)
         } finally {
@@ -111,39 +110,21 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      * Safely executes the cleaning task while ensuring that no concurrent executions occur.
      * This method uses an `AtomicBoolean` to prevent overlapping executions.
      */
-    private fun safeCleaning() {
+    private fun cleanup() {
         if (!cleaningRunning.compareAndSet(false, true)) {
             logger.warn("⏭ Skipping execution: cleaning task still running")
             return
         }
 
         try {
-            cleanup()
+            outboxProcessor.cleanup(
+                cleanupAfter.toDuration(),
+                cleanupBatchSize,
+            )
         } catch (ex: Exception) {
             logger.error("💥 Error in cleaning task", ex)
         } finally {
             cleaningRunning.set(false)
         }
-    }
-
-    /**
-     * Processes pending messages from the outbox table.
-     */
-    private fun outbox() {
-        outboxProcessor?.process(
-            outboxBatchSize,
-            outboxMaxAttempts,
-            outboxInitialDelay.toDuration(),
-        )
-    }
-
-    /**
-     * Cleans up old sent messages from the outbox table.
-     */
-    private fun cleanup() {
-        outboxProcessor?.cleanup(
-            cleanupAfter.toDuration(),
-            cleanupBatchSize,
-        )
     }
 }
