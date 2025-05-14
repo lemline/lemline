@@ -152,6 +152,14 @@ tasks.register("generateVersionProperties") {
     }
 }
 
+tasks.register<Exec>("codesignNativeBinary") {
+    group = "build"
+    description = "Codesign the native binary after build"
+    commandLine("codesign", "-s", "-", "build/lemline-runner-${project.version}-runner")
+    dependsOn("build") // Ensure it runs after the build task
+}
+
+
 // Add the generated resources to the main source set
 sourceSets.main.get().resources.srcDir(
     tasks.named("generateVersionProperties").map { it.outputs.files.singleFile.parentFile })
