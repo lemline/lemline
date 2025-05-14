@@ -48,7 +48,6 @@ internal const val WORKFLOW_OUT = "workflows-out"
  * WorkflowConsumer is responsible for consuming workflow messages from the incoming channel,
  * processing them, and sending the results to the outgoing channel.
  */
-
 @Startup
 @ApplicationScoped
 internal class MessageConsumer @Inject constructor(

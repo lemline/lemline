@@ -42,6 +42,7 @@ dependencies {
     implementation("io.quarkus:quarkus-flyway")
     implementation("io.quarkus:quarkus-jdbc-postgresql")
     implementation("io.quarkus:quarkus-jdbc-mysql")
+    implementation("io.quarkus:quarkus-hibernate-validator")
 
     // Messaging
     implementation("io.quarkus:quarkus-messaging-kafka")
