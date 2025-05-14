@@ -150,7 +150,6 @@ class DefinitionPostCommand : Runnable {
         } catch (e: Exception) {
             // Log error for the specific file but continue if processing a directory
             System.err.println("ERROR processing file '${file.absolutePath}': ${e.message}")
-            throw e
         }
     }
 }
