@@ -63,7 +63,8 @@ class InstanceStartCommand : Runnable {
         // Parse input JSON if provided, or use an empty object if not provided.
         val inputJsonElement: JsonElement = input?.let {
             try {
-                LemlineJson.encodeToElement(it)
+                // Parse the input string as JSON
+                LemlineJson.json.parseToJsonElement(it)
             } catch (e: Exception) {
                 this@InstanceStartCommand.error("Invalid JSON input: ${e.message}")
             }
