@@ -11,6 +11,7 @@ import io.kotest.matchers.string.shouldContain
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import io.mockk.spyk
 import io.mockk.verify
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
@@ -115,7 +116,7 @@ class InstanceStartCommandTest {
             println("Standard output: $outStream")
         }
         exitCode shouldBe 0
-        outStream.toString() shouldContain "Workflow instance started successfully."
+        outStream.toString() shouldContain "started successfully"
 
         verify { emitter.send(capture(messageSlot)) }
 
@@ -320,6 +321,92 @@ class InstanceStartCommandTest {
 
         // When no input is provided, the command should use an empty JSON object
         rawInput shouldBe JsonObject(emptyMap())
+    }
+
+    @Nested
+    inner class SchemaValidationTests {
+        private lateinit var workflowWithSchema: DefinitionModel
+        
+        @BeforeEach
+        fun setupSchemaTest() {
+            // Create a workflow with schema validation
+            workflowWithSchema = DefinitionModel(
+                name = workflowName,
+                version = workflowVersion,
+                definition = """
+                    document:
+                      dsl: 1.0.0
+                      namespace: test
+                      name: $workflowName
+                      version: '$workflowVersion'
+                    input:
+                      schema: 
+                        format: json
+                        document:
+                          type: object
+                          properties:
+                            userId:
+                              type: string
+                            firstName:
+                              type: string
+                            lastName:
+                              type: string
+                          required: [ userId, lastName ]
+                    do: 
+                      - wait30Seconds:
+                          wait: PT30S
+                """.trimIndent()
+            )
+            
+            // Configure repository to return this workflow
+            every {
+                definitionRepository.findByNameAndVersion(
+                    workflowName,
+                    workflowVersion
+                )
+            } returns workflowWithSchema
+        }
+    
+        @Test
+        fun `should validate input against schema when schema exists`() {
+            // Execute command with valid input matching the schema
+            val validInput = """{"userId": "user123", "lastName": "doe"}"""
+            val exitCode = cmd.execute(workflowName, workflowVersion, "--input", validInput)
+            
+            // Verify command was successful
+            exitCode shouldBe 0
+        }
+        
+        @Test
+        fun `should fail when input validation fails`() {
+            // Create an error slot to capture error messages
+            val errorSlot = slot<String>()
+            
+            // Create a spy of the command that intercepts calls to error()
+            val spyCommand = spyk(command) {
+                every { error(capture(errorSlot)) } answers {
+                    throw RuntimeException("Error: ${errorSlot.captured}")
+                }
+            }
+            
+            // Create a new CommandLine with the spy
+            val spyCmd = CommandLine(spyCommand)
+            
+            // Reset streams
+            outStream.reset()
+            errStream.reset()
+            
+            // Execute command with invalid input (missing required lastName field)
+            val invalidInput = """{"userId": "user123"}"""
+            spyCmd.execute(workflowName, workflowVersion, "--input", invalidInput)
+            
+            // Verify error message was captured
+            errorSlot.captured shouldContain "Input validation failed against workflow schema"
+            errorSlot.captured shouldContain "'lastName'"
+            
+            // Verify emitter was NOT called (we failed before sending the message)
+            verify(exactly = 0) { emitter.send(any()) }
+        }
     }
 
     // Helper method to inject dependencies using reflection

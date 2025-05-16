@@ -108,16 +108,22 @@ class LemlineApplication : QuarkusApplication {
          * @return A list of `ParseResult` objects representing the parsed arguments.
          * @throws CommandLine.PicocliException If an error occurs during argument parsing.
          */
-        private fun getParseResults(args: Array<String>): List<ParseResult> = try {
+        private fun getParseResults(args: Array<String>): List<ParseResult> {
             val tempCli = CommandLine(MainCommand(), CommandLine.defaultFactory())
-            val mainParseResult = tempCli.parseArgs(*args)
 
-            fun collectAllSubcommands(pr: ParseResult): List<ParseResult> =
-                listOf(pr) + pr.subcommands().flatMap { collectAllSubcommands(it) }
+            return try {
+                val mainParseResult = tempCli.parseArgs(*args)
 
-            collectAllSubcommands(mainParseResult)
-        } catch (e: CommandLine.PicocliException) {
-            error(e.message ?: "An unexpected error occurred during parsing.")
+                fun collectAllSubcommands(pr: ParseResult): List<ParseResult> =
+                    listOf(pr) + pr.subcommands().flatMap { collectAllSubcommands(it) }
+
+                collectAllSubcommands(mainParseResult)
+            } catch (e: CommandLine.PicocliException) {
+                throw CommandLine.ParameterException(
+                    CommandLine(tempCli),
+                    e.message ?: "An unexpected error occurred during parsing."
+                )
+            }
         }
 
         /**

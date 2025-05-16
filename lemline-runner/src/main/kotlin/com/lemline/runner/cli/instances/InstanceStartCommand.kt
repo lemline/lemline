@@ -3,6 +3,7 @@ package com.lemline.runner.cli.instances
 
 import com.github.zafarkhaja.semver.Version
 import com.lemline.core.json.LemlineJson
+import com.lemline.core.nodes.NodePosition
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
@@ -101,15 +102,14 @@ class InstanceStartCommand : Runnable {
         // Send the message synchronously to the workflow-out channel
         try {
             emitter.send(message.toJsonString()).toCompletableFuture().get()
-            println("Workflow instance started successfully.")
+            println("Instance ${message.states[NodePosition.root]?.workflowId} started successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement)")
         } catch (e: Exception) {
             this@InstanceStartCommand.error("Failed to start workflow instance: ${e.message}")
         }
     }
 
-    private fun error(msg: String): Nothing {
+    internal fun error(msg: String): Nothing {
         System.err.println(msg)
         exitProcess(1)
-        ///throw CommandLine.PicocliException(msg)
     }
 }
