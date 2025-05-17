@@ -106,8 +106,6 @@ class LemlineApplication : QuarkusApplication {
             } catch (ex: Exception) {
                 // Handle all exceptions in a unified way
                 System.err.println("⚠️ ${ex.message}")
-                System.err.println()
-                tempCli.usage(System.err)
                 exitProcess(1)
             }
 
@@ -216,10 +214,10 @@ private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
     val fileExists = Files.exists(path)
     val isRegularFile = Files.isRegularFile(path)
     if (!fileExists && provided) {
-        throw IllegalArgumentException("'${path.toAbsolutePath()} does not exist")
+        throw IllegalArgumentException("'${path.toAbsolutePath()}' does not exist")
     }
     if (!isRegularFile && provided) {
-        throw IllegalArgumentException("'${path.toAbsolutePath()} is not a regular file")
+        throw IllegalArgumentException("'${path.toAbsolutePath()}' is not a regular file")
     }
     if (fileExists && isRegularFile) {
         configPath = path
