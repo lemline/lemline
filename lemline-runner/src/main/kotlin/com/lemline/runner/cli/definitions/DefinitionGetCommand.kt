@@ -3,7 +3,7 @@ package com.lemline.runner.cli.definitions
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.core.workflows.Workflows
-import com.lemline.runner.cli.LemlineMixin
+import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
@@ -23,7 +23,7 @@ import picocli.CommandLine.Parameters
 class DefinitionGetCommand : Runnable {
 
     @Mixin
-    lateinit var mixin: LemlineMixin
+    lateinit var mixin: GlobalMixin
 
     // Enum for validated format options (only for final output)
     enum class OutputFormat { JSON, YAML }

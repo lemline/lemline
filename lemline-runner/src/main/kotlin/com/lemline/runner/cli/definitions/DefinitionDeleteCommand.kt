@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.definitions
 
-import com.lemline.runner.cli.LemlineMixin
+import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
@@ -29,7 +29,7 @@ import picocli.CommandLine.Parameters
 class DefinitionDeleteCommand : Runnable {
 
     @Mixin
-    lateinit var mixin: LemlineMixin
+    lateinit var mixin: GlobalMixin
 
     @Inject
     lateinit var definitionRepository: DefinitionRepository

@@ -2,7 +2,7 @@
 package com.lemline.runner.cli.listen
 
 import com.lemline.common.logger
-import com.lemline.runner.cli.LemlineMixin
+import com.lemline.runner.cli.GlobalMixin
 import io.quarkus.arc.Unremovable
 import io.quarkus.runtime.Quarkus
 import jakarta.enterprise.context.Dependent
@@ -18,7 +18,7 @@ import picocli.CommandLine.Mixin
 class ListenCommand : Runnable {
 
     @Mixin
-    lateinit var mixin: LemlineMixin
+    lateinit var mixin: GlobalMixin
 
     val logger = logger()
 

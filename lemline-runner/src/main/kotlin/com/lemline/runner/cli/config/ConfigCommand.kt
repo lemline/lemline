@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.lemline.runner.LemlineApplication
-import com.lemline.runner.cli.LemlineMixin
+import com.lemline.runner.cli.GlobalMixin
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import org.eclipse.microprofile.config.Config
@@ -21,7 +21,7 @@ import picocli.CommandLine.Option
 )
 class ConfigCommand : Runnable {
     @Mixin
-    lateinit var mixin: LemlineMixin
+    lateinit var mixin: GlobalMixin
 
     enum class Format {
         PROPERTIES,

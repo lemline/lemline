@@ -2,7 +2,7 @@
 package com.lemline.runner.cli.definitions
 
 import com.lemline.core.workflows.Workflows
-import com.lemline.runner.cli.LemlineMixin
+import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
@@ -21,7 +21,7 @@ import picocli.CommandLine.Option
 class DefinitionPostCommand : Runnable {
 
     @Mixin
-    lateinit var mixin: LemlineMixin
+    lateinit var mixin: GlobalMixin
 
     @Option(
         names = ["--file", "-f"],

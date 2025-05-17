@@ -6,13 +6,13 @@ import picocli.CommandLine.Command
 import picocli.CommandLine.Option
 
 /**
- * Mixin class containing log level configuration options
+ * Mixin class containing global configuration options
  */
 @Command(
     mixinStandardHelpOptions = true,
     versionProvider = VersionProvider::class,
 )
-class LemlineMixin {
+class GlobalMixin {
     @ArgGroup(
         exclusive = true,
         heading = "Log level options:%n"

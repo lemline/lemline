@@ -6,7 +6,7 @@ import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.Workflows
-import com.lemline.runner.cli.LemlineMixin
+import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.messaging.Message
 import com.lemline.runner.messaging.WORKFLOW_OUT
@@ -31,7 +31,7 @@ import picocli.CommandLine.Parameters
 class InstanceStartCommand : Runnable {
 
     @Mixin
-    lateinit var mixin: LemlineMixin
+    lateinit var mixin: GlobalMixin
 
     @Inject
     lateinit var definitionRepository: DefinitionRepository

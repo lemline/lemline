@@ -30,5 +30,5 @@ import picocli.CommandLine.Mixin
 @Dependent
 class MainCommand {
     @Mixin
-    lateinit var mixin: LemlineMixin
+    lateinit var mixin: GlobalMixin
 }
