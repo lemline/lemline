@@ -29,7 +29,7 @@ internal class RetryRepository : OutboxRepository<RetryModel>() {
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
-    override val tableName: String = RETRY_TABLE
+    override val tableName = RETRY_TABLE
 
     override fun createModel(
         id: String,

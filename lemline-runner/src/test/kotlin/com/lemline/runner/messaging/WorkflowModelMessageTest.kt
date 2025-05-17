@@ -15,7 +15,7 @@ internal class WorkflowModelMessageTest {
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {
         // Given
-        val message = WorkflowMessage(
+        val message = Message(
             name = "test-workflow",
             version = "1.0.0",
             states = mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive(""))),
@@ -32,7 +32,7 @@ internal class WorkflowModelMessageTest {
     @Test
     fun `should be JSON serializable and deserializable`() {
         // Given
-        val message = WorkflowMessage(
+        val message = Message(
             name = "test-workflow",
             version = "1.0.0",
             states = mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive(""))),
@@ -41,13 +41,13 @@ internal class WorkflowModelMessageTest {
 
         // When
         val jsonString = message.toJsonString()
-        assertEquals(message, WorkflowMessage.fromJsonString(jsonString))
+        assertEquals(message, Message.fromJsonString(jsonString))
     }
 
     @Test
     fun `should serialize and deserialize WorkflowMessage`() {
         // Given
-        val message = WorkflowMessage(
+        val message = Message(
             name = "test-workflow",
             version = "1.0.0",
             states = mapOf(
@@ -62,7 +62,7 @@ internal class WorkflowModelMessageTest {
 
         // When
         val json = LemlineJson.encodeToString(message)
-        val deserialized = LemlineJson.decodeFromString<WorkflowMessage>(json)
+        val deserialized = LemlineJson.decodeFromString<Message>(json)
 
         // Then
         assertEquals(message, deserialized)
@@ -82,7 +82,7 @@ internal class WorkflowModelMessageTest {
         )
 
         // When
-        val message = WorkflowMessage.newInstance(name, version, id, input)
+        val message = Message.newInstance(name, version, input, id)
 
         // Then
         val expectedStates = mapOf(

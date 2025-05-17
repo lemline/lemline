@@ -10,8 +10,8 @@ import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.impl.json.JsonUtils
 import io.serverlessworkflow.impl.resources.DefaultResourceLoaderFactory
-import kotlinx.serialization.json.JsonElement
 import java.util.function.Consumer
+import kotlinx.serialization.json.JsonElement
 
 object SchemaValidator {
     private val resourceLoader = DefaultResourceLoaderFactory.get().getResourceLoader(null)

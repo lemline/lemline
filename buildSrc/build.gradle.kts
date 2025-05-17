@@ -7,6 +7,17 @@ plugins {
     kotlin("jvm") version libs.versions.kotlin.get()
 }
 
+val javaVersion = libs.versions.java.get().toInt()
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(javaVersion))
+    }
+}
+
+kotlin {
+    jvmToolchain(javaVersion)
+}
 
 dependencies {
     // Add a dependency on the Kotlin Gradle plugin, so that convention plugins can apply it.

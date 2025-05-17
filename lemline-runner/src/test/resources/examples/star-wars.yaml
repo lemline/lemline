@@ -1,0 +1,51 @@
+document:
+  dsl: 1.0.0-alpha2
+  namespace: examples
+  name: star-wars-planets-batch
+  version: 1.0.0-alpha2
+do:
+  - tryGetAllCharacters:
+      try:
+        - getAllCharacters:
+            call: http
+            with:
+              method: get
+              endpoint: https://swapi.dev/api/people/
+      catch:
+        errors:
+          with:
+            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+        retry:
+          delay:
+            seconds: 1
+          backoff:
+            exponential: { }
+          limit:
+            attempt:
+              count: 3
+  - processCharacters:
+      for:
+        in: "${ .results }"
+        each: character
+      do:
+        - tryGetHomeworld:
+            try:
+              - getHomeworld:
+                  call: http
+                  with:
+                    method: get
+                    endpoint: ${ $character.homeworld }
+            catch:
+              errors:
+                with:
+                  type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+              as: hwError
+              retry:
+                when: "${ $hwError.status >= 500 or $hwError.status == 429 }"
+                delay:
+                  seconds: 1
+                backoff:
+                  exponential: { }
+                limit:
+                  attempt:
+                    count: 3

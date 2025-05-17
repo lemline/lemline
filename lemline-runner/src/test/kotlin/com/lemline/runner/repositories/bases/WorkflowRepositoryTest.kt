@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.runner.models.WorkflowModel
-import com.lemline.runner.repositories.WorkflowRepository
+import com.lemline.runner.models.DefinitionModel
+import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -30,14 +30,14 @@ import org.junit.jupiter.api.Test
  * - Support transactional operations
  * - Handle concurrent access safely (handled by the underlying database)
  *
- * @see WorkflowRepository
- * @see WorkflowModel
+ * @see DefinitionRepository
+ * @see DefinitionModel
  */
 abstract class WorkflowRepositoryTest {
 
     /** The repository implementation being tested */
     @Inject
-    protected lateinit var repository: WorkflowRepository
+    protected lateinit var repository: DefinitionRepository
 
     /**
      * Cleans up the database before each test to ensure a clean state.
@@ -63,22 +63,22 @@ abstract class WorkflowRepositoryTest {
     @Test
     fun `should successfully persist and retrieve a complete workflow model with all properties`() {
         // Given
-        val workflowModel = WorkflowModel(
+        val definitionModel = DefinitionModel(
             name = "test-workflow",
             version = "1.0.0",
             definition = "test-definition"
         )
 
         // When
-        repository.insert(workflowModel)
+        repository.insert(definitionModel)
 
         // Then
-        val retrievedModel = repository.findByNameAndVersion(workflowModel.name, workflowModel.version)
+        val retrievedModel = repository.findByNameAndVersion(definitionModel.name, definitionModel.version)
         retrievedModel shouldNotBe null
-        retrievedModel?.id shouldBe workflowModel.id
-        retrievedModel?.name shouldBe workflowModel.name
-        retrievedModel?.version shouldBe workflowModel.version
-        retrievedModel?.definition shouldContain workflowModel.definition
+        retrievedModel?.id shouldBe definitionModel.id
+        retrievedModel?.name shouldBe definitionModel.name
+        retrievedModel?.version shouldBe definitionModel.version
+        retrievedModel?.definition shouldContain definitionModel.definition
     }
 
     /**
@@ -114,7 +114,7 @@ abstract class WorkflowRepositoryTest {
     @Test
     fun `should successfully insert a new workflow version`() {
         // Given
-        val original = WorkflowModel(
+        val original = DefinitionModel(
             name = "updatable-workflow",
             version = "1.0.0",
             definition = "original definition"
@@ -122,7 +122,7 @@ abstract class WorkflowRepositoryTest {
         repository.insert(original)
 
         // When
-        val updated = WorkflowModel(
+        val updated = DefinitionModel(
             name = original.name,
             version = "1.1.0",
             definition = "updated definition"
@@ -141,7 +141,7 @@ abstract class WorkflowRepositoryTest {
     @Test
     fun `should successfully updating an existing workflow definition`() {
         // Given
-        val original = WorkflowModel(
+        val original = DefinitionModel(
             name = "updatable-workflow",
             version = "1.0.0",
             definition = "original definition"
@@ -160,7 +160,7 @@ abstract class WorkflowRepositoryTest {
     @Test
     fun `should fail inserting a new workflow with same name and version`() {
         // Given
-        val original = WorkflowModel(
+        val original = DefinitionModel(
             name = "updatable-workflow",
             version = "1.0.0",
             definition = "original definition"
@@ -168,7 +168,7 @@ abstract class WorkflowRepositoryTest {
         repository.insert(original)
 
         // When
-        val updated = WorkflowModel(
+        val updated = DefinitionModel(
             name = original.name,
             version = original.version,
             definition = "updated definition",
@@ -186,9 +186,9 @@ abstract class WorkflowRepositoryTest {
     fun `listByName should return all versions for a given name`() {
         // Given
         val name = "multi-version-workflow"
-        val workflowV1 = WorkflowModel(name = name, version = "1.0.0", definition = "def-v1")
-        val workflowV2 = WorkflowModel(name = name, version = "2.0.0", definition = "def-v2")
-        val otherWorkflow = WorkflowModel(name = "other-workflow", version = "1.0.0", definition = "def-other")
+        val workflowV1 = DefinitionModel(name = name, version = "1.0.0", definition = "def-v1")
+        val workflowV2 = DefinitionModel(name = name, version = "2.0.0", definition = "def-v2")
+        val otherWorkflow = DefinitionModel(name = "other-workflow", version = "1.0.0", definition = "def-other")
         repository.insert(listOf(workflowV1, workflowV2, otherWorkflow))
 
         // When
@@ -203,7 +203,7 @@ abstract class WorkflowRepositoryTest {
     @Test
     fun `listByName should return an empty list if name does not exist`() {
         // Given
-        val existingWorkflow = WorkflowModel(name = "existing", version = "1.0.0", definition = "def")
+        val existingWorkflow = DefinitionModel(name = "existing", version = "1.0.0", definition = "def")
         repository.insert(existingWorkflow)
 
         // When
@@ -217,8 +217,8 @@ abstract class WorkflowRepositoryTest {
     fun `listByName should return a single item list if only one version exists for the name`() {
         // Given
         val name = "single-version-workflow"
-        val workflowV1 = WorkflowModel(name = name, version = "1.0.0", definition = "def-v1")
-        val otherWorkflow = WorkflowModel(name = "another-workflow", version = "1.0.0", definition = "def-other")
+        val workflowV1 = DefinitionModel(name = name, version = "1.0.0", definition = "def-v1")
+        val otherWorkflow = DefinitionModel(name = "another-workflow", version = "1.0.0", definition = "def-other")
         repository.insert(listOf(workflowV1, otherWorkflow))
 
         // When
@@ -234,7 +234,7 @@ abstract class WorkflowRepositoryTest {
     fun `should successfully insert a batch of workflows`() {
         // Given
         val workflows = List(5) { i ->
-            WorkflowModel(
+            DefinitionModel(
                 name = "batch-workflow-$i",
                 version = "1.0.0",
                 definition = "definition-$i"
@@ -260,7 +260,7 @@ abstract class WorkflowRepositoryTest {
     fun `should successfully update a batch of workflows`() {
         // Given
         val originals = List(5) { i ->
-            WorkflowModel(
+            DefinitionModel(
                 name = "batch-workflow-$i",
                 version = "1.0.0",
                 definition = "definition-$i"
@@ -283,7 +283,7 @@ abstract class WorkflowRepositoryTest {
     fun `should successfully update a batch of workflows, returning the number of success`() {
         // Given
         val originals = List(5) { i ->
-            WorkflowModel(
+            DefinitionModel(
                 name = " original-$i",
                 version = "1.0.0",
                 definition = "original-$i"
@@ -294,13 +294,13 @@ abstract class WorkflowRepositoryTest {
         // When
         val newWorkflows = MutableList(5) { i ->
             when (i) {
-                1, 3 -> WorkflowModel(
+                1, 3 -> DefinitionModel(
                     name = originals[i].name,
                     version = originals[i].version,
                     definition = "different-$i"
                 )
 
-                else -> WorkflowModel(
+                else -> DefinitionModel(
                     name = "different-$i",
                     version = "1.0.0",
                     definition = "different-$i"
@@ -319,7 +319,7 @@ abstract class WorkflowRepositoryTest {
     fun `should successfully insert a batch of workflows, returning the number of success`() {
         // Given
         val originals = List(5) { i ->
-            WorkflowModel(
+            DefinitionModel(
                 name = " original-$i",
                 version = "1.0.0",
                 definition = "original-$i"
@@ -330,13 +330,13 @@ abstract class WorkflowRepositoryTest {
         // When
         val newWorkflows = MutableList(5) { i ->
             when (i) {
-                1, 3 -> WorkflowModel(
+                1, 3 -> DefinitionModel(
                     name = originals[i].name,
                     version = originals[i].version,
                     definition = "different-$i"
                 )
 
-                else -> WorkflowModel(
+                else -> DefinitionModel(
                     name = "different-$i",
                     version = "1.0.0",
                     definition = "different-$i"
@@ -358,7 +358,7 @@ abstract class WorkflowRepositoryTest {
     @Test
     fun `should retrieve workflow by ID`() {
         // Given
-        val workflow = WorkflowModel(
+        val workflow = DefinitionModel(
             name = "id-test-workflow",
             version = "1.0.0",
             definition = "test definition"
@@ -387,7 +387,7 @@ abstract class WorkflowRepositoryTest {
     fun `should retrieve all workflows`() {
         // Given
         val workflows = List(3) { i ->
-            WorkflowModel(
+            DefinitionModel(
                 name = "list-workflow-$i",
                 version = "1.0.0",
                 definition = "definition-$i"
@@ -423,7 +423,7 @@ abstract class WorkflowRepositoryTest {
         val threads = List(threadCount) { threadIndex ->
             Thread {
                 val workflowsToPersist = List(workflowsPerThread) { i ->
-                    WorkflowModel(
+                    DefinitionModel(
                         name = "concurrent-workflow-$threadIndex-$i",
                         version = "1.0.0",
                         definition = "definition-$threadIndex-$i"
@@ -432,7 +432,7 @@ abstract class WorkflowRepositoryTest {
                 repository.insert(workflowsToPersist)
 
                 workflowsToPersist.forEach { workflow ->
-                    val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version!!)
+                    val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version)
                     retrieved shouldNotBe null
                     retrieved?.id shouldBe workflow.id
                 }
@@ -451,7 +451,7 @@ abstract class WorkflowRepositoryTest {
     @Test
     fun `delete should remove an existing workflow`() {
         // Given
-        val workflow = WorkflowModel(name = "to-delete", version = "1.0.0", definition = "delete-me")
+        val workflow = DefinitionModel(name = "to-delete", version = "1.0.0", definition = "delete-me")
         repository.insert(workflow)
 
         // When
@@ -465,8 +465,8 @@ abstract class WorkflowRepositoryTest {
     @Test
     fun `delete should return 0 if workflow does not exist`() {
         // Given
-        val existingWorkflow = WorkflowModel(name = "existing", version = "1.0.0", definition = "def")
-        val nonExistentWorkflow = WorkflowModel(name = "non-existent", version = "1.0.0", definition = "def")
+        val existingWorkflow = DefinitionModel(name = "existing", version = "1.0.0", definition = "def")
+        val nonExistentWorkflow = DefinitionModel(name = "non-existent", version = "1.0.0", definition = "def")
         repository.insert(existingWorkflow)
 
         // When

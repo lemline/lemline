@@ -1,0 +1,154 @@
+# ----------------------------------------------------------------------------
+# Lemline Worker - Example Configuration (application.yaml)
+# ----------------------------------------------------------------------------
+#
+# This file provides examples of how to configure Lemline to connect to
+# your specific infrastructure (Database and Message Broker).
+#
+# How to use:
+# 1. Rename this file to `application.yaml`.
+# 2. Place it in the same directory as the Lemline binary or in a standard
+#    configuration location (e.g., /etc/lemline/, ~/.config/lemline/).
+# 3. Configure the `lemline.database` and `lemline.messaging` sections below
+#    to match your environment. Choose ONE database `type` and ONE messaging `type`.
+# 4. Set required environment variables (e.g., for passwords) or replace
+#    the `${VAR_NAME:default}` placeholders with your actual values.
+#
+# Lemline will automatically translate these settings into the required
+# framework configurations based on the `type` you specify.
+# Only the settings relevant to the selected `type` will be used
+# (e.g., `lemline.messaging.kafka.*` is ignored if `type=rabbitmq`).
+#
+# ----------------------------------------------------------------------------
+# Quick Start Minimal Example (PostgreSQL + Kafka with defaults):
+# ----------------------------------------------------------------------------
+# lemline:
+#   database:
+#     type: postgresql
+#     postgresql:
+#       # Assumes PG on localhost:5432, user postgres, password via environment variable
+#   messaging:
+#     type: kafka
+#     kafka:
+#       # Assumes Kafka on localhost:9092
+#       # Optional: Set KAFKA_USER/PASSWORD env vars if needed
+# ----------------------------------------------------------------------------
+# Recommended Environment Variables:
+# ----------------------------------------------------------------------------
+# For security and flexibility, it's best to configure secrets via environment variables:
+# - LEMLINE_DB_PASSWORD
+# - LEMLINE_KAFKA_PASSWORD (if using Kafka SASL)
+# - LEMLINE_RABBITMQ_PASSWORD (if using RabbitMQ authentication)
+# You can also override other settings like LEMLINE_DB_HOST, LEMLINE_KAFKA_BROKERS, etc.
+# ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# Quarkus Core Settings (Only advanced settings exposed)
+# ----------------------------------------------------------------------------
+quarkus:
+
+  # --- App Configuration ---
+  application:
+    name: lemline-runner
+    version: 1.0.0 # Replace with actual version
+
+  # --- Logging Configuration ---
+  # Logging is configured using standard Quarkus properties for full flexibility.
+  # See: https://quarkus.io/guides/logging
+  log:
+    level: INFO # Default log level
+    category:
+      "com.lemline":
+        level: INFO
+    console:
+      format: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p [%X{requestId},%X{workflowId},%X{correlationId}] [%c{2.}] (%t) %s%e%n"
+      color: true
+
+# ----------------------------------------------------------------------------
+# Lemline Infrastructure Settings
+# ----------------------------------------------------------------------------
+lemline:
+  # --- Database Configuration ---
+  database:
+    # Choose the database type you are using: postgresql | mysql
+    type: ${LEMLINE_DB_TYPE:postgresql} # <-- Can be overridden by LEMLINE_DB_TYPE env var
+
+    # Create the schema history table if it doesn't exist: true | false
+    baseline-on-migrate: true
+
+    # Apply database migrations at startup: true | false
+    migrate-at-start: true
+
+    # --- PostgreSQL Settings (Only used if lemline.database.type=postgresql) ---
+    postgresql:
+      host: ${LEMLINE_PG_HOST:localhost}
+      port: ${LEMLINE_PG_PORT:5432}
+      username: ${LEMLINE_PG_USER:postgres}
+      password: ${LEMLINE_PG_PASSWORD:postgres} # RECOMMENDED: Set via LEMLINE_PG_PASSWORD env var!
+      name: ${LEMLINE_PG_DB_NAME:lemline}
+
+    # --- MySQL Settings (Only used if lemline.database.type=mysql) ---
+    mysql:
+      host: ${LEMLINE_MYSQL_HOST:localhost}
+      port: ${LEMLINE_MYSQL_PORT:3306}
+      username: ${LEMLINE_MYSQL_USER:root}
+      password: ${LEMLINE_MYSQL_PASSWORD:password} # RECOMMENDED: Set via LEMLINE_MYSQL_PASSWORD env var!
+      name: ${LEMLINE_MYSQL_DB_NAME:lemline}
+
+  # --- Messaging Configuration ---
+  messaging:
+    # Choose the message broker type you are using: kafka | rabbitmq
+    type: ${LEMLINE_MESSAGING_TYPE:kafka}
+
+    # --- Kafka Specific Settings (Only used if lemline.messaging.type=kafka) ---
+    kafka:
+      brokers: ${LEMLINE_KAFKA_BROKERS:localhost:9092}
+      topic: ${LEMLINE_KAFKA_TOPIC:lemline}
+      topic-dlq: ${LEMLINE_KAFKA_TOPIC_DLQ:lemline-dlq}
+      group-id: ${LEMLINE_KAFKA_GROUP_ID:lemline-runner-group}
+      # offset-reset: earliest # Options: earliest | latest
+      # security-protocol: SASL_SSL # Options: PLAINTEXT | SSL | SASL_PLAINTEXT | SASL_SSL
+      # sasl-mechanism: PLAIN
+      # sasl-username: ${LEMLINE_KAFKA_USER}
+      # sasl-password: ${LEMLINE_KAFKA_PASSWORD} # RECOMMENDED: Set via LEMLINE_KAFKA_PASSWORD env var!
+
+    # --- RabbitMQ Specific Settings (Only used if lemline.messaging.type=rabbitmq) ---
+    rabbitmq:
+      hostname: ${LEMLINE_RABBITMQ_HOST:localhost}
+      port: ${LEMLINE_RABBITMQ_PORT:5672}
+      username: ${LEMLINE_RABBITMQ_USER:guest}
+      password: ${LEMLINE_RABBITMQ_PASSWORD:guest} # RECOMMENDED: Set via LEMLINE_RABBITMQ_PASSWORD env var!
+      virtual-host: ${LEMLINE_RABBITMQ_VHOST:/}
+      queue: ${LEMLINE_RABBITMQ_QUEUE_IN:lemline}
+      # Optional: Configure exchange (if used, remove/comment out the 'queue:' line above)
+      # exchange-name: my_exchange
+      # Optional: TLS/SSL configuration
+      # ssl-enabled: false
+
+  # --- Service Settings ---
+  # Configure internal task scheduling parameters (advanced).
+  # Change only if you understand the implications.
+
+  # --- Wait Service Settings ---
+  wait:
+    outbox:
+      every: "10s"
+      batch-size: 1000
+      initial-delay: "30s"
+      max-attempts: 5 # Max attempts for processing a message
+    cleanup:
+      every: "1h"
+      after: "7d"
+      batch-size: 1000
+
+  # --- Retry Service Settings ---
+  retry:
+    outbox:
+      every: "10s"
+      batch-size: 1000
+      initial-delay: "30s"
+      max-attempts: 5
+    cleanup:
+      every: "1h"
+      after: "7d"
+      batch-size: 1000

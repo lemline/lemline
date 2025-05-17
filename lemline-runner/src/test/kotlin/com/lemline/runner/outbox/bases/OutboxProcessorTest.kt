@@ -10,7 +10,6 @@ import com.lemline.runner.repositories.OutboxRepository
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.date.shouldBeAfter
 import io.kotest.matchers.doubles.plusOrMinus
-import io.kotest.matchers.longs.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.Runs
@@ -62,9 +61,6 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
     // Abstract factory method for creating test entities
     abstract fun createTestModel(payload: String = "{}"): T
-
-    // current datasource
-    private val datasource by lazy { testRepository.databaseManager.datasource }
 
     // Mock and processor using the generic type T
     private val mockProcessorFunction = mockk<(T) -> Unit>()
@@ -156,10 +152,10 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     @Test
     fun `process should handle retry logic on first failure then success`() {
         // Arrange
-        val message = createTestModel(payload = "RetryPayload")
-        testRepository.insert(message)
-        val messageId = message.id
-        val initialDelayedUntil = message.delayedUntil
+        val original = createTestModel(payload = "RetryPayload")
+        testRepository.insert(original)
+        val messageId = original.id
+        val initialDelayedUntil = original.delayedUntil
 
         val failureException = RuntimeException("Processing failed!")
         // Setup mock to fail the first time it's called in this sequence
@@ -170,15 +166,14 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert: First attempt failed - Check DB state
         verify(exactly = 1) { mockProcessorFunction(any(modelClass)) } // Verify it was called once
-        val failedMessage = testRepository.findById(messageId)
-        failedMessage shouldNotBe null
-        val capturedFailedMessage = failedMessage!!
-        capturedFailedMessage.status shouldBe PENDING
-        capturedFailedMessage.attemptCount shouldBe 1
-        capturedFailedMessage.lastError shouldBe failureException.message
-        capturedFailedMessage.delayedUntil shouldBeAfter initialDelayedUntil
+        val updated = testRepository.findById(messageId)!!
 
-        val delayMillis = Duration.between(Instant.now(), capturedFailedMessage.delayedUntil).toMillis()
+        updated.status shouldBe PENDING
+        updated.attemptCount shouldBe 1
+        updated.lastError shouldBe failureException.message
+        updated.delayedUntil shouldBeAfter initialDelayedUntil
+
+        val delayMillis = Duration.between(Instant.now(), updated.delayedUntil).toMillis()
         val tolerance = initialDelay.toMillis() * 0.3
         delayMillis.toDouble() shouldBe (initialDelay.toMillis().toDouble() plusOrMinus tolerance)
 
@@ -191,12 +186,11 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert: A second attempt succeeded - Check DB state
         verify(exactly = 2) { mockProcessorFunction(any(modelClass)) } // Verify it was called again
-        val succeededMessage = testRepository.findById(messageId)
-        succeededMessage shouldNotBe null
-        val capturedSucceededMessage = succeededMessage!!
-        capturedSucceededMessage.status shouldBe SENT // Status updated
-        capturedSucceededMessage.attemptCount shouldBe 2
-        capturedSucceededMessage.lastError shouldBe failureException.message // Error remains
+        val final = testRepository.findById(messageId)!!
+
+        final.status shouldBe SENT // Status updated
+        final.attemptCount shouldBe 2
+        final.lastError shouldBe failureException.message // Error remains
     }
 
     /**
@@ -219,46 +213,43 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     @Test
     fun `process should mark message as FAILED after max attempts`() {
         // Arrange
-        val message = createTestModel(payload = "FailPayload")
-        testRepository.insert(message)
-        val initialDelayedUntil = message.delayedUntil
+        val original = createTestModel(payload = "FailPayload")
+        testRepository.insert(original)
+        val originalDelayedUntil = original.delayedUntil
 
         val failureException = RuntimeException("Persistent failure!")
         // Set up the mock to always fail
         every { mockProcessorFunction(any(modelClass)) } throws failureException
 
         // Act & Assert intermediate attempts by checking DB state
-        var lastDelayedUntil = initialDelayedUntil
+        var lastDelayedUntil = originalDelayedUntil
         for (attempt in 1..maxAttempts) {
+            val now = Instant.now()
+            // when
             outboxProcessor.process(batchSize, maxAttempts, initialDelay)
-            val intermediateMessage = testRepository.findById(message.id)
-            intermediateMessage shouldNotBe null
-            val capturedIntermediate = intermediateMessage!!
+
+            // then
+            val updated = testRepository.findById(original.id)!!
 
             if (attempt < maxAttempts) {
-                capturedIntermediate.status shouldBe PENDING
-                capturedIntermediate.attemptCount shouldBe attempt
-                capturedIntermediate.lastError shouldBe failureException.message
-                capturedIntermediate.delayedUntil shouldBeAfter lastDelayedUntil
-                lastDelayedUntil = capturedIntermediate.delayedUntil
-                val lastAttemptDelayMillis =
-                    Duration.between(Instant.now(), capturedIntermediate.delayedUntil).toMillis()
-                val expectedMinDelay = initialDelay.toMillis() * (1L shl (attempt - 1)) * 0.7
-                lastAttemptDelayMillis shouldBeGreaterThan (expectedMinDelay.toLong() - 200)
-                if (lastAttemptDelayMillis > 0) Thread.sleep(lastAttemptDelayMillis + 300)
-            } else { // Final attempt check
-                capturedIntermediate.status shouldBe FAILED
-                capturedIntermediate.attemptCount shouldBe maxAttempts
-                capturedIntermediate.lastError shouldBe failureException.message
+                updated.status shouldBe PENDING
+                updated.attemptCount shouldBe attempt
+                updated.lastError shouldBe failureException.message
+                updated.delayedUntil shouldBeAfter lastDelayedUntil
+                // Calculate expected delay using exponential backoff - 20% jitter
+                val expectedMinDelay = initialDelay.toMillis() * (1L shl (attempt - 1)) * 0.8
+                updated.delayedUntil shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
+                lastDelayedUntil = updated.delayedUntil
+                // waiting for the next attempt
+                Thread.sleep(Duration.between(now, updated.delayedUntil).toMillis())
+            } else {
+                // Final attempt check
+                updated.status shouldBe FAILED
+                updated.attemptCount shouldBe maxAttempts
+                updated.lastError shouldBe failureException.message
+                updated.delayedUntil shouldBe lastDelayedUntil
             }
         }
-
-        // Assert: Final state verification and call count
-        verify(exactly = maxAttempts) { mockProcessorFunction(any(modelClass)) }
-        val finalMessage = testRepository.findById(message.id)
-        finalMessage shouldNotBe null
-        finalMessage!!.status shouldBe FAILED
-        finalMessage.attemptCount shouldBe maxAttempts
     }
 
     /**

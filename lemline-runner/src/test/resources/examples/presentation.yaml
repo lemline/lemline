@@ -1,0 +1,82 @@
+document:
+  dsl: 1.0.0-alpha2
+  namespace: examples
+  name: order-fulfillment
+  version: 1.0.0-alpha2
+
+do:
+  - checkItemType:
+      switch:
+        - ifDigital:
+            when: .itemType == "digital"
+            then: processDigitalOrder
+        - default:
+            then: checkPhysicalOrderLogic
+
+  - processDigitalOrder:
+      do:
+        - callProcessPayment:
+            call: http
+            with:
+              method: post
+              endpoint: https://httpbin.org/post # Emulating payment call
+              body: # Emulating sending item details in the body
+                itemDetails: ${ .itemDetails }
+        - sendDownloadLink:
+            call: http
+            with:
+              method: post
+              endpoint: https://httpbin.org/post # Emulating sending download link
+              body: # Emulating sending item details in the body
+                itemDetails: ${ .itemDetails }
+            then: exit
+
+  - checkPhysicalOrderLogic:
+      do:
+        - checkInventory:
+            call: http
+            with:
+              method: post
+              endpoint: https://httpbin.org/post" # Emulating inventory check
+              body: # Emulating sending item details in the body
+                isInStock: true
+                itemDetails: ${ .itemDetails }
+        - checkStockStatus:
+            switch:
+              # Note: Emulating stock status logic requires mocking the httpbin response or
+              # using a 'set' task after checkInventory to add '.isInStock' for testing.
+              # This definition only emulates the HTTP call itself.
+              - isInStock:
+                  when: ${ .isInStock }
+                  then: handleInStockOrder
+              - default:
+                  then: handleOutOfStockOrder
+
+  - handleInStockOrder:
+      do:
+        - callProcessPayment:
+            call: http
+            with:
+              method: post
+              endpoint: https://httpbin.org/post" # Emulating payment call again
+              body: # Emulating sending item details in the body
+                itemDetails: ${ .itemDetails }
+        - scheduleShipping:
+            call: http
+            with:
+              method: post
+              endpoint: https://httpbin.org/post" # Emulating scheduling shipping
+              body: ${ .itemDetails } # Emulating sending item details in the body
+            then: exit
+
+  - handleOutOfStockOrder:
+      do:
+        - notifyCustomer:
+            call: http
+            with:
+              method: post
+              endpoint: https://httpbin.org/post" # Emulating customer notification
+              body:
+                customerId: "${ .customerId }"
+                message: "Item ${ .itemDetails.name } is currently out of stock."
+            then: exit

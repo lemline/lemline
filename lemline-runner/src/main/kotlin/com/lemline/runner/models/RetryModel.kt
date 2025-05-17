@@ -7,7 +7,7 @@ import java.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
-const val RETRY_TABLE = "retries"
+const val RETRY_TABLE = "lemline_retries"
 
 @Serializable
 data class RetryModel(

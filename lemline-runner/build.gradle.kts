@@ -9,8 +9,8 @@ plugins {
     alias(libs.plugins.quarkus)
 }
 
-group = "com.lemline.runner"
-version = "0.0.1-SNAPSHOT"
+group = "com.lemline"
+version = "0.1.0-SNAPSHOT"
 
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -42,6 +42,7 @@ dependencies {
     implementation("io.quarkus:quarkus-flyway")
     implementation("io.quarkus:quarkus-jdbc-postgresql")
     implementation("io.quarkus:quarkus-jdbc-mysql")
+    implementation("io.quarkus:quarkus-hibernate-validator")
 
     // Messaging
     implementation("io.quarkus:quarkus-messaging-kafka")
@@ -55,6 +56,11 @@ dependencies {
     // Utilities
     implementation(libs.uuidCreator)
     implementation(libs.javaSemver)
+
+    // Jackson for JSON serialization/deserialization
+    implementation(libs.jackson.bom)
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
 
     // ─────────────────────────────────────────────────────────────────────────
     // Libraries below are needed for Native Compilation - DO NOT TOUCh except you know what you are doing
@@ -145,6 +151,14 @@ tasks.register("generateVersionProperties") {
         println("Generated version.properties with version: ${project.version}")
     }
 }
+
+tasks.register<Exec>("codesignNativeBinary") {
+    group = "build"
+    description = "Codesign the native binary after build"
+    commandLine("codesign", "-s", "-", "build/lemline-runner-${project.version}-runner")
+    dependsOn("build") // Ensure it runs after the build task
+}
+
 
 // Add the generated resources to the main source set
 sourceSets.main.get().resources.srcDir(

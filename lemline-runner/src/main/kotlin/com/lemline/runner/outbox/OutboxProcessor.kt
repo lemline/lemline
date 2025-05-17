@@ -10,6 +10,7 @@ import com.lemline.runner.repositories.OutboxRepository
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import kotlin.random.Random
 import org.jetbrains.annotations.VisibleForTesting
 import org.slf4j.Logger
 
@@ -77,7 +78,9 @@ internal class OutboxProcessor<T : OutboxModel>(
                 val messages = repository.findMessagesToProcess(maxAttempts, batchSize, connection)
 
                 if (messages.isEmpty()) {
+                    logger.info { "Empty processing batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
                     consecutiveEmptyBatches++
+                    Thread.sleep(Random.nextLong(10, 200))
                     continue
                 }
 
@@ -144,34 +147,36 @@ internal class OutboxProcessor<T : OutboxModel>(
         repository.withTransaction { connection ->
             val cutoffDate = Instant.now().minusMillis(afterDelay.toMillis())
             var totalDeleted = 0
-            var chunkNumber = 0
-            var consecutiveEmptyChunks = 0
+            var batchNumber = 0
+            var consecutiveEmptyBatches = 0
             val maxConsecutiveEmptyChunks = 3 // Prevent infinite loops
 
-            while (consecutiveEmptyChunks < maxConsecutiveEmptyChunks) {
+            while (consecutiveEmptyBatches < maxConsecutiveEmptyChunks) {
                 // Find and lock a chunk of messages for deletion
                 val messagesToDelete = repository.findMessagesToDelete(cutoffDate, batchSize, connection)
-                logger.info { "Cleaned up chunk $chunkNumber: retrieved ${messagesToDelete.size} messages to delete" }
+                logger.info { "Cleaned up chunk $batchNumber: retrieved ${messagesToDelete.size} messages to delete" }
 
                 if (messagesToDelete.isEmpty()) {
-                    consecutiveEmptyChunks++
+                    logger.info { "Empty cleaning batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
+                    consecutiveEmptyBatches++
+                    Thread.sleep(Random.nextLong(10, 200))
                     continue
                 }
 
-                consecutiveEmptyChunks = 0
-                chunkNumber++
+                consecutiveEmptyBatches = 0
+                batchNumber++
                 val chunkDeleted = messagesToDelete.size
 
                 // Delete the chunk
                 repository.delete(messagesToDelete, connection)
                 totalDeleted += chunkDeleted
 
-                logger.info { "Cleaned up chunk $chunkNumber: $chunkDeleted messages (total: $totalDeleted)" }
+                logger.info { "Cleaned up chunk $batchNumber: $chunkDeleted messages (total: $totalDeleted)" }
             }
 
             if (totalDeleted > 0) {
                 logger.info {
-                    "Completed cleanup of $totalDeleted messages in $chunkNumber chunks (older than $cutoffDate)"
+                    "Completed cleanup of $totalDeleted messages in $batchNumber chunks (older than $cutoffDate)"
                 }
             }
         }
@@ -195,6 +200,6 @@ internal class OutboxProcessor<T : OutboxModel>(
         val jitter = (Math.random() - 0.5) * 2 * jitterRange // Random value between -1 and 1, multiplied by range
 
         // Ensure we never return less than .1 second (100ms)
-        return (baseDelay + jitter).toLong().coerceAtLeast(100)
+        return (baseDelay + jitter).toLong().coerceAtLeast(100L)
     }
 }

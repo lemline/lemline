@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.common.logger
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.config.LemlineConfiguration.WaitConfig
-import com.lemline.runner.config.toDuration
 import com.lemline.runner.messaging.WORKFLOW_OUT
+import com.lemline.runner.models.WaitModel
 import com.lemline.runner.repositories.WaitRepository
-import io.quarkus.scheduler.Scheduled
-import io.quarkus.scheduler.Scheduled.ConcurrentExecution.SKIP
+import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import org.eclipse.microprofile.reactive.messaging.Channel
@@ -16,84 +13,44 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
 
 /**
  * WaitOutbox is responsible for processing and managing wait messages in the system.
- * It handles two main operations:
- * 1. Processing pending wait messages and sending them to the workflow output channel
- * 2. Cleaning up old sent messages to prevent database bloat
+ * It extends AbstractOutbox to leverage the common outbox pattern implementation.
  *
- * The class uses a scheduled approach with configurable intervals for both operations.
- * It ensures thread safety by using SKIP concurrent execution strategy, preventing
- * multiple instances of the same operation from running simultaneously.
- *
- * Configuration is managed through LemlineConfiguration, allowing for flexible tuning of:
+ * This class specifically handles wait messages with configuration optimized for
+ * the wait use case, including:
  * - Processing batch size
  * - Maximum retry attempts
  * - Initial delay between retries
  * - Cleanup retention period
  *
+ * @see AbstractOutbox for the base implementation
  * @see OutboxProcessor for the core message processing logic
- * @see WaitConfig for configuration details
  */
+@Startup
 @ApplicationScoped
-internal class WaitOutbox @Inject constructor(
-    repository: WaitRepository,
-    lemlineConfig: LemlineConfiguration,
-    @Channel(WORKFLOW_OUT) emitter: Emitter<String>,
-) {
-    private val logger = logger()
+internal class WaitOutbox : AbstractOutbox<WaitModel>() {
 
-    val outboxConf = lemlineConfig.wait().outbox()
-    val cleanupConf = lemlineConfig.wait().cleanup()
+    @Inject
+    @Channel(WORKFLOW_OUT)
+    override lateinit var emitter: Emitter<String>
 
-    internal val outboxProcessor = OutboxProcessor(
-        logger = logger,
-        repository = repository,
-        processor = { waitMessage -> emitter.send(waitMessage.message) },
-    )
+    @Inject
+    private lateinit var lemlineConfig: LemlineConfiguration
 
-    /**
-     * Processes pending wait messages from the outbox table.
-     * This method is scheduled to run at configurable intervals.
-     *
-     * For each batch of messages:
-     * 1. Retrieves messages that are ready to process (status = PENDING)
-     * 2. Attempts to send each message using the emitter
-     * 3. Updates message status to SENT on success
-     * 4. Handles retries on failure with exponential backoff
-     *
-     * The operation is transactional and thread-safe, ensuring that:
-     * - Messages are processed exactly once
-     * - Failed messages are properly tracked and retried
-     * - Concurrent processing is prevented
-     */
-    @Scheduled(every = "{lemline.wait.outbox.every}", concurrentExecution = SKIP)
-    fun outbox() {
-        outboxProcessor.process(
-            outboxConf.batchSize(),
-            outboxConf.maxAttempts(),
-            outboxConf.initialDelay().toDuration(),
-        )
-    }
+    @Inject
+    override lateinit var repository: WaitRepository
 
-    /**
-     * Cleans up old sent messages from the outbox table.
-     * This method is scheduled to run at configurable intervals.
-     *
-     * For each batch of messages:
-     * 1. Identifies messages that are:
-     *    - Marked as SENT
-     *    - Older than the configured retention period
-     * 2. Deletes these messages in batches to prevent database locks
-     *
-     * The operation is transactional and thread-safe, ensuring that:
-     * - Only sent messages are deleted
-     * - Cleanup doesn't interfere with active message processing
-     * - Database performance is maintained through batch processing
-     */
-    @Scheduled(every = "{lemline.wait.cleanup.every}", concurrentExecution = SKIP)
-    fun cleanup() {
-        outboxProcessor.cleanup(
-            cleanupConf.after().toDuration(),
-            cleanupConf.batchSize(),
-        )
-    }
+    override val enabled by lazy { lemlineConfig.messaging().consumer().enabled() }
+
+    // Outbox processing configuration
+    private val outboxConf by lazy { lemlineConfig.wait().outbox() }
+    override val outboxBatchSize by lazy { outboxConf.batchSize() }
+    override val outboxMaxAttempts by lazy { outboxConf.maxAttempts() }
+    override val outboxInitialDelay by lazy { outboxConf.initialDelay() }
+    override val outboxExecutionPeriod by lazy { outboxConf.every() }
+
+    // Cleanup configuration
+    private val cleanupConf by lazy { lemlineConfig.wait().cleanup() }
+    override val cleanupAfter by lazy { cleanupConf.after() }
+    override val cleanupBatchSize by lazy { cleanupConf.batchSize() }
+    override val cleanupExecutionPeriod by lazy { cleanupConf.every() }
 }

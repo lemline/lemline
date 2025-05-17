@@ -28,6 +28,8 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"   # création auto des topics
+      KAFKA_NUM_PARTITIONS: 10                  # 10 partitions par défaut
       # You might need to adjust KAFKA_ADVERTISED_LISTENERS if connecting from inside docker
       # e.g., PLAINTEXT://localhost:9092, PLAINTEXT_INTERNAL://kafka:19092
     networks:
@@ -35,4 +37,4 @@ services:
 
 networks:
   lemline-net:
-    driver: bridge 
+    driver: bridge

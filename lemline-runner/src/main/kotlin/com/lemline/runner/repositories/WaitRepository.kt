@@ -28,7 +28,7 @@ internal class WaitRepository : OutboxRepository<WaitModel>() {
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
-    override val tableName: String = WAIT_TABLE
+    override val tableName = WAIT_TABLE
 
     override fun createModel(
         id: String,

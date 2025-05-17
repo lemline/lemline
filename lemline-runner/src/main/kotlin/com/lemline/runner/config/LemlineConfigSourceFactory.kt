@@ -14,7 +14,6 @@ import io.smallrye.config.ConfigSourceContext
 import io.smallrye.config.ConfigSourceFactory
 import io.smallrye.config.PropertiesConfigSource
 import io.smallrye.config.SmallRyeConfigBuilder
-import java.util.*
 import org.eclipse.microprofile.config.spi.ConfigSource
 
 
@@ -134,6 +133,12 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                 context.getValue(name)?.value?.let { lemlineProps[name] = it.split("#").first().trim() }
             }
         }
+
+        lemlineProps[CONSUMER_ENABLED] = System.getProperty(CONSUMER_ENABLED)
+            ?: lemlineProps[CONSUMER_ENABLED] ?: "false"
+        lemlineProps[PRODUCER_ENABLED] = System.getProperty(PRODUCER_ENABLED)
+            ?: lemlineProps[PRODUCER_ENABLED] ?: "false"
+
 
         // Override properties from the config file, if any
         LemlineApplication.configPath?.let {

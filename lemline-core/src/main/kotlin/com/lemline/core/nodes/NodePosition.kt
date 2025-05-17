@@ -74,6 +74,6 @@ data class NodePosition(private val path: List<String> = listOf()) {
         get() = if (path.isEmpty()) null else NodePosition(path.dropLast(1))
 
     companion object {
-        val root = com.lemline.core.nodes.JsonPointer.root.toPosition()
+        val root = JsonPointer.root.toPosition()
     }
 }
