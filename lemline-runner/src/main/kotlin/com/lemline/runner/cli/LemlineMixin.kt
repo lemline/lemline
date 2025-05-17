@@ -13,7 +13,10 @@ import picocli.CommandLine.Option
     versionProvider = VersionProvider::class,
 )
 class LemlineMixin {
-    @ArgGroup(exclusive = true)
+    @ArgGroup(
+        exclusive = true,
+        heading = "Log level options:%n"
+    )
     var logLevelGroup: LogLevelGroup? = null
 
     @Option(
