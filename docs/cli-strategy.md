@@ -1,12 +1,12 @@
 # Lemline CLI Strategy
 
-This document outlines the proposed command-line interface (CLI) strategy for Lemline, focusing on user experience,
+This document outlines the command-line interface (CLI) for Lemline, focusing on user experience,
 consistency, and extensibility.
 
 ## Overview
 
-The Lemline CLI provides a unified interface for managing workflows and interacting with the Lemline runtime. It follows
-modern CLI design principles and provides both interactive and non-interactive modes.
+The Lemline CLI provides a unified interface for managing workflow definitions and interacting with the Lemline runtime. It follows
+modern CLI design principles using picocli.
 
 ## Command Structure
 
@@ -21,126 +21,78 @@ lemline [global-options] <command> [command-options] [arguments]
 These options are available for all commands:
 
 ```bash
---config, -c <path>     # Path to configuration file (default: ./application.yaml)
---profile, -p <name>    # Profile to use (dev, test, prod)
---verbose, -v           # Enable verbose output
---quiet, -q            # Suppress non-essential output
+--config, -c <path>     # Path to configuration file
+--debug                # Set log level to DEBUG
+--info                 # Set log level to INFO
+--warn                 # Set log level to WARN
+--error                # Set log level to ERROR
 --help, -h             # Show help
 --version              # Show version information
 ```
 
 ## Core Commands
 
-### Workflow Management
+### Definition Management
 
 ```bash
-# List available workflows
-# Print a list of workflow name + workflow version available in the database
-# format json: [{name: ..., version: [1.0, 2.0, 3.0]}]
-lemline workflow get [--format json|yaml|table]
+# List available workflow definitions
+# Print a list of workflow definitions available in the database
+lemline definition get
 
-# Show workflow details
-# Print the  workflow description in Yaml (default) or beautified Json format
-# if version is not provided, returns the last version
-lemline workflow get <workflow-name> [<workflow-version>] [--format json|yaml]
+# Show workflow definition details
+# Print the workflow description in YAML (default) or JSON format
+# If version is not provided, returns the last version
+lemline definition get <workflow-name> [<workflow-version>] [--format YAML|JSON]
 
-# Create a new workflow
-# Create a workflow, giving its description or a file name containing the description
-# Fails if the workflow already exist
-lemline workflow post [definition] [--file <file-name>]
+# Create new workflow definitions
+# Create workflows from definition files or directories
+lemline definition post --file <file-name> [--file <file-name>...] [--force]
+lemline definition post --directory <directory> [--recursive] [--force]
 
-# Update an existing workflow
-# Update the definition of an existing workflow
-# should require an interactive confirmation (except if --force)
-lemline workflow put [definition] [--file <file-name>] [--force]
-
-# Delete a workflow
-# Delete the last versions of a workflow or a specific version if provided
-# should require an interactive confirmation (except if --force)
-lemline workflow delete <workflow-name> [<workflow-version>] 
-
-# Validate a workflow definition
-lemline workflow validate [definition] [--file <name>] 
-```
-
-### Runtime Management
-
-```bash
-# Start the runtime
-lemline runtime start [--daemon]
-
-# Stop the runtime
-lemline runtime stop
-
-# Show runtime status
-lemline runtime status [--format json|yaml|table]
-
-# Show runtime logs
-lemline runtime logs [--follow] [--tail <lines>] [--since <duration>]
-
-# Restart the runtime
-lemline runtime restart
+# Delete a workflow definition
+# Delete workflows by name, version, or interactively
+lemline definition delete [<workflow-name>] [<workflow-version>] [--force]
 ```
 
 ### Instance Management
 
 ```bash
-# List workflow instances
-lemline instance list [--workflow <id>] [--status <status>] [--format json|yaml|table]
-
-# Show instance details
-lemline instance show <instance-id> [--format json|yaml|table]
-
-# Create a new instance
-lemline instance create <workflow-id> [--input <json-file>]
-
-# Terminate an instance
-lemline instance terminate <instance-id> [--reason <reason>]
-
-# Show instance logs
-lemline instance logs <instance-id> [--follow] [--tail <lines>]
+# Start a workflow instance
+# Create and start a new workflow instance with the given name and optional version
+lemline instance start <workflow-name> [<workflow-version>] [--input <json-string>]
 ```
 
 ### Configuration Management
 
 ```bash
 # Show current configuration
-lemline config [--format json|yaml|properties]
+lemline config [--format YAML|PROPERTIES] [--all]
 ```
 
-## Interactive Mode
-
-The CLI provides an interactive mode for users who prefer a more guided experience:
+### Runtime Management
 
 ```bash
-lemline interactive
+# Start the runtime listener for processing workflow events
+lemline listen
 ```
 
-In interactive mode:
+## Configuration Discovery
 
-- Commands are presented in a menu-driven interface
-- Context-sensitive help is available
-- Command history is maintained
-- Tab completion is supported
-- Common operations are streamlined
+The CLI looks for configuration files in the following order:
 
-## Output Formats
-
-The CLI supports multiple output formats:
-
-- `table`: Human-readable table format (default for interactive use)
-- `json`: JSON format for programmatic use
-- `yaml`: YAML format for configuration files
+1. Command line argument: `--config=<path>` or `-c <path>`
+2. Environment variable: `LEMLINE_CONFIG`
+3. Current directory: `.lemline.yaml`
+4. User configuration directory:
+   - `~/.config/lemline/config.yaml`
+   - `~/.lemline.yaml`
 
 ## Environment Variables
 
 The CLI respects the following environment variables:
 
 ```bash
-LEMLINE_CONFIG_PATH    # Path to configuration file
-LEMLINE_PROFILE       # Default profile to use
-LEMLINE_LOG_LEVEL     # Log level (DEBUG, INFO, WARN, ERROR)
-LEMLINE_NO_COLOR      # Disable colored output
+LEMLINE_CONFIG       # Path to configuration file
 ```
 
 ## Examples
@@ -148,86 +100,66 @@ LEMLINE_NO_COLOR      # Disable colored output
 ### Basic Usage
 
 ```bash
-# Start the runtime
-lemline runtime start
+# Start the runtime listener
+lemline listen
 
-# Create a workflow
-lemline workflow create my-workflow.yaml
+# Create workflow definitions
+lemline definition post --file my-workflow.yaml
 
-# Create and start a workflow instance
-lemline instance create my-workflow --input input.json
-
-# Monitor instance progress
-lemline instance logs my-instance --follow
+# Start a workflow instance
+lemline instance start my-workflow --input '{"key": "value"}'
 ```
 
 ### Advanced Usage
 
 ```bash
 # Use a specific configuration file
-lemline --config /etc/lemline/prod.yaml runtime start
+lemline --config /etc/lemline/prod.yaml listen
 
-# Run in production profile
-lemline --profile prod workflow list
+# View configuration
+lemline config --all --format PROPERTIES
 
-# Get JSON output for scripting
-lemline --format json instance list > instances.json
+# Work with multiple definition files
+lemline definition post --directory workflows --recursive
 
-# Validate workflow and configuration
-lemline workflow validate my-workflow.yaml && \
-lemline config validate prod.yaml
+# Delete a specific workflow version with force option
+lemline definition delete my-workflow 1.0.0 --force
 ```
 
 ## Implementation Guidelines
 
 1. **Command Structure**
-    - Use a consistent verb-noun pattern
-    - Group related commands under common prefixes
-    - Provide clear, concise command names
+   - Use a consistent verb-noun pattern
+   - Group related commands under common prefixes
+   - Provide clear, concise command names
 
 2. **Error Handling**
-    - Provide clear, actionable error messages
-    - Include error codes for programmatic handling
-    - Suggest solutions for common errors
+   - Provide clear, actionable error messages
+   - Suggest solutions for common errors
 
 3. **Help System**
-    - Include examples in help text
-    - Provide context-sensitive help
-    - Document all options and arguments
+   - Include examples in help text
+   - Provide context-sensitive help
+   - Document all options and arguments
 
-4. **Output Formatting**
-    - Support multiple output formats
-    - Ensure consistent formatting
-    - Provide clear headers and separators
-
-5. **Configuration**
-    - Support both file-based and environment-based configuration
-    - Allow configuration overrides via command line
-    - Validate configuration before use
-
-6. **Extensibility**
-    - Design for easy addition of new commands
-    - Support plugins for additional functionality
-    - Maintain backward compatibility
+4. **Configuration**
+   - Support both file-based and environment-based configuration
+   - Allow configuration overrides via command line
+   - Validate configuration before use
 
 ## Future Considerations
 
-1. **Plugin System**
-    - Allow third-party plugins
-    - Provide plugin management commands
-    - Support plugin-specific configuration
+1. **Additional Commands**
+   - Add more instance management commands (list, show, terminate)
+   - Implement workflow validation features
+   - Add support for workflow templates
 
-2. **API Integration**
-    - Add commands for API key management
-    - Support remote operation
-    - Enable API documentation generation
+2. **Interactive Mode**
+   - Develop a fully interactive CLI mode
+   - Support for tab completion
+   - Command history
 
-3. **Advanced Features**
-    - Add support for workflow templates
-    - Implement workflow versioning
-    - Add support for workflow dependencies
-
-4. **Monitoring and Debugging**
-    - Add performance monitoring commands
-    - Implement debugging tools
-    - Add support for tracing 
+3. **Monitoring and Debugging**
+   - Add performance monitoring commands
+   - Implement debugging tools
+   - Add support for tracing 

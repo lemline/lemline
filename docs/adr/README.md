@@ -16,6 +16,7 @@ An Architectural Decision Record (ADR) is a document that captures an important 
 | [ADR-0004](0004-database-storage-strategy.md) | Database Storage Strategy | Accepted |
 | [ADR-0005](0005-error-handling-approach.md) | Error Handling Approach | Accepted |
 | [ADR-0006](0006-logging-strategy.md) | Logging Strategy | Accepted |
+| [ADR-0007](0006-config-strategy.md) | Config Strategy | Accepted |
 
 ## Creating a New ADR
 
