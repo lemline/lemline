@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.cli
+package com.lemline.runner.cli.config
 
+import com.lemline.runner.cli.MainCommand
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.test.junit.QuarkusTest
@@ -9,12 +10,9 @@ import jakarta.inject.Inject
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.charset.StandardCharsets
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import picocli.CommandLine
-import picocli.CommandLine.IFactory
 
 /**
  * Integration tests for ConfigCommand.
@@ -29,14 +27,14 @@ class ConfigCommandTest {
     lateinit var mainCommand: MainCommand
 
     @Inject
-    lateinit var factory: IFactory // Inject the CDI-aware factory for command instantiation
+    lateinit var factory: CommandLine.IFactory // Inject the CDI-aware factory for command instantiation
 
     // --- Helper to execute command and capture output ---
     private fun executeAndCapture(vararg args: String): String {
         val cmd = CommandLine(mainCommand, factory)
         val baos = ByteArrayOutputStream()
         val originalOut = System.out
-        var exitCode = -1
+        var exitCode: Int
 
         try {
             System.setOut(PrintStream(baos, true, StandardCharsets.UTF_8))
@@ -45,7 +43,7 @@ class ConfigCommandTest {
             System.setOut(originalOut)
         }
 
-        assertEquals(0, exitCode, "Command [${args.joinToString(" ")}] should execute successfully")
+        Assertions.assertEquals(0, exitCode, "Command [${args.joinToString(" ")}] should execute successfully")
         return baos.toString(StandardCharsets.UTF_8).trim()
     }
 
@@ -68,9 +66,9 @@ class ConfigCommandTest {
 
         listOf(output1, output2).forEach { output ->
             // Basic checks for YAML format
-            assertTrue(output.contains("lemline:\n  database:\n    "), "output should be in YAML format")
+            Assertions.assertTrue(output.contains("lemline:\n  database:\n    "), "output should be in YAML format")
             // should not contain Quarkus properties
-            assertFalse(output.contains("quarkus:"), "output should not contain Quarkus properties")
+            Assertions.assertFalse(output.contains("quarkus:"), "output should not contain Quarkus properties")
         }
     }
 
@@ -84,8 +82,11 @@ class ConfigCommandTest {
         val output2 = executeAndCapture("config", "-fproperties")
 
         listOf(output1, output2).forEach { output ->
-            assertTrue(output.contains("lemline.database.type="), "output should have properties format")
-            assertFalse(output.contains("quarkus.log.level="), "output should not contain Quarkus properties")
+            Assertions.assertTrue(output.contains("lemline.database.type="), "output should have properties format")
+            Assertions.assertFalse(
+                output.contains("quarkus.log.level="),
+                "output should not contain Quarkus properties"
+            )
         }
     }
 
@@ -94,9 +95,9 @@ class ConfigCommandTest {
         val output = executeAndCapture("config") // Use helper
 
         // Verify Lemline properties are present in the output
-        assertTrue(output.contains("lemline:\n  database:\n    "), "output should be in YAML format")
+        Assertions.assertTrue(output.contains("lemline:\n  database:\n    "), "output should be in YAML format")
         // Verify Quarkus properties are not present in the output
-        assertFalse(output.contains("quarkus:\n"), "output should not contain Quarkus properties")
+        Assertions.assertFalse(output.contains("quarkus:\n"), "output should not contain Quarkus properties")
 
     }
 
@@ -107,9 +108,9 @@ class ConfigCommandTest {
 
         listOf(output1, output2).forEach { output ->
             // Verify Lemline properties are present in the output
-            assertTrue(output.contains("lemline:\n  database:\n    "), "output should be in YAML format")
+            Assertions.assertTrue(output.contains("lemline:\n  database:\n    "), "output should be in YAML format")
             // Verify Quarkus properties are present in the output
-            assertTrue(output.contains("quarkus:\n"), "output should contain Quarkus properties")
+            Assertions.assertTrue(output.contains("quarkus:\n"), "output should contain Quarkus properties")
         }
     }
 
@@ -120,9 +121,9 @@ class ConfigCommandTest {
 
         listOf(output1, output2).forEach { output ->
             // Verify Lemline properties are present in the output
-            assertTrue(output.contains("lemline.database.type="), "output should have properties format")
+            Assertions.assertTrue(output.contains("lemline.database.type="), "output should have properties format")
             // Verify Quarkus properties are present in the output
-            assertTrue(output.contains("quarkus.log.level="), "output should contain Quarkus properties")
+            Assertions.assertTrue(output.contains("quarkus.log.level="), "output should contain Quarkus properties")
         }
     }
 
@@ -130,19 +131,15 @@ class ConfigCommandTest {
      * Tests that the global log level option is accepted by the MainCommand.
      */
     @Test
-    fun `test main command accepts log level option`() {
-        // Test with various valid log levels using different option syntaxes
-        executeAndCapture("--log=DEBUG", "config")
-        executeAndCapture("-l", "INFO", "config")
-        executeAndCapture("--log=WARN", "config")
-        executeAndCapture("-l", "ERROR", "config")
-        executeAndCapture("--log=FATAL", "config")
-        executeAndCapture("--log=TRACE", "config")
-
-        // The LogOptionConverter in MainCommand will cause an exit if the level is invalid,
-        // which would be caught by executeAndCapture's exit code check.
-        // So, successfully passing executeAndCapture means the log level was accepted.
+    fun `test config command accepts log level option`() {
+        // Test with various log levels before and after the command
+        executeAndCapture("--warn", "config")
+        executeAndCapture("--info", "config")
+        executeAndCapture("--error", "config")
+        executeAndCapture("--debug", "config")
+        executeAndCapture("config", "--warn")
+        executeAndCapture("config", "--info")
+        executeAndCapture("config", "--error")
+        executeAndCapture("config", "--debug")
     }
-
-    // --- Format Option Tests (Assumes --format option exists in ConfigCommand) ---
 }
