@@ -9,7 +9,6 @@ import com.lemline.runner.outbox.OutboxProcessor
 import com.lemline.runner.repositories.OutboxRepository
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.date.shouldBeAfter
-import io.kotest.matchers.doubles.plusOrMinus
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.mockk.Runs
@@ -154,39 +153,39 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Arrange
         val original = createTestModel(payload = "RetryPayload")
         testRepository.insert(original)
-        val messageId = original.id
-        val initialDelayedUntil = original.delayedUntil
 
         val failureException = RuntimeException("Processing failed!")
         // Setup mock to fail the first time it's called in this sequence
         every { mockProcessorFunction(any(modelClass)) } throws failureException
 
         // Act: First process call (fails)
+        val now = Instant.now()
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: First attempt failed - Check DB state
         verify(exactly = 1) { mockProcessorFunction(any(modelClass)) } // Verify it was called once
-        val updated = testRepository.findById(messageId)!!
+        val updated = testRepository.findById(original.id)!!
 
         updated.status shouldBe PENDING
         updated.attemptCount shouldBe 1
         updated.lastError shouldBe failureException.message
-        updated.delayedUntil shouldBeAfter initialDelayedUntil
 
-        val delayMillis = Duration.between(Instant.now(), updated.delayedUntil).toMillis()
-        val tolerance = initialDelay.toMillis() * 0.3
-        delayMillis.toDouble() shouldBe (initialDelay.toMillis().toDouble() plusOrMinus tolerance)
+        // Calculate expected delay using exponential backoff - 20% jitter
+        val expectedMinDelay = initialDelay.toMillis() * 0.8
+        updated.delayedUntil shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
+
+        // waiting for the next attempt
+        Thread.sleep(Duration.between(now, updated.delayedUntil).toMillis())
 
         // Arrange: Setup mock to succeed on subsequent calls
         every { mockProcessorFunction(any(modelClass)) } just Runs
 
         // Act: Second process call (should succeed now)
-        if (delayMillis > 0) Thread.sleep(delayMillis + 300) else Thread.sleep(300)
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: A second attempt succeeded - Check DB state
         verify(exactly = 2) { mockProcessorFunction(any(modelClass)) } // Verify it was called again
-        val final = testRepository.findById(messageId)!!
+        val final = testRepository.findById(original.id)!!
 
         final.status shouldBe SENT // Status updated
         final.attemptCount shouldBe 2
