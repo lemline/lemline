@@ -2,6 +2,7 @@
 package com.lemline.runner.cli.definitions
 
 import com.lemline.core.workflows.Workflows
+import com.lemline.runner.cli.LemlineMixin
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
@@ -9,15 +10,18 @@ import jakarta.inject.Inject
 import java.io.File
 import picocli.CommandLine
 import picocli.CommandLine.Command
+import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
 
 @Unremovable
 @Command(
     name = "post",
     description = ["Create or update workflows from definition files."],
-    mixinStandardHelpOptions = true,
 )
 class DefinitionPostCommand : Runnable {
+
+    @Mixin
+    lateinit var mixin: LemlineMixin
 
     @Option(
         names = ["--file", "-f"],

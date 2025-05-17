@@ -2,9 +2,11 @@
 package com.lemline.runner
 
 import com.lemline.runner.LemlineApplication.Companion.configPath
-import com.lemline.runner.cli.ListenCommand
+import com.lemline.runner.cli.CustomExceptionHandler
+import com.lemline.runner.cli.CustomParameterHandler
 import com.lemline.runner.cli.MainCommand
 import com.lemline.runner.cli.instances.InstanceStartCommand
+import com.lemline.runner.cli.listen.ListenCommand
 import com.lemline.runner.config.CONSUMER_ENABLED
 import com.lemline.runner.config.PRODUCER_ENABLED
 import io.quarkus.picocli.runtime.annotations.TopCommand
@@ -40,7 +42,8 @@ class LemlineApplication : QuarkusApplication {
     lateinit var log: Logger
 
     override fun run(vararg args: String): Int {
-        val commandLine = CommandLine(mainCommand, factory)
+        val commandLine = CommandLine(mainCommand, factory).setup()
+        //  val commandLine = mainCommand.commandLine
         val exitCode = commandLine.execute(*args)
 
         log.info("Execution completed. Exit code: $exitCode. Exiting.")
@@ -63,37 +66,48 @@ class LemlineApplication : QuarkusApplication {
          */
         @JvmStatic
         fun main(args: Array<String>) {
-            val parseResults = getParseResults(args)
+            // Create a temporary CommandLine instance to parse the arguments
+            val tempCli = CommandLine(MainCommand()).setup()
 
-            // Check if the command line arguments contain help or version options
-            val helpOrVersion = parseResults[0].isUsageHelpRequested || parseResults[0].isVersionHelpRequested
+            try {
+                val parseResults = getParseResults(tempCli, args)
 
-            // for the listen command (not overridden by --help or --version)
-            // enable the consumer and producer
-            if (parseResults.any { it.commandSpec().userObject() is ListenCommand && !helpOrVersion }) {
-                System.setProperty(CONSUMER_ENABLED, "true")
-                System.setProperty(PRODUCER_ENABLED, "true")
-            }
+                // Check if the command line arguments contain help or version options
+                val helpOrVersion = parseResults.any { it.isUsageHelpRequested || it.isVersionHelpRequested }
 
-            // for the start command (not overridden by --help or --version)
-            // enable the producer only
-            if (parseResults.any { it.commandSpec().userObject() is InstanceStartCommand && !helpOrVersion }) {
-                System.setProperty(PRODUCER_ENABLED, "true")
-            }
+                // for the listen command (not overridden by --help or --version)
+                // enable the consumer and producer
+                if (parseResults.any { it.commandSpec().userObject() is ListenCommand && !helpOrVersion }) {
+                    System.setProperty(CONSUMER_ENABLED, "true")
+                    System.setProperty(PRODUCER_ENABLED, "true")
+                }
 
-            // Set the logging level
-            setLoggingLevel(parseResults)
+                // for the start command (not overridden by --help or --version)
+                // enable the producer only
+                if (parseResults.any { it.commandSpec().userObject() is InstanceStartCommand && !helpOrVersion }) {
+                    System.setProperty(PRODUCER_ENABLED, "true")
+                }
 
-            // Set the config path
-            setConfigPath(parseResults)
+                // Set the logging level
+                setLoggingLevel(parseResults)
 
-            if (configPath == null && !helpOrVersion) {
-                System.err.println("No valid configuration file found. Please provide one, using one of the following methods:")
-                System.err.println("1. Pass the path to the file as a command-line argument (e.g., --config=<path>).")
-                System.err.println("2. Set the LEMLINE_CONFIG environment variable to the file's path.")
-                System.err.println("3. Place a .lemline.yaml file in the current directory.")
-                System.err.println("4. Place a config.yaml file in ~/.config/lemline/.")
-                System.err.println("5. Place a .lemline.yaml file in your home directory.")
+                // Set the config path
+                setConfigPath(parseResults)
+
+                if (configPath == null && !helpOrVersion) {
+                    System.err.println("No valid configuration file found. Please provide one, using one of the following methods:")
+                    System.err.println("1. Pass the path to the file as a command-line argument (e.g., --config=<path>).")
+                    System.err.println("2. Set the LEMLINE_CONFIG environment variable to the file's path.")
+                    System.err.println("3. Place a .lemline.yaml file in the current directory.")
+                    System.err.println("4. Place a config.yaml file in ~/.config/lemline/.")
+                    System.err.println("5. Place a .lemline.yaml file in your home directory.")
+                    exitProcess(1)
+                }
+            } catch (ex: Exception) {
+                // Handle all exceptions in a unified way
+                System.err.println("⚠️ ${ex.message}")
+                System.err.println()
+                tempCli.usage(System.err)
                 exitProcess(1)
             }
 
@@ -108,37 +122,41 @@ class LemlineApplication : QuarkusApplication {
          * @return A list of `ParseResult` objects representing the parsed arguments.
          * @throws CommandLine.PicocliException If an error occurs during argument parsing.
          */
-        private fun getParseResults(args: Array<String>): List<ParseResult> {
-            val tempCli = CommandLine(MainCommand(), CommandLine.defaultFactory())
+        private fun getParseResults(cl: CommandLine, args: Array<String>): List<ParseResult> {
+            val mainParseResult = cl.parseArgs(*args)
 
-            return try {
-                val mainParseResult = tempCli.parseArgs(*args)
+            fun collectAllSubcommands(pr: ParseResult): List<ParseResult> =
+                listOf(pr) + pr.subcommands().flatMap { collectAllSubcommands(it) }
 
-                fun collectAllSubcommands(pr: ParseResult): List<ParseResult> =
-                    listOf(pr) + pr.subcommands().flatMap { collectAllSubcommands(it) }
-
-                collectAllSubcommands(mainParseResult)
-            } catch (e: CommandLine.PicocliException) {
-                throw CommandLine.ParameterException(
-                    CommandLine(tempCli),
-                    e.message ?: "An unexpected error occurred during parsing."
-                )
-            }
+            return collectAllSubcommands(mainParseResult)
         }
 
         /**
          * Sets the logging level for the application based on the parsed command-line arguments.
          *
-         * This function iterates through the provided `ParseResult` list and checks for the `--log` or `-l` options.
-         * If a logging level is specified, it updates the application's logging configuration accordingly.
+         * This function checks for the `--debug`, `--info`, `--warn`, and `--error` flag options
+         * across the entire command chain. If any of these logging level flags is specified,
+         * it updates the application's logging configuration accordingly.
          *
          * @param parseResults A list of `ParseResult` objects containing parsed command-line arguments.
          */
-        private fun setLoggingLevel(parseResults: List<ParseResult>) = parseResults.forEach { parseResult ->
-            val logLevelValue = parseResult.matchedOptionValue<Level>("--log", null)
-                ?: parseResult.matchedOptionValue<Level>("-l", null)
+        private fun setLoggingLevel(parseResults: List<ParseResult>) {
+            // Check all ParseResults for any of the log level flags
+            val debugMode = parseResults.any { it.hasMatchedOption("--debug") }
+            val infoMode = parseResults.any { it.hasMatchedOption("--info") }
+            val warnMode = parseResults.any { it.hasMatchedOption("--warn") }
+            val errorMode = parseResults.any { it.hasMatchedOption("--error") }
 
-            logLevelValue?.let { setLogLevel(it) }
+            // Prioritize flags in order: debug > info > warn > error
+            val logLevel = when {
+                debugMode -> Level.DEBUG
+                infoMode -> Level.INFO
+                warnMode -> Level.WARN
+                errorMode -> Level.ERROR
+                else -> null
+            }
+
+            logLevel?.let { setLogLevel(it) }
         }
 
         /**
@@ -184,15 +202,24 @@ class LemlineApplication : QuarkusApplication {
     }
 }
 
+private fun CommandLine.setup() = this
+    .setUsageHelpAutoWidth(true)
+    .setCaseInsensitiveEnumValuesAllowed(true)
+    .setUnmatchedArgumentsAllowed(false)
+    .apply {
+        parameterExceptionHandler = CustomParameterHandler()
+        executionExceptionHandler = CustomExceptionHandler()
+    }
+
 private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
     val path = filePath.normalize()
     val fileExists = Files.exists(path)
     val isRegularFile = Files.isRegularFile(path)
     if (!fileExists && provided) {
-        error("'${path.toAbsolutePath()} does not exist")
+        throw IllegalArgumentException("'${path.toAbsolutePath()} does not exist")
     }
     if (!isRegularFile && provided) {
-        error("'${path.toAbsolutePath()} is not a regular file")
+        throw IllegalArgumentException("'${path.toAbsolutePath()} is not a regular file")
     }
     if (fileExists && isRegularFile) {
         configPath = path
@@ -210,9 +237,4 @@ private fun setLogLevel(level: Level) = level.name.let {
     System.setProperty("quarkus.log.category.\"io.smallrye\".level", it)
     System.setProperty("quarkus.log.category.\"io.agroal\".level", it)
     System.setProperty("quarkus.log.category.\"org.apache.kafka\".level", it)
-}
-
-private fun error(msg: String): Nothing {
-    System.err.println(msg)
-    exitProcess(1)
 }

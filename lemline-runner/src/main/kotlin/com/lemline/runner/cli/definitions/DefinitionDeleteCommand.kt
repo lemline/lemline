@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.definitions
 
+import com.lemline.runner.cli.LemlineMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
@@ -8,6 +9,7 @@ import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import picocli.CommandLine
 import picocli.CommandLine.Command
+import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 
@@ -23,9 +25,11 @@ import picocli.CommandLine.Parameters
         "  - <name>: Deletes all versions of the workflow with the specified name.",
         "  - <name> <version>: Deletes the specific workflow version."
     ],
-    mixinStandardHelpOptions = true
 )
 class DefinitionDeleteCommand : Runnable {
+
+    @Mixin
+    lateinit var mixin: LemlineMixin
 
     @Inject
     lateinit var definitionRepository: DefinitionRepository

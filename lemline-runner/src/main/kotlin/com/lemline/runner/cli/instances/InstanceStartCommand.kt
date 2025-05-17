@@ -6,9 +6,11 @@ import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.Workflows
+import com.lemline.runner.cli.LemlineMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.messaging.Message
 import com.lemline.runner.messaging.WORKFLOW_OUT
+import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
@@ -17,6 +19,7 @@ import kotlinx.serialization.json.JsonElement
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 import picocli.CommandLine.Command
+import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 
@@ -24,9 +27,11 @@ import picocli.CommandLine.Parameters
 @Command(
     name = "start",
     description = ["Get specific workflow definitions, interactively if needed."],
-    mixinStandardHelpOptions = true,
 )
 class InstanceStartCommand : Runnable {
+
+    @Mixin
+    lateinit var mixin: LemlineMixin
 
     @Inject
     lateinit var definitionRepository: DefinitionRepository
@@ -59,53 +64,68 @@ class InstanceStartCommand : Runnable {
     var input: String? = null
 
     override fun run() {
-        if (name.isNullOrBlank()) this@InstanceStartCommand.error("Workflow name must be provided")
+        if (name.isNullOrBlank()) error("Workflow name must be provided")
 
         // Parse input JSON if provided, or use an empty object if not provided.
-        val inputJsonElement: JsonElement = input?.let {
-            try {
-                // Parse the input string as JSON
-                LemlineJson.json.parseToJsonElement(it)
-            } catch (e: Exception) {
-                this@InstanceStartCommand.error("Invalid JSON input: ${e.message}")
-            }
-        } ?: LemlineJson.jsonObject
+        val inputJsonElement = getInput(input)
 
-        val workflowDefinition = version?.let {
-            definitionRepository.findByNameAndVersion(name!!, it)
-                ?: this@InstanceStartCommand.error("Workflow with name '$name' and version '$it' not found")
-        } ?: run {
-            val workflows = definitionRepository.listByName(name!!)
-            if (workflows.isEmpty()) this.error("No workflows found with name '$name'")
+        // Retrieve the workflow definition from the repository
+        val workflowDefinition = getDefinition(name!!, version)
 
-            workflows.maxWithOrNull { w1, w2 ->
-                runCatching {
-                    Version.parse(w1.version).compareTo(Version.parse(w2.version))
-                }.getOrDefault(w1.version.compareTo(w2.version))
-            } ?: this.error("Failed to determine latest version for workflow '$name'")
-        }
+        // Check if the workflow input is valid against the workflow definition
+        checkInput(workflowDefinition.definition, inputJsonElement)
 
-        // Parse workflow definition into a Workflow object
-        val workflow = Workflows.parse(workflowDefinition.definition)
-
-        // Validate input against schema if the workflow has an input schema
-        workflow.input?.schema?.let { schema ->
-            try {
-                SchemaValidator.validate(inputJsonElement, schema)
-            } catch (e: Exception) {
-                this@InstanceStartCommand.error("Input validation failed against workflow schema: ${e.message}")
-            }
-        }
-
+        // create the message
         val message = Message.newInstance(name!!, workflowDefinition.version, inputJsonElement)
 
-        // Send the message synchronously to the workflow-out channel
+        // Synchronously send the message to the workflow-out channel
         try {
             emitter.send(message.toJsonString()).toCompletableFuture().get()
             println("Instance ${message.states[NodePosition.root]?.workflowId} started successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement)")
         } catch (e: Exception) {
-            this@InstanceStartCommand.error("Failed to start workflow instance: ${e.message}")
+            error("Failed to start workflow instance: ${e.message}")
         }
+    }
+
+    private fun getInput(input: String?): JsonElement = input?.let {
+        try {
+            // Parse the input string as JSON
+            LemlineJson.json.parseToJsonElement(it)
+        } catch (e: Exception) {
+            error("Invalid JSON input: ${e.message}")
+        }
+    } ?: LemlineJson.jsonObject
+
+    private fun checkInput(definition: String, input: JsonElement) {
+        // Parse workflow definition into a Workflow object
+        val workflow = try {
+            Workflows.parse(definition)
+        } catch (e: Exception) {
+            error("Invalid workflow definition: ${e.message}")
+        }
+
+        // Validate input against schema if the workflow has an input schema
+        workflow.input?.schema?.let { schema ->
+            try {
+                SchemaValidator.validate(input, schema)
+            } catch (e: Exception) {
+                error("Input validation failed against workflow schema: ${e.message}")
+            }
+        }
+    }
+
+    private fun getDefinition(name: String, version: String?): DefinitionModel = version?.let {
+        definitionRepository.findByNameAndVersion(name, it)
+            ?: error("Workflow with name '$name' and version '$it' not found")
+    } ?: run {
+        val workflows = definitionRepository.listByName(name)
+        if (workflows.isEmpty()) this.error("No workflows found with name '$name'")
+
+        workflows.maxWithOrNull { w1, w2 ->
+            runCatching {
+                Version.parse(w1.version).compareTo(Version.parse(w2.version))
+            }.getOrDefault(w1.version.compareTo(w2.version))
+        } ?: error("Failed to determine latest version for workflow '$name'")
     }
 
     internal fun error(msg: String): Nothing {

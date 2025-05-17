@@ -3,6 +3,7 @@ package com.lemline.runner.cli.definitions
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.core.workflows.Workflows
+import com.lemline.runner.cli.LemlineMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
@@ -10,6 +11,7 @@ import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import picocli.CommandLine
 import picocli.CommandLine.Command
+import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 
@@ -17,9 +19,11 @@ import picocli.CommandLine.Parameters
 @Command(
     name = "get",
     description = ["Get specific workflow definitions, interactively if needed."],
-    mixinStandardHelpOptions = true,
 )
 class DefinitionGetCommand : Runnable {
+
+    @Mixin
+    lateinit var mixin: LemlineMixin
 
     // Enum for validated format options (only for final output)
     enum class OutputFormat { JSON, YAML }

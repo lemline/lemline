@@ -1,20 +1,24 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.cli
+package com.lemline.runner.cli.listen
 
 import com.lemline.common.logger
+import com.lemline.runner.cli.LemlineMixin
 import io.quarkus.arc.Unremovable
 import io.quarkus.runtime.Quarkus
 import jakarta.enterprise.context.Dependent
 import picocli.CommandLine.Command
+import picocli.CommandLine.Mixin
 
 @Command(
     name = "listen",
     description = ["listen for Lemline messages"],
-    mixinStandardHelpOptions = true
 )
 @Unremovable
 @Dependent
 class ListenCommand : Runnable {
+
+    @Mixin
+    lateinit var mixin: LemlineMixin
 
     val logger = logger()
 

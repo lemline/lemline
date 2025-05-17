@@ -1,24 +1,28 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.cli
+package com.lemline.runner.cli.config
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator
 import com.lemline.runner.LemlineApplication
+import com.lemline.runner.cli.LemlineMixin
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import org.eclipse.microprofile.config.Config
 import picocli.CommandLine.Command
 import picocli.CommandLine.ITypeConverter
+import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
 
 @Unremovable
 @Command(
     name = "config",
     description = ["Display current configuration"],
-    mixinStandardHelpOptions = true
 )
 class ConfigCommand : Runnable {
+    @Mixin
+    lateinit var mixin: LemlineMixin
+
     enum class Format {
         PROPERTIES,
         YAML,
@@ -38,21 +42,21 @@ class ConfigCommand : Runnable {
     var all: Boolean = false
 
     @Inject
-    lateinit var config: Config
+    lateinit var lemlineConfig: Config
 
     override fun run() {
 
-        val properties = config.propertyNames.asSequence()
+        val properties = lemlineConfig.propertyNames.asSequence()
             .filter { all || it.startsWith("lemline.") }
             .filter { it.isNotBlank() } // Skip empty property names
             .sorted()
             .associateWith {
-                config.getOptionalValue(it, String::class.java).orElse("")
+                lemlineConfig.getOptionalValue(it, String::class.java).orElse("")
             }
 
         println(
             "# Configuration from " +
-                (LemlineApplication.configPath?.toAbsolutePath()?.let { "$it + " } ?: "") +
+                (LemlineApplication.Companion.configPath?.toAbsolutePath()?.let { "$it + " } ?: "") +
                 "default values."
         )
         when (format) {
