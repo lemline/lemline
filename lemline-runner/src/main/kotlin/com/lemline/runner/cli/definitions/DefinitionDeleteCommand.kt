@@ -26,7 +26,7 @@ import picocli.CommandLine.Parameters
         "  - <name> <version>: Deletes the specific workflow version."
     ],
 )
-class DefinitionDeleteCommand : Runnable {
+open class DefinitionDeleteCommand : Runnable {
 
     @Mixin
     lateinit var mixin: GlobalMixin
@@ -241,18 +241,22 @@ class DefinitionDeleteCommand : Runnable {
 
     // --- Common Helper --- //
 
-    private fun confirmDeletion(subjectDescription: String): Boolean {
+    // Made protected to enable testing through inheritance
+    protected fun confirmDeletion(subjectDescription: String): Boolean {
         // This check makes confirmation a no-op if force is true
         if (force) return true
 
         print("Are you sure you want to delete $subjectDescription? [y/N]: ")
-        val confirmation = readlnOrNull()?.trim()?.lowercase()
+        val confirmation = readUserInput()?.trim()?.lowercase()
         if (confirmation != "y") {
             println("Deletion cancelled.")
             return false
         }
         return true
     }
+    
+    // Made protected and extracted to support testing through override
+    protected open fun readUserInput(): String? = readlnOrNull()
 
     // Helper for concise exception throwing
     private fun ExecutionException(message: String, cause: Throwable? = null) =
