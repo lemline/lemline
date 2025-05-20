@@ -7,4 +7,137 @@
                  start-page="lemline-documentation.md">
 
     <toc-element topic="lemline-documentation.md"/>
+        <!-- Home section -->
+        <toc-element topic="lemline-what-is.md"/>
+        <toc-element topic="lemline-why-exists.md"/>
+        <toc-element topic="lemline-doc-guide.md"/>
+        <toc-element topic="lemline-who-for.md"/>
+        <toc-element topic="lemline-getting-started.md"/>
+        
+        <!-- Tutorials section -->
+        <toc-element toc-title="Tutorials">
+            <toc-element topic="lemline-tutorial-hello.md"/>
+            <toc-element topic="lemline-tutorial-order-processing.md"/>
+            <toc-element topic="lemline-tutorial-waits.md"/>
+            <toc-element topic="lemline-tutorial-iot.md"/>
+        </toc-element>
+        
+        <!-- How-to guides section -->
+        <toc-element toc-title="How-to Guides">
+            <toc-element toc-title="Core Operations">
+                <toc-element topic="lemline-howto-define-workflow.md"/>
+                <toc-element topic="lemline-howto-publish-run.md"/>
+                <toc-element topic="lemline-howto-monitor.md"/>
+                <toc-element topic="lemline-howto-lifecycle.md"/>
+            </toc-element>
+            <toc-element toc-title="Flow Control">
+                <toc-element topic="lemline-howto-conditional.md"/>
+                <toc-element topic="lemline-howto-parallel.md"/>
+                <toc-element topic="lemline-howto-loops.md"/>
+                <toc-element topic="lemline-howto-jumps.md"/>
+            </toc-element>
+            <toc-element toc-title="Working with Tasks">
+                <toc-element topic="lemline-howto-http.md"/>
+                <toc-element topic="lemline-howto-openapi.md"/>
+                <toc-element topic="lemline-howto-run.md"/>
+                <toc-element topic="lemline-howto-grpc.md"/>
+                <toc-element topic="lemline-howto-events.md"/>
+            </toc-element>
+            <toc-element toc-title="Data Management">
+                <toc-element topic="lemline-howto-data-passing.md"/>
+                <toc-element topic="lemline-howto-io.md"/>
+                <toc-element topic="lemline-howto-jq.md"/>
+                <toc-element topic="lemline-howto-schemas.md"/>
+            </toc-element>
+            <toc-element toc-title="Resilience and Error Handling">
+                <toc-element topic="lemline-howto-try-catch.md"/>
+                <toc-element topic="lemline-howto-retry.md"/>
+                <toc-element topic="lemline-howto-custom-errors.md"/>
+                <toc-element topic="lemline-howto-debug.md"/>
+                <toc-element topic="dsl-resilience-patterns.md"/>
+            </toc-element>
+            <toc-element toc-title="Authentication and Secrets">
+                <toc-element topic="lemline-howto-oauth2.md"/>
+                <toc-element topic="lemline-howto-secrets.md"/>
+                <toc-element topic="lemline-howto-api-keys.md"/>
+                <toc-element topic="lemline-howto-tls.md"/>
+            </toc-element>
+            <toc-element toc-title="Runner Configuration">
+                <toc-element topic="lemline-howto-config.md"/>
+                <toc-element topic="lemline-howto-brokers.md"/>
+                <toc-element topic="lemline-howto-observability.md"/>
+                <toc-element topic="lemline-howto-scaling.md"/>
+            </toc-element>
+        </toc-element>
+        
+        <!-- Reference section -->
+        <toc-element toc-title="Reference">
+            <toc-element toc-title="DSL Reference">
+                <toc-element topic="lemline-ref-dsl-syntax.md"/>
+                <toc-element topic="lemline-ref-task-types.md"/>
+            </toc-element>
+            <toc-element toc-title="Runner Reference">
+                <toc-element topic="lemline-ref-config.md"/>
+                <toc-element topic="lemline-ref-env-vars.md"/>
+                <toc-element topic="lemline-ref-metrics.md"/>
+            </toc-element>
+            <toc-element toc-title="CLI Reference">
+                <toc-element topic="lemline-ref-cli.md"/>
+                <toc-element topic="lemline-ref-errors.md"/>
+            </toc-element>
+            <toc-element toc-title="Auth & Secrets Reference">
+                <toc-element topic="lemline-ref-auth.md"/>
+                <toc-element topic="lemline-ref-secrets.md"/>
+            </toc-element>
+            <toc-element toc-title="Protocol Support Reference">
+                <toc-element topic="lemline-ref-http.md"/>
+                <toc-element topic="lemline-ref-grpc.md"/>
+                <toc-element topic="lemline-ref-openapi.md"/>
+                <toc-element topic="lemline-ref-asyncapi.md"/>
+                <toc-element topic="lemline-ref-connections.md"/>
+                <toc-element topic="lemline-ref-serialization.md"/>
+            </toc-element>
+        </toc-element>
+        
+        <!-- Explanations section -->
+        <toc-element toc-title="Explanations">
+            <toc-element topic="lemline-explain-event-driven.md"/>
+            <toc-element topic="lemline-explain-execution.md"/>
+            <toc-element topic="lemline-explain-sw-dsl.md"/>
+            <toc-element topic="lemline-explain-fan-in.md"/>
+            <toc-element topic="lemline-explain-time.md"/>
+            <toc-element topic="lemline-explain-errors.md"/>
+            <toc-element topic="lemline-explain-jq.md"/>
+            <toc-element topic="lemline-explain-security.md"/>
+            <toc-element topic="lemline-explain-scaling.md"/>
+        </toc-element>
+        
+        <!-- Examples Library section -->
+        <toc-element toc-title="Examples Library">
+            <toc-element topic="lemline-examples-library.md"/>
+            <toc-element topic="lemline-examples-basic-patterns.md"/>
+            <toc-element topic="lemline-examples-integrations.md"/>
+            <toc-element topic="lemline-examples-error-handling.md"/>
+            <toc-element topic="lemline-examples-real-world.md"/>
+            <toc-element topic="lemline-examples-order.md"/>
+            <toc-element topic="lemline-examples-iot.md"/>
+            <toc-element topic="lemline-examples-api.md"/>
+            <toc-element topic="lemline-examples-timeouts.md"/>
+            <toc-element topic="lemline-example-compensation.md"/>
+        </toc-element>
+        
+        <!-- Observability & Performance section -->
+        <toc-element toc-title="Observability & Performance">
+            <toc-element topic="lemline-observability-lifecycle.md"/>
+            <toc-element topic="lemline-observability-performance.md"/>
+            <toc-element topic="lemline-observability-io.md"/>
+            <toc-element topic="lemline-observability-sizing.md"/>
+        </toc-element>
+        
+        <!-- Community and Contribution section -->
+        <toc-element toc-title="Community and Contribution">
+            <toc-element topic="lemline-community-contribution.md"/>
+            <toc-element topic="lemline-community-style.md"/>
+            <toc-element topic="lemline-community-diataxis.md"/>
+        </toc-element>
 </instance-profile>
