@@ -55,3 +55,6 @@ webHelpDOCS2-all/
 
 ### Local configuration files
 /.lemline.yaml
+
+### Qarkus ###
+.quarkus/

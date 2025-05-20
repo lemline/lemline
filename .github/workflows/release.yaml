@@ -21,7 +21,6 @@ jobs:
   # 1) Check Changes
   #################################
   check-changes:
-    # Only run on schedule; version/tag pushes always proceed.
     runs-on: ubuntu-22.04
     outputs:
       changed: ${{ steps.diff.outputs.changed }}
