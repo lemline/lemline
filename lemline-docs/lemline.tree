@@ -75,6 +75,7 @@
             <toc-element toc-title="DSL Reference">
                 <toc-element topic="lemline-ref-dsl-syntax.md"/>
                 <toc-element topic="lemline-ref-task-types.md"/>
+                <toc-element topic="lemline-ref-supported-features.md"/>
             </toc-element>
             <toc-element toc-title="Runner Reference">
                 <toc-element topic="lemline-ref-config.md"/>
