@@ -219,7 +219,7 @@ class DefinitionDeleteCommandTest {
         // This would be better tested with an approach that mocks the input stream differently
         // or with a more testable design pattern
 
-        // Skip this test as it's effectively the same as "should delete all versions 
+        // Skip this test as it's effectively the same as "should delete all versions
         // of workflow when only name is provided with force flag" in the ForcedDeletionTests class
 
         @Test

@@ -254,7 +254,7 @@ open class DefinitionDeleteCommand : Runnable {
         }
         return true
     }
-    
+
     // Made protected and extracted to support testing through override
     protected open fun readUserInput(): String? = readlnOrNull()
 

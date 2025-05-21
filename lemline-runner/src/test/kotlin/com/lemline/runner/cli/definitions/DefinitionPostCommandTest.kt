@@ -164,7 +164,7 @@ class DefinitionPostCommandTest {
 
             // When
             val exitCode = cmd.execute("--file", nonExistentFile.absolutePath)
-            
+
             // Then
             exitCode shouldBe 1 // We expect a non-zero exit code for errors
             errStream.toString() shouldContain "does not exist"
@@ -233,7 +233,7 @@ class DefinitionPostCommandTest {
 
             // When
             val exitCode = cmd.execute("--directory", nonExistentDir.absolutePath)
-            
+
             // Then
             exitCode shouldBe 1 // We expect a non-zero exit code for errors
             errStream.toString() shouldContain "does not exist"
@@ -244,7 +244,7 @@ class DefinitionPostCommandTest {
     fun `should require at least one source`() {
         // When
         val exitCode = cmd.execute()
-        
+
         // Then
         exitCode shouldBe 2 // We expect a parameter validation exit code (2)
         errStream.toString() shouldContain "You must specify at least one file"
@@ -254,7 +254,7 @@ class DefinitionPostCommandTest {
     fun `should require directory with recursive flag`() {
         // When
         val exitCode = cmd.execute("--recursive")
-        
+
         // Then
         exitCode shouldBe 2 // We expect a parameter validation exit code (2)
         errStream.toString() shouldContain "can only be used with"

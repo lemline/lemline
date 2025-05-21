@@ -133,8 +133,8 @@ class DefinitionGetCommandTest {
             every { Workflows.parse(workflowDefinition.definition) } returns workflow
 
             // Mock the entire chain of method calls
-            every { 
-                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(any<Workflow>()) 
+            every {
+                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(any<Workflow>())
             } returns jsonOutput
 
             // When
