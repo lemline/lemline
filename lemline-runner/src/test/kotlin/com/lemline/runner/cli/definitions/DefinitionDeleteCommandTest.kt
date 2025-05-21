@@ -10,7 +10,6 @@ import io.kotest.matchers.string.shouldContain
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
-import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.lang.reflect.Field
@@ -31,7 +30,6 @@ class DefinitionDeleteCommandTest {
     private lateinit var originalOut: PrintStream
     private lateinit var originalErr: PrintStream
     private lateinit var originalIn: java.io.InputStream
-    private lateinit var systemIn: ByteArrayInputStream
 
     private lateinit var workflowName: String
     private lateinit var workflowVersion: String
