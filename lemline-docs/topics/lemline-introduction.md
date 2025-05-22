@@ -66,6 +66,8 @@ This documentation is intended for:
 * **Operations Engineers:** Automating infrastructure tasks and operational procedures.
 * Anyone interested in learning and applying the Serverless Workflow standard.
 
+For a more detailed breakdown by role, see [Who is Lemline For?](lemline-who-for.md)
+
 ## Getting Started
 
 To get started with the Serverless Workflow DSL:

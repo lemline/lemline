@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 env:
-  INSTANCE: 'lemline-docs/docs'  # Adjust 'hi' if your instance ID differs
+  INSTANCE: 'lemline-docs/lemline'  # Adjust 'hi' if your instance ID differs
   DOCKER_VERSION: '2025.04.8412'  # Use the latest Writerside Docker version
 
 jobs:

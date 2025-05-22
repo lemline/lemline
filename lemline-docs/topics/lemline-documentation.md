@@ -6,9 +6,6 @@ title: Lemline Documentation
 
 Welcome to the official documentation for Lemline, the modern runtime for Serverless Workflow DSL.
 
-This documentation is structured using the Diátaxis framework, organizing content into four distinct types to better
-serve your needs:
-
 ## 🏠 Home
 
 * [What Is Lemline?](lemline-what-is.md)

@@ -4,13 +4,10 @@ title: Documentation Guide
 
 # Documentation Guide
 
-The Lemline documentation is structured following the [Diátaxis framework](https://diataxis.fr/), which organizes
-technical documentation into four distinct types based on how users approach and use documentation. This guide will help
-you navigate to the right type of documentation for your needs.
+The Lemline documentation is organized into four distinct types based on how users approach
+and use documentation. This guide will help you navigate to the right type of documentation for your needs.
 
-## The Four Documentation Types
-
-### 🎓 Tutorials
+## 🎓 Tutorials
 
 **Purpose**: Learning-oriented content focused on practical experience.
 
@@ -22,7 +19,7 @@ you navigate to the right type of documentation for your needs.
 
 [Browse Tutorials →](lemline-tutorial-hello.md)
 
-### 🛠️ How-to Guides
+## 🛠️ How-to Guides
 
 **Purpose**: Task-oriented instructions focused on solving specific problems.
 
@@ -34,7 +31,7 @@ you navigate to the right type of documentation for your needs.
 
 [Browse How-to Guides →](lemline-howto-define-workflow.md)
 
-### 📖 Reference
+## 📖 Reference
 
 **Purpose**: Information-oriented content with precise, comprehensive details.
 
@@ -46,7 +43,7 @@ you navigate to the right type of documentation for your needs.
 
 [Browse Reference →](lemline-ref-dsl-syntax.md)
 
-### 🧠 Explanations
+## 🧠 Explanations
 
 **Purpose**: Understanding-oriented discussions of concepts and approaches.
 
@@ -62,20 +59,14 @@ you navigate to the right type of documentation for your needs.
 
 ### By Role
 
-* **As a Developer** new to Lemline:
-    1. Start with [What is Lemline?](lemline-what-is.md) and [Getting Started Fast](lemline-getting-started.md)
-    2. Follow the [Hello Workflow Tutorial](lemline-tutorial-hello.md)
-    3. Explore [How-to Guides](lemline-howto-define-workflow.md) for specific tasks
+For role-specific documentation paths, those links provide tailored
+documentation paths for:
 
-* **As an Architect**:
-    1. Read [Why Lemline Exists](lemline-why-exists.md) to understand the philosophy
-    2. Dive into the [Explanations](lemline-explain-event-driven.md) section for architectural insights
-    3. Examine the [Examples Library](lemline-examples-order.md) for real-world patterns
-
-* **As a DevOps Engineer**:
-    1. Start with [Runner Configuration](lemline-howto-config.md) guides
-    2. Review [Observability & Performance](lemline-observability-lifecycle.md) documentation
-    3. Consult the [Reference](lemline-ref-config.md) section for detailed settings
+* **[Back-end Developers](lemline-who-for.md#back-end-developers)** implementing business logic and services
+* **[Architects](lemline-who-for.md#architects-designing-event-driven-systems)** designing distributed systems and
+  integration patterns
+* **[Platform Engineers](lemline-who-for.md#platform-engineers)** building reliable, observable platforms
+* **[Integration Specialists](lemline-who-for.md#integration-specialists)** connecting disparate systems and services
 
 ### By Problem
 
