@@ -68,12 +68,11 @@ jobs:
       # 3) Graalvm setup
       #################################
 
-      - name: Set up Mandrel Native Image
+      - name: Set up Graalvm Native Image
         uses: graalvm/setup-graalvm@v1
         with:
-          distribution: graalvm
+          distribution: graalvm-community
           java-version: '17'  # JDK version to install
-          version: '21.0.2'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       #################################
