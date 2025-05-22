@@ -67,20 +67,22 @@ dependencies {
     // ─────────────────────────────────────────────────────────────────────────
 
     // JTA + JMS
-    implementation("io.quarkus:quarkus-narayana-jta") {
+    runtimeOnly("io.quarkus:quarkus-narayana-jta") {
         exclude("org.jboss.narayana.jta", "jms")
     }
-    implementation("jakarta.jms:jakarta.jms-api:3.1.0")
+    runtimeOnly("jakarta.jms:jakarta.jms-api:3.1.0")
+
+    runtimeOnly("net.java.dev.jna:jna-platform:5.17.0")
 
     // Quarkus helpers
-    implementation("org.jboss:jboss-vfs:3.2.15.Final")
-    implementation("org.osgi:org.osgi.framework:1.10.0")
+    runtimeOnly("org.jboss:jboss-vfs:3.2.15.Final")
+    runtimeOnly("org.osgi:org.osgi.framework:1.10.0")
 
     // AWS
-    implementation(platform(libs.quarkus.amazon.services.bom))
-    implementation("io.quarkiverse.amazonservices:quarkus-amazon-common")
-    implementation("io.quarkiverse.amazonservices:quarkus-amazon-s3")
-    implementation("io.quarkiverse.amazonservices:quarkus-amazon-crt")
+    runtimeOnly(platform(libs.quarkus.amazon.services.bom))
+    runtimeOnly("io.quarkiverse.amazonservices:quarkus-amazon-common")
+    runtimeOnly("io.quarkiverse.amazonservices:quarkus-amazon-s3")
+    runtimeOnly("io.quarkiverse.amazonservices:quarkus-amazon-crt")
 
     // ─────────────────────────────────────────────────────────────────────────
     // 4) Testing
