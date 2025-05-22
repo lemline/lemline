@@ -91,6 +91,13 @@ jobs:
         with:
           arch: x64
 
+      - name: Set up Java 17 for Gradle toolchain
+        if: ${{ runner.os == 'Windows' }}
+        uses: actions/setup-java@v3
+        with:
+          distribution: temurin
+          java-version: 17
+
       #################################
       # 5) Native build step
       #################################
