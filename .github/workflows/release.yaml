@@ -45,6 +45,7 @@ jobs:
 
   build:
     needs: check-changes
+    if: ${{ needs.check-changes.outputs.changed == 'true' }}
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
