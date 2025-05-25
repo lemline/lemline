@@ -21,7 +21,6 @@ class ShellRunTest {
         val result = shellRun.execute()
 
         // Then
-        println(result)
         assertEquals(0, result.code)
         assertTrue(result.stdout.contains("Hello") && result.stdout.contains("World"))
         assertEquals("", result.stderr)

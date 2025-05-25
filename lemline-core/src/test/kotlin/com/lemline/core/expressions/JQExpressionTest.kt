@@ -60,13 +60,13 @@ class JQExpressionTest {
         val input = """{"key": "value"}""".toJsonElement()
 
         // JQ expression to extract and concatenate the value of "key" with a scoped variable "scopedKey"
-        val filter = ".key + \$scopedKey"
+        val filter = JsonPrimitive(".key + \$scopedKey")
 
         // Scope to override the value of "$scopedKey"
         val customScope = """{"scopedKey": "ScopedValue"}""".toJsonElement() as JsonObject
 
         // Use the custom scope in the evaluation
-        val result = JQExpression.eval(input, filter, customScope)
+        val result = JQExpression.eval(input, filter, customScope, true)
 
         // Ensure the concat value is returned
         assertEquals(JsonPrimitive("valueScopedValue"), result)
@@ -77,13 +77,13 @@ class JQExpressionTest {
         val input = """{"key": "value"}""".toJsonElement()
 
         // JQ expression to extract and concatenate the value of "key" with a scoped variable "scopedKey"
-        val filter = ".key + \$scopedObject.scopedKey"
+        val filter = JsonPrimitive(".key + \$scopedObject.scopedKey")
 
         // Scope to override the value of "$scopedKey"
         val customScope = """{"scopedObject": {"scopedKey": "ScopedValue"}}""".toJsonElement() as JsonObject
 
         // Use the custom scope in the evaluation
-        val result = JQExpression.eval(input, filter, customScope)
+        val result = JQExpression.eval(input, filter, customScope, true)
 
         // Ensure the concat value is returned
         assertEquals(JsonPrimitive("valueScopedValue"), result)

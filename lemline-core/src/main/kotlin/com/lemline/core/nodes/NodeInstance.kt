@@ -1,10 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
-import com.lemline.common.*
+import com.lemline.common.debug
+import com.lemline.common.error
+import com.lemline.common.info
+import com.lemline.common.logger
+import com.lemline.common.withWorkflowContext
 import com.lemline.core.errors.WorkflowError
 import com.lemline.core.errors.WorkflowErrorType
-import com.lemline.core.errors.WorkflowErrorType.*
+import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
+import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
+import com.lemline.core.errors.WorkflowErrorType.RUNTIME
+import com.lemline.core.errors.WorkflowErrorType.VALIDATION
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.expressions.scopes.Scope
@@ -13,12 +20,22 @@ import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.flows.RootInstance
 import com.lemline.core.nodes.flows.TryInstance
 import com.lemline.core.schemas.SchemaValidator
-import io.serverlessworkflow.api.types.*
+import io.serverlessworkflow.api.types.ExportAs
+import io.serverlessworkflow.api.types.FlowDirectiveEnum
+import io.serverlessworkflow.api.types.InputFrom
+import io.serverlessworkflow.api.types.OutputAs
+import io.serverlessworkflow.api.types.SchemaUnion
+import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.booleanOrNull
 
 /**
  * Base class for all task instances.
@@ -421,7 +438,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         exportAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
 
     private fun eval(data: JsonElement, expr: String, scope: JsonObject = this.scope) = try {
-        JQExpression.eval(data, expr, scope)
+        JQExpression.eval(data, JsonPrimitive(expr), scope, false)
     } catch (e: Exception) {
         error(EXPRESSION, e.message, e.stackTraceToString())
     }

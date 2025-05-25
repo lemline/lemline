@@ -17,7 +17,7 @@ internal interface ExpressionEvaluator {
     /**
      * Convert JsonElement to JsonNode and JsonObject to ObjectNode then evaluate the expression.
      */
-    fun eval(input: JsonElement, expr: String, scope: JsonObject): JsonElement = with(LemlineJson) {
+    private fun eval(input: JsonElement, expr: String, scope: JsonObject): JsonElement = with(LemlineJson) {
         eval(input.toJsonNode(), ExpressionUtils.trimExpr(expr), scope.toJsonNode() as ObjectNode).toJsonElement()
     }
 

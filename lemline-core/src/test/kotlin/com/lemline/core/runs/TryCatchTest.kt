@@ -260,7 +260,7 @@ class TryCatchTest {
                             type: https://serverlessworkflow.io/errors/not-implemented
                             status: 500
                   catch:
-                    when: @error.status == 500
+                    when: @{ @error.status == 500 }
                     do:
                       - setCaught:
                           set:
@@ -287,7 +287,7 @@ class TryCatchTest {
                             type: https://serverlessworkflow.io/errors/not-implemented
                             status: 500
                   catch:
-                    when: @error.status == 400
+                    when: @{ @error.status == 400 }
                     do:
                       - setCaught:
                           set:
@@ -315,7 +315,7 @@ class TryCatchTest {
                             status: 500
                   catch:
                     as: issue
-                    when: @issue.status == 500
+                    when: @{ @issue.status == 500 }
                     do:
                       - setCaught:
                           set:
@@ -343,7 +343,7 @@ class TryCatchTest {
                             status: 500
                   catch:
                     as: issue
-                    when: @issue.status == 400
+                    when: @{ @issue.status == 400 }
                     do:
                       - setCaught:
                           set:
@@ -370,7 +370,7 @@ class TryCatchTest {
                             type: https://serverlessworkflow.io/errors/not-implemented
                             status: 500
                   catch:
-                    exceptWhen: @error.status == 400
+                    exceptWhen: @{ @error.status == 400 }
                     do:
                       - setCaught:
                           set:
@@ -397,7 +397,7 @@ class TryCatchTest {
                             type: https://serverlessworkflow.io/errors/not-implemented
                             status: 500
                   catch:
-                    exceptWhen: @error.status == 500
+                    exceptWhen: @{ @error.status == 500 }
                     do:
                       - setCaught:
                           set:

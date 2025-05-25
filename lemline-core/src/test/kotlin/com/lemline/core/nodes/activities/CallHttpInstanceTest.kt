@@ -7,19 +7,35 @@ import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.nodes.NodePosition
-import io.mockk.*
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.every
 import io.mockk.junit5.MockKExtension
-import io.serverlessworkflow.api.types.*
+import io.mockk.mockk
+import io.mockk.spyk
+import io.mockk.unmockkObject
+import io.serverlessworkflow.api.types.AuthenticationPolicyUnion
+import io.serverlessworkflow.api.types.BasicAuthenticationPolicy
+import io.serverlessworkflow.api.types.BasicAuthenticationPolicyConfiguration
+import io.serverlessworkflow.api.types.BasicAuthenticationProperties
+import io.serverlessworkflow.api.types.CallHTTP
+import io.serverlessworkflow.api.types.Endpoint
+import io.serverlessworkflow.api.types.EndpointConfiguration
+import io.serverlessworkflow.api.types.EndpointUri
+import io.serverlessworkflow.api.types.HTTPArguments
+import io.serverlessworkflow.api.types.HTTPHeaders
+import io.serverlessworkflow.api.types.HTTPQuery
+import io.serverlessworkflow.api.types.ReferenceableAuthenticationPolicy
+import io.serverlessworkflow.api.types.UriTemplate
+import java.net.URI
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlinx.coroutines.test.runTest
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import java.net.URI
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 
 @ExtendWith(MockKExtension::class)
 class CallHttpInstanceTest {
@@ -226,17 +242,10 @@ class CallHttpInstanceTest {
     @Test
     fun `test execute with runtime expression endpoint`() = runTest {
         // Setup
-        val runtimeExpr = "\${.apiUrl}"
         val jsonResponse = JsonObject(mapOf("result" to JsonPrimitive("success")))
 
         // Mock endpoint resolution
-        every { mockEndpoint.get() } returns runtimeExpr
-
-        // Mock expression evaluation
-        mockkObject(JQExpression)
-        every {
-            JQExpression.eval(any<JsonElement>(), any<String>(), any<JsonObject>())
-        } returns JsonPrimitive("https://example.com/api/dynamic")
+        every { mockEndpoint.get() } returns "https://example.com/api/dynamic"
 
         // Mock headers and query params
         every { mockHeaders.additionalProperties } returns emptyMap()
@@ -457,12 +466,6 @@ class CallHttpInstanceTest {
 
         // Mock endpoint resolution
         every { mockEndpoint.get() } returns runtimeExpr
-
-        // Mock expression evaluation to throw exception
-        mockkObject(JQExpression)
-        every {
-            JQExpression.eval(any<JsonElement>(), any<String>(), any<JsonObject>())
-        } throws RuntimeException("Expression evaluation failed")
 
         // Execute and verify
         assertFailsWith<RuntimeException> {

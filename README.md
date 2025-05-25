@@ -160,7 +160,7 @@ Currently implemented features are:
 - Run:
     - [ ] Container
     - [ ] Script
-    - [ ] Shell
+    - [x] Shell
     - [ ] Workflow
 - Call:
     - [x] HTTP

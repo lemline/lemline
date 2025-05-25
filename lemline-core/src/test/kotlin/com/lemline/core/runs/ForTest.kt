@@ -16,7 +16,7 @@ class ForTest {
            do:
              - sumAll:
                  for:
-                   in: .input
+                   in: @{ .input }
                  do:
                    - accumulate:
                        set:
