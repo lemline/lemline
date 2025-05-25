@@ -3,8 +3,6 @@ package com.lemline.core.nodes.activities
 
 import com.lemline.core.activities.runs.ShellRun
 import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
-import com.lemline.core.errors.WorkflowErrorType.RUNTIME
-import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import io.serverlessworkflow.api.types.RunShell
@@ -14,6 +12,9 @@ import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.CO
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.NONE
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.STDERR
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.STDOUT
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 class RunInstance(
     override val node: Node<RunTask>,
@@ -46,14 +47,18 @@ class RunInstance(
         debug { "Shell config: $shellConfig" }
 
         // Evaluate command through expression evaluator
-        debug { "About to evaluate command: ${shellConfig.command}" }
         val command = evalString(transformedInput, shellConfig.command, "shell.command")
+
         debug { "Evaluated command: $command" }
 
         // Evaluate arguments if present
-        val arguments = shellConfig.arguments?.additionalProperties?.mapValues { (_, value) ->
-            evalString(transformedInput, value.toString(), "shell.arguments")
-        }
+        val arguments = shellConfig.arguments?.additionalProperties
+            ?.mapValues { (_, value) ->
+                evalString(transformedInput, value.toString(), "shell.arguments.value")
+            }
+            ?.mapKeys { (key, _) ->
+                evalString(transformedInput, key.toString(), "shell.arguments.key")
+            }
 
         // Evaluate environment variables if present
         val environment = shellConfig.environment?.additionalProperties?.mapValues { (_, value) ->
@@ -63,8 +68,9 @@ class RunInstance(
         debug { "Shell command: $command" }
         debug { "Arguments: $arguments" }
         debug { "Environment: $environment" }
-        val awaitCompletion = true  // Default to await completion
-        val returnType = STDOUT  // Default to stdout return type
+
+        val awaitCompletion = runShell.isAwait
+        val returnType = runShell.`return` ?: STDOUT  // Default to stdout return type
 
         debug { "Await: $awaitCompletion" }
         debug { "Return: $returnType" }
@@ -84,25 +90,21 @@ class RunInstance(
                 debug { "stderr: ${result.stderr}" }
             }
 
-            // Configure output based on return type
-            rawOutput = LemlineJson.encodeToElement(
-                when (returnType) {
-                    STDOUT -> result.stdout
-                    STDERR -> result.stderr
-                    CODE -> result.code
-                    ALL -> mapOf(
-                        "code" to result.code,
-                        "stdout" to result.stdout,
-                        "stderr" to result.stderr
+            // Configure output based on the return type
+            rawOutput = when (returnType) {
+                STDOUT -> JsonPrimitive(result.stdout)
+                STDERR -> JsonPrimitive(result.stderr)
+                CODE -> JsonPrimitive(result.code)
+                ALL -> JsonObject(
+                    mapOf(
+                        "code" to JsonPrimitive(result.code),
+                        "stdout" to JsonPrimitive(result.stdout),
+                        "stderr" to JsonPrimitive(result.stderr)
                     )
+                )
 
-                    NONE -> null
-                    else -> error(
-                        RUNTIME,
-                        "Unsupported return type: $returnType"
-                    )
-                }
-            )
+                NONE -> JsonNull
+            }
 
             // Throw exception if command failed (non-zero exit code) and we're awaiting completion
             if (awaitCompletion && result.code != 0) {

@@ -27,13 +27,14 @@ class RunShellTest {
               - echoHello:
                   run:
                     shell:
-                      command: \"echo\"
+                      command: echo
                       arguments:
-                        "Hello": .name
+                        "Hello": @{ .name }
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -41,7 +42,7 @@ class RunShellTest {
 
         // Assert the output contains the expected stdout (default return type)
         val output = instance.rootInstance.transformedOutput.toString()
-        assertTrue(output.contains("Hello World"))
+        assertTrue(output.contains("Hello World"), "output shouldBe \"Hello World\" but is $output")
     }
 
     @Test
@@ -58,7 +59,8 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -82,7 +84,8 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -108,7 +111,8 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -134,7 +138,8 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -160,17 +165,20 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
         instance.status shouldBe WorkflowStatus.COMPLETED
 
         // Assert the output contains all fields
-        val expectedOutput = mapOf(
-            "code" to 5,
-            "stdout" to "stdout",
-            "stderr" to "stderr"
+        val expectedOutput = JsonObject(
+            mapOf(
+                "code" to JsonPrimitive(5),
+                "stdout" to JsonPrimitive("stdout"),
+                "stderr" to JsonPrimitive("stderr")
+            )
         )
         assertEquals(LemlineJson.encodeToElement(expectedOutput), instance.rootInstance.transformedOutput)
     }
@@ -188,7 +196,8 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -214,7 +223,8 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -243,7 +253,8 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -261,11 +272,12 @@ class RunShellTest {
               - expressionEcho:
                   run:
                     shell:
-                      command: echo ${'$'}{ .greeting }
+                      command: @{ "echo " + . }
         """
         val instance = getWorkflowInstance(workflowYaml, JsonPrimitive("Hello Expression"))
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -285,8 +297,8 @@ class RunShellTest {
                     shell:
                       command: echo
                       arguments:
-                        "${'$'}{ .prefix }": ""
-                        "${'$'}{ .suffix }": ""
+                        @{ .prefix }: ""
+                        @{ .suffix }: ""
         """
         val input = JsonObject(
             mapOf(
@@ -296,16 +308,15 @@ class RunShellTest {
         )
         val instance = getWorkflowInstance(workflowYaml, input)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
         instance.status shouldBe WorkflowStatus.COMPLETED
 
         // Assert the output contains both values
-        val output = instance.rootInstance.transformedOutput.toString()
-        assertTrue(output.contains("Hello"))
-        assertTrue(output.contains("World"))
+        assertEquals(JsonPrimitive("Hello World"), instance.rootInstance.transformedOutput)
     }
 
     @Test
@@ -318,13 +329,14 @@ class RunShellTest {
                     shell:
                       command: sh
                       arguments:
-                        "-c": echo ${'$'}DYNAMIC_VAR
+                        "-c": echo @DYNAMIC_VAR
                       environment:
-                        DYNAMIC_VAR: ${'$'}{ .value }
+                        DYNAMIC_VAR: @{ . }
         """
         val instance = getWorkflowInstance(workflowYaml, JsonPrimitive("Dynamic Value"))
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -349,7 +361,8 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully even though command failed
@@ -373,7 +386,8 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -399,7 +413,9 @@ class RunShellTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
@@ -420,7 +436,7 @@ class RunShellTest {
                       command: echo
                       arguments:
                         "Processing:": ""
-                        "${'$'}{ .data }": ""
+                        @{ .data }: ""
         """
         val input = JsonObject(
             mapOf(
@@ -429,7 +445,8 @@ class RunShellTest {
         )
         val instance = getWorkflowInstance(workflowYaml, input)
 
-        // Run the workflow
+        // Run the workflow twice (2 messages)
+        instance.run()
         instance.run()
 
         // Assert workflow completed successfully
