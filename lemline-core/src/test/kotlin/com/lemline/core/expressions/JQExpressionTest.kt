@@ -2,70 +2,71 @@
 package com.lemline.core.expressions
 
 import com.lemline.core.json.LemlineJson
-import com.lemline.core.set
+import com.lemline.core.json.toJsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class JQExpressionTest {
 
-    private val scope = LemlineJson.jsonObject
+    private val emptyScope = LemlineJson.jsonObject
 
     @Test
-    fun `test eval returns rawInput for NullNode`() {
-        val rawInput = LemlineJson.jsonObject.set("key", "value")
-        val fromNode = JsonNull
+    fun `test eval returns input for NullNode`() {
+        val input = """{"key": "value"}""".toJsonElement()
+        val filter = JsonNull
 
-        val result = JQExpression.eval(rawInput, fromNode, scope, false)
+        val result = JQExpression.eval(input, filter, emptyScope, false)
 
-        assertEquals(rawInput, result)
+        assertEquals(input, result)
     }
 
     @Test
     fun `test eval evaluates JsonPrimitive correctly`() {
-        val rawInput = LemlineJson.jsonObject.set("key", "value")
-        val fromNode = JsonPrimitive(".key")
+        val input = """{"key": "value"}""".toJsonElement()
+        val filter = JsonPrimitive(".key")
 
         assertEquals(
             JsonPrimitive("value"),
-            JQExpression.eval(rawInput, fromNode, scope, true),
+            JQExpression.eval(input, filter, emptyScope, true),
         )
 
         assertEquals(
-            fromNode,
-            JQExpression.eval(rawInput, fromNode, scope, false),
+            filter,
+            JQExpression.eval(input, filter, emptyScope, false),
         )
 
         assertEquals(
             JsonPrimitive("value"),
-            JQExpression.eval(rawInput, JsonPrimitive("\${.key}"), scope, false),
+            JQExpression.eval(input, JsonPrimitive("\${.key}"), emptyScope, false),
         )
     }
 
     @Test
     fun `test eval processes ObjectNode correctly`() {
-        val rawInput = LemlineJson.jsonObject.set("key", "value")
-        val fromNode = LemlineJson.jsonObject.set("field", ".key")
+        val input = """{"key": "value"}""".toJsonElement()
+        val filter = """{"field": ".key"}""".toJsonElement()
 
-        val expected = LemlineJson.jsonObject.set("field", "value")
-        val result = JQExpression.eval(rawInput, fromNode, scope, true)
+        val result = JQExpression.eval(input, filter, emptyScope, true)
 
+        val expected = """{"field": "value"}""".toJsonElement()
         assertEquals(expected, result)
     }
 
     @Test
     fun `test eval with scope variable influences output`() {
-        val input = LemlineJson.jsonObject.set("key", "value")
+        val input = """{"key": "value"}""".toJsonElement()
 
         // JQ expression to extract and concatenate the value of "key" with a scoped variable "scopedKey"
-        val expression = ".key + \$scopedKey"
+        val filter = ".key + \$scopedKey"
 
         // Scope to override the value of "$scopedKey"
-        val customScope = LemlineJson.jsonObject.set("scopedKey", JsonPrimitive("ScopedValue"))
+        val customScope = """{"scopedKey": "ScopedValue"}""".toJsonElement() as JsonObject
 
         // Use the custom scope in the evaluation
-        val result = JQExpression.eval(input, expression, customScope)
+        val result = JQExpression.eval(input, filter, customScope)
 
         // Ensure the concat value is returned
         assertEquals(JsonPrimitive("valueScopedValue"), result)
@@ -73,17 +74,16 @@ class JQExpressionTest {
 
     @Test
     fun `test eval with scope object influences output`() {
-        val input = LemlineJson.jsonObject.set("key", "value")
+        val input = """{"key": "value"}""".toJsonElement()
 
         // JQ expression to extract and concatenate the value of "key" with a scoped variable "scopedKey"
-        val expression = ".key + \$scopedObject.scopedKey"
+        val filter = ".key + \$scopedObject.scopedKey"
 
         // Scope to override the value of "$scopedKey"
-        val customScope =
-            LemlineJson.jsonObject.set("scopedObject", LemlineJson.jsonObject.set("scopedKey", "ScopedValue"))
+        val customScope = """{"scopedObject": {"scopedKey": "ScopedValue"}}""".toJsonElement() as JsonObject
 
         // Use the custom scope in the evaluation
-        val result = JQExpression.eval(input, expression, customScope)
+        val result = JQExpression.eval(input, filter, customScope)
 
         // Ensure the concat value is returned
         assertEquals(JsonPrimitive("valueScopedValue"), result)
