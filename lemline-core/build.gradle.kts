@@ -6,6 +6,29 @@ plugins {
     alias(libs.plugins.kotlinPluginSerialization)
 }
 
+/**
+ * Configures the `test` task for the project.
+ *
+ * - **JUnit Platform**: Specifies that the JUnit Platform (used for JUnit 5) should be used to execute the tests.
+ * - **Test Logging**:
+ *   - Logs events for passed, skipped, and failed tests.
+ *   - Displays standard output and error streams in the logs.
+ *   - Ensures exceptions, stack traces, and root causes are logged.
+ *   - Uses the full exception format for detailed debugging information.
+ */
+tasks.test {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+        showStandardStreams = true
+        showExceptions = true
+        showStackTraces = true
+        showCauses = true
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        showStandardStreams = true
+    }
+}
+
 dependencies {
     implementation(project(":lemline-common"))
 
@@ -35,4 +58,8 @@ dependencies {
     testImplementation("io.kotest:kotest-framework-api")
     testImplementation(libs.mockk)
     testImplementation("io.ktor:ktor-client-mock")
+
+    // Logging for tests
+    testImplementation("io.github.oshai:kotlin-logging-jvm:7.0.7")
+    testImplementation("ch.qos.logback:logback-classic:1.5.18")
 }
