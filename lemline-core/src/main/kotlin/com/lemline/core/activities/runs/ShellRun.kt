@@ -19,22 +19,62 @@ data class ShellRun(
 ) {
 
     /**
-     * Executes the shell command with the specified arguments and environment variables.
+     * Parses a command string into a list of arguments, handling quoted strings.
      *
-     * @return A [ProcessResult] containing the exit code, standard output, and standard error of the command execution.
-     * @throws IOException If an I/O error occurs during command execution.
+     * This method splits the input command string into individual arguments, respecting quoted sections.
+     * Quoted strings are treated as a single argument, and spaces outside quotes are used as delimiters.
+     *
+     * @param input The command string to parse. Defaults to the `command` property of the class.
+     * @return A list of strings representing the parsed arguments.
      */
-    fun execute(): ProcessResult {
-        val processBuilder = ProcessBuilder()
+    internal fun parseCommand(input: String = this.command): List<String> {
+        if (input.isBlank()) return emptyList()
 
-        // Build the full command with arguments
-        val fullCommand = mutableListOf<String>()
-        fullCommand.add(command)
+        val result = mutableListOf<String>()
+        var inQuotes = false
+        var currentArg = StringBuilder()
+
+        input.forEach { c ->
+            when {
+                c == '\"' -> inQuotes = !inQuotes
+                c == ' ' && !inQuotes -> {
+                    if (currentArg.isNotEmpty()) {
+                        result.add(currentArg.toString())
+                        currentArg = StringBuilder()
+                    }
+                }
+
+                else -> currentArg.append(c)
+            }
+        }
+
+        if (currentArg.isNotEmpty()) {
+            result.add(currentArg.toString())
+        }
+
+        return result
+    }
+
+    /**
+     * Builds the full command list by combining the parsed command and additional arguments.
+     *
+     * @return List containing the full command and all its arguments.
+     */
+    private fun buildCommandList(): List<String> {
+        val fullCommand = parseCommand(command).toMutableList()
+
+        // Add additional arguments from the arguments map
         arguments?.forEach { (key, value) ->
             fullCommand.add(key)
-            fullCommand.add(value)
+            if (value.isNotBlank()) fullCommand.add(value)
         }
-        processBuilder.command(fullCommand)
+
+        return fullCommand
+    }
+
+    fun execute(): ProcessResult {
+        val processBuilder = ProcessBuilder()
+        processBuilder.command(buildCommandList())
 
         // Set environment variables if provided
         environment?.let {
