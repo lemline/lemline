@@ -6,6 +6,7 @@ import com.lemline.runner.tests.profiles.MySQLProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import org.junit.jupiter.api.TestInstance
+import org.testcontainers.junit.jupiter.EnabledIfDockerAvailable
 
 /**
  * Runs the RetryRepositoryTest suite against a MySQL database.
@@ -13,4 +14,5 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(MySQLProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@EnabledIfDockerAvailable
 internal class MySQLRetryRepositoryTest : RetryRepositoryTest()

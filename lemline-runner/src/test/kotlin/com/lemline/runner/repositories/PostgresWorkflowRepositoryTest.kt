@@ -6,6 +6,7 @@ import com.lemline.runner.tests.profiles.PostgresProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import org.junit.jupiter.api.TestInstance
+import org.testcontainers.junit.jupiter.EnabledIfDockerAvailable
 
 /**
  * Runs the WorkflowRepositoryTest suite against a PostgresSQL database.
@@ -13,4 +14,5 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(PostgresProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@EnabledIfDockerAvailable
 internal class PostgresWorkflowRepositoryTest : WorkflowRepositoryTest()

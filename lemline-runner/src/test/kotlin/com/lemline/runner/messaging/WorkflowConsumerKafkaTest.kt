@@ -16,6 +16,7 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
+import org.testcontainers.junit.jupiter.EnabledIfDockerAvailable
 
 /**
  * Runs the WorkflowConsumerTest suite against a Kafka broker.
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Tag
 @QuarkusTest
 @TestProfile(KafkaProfile::class)
 @Tag("integration")
+@EnabledIfDockerAvailable
 internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 
     @ConfigProperty(name = "kafka.bootstrap.servers")
