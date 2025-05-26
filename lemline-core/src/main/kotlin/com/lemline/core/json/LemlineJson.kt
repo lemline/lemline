@@ -50,12 +50,14 @@ object LemlineJson {
 
     // Configure a kotlinx.serialization.Json instance with the module
     val json = Json {
+        isLenient = true
         ignoreUnknownKeys = true
         encodeDefaults = false
         serializersModule = module
     }
 
     val jsonPretty = Json {
+        isLenient = true
         ignoreUnknownKeys = true
         encodeDefaults = false
         serializersModule = module
