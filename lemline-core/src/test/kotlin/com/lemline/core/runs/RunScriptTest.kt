@@ -33,7 +33,7 @@ class RunScriptTest {
             function greet(name) {
                 return 'Hello, ' + name + '!';
             }
-            
+
             // For testing, we'll just use a hardcoded name
             console.log(greet('TestUser'));
             // Write some output to stderr for testing
@@ -109,7 +109,7 @@ class RunScriptTest {
                       language: js
                       code: |
                         // This will cause a syntax error
-                        const x 
+                        const x
                         console.log('This will not run');
                     return: stderr
         """.trimIndent()
@@ -197,7 +197,7 @@ class RunScriptTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should execute script with await false`() = runTest {
+    fun `should execute script with await true`() = runTest {
         val file = tempDir.resolve("async_complete.txt").absolutePathString()
         val workflowYaml = """
             do:
@@ -206,15 +206,14 @@ class RunScriptTest {
                     script:
                       language: js
                       code: >
-                        const fs = require('fs');
+                        const fs = await import('fs');
                         fs.writeFileSync('$file', 'done');
-                    await: false
               - verifyAsync:
                   run:
                     script:
                       language: js
                       code: >
-                        const fs = require('fs');
+                        const fs = await import('fs');
                         const fileExists = fs.existsSync('$file');
                         console.log(`File exists: ` + fileExists);
         """.trimIndent()
@@ -229,6 +228,47 @@ class RunScriptTest {
         val output = instance.rootInstance.transformedOutput.toString()
         assertTrue(
             output.contains("File exists: true"),
+            "Async script should have created the file"
+        )
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `should execute script with await false`() = runTest {
+        val file = tempDir.resolve("async_complete.txt").absolutePathString()
+        val workflowYaml = """
+            do:
+              - runAsync:
+                  run:
+                    script:
+                      language: js
+                      code: >
+                        const fs = await import('fs');
+                        // wait for 100ms
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                        fs.writeFileSync('$file', 'done');
+                    await: false
+              - verifyAsync:
+                  run:
+                    script:
+                      language: js
+                      code: >
+                        const fs = await import('fs');
+                        const fileExists = fs.existsSync('$file');
+                        console.log(`File exists: ` + fileExists);
+        """.trimIndent()
+
+        println(workflowYaml)
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        instance.run()
+        instance.run()
+        instance.run()
+
+        instance.status shouldBe WorkflowStatus.COMPLETED
+        val output = instance.rootInstance.transformedOutput.toString()
+        println("Output: $output")
+        assertTrue(
+            output.contains("File exists: false"),
             "Async script should have created the file"
         )
     }

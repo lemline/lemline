@@ -72,7 +72,16 @@ data class ShellRun(
         return fullCommand
     }
 
-    fun execute(): ProcessResult {
+    /**
+     * Executes the shell command asynchronously.
+     *
+     * This method prepares a `ProcessBuilder` with the full command and any provided environment variables,
+     * then starts the process and returns the resulting [Process] object immediately.
+     * The caller is responsible for managing the process lifecycle (e.g., waiting for completion, reading output).
+     *
+     * @return The [Process] object representing the running shell command.
+     */
+    fun executeAsync(): Process {
         val processBuilder = ProcessBuilder()
         processBuilder.command(buildCommandList())
 
@@ -84,10 +93,23 @@ data class ShellRun(
             }
         }
 
-        // Start the process
-        val process = processBuilder.start()
+        // Start the process and return it immediately
+        return processBuilder.start()
+    }
 
-        // Capture standard output and error streams
+    /**
+     * Executes the shell command synchronously and returns the result.
+     *
+     * This method:
+     * - Starts the process using the built command and environment.
+     * - Reads and collects all output from both stdout and stderr.
+     * - Waits up to 60 seconds for the process to complete.
+     * - Returns a [ProcessResult] containing the exit code, stdout, and stderr.
+     *
+     * @return [ProcessResult] with the process exit code, standard output, and standard error.
+     */
+    fun execute(): ProcessResult {
+        val process = executeAsync()
         val stdout = StringBuilder()
         val stderr = StringBuilder()
 

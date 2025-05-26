@@ -73,6 +73,13 @@ internal fun NodeInstance<*>.execute(runShell: RunShell): JsonElement {
             environment = environment
         )
 
+        if (!awaitCompletion) {
+            val process = shellRun.executeAsync()
+            debug { "Launched shell command asynchronously with PID: ${process.pid()}" }
+            // As per DSL, output for await: false is the transformed input
+            return transformedInput
+        }
+
         val result = shellRun.execute()
 
         debug { "Shell execution completed with exit code: ${result.code}" }
@@ -97,15 +104,6 @@ internal fun NodeInstance<*>.execute(runShell: RunShell): JsonElement {
             NONE -> JsonNull
         }
 
-        // Throw exception if the command failed (non-zero exit code) and we're awaiting completion
-        if (awaitCompletion && result.code != 0) {
-            error(
-                COMMUNICATION,
-                "Shell command failed with exit code ${result.code}: ${result.stderr}"
-            )
-        }
-
-        // output is already non-null as we handle all cases in the when expression
         return output
     } catch (e: Exception) {
         error(e) { "Failed to execute shell command" }
