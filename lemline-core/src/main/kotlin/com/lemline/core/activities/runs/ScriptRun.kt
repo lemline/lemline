@@ -52,7 +52,7 @@ data class ScriptRun(
      */
     private fun executeJavascriptAsync(): Process {
         val scriptFile = createAndWriteTempFile(".js")
-        return startProcess(NodeChecker.exec, scriptFile)
+        return startProcess(NodeChecker.exec ?: noNodeError(), scriptFile)
     }
 
     /**
@@ -60,7 +60,7 @@ data class ScriptRun(
      */
     private fun executePythonAsync(): Process {
         val scriptFile = createAndWriteTempFile(".py")
-        return startProcess(PythonChecker.exec, scriptFile)
+        return startProcess(PythonChecker.exec ?: noPythonError(), scriptFile)
     }
 
     /**
@@ -94,14 +94,20 @@ data class ScriptRun(
         )
     }
 
+    private fun noNodeError(): Nothing =
+        throw RuntimeException("Node.js executable not found. Please install Node.js >= 22.0.0 or set LEMLINE_NODE_EXEC to locate the Node.js executable.")
+
+    private fun noPythonError(): Nothing =
+        throw RuntimeException("Python executable not found. Please install Python 3.8+ or set LEMLINE_PYTHON_EXEC to locate the Python executable.")
+
     private fun executeJavascript(): ProcessResult = executeScriptSync(
         ext = ".js",
-        processStarter = { startProcess(NodeChecker.exec, it) }
+        processStarter = { startProcess(NodeChecker.exec ?: noNodeError(), it) }
     )
 
     private fun executePython(): ProcessResult = executeScriptSync(
         ext = ".py",
-        processStarter = { startProcess(PythonChecker.exec, it) }
+        processStarter = { startProcess(PythonChecker.exec ?: noPythonError(), it) }
     )
 
 
