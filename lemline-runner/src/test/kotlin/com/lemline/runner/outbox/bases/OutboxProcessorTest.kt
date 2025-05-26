@@ -63,7 +63,13 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
     // Mock and processor using the generic type T
     private val mockProcessorFunction = mockk<(T) -> Unit>()
-    private lateinit var outboxProcessor: OutboxProcessor<T>
+    private val outboxProcessor: OutboxProcessor<T> by lazy {
+        OutboxProcessor(
+            logger = LoggerFactory.getLogger(this::class.java),
+            repository = testRepository,
+            processor = mockProcessorFunction,
+        )
+    }
 
     // Default test configuration
     private val batchSize = 10
@@ -74,11 +80,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun setUp() = runTest {
         // Reset mock before each test, default to success
         every { mockProcessorFunction(any(modelClass)) } just Runs
-        outboxProcessor = OutboxProcessor(
-            logger = LoggerFactory.getLogger(this::class.java),
-            repository = testRepository,
-            processor = mockProcessorFunction,
-        )
+
         testRepository.deleteAll()
         delay(100)
     }
