@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
 import java.io.File
 import java.nio.file.Path
+import kotlin.io.path.absolutePathString
 import kotlin.test.assertTrue
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -193,5 +194,156 @@ class RunScriptTest {
             "Output should contain environment variable values but was: $output"
         )
     }
-    
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `should execute script with await false`() = runTest {
+        val file = tempDir.resolve("async_complete.txt").absolutePathString()
+        val workflowYaml = """
+            do:
+              - runAsync:
+                  run:
+                    script:
+                      language: js
+                      code: >
+                        const fs = require('fs');
+                        fs.writeFileSync('$file', 'done');
+                    await: false
+              - verifyAsync:
+                  run:
+                    script:
+                      language: js
+                      code: >
+                        const fs = require('fs');
+                        const fileExists = fs.existsSync('$file');
+                        console.log(`File exists: ` + fileExists);
+        """.trimIndent()
+
+        println(workflowYaml)
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        instance.run()
+        instance.run()
+        instance.run()
+
+        instance.status shouldBe WorkflowStatus.COMPLETED
+        val output = instance.rootInstance.transformedOutput.toString()
+        assertTrue(
+            output.contains("File exists: true"),
+            "Async script should have created the file"
+        )
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `should return stderr output`() = runTest {
+        val workflowYaml = """
+            do:
+              - runWithStderr:
+                  run:
+                    script:
+                      language: js
+                      code: >
+                        console.error('This is an error message');
+                        console.log('This is stdout');
+                        console.error('Another error');
+                    return: stderr
+        """.trimIndent()
+
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        instance.run()
+        instance.run()
+
+        instance.status shouldBe WorkflowStatus.COMPLETED
+        val output = instance.rootInstance.transformedOutput.toString()
+        assertTrue(
+            output.contains("This is an error message") &&
+                output.contains("Another error") &&
+                !output.contains("This is stdout"),
+            "Output should contain only stderr messages but was: $output"
+        )
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `should return exit code`() = runTest {
+        val workflowYaml = """
+            do:
+              - runWithExitCode:
+                  run:
+                    script:
+                      language: js
+                      code: >
+                        process.exit(42);
+                    return: code
+        """.trimIndent()
+
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        instance.run()
+        instance.run()
+
+        instance.status shouldBe WorkflowStatus.COMPLETED
+        val output = instance.rootInstance.transformedOutput.toString().trim()
+        assertTrue(
+            output == "42",
+            "Output should be the exit code 42 but was: $output"
+        )
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `should return all script outputs`() = runTest {
+        val workflowYaml = """
+            do:
+              - runWithAllOutputs:
+                  run:
+                    script:
+                      language: js
+                      code: >
+                        console.log('Standard output');
+                        console.error('Error output');
+                        process.exit(1);
+                    return: all
+        """.trimIndent()
+
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        instance.run()
+        instance.run()
+
+        instance.status shouldBe WorkflowStatus.COMPLETED
+        val output = instance.rootInstance.transformedOutput.toString()
+        // Accept both with and without trailing newlines
+        val normalizedOutput = output.replace("\\n", "").replace("\n", "")
+        assertTrue(
+            normalizedOutput.contains("\"stdout\":\"Standard output\"") &&
+                normalizedOutput.contains("\"stderr\":\"Error output\"") &&
+                normalizedOutput.contains("\"code\":1"),
+            "Output should contain all script outputs but was: $output"
+        )
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `should handle script errors with nonzero exit code`() = runTest {
+        val workflowYaml = """
+            do:
+              - runWithError:
+                  run:
+                    script:
+                      language: js
+                      code: >
+                        throw new Error('Intentional failure');
+                    return: all
+        """.trimIndent()
+
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        instance.run()
+        instance.run()
+
+        instance.status shouldBe WorkflowStatus.COMPLETED
+        val output = instance.rootInstance.transformedOutput.toString()
+        assertTrue(
+            output.contains("stderr") && output.contains("Intentional failure"),
+            "Output should contain error information but was: $output"
+        )
+    }
 }

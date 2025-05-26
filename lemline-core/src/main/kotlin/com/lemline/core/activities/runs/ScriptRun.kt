@@ -6,7 +6,6 @@ import java.io.InputStreamReader
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import java.util.concurrent.TimeUnit
 import kotlin.io.path.deleteIfExists
 
 /**
@@ -29,12 +28,10 @@ data class ScriptRun(
     /**
      * Executes the script and returns the result
      */
-    fun execute(): ProcessResult {
-        return when (language.lowercase()) {
-            "js" -> executeJavascript()
-            // Add more languages here as needed
-            else -> throw IllegalArgumentException("Unsupported script language: $language")
-        }
+    fun execute(): ProcessResult = when (language.lowercase()) {
+        "js" -> executeJavascript()
+        // Add more languages here as needed
+        else -> throw IllegalArgumentException("Unsupported script language: $language")
     }
 
     /**
@@ -89,9 +86,8 @@ data class ScriptRun(
                 stderr.append(line).append(System.lineSeparator())
             }
 
-            // Wait for process to complete
-            val completed = process.waitFor(1, TimeUnit.MINUTES)
-            val exitCode = if (completed) process.exitValue() else -1
+            // Wait for the process to complete
+            val exitCode = process.waitFor()
 
             return ProcessResult(
                 code = exitCode,
