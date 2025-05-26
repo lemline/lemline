@@ -87,6 +87,8 @@ dependencies {
     // ─────────────────────────────────────────────────────────────────────────
     // 4) Testing
     // ─────────────────────────────────────────────────────────────────────────
+    testImplementation(testFixtures(project(":lemline-common")))
+
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform(libs.kotest.bom))
     testImplementation("io.quarkus:quarkus-junit5")

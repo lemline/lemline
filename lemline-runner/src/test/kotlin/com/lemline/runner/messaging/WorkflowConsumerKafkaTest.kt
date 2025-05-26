@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
+import com.lemline.common.EnabledOnlyIfDockerAvailable
 import com.lemline.runner.messaging.bases.WorkflowConsumerTest
 import com.lemline.runner.tests.profiles.KafkaProfile
 import io.quarkus.test.junit.QuarkusTest
@@ -16,7 +17,6 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
-import org.testcontainers.junit.jupiter.EnabledIfDockerAvailable
 
 /**
  * Runs the WorkflowConsumerTest suite against a Kafka broker.
@@ -24,7 +24,7 @@ import org.testcontainers.junit.jupiter.EnabledIfDockerAvailable
 @QuarkusTest
 @TestProfile(KafkaProfile::class)
 @Tag("integration")
-@EnabledIfDockerAvailable
+@EnabledOnlyIfDockerAvailable
 internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 
     @ConfigProperty(name = "kafka.bootstrap.servers")
