@@ -58,7 +58,7 @@ class ScriptRunJavascriptTest {
         val scriptRun = ScriptRun(
             script = script,
             language = "js",
-            arguments = mapOf("name" to "TestUser")
+            arguments = mapOf("--name" to "TestUser")
         )
 
         // When
@@ -207,16 +207,16 @@ class ScriptRunJavascriptTest {
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `should throw exception for unsupported language`() = runTest {
         // Given
-        val script = "print('This is Python, but we'll say it's JavaScript')"
+        val script = "print('This is Python, but we'll say it's Elixir')"
         val scriptRun = ScriptRun(
             script = script,
-            language = "python"
+            language = "elixir"
         )
 
         // When / Then
         val exception = shouldThrow<IllegalArgumentException> {
             scriptRun.execute()
         }
-        exception.message shouldBe "Unsupported script language: python"
+        exception.message shouldBe "Unsupported script language: elixir"
     }
 }
