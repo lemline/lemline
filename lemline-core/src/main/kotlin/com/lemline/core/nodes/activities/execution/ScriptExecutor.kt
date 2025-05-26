@@ -106,6 +106,15 @@ internal fun NodeInstance<*>.execute(runScript: RunScript): JsonElement {
             workingDir = File(".").toPath()
         )
 
+        val await = runScript.isAwait
+        if (!await) {
+            // Launch process and return immediately (do not wait for completion)
+            val process = scriptRun.executeAsync()
+            debug { "Launched script asynchronously with PID: ${process.pid()}" }
+            // As per DSL, output for await: false is the transformed input
+            return transformedInput
+        }
+
         val processResult = scriptRun.execute()
 
         debug { "Script execution completed with exit code: ${processResult.code}" }
