@@ -5,12 +5,12 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
+import java.nio.file.Path
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.io.TempDir
-import java.nio.file.Path
 
 class ScriptRunTest {
 
@@ -25,7 +25,7 @@ class ScriptRunTest {
 
         val scriptRun = ScriptRun(
             script = script,
-            language = "javascript"
+            language = "js"
         )
 
         // When
@@ -57,7 +57,7 @@ class ScriptRunTest {
 
         val scriptRun = ScriptRun(
             script = script,
-            language = "javascript",
+            language = "js",
             arguments = mapOf("name" to "TestUser")
         )
 
@@ -83,7 +83,7 @@ class ScriptRunTest {
 
         val scriptRun = ScriptRun(
             script = script,
-            language = "javascript",
+            language = "js",
             environment = mapOf(
                 "GREETING" to "Welcome",
                 "NAME" to "User"
@@ -112,7 +112,7 @@ class ScriptRunTest {
 
         val scriptRun = ScriptRun(
             script = script,
-            language = "javascript"
+            language = "js"
         )
 
         // When
@@ -136,7 +136,7 @@ class ScriptRunTest {
 
         val scriptRun = ScriptRun(
             script = script,
-            language = "javascript"
+            language = "js"
         )
 
         // When
@@ -159,7 +159,7 @@ class ScriptRunTest {
 
         val scriptRun = ScriptRun(
             script = script,
-            language = "javascript"
+            language = "js"
         )
 
         // When
@@ -190,7 +190,7 @@ class ScriptRunTest {
 
         val scriptRun = ScriptRun(
             script = script,
-            language = "javascript",
+            language = "js",
             workingDir = tempDir
         )
 
