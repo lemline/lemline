@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.json
 
+import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
@@ -25,8 +26,14 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.contextual
 
 object LemlineJson {
+
     // Expose Jackson ObjectMapper - configure as needed
-    val jacksonMapper = ObjectMapper()
+    val jacksonMapper = ObjectMapper().apply {
+        configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true)
+        configure(JsonParser.Feature.ALLOW_SINGLE_QUOTES, true)
+        configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true)
+        configure(JsonParser.Feature.ALLOW_COMMENTS, true)
+    }
 
     // Expose Jackson YAMLMapper - configure as needed
     val yamlMapper = YAMLMapper()
@@ -43,15 +50,15 @@ object LemlineJson {
 
     // Configure a kotlinx.serialization.Json instance with the module
     val json = Json {
-        ignoreUnknownKeys = true
         isLenient = true
+        ignoreUnknownKeys = true
         encodeDefaults = false
         serializersModule = module
     }
 
     val jsonPretty = Json {
-        ignoreUnknownKeys = true
         isLenient = true
+        ignoreUnknownKeys = true
         encodeDefaults = false
         serializersModule = module
         prettyPrint = true

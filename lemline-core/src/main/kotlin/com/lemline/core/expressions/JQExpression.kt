@@ -4,13 +4,12 @@ package com.lemline.core.expressions
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import io.serverlessworkflow.impl.json.JsonUtils
 import net.thisptr.jackson.jq.Output
+import net.thisptr.jackson.jq.Scope as JQScope
 import net.thisptr.jackson.jq.Versions
 import net.thisptr.jackson.jq.exception.JsonQueryException
 import net.thisptr.jackson.jq.internal.javacc.ExpressionParser
-import net.thisptr.jackson.jq.Scope as JQScope
 
 /**
  * Object that provides functionality to evaluate JQ expressions.
@@ -31,8 +30,7 @@ object JQExpression : ExpressionEvaluator {
      */
     override fun eval(input: JsonNode, expr: String, scope: ObjectNode): JsonNode = try {
         val output = JsonNodeOutput()
-        val trimmedExpr = ExpressionUtils.trimExpr(expr)
-        ExpressionParser.compile(trimmedExpr, jqVersion).apply(scope.toJQScope(), input, output)
+        ExpressionParser.compile(expr, jqVersion).apply(scope.toJQScope(), input, output)
         output.result!!
     } catch (e: JsonQueryException) {
         throw IllegalArgumentException("Unable to evaluate content $input using expr $expr", e)
@@ -42,6 +40,8 @@ object JQExpression : ExpressionEvaluator {
      * Custom Output implementation to capture the result of the JQ expression evaluation.
      */
     private class JsonNodeOutput : Output {
+        private val mapper = JsonUtils.mapper()
+
         // The result of the JQ expression evaluation.
         var result: JsonNode? = null
 
@@ -54,7 +54,7 @@ object JQExpression : ExpressionEvaluator {
             result = when (result) {
                 null -> out
                 is ArrayNode -> (result as ArrayNode).add(out)
-                else -> JsonUtils.mapper().createArrayNode().add(result).add(out)
+                else -> mapper.createArrayNode().add(result).add(out)
             }
         }
     }

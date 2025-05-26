@@ -23,6 +23,9 @@ import java.util.*
 
 const val PRODUCER_ENABLED = "lemline.messaging.producer.enabled"
 const val CONSUMER_ENABLED = "lemline.messaging.consumer.enabled"
+const val DATABASE_TYPE = "lemline.database.type"
+const val MESSAGING_TYPE = "lemline.messaging.type"
+const val MIGRATE_AT_START = "lemline.database.migrate-at-start"
 
 /**
  * Type-safe configuration mapping for Lemline.
@@ -49,6 +52,7 @@ const val CONSUMER_ENABLED = "lemline.messaging.consumer.enabled"
  * @see LemlineConfigSourceFactory for configuration transformation
  * @see https://quarkus.io/guides/config-reference for Quarkus configuration details
  */
+@Suppress("unused")
 @ConfigMapping(prefix = "lemline")
 interface LemlineConfiguration {
     fun config(): Optional<String>
@@ -140,7 +144,7 @@ interface LemlineConfiguration {
 
     /**
      * PostgresSQL-specific configuration.
-     * Required when database.type is "postgresql".
+     * Required when the database type is "postgresql".
      */
     interface PostgreSQLConfig {
         @WithDefault("localhost")
@@ -163,7 +167,7 @@ interface LemlineConfiguration {
 
     /**
      * MySQL-specific configuration.
-     * Required when database.type is "mysql".
+     * Required when the database type is "mysql".
      */
     interface MySQLConfig {
         @WithDefault("localhost")

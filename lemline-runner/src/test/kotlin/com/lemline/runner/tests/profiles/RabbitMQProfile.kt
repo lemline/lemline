@@ -2,8 +2,10 @@
 package com.lemline.runner.tests.profiles
 
 import com.lemline.runner.config.CONSUMER_ENABLED
+import com.lemline.runner.config.DATABASE_TYPE
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
+import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.config.PRODUCER_ENABLED
 import com.lemline.runner.tests.resources.RabbitMQTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
@@ -27,10 +29,10 @@ class RabbitMQProfile : QuarkusTestProfile {
     override fun getConfigOverrides(): Map<String, String> {
         return mapOf(
             // Database configuration
-            "lemline.database.type" to DB_TYPE_IN_MEMORY,
+            DATABASE_TYPE to DB_TYPE_IN_MEMORY,
 
             // Messaging configuration
-            "lemline.messaging.type" to MSG_TYPE_RABBITMQ,
+            MESSAGING_TYPE to MSG_TYPE_RABBITMQ,
             CONSUMER_ENABLED to "true",
             PRODUCER_ENABLED to "true",
         )

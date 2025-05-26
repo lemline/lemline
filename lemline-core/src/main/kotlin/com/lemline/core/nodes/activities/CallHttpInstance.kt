@@ -13,8 +13,10 @@ import com.lemline.core.utils.toUrl
 import io.serverlessworkflow.api.types.CallHTTP
 import kotlinx.serialization.json.JsonElement
 
-class CallHttpInstance(override val node: Node<CallHTTP>, override val parent: NodeInstance<*>) :
-    NodeInstance<CallHTTP>(node, parent) {
+class CallHttpInstance(
+    override val node: Node<CallHTTP>,
+    override val parent: NodeInstance<*>
+) : NodeInstance<CallHTTP>(node, parent) {
 
     private val httpCall = HttpCall(this)
     private val logger = logger()

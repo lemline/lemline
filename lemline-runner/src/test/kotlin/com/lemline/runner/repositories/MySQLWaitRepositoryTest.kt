@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.common.EnabledOnlyIfDockerAvailable
 import com.lemline.runner.repositories.bases.WaitRepositoryTest
 import com.lemline.runner.tests.profiles.MySQLProfile
 import io.quarkus.test.junit.QuarkusTest
@@ -13,4 +14,5 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(MySQLProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@EnabledOnlyIfDockerAvailable
 internal class MySQLWaitRepositoryTest : WaitRepositoryTest()

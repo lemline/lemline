@@ -10,7 +10,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.Test
 
-class HttpWorkflowTest {
+class CallHttpTest {
 
     @Test
     fun `test basic GET request to JSONPlaceholder`() = runTest {

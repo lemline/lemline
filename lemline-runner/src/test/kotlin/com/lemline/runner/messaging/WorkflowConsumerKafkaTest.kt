@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
+import com.lemline.common.EnabledOnlyIfDockerAvailable
 import com.lemline.runner.messaging.bases.WorkflowConsumerTest
 import com.lemline.runner.tests.profiles.KafkaProfile
 import io.quarkus.test.junit.QuarkusTest
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Tag
 @QuarkusTest
 @TestProfile(KafkaProfile::class)
 @Tag("integration")
+@EnabledOnlyIfDockerAvailable
 internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 
     @ConfigProperty(name = "kafka.bootstrap.servers")
