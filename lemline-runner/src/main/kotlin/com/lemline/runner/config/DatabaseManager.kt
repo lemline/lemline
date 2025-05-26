@@ -21,7 +21,7 @@ class DatabaseManager {
     private val log = logger()
 
     @Inject
-    @ConfigProperty(name = LEMLINE_DATABASE_TYPE)
+    @ConfigProperty(name = DATABASE_TYPE)
     internal lateinit var dbType: String
 
     @Inject
