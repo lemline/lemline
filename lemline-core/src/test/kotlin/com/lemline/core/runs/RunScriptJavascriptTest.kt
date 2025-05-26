@@ -17,7 +17,7 @@ import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.io.TempDir
 
-class RunScriptTest {
+class RunScriptJavascriptTest {
 
     @TempDir
     lateinit var tempDir: Path
@@ -56,7 +56,7 @@ class RunScriptTest {
                   run:
                     script:
                       language: js
-                      code: >
+                      code: |
                         console.log('Hello, World!');
         """.trimIndent()
 
@@ -138,7 +138,7 @@ class RunScriptTest {
                   run:
                     script:
                       language: js
-                      code: >
+                      code: |
                         const [param1, param2, param3, param4] = process.argv.slice(2);
                         console.log(`Param1: ` + param1);
                         console.log(`Param2: ` + param2);
@@ -174,7 +174,7 @@ class RunScriptTest {
                   run:
                     script:
                       language: js
-                      code: >
+                      code: |
                         console.log(`CUSTOM_VAR: `+ process.env.CUSTOM_VAR);
                         console.log(`ANOTHER_VAR: `+ process.env.ANOTHER_VAR);
                       environment:
@@ -212,7 +212,7 @@ class RunScriptTest {
                   run:
                     script:
                       language: js
-                      code: >
+                      code: |
                         const fs = await import('fs');
                         const fileExists = fs.existsSync('$file');
                         console.log(`File exists: ` + fileExists);
@@ -252,7 +252,7 @@ class RunScriptTest {
                   run:
                     script:
                       language: js
-                      code: >
+                      code: |
                         const fs = await import('fs');
                         const fileExists = fs.existsSync('$file');
                         console.log(`File exists: ` + fileExists);
@@ -282,7 +282,7 @@ class RunScriptTest {
                   run:
                     script:
                       language: js
-                      code: >
+                      code: |
                         console.error('This is an error message');
                         console.log('This is stdout');
                         console.error('Another error');
@@ -312,7 +312,7 @@ class RunScriptTest {
                   run:
                     script:
                       language: js
-                      code: >
+                      code: |
                         process.exit(42);
                     return: code
         """.trimIndent()
@@ -338,7 +338,7 @@ class RunScriptTest {
                   run:
                     script:
                       language: js
-                      code: >
+                      code: |
                         console.log('Standard output');
                         console.error('Error output');
                         process.exit(1);
@@ -370,7 +370,7 @@ class RunScriptTest {
                   run:
                     script:
                       language: js
-                      code: >
+                      code: |
                         throw new Error('Intentional failure');
                     return: all
         """.trimIndent()

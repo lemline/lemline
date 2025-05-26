@@ -34,7 +34,7 @@ data class ScriptRun(
      */
     fun executeAsync(): Process = when (language.lowercase()) {
         "js" -> executeJavascriptAsync()
-        // Add more languages here as needed
+        "python" -> executePythonAsync()
         else -> throw IllegalArgumentException("Unsupported script language: $language")
     }
 
@@ -43,16 +43,105 @@ data class ScriptRun(
      */
     fun execute(): ProcessResult = when (language.lowercase()) {
         "js" -> executeJavascript()
-        // Add more languages here as needed
+        "python" -> executePython()
         else -> throw IllegalArgumentException("Unsupported script language: $language")
     }
 
-    private fun createAndWriteTempScriptFile(suffix: String = ".js"): Path {
-        val scriptFile = createTempScriptFile("script", suffix)
+    /**
+     * Executes the JavaScript script asynchronously.
+     */
+    private fun executeJavascriptAsync(): Process {
+        NodeVersionChecker.NODE_VERSION
+        val scriptFile = createAndWriteTempFile(".js")
+        return startJavascriptProcess(scriptFile)
+    }
+
+    /**
+     * Executes the Python script asynchronously.
+     */
+    private fun executePythonAsync(): Process {
+        PythonVersionChecker.PYTHON_VERSION
+        val scriptFile = createAndWriteTempFile(".py")
+        return startPythonProcess(scriptFile)
+    }
+
+    /**
+     * Executes the JavaScript script synchronously and returns the result.
+     */
+    private fun executeJavascript(): ProcessResult {
+        NodeVersionChecker.NODE_VERSION
+        val scriptFile = createAndWriteTempFile(".js")
+        val process = startJavascriptProcess(scriptFile)
+        val stdout = StringBuilder()
+        val stderr = StringBuilder()
+        val stdoutReader = BufferedReader(InputStreamReader(process.inputStream))
+        val stderrReader = BufferedReader(InputStreamReader(process.errorStream))
+        var line: String?
+        while (stdoutReader.readLine().also { line = it } != null) {
+            stdout.append(line).append(System.lineSeparator())
+        }
+        while (stderrReader.readLine().also { line = it } != null) {
+            stderr.append(line).append(System.lineSeparator())
+        }
+        val exitCode = process.waitFor()
+        return ProcessResult(
+            code = exitCode,
+            stdout = stdout.toString().trim(),
+            stderr = stderr.toString().trim()
+        )
+    }
+
+    /**
+     * Executes the Python script synchronously and returns the result.
+     */
+    private fun executePython(): ProcessResult {
+        PythonVersionChecker.PYTHON_VERSION
+        val scriptFile = createAndWriteTempFile(".py")
+        val process = startPythonProcess(scriptFile)
+        val stdout = StringBuilder()
+        val stderr = StringBuilder()
+        val stdoutReader = BufferedReader(InputStreamReader(process.inputStream))
+        val stderrReader = BufferedReader(InputStreamReader(process.errorStream))
+        var line: String?
+        while (stdoutReader.readLine().also { line = it } != null) {
+            stdout.append(line).append(System.lineSeparator())
+        }
+        while (stderrReader.readLine().also { line = it } != null) {
+            stderr.append(line).append(System.lineSeparator())
+        }
+        val exitCode = process.waitFor()
+        return ProcessResult(
+            code = exitCode,
+            stdout = stdout.toString().trim(),
+            stderr = stderr.toString().trim()
+        )
+    }
+
+    /**
+     * Creates a temporary file with the given prefix and suffix
+     */
+    private fun createTempScriptFile(suffix: String): Path =
+        Files.createTempFile("lemline-script-", suffix).apply { toFile().deleteOnExit() }
+
+    /**
+     * Creates a temporary script file with the given suffix, writes the script content to it,
+     * and returns the file path.
+     *
+     * @param suffix The file extension (e.g., ".js", ".py")
+     * @return The path to the created temporary script file
+     */
+    private fun createAndWriteTempFile(suffix: String): Path {
+        val scriptFile = createTempScriptFile(suffix)
         Files.writeString(scriptFile, script, StandardOpenOption.WRITE)
         return scriptFile
     }
 
+    /**
+     * Starts a JavaScript process using Node.js with the provided script file.
+     *
+     * @param scriptFile The path to the script file to execute
+     * @return The started Process object
+     */
     private fun startJavascriptProcess(scriptFile: Path): Process {
         val command = mutableListOf("node", scriptFile.toString())
         arguments?.forEach { (key, value) ->
@@ -79,74 +168,32 @@ data class ScriptRun(
     }
 
     /**
-     * Executes the JavaScript script asynchronously.
+     * Starts a Python process using the provided script file.
      *
-     * This method performs the following steps:
-     * 1. Creates a temporary file and writes the script content to it.
-     * 2. Prepares a `ProcessBuilder` to execute the script using Node.js, including any provided arguments and environment variables.
-     * 3. Starts the process and returns it immediately.
-     * 4. Registers a callback to delete the temporary script file once the process exits, ensuring cleanup.
-     *
-     * @return The [Process] object representing the running script.
+     * @param scriptFile The path to the script file to execute
+     * @return The started Process object
      */
-    private fun executeJavascriptAsync(): Process {
-        NodeVersionChecker.NODE_VERSION
-
-        val scriptFile = createAndWriteTempScriptFile()
-        return startJavascriptProcess(scriptFile)
-    }
-
-    /**
-     * Executes the JavaScript script synchronously and returns the result.
-     *
-     * This method performs the following steps:
-     * 1. Creates a temporary file and writes the script content to it.
-     * 2. Prepares a `ProcessBuilder` to execute the script using Node.js, including any provided arguments and environment variables.
-     * 3. Starts the process and captures both standard output and standard error streams.
-     * 4. Waits for the process to complete and collects the exit code, stdout, and stderr.
-     * 5. Deletes the temporary script file after execution, regardless of success or failure.
-     *
-     * @return [ProcessResult] containing the exit code, standard output, and standard error of the script execution.
-     */
-    private fun executeJavascript(): ProcessResult {
-        NodeVersionChecker.NODE_VERSION
-
-        val scriptFile = createAndWriteTempScriptFile()
-        val process = startJavascriptProcess(scriptFile)
-
-        val stdout = StringBuilder()
-        val stderr = StringBuilder()
-
-        val stdoutReader = BufferedReader(InputStreamReader(process.inputStream))
-        val stderrReader = BufferedReader(InputStreamReader(process.errorStream))
-
-        var line: String?
-        // Read standard output from the process
-        while (stdoutReader.readLine().also { line = it } != null) {
-            stdout.append(line).append(System.lineSeparator())
+    private fun startPythonProcess(scriptFile: Path): Process {
+        val command = mutableListOf("python3", scriptFile.toString())
+        arguments?.forEach { (key, value) ->
+            command.add(key)
+            if (value.isNotBlank()) command.add(value)
         }
-        // Read standard error from the process
-        while (stderrReader.readLine().also { line = it } != null) {
-            stderr.append(line).append(System.lineSeparator())
+        val processBuilder = ProcessBuilder(command)
+        workingDir?.let { processBuilder.directory(it.toFile()) }
+        environment?.let { env ->
+            val processEnv = processBuilder.environment()
+            env.forEach { (key, value) -> processEnv[key] = value }
         }
-
-        // Wait for the process to finish and get the exit code
-        val exitCode = process.waitFor()
-        return ProcessResult(
-            code = exitCode,
-            stdout = stdout.toString().trim(),
-            stderr = stderr.toString().trim()
-        )
-    }
-
-    /**
-     * Creates a temporary file with the given prefix and suffix
-     */
-    private fun createTempScriptFile(prefix: String, suffix: String): Path {
-        // Using a consistent prefix for all script files
-        @Suppress("UNUSED_PARAMETER") // prefix is kept for future use
-        return Files.createTempFile("lemline-script-", suffix).apply {
-            toFile().deleteOnExit()
+        return processBuilder.start().apply {
+            onExit()
+                .whenComplete { out, ex ->
+                    when (ex) {
+                        null -> log.debug { "Python process completed successfully with exit code ${exitValue()} and output $out" }
+                        else -> log.warn(ex) { "Python process terminated with an exception: ${ex.message}" }
+                    }
+                    scriptFile.deleteIfExists()
+                }
         }
     }
 }
