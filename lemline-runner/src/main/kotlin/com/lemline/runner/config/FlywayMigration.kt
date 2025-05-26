@@ -18,7 +18,7 @@ class FlywayMigration(
     @ConfigProperty(name = "quarkus.profile")
     val profile: String,
 
-    @ConfigProperty(name = "lemline.database.type")
+    @ConfigProperty(name = LEMLINE_DATABASE_TYPE)
     val db: String,
 
     @ConfigProperty(name = "lemline.database.migrate-at-start")

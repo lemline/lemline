@@ -23,6 +23,8 @@ import java.util.*
 
 const val PRODUCER_ENABLED = "lemline.messaging.producer.enabled"
 const val CONSUMER_ENABLED = "lemline.messaging.consumer.enabled"
+const val LEMLINE_DATABASE_TYPE = "lemline.database.type"
+const val LEMLINE_MESSAGING_TYPE = "lemline.messaging.type"
 
 /**
  * Type-safe configuration mapping for Lemline.
