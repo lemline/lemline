@@ -3,7 +3,6 @@ package com.lemline.runner.messaging
 
 import com.lemline.runner.messaging.bases.WorkflowConsumerTest
 import com.lemline.runner.tests.profiles.RabbitMQProfile
-import com.rabbitmq.client.CancelCallback
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
 import com.rabbitmq.client.ConnectionFactory
@@ -16,6 +15,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
+import org.testcontainers.junit.jupiter.EnabledIfDockerAvailable
 
 
 /**
@@ -24,6 +24,7 @@ import org.junit.jupiter.api.Tag
 @QuarkusTest
 @TestProfile(RabbitMQProfile::class)
 @Tag("integration")
+@EnabledIfDockerAvailable
 internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 
     @ConfigProperty(name = "rabbitmq-host")
@@ -86,7 +87,7 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
             println("Received message on output queue: ${String(delivery.body)}")
             deliveries.offer(delivery)
         }
-        channel.basicConsume(queueOut, true, deliverCallback, CancelCallback { })
+        channel.basicConsume(queueOut, true, deliverCallback) { }
     }
 
     override fun cleanupMessaging() {
