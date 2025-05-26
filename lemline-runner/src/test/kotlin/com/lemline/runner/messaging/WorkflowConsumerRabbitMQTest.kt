@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
+import com.lemline.common.EnabledOnlyIfDockerAvailable
 import com.lemline.runner.messaging.bases.WorkflowConsumerTest
 import com.lemline.runner.tests.profiles.RabbitMQProfile
 import com.rabbitmq.client.Channel
@@ -15,7 +16,6 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
-import org.testcontainers.junit.jupiter.EnabledIfDockerAvailable
 
 
 /**
@@ -24,7 +24,7 @@ import org.testcontainers.junit.jupiter.EnabledIfDockerAvailable
 @QuarkusTest
 @TestProfile(RabbitMQProfile::class)
 @Tag("integration")
-@EnabledIfDockerAvailable
+@EnabledOnlyIfDockerAvailable
 internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 
     @ConfigProperty(name = "rabbitmq-host")
