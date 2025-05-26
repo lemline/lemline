@@ -8,15 +8,15 @@ import com.lemline.common.warn
 internal object NodeChecker {
     private val log = logger()
 
-    val exec: String by lazy {
-        checkNodeExecAndVersion()
+    val exec: String? by lazy {
+        getNodeExecAndCheckVersion()
     }
 
     /**
      * Checks that the installed Node.js version supports ES2024 (>= 22.0.0).
      * If not, logs a warning and returns "0.0.0".
      */
-    private fun checkNodeExecAndVersion(): String {
+    private fun getNodeExecAndCheckVersion(): String? {
         // Allow override via environment variable or system property
         val nodeExec = System.getenv("LEMLINE_NODE_EXEC")
             ?: System.getProperty("lemline.node.exec")
@@ -37,10 +37,8 @@ internal object NodeChecker {
                 // Try next command
             }
         }
-        if (foundExec == null || version == null) {
-            log.warn { "Node.js executable not found. Please install Node.js >= 22.0.0 or set LEMLINE_NODE_EXEC to locate the Node.js executable." }
-            return ""
-        }
+        // If no Node.js executable found,  return null
+        if (foundExec == null || version == null) return null
         // Node.js version format: v22.1.0
         val versionPattern = Regex("v(\\d+)\\.(\\d+)\\.(\\d+)")
         val match = versionPattern.matchEntire(version)
@@ -59,4 +57,3 @@ internal object NodeChecker {
 
     }
 }
-

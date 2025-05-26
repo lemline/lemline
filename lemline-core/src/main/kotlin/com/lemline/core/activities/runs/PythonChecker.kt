@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.runs
 
 import com.lemline.common.logger
@@ -6,11 +7,15 @@ import com.lemline.common.warn
 object PythonChecker {
     private val log = logger()
 
-    val exec: String by lazy {
-        checkPythonExecAndVersion()
+    val exec: String? by lazy {
+        getPythonExecAndCheckVersion()
     }
 
-    private fun checkPythonExecAndVersion(): String {
+    /**
+     * Checks that the installed Python version supports the required features (>= 3.8).
+     * If not, logs a warning and returns an empty string.
+     */
+    private fun getPythonExecAndCheckVersion(): String? {
         val pythonExec = System.getenv("LEMLINE_PYTHON_EXEC")
             ?: System.getProperty("lemline.python.exec")
             ?: "python3"
@@ -27,13 +32,12 @@ object PythonChecker {
                     break
                 }
             } catch (_: Exception) {
-                // Try next command
+                // Try the next command
             }
         }
-        if (foundExec == null || versionOutput == null) {
-            log.warn { "Python executable not found. Please install Python 3.8+ or set LEMLINE_PYTHON_EXEC to locate the Python executable." }
-            return ""
-        }
+        // If no Python executable found, return null
+        if (foundExec == null || versionOutput == null) return null
+        // Python version format: Python 3.8.10
         val versionPattern = Regex("Python (\\d+)\\.(\\d+)\\.(\\d+)")
         val match = versionPattern.find(versionOutput)
         if (match != null) {
