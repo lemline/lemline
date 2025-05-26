@@ -13,7 +13,7 @@ import kotlin.io.path.deleteIfExists
  * Represents a script execution with support for multiple scripting languages.
  *
  * @property script The script content to execute
- * @property language The script language (e.g., "javascript", "python")
+ * @property language The script language (e.g., "js", "python")
  * @property arguments Arguments to pass to the script
  * @property environment Environment variables for the script execution
  * @property workingDir Optional working directory for script execution
@@ -31,7 +31,7 @@ data class ScriptRun(
      */
     fun execute(): ProcessResult {
         return when (language.lowercase()) {
-            "javascript" -> executeJavascript()
+            "js" -> executeJavascript()
             // Add more languages here as needed
             else -> throw IllegalArgumentException("Unsupported script language: $language")
         }
