@@ -107,7 +107,6 @@ class RunShellTest {
                       arguments:
                         "-c": echo Error message >&2
                     return: stderr
-                    await: false
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
@@ -134,7 +133,6 @@ class RunShellTest {
                       arguments:
                         "-c": exit 42
                     return: code
-                    await: false
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
@@ -161,7 +159,6 @@ class RunShellTest {
                       arguments:
                         "-c": echo stdout; echo stderr >&2; exit 5
                     return: all
-                    await: false
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
@@ -359,7 +356,7 @@ class RunShellTest {
                         "-c": exit 1
                     await: false
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowInstance(workflowYaml, JsonPrimitive(42))
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -368,8 +365,8 @@ class RunShellTest {
         // Assert workflow completed successfully even though command failed
         instance.status shouldBe WorkflowStatus.COMPLETED
 
-        // Assert the output is empty stdout (since await=false, no exception thrown)
-        assertEquals(JsonPrimitive(""), instance.rootInstance.transformedOutput)
+        // Assert the output is the input stdout (since await=false, no exception thrown)
+        assertEquals(JsonPrimitive(42), instance.rootInstance.transformedOutput)
     }
 
     @Test

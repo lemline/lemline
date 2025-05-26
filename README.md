@@ -159,7 +159,7 @@ Currently implemented features are:
 - [x] Wait
 - Run:
     - [ ] Container
-    - [ ] Script
+    - [x] Script
     - [x] Shell
     - [ ] Workflow
 - Call:
