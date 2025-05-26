@@ -51,7 +51,7 @@ data class ScriptRun(
 
             // Add arguments to the command
             arguments?.forEach { (key, value) ->
-                command.add("--$key")
+                command.add(key)
                 if (value.isNotBlank()) command.add(value)
             }
 

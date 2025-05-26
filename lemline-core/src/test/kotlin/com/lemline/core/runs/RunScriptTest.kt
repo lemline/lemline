@@ -127,4 +127,71 @@ class RunScriptTest {
             "Output should contain a syntax error but was: $output"
         )
     }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `should execute script with parameters`() = runTest {
+        val workflowYaml = """
+            do:
+              - runWithParams:
+                  run:
+                    script:
+                      language: js
+                      code: >
+                        const [param1, param2, param3, param4] = process.argv.slice(2);
+                        console.log(`Param1: ` + param1);
+                        console.log(`Param2: ` + param2);
+                        console.log(`Param3: ` + param3);
+                        console.log(`Param4: ` + param4);
+                      arguments:
+                        "key1": "value1"
+                        "key2": "value2"
+        """.trimIndent()
+
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        instance.run()
+        instance.run()
+
+        instance.status shouldBe WorkflowStatus.COMPLETED
+        val output = instance.rootInstance.transformedOutput.toString()
+
+        assertTrue(
+            output.contains("Param1: key1") &&
+                output.contains("Param2: value1") &&
+                output.contains("Param3: key2") &&
+                output.contains("Param4: value2"),
+            "Output should contain all parameter values but was: $output"
+        )
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX, OS.MAC)
+    fun `should execute script with environment variables`() = runTest {
+        val workflowYaml = """
+            do:
+              - runWithEnv:
+                  run:
+                    script:
+                      language: js
+                      code: >
+                        console.log(`CUSTOM_VAR: `+ process.env.CUSTOM_VAR);
+                        console.log(`ANOTHER_VAR: `+ process.env.ANOTHER_VAR);
+                      environment:
+                        CUSTOM_VAR: "test-value"
+                        ANOTHER_VAR: "12345"
+        """.trimIndent()
+
+        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        instance.run()
+        instance.run()
+
+        instance.status shouldBe WorkflowStatus.COMPLETED
+        val output = instance.rootInstance.transformedOutput.toString()
+
+        assertTrue(
+            output.contains("CUSTOM_VAR: test-value") && output.contains("ANOTHER_VAR: 12345"),
+            "Output should contain environment variable values but was: $output"
+        )
+    }
+    
 }
