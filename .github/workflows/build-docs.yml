@@ -3,6 +3,8 @@ name: Build and Deploy Writerside Documentation
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'lemline-docs/**'
   workflow_dispatch:
 
 permissions:
@@ -15,7 +17,22 @@ env:
   DOCKER_VERSION: '2025.04.8412'  # Use the latest Writerside Docker version
 
 jobs:
+  check_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      docs_changed: ${{ steps.filter.outputs.docs_changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docs_changed:
+              - 'lemline-docs/**'
+
   build:
+    needs: check_changes
+    if: needs.check_changes.outputs.docs_changed == 'true'
     runs-on: ubuntu-latest
     outputs:
       artifact: ${{ steps.define-ids.outputs.artifact }}
