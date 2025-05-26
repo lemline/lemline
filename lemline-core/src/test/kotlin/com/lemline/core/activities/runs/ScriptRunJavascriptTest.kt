@@ -12,7 +12,7 @@ import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.io.TempDir
 
-class ScriptRunTest {
+class ScriptRunJavascriptTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)

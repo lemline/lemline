@@ -13,17 +13,38 @@ internal object NodeVersionChecker {
     /**
      * Checks that the installed Node.js version supports ES2024 (>= 22.0.0). Logs a warning if not.
      */
-    private fun checkNodeVersionForES2024(): String = try {
-        val process = ProcessBuilder("node", "--version").start()
-        val version = process.inputStream.bufferedReader().readText().trim()
+    private fun checkNodeVersionForES2024(): String {
+        // Allow override via environment variable or system property
+        val nodeExec = System.getenv("LEMLINE_NODE_EXEC")
+            ?: System.getProperty("lemline.node.exec")
+            ?: "node"
+        val commandsToTry = setOf(nodeExec, "node")
+        var version: String? = null
+        var found = false
+        for (cmd in commandsToTry) {
+            try {
+                val process = ProcessBuilder(cmd, "--version").redirectErrorStream(true).start()
+                val output = process.inputStream.bufferedReader().readText().trim()
+                if (output.isNotBlank()) {
+                    version = output
+                    found = true
+                    break
+                }
+            } catch (_: Exception) {
+                // Try next command
+            }
+        }
+        if (!found || version == null) {
+            log.warn { "Node.js executable not found. Please install Node.js >= 22.0.0 or set LEMLINE_NODE_EXEC." }
+            return "0.0.0"
+        }
         val versionPattern = Regex("v(\\d+)\\.(\\d+)\\.(\\d+)") // Node.js version format: v22.1.0
         val match = versionPattern.matchEntire(version)
-        when (match) {
+        return when (match) {
             null -> {
                 log.warn { "Node.js version '$version' does not match expected format. Cannot verify ES2024 compatibility." }
                 "0.0.0"
             }
-
             else -> {
                 log.debug { "Detected Node.js version: '$version'" }
                 val (major, minor, patch) = match.destructured
@@ -37,8 +58,6 @@ internal object NodeVersionChecker {
                 "$majorInt.$minorInt.$patchInt"
             }
         }
-    } catch (e: Exception) {
-        log.warn(e) { "Failed to check Node.js version for ES2024 compatibility." }
-        "0.0.0"
     }
 }
+
