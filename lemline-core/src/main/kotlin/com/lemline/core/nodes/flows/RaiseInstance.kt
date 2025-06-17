@@ -17,7 +17,7 @@ class RaiseInstance(override val node: Node<RaiseTask>, override val parent: Nod
 
     private val error by lazy { node.task.raise.error.getError() }
 
-    override suspend fun execute() {
+    override suspend fun run() {
         val error = WorkflowError(
             type = error.getErrorType(),
             status = error.status,

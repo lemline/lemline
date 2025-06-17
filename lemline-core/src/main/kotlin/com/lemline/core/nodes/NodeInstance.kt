@@ -83,9 +83,8 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     internal val rootInstance: RootInstance by lazy {
         when (this) {
             is RootInstance -> this
-            else ->
-                parent?.rootInstance
-                    ?: error(RUNTIME, "$this is not root, but does not have a parent")
+            else -> parent?.rootInstance
+                ?: error(RUNTIME, "$this is not root, but does not have a parent")
         }
     }
 
@@ -326,7 +325,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         return transformedInput
     }
 
-    open suspend fun execute() {
+    open suspend fun run() {
         this.rawOutput = transformedInput
     }
 

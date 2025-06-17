@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.nodes.activities.execution
+package com.lemline.core.nodes.activities.runners
 
 import com.lemline.core.activities.runs.ShellRun
 import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
@@ -15,8 +15,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-internal fun NodeInstance<*>.execute(runShell: RunShell): JsonElement {
-    info { "Executing shell command: ${node.name}" }
+internal fun NodeInstance<*>.run(runShell: RunShell): JsonElement {
+    info { "Executing run shell command: ${node.name}" }
 
     val shellConfig = runShell.shell
     debug { "Shell config: $shellConfig" }

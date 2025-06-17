@@ -21,7 +21,7 @@ class CallHttpInstance(
     private val httpCall = HttpCall(this)
     private val logger = logger()
 
-    override suspend fun execute() {
+    override suspend fun run() {
         logger.info("Executing HTTP call: ${node.name}")
 
         val httpArgs = node.task.with

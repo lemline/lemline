@@ -9,7 +9,7 @@ import io.serverlessworkflow.api.types.SetTask
 class SetInstance(override val node: Node<SetTask>, override val parent: NodeInstance<*>) :
     NodeInstance<SetTask>(node, parent) {
 
-    override suspend fun execute() {
+    override suspend fun run() {
         // set raw output
         rawOutput = eval(transformedInput, LemlineJson.encodeToElement(node.task.set))
     }

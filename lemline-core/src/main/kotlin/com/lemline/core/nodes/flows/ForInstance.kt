@@ -39,11 +39,11 @@ class ForInstance(override val node: Node<ForTask>, override val parent: NodeIns
         super.reset()
     }
 
-    override suspend fun execute() {
+    override suspend fun run() {
         // useless, but indicate we entered the node
         childIndex++
         // set rawOutput
-        super.execute()
+        super.run()
     }
 
     override fun `continue`(): NodeInstance<*>? {
