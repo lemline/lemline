@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.nodes.activities.execution
+package com.lemline.core.nodes.activities.runners
 
 import com.lemline.core.activities.runs.ScriptRun
 import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
@@ -25,8 +25,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-internal fun NodeInstance<*>.execute(runScript: RunScript): JsonElement {
-    info { "Executing script: ${node.name}" }
+internal fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
+    info { "Executing run script: ${node.name}" }
 
     val scriptUnion = runScript.script
     val script: Script? = scriptUnion.get()

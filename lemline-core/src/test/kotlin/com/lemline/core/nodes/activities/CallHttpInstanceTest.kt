@@ -125,7 +125,7 @@ class CallHttpInstanceTest {
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
@@ -173,7 +173,7 @@ class CallHttpInstanceTest {
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
@@ -223,7 +223,7 @@ class CallHttpInstanceTest {
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
@@ -265,7 +265,7 @@ class CallHttpInstanceTest {
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
@@ -315,7 +315,7 @@ class CallHttpInstanceTest {
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
@@ -364,7 +364,7 @@ class CallHttpInstanceTest {
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
@@ -411,7 +411,7 @@ class CallHttpInstanceTest {
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
@@ -434,7 +434,7 @@ class CallHttpInstanceTest {
 
         // Execute and verify
         val exception = assertFailsWith<RuntimeException> {
-            callHttpInstance.execute()
+            callHttpInstance.run()
         }
 
         // Verify the exception message
@@ -452,7 +452,7 @@ class CallHttpInstanceTest {
 
         // Execute and verify
         val exception = assertFailsWith<RuntimeException> {
-            callHttpInstance.execute()
+            callHttpInstance.run()
         }
 
         // Verify the exception message
@@ -469,7 +469,7 @@ class CallHttpInstanceTest {
 
         // Execute and verify
         assertFailsWith<RuntimeException> {
-            callHttpInstance.execute()
+            callHttpInstance.run()
         }
 
         // We only need to verify that an exception is thrown, not the specific message
@@ -505,7 +505,7 @@ class CallHttpInstanceTest {
 
         // Execute and verify
         assertFailsWith<RuntimeException> {
-            callHttpInstance.execute()
+            callHttpInstance.run()
         }
     }
 
@@ -562,7 +562,7 @@ class CallHttpInstanceTest {
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {

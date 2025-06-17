@@ -5,7 +5,7 @@ import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
-import com.lemline.core.nodes.activities.execution.execute
+import com.lemline.core.nodes.activities.runners.run
 import io.serverlessworkflow.api.types.RunContainer
 import io.serverlessworkflow.api.types.RunScript
 import io.serverlessworkflow.api.types.RunShell
@@ -20,13 +20,13 @@ class RunInstance(
 
     private val runConfig: RunTaskConfiguration = node.task.run.get()
 
-    override suspend fun execute() {
+    override suspend fun run() {
         info { "Executing run task: ${node.name}" }
         rawOutput = when (runConfig) {
-            is RunShell -> execute(runConfig)
-            is RunScript -> execute(runConfig)
-            is RunContainer -> error(COMMUNICATION, "Container execution not yet implemented")
+            is RunShell -> run(runConfig)
+            is RunScript -> run(runConfig)
             is RunWorkflow -> error(COMMUNICATION, "Workflow execution not yet implemented")
+            is RunContainer -> error(COMMUNICATION, "Container execution not yet implemented")
             else -> error(RUNTIME, "Unknown run task configuration: ${runConfig.javaClass.simpleName}")
         }
         info { "Run task completed successfully: ${node.name}" }
