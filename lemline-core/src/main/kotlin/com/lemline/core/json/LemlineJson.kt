@@ -15,6 +15,7 @@ import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -35,7 +36,7 @@ object LemlineJson {
         configure(JsonParser.Feature.ALLOW_COMMENTS, true)
     }
 
-    // Expose Jackson YAMLMapper - configure as needed
+    // Expose Jackson YAMLMapper
     val yamlMapper = YAMLMapper()
 
     // simply create a new JsonObject
@@ -137,8 +138,14 @@ object LemlineJson {
      */
     fun encodeToElement(dateTimeDescriptor: DateTimeDescriptor) = dateTimeDescriptor.toJsonElement() as JsonObject
 
+    /**
+     * Converts a `JsonElement` to a `JsonNode` using Jackson.
+     */
     fun JsonElement.toJsonNode(): JsonNode = jacksonMapper.readTree(toString())
 
+    /**
+     * Converts a `JsonNode` to a `JsonElement` using kotlinx.serialization.
+     */
     fun JsonNode.toJsonElement(): JsonElement = decodeFromString(toString())
 
     internal fun Any?.toJsonElement(): JsonElement = when (this) {
@@ -151,6 +158,7 @@ object LemlineJson {
             this@toJsonElement.forEach { (key, value) -> put(key as String, value.toJsonElement()) }
         }
 
+        is Collection<*> -> JsonArray(this.map { it.toJsonElement() })
         is DateTimeDescriptor -> decodeFromString(jacksonMapper.writeValueAsString(this))
 
         else -> throw IllegalArgumentException("Unsupported type: ${this::class}")

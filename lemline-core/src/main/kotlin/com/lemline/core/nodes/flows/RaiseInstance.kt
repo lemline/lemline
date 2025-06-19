@@ -32,20 +32,20 @@ class RaiseInstance(override val node: Node<RaiseTask>, override val parent: Nod
     private fun Error.getErrorType() = when (val errorType = type.get()) {
         is UriTemplate -> errorType.getErrorType() // TODO interpret URI
         is String -> errorType
-        else -> error(RUNTIME, "Unknown Error type '$errorType'")
+        else -> onError(RUNTIME, "Unknown Error type '$errorType'")
     }
 
     private fun UriTemplate.getErrorType() = when (val errorType = get()) {
         is URI -> errorType.toString()
         is String -> errorType
-        else -> error(RUNTIME, "Unknown Uri Template '$errorType'")
+        else -> onError(RUNTIME, "Unknown Uri Template '$errorType'")
     }
 
     private fun RaiseTaskError.getError(): Error = when (val error = get()) {
         is String -> rootInstance.node.task.use?.errors?.additionalProperties?.get(error)
-            ?: error(CONFIGURATION, "Error '$error' not found")
+            ?: onError(CONFIGURATION, "Error '$error' not found")
 
         is Error -> error
-        else -> error(RUNTIME, "Unknown Error '$error'")
+        else -> onError(RUNTIME, "Unknown Error '$error'")
     }
 }

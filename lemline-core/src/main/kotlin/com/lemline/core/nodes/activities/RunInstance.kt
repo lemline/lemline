@@ -21,14 +21,14 @@ class RunInstance(
     private val runConfig: RunTaskConfiguration = node.task.run.get()
 
     override suspend fun run() {
-        info { "Executing run task: ${node.name}" }
+        logInfo { "Executing run task: ${node.name}" }
         rawOutput = when (runConfig) {
             is RunShell -> run(runConfig)
             is RunScript -> run(runConfig)
-            is RunWorkflow -> error(COMMUNICATION, "Workflow execution not yet implemented")
-            is RunContainer -> error(COMMUNICATION, "Container execution not yet implemented")
-            else -> error(RUNTIME, "Unknown run task configuration: ${runConfig.javaClass.simpleName}")
+            is RunWorkflow -> onError(COMMUNICATION, "Workflow execution not yet implemented")
+            is RunContainer -> onError(COMMUNICATION, "Container execution not yet implemented")
+            else -> onError(RUNTIME, "Unknown run task configuration: ${runConfig.javaClass.simpleName}")
         }
-        info { "Run task completed successfully: ${node.name}" }
+        logInfo { "Run task completed successfully: ${node.name}" }
     }
 }
