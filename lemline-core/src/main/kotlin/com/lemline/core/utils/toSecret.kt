@@ -23,7 +23,7 @@ internal fun NodeInstance<*>.toSecret(name: String): String = when (ExpressionUt
     true -> toSecret(evalString(transformedInput, ExpressionUtils.trimExpr(name), name))
     // if the name is the name of a secret in the workflow definition, return the value of the secret
     false -> when (name in rootInstance.secrets.keys) {
-        true -> rootInstance.secrets[name]?.toString() ?: error(CONFIGURATION, "Secret '$name' not found")
+        true -> rootInstance.secrets[name]?.toString() ?: onError(CONFIGURATION, "Secret '$name' not found")
         false -> name
     }
 }

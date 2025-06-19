@@ -26,7 +26,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
 internal fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
-    info { "Executing run script: ${node.name}" }
+    logInfo { "Executing run script: ${node.name}" }
 
     val scriptUnion = runScript.script
     val script: Script? = scriptUnion.get()
@@ -44,19 +44,19 @@ internal fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
             val filePath = Paths.get(URI.create(uri))
             if (!Files.exists(filePath)) {
                 val errorMsg = "File not found from $uri"
-                error(CONFIGURATION, errorMsg)
+                onError(CONFIGURATION, errorMsg)
             }
             try {
                 Files.readString(filePath)
             } catch (e: Exception) {
                 val errorMsg = "Failed to read script from $uri: ${e.message}"
-                error(COMMUNICATION, errorMsg)
+                onError(COMMUNICATION, errorMsg)
             }
         }
 
         else -> {
             val errorMsg = "Unsupported script type: ${script?.javaClass?.simpleName}"
-            error(RUNTIME, errorMsg)
+            onError(RUNTIME, errorMsg)
         }
     }
 
@@ -89,13 +89,13 @@ internal fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
         )
     }
 
-    debug { "Script language: $language" }
-    debug { "Script content length: ${scriptContent.length} characters" }
-    debug { "Arguments: $arguments" }
-    debug { "Environment: $environment" }
+    logDebug { "Script language: $language" }
+    logDebug { "Script content length: ${scriptContent.length} characters" }
+    logDebug { "Arguments: $arguments" }
+    logDebug { "Environment: $environment" }
 
     val returnType = runScript.`return` ?: STDOUT  // Default to stdout return type
-    debug { "Return: $returnType" }
+    logDebug { "Return: $returnType" }
 
     try {
         val scriptRun = ScriptRun(
@@ -110,17 +110,17 @@ internal fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
         if (!await) {
             // Launch process and return immediately (do not wait for completion)
             val process = scriptRun.executeAsync()
-            debug { "Launched script asynchronously with PID: ${process.pid()}" }
+            logDebug { "Launched script asynchronously with PID: ${process.pid()}" }
             // As per DSL, output for await: false is the transformed input
             return transformedInput
         }
 
         val processResult = scriptRun.execute()
 
-        debug { "Script execution completed with exit code: ${processResult.code}" }
-        debug { "stdout: ${processResult.stdout}" }
+        logDebug { "Script execution completed with exit code: ${processResult.code}" }
+        logDebug { "stdout: ${processResult.stdout}" }
         if (processResult.stderr.isNotEmpty()) {
-            debug { "stderr: ${processResult.stderr}" }
+            logDebug { "stderr: ${processResult.stderr}" }
         }
 
         // Configure output based on the return type
@@ -139,8 +139,8 @@ internal fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
             NONE -> JsonNull
         }
     } catch (e: Exception) {
-        error(e) { "Failed to execute script" }
+        logError(e) { "Failed to execute script" }
         val errorMsg = "Script execution failed: ${e.message}"
-        error(COMMUNICATION, errorMsg)
+        onError(COMMUNICATION, errorMsg)
     }
 }

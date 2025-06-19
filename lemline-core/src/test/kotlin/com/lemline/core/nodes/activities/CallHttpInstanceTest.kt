@@ -23,6 +23,7 @@ import io.serverlessworkflow.api.types.Endpoint
 import io.serverlessworkflow.api.types.EndpointConfiguration
 import io.serverlessworkflow.api.types.EndpointUri
 import io.serverlessworkflow.api.types.HTTPArguments
+import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.HTTPHeaders
 import io.serverlessworkflow.api.types.HTTPQuery
 import io.serverlessworkflow.api.types.ReferenceableAuthenticationPolicy
@@ -119,8 +120,9 @@ class CallHttpInstanceTest {
                 headers = mapOf("Content-Type" to "application/json"),
                 body = null,
                 query = mapOf("param" to "value"),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         } returns jsonResponse
 
@@ -135,8 +137,9 @@ class CallHttpInstanceTest {
                 headers = mapOf("Content-Type" to "application/json"),
                 body = null,
                 query = mapOf("param" to "value"),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         }
 
@@ -167,8 +170,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                null
             )
         } returns jsonResponse
 
@@ -183,8 +187,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         }
     }
@@ -217,8 +222,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         } returns jsonResponse
 
@@ -233,8 +239,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         }
     }
@@ -259,8 +266,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         } returns jsonResponse
 
@@ -275,8 +283,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         }
 
@@ -309,8 +318,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = any(),
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         } returns jsonResponse
 
@@ -325,8 +335,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = any(),
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         }
     }
@@ -335,7 +346,7 @@ class CallHttpInstanceTest {
     fun `test execute with output format`() = runTest {
         // Setup
         val uriTemplate = mockk<UriTemplate>()
-        val outputFormat = mockk<HTTPArguments.HTTPOutput>()
+        val outputFormat = HTTPOutput.RAW
         val jsonResponse = JsonObject(mapOf("result" to JsonPrimitive("success")))
 
         // Mock endpoint resolution
@@ -344,7 +355,6 @@ class CallHttpInstanceTest {
 
         // Mock output format
         every { mockHttpArgs.output } returns outputFormat
-        every { outputFormat.value() } returns "raw"
 
         // Mock headers and query params
         every { mockHeaders.additionalProperties } returns emptyMap()
@@ -358,8 +368,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "raw",
+                output = HTTPOutput.RAW,
                 redirect = false,
+                authentication = null,
             )
         } returns jsonResponse
 
@@ -374,8 +385,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "raw",
+                output = HTTPOutput.RAW,
                 redirect = false,
+                authentication = null,
             )
         }
     }
@@ -405,8 +417,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = true,
+                authentication = null,
             )
         } returns jsonResponse
 
@@ -421,8 +434,9 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = true,
+                authentication = null,
             )
         }
     }
@@ -500,6 +514,7 @@ class CallHttpInstanceTest {
                 query = any(),
                 output = any(),
                 redirect = any(),
+                authentication = any()
             )
         } throws RuntimeException("HTTP call failed")
 
@@ -555,7 +570,7 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = basicAuthPolicy, // Use the correct policy object
             )
@@ -572,7 +587,7 @@ class CallHttpInstanceTest {
                 headers = emptyMap(),
                 body = null,
                 query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = basicAuthPolicy, // Use the correct policy object
             )
