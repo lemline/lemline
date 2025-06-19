@@ -101,50 +101,28 @@ class HttpCall(
         followRedirects = false
     }
 
+
     /**
-     * Executes an HTTP request with the given parameters.
+     * Executes an HTTP request with the specified parameters.
      *
-     * This method is suspendable, which means it can be paused and resumed without blocking threads.
-     * It also supports cancellation - if the coroutine is cancelled, the HTTP request will be cancelled as well.
-     *
-     * @param method The HTTP method to use (GET, POST, PUT, DELETE)
-     * @param endpoint The URL to send the request to
-     * @param headers HTTP headers to include in the request
-     * @param body The request body (for POST and PUT requests)
-     * @param query Query parameters to include in the URL
-     * @param output The format of the output (raw, content, response)
-     * @param redirect Specifies whether redirection status codes (300-399) should be treated as errors,
-     *                 and whether HTTP redirects should be followed.
-     *                 If set to false (default):
-     *                 - HTTP redirects will not be followed
-     *                 - An error will be raised for status codes outside the 200-299 range
-     *                 If set to true:
-     *                 - HTTP redirects will be automatically followed
-     *                 - An error will be raised for status codes outside the 200-399 range
-     * @param authentication The authentication configuration to use for the request, if any
-     * @return A JsonNode containing the response
-     * @throws RuntimeException if the HTTP status code is outside the acceptable range based on redirect parameter
-     * @throws IllegalArgumentException if the method or output format is not supported
+     * @param method The HTTP method to use (GET, POST, PUT, DELETE).
+     * @param url The URL to send the request to.
+     * @param headers A map of headers to include in the request.
+     * @param body The body of the request, if applicable (for POST/PUT).
+     * @param output The desired output format for the response.
+     * @param redirect Whether to follow redirects (default is false).
+     * @param authentication Optional authentication policy to apply to the request.
+     * @return The response as a JsonElement based on the requested output format.
      */
     suspend fun execute(
-        method: String,
-        endpoint: String,
+        method: HttpMethod,
+        url: Url,
         headers: Map<String, String>,
         body: JsonElement?,
-        query: Map<String, String> = emptyMap(),
         output: HTTPOutput,
         redirect: Boolean,
         authentication: AuthenticationPolicy?,
     ): JsonElement {
-
-        // Build the URL with query parameters
-        val urlBuilder = URLBuilder(endpoint)
-
-        // Add query parameters
-        query.forEach { (key, value) -> urlBuilder.parameters.append(key, value) }
-
-        // Build the URL string
-        val url = urlBuilder.build()
 
         // Create a new client configuration for this specific request with the redirect setting
         val response: HttpResponse = try {
@@ -156,17 +134,11 @@ class HttpCall(
                 authentication?.let { applyAuthentication(it) }
             }.request(url) {
                 // Set the HTTP method
-                this.method = when (method.uppercase()) {
-                    "POST" -> HttpMethod.Post
-                    "GET" -> HttpMethod.Get
-                    "PUT" -> HttpMethod.Put
-                    "DELETE" -> HttpMethod.Delete
-                    else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
-                }
+                this.method = method
                 // Set headers
                 headers.forEach { (key, value) -> header(key, value) }
                 // Set the content type for requests with the body
-                if (body != null && (method.uppercase() == "POST" || method.uppercase() == "PUT")) {
+                if (body != null && (method == HttpMethod.Post || method == HttpMethod.Put)) {
                     contentType(ContentType.Application.Json)
                     setBody(body)
                 }

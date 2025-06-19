@@ -75,11 +75,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api"),
             headers = mapOf("Content-Type" to "application/json"),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = null,
@@ -101,11 +100,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "POST",
-            endpoint = "https://example.com/api/create",
+            method = HttpMethod.Post,
+            url = Url("https://example.com/api/create"),
             headers = mapOf("Content-Type" to "application/json"),
             body = requestBody,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = null,
@@ -127,11 +125,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "PUT",
-            endpoint = "https://example.com/api/update/123",
+            method = HttpMethod.Put,
+            url = Url("https://example.com/api/update/123"),
             headers = mapOf("Content-Type" to "application/json"),
             body = requestBody,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = null,
@@ -152,11 +149,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "DELETE",
-            endpoint = "https://example.com/api/delete/123",
+            method = HttpMethod.Delete,
+            url = Url("https://example.com/api/delete/123"),
             headers = mapOf("Content-Type" to "application/json"),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = null,
@@ -178,11 +174,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api/search",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api/search?q=test&page=1"),
             headers = emptyMap(),
             body = null,
-            query = mapOf("q" to "test", "page" to "1"),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = null,
@@ -202,11 +197,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api"),
             headers = emptyMap(),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.RAW,
             redirect = false,
             authentication = null,
@@ -225,11 +219,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api"),
             headers = emptyMap(),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.RESPONSE,
             redirect = false,
             authentication = null,
@@ -267,11 +260,10 @@ class HttpCallTest {
         }
         val exception = assertFailsWith<RuntimeException> {
             httpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api/nonexistent",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api/nonexistent"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
                 output = HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
@@ -291,11 +283,10 @@ class HttpCallTest {
         }
         val exception = assertFailsWith<RuntimeException> {
             httpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api/redirect",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api/redirect"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
                 output = HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
@@ -329,41 +320,16 @@ class HttpCallTest {
             }
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api/original",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api/original"),
             headers = emptyMap(),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = true,
             authentication = null,
         ) as JsonObject
         assertEquals(2, requestCount)
         assertEquals(JsonPrimitive("redirected successfully"), result["result"])
-    }
-
-    @Test
-    fun `test with unsupported HTTP method`() = runTest {
-        val httpCall = createHttpCallWithMockEngine() { request ->
-            respond(
-                content = "{}",
-                status = HttpStatusCode.OK,
-                headers = headersOf(HttpHeaders.ContentType, ContentType.Application.Json.toString()),
-            )
-        }
-        val exception = assertFailsWith<RuntimeException> {
-            httpCall.execute(
-                method = "PATCH",
-                endpoint = "https://example.com/api",
-                headers = emptyMap(),
-                body = null,
-                query = emptyMap(),
-                output = HTTPOutput.CONTENT,
-                redirect = false,
-                authentication = null,
-            )
-        }
-        assert(exception.message?.contains("Unsupported HTTP method") == true)
     }
 
     @Test
@@ -381,11 +347,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api/secure",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api/secure"),
             headers = mapOf("Authorization" to expectedAuthHeader),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = null,
@@ -415,11 +380,10 @@ class HttpCallTest {
             basic = basicAuthConfig
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api/secure",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api/secure"),
             headers = emptyMap(),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = basicAuth,
@@ -442,11 +406,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api/secure",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api/secure"),
             headers = mapOf("Authorization" to expectedAuthHeader),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = null,
@@ -476,11 +439,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api/secure",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api/secure"),
             headers = emptyMap(),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = bearerAuth,
@@ -509,11 +471,10 @@ class HttpCallTest {
             )
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api/secure",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api/secure"),
             headers = emptyMap(),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = oauth2AuthAsBearer,
@@ -570,11 +531,10 @@ class HttpCallTest {
         clientField.isAccessible = true
         clientField.set(httpCall, client)
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/api/secure",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/api/secure"),
             headers = emptyMap(),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = false,
             authentication = oauth2AuthPolicy,
@@ -598,11 +558,10 @@ class HttpCallTest {
         }
         assertFailsWith<RuntimeException> {
             httpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api/error",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api/error"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
                 output = HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
@@ -632,11 +591,10 @@ class HttpCallTest {
         }
         assertFailsWith<RuntimeException> {
             httpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/redirect",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/redirect"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
                 output = HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
@@ -673,11 +631,10 @@ class HttpCallTest {
             }
         }
         val result = httpCall.execute(
-            method = "GET",
-            endpoint = "https://example.com/redirect",
+            method = HttpMethod.Get,
+            url = Url("https://example.com/redirect"),
             headers = emptyMap(),
             body = null,
-            query = emptyMap(),
             output = HTTPOutput.CONTENT,
             redirect = true,
             authentication = null,
