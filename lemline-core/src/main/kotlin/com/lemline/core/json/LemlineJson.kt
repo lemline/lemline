@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.HTTPHeaders
-import io.serverlessworkflow.api.types.HTTPQuery
 import io.serverlessworkflow.api.types.InputFrom
 import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.api.types.SetTaskConfiguration
@@ -121,12 +120,6 @@ object LemlineJson {
     fun encodeToElement(outputAs: OutputAs) = outputAs.get().toJsonElement()
 
     /**
-     * Encodes an `HTTPQuery` object into a `Map<String, String>`.
-     */
-    fun encodeToString(httpQuery: HTTPQuery?): Map<String, String> =
-        httpQuery?.additionalProperties?.mapValues { it.value.toJsonPrimitive().content } ?: emptyMap()
-
-    /**
      * Encodes an `HTTPHeaders` object into a `Map<String, String>`.
      */
     fun encodeToString(httpHeaders: HTTPHeaders?): Map<String, String> = httpHeaders?.additionalProperties?.mapValues {
@@ -164,8 +157,8 @@ object LemlineJson {
         else -> throw IllegalArgumentException("Unsupported type: ${this::class}")
     }
 
-    private fun Any?.toJsonPrimitive(): JsonPrimitive = when (val element = this.toJsonElement()) {
+    internal fun Any?.toJsonPrimitive(): JsonPrimitive = when (val element = this.toJsonElement()) {
         is JsonPrimitive -> element
-        else -> JsonPrimitive(toString())
+        else -> JsonPrimitive(element.toString())
     }
 }

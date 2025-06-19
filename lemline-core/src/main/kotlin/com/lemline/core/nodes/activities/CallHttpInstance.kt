@@ -3,13 +3,16 @@ package com.lemline.core.nodes.activities
 
 import com.lemline.common.logger
 import com.lemline.core.activities.calls.HttpCall
+import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.json.LemlineJson
+import com.lemline.core.json.LemlineJson.toJsonPrimitive
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.utils.getAuthenticationPolicyByName
 import com.lemline.core.utils.toAuthenticationPolicy
 import com.lemline.core.utils.toSecret
 import com.lemline.core.utils.toUrl
+import io.ktor.http.*
 import io.serverlessworkflow.api.types.CallHTTP
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import kotlinx.serialization.json.JsonElement
@@ -33,7 +36,13 @@ class CallHttpInstance(
         val httpArgs = node.task.with
 
         // Extract method
-        val method = httpArgs.method
+        val method = when (httpArgs.method.uppercase()) {
+            "POST" -> HttpMethod.Post
+            "GET" -> HttpMethod.Get
+            "PUT" -> HttpMethod.Put
+            "DELETE" -> HttpMethod.Delete
+            else -> onError(WorkflowErrorType.CONFIGURATION, "Unsupported HTTP method: ${httpArgs.method}")
+        }
 
         // Extract endpoint URL and authentication if available
         val endpoint = toUrl(httpArgs.endpoint)
@@ -42,13 +51,11 @@ class CallHttpInstance(
         val authentication = toAuthenticationPolicy(httpArgs.endpoint)
 
         // Extract headers
-        val headers = LemlineJson.encodeToString(httpArgs.headers)
+        val headers = httpArgs.headers?.additionalProperties?.mapValues { it.value.toJsonPrimitive().content }
+            ?: emptyMap()
 
         // Extract body
         val body: JsonElement? = httpArgs.body?.let { with(LemlineJson) { it.toJsonElement() } }
-
-        // Extract query parameters
-        val query: Map<String, String> = LemlineJson.encodeToString(httpArgs.query)
 
         // Extract output format
         val output: HTTPOutput = httpArgs.output ?: HTTPOutput.CONTENT
@@ -60,13 +67,25 @@ class CallHttpInstance(
         logger.info("Passing authentication object to HttpCall.execute: $authentication")
         // --- DEBUGGING END ---
 
+        // Build the URL with query parameters
+        val urlBuilder = URLBuilder(endpoint)
+
+        // Add query parameters
+        httpArgs.query.additionalProperties
+            .mapValues { it.value.toJsonPrimitive().content }
+            .forEach { (key, value) ->
+                urlBuilder.parameters.append(key, value)
+            }
+
+        // Build the URL string
+        val url = urlBuilder.build()
+
         // Execute the HTTP call directly using the suspendable function
         this.rawOutput = httpCall.execute(
             method = method,
-            endpoint = endpoint,
+            url = url,
             headers = headers,
             body = body,
-            query = query,
             output = output,
             redirect = redirect,
             authentication = authentication,
