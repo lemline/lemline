@@ -71,9 +71,10 @@ class CallHttpInstance(
         val urlBuilder = URLBuilder(endpoint)
 
         // Add query parameters
-        httpArgs.query.additionalProperties
-            .mapValues { it.value.toJsonPrimitive().content }
-            .forEach { (key, value) ->
+        httpArgs.query
+            ?.additionalProperties
+            ?.mapValues { it.value.toJsonPrimitive().content }
+            ?.forEach { (key, value) ->
                 urlBuilder.parameters.append(key, value)
             }
 

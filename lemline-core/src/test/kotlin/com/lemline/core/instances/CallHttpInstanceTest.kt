@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.instances
 
 import com.lemline.core.activities.calls.HttpCall

@@ -217,11 +217,15 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         complete()
         // find next
         return when (flow) {
-            null, FlowDirectiveEnum.CONTINUE -> parent?.`continue`()
-            FlowDirectiveEnum.EXIT -> parent?.then()
-            FlowDirectiveEnum.END -> parent?.end()
+            null -> parent?.`continue`()
             is String -> parent?.goTo(flow)
-            else -> onError(CONFIGURATION, "Unknown '.then' directive: $flow")
+            is FlowDirectiveEnum -> when (flow) {
+                FlowDirectiveEnum.CONTINUE -> parent?.`continue`()
+                FlowDirectiveEnum.EXIT -> parent?.then()
+                FlowDirectiveEnum.END -> parent?.end()
+            }
+
+            else -> onError(CONFIGURATION, "Unknown directive: $flow")
         }
     }
 
