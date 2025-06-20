@@ -67,6 +67,29 @@ private val yaml = Yaml(configuration = YamlConfiguration(strictMode = false))
 // XML mapper for kotlin serialization
 private val xml = XML { autoPolymorphic = true }
 
+// HTTP client with CIO engine and JSON serialization
+private val defaultClient = HttpClient(CIO) {
+    install(ContentNegotiation) {
+        json(LemlineJson.json)
+    }
+    // Configure timeout settings
+    install(HttpTimeout) {
+        requestTimeoutMillis = 30000 // 30 seconds
+        connectTimeoutMillis = 15000 // 15 seconds
+        socketTimeoutMillis = 30000 // 30 seconds
+    }
+    // Install HttpRedirect plugin to allow redirect following
+    install(HttpRedirect) {
+        // Default configuration for the HttpRedirect plugin
+        // The actual redirect behavior will be controlled by the `followRedirects` setting
+        // in each request's client configuration
+        checkHttpMethod = false // Allow redirects between different HTTP methods
+        allowHttpsDowngrade = true // Allow redirects from HTTPS to HTTP if needed
+    }
+    // Disable the following redirect behavior by default - will be enabled per request if needed
+    followRedirects = false
+}
+
 /**
  * HttpCall is a utility class for making HTTP requests.
  * It supports GET, POST, PUT, and DELETE methods, with various options
@@ -76,32 +99,8 @@ class HttpCall(
     private val getSecretByName: (String) -> String,
     private val getAuthenticationPolicyByName: (String) -> AuthenticationPolicy,
     private val onError: OnError,
+    private val client: HttpClient = defaultClient,
 ) {
-
-    // Client configured to handle the HTTP requests
-    private val client = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json(LemlineJson.json)
-        }
-        // Configure timeout settings
-        install(HttpTimeout) {
-            requestTimeoutMillis = 30000 // 30 seconds
-            connectTimeoutMillis = 15000 // 15 seconds
-            socketTimeoutMillis = 30000 // 30 seconds
-        }
-        // Install HttpRedirect plugin to allow redirect following
-        install(HttpRedirect) {
-            // Default configuration for the HttpRedirect plugin
-            // The actual redirect behavior will be controlled by the `followRedirects` setting
-            // in each request's client configuration
-            checkHttpMethod = false // Allow redirects between different HTTP methods
-            allowHttpsDowngrade = true // Allow redirects from HTTPS to HTTP if needed
-        }
-        // Disable the following redirect behavior by default - will be enabled per request if needed
-        followRedirects = false
-    }
-
-
     /**
      * Executes an HTTP request with the specified parameters.
      *
@@ -124,7 +123,7 @@ class HttpCall(
         authentication: AuthenticationPolicy?,
     ): JsonElement {
 
-        // Create a new client configuration for this specific request with the redirect setting
+        // Create a new client configuration for this specific request with the redirect setting and authentication
         val response: HttpResponse = try {
             client.config {
                 // Only follow redirects if explicitly requested
