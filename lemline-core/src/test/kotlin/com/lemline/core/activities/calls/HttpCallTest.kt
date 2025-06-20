@@ -53,12 +53,7 @@ class HttpCallTest {
             install(ContentNegotiation) { json(LemlineJson.json) }
         }
 
-        val httpCall = HttpCall(getSecretByName, getAuthenticationPolicyByName, onErrorImpl)
-        val clientField = HttpCall::class.java.getDeclaredField("client")
-        clientField.isAccessible = true
-        clientField.set(httpCall, mockClient)
-
-        return httpCall
+        return HttpCall(getSecretByName, getAuthenticationPolicyByName, onErrorImpl, mockClient)
     }
 
     @Test
