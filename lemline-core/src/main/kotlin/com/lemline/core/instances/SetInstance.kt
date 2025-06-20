@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.nodes.flows
+package com.lemline.core.instances
 
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.Node
