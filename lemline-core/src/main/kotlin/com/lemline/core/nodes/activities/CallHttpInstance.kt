@@ -3,14 +3,18 @@ package com.lemline.core.nodes.activities
 
 import com.lemline.common.logger
 import com.lemline.core.activities.calls.HttpCall
-import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
-import com.lemline.core.errors.WorkflowException
+import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.json.LemlineJson
+import com.lemline.core.json.LemlineJson.toJsonPrimitive
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
+import com.lemline.core.utils.getAuthenticationPolicyByName
 import com.lemline.core.utils.toAuthenticationPolicy
+import com.lemline.core.utils.toSecret
 import com.lemline.core.utils.toUrl
+import io.ktor.http.*
 import io.serverlessworkflow.api.types.CallHTTP
+import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import kotlinx.serialization.json.JsonElement
 
 class CallHttpInstance(
@@ -18,16 +22,27 @@ class CallHttpInstance(
     override val parent: NodeInstance<*>
 ) : NodeInstance<CallHTTP>(node, parent) {
 
-    private val httpCall = HttpCall(this)
+    private val httpCall = HttpCall(
+        getSecretByName = this::toSecret,
+        getAuthenticationPolicyByName = this::getAuthenticationPolicyByName,
+        onError = this::onError,
+    )
+
     private val logger = logger()
 
-    override suspend fun execute() {
+    override suspend fun run() {
         logger.info("Executing HTTP call: ${node.name}")
 
         val httpArgs = node.task.with
 
         // Extract method
-        val method = httpArgs.method
+        val method = when (httpArgs.method.uppercase()) {
+            "POST" -> HttpMethod.Post
+            "GET" -> HttpMethod.Get
+            "PUT" -> HttpMethod.Put
+            "DELETE" -> HttpMethod.Delete
+            else -> onError(WorkflowErrorType.CONFIGURATION, "Unsupported HTTP method: ${httpArgs.method}")
+        }
 
         // Extract endpoint URL and authentication if available
         val endpoint = toUrl(httpArgs.endpoint)
@@ -36,16 +51,14 @@ class CallHttpInstance(
         val authentication = toAuthenticationPolicy(httpArgs.endpoint)
 
         // Extract headers
-        val headers = LemlineJson.encodeToString(httpArgs.headers)
+        val headers = httpArgs.headers?.additionalProperties?.mapValues { it.value.toJsonPrimitive().content }
+            ?: emptyMap()
 
         // Extract body
         val body: JsonElement? = httpArgs.body?.let { with(LemlineJson) { it.toJsonElement() } }
 
-        // Extract query parameters
-        val query: Map<String, String> = LemlineJson.encodeToString(httpArgs.query)
-
         // Extract output format
-        val output: String = httpArgs.output?.value() ?: "content"
+        val output: HTTPOutput = httpArgs.output ?: HTTPOutput.CONTENT
 
         // Extract redirect flag
         val redirect = httpArgs.isRedirect
@@ -54,69 +67,28 @@ class CallHttpInstance(
         logger.info("Passing authentication object to HttpCall.execute: $authentication")
         // --- DEBUGGING END ---
 
-        // Execute the HTTP call and get the result
-        try {
-            // Execute the HTTP call directly using the suspendable function
-            this.rawOutput = httpCall.execute(
-                method = method,
-                endpoint = endpoint,
-                headers = headers,
-                body = body,
-                query = query,
-                output = output,
-                redirect = redirect,
-                authentication = authentication,
-            )
-        } catch (e: WorkflowException) {
-            // rethrow the WorkflowException without catching them
-            throw e
-        } catch (e: RuntimeException) {
-            val statusCode = e.message
-                ?.substringAfter("HTTP error: ")
-                ?.substringBefore(",")
-                ?.toIntOrNull()
-            when (statusCode) {
-                null -> error(
-                    COMMUNICATION,
-                    "Unexpected HTTP error: ${e.message}",
-                    e.stackTraceToString(),
-                )
+        // Build the URL with query parameters
+        val urlBuilder = URLBuilder(endpoint)
 
-                in 300..399 -> error(
-                    COMMUNICATION,
-                    "Redirection error: $statusCode",
-                    e.message,
-                    statusCode,
-                )
-
-                in 400..499 -> error(
-                    COMMUNICATION,
-                    "Client error: $statusCode",
-                    e.message,
-                    statusCode,
-                )
-
-                in 500..599 -> error(
-                    COMMUNICATION,
-                    "Server error: $statusCode",
-                    e.message,
-                    statusCode,
-                )
-
-                else -> error(
-                    COMMUNICATION,
-                    "Unexpected HTTP error: $statusCode",
-                    e.message,
-                    statusCode,
-                )
+        // Add query parameters
+        httpArgs.query.additionalProperties
+            .mapValues { it.value.toJsonPrimitive().content }
+            .forEach { (key, value) ->
+                urlBuilder.parameters.append(key, value)
             }
-        } catch (e: Exception) {
-            // Handle any other exceptions that might occur
-            error(
-                COMMUNICATION,
-                "HTTP call failed: ${e.message}",
-                e.stackTraceToString(),
-            )
-        }
+
+        // Build the URL string
+        val url = urlBuilder.build()
+
+        // Execute the HTTP call directly using the suspendable function
+        this.rawOutput = httpCall.execute(
+            method = method,
+            url = url,
+            headers = headers,
+            body = body,
+            output = output,
+            redirect = redirect,
+            authentication = authentication,
+        )
     }
 }

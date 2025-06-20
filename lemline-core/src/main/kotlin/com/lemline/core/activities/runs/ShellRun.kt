@@ -3,7 +3,8 @@ package com.lemline.core.activities.runs
 
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Represents a shell command execution with optional arguments and environment variables.
@@ -108,7 +109,7 @@ data class ShellRun(
      *
      * @return [ProcessResult] with the process exit code, standard output, and standard error.
      */
-    fun execute(): ProcessResult {
+    suspend fun execute(): ProcessResult {
         val process = executeAsync()
         val stdout = StringBuilder()
         val stderr = StringBuilder()
@@ -127,8 +128,10 @@ data class ShellRun(
             stderr.append(line).append(System.lineSeparator())
         }
 
-        // Wait for the process to complete with a timeout of 60 seconds
-        process.waitFor(60, TimeUnit.SECONDS)
+        // Wait for the process to complete
+        withContext(Dispatchers.IO) {
+            process.waitFor()
+        }
 
         // Return the result of the process execution
         return ProcessResult(

@@ -6,7 +6,9 @@ import java.util.*
 import java.util.regex.Pattern
 import org.eclipse.microprofile.config.spi.Converter
 
-
+/**
+ * Converter for parsing duration strings in the format of "1s", "2m", "3h", or "4d".
+ */
 private class SimpleDurationConverter : Converter<Duration> {
     override fun convert(value: String): Duration {
         require(value.trim { it <= ' ' }.isNotEmpty()) { "Duration value is null or empty" }

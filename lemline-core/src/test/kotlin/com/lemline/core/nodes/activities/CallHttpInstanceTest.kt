@@ -7,6 +7,7 @@ import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.nodes.NodePosition
+import io.ktor.http.*
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -23,6 +24,7 @@ import io.serverlessworkflow.api.types.Endpoint
 import io.serverlessworkflow.api.types.EndpointConfiguration
 import io.serverlessworkflow.api.types.EndpointUri
 import io.serverlessworkflow.api.types.HTTPArguments
+import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.HTTPHeaders
 import io.serverlessworkflow.api.types.HTTPQuery
 import io.serverlessworkflow.api.types.ReferenceableAuthenticationPolicy
@@ -74,7 +76,7 @@ class CallHttpInstanceTest {
         every { mockNode.definition } returns LemlineJson.jsonObject
         every { mockCallHTTP.with } returns mockHttpArgs
         every { mockCallHTTP.input } returns null // Mock getInput to avoid serialization issues
-        every { mockHttpArgs.method } returns "GET"
+        every { mockHttpArgs.method } returns "get"
         every { mockHttpArgs.endpoint } returns mockEndpoint
         every { mockHttpArgs.headers } returns mockHeaders
         every { mockHttpArgs.query } returns mockQuery
@@ -114,29 +116,29 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api?param=value"),
                 headers = mapOf("Content-Type" to "application/json"),
                 body = null,
-                query = mapOf("param" to "value"),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api?param=value"),
                 headers = mapOf("Content-Type" to "application/json"),
                 body = null,
-                query = mapOf("param" to "value"),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         }
 
@@ -162,29 +164,29 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                null
             )
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         }
     }
@@ -212,29 +214,29 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api/config",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api/config"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api/config",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api/config"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         }
     }
@@ -254,29 +256,29 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api/dynamic",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api/dynamic"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api/dynamic",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api/dynamic"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         }
 
@@ -304,29 +306,29 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution with a more flexible mock that accepts any body parameter
         coEvery {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = any(),
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = any(),
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
+                authentication = null,
             )
         }
     }
@@ -335,7 +337,7 @@ class CallHttpInstanceTest {
     fun `test execute with output format`() = runTest {
         // Setup
         val uriTemplate = mockk<UriTemplate>()
-        val outputFormat = mockk<HTTPArguments.HTTPOutput>()
+        val outputFormat = HTTPOutput.RAW
         val jsonResponse = JsonObject(mapOf("result" to JsonPrimitive("success")))
 
         // Mock endpoint resolution
@@ -344,7 +346,6 @@ class CallHttpInstanceTest {
 
         // Mock output format
         every { mockHttpArgs.output } returns outputFormat
-        every { outputFormat.value() } returns "raw"
 
         // Mock headers and query params
         every { mockHeaders.additionalProperties } returns emptyMap()
@@ -353,29 +354,29 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "raw",
+                output = HTTPOutput.RAW,
                 redirect = false,
+                authentication = null,
             )
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "raw",
+                output = HTTPOutput.RAW,
                 redirect = false,
+                authentication = null,
             )
         }
     }
@@ -400,29 +401,29 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = true,
+                authentication = null,
             )
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = true,
+                authentication = null,
             )
         }
     }
@@ -434,7 +435,7 @@ class CallHttpInstanceTest {
 
         // Execute and verify
         val exception = assertFailsWith<RuntimeException> {
-            callHttpInstance.execute()
+            callHttpInstance.run()
         }
 
         // Verify the exception message
@@ -452,7 +453,7 @@ class CallHttpInstanceTest {
 
         // Execute and verify
         val exception = assertFailsWith<RuntimeException> {
-            callHttpInstance.execute()
+            callHttpInstance.run()
         }
 
         // Verify the exception message
@@ -469,7 +470,7 @@ class CallHttpInstanceTest {
 
         // Execute and verify
         assertFailsWith<RuntimeException> {
-            callHttpInstance.execute()
+            callHttpInstance.run()
         }
 
         // We only need to verify that an exception is thrown, not the specific message
@@ -494,18 +495,18 @@ class CallHttpInstanceTest {
         coEvery {
             mockHttpCall.execute(
                 method = any(),
-                endpoint = any(),
+                url = any(),
                 headers = any(),
                 body = any(),
-                query = any(),
                 output = any(),
                 redirect = any(),
+                authentication = any()
             )
         } throws RuntimeException("HTTP call failed")
 
         // Execute and verify
         assertFailsWith<RuntimeException> {
-            callHttpInstance.execute()
+            callHttpInstance.run()
         }
     }
 
@@ -550,32 +551,55 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution including authentication
         coEvery {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api/secure",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api/secure"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = basicAuthPolicy, // Use the correct policy object
             )
         } returns jsonResponse
 
         // Execute
-        callHttpInstance.execute()
+        callHttpInstance.run()
 
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = "GET",
-                endpoint = "https://example.com/api/secure",
+                method = HttpMethod.Get,
+                url = Url("https://example.com/api/secure"),
                 headers = emptyMap(),
                 body = null,
-                query = emptyMap(),
-                output = "content",
+                output = HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = basicAuthPolicy, // Use the correct policy object
             )
         }
+    }
+
+    @Test
+    fun `test unsupported PATCH method throws exception`() = runTest {
+        // Setup
+        val uriTemplate = mockk<UriTemplate>()
+
+        // Mock endpoint resolution
+        every { mockEndpoint.get() } returns uriTemplate
+        every { uriTemplate.get() } returns "https://example.com/api"
+
+        // Mock PATCH method
+        every { mockHttpArgs.method } returns "patch"
+
+        // Mock headers and query params
+        every { mockHeaders.additionalProperties } returns emptyMap()
+        every { mockQuery.additionalProperties } returns emptyMap()
+
+        // Execute and verify
+        val exception = assertFailsWith<RuntimeException> {
+            callHttpInstance.run()
+        }
+
+        // Verify the exception message contains the unsupported method
+        assert(exception.message?.contains("Unsupported HTTP method: patch") == true)
     }
 }

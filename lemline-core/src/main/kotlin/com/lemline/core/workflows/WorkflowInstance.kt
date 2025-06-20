@@ -1,15 +1,52 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
-import com.lemline.common.*
+import com.lemline.common.debug
+import com.lemline.common.error
+import com.lemline.common.info
+import com.lemline.common.logger
+import com.lemline.common.withWorkflowContext
 import com.lemline.core.RuntimeDescriptor
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.json.LemlineJson
-import com.lemline.core.nodes.*
-import com.lemline.core.nodes.activities.*
-import com.lemline.core.nodes.flows.*
-import io.serverlessworkflow.api.types.*
+import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.NodeInstance
+import com.lemline.core.nodes.NodePosition
+import com.lemline.core.nodes.NodeState
+import com.lemline.core.nodes.RootTask
+import com.lemline.core.nodes.activities.CallAsyncApiInstance
+import com.lemline.core.nodes.activities.CallGrpcInstance
+import com.lemline.core.nodes.activities.CallHttpInstance
+import com.lemline.core.nodes.activities.CallOpenApiInstance
+import com.lemline.core.nodes.activities.EmitInstance
+import com.lemline.core.nodes.activities.RunInstance
+import com.lemline.core.nodes.activities.WaitInstance
+import com.lemline.core.nodes.flows.DoInstance
+import com.lemline.core.nodes.flows.ForInstance
+import com.lemline.core.nodes.flows.ForkInstance
+import com.lemline.core.nodes.flows.ListenInstance
+import com.lemline.core.nodes.flows.RaiseInstance
+import com.lemline.core.nodes.flows.RootInstance
+import com.lemline.core.nodes.flows.SetInstance
+import com.lemline.core.nodes.flows.SwitchInstance
+import com.lemline.core.nodes.flows.TryInstance
+import io.serverlessworkflow.api.types.CallAsyncAPI
+import io.serverlessworkflow.api.types.CallGRPC
+import io.serverlessworkflow.api.types.CallHTTP
+import io.serverlessworkflow.api.types.CallOpenAPI
+import io.serverlessworkflow.api.types.DoTask
+import io.serverlessworkflow.api.types.EmitTask
+import io.serverlessworkflow.api.types.ForTask
+import io.serverlessworkflow.api.types.ForkTask
+import io.serverlessworkflow.api.types.ListenTask
+import io.serverlessworkflow.api.types.RaiseTask
+import io.serverlessworkflow.api.types.RunTask
+import io.serverlessworkflow.api.types.SetTask
+import io.serverlessworkflow.api.types.SwitchTask
+import io.serverlessworkflow.api.types.TryTask
+import io.serverlessworkflow.api.types.WaitTask
+import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.datetime.Clock
@@ -334,7 +371,7 @@ class WorkflowInstance(
                     // if next is an activity, then break
                     if (current.node.isActivity()) break
                     // execute current NodeInstance flow node
-                    current.execute()
+                    current.run()
                     // continue flow node
                     current.`continue`()
                 }
@@ -348,7 +385,7 @@ class WorkflowInstance(
 
             // execute the activity
             else -> {
-                current?.execute()
+                current?.run()
                 if (current is WaitInstance) status = WorkflowStatus.WAITING
             }
         }
