@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.nodes.flows
+package com.lemline.core.instances
 
 import com.lemline.core.errors.WorkflowError
 import com.lemline.core.json.LemlineJson
@@ -7,13 +7,18 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration
-import io.serverlessworkflow.api.types.*
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
+import io.serverlessworkflow.api.types.ConstantBackoff
+import io.serverlessworkflow.api.types.ExponentialBackOff
+import io.serverlessworkflow.api.types.LinearBackoff
+import io.serverlessworkflow.api.types.RetryPolicy
+import io.serverlessworkflow.api.types.TryTask
+import io.serverlessworkflow.api.types.TryTaskCatch
 import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 
 class TryInstance(override val node: Node<TryTask>, override val parent: NodeInstance<*>) :
     NodeInstance<TryTask>(node, parent) {
@@ -54,7 +59,7 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
     private val retryPolicy: RetryPolicy? by lazy {
         when (val retry = node.task.catch?.retry?.get()) {
             // from workflow.use
-            is String -> rootInstance.getRetryPolicy(retry)
+            is String -> rootInstance.getRetryPolicyByName(retry)
             is RetryPolicy -> retry
             null -> null
             else -> error("Unknown retry policy: $retry")

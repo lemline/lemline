@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.nodes.activities
+package com.lemline.core.instances
 
 import com.lemline.core.activities.calls.HttpCall
 import com.lemline.core.expressions.JQExpression
@@ -24,7 +23,6 @@ import io.serverlessworkflow.api.types.Endpoint
 import io.serverlessworkflow.api.types.EndpointConfiguration
 import io.serverlessworkflow.api.types.EndpointUri
 import io.serverlessworkflow.api.types.HTTPArguments
-import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.HTTPHeaders
 import io.serverlessworkflow.api.types.HTTPQuery
 import io.serverlessworkflow.api.types.ReferenceableAuthenticationPolicy
@@ -116,11 +114,11 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api?param=value"),
                 headers = mapOf("Content-Type" to "application/json"),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
             )
@@ -132,11 +130,11 @@ class CallHttpInstanceTest {
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api?param=value"),
                 headers = mapOf("Content-Type" to "application/json"),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
             )
@@ -164,11 +162,11 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 null
             )
@@ -180,11 +178,11 @@ class CallHttpInstanceTest {
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
             )
@@ -214,11 +212,11 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api/config"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
             )
@@ -230,11 +228,11 @@ class CallHttpInstanceTest {
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api/config"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
             )
@@ -256,11 +254,11 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api/dynamic"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
             )
@@ -272,11 +270,11 @@ class CallHttpInstanceTest {
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api/dynamic"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
             )
@@ -306,11 +304,11 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution with a more flexible mock that accepts any body parameter
         coEvery {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = any(),
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
             )
@@ -322,11 +320,11 @@ class CallHttpInstanceTest {
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = any(),
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = null,
             )
@@ -337,7 +335,7 @@ class CallHttpInstanceTest {
     fun `test execute with output format`() = runTest {
         // Setup
         val uriTemplate = mockk<UriTemplate>()
-        val outputFormat = HTTPOutput.RAW
+        val outputFormat = HTTPArguments.HTTPOutput.RAW
         val jsonResponse = JsonObject(mapOf("result" to JsonPrimitive("success")))
 
         // Mock endpoint resolution
@@ -354,11 +352,11 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.RAW,
+                output = HTTPArguments.HTTPOutput.RAW,
                 redirect = false,
                 authentication = null,
             )
@@ -370,11 +368,11 @@ class CallHttpInstanceTest {
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.RAW,
+                output = HTTPArguments.HTTPOutput.RAW,
                 redirect = false,
                 authentication = null,
             )
@@ -401,11 +399,11 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution
         coEvery {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = true,
                 authentication = null,
             )
@@ -417,11 +415,11 @@ class CallHttpInstanceTest {
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = true,
                 authentication = null,
             )
@@ -551,11 +549,11 @@ class CallHttpInstanceTest {
         // Mock HttpCall execution including authentication
         coEvery {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api/secure"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = basicAuthPolicy, // Use the correct policy object
             )
@@ -567,11 +565,11 @@ class CallHttpInstanceTest {
         // Verify
         coVerify {
             mockHttpCall.execute(
-                method = HttpMethod.Get,
+                method = HttpMethod.Companion.Get,
                 url = Url("https://example.com/api/secure"),
                 headers = emptyMap(),
                 body = null,
-                output = HTTPOutput.CONTENT,
+                output = HTTPArguments.HTTPOutput.CONTENT,
                 redirect = false,
                 authentication = basicAuthPolicy, // Use the correct policy object
             )

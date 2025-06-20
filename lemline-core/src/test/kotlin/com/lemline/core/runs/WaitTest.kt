@@ -2,7 +2,7 @@
 package com.lemline.core.runs
 
 import com.lemline.core.getWorkflowInstance
-import com.lemline.core.nodes.activities.WaitInstance
+import com.lemline.core.instances.WaitInstance
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.serverlessworkflow.impl.WorkflowStatus

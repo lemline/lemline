@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.nodes.activities
+package com.lemline.core.instances
 
 import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
+import com.lemline.core.instances.runners.run
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
-import com.lemline.core.nodes.activities.runners.run
 import io.serverlessworkflow.api.types.RunContainer
 import io.serverlessworkflow.api.types.RunScript
 import io.serverlessworkflow.api.types.RunShell

@@ -16,9 +16,9 @@ import com.lemline.core.errors.WorkflowException
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
+import com.lemline.core.instances.RootInstance
+import com.lemline.core.instances.TryInstance
 import com.lemline.core.json.LemlineJson
-import com.lemline.core.nodes.flows.RootInstance
-import com.lemline.core.nodes.flows.TryInstance
 import com.lemline.core.schemas.SchemaValidator
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirectiveEnum

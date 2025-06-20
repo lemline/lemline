@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.nodes.flows
+package com.lemline.core.instances
 
 import com.lemline.core.RuntimeDescriptor
 import com.lemline.core.expressions.scopes.Scope
@@ -45,7 +45,7 @@ class RootInstance(override val node: Node<RootTask>) : NodeInstance<RootTask>(n
         state.childIndex = NodeState.CHILD_INDEX_DEFAULT
     }
 
-    fun getRetryPolicy(name: String): RetryPolicy = node.task.use?.retries?.additionalProperties
+    fun getRetryPolicyByName(name: String): RetryPolicy = node.task.use?.retries?.additionalProperties
         ?.get(name)
         ?: error("Unknown retry policy name '$name'")
 }

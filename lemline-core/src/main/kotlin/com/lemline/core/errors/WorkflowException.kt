@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
 
+import com.lemline.core.instances.TryInstance
 import com.lemline.core.nodes.NodeInstance
-import com.lemline.core.nodes.flows.TryInstance
 
 /**
  * Internal Exception thrown during the execution of a workflow.

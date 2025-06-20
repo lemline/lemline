@@ -8,9 +8,9 @@ import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.common.trace
 import com.lemline.common.withLoggingContext
+import com.lemline.core.instances.TryInstance
+import com.lemline.core.instances.WaitInstance
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.nodes.activities.WaitInstance
-import com.lemline.core.nodes.flows.TryInstance
 import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.config.CONSUMER_ENABLED

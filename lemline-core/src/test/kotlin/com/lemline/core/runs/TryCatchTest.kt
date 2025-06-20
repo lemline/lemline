@@ -2,7 +2,7 @@
 package com.lemline.core.runs
 
 import com.lemline.core.getWorkflowInstance
-import com.lemline.core.nodes.flows.TryInstance
+import com.lemline.core.instances.TryInstance
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
 import kotlin.time.Duration.Companion.seconds
