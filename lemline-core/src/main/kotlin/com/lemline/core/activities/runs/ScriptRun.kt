@@ -10,6 +10,8 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
 import kotlin.io.path.deleteIfExists
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Represents a script execution with support for multiple scripting languages.
@@ -25,7 +27,7 @@ data class ScriptRun(
     val language: String,
     val arguments: Map<String, String>? = null,
     val environment: Map<String, String>? = null,
-    val workingDir: Path? = null
+    val workingDir: Path? = null,
 ) {
     private val log = logger()
 
@@ -41,7 +43,7 @@ data class ScriptRun(
     /**
      * Executes the script and returns the result
      */
-    fun execute(): ProcessResult = when (language.lowercase()) {
+    suspend fun execute(): ProcessResult = when (language.lowercase()) {
         "js" -> executeJavascript()
         "python" -> executePython()
         else -> throw IllegalArgumentException("Unsupported script language: $language")
@@ -68,7 +70,7 @@ data class ScriptRun(
      * @param ext file extension (".js" or ".py")
      * @param processStarter lambda to start the process given a script file
      */
-    private fun executeScriptSync(
+    private suspend fun executeScriptSync(
         ext: String,
         processStarter: (Path) -> Process
     ): ProcessResult {
@@ -85,7 +87,9 @@ data class ScriptRun(
         while (stderrReader.readLine().also { line = it } != null) {
             stderr.append(line).append(System.lineSeparator())
         }
-        val exitCode = process.waitFor()
+        val exitCode = withContext(Dispatchers.IO) {
+            process.waitFor()
+        }
 
         return ProcessResult(
             code = exitCode,
@@ -100,12 +104,12 @@ data class ScriptRun(
     private fun noPythonError(): Nothing =
         throw RuntimeException("Python executable not found. Please install Python 3.8+ or set LEMLINE_PYTHON_EXEC to locate the Python executable.")
 
-    private fun executeJavascript(): ProcessResult = executeScriptSync(
+    private suspend fun executeJavascript(): ProcessResult = executeScriptSync(
         ext = ".js",
         processStarter = { startProcess(NodeChecker.exec ?: noNodeError(), it) }
     )
 
-    private fun executePython(): ProcessResult = executeScriptSync(
+    private suspend fun executePython(): ProcessResult = executeScriptSync(
         ext = ".py",
         processStarter = { startProcess(PythonChecker.exec ?: noPythonError(), it) }
     )
@@ -143,7 +147,9 @@ data class ScriptRun(
             if (value.isNotBlank()) command.add(value)
         }
         val processBuilder = ProcessBuilder(command)
-        workingDir?.let { processBuilder.directory(it.toFile()) }
+        workingDir?.let { dir ->
+            processBuilder.directory(dir.toFile())
+        }
         environment?.let { env ->
             val processEnv = processBuilder.environment()
             env.forEach { (key, value) -> processEnv[key] = value }

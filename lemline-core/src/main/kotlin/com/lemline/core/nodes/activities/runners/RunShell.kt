@@ -15,7 +15,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-internal fun NodeInstance<*>.run(runShell: RunShell): JsonElement {
+internal suspend fun NodeInstance<*>.run(runShell: RunShell): JsonElement {
     logInfo { "Executing run shell command: ${node.name}" }
 
     val shellConfig = runShell.shell
