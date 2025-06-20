@@ -25,7 +25,7 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-internal fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
+internal suspend fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
     logInfo { "Executing run script: ${node.name}" }
 
     val scriptUnion = runScript.script
