@@ -63,10 +63,6 @@ class CallHttpInstance(
         // Extract redirect flag
         val redirect = httpArgs.isRedirect
 
-        // --- DEBUGGING START ---
-        logger.info("Passing authentication object to HttpCall.execute: $authentication")
-        // --- DEBUGGING END ---
-
         // Build the URL with query parameters
         val urlBuilder = URLBuilder(endpoint)
 

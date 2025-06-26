@@ -36,7 +36,7 @@ class WaitTest {
         instance.status shouldBe WorkflowStatus.WAITING
         instance.current.shouldBeInstanceOf<WaitInstance>()
         (instance.current as WaitInstance).delay shouldBe 1.days + 2.hours + 30.minutes + 15.seconds
-        println("Continuing...")
+
         // Re-Run the workflow (starting from the wait)
         instance.run()
 
@@ -60,7 +60,6 @@ class WaitTest {
         instance.status shouldBe WorkflowStatus.WAITING
         instance.current.shouldBeInstanceOf<WaitInstance>()
         (instance.current as WaitInstance).delay shouldBe 1.days + 2.hours + 30.minutes + 15.seconds
-        println("Continuing...")
 
         // Re-Run the workflow (starting from the wait)
         instance.run()
