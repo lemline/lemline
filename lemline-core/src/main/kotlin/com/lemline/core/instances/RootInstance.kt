@@ -36,8 +36,8 @@ class RootInstance(override val node: Node<RootTask>) : NodeInstance<RootTask>(n
         childIndex++
 
         return when (childIndex) {
-            0 -> children[0].also { it.rawInput = transformedInput }
-            else -> null
+            0 -> children[0]
+            else -> this
         }
     }
 

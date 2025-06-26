@@ -12,8 +12,8 @@ open class DoInstance(override val node: Node<DoTask>, override val parent: Node
         childIndex++
 
         return when (childIndex) {
-            children.size -> then()
-            else -> children[childIndex].also { it.rawInput = rawOutput!! }
+            children.size -> this
+            else -> children[childIndex]
         }
     }
 }

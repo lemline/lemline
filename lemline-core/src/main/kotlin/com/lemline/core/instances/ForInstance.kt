@@ -42,15 +42,13 @@ class ForInstance(override val node: Node<ForTask>, override val parent: NodeIns
     override suspend fun run() {
         // useless, but indicate we entered the node
         childIndex++
-        // set rawOutput
-        super.run()
     }
 
     override fun `continue`(): NodeInstance<*>? {
         forIndex++
 
         // if we reached the end, follow the then directive
-        if (forIndex == forIn.size) return then()
+        if (forIndex == forIn.size) return this
 
         // else define the additional scope variable
         variables = JsonObject(
@@ -61,10 +59,10 @@ class ForInstance(override val node: Node<ForTask>, override val parent: NodeIns
         )
 
         // test the while directive
-        node.task.`while`?.let { if (!evalWhile(it)) return then() }
+        node.task.`while`?.let { if (!evalWhile(it)) return this }
 
         // Go to Do
-        return children[childIndex].also { it.rawInput = rawOutput!! }
+        return children[childIndex]
     }
 
     private fun evalWhile(`while`: String) = evalBoolean(rawOutput ?: transformedInput, `while`, "while")

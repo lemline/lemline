@@ -5,8 +5,10 @@ import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
+import com.lemline.common.warn
 import com.lemline.common.withWorkflowContext
 import com.lemline.core.RuntimeDescriptor
+import com.lemline.core.errors.WaitException
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.instances.CallAsyncApiInstance
@@ -31,6 +33,8 @@ import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.nodes.isGoingDown
+import com.lemline.core.nodes.isGoingUp
 import io.serverlessworkflow.api.types.CallAsyncAPI
 import io.serverlessworkflow.api.types.CallGRPC
 import io.serverlessworkflow.api.types.CallHTTP
@@ -55,13 +59,13 @@ import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.json.JsonElement
 
 /**
- * Represents a initialPosition of a workflow.
+ * Represents an instance of a workflow, including its state, position, secrets, and execution logic.
  *
  * @property name The name of the workflow.
  * @property version The version of the workflow.
- * @property id The unique identifier of the workflow initialPosition.
- * @property rawInput The raw input data for the initialPosition as a JSON node.
- *
+ * @property states A map of node positions to their corresponding node states.
+ * @property position The current position in the workflow.
+ * @property secrets A map of secrets used in the workflow.
  */
 class WorkflowInstance(
     val name: String,
@@ -71,6 +75,9 @@ class WorkflowInstance(
     secrets: Map<String, JsonElement>,
 ) {
 
+    /**
+     * Companion object for creating new instances of the workflow.
+     */
     companion object {
         /**
          * Creates a new instance of the workflow.
@@ -105,10 +112,23 @@ class WorkflowInstance(
 
     private val logger = logger()
 
+    // Event handlers for workflow and task lifecycle events
+    var onWorkflowStarted = {}
+    var onWorkflowCompleted = {}
+    var onWorkflowFaulted = {}
+    var onTaskCreated = {}
+    var onTaskStarted = {}
+    var onTaskCompleted = {}
+    var onTaskFaulted = {}
+    var onTaskRetried = {}
+
     /**
-     * Local debug function that sets the workflow context each time it's called
+     * Logs debug messages with workflow context.
+     *
+     * @param e Optional throwable to include in the log.
+     * @param message Lambda providing the log message.
      */
-    private fun debug(e: Throwable? = null, message: () -> String) = withWorkflowContext(
+    private fun logDebug(e: Throwable? = null, message: () -> String) = withWorkflowContext(
         workflowId = id,
         workflowName = name,
         workflowVersion = version,
@@ -118,9 +138,12 @@ class WorkflowInstance(
     }
 
     /**
-     * Local info function that sets the workflow context each time it's called
+     * Logs informational messages with workflow context.
+     *
+     * @param e Optional throwable to include in the log.
+     * @param message Lambda providing the log message.
      */
-    private fun info(e: Throwable? = null, message: () -> String) = withWorkflowContext(
+    private fun logInfo(e: Throwable? = null, message: () -> String) = withWorkflowContext(
         workflowId = id,
         workflowName = name,
         workflowVersion = version,
@@ -130,9 +153,27 @@ class WorkflowInstance(
     }
 
     /**
-     * Local error function that sets the workflow context each time it's called
+     * Logs warning messages with workflow context.
+     *
+     * @param e Optional throwable to include in the log.
+     * @param message Lambda providing the log message.
      */
-    private fun error(e: Throwable? = null, message: () -> String) {
+    private fun logWarn(e: Throwable? = null, message: () -> String) = withWorkflowContext(
+        workflowId = id,
+        workflowName = name,
+        workflowVersion = version,
+        nodePosition = currentPosition.toString(),
+    ) {
+        logger.warn(e, message)
+    }
+
+    /**
+     * Logs error messages with workflow context.
+     *
+     * @param e Optional throwable to include in the log.
+     * @param message Lambda providing the log message.
+     */
+    private fun logError(e: Throwable? = null, message: () -> String) {
         withWorkflowContext(
             workflowId = id,
             workflowName = name,
@@ -144,44 +185,37 @@ class WorkflowInstance(
     }
 
     /**
-     * Workflow definition
+     * The workflow definition associated with this instance.
      */
     private val workflow: Workflow
 
     /**
-     * The root instance of the workflow.
-     *
-     * This property represents the root node instance of the workflow, which is initialized
-     * during the creation of the `WorkflowInstance`. It serves as the entry point for the
-     * workflow execution and contains the root-level task and the workflow scope.
+     * The root instance of the workflow, representing the entry point for execution.
      */
     internal val rootInstance: RootInstance
 
     /**
-     * Map of node positions to their corresponding node instances.
+     * A map of node positions to their corresponding node instances.
      */
     private val nodeInstances: Map<NodePosition, NodeInstance<*>>
 
     /**
-     * Instance status
+     * The current status of the workflow instance.
      */
     var status = WorkflowStatus.PENDING
 
     /**
-     * Instance ID
-     * (parsed from the initialStates)
+     * The unique identifier of the workflow instance.
      */
     internal val id: String
 
     /**
-     * Instance starting date
-     * (parsed from the initialStates)
+     * The starting date and time of the workflow instance.
      */
     internal val startedAt: Instant
 
     /**
-     * Instance raw input
-     * (parsed from the initialStates)
+     * The raw input data for the workflow instance.
      */
     internal val rawInput: JsonElement
 
@@ -218,11 +252,9 @@ class WorkflowInstance(
         this.nodeInstances = nodeInstances
     }
 
+
     /**
-     * The current node instance in the workflow.
-     *
-     * This property is initialized when the workflow is run and represents
-     * the current nodeInstance in the workflow execution.
+     * The current node instance in the workflow execution.
      */
     var current: NodeInstance<*>? = nodeInstances[position]
         ?: error("node not found in initialPosition $position")
@@ -234,13 +266,9 @@ class WorkflowInstance(
         get() = current?.node?.position
 
     /**
-     * Retrieves the current initialStates of all nodes in the workflow.
+     * Retrieves the current states of all nodes in the workflow.
      *
-     * This property collects the initialStates of all nodes starting from the root instance
-     * and returns them as a map where the keys are the node positions and the values
-     * are the node initialStates.
-     *
-     * @return A map of node positions to their corresponding node initialStates.
+     * @return A map of node positions to their corresponding node states.
      */
     val currentNodeStates: Map<NodePosition, NodeState>
         get() {
@@ -259,134 +287,143 @@ class WorkflowInstance(
      * Executes the workflow until completion, error, or waiting state.
      *
      * This method implements the main workflow execution loop with error handling:
-     * 1. Sets the workflow status to RUNNING
-     * 2. Executes the workflow nodes using tryRun() until completion or error
-     * 3. Handles exceptions using TryInstance error handlers if available
-     * 4. Manages retry logic with delays when configured
-     * 5. Updates workflow status based on execution result (COMPLETED, FAULTED, WAITING)
+     * - Sets the workflow status to RUNNING
+     * - Executes the workflow nodes using tryRun() until completion or error
+     * - Handles exceptions using TryInstance error handlers if available
+     * - Manages retry logic with delays when configured
+     * - Updates workflow status based on execution result (COMPLETED, FAULTED, WAITING)
      *
-     * Error handling strategy:
-     * - If an exception is caught by a TryInstance, execution continues with the catch handler
-     * - If a retry is configured with delay, execution pauses and will resume later
-     * - If no error handler catches the exception, the workflow is marked as FAULTED
-     *
-     * Edge cases:
-     * - If current is null after an iteration, the loop terminates
-     * - If a TryInstance has a delay, execution breaks to allow scheduling the retry
+     * @throws WaitException If the workflow enters a waiting state.
+     * @throws WorkflowException If an error occurs during workflow execution.
      */
     suspend fun run() {
         status = WorkflowStatus.RUNNING
 
-        debug { "Starting workflow execution" }
-
         do {
             try {
                 tryRun()
-                debug { "Workflow execution ran successfully" }
+            } catch (_: WaitException) {
+                status = WorkflowStatus.WAITING
                 break
             } catch (e: WorkflowException) {
-                val tryInstance = e.catching
+                onTaskFaulted()
+
                 // the error was not caught
+                val tryInstance = e.catching
                 if (tryInstance == null) {
                     // the workflow is faulted
                     status = WorkflowStatus.FAULTED
                     // and stopped there
                     current = e.raising
-                    error(e) { "Workflow execution faulted" }
+                    logError(e) { "Workflow execution faulted" }
+                    onWorkflowFaulted()
                     break
                 }
 
-                info { "Caught workflow exception: ${e.error}" }
+                logInfo { "Caught workflow exception: ${e.error}" }
 
-                if (tryInstance.delay != null) {
+                if (tryInstance.delay?.isPositive() == true) {
                     // reinit childIndex, as we are going to retry
                     tryInstance.childIndex = -1
                     // current being a TryInstance, implies that it should be retried
                     current = tryInstance
+                    onTaskRetried()
                     // Update node position after setting retry
-                    info { "Scheduling retry with delay: ${tryInstance.delay}" }
+                    logInfo { "Scheduling retry with delay: ${tryInstance.delay}" }
                     break
                 }
 
                 // continue with the catch node if any, or just continue if none
                 current = tryInstance.catchDoInstance?.also {
                     it.rawInput = tryInstance.transformedInput
-                    debug { "Continuing with catch handler: ${it.node.position}" }
+                    logDebug { "Continuing with catch handler: ${it.node.position}" }
                 } ?: tryInstance.then().also {
-                    debug { "No catch handler, continuing with next node: ${it?.node?.position}" }
+                    logDebug { "No catch handler, continuing with next node: ${it?.node?.position}" }
                 }
             }
         } while (current != null)
 
-        debug { "Workflow status: $status, current position: $currentPosition" }
+        if (current == null) {
+            status = WorkflowStatus.COMPLETED
+            onWorkflowCompleted()
+        }
+
+        logDebug { "Workflow status: $status, current position: $currentPosition" }
     }
 
     /**
-     * Core workflow execution algorithm that processes nodes until an activity is reached or workflow completes.
+     * Executes the current node in the workflow.
      *
-     * This method implements the main workflow execution algorithm:
-     * 1. Determines the next node to execute based on current state
-     * 2. Executes flow nodes (non-activity nodes) in sequence until an activity node is reached
-     * 3. Executes the activity node if one is reached
-     * 4. Updates workflow status based on execution result
+     * This method handles the execution logic for individual nodes, including:
+     * - Starting tasks
+     * - Skipping tasks
+     * - Transitioning to the next node
      *
-     * The algorithm has three main phases:
-     * - Initialization: Determine the starting node based on current state
-     * - Flow node execution: Process flow nodes in sequence until an activity is reached
-     * - Activity execution: Execute the activity node and update workflow status
-     *
-     * Entry points:
-     * - Starting a new workflow
-     * - Continuing after an activity execution
-     * - Restarting a TryInstance after an error
-     *
-     * Exit conditions:
-     * - Workflow completed (current == null)
-     * - Activity node reached and executed
-     * - WaitInstance encountered (workflow enters WAITING state)
-     *
-     * Performance considerations:
-     * - Flow nodes are executed synchronously in a loop
-     * - Activity nodes may perform I/O operations and should be designed for efficiency
+     * @throws WorkflowException If an error occurs during node execution.
      */
     private suspend fun tryRun() {
-        // Possible cases when starting here:
-        // - starting a workflow
-        // - continuing right after an activity execution (before transformedOutput is set)
-        // - restarting a TryInstance
-
-        current = when (current!!.rawOutput == null || current is TryInstance) {
-            // the current node position is not completed (start or retry)
-            true -> current
-            // the current node position is completed, go to next
-            false -> current?.then()
-        }
-
-        // find and execute the next activity
-        while (true) {
-            val current = current ?: break
-            // get transformed Input for this node
-            this.current = when (current.shouldStart()) {
-                true -> {
-                    // if next is an activity, then break
-                    if (current.node.isActivity()) break
-                    // execute current NodeInstance flow node
-                    current.run()
-                    // continue flow node
-                    current.`continue`()
+        while (current != null) {
+            val node = current!!
+            when {
+                // starting current task
+                node.startedAt == null && node.shouldStart() -> {
+                    node.startedAt = Clock.System.now()
+                    if (node == rootInstance) onWorkflowStarted() else onTaskStarted()
+                    node.run()
                 }
 
-                false -> current.parent?.`continue`()
+                // skipped tasks
+                node.startedAt == null -> skipTo(node.parent?.`continue`()!!)
+
+                // continue after task execution
+                else -> goTo(if (node.rawOutput == null) node.`continue`() else node.then())
             }
         }
+    }
 
-        when (current) {
-            null -> status = WorkflowStatus.COMPLETED
+    private fun skipTo(next: NodeInstance<*>) {
+        when {
+            current.isGoingUp(next) -> {
+                current?.skippingUpTo(next)
+                current = next
+            }
 
-            // execute the activity
             else -> {
-                current?.run()
-                if (current is WaitInstance) status = WorkflowStatus.WAITING
+                // Going to self or sibling
+                current?.skippingSideTo(next)
+                current = next
+                onTaskCreated()
+            }
+        }
+    }
+
+    private fun goTo(next: NodeInstance<*>?) {
+        when {
+            next == null -> {
+                current?.reset()
+                current = null
+            }
+
+            current.isGoingUp(next) -> {
+                // if the next node is going up, we are done with the current node
+                if (current == rootInstance) onWorkflowCompleted() else onTaskCompleted()
+                current?.goingUpTo(next)
+                current = next
+            }
+
+            current.isGoingDown(next) -> {
+                // if the next node is going down, we need to set the input for the next node
+                current?.goingDownTo(next)
+                current = next
+                onTaskCreated()
+            }
+
+            else -> {
+                // Going to self or sibling
+                onTaskCompleted()
+                current?.goingSideTo(next)
+                current = next
+                onTaskCreated()
             }
         }
     }
@@ -394,24 +431,10 @@ class WorkflowInstance(
     /**
      * Creates a node instance based on the node type and recursively builds the node tree.
      *
-     * This method is responsible for:
-     * 1. Creating the appropriate NodeInstance implementation based on the task type
-     * 2. Applying any saved state from initialStates to restore workflow state
-     * 3. Recursively creating child node instances to build the complete node tree
-     *
-     * The algorithm uses a factory pattern approach:
-     * - Each task type maps to a specific NodeInstance implementation
-     * - The node tree is built in a depth-first manner
-     * - State is restored from initialStates if available
-     *
-     * Edge cases:
-     * - If an unknown task type is encountered, an IllegalArgumentException is thrown
-     * - For non-root tasks, parent must not be null (enforced by !!)
-     *
-     * @param initialStates Map of saved states by position to restore workflow state
-     * @param parent The parent node instance (null only for root nodes)
-     * @return The created node instance with its complete subtree
-     * @throws IllegalArgumentException if an unknown task type is encountered
+     * @param initialStates Map of saved states by position to restore workflow state.
+     * @param parent The parent node instance (null only for root nodes).
+     * @return The created node instance with its complete subtree.
+     * @throws IllegalArgumentException If an unknown task type is encountered.
      */
     @Suppress("UNCHECKED_CAST")
     private fun Node<*>.createInstance(
@@ -444,6 +467,12 @@ class WorkflowInstance(
                 this.children?.map { child -> child.createInstance(initialStates, nodeInstance) } ?: emptyList()
         }
 
+    /**
+     * Throws an error with a formatted message.
+     *
+     * @param message The error message to include.
+     * @throws IllegalStateException Always thrown with the provided message.
+     */
     private fun error(message: Any): Nothing =
         throw IllegalStateException("Workflow $name (version $version): $message")
 }

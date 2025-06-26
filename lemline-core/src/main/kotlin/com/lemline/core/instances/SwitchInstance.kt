@@ -10,7 +10,11 @@ import io.serverlessworkflow.api.types.SwitchTask
 class SwitchInstance(override val node: Node<SwitchTask>, override val parent: NodeInstance<*>) :
     NodeInstance<SwitchTask>(node, parent) {
 
-    override fun `continue`(): NodeInstance<*>? {
+    override suspend fun run() {
+        this.rawOutput = transformedInput
+    }
+
+    override fun then(): NodeInstance<*>? {
         var then: FlowDirective? = null
 
         // evaluate the different cases
@@ -21,7 +25,7 @@ class SwitchInstance(override val node: Node<SwitchTask>, override val parent: N
             }
         }
 
-        return then(then?.get())
+        return then(then)
     }
 
     private fun evalCase(`when`: String, name: String) = evalBoolean(transformedInput, `when`, name)
