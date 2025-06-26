@@ -2,7 +2,7 @@
 package com.lemline.core.runs
 
 import com.lemline.core.getWorkflowInstance
-import com.lemline.core.nodes.activities.WaitInstance
+import com.lemline.core.instances.WaitInstance
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.serverlessworkflow.impl.WorkflowStatus
@@ -36,7 +36,7 @@ class WaitTest {
         instance.status shouldBe WorkflowStatus.WAITING
         instance.current.shouldBeInstanceOf<WaitInstance>()
         (instance.current as WaitInstance).delay shouldBe 1.days + 2.hours + 30.minutes + 15.seconds
-        println("Continuing...")
+
         // Re-Run the workflow (starting from the wait)
         instance.run()
 
@@ -60,7 +60,6 @@ class WaitTest {
         instance.status shouldBe WorkflowStatus.WAITING
         instance.current.shouldBeInstanceOf<WaitInstance>()
         (instance.current as WaitInstance).delay shouldBe 1.days + 2.hours + 30.minutes + 15.seconds
-        println("Continuing...")
 
         // Re-Run the workflow (starting from the wait)
         instance.run()
