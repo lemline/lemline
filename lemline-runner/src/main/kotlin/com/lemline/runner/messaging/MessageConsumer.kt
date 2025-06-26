@@ -14,6 +14,7 @@ import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.config.CONSUMER_ENABLED
+import com.lemline.runner.exceptions.TaskCompletedException
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.OutBoxStatus
@@ -151,7 +152,15 @@ internal class MessageConsumer @Inject constructor(
             secrets = Secrets.get(workflow),
         )
 
-        instance.run()
+        instance.onTaskCompleted {
+            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        }
+
+        try {
+            instance.run()
+        } catch (_: TaskCompletedException) {
+            // do nothing
+        }
 
         val nextMessage = when (instance.status) {
             WorkflowStatus.PENDING -> TODO()

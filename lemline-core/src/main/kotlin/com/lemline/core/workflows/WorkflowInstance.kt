@@ -67,6 +67,7 @@ import kotlinx.serialization.json.JsonElement
  * @property position The current position in the workflow.
  * @property secrets A map of secrets used in the workflow.
  */
+@Suppress("unused")
 class WorkflowInstance(
     val name: String,
     val version: String,
@@ -113,14 +114,42 @@ class WorkflowInstance(
     private val logger = logger()
 
     // Event handlers for workflow and task lifecycle events
-    var onWorkflowStarted = {}
-    var onWorkflowCompleted = {}
-    var onWorkflowFaulted = {}
-    var onTaskCreated = {}
-    var onTaskStarted = {}
-    var onTaskCompleted = {}
-    var onTaskFaulted = {}
-    var onTaskRetried = {}
+    fun onWorkflowStarted(handler: () -> Unit) {
+        onWorkflowStarted = handler
+    }
+
+    fun onWorkflowCompleted(handler: () -> Unit) {
+        onWorkflowCompleted = handler
+    }
+
+    fun onWorkflowFaulted(handler: () -> Unit) {
+        onWorkflowFaulted = handler
+    }
+
+    fun onTaskStarted(handler: () -> Unit) {
+        onTaskStarted = handler
+    }
+
+    fun onTaskCompleted(handler: () -> Unit) {
+        onTaskCompleted = handler
+    }
+
+    fun onTaskFaulted(handler: () -> Unit) {
+        onTaskFaulted = handler
+    }
+
+    fun onTaskRetried(handler: () -> Unit) {
+        onTaskRetried = handler
+    }
+
+    // Default event handlers
+    private var onWorkflowStarted = {}
+    private var onWorkflowCompleted = {}
+    private var onWorkflowFaulted = {}
+    private var onTaskStarted = {}
+    private var onTaskCompleted = {}
+    private var onTaskFaulted = {}
+    private var onTaskRetried = {}
 
     /**
      * Logs debug messages with workflow context.
@@ -327,9 +356,9 @@ class WorkflowInstance(
                     tryInstance.childIndex = -1
                     // current being a TryInstance, implies that it should be retried
                     current = tryInstance
-                    onTaskRetried()
                     // Update node position after setting retry
                     logInfo { "Scheduling retry with delay: ${tryInstance.delay}" }
+                    onTaskRetried()
                     break
                 }
 
@@ -366,14 +395,17 @@ class WorkflowInstance(
             val node = current!!
             when {
                 // starting current task
-                node.startedAt == null && node.shouldStart() -> {
-                    node.startedAt = Clock.System.now()
-                    if (node == rootInstance) onWorkflowStarted() else onTaskStarted()
-                    node.run()
-                }
+                node.startedAt == null -> when (node.shouldStart()) {
+                    // run the current task
+                    true -> {
+                        if (node == rootInstance) onWorkflowStarted() else onTaskStarted()
+                        node.startedAt = Clock.System.now()
+                        node.run()
+                    }
 
-                // skipped tasks
-                node.startedAt == null -> skipTo(node.parent?.`continue`()!!)
+                    // skip the current task
+                    false -> skipTo(node.parent?.`continue`()!!)
+                }
 
                 // continue after task execution
                 else -> goTo(if (node.rawOutput == null) node.`continue`() else node.then())
@@ -389,10 +421,8 @@ class WorkflowInstance(
             }
 
             else -> {
-                // Going to self or sibling
                 current?.skippingSideTo(next)
                 current = next
-                onTaskCreated()
             }
         }
     }
@@ -405,17 +435,14 @@ class WorkflowInstance(
             }
 
             current.isGoingUp(next) -> {
-                // if the next node is going up, we are done with the current node
                 if (current == rootInstance) onWorkflowCompleted() else onTaskCompleted()
                 current?.goingUpTo(next)
                 current = next
             }
 
             current.isGoingDown(next) -> {
-                // if the next node is going down, we need to set the input for the next node
                 current?.goingDownTo(next)
                 current = next
-                onTaskCreated()
             }
 
             else -> {
@@ -423,7 +450,6 @@ class WorkflowInstance(
                 onTaskCompleted()
                 current?.goingSideTo(next)
                 current = next
-                onTaskCreated()
             }
         }
     }

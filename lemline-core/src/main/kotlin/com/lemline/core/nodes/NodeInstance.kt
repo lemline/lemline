@@ -268,6 +268,13 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         return children[target]
     }
 
+    private fun logEntering() {
+        logDebug { "Entering node ${node.name} (${node.task::class.simpleName})" }
+        logDebug { "      rawInput         = $rawInput" }
+        logDebug { "      scope            = $scope" }
+        logDebug { "      transformedInput = $transformedInput" }
+    }
+
     private fun logLeaving() {
         logDebug { "Leaving node ${node.name} (${node.task::class.simpleName})" }
         logDebug { "      rawOutput         = $rawOutput" }
@@ -275,43 +282,63 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         logDebug { "      transformedOutput = $transformedOutput" }
     }
 
+    private fun logSkipping() {
+        logDebug { "Skipping node ${node.name} (${node.task::class.simpleName})" }
+    }
+
     internal fun skippingUpTo(next: NodeInstance<*>) {
+        // log skipping current node
+        logSkipping()
+        // Set the next node's raw input to the current raw input
         next.rawOutput = rawInput
+        // reset state from current to next
         resetUpTo(next)
+        // log entering next node
+        next.logEntering()
     }
 
     internal fun skippingSideTo(next: NodeInstance<*>) {
+        // log skipping current node
+        logSkipping()
+        // Set the next node's raw input to the current raw input
         rawInput.let {
             reset()
             next.rawInput = it
         }
+        // log entering next node
+        next.logEntering()
     }
 
     internal fun goingUpTo(next: NodeInstance<*>) {
-        // Exiting node
-        logLeaving()
         // Update workflow context using export.as expression if provided
         exportAs?.let { rootInstance.context = it }
+        // log leaving current node
+        logLeaving()
         // Set the next node's raw output to the transformed output
         next.rawOutput = transformedOutput
+        // reset state from current to next
         resetUpTo(next)
     }
 
     internal fun goingSideTo(next: NodeInstance<*>) {
-        // Exiting node
-        logLeaving()
         // Update workflow context using export.as expression if provided
         exportAs?.let { rootInstance.context = it }
-        // Set the next node's raw input to the transformed output
+        // log leaving current node
+        logLeaving()
+        // Set the next node's raw input to the transformed output (can be self)
         transformedOutput.let {
             reset()
             next.rawInput = it
         }
+        // log entering next node
+        next.logEntering()
     }
 
     internal fun goingDownTo(next: NodeInstance<*>) {
-        // Going do
+        // Set the next node's raw input to the transformed output
         next.rawInput = transformedInput
+        // log entering next node
+        next.logEntering()
     }
 
     /**
@@ -330,13 +357,6 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         val shouldStart = node.task.`if`
             ?.let { evalBoolean(transformedInput, it, ".if") }
             ?: true
-
-        if (shouldStart) {
-            logDebug { "Entering node ${node.name} (${node.task::class.simpleName})" }
-            logDebug { "      rawInput         = $rawInput" }
-            logDebug { "      scope            = $scope" }
-            logDebug { "      transformedInput = $transformedInput" }
-        }
 
         return shouldStart
     }
@@ -489,13 +509,3 @@ internal fun NodeInstance<*>?.isGoingUp(node: NodeInstance<*>?): Boolean = when 
  * Check if the current node is going down to the given node.
  */
 internal fun NodeInstance<*>?.isGoingDown(node: NodeInstance<*>?): Boolean = node.isGoingUp(this)
-
-/**
- * Check if the current node is a sibling of the given node.
- */
-internal fun NodeInstance<*>?.isSibling(node: NodeInstance<*>?): Boolean = when {
-    this == null -> node == null
-    node == null -> false
-    parent?.children?.any { it == node } == true -> true
-    else -> false
-}
