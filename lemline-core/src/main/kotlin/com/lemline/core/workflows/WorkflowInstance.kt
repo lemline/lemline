@@ -337,8 +337,9 @@ class WorkflowInstance(
             } catch (e: WorkflowException) {
                 onTaskFaulted()
 
-                // the error was not caught
                 val tryInstance = e.catching
+
+                // the error was not caught
                 if (tryInstance == null) {
                     // the workflow is faulted
                     status = WorkflowStatus.FAULTED
@@ -351,6 +352,7 @@ class WorkflowInstance(
 
                 logInfo { "Caught workflow exception: ${e.error}" }
 
+                // retry if the TryInstance has a delay configured
                 if (tryInstance.delay?.isPositive() == true) {
                     // reinit childIndex, as we are going to retry
                     tryInstance.childIndex = -1
@@ -362,7 +364,7 @@ class WorkflowInstance(
                     break
                 }
 
-                // continue with the catch node if any, or just continue if none
+                // if the tryInstance is not retryable, we just continue with the catch node
                 current = tryInstance.catchDoInstance?.also {
                     it.rawInput = tryInstance.transformedInput
                     logDebug { "Continuing with catch handler: ${it.node.position}" }

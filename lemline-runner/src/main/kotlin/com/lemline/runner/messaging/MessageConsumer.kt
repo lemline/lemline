@@ -219,12 +219,7 @@ internal class MessageConsumer @Inject constructor(
         val delayedUntil = Instant.now().plus(delay?.toJavaDuration() ?: error("No delay set in for $this"))
 
         // Save the message to the retry table
-        retryRepository.insert(
-            RetryModel(
-                message = msg.toJsonString(),
-                delayedUntil = delayedUntil,
-            ),
-        )
+        retryRepository.insert(RetryModel(message = msg.toJsonString(), delayedUntil = delayedUntil))
 
         // Stop here instance, the outbox will process it later
         return null

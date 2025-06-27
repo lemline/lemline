@@ -25,7 +25,7 @@ class RunInstance(
         rawOutput = when (runConfig) {
             is RunShell -> run(runConfig)
             is RunScript -> run(runConfig)
-            is RunWorkflow -> onError(COMMUNICATION, "Workflow execution not yet implemented")
+            is RunWorkflow -> run(runConfig)
             is RunContainer -> onError(COMMUNICATION, "Container execution not yet implemented")
             else -> onError(RUNTIME, "Unknown run task configuration: ${runConfig.javaClass.simpleName}")
         }
