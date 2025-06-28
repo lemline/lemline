@@ -13,7 +13,7 @@ import kotlinx.coroutines.withContext
  * @property arguments A map of arguments to pass to the command. Keys are argument names, and values are their corresponding values.
  * @property environment A map of environment variables to set for the command execution.
  */
-data class ShellRun(
+data class Shell(
     val command: String,
     val arguments: Map<String, String>? = null,
     val environment: Map<String, String>? = null
@@ -141,9 +141,3 @@ data class ShellRun(
         )
     }
 }
-
-data class ProcessResult(
-    val code: Int,
-    val stdout: String,
-    val stderr: String
-)

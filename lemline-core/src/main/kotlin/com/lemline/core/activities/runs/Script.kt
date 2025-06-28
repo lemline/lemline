@@ -22,7 +22,7 @@ import kotlinx.coroutines.withContext
  * @property environment Environment variables for the script execution
  * @property workingDir Optional working directory for script execution
  */
-data class ScriptRun(
+data class Script(
     val script: String,
     val language: String,
     val arguments: Map<String, String>? = null,

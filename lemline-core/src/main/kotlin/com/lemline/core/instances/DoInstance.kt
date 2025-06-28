@@ -16,4 +16,8 @@ open class DoInstance(override val node: Node<DoTask>, override val parent: Node
             else -> children[childIndex]
         }
     }
+
+    override suspend fun run() {
+        // do nothing
+    }
 }

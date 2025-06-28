@@ -1,21 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.instances.runners
+package com.lemline.core.activities.runs
 
-import com.lemline.core.activities.runs.ShellRun
 import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
-import com.lemline.core.nodes.NodeInstance
+import com.lemline.core.instances.RunInstance
 import io.serverlessworkflow.api.types.RunShell
-import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.ALL
-import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.CODE
-import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.NONE
-import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.STDERR
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.STDOUT
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
-internal suspend fun NodeInstance<*>.run(runShell: RunShell): JsonElement {
+internal suspend fun RunInstance.runShell(runShell: RunShell): JsonElement {
     logInfo { "Executing run shell command: ${node.name}" }
 
     val shellConfig = runShell.shell
@@ -67,7 +59,7 @@ internal suspend fun NodeInstance<*>.run(runShell: RunShell): JsonElement {
     logDebug { "Return: $returnType" }
 
     try {
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = command,
             arguments = arguments,
             environment = environment
@@ -80,31 +72,14 @@ internal suspend fun NodeInstance<*>.run(runShell: RunShell): JsonElement {
             return transformedInput
         }
 
-        val result = shellRun.execute()
+        val processResult = shellRun.execute()
 
-        logDebug { "Shell execution completed with exit code: ${result.code}" }
-        logDebug { "stdout: ${result.stdout}" }
-        if (result.stderr.isNotEmpty()) {
-            logDebug { "stderr: ${result.stderr}" }
-        }
+        logDebug { "Shell execution completed with exit code: ${processResult.code}" }
+        logDebug { "stdout: ${processResult.stdout}" }
+        logDebug { "stderr: ${processResult.stderr}" }
 
         // Configure output based on the return type
-        val output = when (returnType) {
-            STDOUT -> JsonPrimitive(result.stdout)
-            STDERR -> JsonPrimitive(result.stderr)
-            CODE -> JsonPrimitive(result.code)
-            ALL -> JsonObject(
-                mapOf(
-                    "code" to JsonPrimitive(result.code),
-                    "stdout" to JsonPrimitive(result.stdout),
-                    "stderr" to JsonPrimitive(result.stderr)
-                )
-            )
-
-            NONE -> JsonNull
-        }
-
-        return output
+        return processResult.get(returnType)
     } catch (e: Exception) {
         logError(e) { "Failed to execute shell command" }
         val errorMsg = "Shell command execution failed: ${e.message}"

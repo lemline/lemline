@@ -6,4 +6,9 @@ import com.lemline.core.nodes.NodeInstance
 import io.serverlessworkflow.api.types.ForkTask
 
 class ForkInstance(override val node: Node<ForkTask>, override val parent: NodeInstance<*>) :
-    NodeInstance<ForkTask>(node, parent)
+    NodeInstance<ForkTask>(node, parent) {
+
+    override suspend fun run() {
+        // do nothing
+    }
+}
