@@ -1,19 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.instances.runners
+package com.lemline.core.activities.runs
 
-import com.lemline.core.activities.runs.ScriptRun
 import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
-import com.lemline.core.nodes.NodeInstance
+import com.lemline.core.instances.RunInstance
 import com.lemline.core.utils.toUrl
 import io.serverlessworkflow.api.types.ExternalScript
 import io.serverlessworkflow.api.types.InlineScript
 import io.serverlessworkflow.api.types.RunScript
-import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.ALL
-import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.CODE
-import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.NONE
-import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.STDERR
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.STDOUT
 import io.serverlessworkflow.api.types.Script
 import java.io.File
@@ -21,11 +16,8 @@ import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Paths
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
-internal suspend fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
+internal suspend fun RunInstance.runScript(runScript: RunScript): JsonElement {
     logInfo { "Executing run script: ${node.name}" }
 
     val scriptUnion = runScript.script
@@ -98,7 +90,7 @@ internal suspend fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
     logDebug { "Return: $returnType" }
 
     try {
-        val scriptRun = ScriptRun(
+        val scriptRun = Script(
             script = scriptContent,
             language = language,
             arguments = arguments,
@@ -119,25 +111,10 @@ internal suspend fun NodeInstance<*>.run(runScript: RunScript): JsonElement {
 
         logDebug { "Script execution completed with exit code: ${processResult.code}" }
         logDebug { "stdout: ${processResult.stdout}" }
-        if (processResult.stderr.isNotEmpty()) {
-            logDebug { "stderr: ${processResult.stderr}" }
-        }
+        logDebug { "stderr: ${processResult.stderr}" }
 
         // Configure output based on the return type
-        return when (returnType) {
-            STDOUT -> JsonPrimitive(processResult.stdout)
-            STDERR -> JsonPrimitive(processResult.stderr)
-            CODE -> JsonPrimitive(processResult.code)
-            ALL -> JsonObject(
-                mapOf(
-                    "code" to JsonPrimitive(processResult.code),
-                    "stdout" to JsonPrimitive(processResult.stdout),
-                    "stderr" to JsonPrimitive(processResult.stderr)
-                )
-            )
-
-            NONE -> JsonNull
-        }
+        return processResult.get(returnType)
     } catch (e: Exception) {
         logError(e) { "Failed to execute script" }
         val errorMsg = "Script execution failed: ${e.message}"

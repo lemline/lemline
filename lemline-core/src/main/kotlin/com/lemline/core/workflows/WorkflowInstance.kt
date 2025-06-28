@@ -8,7 +8,7 @@ import com.lemline.common.logger
 import com.lemline.common.warn
 import com.lemline.common.withWorkflowContext
 import com.lemline.core.RuntimeDescriptor
-import com.lemline.core.errors.WaitException
+import com.lemline.core.activities.ActivityRunnerProvider
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.instances.CallAsyncApiInstance
@@ -74,6 +74,7 @@ class WorkflowInstance(
     states: Map<NodePosition, NodeState>,
     position: NodePosition,
     secrets: Map<String, JsonElement>,
+    private val activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
 ) {
 
     /**
@@ -96,6 +97,7 @@ class WorkflowInstance(
             id: String,
             rawInput: JsonElement,
             secrets: Map<String, JsonElement> = emptyMap(),
+            activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
         ) = WorkflowInstance(
             name = name,
             version = version,
@@ -108,6 +110,7 @@ class WorkflowInstance(
             ),
             position = NodePosition.root,
             secrets = secrets,
+            activityRunnerProvider = activityRunnerProvider
         )
     }
 
@@ -262,6 +265,7 @@ class WorkflowInstance(
         val rootNode = Workflows.getRootNode(workflow)
         rootInstance = rootNode.createInstance(states, null) as RootInstance
         rootInstance.secrets = secrets
+        rootInstance.activityRunnerProvider = activityRunnerProvider
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
             id = id,
@@ -322,7 +326,6 @@ class WorkflowInstance(
      * - Manages retry logic with delays when configured
      * - Updates workflow status based on execution result (COMPLETED, FAULTED, WAITING)
      *
-     * @throws WaitException If the workflow enters a waiting state.
      * @throws WorkflowException If an error occurs during workflow execution.
      */
     suspend fun run() {
@@ -331,9 +334,6 @@ class WorkflowInstance(
         do {
             try {
                 tryRun()
-            } catch (_: WaitException) {
-                status = WorkflowStatus.WAITING
-                break
             } catch (e: WorkflowException) {
                 onTaskFaulted()
 
@@ -400,8 +400,9 @@ class WorkflowInstance(
                 node.startedAt == null -> when (node.shouldStart()) {
                     // run the current task
                     true -> {
-                        if (node == rootInstance) onWorkflowStarted() else onTaskStarted()
                         node.startedAt = Clock.System.now()
+                        if (node is WaitInstance) status = WorkflowStatus.WAITING
+                        if (node == rootInstance) onWorkflowStarted() else onTaskStarted()
                         node.run()
                     }
 
@@ -410,7 +411,10 @@ class WorkflowInstance(
                 }
 
                 // continue after task execution
-                else -> goTo(if (node.rawOutput == null) node.`continue`() else node.then())
+                else -> {
+                    if (node is WaitInstance) status = WorkflowStatus.RUNNING
+                    goTo(if (node.rawOutput == null) node.`continue`() else node.then())
+                }
             }
         }
     }

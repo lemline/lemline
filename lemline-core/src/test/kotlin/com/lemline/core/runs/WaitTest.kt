@@ -3,6 +3,7 @@ package com.lemline.core.runs
 
 import com.lemline.core.getWorkflowInstance
 import com.lemline.core.instances.WaitInstance
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.serverlessworkflow.impl.WorkflowStatus
@@ -13,6 +14,8 @@ import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonNull
 import org.junit.jupiter.api.Test
+
+private class WaitStartedException() : RuntimeException()
 
 class WaitTest {
 
@@ -29,8 +32,12 @@ class WaitTest {
         """
         val instance = getWorkflowInstance(workflowYaml, JsonNull)
 
+        instance.onTaskStarted {
+            if (instance.current is WaitInstance) throw WaitStartedException()
+        }
+
         // Run the workflow (stops at the wait)
-        instance.run()
+        shouldThrow<WaitStartedException> { instance.run() }
 
         // Assert the current node is the wait
         instance.status shouldBe WorkflowStatus.WAITING
@@ -38,6 +45,7 @@ class WaitTest {
         (instance.current as WaitInstance).delay shouldBe 1.days + 2.hours + 30.minutes + 15.seconds
 
         // Re-Run the workflow (starting from the wait)
+        instance.current?.rawOutput = instance.current?.transformedInput
         instance.run()
 
         // Assert that the elapsed time is at least the wait duration
@@ -53,8 +61,12 @@ class WaitTest {
         """
         val instance = getWorkflowInstance(workflowYaml, JsonNull)
 
+        instance.onTaskStarted {
+            if (instance.current is WaitInstance) throw WaitStartedException()
+        }
+
         // Run the workflow (stops at the wait)
-        instance.run()
+        shouldThrow<WaitStartedException> { instance.run() }
 
         // Assert the current node is the wait
         instance.status shouldBe WorkflowStatus.WAITING
@@ -62,6 +74,7 @@ class WaitTest {
         (instance.current as WaitInstance).delay shouldBe 1.days + 2.hours + 30.minutes + 15.seconds
 
         // Re-Run the workflow (starting from the wait)
+        instance.current?.rawOutput = instance.current?.transformedInput
         instance.run()
 
         // Assert that the elapsed time is at least the wait duration

@@ -86,6 +86,10 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
         return super.shouldStart()
     }
 
+    override suspend fun run() {
+        // do nothing
+    }
+
     /**
      * Determines if this tryInstance is catching the specified error.
      *

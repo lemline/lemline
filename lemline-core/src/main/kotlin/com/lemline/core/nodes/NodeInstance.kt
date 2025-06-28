@@ -361,9 +361,27 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         return shouldStart
     }
 
-    open suspend fun run() {
-        // this method should be overridden by subclasses to implement the activity logic
-    }
+    abstract suspend fun run() // <--- Make it abstract
+
+//    open suspend fun run() {
+//        // Default implementation for activity nodes.
+//        // It delegates the execution to the ActivityRunner.
+//        // Flow control nodes (e.g., For, Switch, Try) must override this method.
+//        when (this) {
+//            is CallHttpInstance -> rootInstance.activityRunner.run(this)
+//            is CallGrpcInstance -> rootInstance.activityRunner.run(this)
+//            is CallAsyncApiInstance -> rootInstance.activityRunner.run(this)
+//            is CallOpenApiInstance -> rootInstance.activityRunner.run(this)
+//            is EmitInstance -> rootInstance.activityRunner.run(this)
+//            is ListenInstance -> rootInstance.activityRunner.run(this)
+//            is RunInstance -> rootInstance.activityRunner.run(this)
+//            is WaitInstance -> rootInstance.activityRunner.run(this)
+//            else -> {
+//                // This branch is for flow control nodes that have their own `run` implementation,
+//                // or for new activity nodes that have not yet been added to this `when` statement.
+//            }
+//        }
+//    }
 
     /**
      * Validate a Schema

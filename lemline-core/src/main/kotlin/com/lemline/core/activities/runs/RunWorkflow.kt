@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.instances.runners
+package com.lemline.core.activities.runs
 
 import com.lemline.core.errors.RunWorkflowException
 import com.lemline.core.nodes.NodeInstance
