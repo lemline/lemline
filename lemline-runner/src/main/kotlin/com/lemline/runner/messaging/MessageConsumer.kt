@@ -15,6 +15,8 @@ import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.config.CONSUMER_ENABLED
 import com.lemline.runner.exceptions.TaskCompletedException
+import com.lemline.runner.exceptions.TaskRetriedException
+import com.lemline.runner.exceptions.TaskStartedException
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.OutBoxStatus
@@ -152,13 +154,29 @@ internal class MessageConsumer @Inject constructor(
             secrets = Secrets.get(workflow),
         )
 
+
+        // stop after activity completion
         instance.onTaskCompleted {
             if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        }
+
+        // stop when waiting
+        instance.onTaskStarted {
+            if (instance.current is WaitInstance && (instance.current as WaitInstance).delay.isPositive()) throw TaskStartedException()
+        }
+
+        // stop when retrying
+        instance.onTaskRetried {
+            throw TaskRetriedException()
         }
 
         try {
             instance.run()
         } catch (_: TaskCompletedException) {
+            // do nothing
+        } catch (_: TaskStartedException) {
+            // do nothing
+        } catch (_: TaskRetriedException) {
             // do nothing
         }
 
