@@ -20,6 +20,7 @@ import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.instances.RootInstance
 import com.lemline.core.instances.TryInstance
 import com.lemline.core.json.LemlineJson
+import com.lemline.core.json.LemlineJson.toJsonElement
 import com.lemline.core.schemas.SchemaValidator
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
@@ -27,6 +28,7 @@ import io.serverlessworkflow.api.types.FlowDirectiveEnum
 import io.serverlessworkflow.api.types.InputFrom
 import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.api.types.SchemaUnion
+import io.serverlessworkflow.api.types.SubflowInput
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.datetime.Instant
@@ -426,6 +428,9 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
                 false -> onError(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
             }
         }
+
+    internal fun eval(data: JsonElement, subFlowInput: SubflowInput?, scope: JsonObject = this.scope) =
+        subFlowInput?.let { eval(data, it.additionalProperties.toJsonElement(), scope, true) } ?: data
 
     private fun eval(data: JsonElement, inputFrom: InputFrom?, scope: JsonObject = this.scope) =
         inputFrom?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data

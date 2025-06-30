@@ -53,6 +53,12 @@ import io.serverlessworkflow.api.types.WaitTask
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import java.util.concurrent.CompletableFuture
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.future.future
+import kotlinx.coroutines.runBlocking
 import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
@@ -82,15 +88,21 @@ class WorkflowInstance(
      */
     companion object {
         /**
-         * Creates a new instance of the workflow.
+         * Creates a new instance of the workflow. This is the primary factory method.
+         *
+         * For Java users, this method is exposed as a static method on `WorkflowInstance`
+         * and provides overloads for optional parameters.
          *
          * @param name The name of the workflow.
          * @param version The version of the workflow.
          * @param id The unique identifier of the workflow instance.
          * @param rawInput The raw input data for the workflow as a JSON node.
          * @param secrets A map of secrets to be used in the workflow.
+         * @param activityRunnerProvider The provider for custom activity runners.
          * @return A new instance of the WorkflowInstance class.
          */
+        @JvmStatic
+        @JvmOverloads
         fun createNew(
             name: String,
             version: String,
@@ -112,47 +124,163 @@ class WorkflowInstance(
             secrets = secrets,
             activityRunnerProvider = activityRunnerProvider
         )
+
+        /**
+         * Sets a handler to be invoked when the workflow starts.
+         *
+         * @param handler A lambda function that receives the `WorkflowInstance` when the workflow starts.
+         */
+        @JvmStatic
+        fun onWorkflowStarted(handler: (WorkflowInstance) -> Unit) {
+            onWorkflowStarted = handler
+        }
+
+        /**
+         * Sets a handler to be invoked when the workflow completes.
+         *
+         * @param handler A lambda function that receives the `WorkflowInstance` when the workflow completes.
+         */
+        @JvmStatic
+        fun onWorkflowCompleted(handler: (WorkflowInstance) -> Unit) {
+            onWorkflowCompleted = handler
+        }
+
+        /**
+         * Sets a handler to be invoked when the workflow encounters a fault.
+         *
+         * @param handler A lambda function that receives the `WorkflowInstance` when the workflow faults.
+         */
+        @JvmStatic
+        fun onWorkflowFaulted(handler: (WorkflowInstance) -> Unit) {
+            onWorkflowFaulted = handler
+        }
+
+        /**
+         * Sets a handler to be invoked when a task starts.
+         *
+         * @param handler A lambda function that receives the `WorkflowInstance` when a task starts.
+         */
+        @JvmStatic
+        fun onTaskStarted(handler: (WorkflowInstance) -> Unit) {
+            onTaskStarted = handler
+        }
+
+        /**
+         * Sets a handler to be invoked when a task completes.
+         *
+         * @param handler A lambda function that receives the `WorkflowInstance` when a task completes.
+         */
+        @JvmStatic
+        fun onTaskCompleted(handler: (WorkflowInstance) -> Unit) {
+            onTaskCompleted = handler
+        }
+
+        /**
+         * Sets a handler to be invoked when a task encounters a fault.
+         *
+         * @param handler A lambda function that receives the `WorkflowInstance` when a task faults.
+         */
+        @JvmStatic
+        fun onTaskFaulted(handler: (WorkflowInstance) -> Unit) {
+            onTaskFaulted = handler
+        }
+
+        /**
+         * Sets a handler to be invoked when a task is retried.
+         *
+         * @param handler A lambda function that receives the `WorkflowInstance` when a task is retried.
+         */
+        @JvmStatic
+        fun onTaskRetried(handler: (WorkflowInstance) -> Unit) {
+            onTaskRetried = handler
+        }
+
+        // Default event handlers
+        private var onWorkflowStarted = { i: WorkflowInstance -> }
+        private var onWorkflowCompleted = { i: WorkflowInstance -> }
+        private var onWorkflowFaulted = { i: WorkflowInstance -> }
+        private var onTaskStarted = { i: WorkflowInstance -> }
+        private var onTaskCompleted = { i: WorkflowInstance -> }
+        private var onTaskFaulted = { i: WorkflowInstance -> }
+        private var onTaskRetried = { i: WorkflowInstance -> }
+
+        internal val scope = CoroutineScope(Dispatchers.IO)
     }
 
     private val logger = logger()
 
-    // Event handlers for workflow and task lifecycle events
+
+    /**
+     * Sets a handler to be invoked when the workflow starts.
+     *
+     * @param handler A lambda function to execute when the workflow starts.
+     */
     fun onWorkflowStarted(handler: () -> Unit) {
         onWorkflowStarted = handler
     }
 
+    /**
+     * Sets a handler to be invoked when the workflow completes.
+     *
+     * @param handler A lambda function to execute when the workflow completes.
+     */
     fun onWorkflowCompleted(handler: () -> Unit) {
         onWorkflowCompleted = handler
     }
 
+    /**
+     * Sets a handler to be invoked when the workflow encounters a fault.
+     *
+     * @param handler A lambda function to execute when the workflow faults.
+     */
     fun onWorkflowFaulted(handler: () -> Unit) {
         onWorkflowFaulted = handler
     }
 
+    /**
+     * Sets a handler to be invoked when a task starts.
+     *
+     * @param handler A lambda function to execute when a task starts.
+     */
     fun onTaskStarted(handler: () -> Unit) {
         onTaskStarted = handler
     }
 
+    /**
+     * Sets a handler to be invoked when a task completes.
+     *
+     * @param handler A lambda function to execute when a task completes.
+     */
     fun onTaskCompleted(handler: () -> Unit) {
         onTaskCompleted = handler
     }
 
+    /**
+     * Sets a handler to be invoked when a task encounters a fault.
+     *
+     * @param handler A lambda function to execute when a task faults.
+     */
     fun onTaskFaulted(handler: () -> Unit) {
         onTaskFaulted = handler
     }
 
+    /**
+     * Sets a handler to be invoked when a task is retried.
+     *
+     * @param handler A lambda function to execute when a task is retried.
+     */
     fun onTaskRetried(handler: () -> Unit) {
         onTaskRetried = handler
     }
 
     // Default event handlers
-    private var onWorkflowStarted = {}
-    private var onWorkflowCompleted = {}
-    private var onWorkflowFaulted = {}
-    private var onTaskStarted = {}
-    private var onTaskCompleted = {}
-    private var onTaskFaulted = {}
-    private var onTaskRetried = {}
+    private var onWorkflowStarted = { onWorkflowStarted(this) }
+    private var onWorkflowCompleted = { onWorkflowCompleted(this) }
+    private var onWorkflowFaulted = { onWorkflowFaulted(this) }
+    private var onTaskStarted = { onTaskStarted(this) }
+    private var onTaskCompleted = { onTaskCompleted(this) }
+    private var onTaskFaulted = { onTaskFaulted(this) }
+    private var onTaskRetried = { onTaskRetried(this) }
 
     /**
      * Logs debug messages with workflow context.
@@ -317,18 +445,41 @@ class WorkflowInstance(
         }
 
     /**
-     * Executes the workflow until completion, error, or waiting state.
+     * Executes the workflow asynchronously. This is the recommended method for Java users
+     * who need non-blocking execution.
+     *
+     * @return A `CompletableFuture` that completes with the workflow result, or completes
+     * exceptionally if the workflow faults.
+     */
+    fun runAsync(): CompletableFuture<JsonElement> = scope.future {
+        run()
+    }
+
+    /**
+     * Executes the workflow synchronously, blocking the current thread until completion.
+     * This method is provided for convenience for Java users or in testing scenarios.
+     *
+     * @return The final result of the workflow as a [JsonElement].
+     * @throws WorkflowException If a non-retryable error occurs during execution.
+     */
+    fun runBlocking(): JsonElement = runBlocking {
+        run()
+    }
+
+    /**
+     * Executes the workflow until completion or a non-retryable error. This is a suspending
+     * function and is the idiomatic way to run a workflow from Kotlin coroutines.
      *
      * This method implements the main workflow execution loop with error handling:
-     * - Sets the workflow status to RUNNING
-     * - Executes the workflow nodes using tryRun() until completion or error
-     * - Handles exceptions using TryInstance error handlers if available
-     * - Manages retry logic with delays when configured
-     * - Updates workflow status based on execution result (COMPLETED, FAULTED, WAITING)
+     * - Sets the workflow status to RUNNING.
+     * - Executes the workflow nodes until completion.
+     * - If a non-retryable error occurs, it is thrown to the caller.
+     * - If a retryable error occurs, it internally handles the delay and continues execution.
      *
-     * @throws WorkflowException If an error occurs during workflow execution.
+     * @return The final result of the workflow as a [JsonElement].
+     * @throws WorkflowException If a non-retryable error occurs during workflow execution.
      */
-    suspend fun run() {
+    suspend fun run(): JsonElement {
         status = WorkflowStatus.RUNNING
 
         do {
@@ -347,7 +498,7 @@ class WorkflowInstance(
                     current = e.raising
                     logError(e) { "Workflow execution faulted" }
                     onWorkflowFaulted()
-                    break
+                    throw e
                 }
 
                 logInfo { "Caught workflow exception: ${e.error}" }
@@ -361,7 +512,10 @@ class WorkflowInstance(
                     // Update node position after setting retry
                     logInfo { "Scheduling retry with delay: ${tryInstance.delay}" }
                     onTaskRetried()
-                    break
+                    // Suspend execution for the duration of the delay.
+                    delay(tryInstance.delay!!)
+                    // Continue the loop to re-execute the TryInstance's children.
+                    continue
                 }
 
                 // if the tryInstance is not retryable, we just continue with the catch node
@@ -374,18 +528,19 @@ class WorkflowInstance(
             }
         } while (current != null)
 
-        if (current == null) {
-            status = WorkflowStatus.COMPLETED
-            onWorkflowCompleted()
-        }
-
+        // If the loop completes, the workflow has finished successfully.
+        status = WorkflowStatus.COMPLETED
+        onWorkflowCompleted()
         logDebug { "Workflow status: $status, current position: $currentPosition" }
+
+        // Return the final transformed output of the root node.
+        return rootInstance.transformedOutput
     }
 
     /**
      * Executes the current node in the workflow.
      *
-     * This method handles the execution logic for individual nodes, including:
+     * This method handles the execution logic for individual nodes, including
      * - Starting tasks
      * - Skipping tasks
      * - Transitioning to the next node

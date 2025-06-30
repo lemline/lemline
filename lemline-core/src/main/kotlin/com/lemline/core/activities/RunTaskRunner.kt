@@ -3,10 +3,12 @@ package com.lemline.core.activities
 
 import com.lemline.core.activities.runs.runScript
 import com.lemline.core.activities.runs.runShell
+import com.lemline.core.activities.runs.runWorkflow
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.instances.RunInstance
 import io.serverlessworkflow.api.types.RunScript
 import io.serverlessworkflow.api.types.RunShell
+import io.serverlessworkflow.api.types.RunWorkflow
 
 /**
  * An ActivityRunner responsible for handling the `RunTask`.
@@ -23,6 +25,7 @@ class RunTaskRunner : ActivityRunner<RunInstance> {
         instance.rawOutput = when (run) {
             is RunScript -> instance.runScript(run)
             is RunShell -> instance.runShell(run)
+            is RunWorkflow -> instance.runWorkflow(run)
             else -> instance.onError(RUNTIME, "Unsupported run type: ${run.javaClass.simpleName}")
         }
     }
