@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.calls
 
+import com.charleskorn.kaml.Yaml
+import com.charleskorn.kaml.YamlConfiguration
+import com.lemline.core.OnError
 import com.lemline.core.errors.WorkflowErrorType.AUTHENTICATION
+import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.json.LemlineJson
-import com.lemline.core.nodes.activities.CallHttpInstance
-import com.lemline.core.utils.toSecret
+import com.lemline.core.json.LemlineJson.toJsonElement
 import com.lemline.core.utils.toUrl
 import io.ktor.client.*
 import io.ktor.client.call.*
@@ -20,6 +23,7 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import io.ktor.util.*
 import io.serverlessworkflow.api.types.AuthenticationPolicy
 import io.serverlessworkflow.api.types.BasicAuthenticationPolicy
 import io.serverlessworkflow.api.types.BasicAuthenticationProperties
@@ -27,6 +31,7 @@ import io.serverlessworkflow.api.types.BearerAuthenticationPolicy
 import io.serverlessworkflow.api.types.BearerAuthenticationProperties
 import io.serverlessworkflow.api.types.DigestAuthenticationPolicy
 import io.serverlessworkflow.api.types.DigestAuthenticationProperties
+import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import io.serverlessworkflow.api.types.OAuth2AutenthicationData
 import io.serverlessworkflow.api.types.OAuth2AutenthicationData.OAuth2AutenthicationDataGrant.AUTHORIZATION_CODE
 import io.serverlessworkflow.api.types.OAuth2AutenthicationData.OAuth2AutenthicationDataGrant.CLIENT_CREDENTIALS
@@ -46,153 +51,172 @@ import io.serverlessworkflow.api.types.OpenIdConnectAuthenticationPolicy
 import io.serverlessworkflow.api.types.SecretBasedAuthenticationPolicy
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import nl.adaptivity.xmlutil.serialization.XML
+
+// Yaml mapper for kotlin serialization
+private val yaml = Yaml(configuration = YamlConfiguration(strictMode = false))
+
+// XML mapper for kotlin serialization
+private val xml = XML { autoPolymorphic = true }
+
+// HTTP client with CIO engine and JSON serialization
+private val defaultClient = HttpClient(CIO) {
+    install(ContentNegotiation) {
+        json(LemlineJson.json)
+    }
+    // Configure timeout settings
+    install(HttpTimeout) {
+        requestTimeoutMillis = 30000 // 30 seconds
+        connectTimeoutMillis = 15000 // 15 seconds
+        socketTimeoutMillis = 30000 // 30 seconds
+    }
+    // Install HttpRedirect plugin to allow redirect following
+    install(HttpRedirect) {
+        // Default configuration for the HttpRedirect plugin
+        // The actual redirect behavior will be controlled by the `followRedirects` setting
+        // in each request's client configuration
+        checkHttpMethod = false // Allow redirects between different HTTP methods
+        allowHttpsDowngrade = true // Allow redirects from HTTPS to HTTP if needed
+    }
+    // Disable the following redirect behavior by default - will be enabled per request if needed
+    followRedirects = false
+}
 
 /**
  * HttpCall is a utility class for making HTTP requests.
  * It supports GET, POST, PUT, and DELETE methods, with various options
  * for handling response formats and authentication.
  */
-class HttpCall(private val nodeInstance: CallHttpInstance) {
-
-    // Client configured to handle the HTTP requests
-    private val client = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json(LemlineJson.json)
-        }
-        // Configure timeout settings
-        install(HttpTimeout) {
-            requestTimeoutMillis = 30000 // 30 seconds
-            connectTimeoutMillis = 15000 // 15 seconds
-            socketTimeoutMillis = 30000 // 30 seconds
-        }
-        // Install HttpRedirect plugin to allow redirect following
-        install(HttpRedirect) {
-            // Default configuration for the HttpRedirect plugin
-            // The actual redirect behavior will be controlled by the `followRedirects` setting
-            // in each request's client configuration
-            checkHttpMethod = false // Allow redirects between different HTTP methods
-            allowHttpsDowngrade = true // Allow redirects from HTTPS to HTTP if needed
-        }
-        // Disable the following redirect behavior by default - will be enabled per request if needed
-        followRedirects = false
-    }
-
+class HttpCall(
+    private val getSecretByName: (String) -> String,
+    private val getAuthenticationPolicyByName: (String) -> AuthenticationPolicy,
+    private val onError: OnError,
+    private val client: HttpClient = defaultClient,
+) {
     /**
-     * Executes an HTTP request with the given parameters.
+     * Executes an HTTP request with the specified parameters.
      *
-     * This method is suspendable, which means it can be paused and resumed without blocking threads.
-     * It also supports cancellation - if the coroutine is cancelled, the HTTP request will be cancelled as well.
-     *
-     * @param method The HTTP method to use (GET, POST, PUT, DELETE)
-     * @param endpoint The URL to send the request to
-     * @param headers HTTP headers to include in the request
-     * @param body The request body (for POST and PUT requests)
-     * @param query Query parameters to include in the URL
-     * @param output The format of the output (raw, content, response)
-     * @param redirect Specifies whether redirection status codes (300-399) should be treated as errors,
-     *                 and whether HTTP redirects should be followed.
-     *                 If set to false (default):
-     *                 - HTTP redirects will not be followed
-     *                 - An error will be raised for status codes outside the 200-299 range
-     *                 If set to true:
-     *                 - HTTP redirects will be automatically followed
-     *                 - An error will be raised for status codes outside the 200-399 range
-     * @param authentication The authentication configuration to use for the request, if any
-     * @return A JsonNode containing the response
-     * @throws RuntimeException if the HTTP status code is outside the acceptable range based on redirect parameter
-     * @throws IllegalArgumentException if the method or output format is not supported
+     * @param method The HTTP method to use (GET, POST, PUT, DELETE).
+     * @param url The URL to send the request to.
+     * @param headers A map of headers to include in the request.
+     * @param body The body of the request, if applicable (for POST/PUT).
+     * @param output The desired output format for the response.
+     * @param redirect Whether to follow redirects (default is false).
+     * @param authentication Optional authentication policy to apply to the request.
+     * @return The response as a JsonElement based on the requested output format.
      */
     suspend fun execute(
-        method: String,
-        endpoint: String,
+        method: HttpMethod,
+        url: Url,
         headers: Map<String, String>,
         body: JsonElement?,
-        query: Map<String, String> = emptyMap(),
-        output: String = "content",
-        redirect: Boolean = false,
-        authentication: AuthenticationPolicy? = null,
+        output: HTTPOutput,
+        redirect: Boolean,
+        authentication: AuthenticationPolicy?,
     ): JsonElement {
-        try {
-            // Build the URL with query parameters
-            val urlBuilder = URLBuilder(endpoint)
 
-            // Add query parameters
-            query.forEach { (key, value) -> urlBuilder.parameters.append(key, value) }
-
-            // Create a new client configuration for this specific request with the redirect setting
-            val response: HttpResponse = client.config {
+        // Create a new client configuration for this specific request with the redirect setting and authentication
+        val response: HttpResponse = try {
+            client.config {
                 // Only follow redirects if explicitly requested
                 followRedirects = redirect
 
                 // Apply authentication if provided
                 authentication?.let { applyAuthentication(it) }
-            }.request(urlBuilder.build()) {
+            }.request(url) {
                 // Set the HTTP method
-                this.method = when (method.uppercase()) {
-                    "POST" -> HttpMethod.Post
-                    "GET" -> HttpMethod.Get
-                    "PUT" -> HttpMethod.Put
-                    "DELETE" -> HttpMethod.Delete
-                    else -> throw IllegalArgumentException("Unsupported HTTP method: $method")
-                }
-
+                this.method = method
                 // Set headers
                 headers.forEach { (key, value) -> header(key, value) }
-
                 // Set the content type for requests with the body
-                if (body != null && (method.uppercase() == "POST" || method.uppercase() == "PUT")) {
+                if (body != null && (method == HttpMethod.Post || method == HttpMethod.Put)) {
                     contentType(ContentType.Application.Json)
                     setBody(body)
                 }
             }
-
-            // Check for HTTP errors based on the redirect parameter
-            if (!isAcceptableStatus(response.status, redirect)) {
-                throw RuntimeException("HTTP error: ${response.status.value}, ${response.bodyAsText()}")
-            }
-
-            // Handle output format based on DSL spec
-            return when (output.lowercase()) {
-                "raw" -> {
-                    // Base64 encode the response content
-                    val bytes = response.bodyAsText().toByteArray()
-                    val base64Content = Base64.getEncoder().encodeToString(bytes)
-                    JsonPrimitive(base64Content) // Create a JsonNode with the base64 content
-                }
-
-                "content" -> {
-                    // Return deserialized content directly
-                    response.body<JsonElement>()
-                }
-
-                "response" -> {
-                    // Return the full response object as JSON
-                    response.body<JsonElement>()
-                }
-
-                else -> throw IllegalArgumentException(
-                    "Unsupported output format: $output. Must be one of: raw, content, response",
-                )
-            }
-        } catch (e: CancellationException) {
-            // Propagate cancellation exceptions to allow proper coroutine cancellation
-            throw e
-        } catch (e: ClientRequestException) {
-            // Handle HTTP error responses (4xx)
-            throw RuntimeException("HTTP error: ${e.response.status.value}, ${e.response.bodyAsText()}")
-        } catch (e: ServerResponseException) {
-            // Handle HTTP error responses (5xx)
-            throw RuntimeException("HTTP error: ${e.response.status.value}, ${e.response.bodyAsText()}")
         } catch (e: Exception) {
             // Handle other exceptions (connection errors, etc.)
-            throw RuntimeException("HTTP call failed: ${e.message}", e)
+            onError(COMMUNICATION, "HTTP call failed: ${e.message}", e.stackTraceToString(), null)
+        }
+
+        // Check for HTTP errors based on the redirect parameter
+        if (!isAcceptableStatus(response.status, redirect)) {
+            val statusCode = response.status.value
+            val responseBody = response.bodyAsText()
+            val message = when (statusCode) {
+                in 300..399 -> "Redirection error: $statusCode"
+                in 400..499 -> "Client error: $statusCode"
+                in 500..599 -> "Server error: $statusCode"
+                else -> "Unexpected HTTP error: $statusCode"
+            }
+            onError(COMMUNICATION, message, responseBody, statusCode)
+        }
+
+        // Return response as requested
+        return response.getAs(output)
+    }
+
+    private suspend fun HttpResponse.getAs(format: HTTPOutput): JsonElement = when (format) {
+        HTTPOutput.RAW -> getRawContentAsJsonElement(this)
+        HTTPOutput.CONTENT -> getContentAsJsonElement(this)
+        HTTPOutput.RESPONSE -> getResponseAsJsonElement(this)
+    }
+
+    /**
+     * Retrieves the HTTP response as a JsonElement, including request details, status code, headers, and content.
+     *
+     * @param response The HTTP response to process
+     * @return A JsonElement containing the response details
+     */
+    private suspend fun getResponseAsJsonElement(response: HttpResponse) = buildJsonObject {
+        // Include status code and headers in the response
+        put("request", buildJsonObject {
+            put("method", JsonPrimitive(response.request.method.value.uppercase()))
+            put("uri", JsonPrimitive(response.request.url.toString()))
+            put("headers", response.request.headers.toMap().toJsonElement())
+        })
+        put("statusCode", JsonPrimitive(response.status.value))
+        put("headers", response.headers.toMap().toJsonElement())
+        put("content", getContentAsJsonElement(response))
+    }
+
+    /**
+     * Retrieves the raw content of the HTTP response as a base64-encoded JsonPrimitive.
+     */
+    private suspend fun getRawContentAsJsonElement(response: HttpResponse) =
+        JsonPrimitive(Base64.getEncoder().encodeToString(response.bodyAsBytes()))
+
+    /**
+     * Retrieves the content of the HTTP response as a JsonElement based on the content type.
+     * It supports JSON, YAML, XML, and plain text formats.
+     *
+     * @param response The HTTP response to process
+     * @return A JsonElement representing the content of the response
+     */
+    private suspend fun getContentAsJsonElement(response: HttpResponse): JsonElement {
+        val contentType = response.contentType()?.withoutParameters()?.toString()?.lowercase()
+            ?: return getRawContentAsJsonElement(response)
+
+        val text = response.bodyAsText()
+
+        return try {
+            when {
+                contentType.contains("json") -> LemlineJson.json.parseToJsonElement(text)
+                contentType.contains("yaml") -> yaml.decodeFromString(text)
+                contentType.contains("xml") -> xml.decodeFromString(text)
+                contentType.contains("text") -> JsonPrimitive(text)
+                else -> getRawContentAsJsonElement(response)
+            }
+        } catch (e: Exception) {
+            onError(COMMUNICATION, "Failed to parse response content as $contentType: ${e.message}", text, null)
         }
     }
 
@@ -224,34 +248,34 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
         is BasicAuthenticationPolicy -> when (val auth = authentication.basic.get()) {
             is BasicAuthenticationProperties -> applyBasicAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
-            else -> nodeInstance.error(RUNTIME, "Unsupported basic authentication type: ${auth::class.simpleName}")
+            else -> onError(RUNTIME, "Unsupported basic authentication type: ${auth::class.simpleName}", null, null)
         }
 
         is BearerAuthenticationPolicy -> when (val auth = authentication.bearer.get()) {
             is BearerAuthenticationProperties -> applyBearerAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
-            else -> nodeInstance.error(RUNTIME, "Unsupported bearer authentication type: ${auth::class.simpleName}")
+            else -> onError(RUNTIME, "Unsupported bearer authentication type: ${auth::class.simpleName}", null, null)
         }
 
         is OAuth2AuthenticationPolicy -> when (val auth = authentication.oauth2.get()) {
             is OAuth2AuthenticationPolicyConfiguration -> applyOauth2Auth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
-            else -> nodeInstance.error(RUNTIME, "Unsupported oauth2 authentication type: ${auth::class.simpleName}")
+            else -> onError(RUNTIME, "Unsupported oauth2 authentication type: ${auth::class.simpleName}", null, null)
         }
 
         is DigestAuthenticationPolicy -> when (val auth = authentication.digest.get()) {
             is DigestAuthenticationProperties -> applyDigestAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
-            else -> nodeInstance.error(RUNTIME, "Unsupported digest authentication type: ${auth::class.simpleName}")
+            else -> onError(RUNTIME, "Unsupported digest authentication type: ${auth::class.simpleName}", null, null)
         }
 
         is OpenIdConnectAuthenticationPolicy -> when (val auth = authentication.oidc.get()) {
             is OAuth2AutenthicationData -> applyOpenIdAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
-            else -> nodeInstance.error(RUNTIME, "Unsupported openId authentication type: ${auth::class.simpleName}")
+            else -> onError(RUNTIME, "Unsupported openId authentication type: ${auth::class.simpleName}", null, null)
         }
 
-        else -> nodeInstance.error(RUNTIME, "Unsupported authentication type: ${authentication::class.simpleName}")
+        else -> onError(RUNTIME, "Unsupported authentication type: ${authentication::class.simpleName}", null, null)
     }
 
     /**
@@ -263,11 +287,9 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
     ) {
         val name = secretBasedAuthenticationPolicy.use
         // Check if the authentication is circular
-        if (fromUse) nodeInstance.error(CONFIGURATION, "Circular definition of the named authentification: $name")
+        if (fromUse) onError(CONFIGURATION, "Circular definition of the named authentification: $name", null, null)
         // Check if the authentication is defined in the workflow's use section
-        nodeInstance.rootInstance.node.task.use?.authentications?.additionalProperties?.get(name)?.let {
-            applyAuthentication(it.get(), true)
-        } ?: nodeInstance.error(CONFIGURATION, "Named authentification not found: $name")
+        applyAuthentication(getAuthenticationPolicyByName(name), true)
     }
 
     /**
@@ -275,9 +297,9 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
      */
     private fun HttpClientConfig<*>.applyDigestAuth(digestAuthenticationProperties: DigestAuthenticationProperties) {
         val username = digestAuthenticationProperties.username
-            ?: nodeInstance.error(CONFIGURATION, "Username is missing for Digest authentication")
-        val password = digestAuthenticationProperties.password?.let { nodeInstance.toSecret(it) }
-            ?: nodeInstance.error(CONFIGURATION, "Password is missing for Digest authentication")
+            ?: onError(CONFIGURATION, "Username is missing for Digest authentication", null, null)
+        val password = digestAuthenticationProperties.password?.let { getSecretByName(it) }
+            ?: onError(CONFIGURATION, "Password is missing for Digest authentication", null, null)
 
         install(Auth) {
             digest {
@@ -296,9 +318,9 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
      */
     private fun HttpClientConfig<*>.applyBasicAuth(basicAuthenticationProperties: BasicAuthenticationProperties) {
         val username = basicAuthenticationProperties.username
-            ?: nodeInstance.error(CONFIGURATION, "Username is missing for Basic authentication")
-        val password = basicAuthenticationProperties.password?.let { nodeInstance.toSecret(it) }
-            ?: nodeInstance.error(CONFIGURATION, "Password is missing for Basic authentication")
+            ?: onError(CONFIGURATION, "Username is missing for Basic authentication", null, null)
+        val password = basicAuthenticationProperties.password?.let { getSecretByName(it) }
+            ?: onError(CONFIGURATION, "Password is missing for Basic authentication", null, null)
 
         install(Auth) {
             basic {
@@ -313,8 +335,8 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
      * Applies Bearer authentication to the HTTP client configuration.
      */
     private fun HttpClientConfig<*>.applyBearerAuth(bearerAuthenticationProperties: BearerAuthenticationProperties) {
-        val token = bearerAuthenticationProperties.token?.let { nodeInstance.toSecret(it) }
-            ?: nodeInstance.error(CONFIGURATION, "Token is missing for Bearer authentication")
+        val token = bearerAuthenticationProperties.token?.let { getSecretByName(it) }
+            ?: onError(CONFIGURATION, "Token is missing for Bearer authentication", null, null)
 
         install(Auth) {
             bearer {
@@ -387,9 +409,9 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
         authData: OAuth2AutenthicationData,
         endpoints: OAuth2AuthenticationPropertiesEndpoints,
     ): OAuthTokenResponse {
-        val authority = authData.authority?.let { nodeInstance.toUrl(it) }
-            ?: nodeInstance.error(CONFIGURATION, "Authority is missing for OAuth2 authentification")
-        val tokenUrl = URLBuilder(authority).apply { path(endpoints.token) }.buildString()
+        val authority = authData.authority?.toUrl(onError)
+            ?: onError(CONFIGURATION, "Authority is missing for OAuth2 authentification", null, null)
+        val tokenUrl = URLBuilder(authority).apply { encodedPath += endpoints.token }.buildString()
 
         val params = Parameters.build {
             append("grant_type", authData.grant.value())
@@ -398,18 +420,18 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
             val authMethodError by lazy { "is required for ${authMethod.value()} of OAuth2 authentication" }
 
             val clientId = authData.client?.id
-                ?: nodeInstance.error(CONFIGURATION, "client.id $authMethodError")
-            val clientSecret = authData.client?.secret?.let { nodeInstance.toSecret(it) }
+                ?: onError(CONFIGURATION, "client.id $authMethodError", null, null)
+            val clientSecret = authData.client?.secret?.let { getSecretByName(it) }
 
             when (authMethod) {
                 CLIENT_SECRET_POST -> {
-                    clientSecret ?: nodeInstance.error(CONFIGURATION, "client.secret $authMethodError")
+                    clientSecret ?: onError(CONFIGURATION, "client.secret $authMethodError", null, null)
                     append("client_id", clientId)
                     append("client_secret", clientSecret)
                 }
 
                 CLIENT_SECRET_BASIC -> {
-                    clientSecret ?: nodeInstance.error(CONFIGURATION, "client.secret $authMethodError")
+                    clientSecret ?: onError(CONFIGURATION, "client.secret $authMethodError", null, null)
                     headers {
                         append(
                             HttpHeaders.Authorization,
@@ -423,7 +445,7 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
                     append("client_id", clientId)
                     append("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
                     val jwtAssertion = authData.client.assertion
-                        ?: nodeInstance.error(CONFIGURATION, "client.assertion $authMethodError")
+                        ?: onError(CONFIGURATION, "client.assertion $authMethodError", null, null)
                     append("client_assertion", jwtAssertion)
                 }
 
@@ -442,7 +464,7 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
 
             when (val grantType = authData.grant) {
                 AUTHORIZATION_CODE -> {
-                    nodeInstance.error(RUNTIME, "authorization_code grant is not yet supported") // TODO
+                    onError(RUNTIME, "authorization_code grant is not yet supported", null, null) // TODO
 
 //                    authData.request?.let { req ->
 //                        req.code?.let { append("code", it) }
@@ -457,31 +479,31 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
 
                 PASSWORD -> {
                     val username = authData.username
-                        ?: nodeInstance.error(CONFIGURATION, "username is missing for ${grantType.value()} grant")
+                        ?: onError(CONFIGURATION, "username is missing for ${grantType.value()} grant", null, null)
                     val password = authData.password
-                        ?: nodeInstance.error(CONFIGURATION, "password is missing for ${grantType.value()} grant")
+                        ?: onError(CONFIGURATION, "password is missing for ${grantType.value()} grant", null, null)
                     append("username", username)
                     append("password", password)
                 }
 
                 REFRESH_TOKEN -> {
-                    val refreshToken = authData.subject.token?.let { nodeInstance.toSecret(it) }
-                        ?: nodeInstance.error(CONFIGURATION, "subject.token is missing for ${grantType.value()} grant")
+                    val refreshToken = authData.subject.token?.let { getSecretByName(it) }
+                        ?: onError(CONFIGURATION, "subject.token is missing for ${grantType.value()} grant", null, null)
                     append("refresh_token", refreshToken)
                 }
 
                 URN_IETF_PARAMS_OAUTH_GRANT_TYPE_TOKEN_EXCHANGE -> {
-                    val subjectToken = authData.subject.token?.let { nodeInstance.toSecret(it) }
-                        ?: nodeInstance.error(CONFIGURATION, "subject.token is missing for ${grantType.value()} grant")
-                    val actorToken = authData.actor.token?.let { nodeInstance.toSecret(it) }
-                        ?: nodeInstance.error(CONFIGURATION, "actor.token is missing for ${grantType.value()} grant")
+                    val subjectToken = authData.subject.token?.let { getSecretByName(it) }
+                        ?: onError(CONFIGURATION, "subject.token is missing for ${grantType.value()} grant", null, null)
+                    val actorToken = authData.actor.token?.let { getSecretByName(it) }
+                        ?: onError(CONFIGURATION, "actor.token is missing for ${grantType.value()} grant", null, null)
                     append("subject_token", subjectToken)
                     append("actor_token", actorToken)
                     append("requested_token_type", "urn:ietf:params:oauth:token-type:access_token")
                     append("subject_token_type", "urn:ietf:params:oauth:token-type:access_token")
                 }
 
-                else -> nodeInstance.error(CONFIGURATION, "Unsupported grant type: $grantType")
+                else -> onError(CONFIGURATION, "Unsupported grant type: $grantType", null, null)
             }
         }
 
@@ -544,10 +566,11 @@ class HttpCall(private val nodeInstance: CallHttpInstance) {
                     return@withLock refreshed
                 } catch (e: Exception) {
                     tokenCache.remove(key)
-                    nodeInstance.error(
+                    onError(
                         AUTHENTICATION,
                         "Failed to refresh OAuth2 token: ${e.message}",
                         e.stackTraceToString(),
+                        null,
                     )
                 }
             }

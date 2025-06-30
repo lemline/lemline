@@ -16,7 +16,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
  * It extends AbstractOutbox to leverage the common outbox pattern implementation.
  *
  * This class specifically handles retry messages with configuration optimized for
- * the retry use case, including:
+ * the retry use case, including
  * - Processing batch size
  * - Maximum retry attempts
  * - Initial delay between retries
@@ -34,7 +34,7 @@ internal class RetryOutbox : AbstractOutbox<RetryModel>() {
     override lateinit var emitter: Emitter<String>
 
     @Inject
-    private lateinit var lemlineConfig: LemlineConfiguration // Changed to internal as per WaitOutbox
+    private lateinit var lemlineConfig: LemlineConfiguration
 
     @Inject
     override lateinit var repository: RetryRepository

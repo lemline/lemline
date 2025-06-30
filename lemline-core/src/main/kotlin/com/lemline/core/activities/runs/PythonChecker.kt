@@ -4,7 +4,7 @@ package com.lemline.core.activities.runs
 import com.lemline.common.logger
 import com.lemline.common.warn
 
-object PythonChecker {
+internal object PythonChecker {
     private val log = logger()
 
     val exec: String? by lazy {

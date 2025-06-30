@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
 
+import com.lemline.core.instances.TryInstance
 import com.lemline.core.nodes.NodeInstance
-import com.lemline.core.nodes.flows.TryInstance
 
 /**
  * Internal Exception thrown during the execution of a workflow.
@@ -14,8 +14,11 @@ import com.lemline.core.nodes.flows.TryInstance
  * @property catching The try instance that is catching the exception, if any.
  * @property error The workflow error associated with this exception.
  */
-class WorkflowException(val raising: NodeInstance<*>, val catching: TryInstance?, val error: WorkflowError) :
-    RuntimeException() {
+class WorkflowException(
+    val raising: NodeInstance<*>,
+    val catching: TryInstance?,
+    val error: WorkflowError
+) : RuntimeException() {
 
     override fun toString() =
         "WorkflowException(raising=${raising.node.name}:${raising.node.position}, catching=${catching?.node?.name}:${catching?.node?.position}, error=$error)"

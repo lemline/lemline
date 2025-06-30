@@ -4,6 +4,7 @@ package com.lemline.core.activities.runs
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.DisabledOnOs
 import org.junit.jupiter.api.condition.EnabledOnOs
@@ -13,9 +14,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should execute simple echo command successfully`() {
+    fun `should execute simple echo command successfully`() = runTest {
         // Given
-        val shellRun = ShellRun(command = "echo", arguments = mapOf("Hello" to "World"))
+        val shellRun = Shell(command = "echo", arguments = mapOf("Hello" to "World"))
 
         // When
         val result = shellRun.execute()
@@ -28,9 +29,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.WINDOWS)
-    fun `should execute simple echo command successfully on Windows`() {
+    fun `should execute simple echo command successfully on Windows`() = runTest {
         // Given
-        val shellRun = ShellRun(command = "cmd", arguments = mapOf("/c" to "echo Hello World"))
+        val shellRun = Shell(command = "cmd", arguments = mapOf("/c" to "echo Hello World"))
 
         // When
         val result = shellRun.execute()
@@ -43,9 +44,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should execute command with multiple arguments`() {
+    fun `should execute command with multiple arguments`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "echo",
             arguments = mapOf(
                 "-n" to "",
@@ -64,9 +65,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should execute command with environment variables`() {
+    fun `should execute command with environment variables`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "sh",
             arguments = mapOf("-c" to "echo \$TEST_VAR"),
             environment = mapOf("TEST_VAR" to "test_value")
@@ -83,9 +84,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.WINDOWS)
-    fun `should execute command with environment variables on Windows`() {
+    fun `should execute command with environment variables on Windows`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "cmd",
             arguments = mapOf("/c" to "echo %TEST_VAR%"),
             environment = mapOf("TEST_VAR" to "test_value")
@@ -102,9 +103,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should handle command with quoted arguments`() {
+    fun `should handle command with quoted arguments`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "echo \"Hello World\""
         )
 
@@ -119,9 +120,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should handle command with multiple quoted arguments`() {
+    fun `should handle command with multiple quoted arguments`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "echo \"Hello\" \"World\" \"with spaces\""
         )
 
@@ -136,9 +137,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should handle command with mixed quoted and unquoted arguments`() {
+    fun `should handle command with mixed quoted and unquoted arguments`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "echo Hello \"beautiful World\"!"
         )
 
@@ -153,9 +154,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should handle command with nested quotes`() {
+    fun `should handle command with nested quotes`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "echo \"He said, 'Hello World'\""
         )
 
@@ -170,9 +171,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should handle command with additional arguments map`() {
+    fun `should handle command with additional arguments map`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "echo \"Hello\"",
             arguments = mapOf("World" to "from test")
         )
@@ -192,9 +193,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should capture stderr output`() {
+    fun `should capture stderr output`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "sh",
             arguments = mapOf("-c" to "echo 'error message' >&2")
         )
@@ -210,9 +211,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.WINDOWS)
-    fun `should capture stderr output on Windows`() {
+    fun `should capture stderr output on Windows`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "cmd",
             arguments = mapOf("/c" to "echo error message 1>&2")
         )
@@ -228,9 +229,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should return non-zero exit code for failing command`() {
+    fun `should return non-zero exit code for failing command`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "sh",
             arguments = mapOf("-c" to "exit 1")
         )
@@ -246,9 +247,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.WINDOWS)
-    fun `should return non-zero exit code for failing command on Windows`() {
+    fun `should return non-zero exit code for failing command on Windows`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "cmd",
             arguments = mapOf("/c" to "exit 1")
         )
@@ -264,9 +265,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should handle command with no arguments on Unix`() {
+    fun `should handle command with no arguments on Unix`() = runTest {
         // Given
-        val shellRun = ShellRun(command = "pwd")
+        val shellRun = Shell(command = "pwd")
 
         // When
         val result = shellRun.execute()
@@ -279,9 +280,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.WINDOWS)
-    fun `should handle command with no arguments on Windows`() {
+    fun `should handle command with no arguments on Windows`() = runTest {
         // Given
-        val shellRun = ShellRun(command = "cmd", arguments = mapOf("/c" to "echo Hello"))
+        val shellRun = Shell(command = "cmd", arguments = mapOf("/c" to "echo Hello"))
 
         // When
         val result = shellRun.execute()
@@ -294,9 +295,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should handle command that outputs to both stdout and stderr`() {
+    fun `should handle command that outputs to both stdout and stderr`() = runTest {
         // Given
-        val shellRun = ShellRun(
+        val shellRun = Shell(
             command = "sh",
             arguments = mapOf("-c" to "echo 'stdout message'; echo 'stderr message' >&2")
         )
@@ -312,9 +313,9 @@ class ShellRunTest {
 
     @Test
     @DisabledOnOs(OS.WINDOWS) // This test is specific to Unix-like systems
-    fun `should handle command that doesn't exist on Unix`() {
+    fun `should handle command that doesn't exist on Unix`() = runTest {
         // Given
-        val shellRun = ShellRun(command = "nonexistentcommand12345")
+        val shellRun = Shell(command = "nonexistentcommand12345")
 
         // When & Then
         try {
@@ -329,9 +330,9 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.WINDOWS)
-    fun `should handle command that doesn't exist on Windows`() {
+    fun `should handle command that doesn't exist on Windows`() = runTest {
         // Given
-        val shellRun = ShellRun(command = "nonexistentcommand12345")
+        val shellRun = Shell(command = "nonexistentcommand12345")
 
         // When & Then
         try {
@@ -346,7 +347,7 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should handle command with spaces in path`() {
+    fun `should handle command with spaces in path`() = runTest {
         // Create a temporary directory with a space in the name
         val tempDir = java.nio.file.Files.createTempDirectory("test dir").toFile()
         try {
@@ -361,7 +362,7 @@ class ShellRunTest {
             scriptFile.setExecutable(true)
 
             // Test with a command containing spaces and arguments
-            val shellRun = ShellRun(
+            val shellRun = Shell(
                 command = "\"${scriptFile.absolutePath}\"",
                 arguments = mapOf("arg1" to "value 1", "arg2" to "value 2")
             )
@@ -384,7 +385,7 @@ class ShellRunTest {
 
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
-    fun `should handle command with spaces and quoted arguments`() {
+    fun `should handle command with spaces and quoted arguments`() = runTest {
         // Create a temporary directory with a space in the name
         val tempDir = java.nio.file.Files.createTempDirectory("test dir").toFile()
         try {
@@ -399,7 +400,7 @@ class ShellRunTest {
             scriptFile.setExecutable(true)
 
             // Test with a command containing spaces and quoted arguments
-            val shellRun = ShellRun(
+            val shellRun = Shell(
                 command = "\"${scriptFile.absolutePath}\" \"first argument\" \"second argument\""
             )
 

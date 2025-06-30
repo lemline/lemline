@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import org.junit.jupiter.api.Test
 
 class ShellRunParseCommandTest {
-    private val shellRun = ShellRun("")
+    private val shellRun = Shell("")
 
     @Test
     fun `should parse simple command`() {

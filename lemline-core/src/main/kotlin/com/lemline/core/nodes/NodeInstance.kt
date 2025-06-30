@@ -5,6 +5,7 @@ import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
+import com.lemline.common.warn
 import com.lemline.common.withWorkflowContext
 import com.lemline.core.errors.WorkflowError
 import com.lemline.core.errors.WorkflowErrorType
@@ -16,18 +17,20 @@ import com.lemline.core.errors.WorkflowException
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
+import com.lemline.core.instances.RootInstance
+import com.lemline.core.instances.TryInstance
 import com.lemline.core.json.LemlineJson
-import com.lemline.core.nodes.flows.RootInstance
-import com.lemline.core.nodes.flows.TryInstance
+import com.lemline.core.json.LemlineJson.toJsonElement
 import com.lemline.core.schemas.SchemaValidator
 import io.serverlessworkflow.api.types.ExportAs
+import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
 import io.serverlessworkflow.api.types.InputFrom
 import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.api.types.SchemaUnion
+import io.serverlessworkflow.api.types.SubflowInput
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import kotlinx.datetime.Clock
 import kotlinx.datetime.Instant
 import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.json.JsonArray
@@ -55,17 +58,25 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     /**
      * Local debug function that sets the workflow context each time it's called
      */
-    internal fun debug(e: Throwable? = null, message: () -> String) = withWorkflowContext { logger.debug(e, message) }
+    internal fun logDebug(e: Throwable? = null, message: () -> String) =
+        withWorkflowContext { logger.debug(e, message) }
 
     /**
      * Local info function that sets the workflow context each time it's called
      */
-    internal fun info(e: Throwable? = null, message: () -> String) = withWorkflowContext { logger.info(e, message) }
+    internal fun logInfo(e: Throwable? = null, message: () -> String) = withWorkflowContext { logger.info(e, message) }
+
+    /**
+     * Local warn function that sets the workflow context each time it's called
+     */
+    internal fun logWarn(e: Throwable? = null, message: () -> String) =
+        withWorkflowContext { logger.warn(e, message) }
 
     /**
      * Local error function that sets the workflow context each time it's called
      */
-    internal fun error(e: Throwable? = null, message: () -> String) = withWorkflowContext { logger.error(e, message) }
+    internal fun logError(e: Throwable? = null, message: () -> String) =
+        withWorkflowContext { logger.error(e, message) }
 
     /**
      * Node internal initialStates
@@ -83,9 +94,8 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     internal val rootInstance: RootInstance by lazy {
         when (this) {
             is RootInstance -> this
-            else ->
-                parent?.rootInstance
-                    ?: error(RUNTIME, "$this is not root, but does not have a parent")
+            else -> parent?.rootInstance
+                ?: onError(RUNTIME, "$this is not root, but does not have a parent")
         }
     }
 
@@ -110,7 +120,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     /**
      * The time the task was started at.
      */
-    private var startedAt: Instant?
+    internal var startedAt: Instant?
         get() = state.startedAt
         set(value) {
             state.startedAt = value
@@ -139,11 +149,14 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
      */
     private var _transformedInput: JsonElement? = null
 
-    internal var transformedInput: JsonElement
-        get() = _transformedInput ?: eval(rawInput, node.task.input?.from).also { _transformedInput = it }
-        set(value) {
-            _transformedInput = value
-        }
+    internal val transformedInput: JsonElement
+        get() = _transformedInput
+            ?: run {
+                // Validate the raw input against the schema if one is provided
+                node.task.input?.schema?.let { schema -> validate(rawInput, schema) }
+                // Evaluate the input transformation expression if provided
+                eval(rawInput, node.task.input?.from).also { _transformedInput = it }
+            }
 
     /**
      * The task transformed output. (calculated)
@@ -151,7 +164,30 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     private var _transformedOutput: JsonElement? = null
 
     internal val transformedOutput: JsonElement
-        get() = _transformedOutput ?: eval(rawOutput!!, node.task.output?.`as`).also { _transformedOutput = it }
+        get() = _transformedOutput
+            ?: eval(rawOutput!!, node.task.output?.`as`).also {
+                _transformedOutput = it
+                // Validate the transformed output against the schema if one is provided
+                node.task.output?.schema?.let { schema -> validate(it, schema) }
+            }
+
+
+    /**
+     * The task exported context. (calculated)
+     */
+    private var _exportAs: JsonObject? = null
+
+    private val exportAs: JsonObject?
+        get() = _exportAs
+            ?: run {
+                node.task.export?.let { export ->
+                    evalObject(transformedOutput, export.`as`, ".export.as").also {
+                        _exportAs = it
+                        // Validate exported context using schema if provided
+                        export.schema?.let { schema -> validate(it, schema) }
+                    }
+                }
+            }
 
     /**
      * Reset the internal state of this instance
@@ -159,6 +195,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     open fun reset() {
         _transformedInput = null
         _transformedOutput = null
+        _exportAs = null
         state = NodeState()
     }
 
@@ -192,197 +229,161 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
             .merge(parent?.scope)
 
     /**
-     * Get the next node initialPosition after completion
-     */
-    internal fun then(): NodeInstance<*>? = then(node.task.then?.get())
-
-    /**
-     * Get the next node initialPosition based on the provided flow directive.
+     * Get the next node
      *
-     * @param flow The flow directive which can be one of the following:
-     * - `null` or `FlowDirectiveEnum.CONTINUE`: Continue to the next sibling.
-     * - `FlowDirectiveEnum.EXIT`: Exit the current flow and continue with the parent flow.
-     * - `FlowDirectiveEnum.END`: End the workflow.
-     * - `String`: Go to the sibling with the specified name.
-     * - Any other value will result in an error.
-     *
-     * @return The next node initialPosition or `null` if we reach the end of the workflow
-     */
-    internal fun then(flow: Any?): NodeInstance<*>? {
-        // calculate transformedOutput
-        // validate schema
-        // export context
-        // set parent raw output
-        complete()
-        // find next
-        return when (flow) {
-            null, FlowDirectiveEnum.CONTINUE -> parent?.`continue`()
-            FlowDirectiveEnum.EXIT -> parent?.then()
-            FlowDirectiveEnum.END -> parent?.end()
-            is String -> parent?.goTo(flow)
-            else -> error(CONFIGURATION, "Unknown '.then' directive: $flow")
-        }
-    }
-
-    /**
-     * Get the next node initialPosition, for the `continue` flow directive
      * This implementation is for activities only, must be overridden for flows
+     *
      * Note: continue should return null only if the workflow is finished
      */
     internal open fun `continue`(): NodeInstance<out TaskBase>? = then()
 
     /**
-     * Go to the sibling with the specified name
+     * Get the next node, according to the `.then` directive.
      */
-    private fun goTo(name: String): NodeInstance<*> {
-        val target = children.indexOfFirst { it.node.name == name }
-        if (target == -1) error(CONFIGURATION, "'.then' directive '$name' not found")
-        childIndex = target
-        return children[target].also { it.rawInput = rawOutput!! }
-    }
+    internal open fun then(): NodeInstance<*>? = then(node.task.then)
 
     /**
-     * End the workflow right away
+     * Get the next node according to the provided flow directive.
      */
-    private fun end(): RootInstance? {
-        // complete current node
-        complete()
+    internal fun then(flow: FlowDirective?): NodeInstance<*>? {
+        if (flow == null) return parent?.`continue`()
+        // find next
+        return when (val directive = flow.get()) {
+            is String -> parent?.gotoByName(directive)
+            is FlowDirectiveEnum -> when (directive) {
+                FlowDirectiveEnum.CONTINUE -> parent?.`continue`()
+                FlowDirectiveEnum.EXIT -> parent
+                FlowDirectiveEnum.END -> rootInstance
+            }
 
-        // recursively up to Root
-        return when (this) {
-            is RootInstance -> null
-            else -> parent!!.end()
+            else -> onError(CONFIGURATION, "Unknown directive: $directive")
         }
     }
 
     /**
-     * Determines if the task should be entered based on its condition.
+     * Go to the sibling with the specified name
+     */
+    private fun gotoByName(name: String): NodeInstance<*> {
+        val target = children.indexOfFirst { it.node.name == name }
+        if (target == -1) onError(CONFIGURATION, "'.then' directive '$name' not found")
+        childIndex = target
+        return children[target]
+    }
+
+    private fun logEntering() {
+        logDebug { "Entering node ${node.name} (${node.task::class.simpleName})" }
+        logDebug { "      rawInput         = $rawInput" }
+        logDebug { "      scope            = $scope" }
+        logDebug { "      transformedInput = $transformedInput" }
+    }
+
+    private fun logLeaving() {
+        logDebug { "Leaving node ${node.name} (${node.task::class.simpleName})" }
+        logDebug { "      rawOutput         = $rawOutput" }
+        logDebug { "      scope             = $scope" }
+        logDebug { "      transformedOutput = $transformedOutput" }
+    }
+
+    private fun logSkipping() {
+        logDebug { "Skipping node ${node.name} (${node.task::class.simpleName})" }
+    }
+
+    internal fun skippingUpTo(next: NodeInstance<*>) {
+        // log skipping current node
+        logSkipping()
+        // Set the next node's raw input to the current raw input
+        next.rawOutput = rawInput
+        // reset state from current to next
+        resetUpTo(next)
+        // log entering next node
+        next.logEntering()
+    }
+
+    internal fun skippingSideTo(next: NodeInstance<*>) {
+        // log skipping current node
+        logSkipping()
+        // Set the next node's raw input to the current raw input
+        rawInput.let {
+            reset()
+            next.rawInput = it
+        }
+        // log entering next node
+        next.logEntering()
+    }
+
+    internal fun goingUpTo(next: NodeInstance<*>) {
+        // Update workflow context using export.as expression if provided
+        exportAs?.let { rootInstance.context = it }
+        // log leaving current node
+        logLeaving()
+        // Set the next node's raw output to the transformed output
+        next.rawOutput = transformedOutput
+        // reset state from current to next
+        resetUpTo(next)
+    }
+
+    internal fun goingSideTo(next: NodeInstance<*>) {
+        // Update workflow context using export.as expression if provided
+        exportAs?.let { rootInstance.context = it }
+        // log leaving current node
+        logLeaving()
+        // Set the next node's raw input to the transformed output (can be self)
+        transformedOutput.let {
+            reset()
+            next.rawInput = it
+        }
+        // log entering next node
+        next.logEntering()
+    }
+
+    internal fun goingDownTo(next: NodeInstance<*>) {
+        // Set the next node's raw input to the transformed output
+        next.rawInput = transformedInput
+        // log entering next node
+        next.logEntering()
+    }
+
+    /**
+     * Check if the task should start based on the `if` condition.
      *
-     * This method:
-     * 1. Initializes the node by calling start() to set timestamps and transform input
-     * 2. Evaluates the node's conditional expression (if present)
-     * 3. Resets the node state if the condition evaluates to false
+     * This method is called before executing the task to determine if it should be run.
+     * It evaluates the `if` condition against the transformed input and returns true if the task should start,
+     * or false if it should be skipped.
      *
-     * The algorithm handles conditional execution based on the task's `if` property:
-     * - If no condition is specified, the node is always executed (returns true)
-     * - If a condition is specified, it's evaluated against the transformed input
-     * - If the condition evaluates to false, the node state is reset
+     * The `if` condition is evaluated using the transformed input, which is set during the `onStart()` method.
      *
-     * Edge cases:
-     * - If the condition expression is invalid or doesn't evaluate to a boolean, an error is thrown
-     * - If the condition evaluates to false, the node is reset to its initial state
-     *
-     * @return `true` if the task should be entered, `false` otherwise.
+     * @return true if the task should start, false otherwise
      */
     open fun shouldStart(): Boolean {
-        // set the start time, validate and transform the input, used for the calculation
-        start()
         // Test if the task should be executed
         val shouldStart = node.task.`if`
             ?.let { evalBoolean(transformedInput, it, ".if") }
             ?: true
 
-        if (!shouldStart) reset()
-
         return shouldStart
     }
 
-    /**
-     * Initializes node execution by setting timestamps, validating input, and transforming input data.
-     *
-     * This method is called when a node is about to be executed and performs several key functions:
-     * 1. Records the start time of the node execution
-     * 2. Logs entry into the node with input data for debugging
-     * 3. Validates the raw input against a schema if one is provided
-     * 4. Transforms the input using expressions if configured
-     *
-     * The input transformation process:
-     * - If no input transformation is configured, rawInput is used as-is
-     * - If input.from is specified, the expression is evaluated against rawInput
-     * - The transformed input is available via the transformedInput property
-     *
-     * Validation behavior:
-     * - If input.schema is provided, the rawInput is validated against it
-     * - If validation fails, a VALIDATION error is thrown and execution stops
-     *
-     * Prerequisites:
-     * - The rawInput property must be set before calling this method
-     *
-     * @return The transformed input as a JSON element, also available via the transformedInput property
-     * @throws WorkflowException with VALIDATION error type if input validation fails
-     */
-    internal fun start(): JsonElement {
-        startedAt = Clock.System.now()
+    abstract suspend fun run() // <--- Make it abstract
 
-        debug { "Entering node ${node.name} (${node.task::class.simpleName})" }
-        debug { "      rawInput         = $rawInput" }
-        debug { "      scope            = $scope" }
-
-        // Validate rawInput using schema if provided
-        node.task.input?.schema?.let { schema -> validate(rawInput, schema) }
-
-        debug { "      transformedInput = $transformedInput" }
-
-        return transformedInput
-    }
-
-    open suspend fun execute() {
-        this.rawOutput = transformedInput
-    }
-
-    /**
-     * Finalizes node execution by validating output, updating context, and resetting state.
-     *
-     * This method is called when a node has finished execution and performs several key functions:
-     * 1. Logs completion of the node with output data for debugging
-     * 2. Validates the transformed output against a schema if one is provided
-     * 3. Updates the workflow context using export expressions if configured
-     * 4. Propagates the output to the parent node
-     * 5. Resets the node state to prepare for potential reuse
-     *
-     * The output processing workflow:
-     * 1. Output validation: If output.schema is provided, the transformedOutput is validated
-     * 2. Context update: If export.as is specified, the expression is evaluated and validated
-     * 3. Parent update: The parent node's rawOutput is set to this node's transformedOutput
-     * 4. State reset: The node state is reset to its initial state
-     *
-     * Validation behavior:
-     * - If output.schema is provided, the transformedOutput is validated against it
-     * - If export.schema is provided, the exported context is validated against it
-     * - If validation fails, a VALIDATION error is thrown and execution stops
-     *
-     * Context update behavior:
-     * - The export.as expression must evaluate to a JSON object
-     * - The resulting object becomes the new workflow context
-     * - The previous context is completely replaced (not merged)
-     *
-     * @throws WorkflowException with VALIDATION error type if output validation fails
-     * @throws WorkflowException with EXPRESSION error type if export.as doesn't evaluate to an object
-     */
-    private fun complete() {
-        debug { "Leaving node ${node.name} (${node.task::class.simpleName})" }
-        debug { "      rawOutput        = $rawOutput" }
-        debug { "      scope            = $scope" }
-        debug { "      transformedOutput = $transformedOutput" }
-
-        // Validate transformedOutput using schema if provided
-        node.task.output?.schema?.let { schema -> validate(transformedOutput, schema) }
-
-        // Update workflow context using export.as expression if provided
-        node.task.export?.let { export ->
-            val exportAs = evalObject(transformedOutput, export.`as`, ".export.as")
-            // Validate exported context using schema if provided
-            export.schema?.let { schema -> validate(exportAs, schema) }
-            // Set new context
-            rootInstance.context = exportAs
-        }
-
-        // set current parent raw output
-        parent?.rawOutput = transformedOutput
-
-        // reset the node instance
-        reset()
-    }
+//    open suspend fun run() {
+//        // Default implementation for activity nodes.
+//        // It delegates the execution to the ActivityRunner.
+//        // Flow control nodes (e.g., For, Switch, Try) must override this method.
+//        when (this) {
+//            is CallHttpInstance -> rootInstance.activityRunner.run(this)
+//            is CallGrpcInstance -> rootInstance.activityRunner.run(this)
+//            is CallAsyncApiInstance -> rootInstance.activityRunner.run(this)
+//            is CallOpenApiInstance -> rootInstance.activityRunner.run(this)
+//            is EmitInstance -> rootInstance.activityRunner.run(this)
+//            is ListenInstance -> rootInstance.activityRunner.run(this)
+//            is RunInstance -> rootInstance.activityRunner.run(this)
+//            is WaitInstance -> rootInstance.activityRunner.run(this)
+//            else -> {
+//                // This branch is for flow control nodes that have their own `run` implementation,
+//                // or for new activity nodes that have not yet been added to this `when` statement.
+//            }
+//        }
+//    }
 
     /**
      * Validate a Schema
@@ -390,7 +391,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     private fun validate(data: JsonElement, schemaUnion: SchemaUnion) = try {
         SchemaValidator.validate(data, schemaUnion)
     } catch (e: Exception) {
-        error(VALIDATION, e.message, e.stackTraceToString())
+        onError(VALIDATION, e.message, e.stackTraceToString())
     }
 
     /**
@@ -400,7 +401,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonPrimitive && it.isString) {
                 true -> it.content
-                false -> error(EXPRESSION, "'.$name' expression must be a string, but is '$it'")
+                false -> onError(EXPRESSION, "'.$name' expression must be a string, but is '$it'")
             }
         }
 
@@ -408,7 +409,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonPrimitive && it.booleanOrNull != null) {
                 true -> it.boolean
-                false -> error(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
+                false -> onError(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
             }
         }
 
@@ -416,7 +417,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonArray) {
                 true -> it.toList()
-                false -> error(EXPRESSION, "'.$name' expression must be an array, but is '$it'")
+                false -> onError(EXPRESSION, "'.$name' expression must be an array, but is '$it'")
             }
         }
 
@@ -424,9 +425,12 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonObject) {
                 true -> it
-                false -> error(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
+                false -> onError(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
             }
         }
+
+    internal fun eval(data: JsonElement, subFlowInput: SubflowInput?, scope: JsonObject = this.scope) =
+        subFlowInput?.let { eval(data, it.additionalProperties.toJsonElement(), scope, true) } ?: data
 
     private fun eval(data: JsonElement, inputFrom: InputFrom?, scope: JsonObject = this.scope) =
         inputFrom?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
@@ -440,14 +444,14 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     private fun eval(data: JsonElement, expr: String, scope: JsonObject = this.scope) = try {
         JQExpression.eval(data, JsonPrimitive(expr), scope, false)
     } catch (e: Exception) {
-        error(EXPRESSION, e.message, e.stackTraceToString())
+        onError(EXPRESSION, e.message, e.stackTraceToString())
     }
 
     protected fun eval(data: JsonElement, expr: JsonElement, scope: JsonObject = this.scope, force: Boolean = false) =
         try {
             JQExpression.eval(data, expr, scope, force)
         } catch (e: Exception) {
-            error(EXPRESSION, e.message, e.stackTraceToString())
+            onError(EXPRESSION, e.message, e.stackTraceToString())
         }
 
     /**
@@ -464,17 +468,17 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     /**
      * Create an error and raise it
      */
-    internal fun error(
+    internal fun onError(
         type: WorkflowErrorType,
         title: String?,
         details: String? = null,
-        status: Int = type.defaultStatus,
+        status: Int? = null,
     ): Nothing {
         val error = WorkflowError(
             errorType = type,
             title = title ?: "Unknown Error",
             details = details,
-            status = status,
+            status = status ?: type.defaultStatus,
             position = node.position,
         )
 
@@ -496,7 +500,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         )
     }
 
-    private fun resetUpTo(node: TryInstance) {
+    internal fun resetUpTo(node: NodeInstance<*>) {
         reset()
         parent?.let {
             when (it) {
@@ -514,3 +518,17 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         else -> parent?.getTry(error)
     }
 }
+
+/**
+ * Check if the current node has the given node as parent.
+ */
+internal fun NodeInstance<*>?.isGoingUp(node: NodeInstance<*>?): Boolean = when {
+    this == null -> false
+    node == null -> true
+    else -> parent == node || parent?.isGoingUp(node) == true
+}
+
+/**
+ * Check if the current node is going down to the given node.
+ */
+internal fun NodeInstance<*>?.isGoingDown(node: NodeInstance<*>?): Boolean = node.isGoingUp(this)

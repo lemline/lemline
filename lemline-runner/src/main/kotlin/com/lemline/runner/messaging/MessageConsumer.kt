@@ -8,12 +8,15 @@ import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.common.trace
 import com.lemline.common.withLoggingContext
+import com.lemline.core.instances.TryInstance
+import com.lemline.core.instances.WaitInstance
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.nodes.activities.WaitInstance
-import com.lemline.core.nodes.flows.TryInstance
 import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.config.CONSUMER_ENABLED
+import com.lemline.runner.exceptions.TaskCompletedException
+import com.lemline.runner.exceptions.TaskRetriedException
+import com.lemline.runner.exceptions.TaskStartedException
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.OutBoxStatus
@@ -151,7 +154,31 @@ internal class MessageConsumer @Inject constructor(
             secrets = Secrets.get(workflow),
         )
 
-        instance.run()
+
+        // stop after activity completion
+        instance.onTaskCompleted {
+            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        }
+
+        // stop when waiting
+        instance.onTaskStarted {
+            if (instance.current is WaitInstance && (instance.current as WaitInstance).delay.isPositive()) throw TaskStartedException()
+        }
+
+        // stop when retrying
+        instance.onTaskRetried {
+            throw TaskRetriedException()
+        }
+
+        try {
+            instance.run()
+        } catch (_: TaskCompletedException) {
+            // do nothing
+        } catch (_: TaskStartedException) {
+            // do nothing
+        } catch (_: TaskRetriedException) {
+            // do nothing
+        }
 
         val nextMessage = when (instance.status) {
             WorkflowStatus.PENDING -> TODO()
@@ -210,12 +237,7 @@ internal class MessageConsumer @Inject constructor(
         val delayedUntil = Instant.now().plus(delay?.toJavaDuration() ?: error("No delay set in for $this"))
 
         // Save the message to the retry table
-        retryRepository.insert(
-            RetryModel(
-                message = msg.toJsonString(),
-                delayedUntil = delayedUntil,
-            ),
-        )
+        retryRepository.insert(RetryModel(message = msg.toJsonString(), delayedUntil = delayedUntil))
 
         // Stop here instance, the outbox will process it later
         return null
