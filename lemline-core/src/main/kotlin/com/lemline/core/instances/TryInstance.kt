@@ -148,8 +148,12 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
         }
     }
 
+
     /**
-     * Calculate the delay before the next retry attempt based on the retry configuration
+     * Calculates the retry delay based on the current retry policy, retry limit, and jitter/backoff settings.
+     *
+     * @param error The workflow error that occurred, which might influence the computed retry policies.
+     * @return The duration to wait before the next retry attempt, or `null` if no retry should occur.
      */
     private fun getRetryDelay(error: WorkflowError): Duration? {
         // if no retry policy
@@ -194,6 +198,6 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
         // apply jitter if any
         delay += retryPolicy?.jitter.toRandomDuration()
 
-        return if (delay > Duration.ZERO) delay.also { this.delay = it } else null
+        return if (delay > Duration.ZERO) delay.also { this.delay = it } else Duration.ZERO
     }
 }

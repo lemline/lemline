@@ -539,11 +539,6 @@ class CallHttpTest {
     @Test
     fun `test HTTP Authentication with named policy`() = runTest {
         val workflowYaml = """
-            document:
-              dsl: '1.0.0'
-              namespace: test
-              name: auth-test
-              version: '0.1.0'
             use:
               authentications:
                 httpBinAuth:

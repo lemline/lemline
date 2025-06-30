@@ -363,27 +363,14 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         return shouldStart
     }
 
-    abstract suspend fun run() // <--- Make it abstract
-
-//    open suspend fun run() {
-//        // Default implementation for activity nodes.
-//        // It delegates the execution to the ActivityRunner.
-//        // Flow control nodes (e.g., For, Switch, Try) must override this method.
-//        when (this) {
-//            is CallHttpInstance -> rootInstance.activityRunner.run(this)
-//            is CallGrpcInstance -> rootInstance.activityRunner.run(this)
-//            is CallAsyncApiInstance -> rootInstance.activityRunner.run(this)
-//            is CallOpenApiInstance -> rootInstance.activityRunner.run(this)
-//            is EmitInstance -> rootInstance.activityRunner.run(this)
-//            is ListenInstance -> rootInstance.activityRunner.run(this)
-//            is RunInstance -> rootInstance.activityRunner.run(this)
-//            is WaitInstance -> rootInstance.activityRunner.run(this)
-//            else -> {
-//                // This branch is for flow control nodes that have their own `run` implementation,
-//                // or for new activity nodes that have not yet been added to this `when` statement.
-//            }
-//        }
-//    }
+    /**
+     * Executes the main functionality associated with the current node instance.
+     *
+     * This is an abstract suspend method that must be implemented by subclasses to define the specific
+     * behavior or task that the node instance is responsible for. The method is executed as part of the
+     * workflow lifecycle when the node's conditions are met.
+     */
+    abstract suspend fun run()
 
     /**
      * Validate a Schema
@@ -489,8 +476,8 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
      * Raise an error and propagate it to the parent
      */
     protected fun raise(error: WorkflowError): Nothing {
-        // get catching try if any reset initialStates up to it
-        val catching: TryInstance? = getTry(error)?.also { resetUpTo(it) }
+        // get catching try
+        val catching: TryInstance? = getTry(error)
 
         // send an exception that will be caught by the WorkflowInstance::run
         throw WorkflowException(

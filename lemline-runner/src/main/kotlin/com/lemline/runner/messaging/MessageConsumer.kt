@@ -8,6 +8,7 @@ import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.common.trace
 import com.lemline.common.withLoggingContext
+import com.lemline.core.errors.WorkflowException
 import com.lemline.core.instances.TryInstance
 import com.lemline.core.instances.WaitInstance
 import com.lemline.core.nodes.NodePosition
@@ -25,7 +26,6 @@ import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.secrets.Secrets
 import io.quarkus.runtime.Startup
-import io.serverlessworkflow.impl.WorkflowStatus
 import io.smallrye.mutiny.Multi
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
@@ -153,8 +153,7 @@ internal class MessageConsumer @Inject constructor(
             position = message.position,
             secrets = Secrets.get(workflow),
         )
-
-
+        
         // stop after activity completion
         instance.onTaskCompleted {
             if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
@@ -170,27 +169,17 @@ internal class MessageConsumer @Inject constructor(
             throw TaskRetriedException()
         }
 
-        try {
+        val nextMessage = try {
             instance.run()
+            null
+        } catch (_: WorkflowException) {
+            instance.faulted()
         } catch (_: TaskCompletedException) {
-            // do nothing
+            instance.running()
         } catch (_: TaskStartedException) {
-            // do nothing
+            instance.waiting()
         } catch (_: TaskRetriedException) {
-            // do nothing
-        }
-
-        val nextMessage = when (instance.status) {
-            WorkflowStatus.PENDING -> TODO()
-            WorkflowStatus.WAITING -> instance.waiting()
-            WorkflowStatus.RUNNING -> when (instance.current is TryInstance) {
-                true -> instance.retry()
-                else -> instance.running()
-            }
-
-            WorkflowStatus.COMPLETED -> null // Nothing to do
-            WorkflowStatus.FAULTED -> instance.faulted()
-            WorkflowStatus.CANCELLED -> TODO()
+            instance.retry()
         }?.toJsonString()
 
         return nextMessage
