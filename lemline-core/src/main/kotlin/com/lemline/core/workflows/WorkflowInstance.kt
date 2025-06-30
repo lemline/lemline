@@ -494,23 +494,23 @@ class WorkflowInstance(
                 if (tryInstance == null) {
                     // the workflow is faulted
                     status = WorkflowStatus.FAULTED
-                    // and stopped there
-                    current = e.raising
                     logError(e) { "Workflow execution faulted" }
                     onWorkflowFaulted()
                     throw e
                 }
 
                 logInfo { "Caught workflow exception: ${e.error}" }
+                // reset the state of current nodes up to the tryInstance
+                current?.resetUpTo(tryInstance)
+                // returning to the TryInstance
+                current = tryInstance
 
                 // retry if the TryInstance has a delay configured
-                if (tryInstance.delay?.isPositive() == true) {
+                if (tryInstance.delay != null) {
+                    logInfo { "Retry with delay: ${tryInstance.delay}" }
                     // reinit childIndex, as we are going to retry
                     tryInstance.childIndex = -1
-                    // current being a TryInstance, implies that it should be retried
-                    current = tryInstance
                     // Update node position after setting retry
-                    logInfo { "Scheduling retry with delay: ${tryInstance.delay}" }
                     onTaskRetried()
                     // Suspend execution for the duration of the delay.
                     delay(tryInstance.delay!!)
@@ -519,12 +519,10 @@ class WorkflowInstance(
                 }
 
                 // if the tryInstance is not retryable, we just continue with the catch node
-                current = tryInstance.catchDoInstance?.also {
-                    it.rawInput = tryInstance.transformedInput
-                    logDebug { "Continuing with catch handler: ${it.node.position}" }
-                } ?: tryInstance.then().also {
-                    logDebug { "No catch handler, continuing with next node: ${it?.node?.position}" }
-                }
+                val next = tryInstance.catchDoInstance
+                    ?: (tryInstance.then().also { tryInstance.rawOutput = tryInstance.transformedInput })
+
+                goTo(next)
             }
         } while (current != null)
 

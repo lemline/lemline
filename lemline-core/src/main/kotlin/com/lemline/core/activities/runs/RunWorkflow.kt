@@ -21,7 +21,7 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
 
     // Determine the input for the sub-workflow by evaluating the 'input' expression if it exists
     val subWorkflowInput = eval(transformedInput, subWorkflowDef.input)
-    
+
     logDebug { "Sub-workflow input data: $subWorkflowInput" }
 
     val awaitCompletion = runWorkflow.isAwait
@@ -72,4 +72,3 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
         )
     }
 }
-
