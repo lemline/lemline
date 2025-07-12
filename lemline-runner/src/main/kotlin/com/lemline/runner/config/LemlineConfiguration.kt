@@ -60,7 +60,7 @@ interface LemlineConfiguration {
     fun messaging(): MessagingConfig
     fun wait(): WaitConfig
     fun retry(): RetryConfig
-    fun run(): RunConfig
+    fun runWorkflow(): RunWorkflowConfig
 
     /**
      * Database configuration mapping.
@@ -423,7 +423,7 @@ interface LemlineConfiguration {
      * Run Workflow service configuration.
      * Controls the behavior of the run workflow message processing.
      */
-    interface RunConfig {
+    interface RunWorkflowConfig {
         fun outbox(): OutboxConfig
         fun cleanup(): CleanupConfig
     }
