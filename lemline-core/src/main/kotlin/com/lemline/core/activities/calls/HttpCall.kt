@@ -68,26 +68,28 @@ private val yaml = Yaml(configuration = YamlConfiguration(strictMode = false))
 private val xml = XML { autoPolymorphic = true }
 
 // HTTP client with CIO engine and JSON serialization
-private val defaultClient = HttpClient(CIO) {
-    install(ContentNegotiation) {
-        json(LemlineJson.json)
+private val defaultClient by lazy {
+    HttpClient(CIO) {
+        install(ContentNegotiation) {
+            json(LemlineJson.json)
+        }
+        // Configure timeout settings
+        install(HttpTimeout) {
+            requestTimeoutMillis = 30000 // 30 seconds
+            connectTimeoutMillis = 15000 // 15 seconds
+            socketTimeoutMillis = 30000 // 30 seconds
+        }
+        // Install HttpRedirect plugin to allow redirect following
+        install(HttpRedirect) {
+            // Default configuration for the HttpRedirect plugin
+            // The actual redirect behavior will be controlled by the `followRedirects` setting
+            // in each request's client configuration
+            checkHttpMethod = false // Allow redirects between different HTTP methods
+            allowHttpsDowngrade = true // Allow redirects from HTTPS to HTTP if needed
+        }
+        // Disable the following redirect behavior by default - will be enabled per request if needed
+        followRedirects = false
     }
-    // Configure timeout settings
-    install(HttpTimeout) {
-        requestTimeoutMillis = 30000 // 30 seconds
-        connectTimeoutMillis = 15000 // 15 seconds
-        socketTimeoutMillis = 30000 // 30 seconds
-    }
-    // Install HttpRedirect plugin to allow redirect following
-    install(HttpRedirect) {
-        // Default configuration for the HttpRedirect plugin
-        // The actual redirect behavior will be controlled by the `followRedirects` setting
-        // in each request's client configuration
-        checkHttpMethod = false // Allow redirects between different HTTP methods
-        allowHttpsDowngrade = true // Allow redirects from HTTPS to HTTP if needed
-    }
-    // Disable the following redirect behavior by default - will be enabled per request if needed
-    followRedirects = false
 }
 
 /**

@@ -247,7 +247,7 @@ class CallHttpTest {
                         call: http
                         with:
                           method: GET
-                          endpoint: https://httpstat.us/404
+                          endpoint: https://google.com/404
                   catch:
                     errors:
                       with:

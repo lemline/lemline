@@ -115,7 +115,7 @@ To build a linux native image (on Docker), run the following command:
 On a macOS system, you can use the following command to build a macOS native image:
 
 ```bash
-./gradlew :lemline-runner:build -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false
+./gradlew clean :lemline-runner:assemble -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false --no-daemon --rerun-tasks
 ```
 
 The binary will be created in `lemline-runner/build/lemline-runner-$version-runner`
@@ -161,7 +161,7 @@ Currently implemented features are:
     - [ ] Container
     - [x] Script
     - [x] Shell
-    - [ ] Workflow
+    - [x] Workflow
 - Call:
     - [x] HTTP
     - [ ] OpenAPI

@@ -12,7 +12,6 @@ plugins {
 group = "com.lemline"
 version = "0.1.0-SNAPSHOT"
 
-
 // ────────────────────────────────────────────────────────────────────────────
 // 2) Exclude unwanted HTTP clients
 // ────────────────────────────────────────────────────────────────────────────
@@ -179,3 +178,4 @@ tasks.named("processResources") {
 // but if we face issues, we might need to add:
 // quarkus.native.resources.includes=version.properties
 // to the application.properties.
+
