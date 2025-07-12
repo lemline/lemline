@@ -5,6 +5,7 @@ import com.lemline.runner.cli.config.ConfigCommand
 import com.lemline.runner.cli.definitions.DefinitionCommand
 import com.lemline.runner.cli.instances.InstanceCommand
 import com.lemline.runner.cli.listen.ListenCommand
+import com.lemline.runner.cli.migrate.MigrateCommand
 import io.quarkus.arc.Unremovable
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import jakarta.enterprise.context.Dependent
@@ -23,7 +24,8 @@ import picocli.CommandLine.Mixin
         DefinitionCommand::class,
         InstanceCommand::class,
         ConfigCommand::class,
-        ListenCommand::class
+        ListenCommand::class,
+        MigrateCommand::class
     ]
 )
 @Unremovable
