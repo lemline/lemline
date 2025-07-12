@@ -131,8 +131,8 @@ internal class StepByStepRunner @Inject constructor(
             )
 
             // insert the child workflow (running) to start right away
-            runWorkflowRepository.insert(
-                RunWorkflowModel(
+            retryRepository.insert(
+                RetryModel(
                     message = Message.newInstance(
                         name = runWorkflow.workflow.name,
                         version = runWorkflow.workflow.version,
@@ -140,9 +140,7 @@ internal class StepByStepRunner @Inject constructor(
                         parentId = id,
                         parentIsWaiting = runWorkflow.isAwait
 
-                    ).toJsonString(),
-                    status = OutBoxStatus.PENDING,
-                    delayedUntil = Instant.now()
+                    ).toJsonString()
                 ),
                 connection
             )
@@ -151,7 +149,7 @@ internal class StepByStepRunner @Inject constructor(
 
     /**
      * Handles the completion of the workflow instance. This method finalizes the processing of
-     * the workflow by performing necessary cleanup or post-processing actions as applicable.
+     * the workflow by performing the necessary cleanup or post-processing actions as applicable.
      * Once this method is called, no further processing will occur for the current workflow instance.
      */
     private fun WorkflowInstance.onWorkflowCompleted() {
