@@ -417,5 +417,5 @@ abstract class Repository<T : UuidV7Entity> {
         else -> block(connection)
     }
 
-    protected fun ResultSet.getInstant(column: String): Instant = getTimestamp(column).toInstant()
+    protected fun ResultSet.getInstant(column: String): Instant? = getTimestamp(column)?.toInstant()
 }

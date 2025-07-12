@@ -7,17 +7,17 @@ import java.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
-const val RUN_TABLE = "lemline_runs"
+const val RUN_WORKFLOW_TABLE = "lemline_run_workflows"
 
 @Serializable
-data class RunModel(
+data class RunWorkflowModel(
     override val id: String = UuidCreator.getTimeOrderedEpoch().toString(),
 
     override val message: String,
 
     override var status: OutBoxStatus = OutBoxStatus.PENDING,
 
-    override var delayedUntil: @Contextual Instant = Instant.now(),
+    override var delayedUntil: @Contextual Instant? = null,
 
     override var attemptCount: Int = 0,
 

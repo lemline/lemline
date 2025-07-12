@@ -80,7 +80,7 @@ class WorkflowInstance(
     states: Map<NodePosition, NodeState>,
     position: NodePosition,
     secrets: Map<String, JsonElement>,
-    private val activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
+    var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
 ) {
 
     /**
@@ -345,6 +345,23 @@ class WorkflowInstance(
     }
 
     /**
+     * Retrieves the transformed output of the workflow if the workflow status is `COMPLETED`.
+     * Returns `null` for all other statuses.
+     *
+     * @return The transformed output of the workflow as a [JsonElement], or `null` if the workflow is not completed.
+     */
+    fun getOutput(): JsonElement? = when (status) {
+        WorkflowStatus.COMPLETED -> rootInstance.transformedOutput
+        else -> null
+    }
+
+    /**
+     * The property refers to the parent information as a [NodeState.Parent] object,
+     * which includes details such as the parent workflow's identifier and its waiting status.
+     */
+    val parent: NodeState.Parent? by lazy { rootInstance.state.parent }
+
+    /**
      * The workflow definition associated with this instance.
      */
     private val workflow: Workflow
@@ -367,7 +384,7 @@ class WorkflowInstance(
     /**
      * The unique identifier of the workflow instance.
      */
-    internal val id: String
+    val id: String
 
     /**
      * The starting date and time of the workflow instance.
@@ -392,8 +409,8 @@ class WorkflowInstance(
         // init root instance and workflow scope
         val rootNode = Workflows.getRootNode(workflow)
         rootInstance = rootNode.createInstance(states, null) as RootInstance
+        rootInstance.workflowInstance = this
         rootInstance.secrets = secrets
-        rootInstance.activityRunnerProvider = activityRunnerProvider
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
             id = id,
@@ -574,43 +591,32 @@ class WorkflowInstance(
 
     private fun skipTo(next: NodeInstance<*>) {
         when {
-            current.isGoingUp(next) -> {
-                current?.skippingUpTo(next)
-                current = next
-            }
-
-            else -> {
-                current?.skippingSideTo(next)
-                current = next
-            }
+            current.isGoingUp(next) -> current?.skippingUpTo(next)
+            else -> current?.skippingSideTo(next)
         }
+        current = next
     }
 
     private fun goTo(next: NodeInstance<*>?) {
         when {
-            next == null -> {
+            next == null ->
                 current?.reset()
-                current = null
-            }
 
             current.isGoingUp(next) -> {
                 if (current == rootInstance) onWorkflowCompleted() else onTaskCompleted()
                 current?.goingUpTo(next)
-                current = next
             }
 
-            current.isGoingDown(next) -> {
+            current.isGoingDown(next) ->
                 current?.goingDownTo(next)
-                current = next
-            }
 
             else -> {
                 // Going to self or sibling
                 onTaskCompleted()
                 current?.goingSideTo(next)
-                current = next
             }
         }
+        current = next
     }
 
     /**

@@ -3,8 +3,8 @@ package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.WORKFLOW_OUT
-import com.lemline.runner.models.RunModel
-import com.lemline.runner.repositories.RunRepository
+import com.lemline.runner.models.RunWorkflowModel
+import com.lemline.runner.repositories.RunWorkflowRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -27,7 +27,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
  */
 @Startup
 @ApplicationScoped
-internal class RunOutbox : AbstractOutbox<RunModel>() {
+internal class RunOutbox : AbstractOutbox<RunWorkflowModel>() {
 
     @Inject
     @Channel(WORKFLOW_OUT)
@@ -37,7 +37,7 @@ internal class RunOutbox : AbstractOutbox<RunModel>() {
     private lateinit var lemlineConfig: LemlineConfiguration
 
     @Inject
-    override lateinit var repository: RunRepository
+    override lateinit var repository: RunWorkflowRepository
 
     override val enabled by lazy { lemlineConfig.messaging().consumer().enabled() }
 

@@ -13,14 +13,13 @@ import kotlinx.serialization.json.JsonElement
 internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElement {
     logInfo { "Executing run workflow command: ${node.name}" }
 
-    val subWorkflowDef = runWorkflow.workflow
-    val subWorkflowName = subWorkflowDef.name
-    val subWorkflowVersion = subWorkflowDef.version
+    val subWorkflowName = runWorkflow.workflow.name
+    val subWorkflowVersion = runWorkflow.workflow.version
 
     logDebug { "Sub-workflow name: $subWorkflowName, version: $subWorkflowVersion" }
 
     // Determine the input for the sub-workflow by evaluating the 'input' expression if it exists
-    val subWorkflowInput = eval(transformedInput, subWorkflowDef.input)
+    val subWorkflowInput = runWorkflow.getInputFor(this)
 
     logDebug { "Sub-workflow input data: $subWorkflowInput" }
 
@@ -34,7 +33,7 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
         id = UUID.randomUUID().toString(),
         rawInput = subWorkflowInput,
         secrets = rootInstance.secrets,
-        activityRunnerProvider = rootInstance.activityRunnerProvider,
+        activityRunnerProvider = workflowInstance.activityRunnerProvider,
     )
 
     if (!awaitCompletion) {
@@ -72,3 +71,10 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
         )
     }
 }
+
+/**
+ * Returns the input for the provided run instance.
+ *
+ * @param runInstance The run instance containing the input configuration that will be evaluated.
+ */
+fun RunWorkflow.getInputFor(runInstance: RunInstance) = runInstance.eval(runInstance.transformedInput, workflow.input)

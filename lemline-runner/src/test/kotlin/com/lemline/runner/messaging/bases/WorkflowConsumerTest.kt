@@ -306,7 +306,7 @@ internal abstract class WorkflowConsumerTest {
 
         // Verify delay was set correctly (within 1 second of expected)
         val expectedDelay = Instant.now().plus(30, ChronoUnit.SECONDS)
-        val actualDelay = waitMessages[0].delayedUntil
+        val actualDelay = waitMessages[0].delayedUntil!!
         assertTrue(
             actualDelay.isAfter(expectedDelay.minus(1, ChronoUnit.SECONDS)) &&
                 actualDelay.isBefore(expectedDelay.plus(1, ChronoUnit.SECONDS)),

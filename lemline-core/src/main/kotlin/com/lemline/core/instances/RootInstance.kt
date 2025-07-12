@@ -2,20 +2,20 @@
 package com.lemline.core.instances
 
 import com.lemline.core.RuntimeDescriptor
-import com.lemline.core.activities.ActivityRunnerProvider
 import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.nodes.NodeState
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.workflows.WorkflowInstance
 import io.serverlessworkflow.api.types.RetryPolicy
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 class RootInstance(override val node: Node<RootTask>) : NodeInstance<RootTask>(node, null) {
 
-    lateinit var activityRunnerProvider: ActivityRunnerProvider
+    override lateinit var workflowInstance: WorkflowInstance
 
     internal var context: JsonObject
         get() = state.context

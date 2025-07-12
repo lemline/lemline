@@ -5,7 +5,10 @@ import com.fasterxml.jackson.databind.node.JsonNodeFactory
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.set
 import kotlinx.datetime.Instant
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -24,19 +27,18 @@ class NodeStateTest {
     fun `test constants maintain their values for messages backward compatibility`() {
         assertEquals("i", NodeState.CHILD_INDEX)
         assertEquals("try", NodeState.ATTEMPT_INDEX)
-        assertEquals("var", NodeState.VARIABLES)
         assertEquals("inp", NodeState.RAW_INPUT)
         assertEquals("out", NodeState.RAW_OUTPUT)
         assertEquals("ctx", NodeState.CONTEXT)
         assertEquals("wid", NodeState.WORKFLOW_ID)
         assertEquals("sat", NodeState.STARTED_AT)
         assertEquals("fori", NodeState.FOR_INDEX)
+        assertEquals("wai", NodeState.IS_WAITING)
     }
 
     @Test
     fun `test default values`() {
         val state = NodeState()
-        assertTrue(state.variables.isEmpty())
         assertEquals(NodeState.ATTEMPT_INDEX_DEFAULT, state.attemptIndex)
         assertEquals(NodeState.CHILD_INDEX_DEFAULT, state.childIndex)
         assertNull(state.rawInput)
@@ -44,6 +46,7 @@ class NodeStateTest {
         assertTrue(state.context.isEmpty())
         assertNull(state.workflowId)
         assertNull(state.startedAt)
+        assertNull(state.parent)
         assertEquals(NodeState.FOR_INDEX_DEFAULT, state.forIndex)
     }
 
@@ -55,13 +58,13 @@ class NodeStateTest {
         @BeforeEach
         fun setup() {
             state = NodeState().apply {
-                variables = LemlineJson.jsonObject.set("testVar", "value")
                 attemptIndex = 1
                 childIndex = 2
                 rawInput = LemlineJson.jsonObject.set("input", "test")
                 rawOutput = LemlineJson.jsonObject.set("output", "result")
                 context = LemlineJson.jsonObject.set("contextKey", "contextValue")
                 workflowId = "test-workflow"
+                parent = NodeState.Parent("parent-test-workflow", true)
                 startedAt = testInstant
                 forIndex = 3
             }
@@ -73,20 +76,11 @@ class NodeStateTest {
 
             @BeforeEach
             fun setup() {
-                invalidJson.put(NodeState.VARIABLES, "not-an-object")
                 invalidJson.put(NodeState.ATTEMPT_INDEX, "not-an-int")
                 invalidJson.put(NodeState.CHILD_INDEX, "not-an-int")
                 invalidJson.put(NodeState.CONTEXT, "not-an-object")
                 invalidJson.put(NodeState.STARTED_AT, "not-a-date")
                 invalidJson.put(NodeState.FOR_INDEX, "not-an-int")
-            }
-
-            @Test
-            fun `test invalid variables type`() {
-                val json = LemlineJson.jsonObject.set(NodeState.VARIABLES, "invalid")
-                assertThrows(IllegalArgumentException::class.java) {
-                    LemlineJson.decodeFromElement<NodeState>(json)
-                }
             }
 
             @Test

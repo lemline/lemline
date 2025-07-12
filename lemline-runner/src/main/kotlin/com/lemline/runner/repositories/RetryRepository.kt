@@ -35,7 +35,7 @@ internal class RetryRepository : OutboxRepository<RetryModel>() {
         id: String,
         message: String,
         status: OutBoxStatus,
-        delayedUntil: Instant,
+        delayedUntil: Instant?,
         attemptCount: Int,
         lastError: String?,
     ) = RetryModel(

@@ -34,7 +34,7 @@ internal class WaitRepository : OutboxRepository<WaitModel>() {
         id: String,
         message: String,
         status: OutBoxStatus,
-        delayedUntil: Instant,
+        delayedUntil: Instant?,
         attemptCount: Int,
         lastError: String?,
     ) = WaitModel(
