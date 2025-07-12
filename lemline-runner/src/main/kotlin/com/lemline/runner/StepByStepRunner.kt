@@ -1,0 +1,227 @@
+// SPDX-License-Identifier: BUSL-1.1
+package com.lemline.runner
+
+import com.lemline.common.logger
+import com.lemline.core.activities.runs.getInputFor
+import com.lemline.core.instances.RunInstance
+import com.lemline.core.instances.TryInstance
+import com.lemline.core.instances.WaitInstance
+import com.lemline.core.workflows.WorkflowInstance
+import com.lemline.runner.exceptions.RunWorkflowStartedException
+import com.lemline.runner.exceptions.TaskCompletedException
+import com.lemline.runner.exceptions.TaskRetriedException
+import com.lemline.runner.exceptions.WaitStartedException
+import com.lemline.runner.messaging.Message
+import com.lemline.runner.messaging.toMessage
+import com.lemline.runner.models.RetryModel
+import com.lemline.runner.models.RunWorkflowModel
+import com.lemline.runner.models.WaitModel
+import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.repositories.RetryRepository
+import com.lemline.runner.repositories.RunWorkflowRepository
+import com.lemline.runner.repositories.WaitRepository
+import io.quarkus.runtime.Startup
+import io.serverlessworkflow.api.types.RunWorkflow
+import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
+import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.toJavaDuration
+
+/**
+ * WorkflowConsumer is responsible for consuming workflow messages from the incoming channel,
+ * processing them, and sending the results to the outgoing channel.
+ */
+@Startup
+@ApplicationScoped
+internal class StepByStepRunner @Inject constructor(
+    private val retryRepository: RetryRepository,
+    private val waitRepository: WaitRepository,
+    private val runWorkflowRepository: RunWorkflowRepository,
+) {
+    private val logger = logger()
+
+    suspend fun run(instance: WorkflowInstance): Message? {
+
+        // stop after activity completion
+        instance.onTaskCompleted {
+            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        }
+        // stop when waiting or starting a child workflow
+        instance.onTaskStarted {
+            when (val current = instance.current) {
+                is WaitInstance -> if (current.delay.isPositive()) throw WaitStartedException(current.delay)
+                is RunInstance -> if (current.node.task.run.get() is RunWorkflow) throw RunWorkflowStartedException(
+                    current.node.task.run.get() as RunWorkflow
+                )
+
+                else -> Unit // Do nothing (run task as usual)
+            }
+        }
+
+        // stop when retrying
+        instance.onTaskRetried {
+            throw TaskRetriedException()
+        }
+
+        val nextMessage = try {
+            instance.run()
+            instance.onWorkflowCompleted()
+            null
+        } catch (_: TaskCompletedException) {
+            // next message
+            instance.toMessage()
+        } catch (_: TaskRetriedException) {
+            // Store the message to the retry repository
+            instance.onRetry()
+            null
+        } catch (e: WaitStartedException) {
+            // Store the message to the wait repository
+            instance.onWait(e.delay)
+            null
+        } catch (e: RunWorkflowStartedException) {
+            // Store the message to the run workflow repository
+            instance.onRunWorkflow(e.runWorkflow)
+            null
+        } catch (e: Exception) {
+            // Store the message in retry in a failed state (for information)
+            instance.onFault(e)
+            null
+        }
+
+        return nextMessage
+    }
+
+    /**
+     * Handles fault scenarios for the workflow instance by saving the current message as a failed message.
+     * This method serializes the workflow instance into a message string, associates it with the provided
+     * exception details, and stores it in the retry repository with a `FAILED` status.
+     *
+     * @param e The exception that caused the fault. Its stack trace will be saved for debugging purposes.
+     */
+    private fun WorkflowInstance.onFault(e: Exception) {
+        toMessage().toJsonString().saveMsgAsFailed(e)
+    }
+
+    /**
+     * Handles the execution of a child workflow.
+     * This method inserts records for both the parent workflow (waiting state) and the
+     * child workflow (running state) into the `RunWorkflowRepository` within the same transaction.
+     * The parent workflow is marked as waiting, and the child workflow is initialized with
+     * a running state and other relevant attributes.
+     *
+     * @param runWorkflow The workflow execution details, including the workflow name, version,
+     *                    input parameters, and configuration for whether the parent waits.
+     * @return Always returns null to indicate that the processing of the current workflow instance
+     *         has been stopped post-handling of the child workflow setup.
+     */
+    private fun WorkflowInstance.onRunWorkflow(runWorkflow: RunWorkflow) {
+
+        // in the same transaction, we need to insert the parent workflow (waiting) and the child workflow (running)
+        runWorkflowRepository.withTransaction { connection ->
+            // insert the parent workflow (waiting) without date for delayedUntil
+            runWorkflowRepository.insert(
+                RunWorkflowModel(
+                    id = id,
+                    message = toMessage().toJsonString(),
+                    status = OutBoxStatus.PENDING,
+                    delayedUntil = null
+                ),
+                connection
+            )
+
+            // insert the child workflow (running) to start right away
+            runWorkflowRepository.insert(
+                RunWorkflowModel(
+                    message = Message.newInstance(
+                        name = runWorkflow.workflow.name,
+                        version = runWorkflow.workflow.version,
+                        input = runWorkflow.getInputFor(current as RunInstance),
+                        parentId = id,
+                        parentIsWaiting = runWorkflow.isAwait
+
+                    ).toJsonString(),
+                    status = OutBoxStatus.PENDING,
+                    delayedUntil = Instant.now()
+                ),
+                connection
+            )
+        }
+    }
+
+    /**
+     * Handles the completion of the workflow instance. This method finalizes the processing of
+     * the workflow by performing necessary cleanup or post-processing actions as applicable.
+     * Once this method is called, no further processing will occur for the current workflow instance.
+     */
+    private fun WorkflowInstance.onWorkflowCompleted() {
+        if (parent?.isWaiting == true) {
+            // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
+            val runModel = runWorkflowRepository.findById(parent!!.workflowId)!!
+            // Deserialize the message
+            val message = Message.fromJsonString(runModel.message)
+            // set the workflow output at the rawOutput at the current position of the parent workflow
+            message.states[message.position]!!.rawOutput = getOutput()
+            // by adding a delayedUntil value, the outbox pattern will send the message asap to restart the parent workflow
+            runWorkflowRepository.update(
+                runModel.copy(
+                    delayedUntil = Instant.now(),
+                    message = message.toJsonString()
+                )
+            )
+        }
+    }
+
+    /**
+     * Handles the retry mechanism for the workflow instance. This method calculates the delay duration
+     * specified in the workflow instance, determines the delayed execution time, and stores this information
+     * along with the serialized message in the retry repository. The workflow instance processing is then
+     * halted temporarily, with the expectation that further processing will be resumed asynchronously
+     * via an external mechanism like an outbox system.
+     */
+    private fun WorkflowInstance.onRetry() {
+        val delay = (current as TryInstance).delay?.toJavaDuration()
+
+        val retryModel = RetryModel(
+            message = toMessage().toJsonString(),
+            delayedUntil = Instant.now().plus(delay ?: error("No delay set in for $this"))
+        )
+        // Save the message to the retry table
+        retryRepository.insert(retryModel)
+    }
+
+    /**
+     * Handles the "wait" state of the workflow instance by saving a wait message to the wait repository.
+     * The method calculates the delay duration specified in the workflow instance, determines the delayed
+     * execution time, and stores this information along with the serialized message in the wait repository.
+     * The workflow instance's processing is halted temporarily, and further processing is expected to resume
+     * asynchronously through an external mechanism such as an outbox system.
+     */
+    private fun WorkflowInstance.onWait(delay: Duration) {
+        val waitModel = WaitModel(
+            message = toMessage().toJsonString(),
+            delayedUntil = Instant.now().plus(delay.toJavaDuration()),
+        )
+        // Save the message to the wait table
+        waitRepository.insert(waitModel)
+    }
+
+    /**
+     * Saves the current message (`String`) as a failed message in the retry repository.
+     * A `RetryModel` is created with the message, the current timestamp as `delayedUntil`,
+     * the stack trace string of the provided exception (if any) as `lastError`, and the status set to `FAILED`.
+     * The created `RetryModel` is then inserted into the retry repository.
+     *
+     * @param e An optional exception that caused the failure. If provided, its stack trace will be stored
+     *          as the `lastError` in the `RetryModel`.
+     */
+    internal fun String.saveMsgAsFailed(e: Exception?) {
+        val retryModel = RetryModel(
+            message = this@saveMsgAsFailed,
+            delayedUntil = Instant.now(),
+            lastError = e?.stackTraceToString(),
+            status = OutBoxStatus.FAILED,
+        )
+        retryRepository.insert(retryModel)
+    }
+}

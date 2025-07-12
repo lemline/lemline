@@ -2,6 +2,7 @@
 package com.lemline.core.activities
 
 import com.lemline.core.instances.ActivityInstance
+import kotlinx.serialization.json.JsonElement
 
 /**
  * A generic interface for a component that can execute a specific type of activity.
@@ -9,5 +10,5 @@ import com.lemline.core.instances.ActivityInstance
  * @param T The specific type of ActivityInstance this runner can handle.
  */
 interface ActivityRunner<T : ActivityInstance<*>> {
-    suspend fun run(instance: T)
+    suspend fun run(instance: T): JsonElement
 }

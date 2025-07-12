@@ -8,34 +8,21 @@ import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.common.trace
 import com.lemline.common.withLoggingContext
-import com.lemline.core.errors.WorkflowException
-import com.lemline.core.instances.TryInstance
-import com.lemline.core.instances.WaitInstance
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.Workflows
+import com.lemline.runner.StepByStepRunner
 import com.lemline.runner.config.CONSUMER_ENABLED
-import com.lemline.runner.exceptions.TaskCompletedException
-import com.lemline.runner.exceptions.TaskRetriedException
-import com.lemline.runner.exceptions.TaskStartedException
-import com.lemline.runner.models.RetryModel
-import com.lemline.runner.models.WaitModel
-import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.DefinitionRepository
-import com.lemline.runner.repositories.RetryRepository
-import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.secrets.Secrets
 import io.quarkus.runtime.Startup
 import io.smallrye.mutiny.Multi
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.time.Instant
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.time.Duration
-import kotlin.time.toJavaDuration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -58,10 +45,11 @@ internal class MessageConsumer @Inject constructor(
     @Channel(WORKFLOW_OUT) private val emitter: Emitter<String>,
     @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
     private val definitionRepository: DefinitionRepository,
-    private val retryRepository: RetryRepository,
-    private val waitRepository: WaitRepository,
+    private val stepByStepRunner: StepByStepRunner
 ) {
     private val logger = logger()
+
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     @PostConstruct
     fun init() {
@@ -73,9 +61,7 @@ internal class MessageConsumer @Inject constructor(
         }
     }
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
-    fun consume(msg: String): CompletionStage<String?> = scope.future {
+    private fun consume(msg: String): CompletionStage<String?> = scope.future {
         // Generate a unique request ID for this message processing
         val requestId = java.util.UUID.randomUUID().toString()
 
@@ -92,7 +78,7 @@ internal class MessageConsumer @Inject constructor(
             } catch (e: Exception) {
                 logger.error(e) { "Failed to deserialize message" }
                 // save to retry table with a status of FAILED
-                msg.saveMsgAsFailed(e)
+                saveMsgAsFailed(msg, e)
                 // Send message to dead letter queue
                 // NOTE - MUST have mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
                 // If not, Quarkus will stop consuming messages
@@ -113,8 +99,7 @@ internal class MessageConsumer @Inject constructor(
                     logger.info { "Processing workflow message" }
                     process(message).also { result ->
                         if (result != null) {
-                            logger.info { "Workflow processing completed with next message" }
-                            logger.debug { "Next message: $result" }
+                            logger.debug { "Workflow processing completed with next message: $result" }
                             // Send the next message to the outgoing channel
                             emitter.send(result)
                         } else {
@@ -124,7 +109,7 @@ internal class MessageConsumer @Inject constructor(
                     }
                 } catch (e: Exception) {
                     logger.error(e) { "Failed to process workflow message" }
-                    msg.saveMsgAsFailed(e)
+                    saveMsgAsFailed(msg, e)
                     // Send the message to dead letter queue
                     // NOTE - we MUST set mp.messaging.incoming.workflows-in.failure-strategy=dead-letter-queue
                     // If not, Quarkus will stop consuming messages
@@ -153,50 +138,16 @@ internal class MessageConsumer @Inject constructor(
             position = message.position,
             secrets = Secrets.get(workflow),
         )
-        
-        // stop after activity completion
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
-        }
 
-        // stop when waiting
-        instance.onTaskStarted {
-            if (instance.current is WaitInstance && (instance.current as WaitInstance).delay.isPositive()) throw TaskStartedException()
-        }
-
-        // stop when retrying
-        instance.onTaskRetried {
-            throw TaskRetriedException()
-        }
-
-        val nextMessage = try {
-            instance.run()
-            null
-        } catch (_: WorkflowException) {
-            instance.faulted()
-        } catch (_: TaskCompletedException) {
-            instance.running()
-        } catch (_: TaskStartedException) {
-            instance.waiting()
-        } catch (_: TaskRetriedException) {
-            instance.retry()
-        }?.toJsonString()
-
-        return nextMessage
+        return stepByStepRunner.run(instance)?.toJsonString()
     }
 
-    private fun String.saveMsgAsFailed(e: Exception?) {
-        // Store the message in retry in a failed state (for information)
-        retryRepository.insert(
-            RetryModel(
-                message = this@saveMsgAsFailed,
-                delayedUntil = Instant.now(),
-                lastError = e?.stackTraceToString(),
-                status = OutBoxStatus.FAILED,
-            )
-        )
-        // for testing, set the CompletableFuture to a failed state
-        processingMessages.remove(this)?.completeExceptionally(e)
+    private fun saveMsgAsFailed(msg: String, e: Exception) {
+        with(stepByStepRunner) {
+            msg.saveMsgAsFailed(e)
+            // for testing, set the CompletableFuture to a failed state
+            processingMessages.remove(msg)?.completeExceptionally(e)
+        }
     }
 
     // For testing purposes
@@ -206,52 +157,4 @@ internal class MessageConsumer @Inject constructor(
     internal fun waitForProcessing(msg: String): CompletableFuture<String?> =
         processingMessages.computeIfAbsent(msg) { CompletableFuture() }
 
-    private fun WorkflowInstance.running(): Message = Message(
-        name = this.name,
-        version = this.version,
-        states = this.currentNodeStates,
-        position = this.currentPosition!!,
-    )
-
-    private fun WorkflowInstance.faulted(): Message? {
-        // Store the message in retry in a failed state (for information)
-        toMessage().toJsonString().saveMsgAsFailed(null)
-        // Stop the processing of this instance
-        return null
-    }
-
-    private fun WorkflowInstance.retry(): Message? {
-        val msg = this.toMessage()
-        val delay = (current as TryInstance).delay
-        val delayedUntil = Instant.now().plus(delay?.toJavaDuration() ?: error("No delay set in for $this"))
-
-        // Save the message to the retry table
-        retryRepository.insert(RetryModel(message = msg.toJsonString(), delayedUntil = delayedUntil))
-
-        // Stop here instance, the outbox will process it later
-        return null
-    }
-
-    private fun WorkflowInstance.waiting(): Message? {
-        val msg = this.toMessage()
-        val delay: Duration = (this.current as WaitInstance).delay
-        val delayedUntil = Instant.now().plus(delay.toJavaDuration())
-
-        // Save the message to the wait table
-        waitRepository.insert(
-            WaitModel(
-                message = msg.toJsonString(),
-                delayedUntil = delayedUntil,
-            ),
-        )
-        // Stop here instance, the outbox will process it later
-        return null
-    }
-
-    private fun WorkflowInstance.toMessage() = Message(
-        name = this.name,
-        version = this.version,
-        states = this.currentNodeStates,
-        position = this.currentPosition!!,
-    )
 }

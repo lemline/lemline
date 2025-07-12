@@ -17,7 +17,7 @@ data class WaitModel(
 
     override var status: OutBoxStatus = OutBoxStatus.PENDING,
 
-    override var delayedUntil: @Contextual Instant = Instant.now(),
+    override var delayedUntil: @Contextual Instant? = Instant.now(),
 
     override var attemptCount: Int = 0,
 

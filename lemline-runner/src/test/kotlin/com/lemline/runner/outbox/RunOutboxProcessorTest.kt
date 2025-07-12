@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.runner.models.RunModel
+import com.lemline.runner.models.RunWorkflowModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.repositories.OutboxRepository
-import com.lemline.runner.repositories.RunRepository
+import com.lemline.runner.repositories.RunWorkflowRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -17,22 +17,22 @@ import kotlin.reflect.KClass
  */
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class RunOutboxProcessorTest : OutboxProcessorTest<RunModel>() {
+internal class RunOutboxProcessorTest : OutboxProcessorTest<RunWorkflowModel>() {
 
     @Inject // Inject the specific repository
-    lateinit var runRepository: RunRepository
+    lateinit var runWorkflowRepository: RunWorkflowRepository
 
     // Implement the abstract repository property
-    override val testRepository: OutboxRepository<RunModel>
-        get() = runRepository
+    override val testRepository: OutboxRepository<RunWorkflowModel>
+        get() = runWorkflowRepository
 
     // Implement the abstract KClass property
-    override val modelClass: KClass<RunModel> = RunModel::class
+    override val modelClass: KClass<RunWorkflowModel> = RunWorkflowModel::class
 
     // Implement the abstract factory method
-    override fun createTestModel(payload: String): RunModel {
+    override fun createTestModel(payload: String): RunWorkflowModel {
         // Use the RunModel companion object factory method
-        return RunModel(
+        return RunWorkflowModel(
             message = "Test Retry Message: $payload",
             delayedUntil = Instant.now() // Ensure ready for processing
         )

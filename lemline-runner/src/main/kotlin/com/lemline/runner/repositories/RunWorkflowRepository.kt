@@ -2,9 +2,10 @@
 package com.lemline.runner.repositories
 
 import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.models.RUN_TABLE
-import com.lemline.runner.models.RunModel
+import com.lemline.runner.models.RUN_WORKFLOW_TABLE
+import com.lemline.runner.models.RunWorkflowModel
 import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.outbox.OutboxProcessor
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.Instant
@@ -20,25 +21,25 @@ import java.time.Instant
  * ensuring reliable message delivery in distributed systems.
  *
  * @see OutboxRepository for base functionality and documentation
- * @see RunModel for the message model
+ * @see RunWorkflowModel for the message model
  * @see OutboxProcessor for the processing logic
  */
 @ApplicationScoped
-internal class RunRepository : OutboxRepository<RunModel>() {
+internal class RunWorkflowRepository : OutboxRepository<RunWorkflowModel>() {
 
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
-    override val tableName = RUN_TABLE
+    override val tableName = RUN_WORKFLOW_TABLE
 
     override fun createModel(
         id: String,
         message: String,
         status: OutBoxStatus,
-        delayedUntil: Instant,
+        delayedUntil: Instant?,
         attemptCount: Int,
         lastError: String?,
-    ) = RunModel(
+    ) = RunWorkflowModel(
         id = id,
         message = message,
         status = status,

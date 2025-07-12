@@ -5,6 +5,7 @@ import com.github.f4b6a3.uuid.UuidCreator
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
+import com.lemline.core.workflows.WorkflowInstance
 import kotlinx.datetime.Clock
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -33,12 +34,15 @@ data class Message(
             name: String,
             version: String,
             input: JsonElement,
-            id: String = UuidCreator.getTimeOrderedEpoch().toString()
+            id: String = UuidCreator.getTimeOrderedEpoch().toString(),
+            parentId: String? = null,
+            parentIsWaiting: Boolean = false,
         ) = Message(
             name = name,
             version = version,
             states = mapOf(
                 NodePosition.root to NodeState(
+                    parent = parentId?.let { NodeState.Parent(it, parentIsWaiting) },
                     workflowId = id,
                     rawInput = input,
                     startedAt = Clock.System.now(),
@@ -52,3 +56,10 @@ data class Message(
 
     fun toJsonString(): String = LemlineJson.encodeToString(this)
 }
+
+internal fun WorkflowInstance.toMessage() = Message(
+    name = this.name,
+    version = this.version,
+    states = this.currentNodeStates,
+    position = this.currentPosition!!,
+)

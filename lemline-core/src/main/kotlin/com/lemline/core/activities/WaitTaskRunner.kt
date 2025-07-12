@@ -3,6 +3,7 @@ package com.lemline.core.activities
 
 import com.lemline.core.instances.WaitInstance
 import kotlinx.coroutines.delay
+import kotlinx.serialization.json.JsonElement
 
 /**
  * An ActivityRunner responsible for handling the `RunTask`.
@@ -11,7 +12,7 @@ import kotlinx.coroutines.delay
  */
 class WaitTaskRunner : ActivityRunner<WaitInstance> {
 
-    override suspend fun run(instance: WaitInstance) {
+    override suspend fun run(instance: WaitInstance): JsonElement {
         /**
          * Duration for which the workflow should wait before resuming.
          * The duration is extracted from the WaitTask and converted to a Duration using ISO-8601 duration format.
@@ -19,6 +20,6 @@ class WaitTaskRunner : ActivityRunner<WaitInstance> {
         delay(instance.delay)
 
         // Set the rawOutput to the transformedInput
-        instance.rawOutput = instance.transformedInput
+        return instance.transformedInput
     }
 }

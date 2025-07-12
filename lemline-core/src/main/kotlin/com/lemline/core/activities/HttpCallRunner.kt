@@ -15,7 +15,7 @@ import io.serverlessworkflow.api.types.HTTPArguments
 import kotlinx.serialization.json.JsonElement
 
 class HttpCallRunner : ActivityRunner<CallHttpInstance> {
-    override suspend fun run(instance: CallHttpInstance) {
+    override suspend fun run(instance: CallHttpInstance): JsonElement {
         // The HttpCall helper is instantiated here, using method references from the instance
         val httpCall = HttpCall(
             getSecretByName = instance::toSecret,
@@ -56,7 +56,7 @@ class HttpCallRunner : ActivityRunner<CallHttpInstance> {
         val url = urlBuilder.build()
 
         // Execute the call and set the rawOutput on the instance
-        instance.rawOutput = httpCall.execute(
+        return httpCall.execute(
             method = method,
             url = url,
             headers = headers,

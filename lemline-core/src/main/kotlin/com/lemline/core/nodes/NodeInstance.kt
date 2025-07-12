@@ -22,6 +22,7 @@ import com.lemline.core.instances.TryInstance
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.json.LemlineJson.toJsonElement
 import com.lemline.core.schemas.SchemaValidator
+import com.lemline.core.workflows.WorkflowInstance
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
@@ -84,12 +85,17 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     internal var state = NodeState()
 
     /**
+     * Additional properties for this scope (for example, from a For task)
+     */
+    internal var variables = JsonObject(mapOf())
+
+    /**
      * Possible children of this task
      */
     lateinit var children: List<NodeInstance<*>>
 
     /**
-     * Root initialPosition
+     * Root instance of the workflow.
      */
     internal val rootInstance: RootInstance by lazy {
         when (this) {
@@ -100,21 +106,19 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     }
 
     /**
+     * Workflow instance that this node belongs to.
+     */
+    open val workflowInstance: WorkflowInstance by lazy {
+        rootInstance.workflowInstance
+    }
+
+    /**
      * Index of the current child being processed
      */
     internal var childIndex: Int
         get() = state.childIndex
         set(value) {
             state.childIndex = value
-        }
-
-    /**
-     * Additional properties for this scope (for example from For task)
-     */
-    internal var variables: JsonObject
-        get() = state.variables
-        set(value) {
-            state.variables = value
         }
 
     /**
@@ -507,7 +511,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
 }
 
 /**
- * Check if the current node has the given node as parent.
+ * Check if the current node has the given node as a parent.
  */
 internal fun NodeInstance<*>?.isGoingUp(node: NodeInstance<*>?): Boolean = when {
     this == null -> false

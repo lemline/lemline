@@ -11,38 +11,55 @@ import com.lemline.core.instances.ListenInstance
 import com.lemline.core.instances.RunInstance
 import com.lemline.core.instances.WaitInstance
 import kotlin.reflect.KClass
+import kotlinx.serialization.json.JsonElement
 
 /**
  * A registry that holds and provides the correct ActivityRunner for a given ActivityInstance.
- * This uses a map to look up the runner at runtime based on the instance's class.
- * This class is immutable; modification methods return a new instance.
+ *
+ * This provider uses a hybrid approach for maximum safety and flexibility:
+ * 1.  It first checks a map of custom runners, allowing users to override or extend behavior.
+ * 2.  If no custom runner is found, it falls back to a compile-time safe `when` block
+ *     that dispatches to the default, built-in runners for all known sealed subtypes
+ *     of `ActivityInstance`.
  */
 class ActivityRunnerProvider(
-    private val runners: Map<KClass<out ActivityInstance<*>>, ActivityRunner<*>>,
+    private val customRunners: Map<KClass<out ActivityInstance<*>>, ActivityRunner<*>> = emptyMap(),
 ) {
     /**
      * Finds the appropriate runner for the given instance and executes it.
+     * It prioritizes custom runners before falling back to the default built-in runners.
      */
     @Suppress("UNCHECKED_CAST")
-    suspend fun run(instance: ActivityInstance<*>) {
-        // Find the runner registered for this specific instance class (e.g., CallHttpInstance::class)
-        val runner = runners[instance::class]
-            ?: throw IllegalStateException("No ActivityRunner registered for type ${instance::class.simpleName}")
+    suspend fun run(instance: ActivityInstance<*>): JsonElement {
+        // 1. Prioritize custom/overridden runners from the map.
+        val customRunner = customRunners[instance::class]
+        if (customRunner != null) {
+            return (customRunner as ActivityRunner<ActivityInstance<*>>).run(instance)
+        }
 
-        // We need to cast because the map stores Runner<*>, but we know it's the correct one.
-        (runner as ActivityRunner<ActivityInstance<*>>).run(instance)
+        // 2. Fallback to default runners.
+        return when (instance) {
+            is CallHttpInstance -> defaultHttpCallRunner.run(instance)
+            is RunInstance -> defaultRunTaskRunner.run(instance)
+            is WaitInstance -> defaultWaitTaskRunner.run(instance)
+            is CallGrpcInstance -> notImplementedRunner.run(instance)
+            is CallAsyncApiInstance -> notImplementedRunner.run(instance)
+            is CallOpenApiInstance -> notImplementedRunner.run(instance)
+            is EmitInstance -> notImplementedRunner.run(instance)
+            is ListenInstance -> notImplementedRunner.run(instance)
+        }
     }
 
+
     /**
-     * Creates a new ActivityRunnerProvider by adding or replacing a runner for a given activity type.
+     * Creates a new ActivityRunnerProvider by adding or replacing a custom runner.
      * This is an immutable operation; it returns a new instance.
      *
      * @param pair A pair of the ActivityInstance class and the runner to register for it.
      * @return A new ActivityRunnerProvider instance with the added runner.
      */
-    operator fun plus(pair: Pair<KClass<out ActivityInstance<*>>, ActivityRunner<*>>): ActivityRunnerProvider {
-        return ActivityRunnerProvider(runners + pair)
-    }
+    operator fun <T : ActivityInstance<*>> plus(pair: Pair<KClass<out T>, ActivityRunner<T>>) =
+        ActivityRunnerProvider(customRunners + pair)
 
     /**
      * Merges this provider with another, creating a new provider.
@@ -51,29 +68,23 @@ class ActivityRunnerProvider(
      * @param other The ActivityRunnerProvider to merge with.
      * @return A new ActivityRunnerProvider instance containing runners from both providers.
      */
-    operator fun plus(other: ActivityRunnerProvider): ActivityRunnerProvider {
-        return ActivityRunnerProvider(this.runners + other.runners)
-    }
+    operator fun plus(other: ActivityRunnerProvider) =
+        ActivityRunnerProvider(this.customRunners + other.customRunners)
+
 
     companion object {
         /**
-         * A default provider containing runners for all standard, built-in activities.
-         * This can be used as a base and extended with custom runners.
+         * A default provider with no custom runners. It will use the built-in `when` block
+         * for all executions. This can be extended via the `plus` operator.
          */
-        val default by lazy {
-            ActivityRunnerProvider(
-                mapOf(
-                    CallHttpInstance::class to HttpCallRunner(),
-                    RunInstance::class to RunTaskRunner(),
-                    WaitInstance::class to WaitTaskRunner(),
-                    CallGrpcInstance::class to NotImplementedRunner(),
-                    CallAsyncApiInstance::class to NotImplementedRunner(),
-                    CallOpenApiInstance::class to NotImplementedRunner(),
-                    EmitInstance::class to NotImplementedRunner(),
-                    ListenInstance::class to NotImplementedRunner(),
-                )
-            )
-        }
+        val default by lazy { ActivityRunnerProvider() }
+
+        // Pre-instantiate the default runners to be used by the 'when' block.
+        // These are private to the companion object to avoid direct access.
+        private val defaultHttpCallRunner = HttpCallRunner()
+        private val defaultRunTaskRunner = RunTaskRunner()
+        private val defaultWaitTaskRunner = WaitTaskRunner()
+        private val notImplementedRunner = NotImplementedRunner<ActivityInstance<*>>()
     }
 }
 
@@ -82,7 +93,7 @@ class ActivityRunnerProvider(
  * Throws a NotImplementedError when its run method is called.
  */
 class NotImplementedRunner<T : ActivityInstance<*>> : ActivityRunner<T> {
-    override suspend fun run(instance: T) {
+    override suspend fun run(instance: T): JsonElement {
         TODO("Activity runner for ${instance::class.simpleName} is not yet implemented.")
     }
 }

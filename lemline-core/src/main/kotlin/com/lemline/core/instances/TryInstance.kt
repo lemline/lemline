@@ -46,7 +46,7 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
         childIndex++
 
         return when (childIndex) {
-            0 -> tryDoInstance.also { it.rawInput = transformedInput }
+            0 -> tryDoInstance
             else -> this
         }
     }

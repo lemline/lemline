@@ -174,7 +174,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Calculate expected delay using exponential backoff - 20% jitter
         val expectedMinDelay = initialDelay.toMillis() * 0.8
-        updated.delayedUntil shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
+        updated.delayedUntil!! shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
 
         // waiting for the next attempt
         Thread.sleep(Duration.between(now, updated.delayedUntil).toMillis())
@@ -216,7 +216,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Arrange
         val original = createTestModel(payload = "FailPayload")
         testRepository.insert(original)
-        val originalDelayedUntil = original.delayedUntil
+        val originalDelayedUntil = original.delayedUntil!!
 
         val failureException = RuntimeException("Persistent failure!")
         // Set up the mock to always fail
@@ -236,11 +236,11 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
                 updated.status shouldBe PENDING
                 updated.attemptCount shouldBe attempt
                 updated.lastError shouldBe failureException.message
-                updated.delayedUntil shouldBeAfter lastDelayedUntil
+                updated.delayedUntil!! shouldBeAfter lastDelayedUntil
                 // Calculate expected delay using exponential backoff - 20% jitter
                 val expectedMinDelay = initialDelay.toMillis() * (1L shl (attempt - 1)) * 0.8
-                updated.delayedUntil shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
-                lastDelayedUntil = updated.delayedUntil
+                updated.delayedUntil!! shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
+                lastDelayedUntil = updated.delayedUntil!!
                 // waiting for the next attempt
                 Thread.sleep(Duration.between(now, updated.delayedUntil).toMillis())
             } else {

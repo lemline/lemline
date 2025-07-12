@@ -9,6 +9,7 @@ import com.lemline.core.instances.RunInstance
 import io.serverlessworkflow.api.types.RunScript
 import io.serverlessworkflow.api.types.RunShell
 import io.serverlessworkflow.api.types.RunWorkflow
+import kotlinx.serialization.json.JsonElement
 
 /**
  * An ActivityRunner responsible for handling the `RunTask`.
@@ -16,13 +17,9 @@ import io.serverlessworkflow.api.types.RunWorkflow
  * execution logic for running a shell command or a script.
  */
 class RunTaskRunner : ActivityRunner<RunInstance> {
-    override suspend fun run(instance: RunInstance) {
-        val runTask = instance.node.task
-        // Get the specific run configuration (e.g., RunScript or RunShell)
-        val run = runTask.run.get()
-
+    override suspend fun run(instance: RunInstance): JsonElement {
         // Delegate to the appropriate private helper and set the rawOutput
-        instance.rawOutput = when (run) {
+        return when (val run = instance.node.task.run.get()) {
             is RunScript -> instance.runScript(run)
             is RunShell -> instance.runShell(run)
             is RunWorkflow -> instance.runWorkflow(run)
