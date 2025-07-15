@@ -125,84 +125,6 @@ class WorkflowInstance(
             activityRunnerProvider = activityRunnerProvider
         )
 
-        /**
-         * Sets a handler to be invoked when the workflow starts.
-         *
-         * @param handler A lambda function that receives the `WorkflowInstance` when the workflow starts.
-         */
-        @JvmStatic
-        fun onWorkflowStarted(handler: (WorkflowInstance) -> Unit) {
-            onWorkflowStarted = handler
-        }
-
-        /**
-         * Sets a handler to be invoked when the workflow completes.
-         *
-         * @param handler A lambda function that receives the `WorkflowInstance` when the workflow completes.
-         */
-        @JvmStatic
-        fun onWorkflowCompleted(handler: (WorkflowInstance) -> Unit) {
-            onWorkflowCompleted = handler
-        }
-
-        /**
-         * Sets a handler to be invoked when the workflow encounters a fault.
-         *
-         * @param handler A lambda function that receives the `WorkflowInstance` when the workflow faults.
-         */
-        @JvmStatic
-        fun onWorkflowFaulted(handler: (WorkflowInstance) -> Unit) {
-            onWorkflowFaulted = handler
-        }
-
-        /**
-         * Sets a handler to be invoked when a task starts.
-         *
-         * @param handler A lambda function that receives the `WorkflowInstance` when a task starts.
-         */
-        @JvmStatic
-        fun onTaskStarted(handler: (WorkflowInstance) -> Unit) {
-            onTaskStarted = handler
-        }
-
-        /**
-         * Sets a handler to be invoked when a task completes.
-         *
-         * @param handler A lambda function that receives the `WorkflowInstance` when a task completes.
-         */
-        @JvmStatic
-        fun onTaskCompleted(handler: (WorkflowInstance) -> Unit) {
-            onTaskCompleted = handler
-        }
-
-        /**
-         * Sets a handler to be invoked when a task encounters a fault.
-         *
-         * @param handler A lambda function that receives the `WorkflowInstance` when a task faults.
-         */
-        @JvmStatic
-        fun onTaskFaulted(handler: (WorkflowInstance) -> Unit) {
-            onTaskFaulted = handler
-        }
-
-        /**
-         * Sets a handler to be invoked when a task is retried.
-         *
-         * @param handler A lambda function that receives the `WorkflowInstance` when a task is retried.
-         */
-        @JvmStatic
-        fun onTaskRetried(handler: (WorkflowInstance) -> Unit) {
-            onTaskRetried = handler
-        }
-
-        // Default event handlers
-        private var onWorkflowStarted = { i: WorkflowInstance -> }
-        private var onWorkflowCompleted = { i: WorkflowInstance -> }
-        private var onWorkflowFaulted = { i: WorkflowInstance -> }
-        private var onTaskStarted = { i: WorkflowInstance -> }
-        private var onTaskCompleted = { i: WorkflowInstance -> }
-        private var onTaskFaulted = { i: WorkflowInstance -> }
-        private var onTaskRetried = { i: WorkflowInstance -> }
 
         internal val scope = CoroutineScope(Dispatchers.IO)
     }
@@ -242,7 +164,7 @@ class WorkflowInstance(
      *
      * @param handler A lambda function to execute when a task starts.
      */
-    fun onTaskStarted(handler: () -> Unit) {
+    fun onTaskStarted(handler: (t: NodeInstance<*>) -> Unit) {
         onTaskStarted = handler
     }
 
@@ -251,7 +173,7 @@ class WorkflowInstance(
      *
      * @param handler A lambda function to execute when a task completes.
      */
-    fun onTaskCompleted(handler: () -> Unit) {
+    fun onTaskCompleted(handler: (t: NodeInstance<*>) -> Unit) {
         onTaskCompleted = handler
     }
 
@@ -260,7 +182,7 @@ class WorkflowInstance(
      *
      * @param handler A lambda function to execute when a task faults.
      */
-    fun onTaskFaulted(handler: () -> Unit) {
+    fun onTaskFaulted(handler: (t: NodeInstance<*>) -> Unit) {
         onTaskFaulted = handler
     }
 
@@ -269,18 +191,18 @@ class WorkflowInstance(
      *
      * @param handler A lambda function to execute when a task is retried.
      */
-    fun onTaskRetried(handler: () -> Unit) {
+    fun onTaskRetried(handler: (t: NodeInstance<*>) -> Unit) {
         onTaskRetried = handler
     }
 
     // Default event handlers
-    private var onWorkflowStarted = { onWorkflowStarted(this) }
-    private var onWorkflowCompleted = { onWorkflowCompleted(this) }
-    private var onWorkflowFaulted = { onWorkflowFaulted(this) }
-    private var onTaskStarted = { onTaskStarted(this) }
-    private var onTaskCompleted = { onTaskCompleted(this) }
-    private var onTaskFaulted = { onTaskFaulted(this) }
-    private var onTaskRetried = { onTaskRetried(this) }
+    private var onWorkflowStarted = { }
+    private var onWorkflowCompleted = { }
+    private var onWorkflowFaulted = { }
+    private var onTaskStarted = { t: NodeInstance<*> -> }
+    private var onTaskCompleted = { t: NodeInstance<*> -> }
+    private var onTaskFaulted = { t: NodeInstance<*> -> }
+    private var onTaskRetried = { t: NodeInstance<*> -> }
 
     /**
      * Logs debug messages with workflow context.
@@ -292,7 +214,7 @@ class WorkflowInstance(
         workflowId = id,
         workflowName = name,
         workflowVersion = version,
-        nodePosition = currentPosition.toString(),
+        nodePosition = position.toString(),
     ) {
         logger.debug(e, message)
     }
@@ -307,7 +229,7 @@ class WorkflowInstance(
         workflowId = id,
         workflowName = name,
         workflowVersion = version,
-        nodePosition = currentPosition.toString(),
+        nodePosition = position.toString(),
     ) {
         logger.info(e, message)
     }
@@ -322,7 +244,7 @@ class WorkflowInstance(
         workflowId = id,
         workflowName = name,
         workflowVersion = version,
-        nodePosition = currentPosition.toString(),
+        nodePosition = position.toString(),
     ) {
         logger.warn(e, message)
     }
@@ -338,7 +260,7 @@ class WorkflowInstance(
             workflowId = id,
             workflowName = name,
             workflowVersion = version,
-            nodePosition = currentPosition.toString(),
+            nodePosition = position.toString(),
         ) {
             logger.error(e, message)
         }
@@ -440,7 +362,7 @@ class WorkflowInstance(
     /**
      * Retrieves the current position in the workflow.
      */
-    val currentPosition: NodePosition?
+    val position: NodePosition?
         get() = current?.node?.position
 
     /**
@@ -448,7 +370,7 @@ class WorkflowInstance(
      *
      * @return A map of node positions to their corresponding node states.
      */
-    val currentNodeStates: Map<NodePosition, NodeState>
+    val states: Map<NodePosition, NodeState>
         get() {
             val currentStates = mutableMapOf<NodePosition, NodeState>()
             fun collectStates(nodeInstance: NodeInstance<*>) {
@@ -503,7 +425,7 @@ class WorkflowInstance(
             try {
                 tryRun()
             } catch (e: WorkflowException) {
-                onTaskFaulted()
+                onTaskFaulted(current!!)
 
                 val tryInstance = e.catching
 
@@ -528,7 +450,7 @@ class WorkflowInstance(
                     // reinit childIndex, as we are going to retry
                     tryInstance.childIndex = -1
                     // Update node position after setting retry
-                    onTaskRetried()
+                    onTaskRetried(current!!)
                     // Suspend execution for the duration of the delay.
                     delay(tryInstance.delay!!)
                     // Continue the loop to re-execute the TryInstance's children.
@@ -546,7 +468,7 @@ class WorkflowInstance(
         // If the loop completes, the workflow has finished successfully.
         status = WorkflowStatus.COMPLETED
         onWorkflowCompleted()
-        logDebug { "Workflow status: $status, current position: $currentPosition" }
+        logDebug { "Workflow status: $status, current position: $position" }
 
         // Return the final transformed output of the root node.
         return rootInstance.transformedOutput
@@ -572,7 +494,7 @@ class WorkflowInstance(
                     true -> {
                         node.startedAt = Clock.System.now()
                         if (node is WaitInstance) status = WorkflowStatus.WAITING
-                        if (node == rootInstance) onWorkflowStarted() else onTaskStarted()
+                        if (node == rootInstance) onWorkflowStarted() else onTaskStarted(node)
                         node.run()
                     }
 
@@ -599,24 +521,32 @@ class WorkflowInstance(
 
     private fun goTo(next: NodeInstance<*>?) {
         when {
-            next == null ->
+            next == null -> {
                 current?.reset()
+                current = null
+                onWorkflowCompleted()
+            }
 
             current.isGoingUp(next) -> {
-                if (current == rootInstance) onWorkflowCompleted() else onTaskCompleted()
-                current?.goingUpTo(next)
+                val prev = current!!
+                current!!.goingUpTo(next)
+                current = next
+                onTaskCompleted(prev)
             }
 
-            current.isGoingDown(next) ->
-                current?.goingDownTo(next)
+            current.isGoingDown(next) -> {
+                current!!.goingDownTo(next)
+                current = next
+            }
 
+            // Going to self or sibling
             else -> {
-                // Going to self or sibling
-                onTaskCompleted()
-                current?.goingSideTo(next)
+                val prev = current!!
+                current!!.goingSideTo(next)
+                current = next
+                onTaskCompleted(prev)
             }
         }
-        current = next
     }
 
     /**

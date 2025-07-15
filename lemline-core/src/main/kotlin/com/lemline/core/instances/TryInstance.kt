@@ -38,6 +38,10 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
         super.reset()
     }
 
+    override suspend fun run() {
+        // do nothing
+    }
+    
     /**
      * The first time we enter the node, we continue to the tryDoInstance
      * If we return, this means the processing was successful
@@ -84,10 +88,6 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
         // if has already started and is retrying
         if (attemptIndex > 0) return true
         return super.shouldStart()
-    }
-
-    override suspend fun run() {
-        // do nothing
     }
 
     /**

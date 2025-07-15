@@ -96,10 +96,11 @@ internal class MessageConsumer @Inject constructor(
                 LogContext.NODE_POSITION to message.position.toString(),
             ) {
                 try {
-                    logger.info { "Processing workflow message" }
-                    process(message).also { result ->
+                    logger.info { "Processing workflow message: ${message.toPrettyString()}" }
+                    val next = process(message)
+                    next?.toJsonString().also { result ->
                         if (result != null) {
-                            logger.debug { "Workflow processing completed with next message: $result" }
+                            logger.debug { "Workflow processing completed with next message:\n${next?.toPrettyString()}" }
                             // Send the next message to the outgoing channel
                             emitter.send(result)
                         } else {
@@ -119,7 +120,7 @@ internal class MessageConsumer @Inject constructor(
         }
     }
 
-    suspend fun process(message: Message): String? {
+    suspend fun process(message: Message): Message? {
         val name = message.name
         val version = message.version
         // Get workflow definition from the cache or load it from the database
@@ -139,7 +140,7 @@ internal class MessageConsumer @Inject constructor(
             secrets = Secrets.get(workflow),
         )
 
-        return stepByStepRunner.run(instance)?.toJsonString()
+        return stepByStepRunner.run(instance)
     }
 
     private fun saveMsgAsFailed(msg: String, e: Exception) {

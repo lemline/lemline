@@ -27,8 +27,8 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
         }
 
         // Run the workflow
@@ -60,8 +60,8 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
         }
 
         // Run the workflow
@@ -92,8 +92,8 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
         }
 
         // Run the workflow
@@ -128,8 +128,8 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
         }
 
         // Run the workflow
@@ -156,8 +156,8 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
         }
 
         // Run the workflow
@@ -186,8 +186,8 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
         }
 
         // Run the workflow
@@ -214,8 +214,8 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
         }
 
         // Run the workflow
@@ -440,8 +440,8 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
         }
 
         // Run the workflow
@@ -479,8 +479,8 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
         }
 
         // Run the workflow

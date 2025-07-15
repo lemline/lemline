@@ -25,14 +25,14 @@ class NodeStateTest {
 
     @Test
     fun `test constants maintain their values for messages backward compatibility`() {
-        assertEquals("i", NodeState.CHILD_INDEX)
+        assertEquals("idx", NodeState.CHILD_INDEX)
         assertEquals("try", NodeState.ATTEMPT_INDEX)
         assertEquals("inp", NodeState.RAW_INPUT)
         assertEquals("out", NodeState.RAW_OUTPUT)
         assertEquals("ctx", NodeState.CONTEXT)
         assertEquals("wid", NodeState.WORKFLOW_ID)
         assertEquals("sat", NodeState.STARTED_AT)
-        assertEquals("fori", NodeState.FOR_INDEX)
+        assertEquals("for", NodeState.FOR_INDEX)
         assertEquals("wai", NodeState.IS_WAITING)
     }
 
@@ -132,7 +132,7 @@ class NodeStateTest {
             }
 
             assertEquals(
-                """{"i":1,"wid":"test-workflow"}""",
+                """{"idx":1,"wid":"test-workflow"}""",
                 LemlineJson.encodeToString(state),
             )
         }
