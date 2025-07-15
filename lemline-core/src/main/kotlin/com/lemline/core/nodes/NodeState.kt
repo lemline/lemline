@@ -37,7 +37,7 @@ data class NodeState(
      * Those constants MUST NOT be changed to ensure backward compatibility of messages
      */
     companion object {
-        const val CHILD_INDEX = "i"
+        const val CHILD_INDEX = "idx"
         const val ATTEMPT_INDEX = "try"
         const val RAW_INPUT = "inp"
         const val RAW_OUTPUT = "out"
@@ -46,7 +46,7 @@ data class NodeState(
         const val PARENT = "par"
         const val IS_WAITING = "wai"
         const val STARTED_AT = "sat"
-        const val FOR_INDEX = "fori"
+        const val FOR_INDEX = "for"
 
         const val CHILD_INDEX_DEFAULT = -1
         const val ATTEMPT_INDEX_DEFAULT = 0

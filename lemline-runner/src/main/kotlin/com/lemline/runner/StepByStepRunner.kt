@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner
 
+import com.lemline.common.debug
+import com.lemline.common.error
 import com.lemline.common.logger
 import com.lemline.core.activities.runs.getInputFor
 import com.lemline.core.instances.RunInstance
 import com.lemline.core.instances.TryInstance
 import com.lemline.core.instances.WaitInstance
+import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.runner.exceptions.RunWorkflowStartedException
 import com.lemline.runner.exceptions.TaskCompletedException
@@ -41,45 +44,52 @@ internal class StepByStepRunner @Inject constructor(
 ) {
     private val logger = logger()
 
+    private val onTaskCompleted = { task: NodeInstance<*> ->
+        if (task.node.isActivity()) throw TaskCompletedException()
+//            when (task) {
+//                is WaitInstance -> Unit
+//                is RunInstance -> if (task.node.task.run.get() !is RunWorkflow) throw TaskCompletedException()
+//                else -> if (task.node.isActivity()) throw TaskCompletedException()
+//            }
+    }
+
+    private val onTaskStarted = { task: NodeInstance<*> ->
+        when (task) {
+            is WaitInstance -> if (task.delay.isPositive()) throw WaitStartedException(task.delay)
+            is RunInstance -> if (task.node.task.run.get() is RunWorkflow) throw RunWorkflowStartedException(
+                task.node.task.run.get() as RunWorkflow
+            )
+
+            else -> Unit
+        }
+    }
+
     suspend fun run(instance: WorkflowInstance): Message? {
 
-        // stop after activity completion
-        instance.onTaskCompleted {
-            if (instance.current?.node?.isActivity() == true) throw TaskCompletedException()
-        }
-        // stop when waiting or starting a child workflow
-        instance.onTaskStarted {
-            when (val current = instance.current) {
-                is WaitInstance -> if (current.delay.isPositive()) throw WaitStartedException(current.delay)
-                is RunInstance -> if (current.node.task.run.get() is RunWorkflow) throw RunWorkflowStartedException(
-                    current.node.task.run.get() as RunWorkflow
-                )
-
-                else -> Unit // Do nothing (run task as usual)
-            }
-        }
-
-        // stop when retrying
-        instance.onTaskRetried {
-            throw TaskRetriedException()
-        }
+        instance.onTaskCompleted { onTaskCompleted(it) }
+        instance.onTaskStarted { onTaskStarted(it) }
+        instance.onTaskRetried { throw TaskRetriedException() }
 
         val nextMessage = try {
             instance.run()
             instance.onWorkflowCompleted()
             null
         } catch (_: TaskCompletedException) {
+            logger.debug { "Task completed at ${instance.position}" }
             // next message
             instance.toMessage()
         } catch (_: TaskRetriedException) {
+            logger.debug { "Task retried at ${instance.position}" }
             // Store the message to the retry repository
             instance.onRetry()
             null
         } catch (e: WaitStartedException) {
+            logger.debug { "Task waiting at ${instance.position}" }
             // Store the message to the wait repository
             instance.onWait(e.delay)
             null
         } catch (e: RunWorkflowStartedException) {
+            logger.debug { "run Workflow at ${instance.position}" }
             // Store the message to the run workflow repository
             instance.onRunWorkflow(e.runWorkflow)
             null
@@ -130,17 +140,19 @@ internal class StepByStepRunner @Inject constructor(
                 connection
             )
 
-            // insert the child workflow (running) to start right away
-            retryRepository.insert(
-                RetryModel(
-                    message = Message.newInstance(
-                        name = runWorkflow.workflow.name,
-                        version = runWorkflow.workflow.version,
-                        input = runWorkflow.getInputFor(current as RunInstance),
-                        parentId = id,
-                        parentIsWaiting = runWorkflow.isAwait
+            // insert the child workflow (running) to start right away (the id must NOT be the workflow id)
+            val child = Message.newInstance(
+                name = runWorkflow.workflow.name,
+                version = runWorkflow.workflow.version,
+                input = runWorkflow.getInputFor(current as RunInstance),
+                parentId = id,
+                parentIsWaiting = runWorkflow.isAwait
 
-                    ).toJsonString()
+            )
+            runWorkflowRepository.insert(
+                RunWorkflowModel(
+                    message = child.toJsonString(),
+                    delayedUntil = Instant.now(),
                 ),
                 connection
             )
@@ -167,6 +179,7 @@ internal class StepByStepRunner @Inject constructor(
                     message = message.toJsonString()
                 )
             )
+            logger.info("Restarting parent workflow:\n${message.toPrettyString()}")
         }
     }
 
@@ -214,6 +227,8 @@ internal class StepByStepRunner @Inject constructor(
      *          as the `lastError` in the `RetryModel`.
      */
     internal fun String.saveMsgAsFailed(e: Exception?) {
+        logger.error(e) { "Failed to process message: $this" }
+
         val retryModel = RetryModel(
             message = this@saveMsgAsFailed,
             delayedUntil = Instant.now(),

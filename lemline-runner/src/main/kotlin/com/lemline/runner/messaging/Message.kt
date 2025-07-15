@@ -55,11 +55,13 @@ data class Message(
     }
 
     fun toJsonString(): String = LemlineJson.encodeToString(this)
+
+    fun toPrettyString(): String = LemlineJson.encodeToPrettyString(this)
 }
 
 internal fun WorkflowInstance.toMessage() = Message(
     name = this.name,
     version = this.version,
-    states = this.currentNodeStates,
-    position = this.currentPosition!!,
+    states = this.states,
+    position = this.position!!,
 )
