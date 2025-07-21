@@ -3,6 +3,7 @@ package com.lemline.core.runs
 
 import com.lemline.core.getWorkflowInstance
 import com.lemline.core.json.LemlineJson
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
 import kotlin.test.assertTrue
@@ -11,6 +12,8 @@ import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.Test
 
 class CallHttpTest {
+
+    class TaskCompletedException : RuntimeException("Task completed")
 
     @Test
     fun `test basic GET request to JSONPlaceholder`() = runTest {
@@ -24,11 +27,19 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
+        }
+
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskCompletedException> {
+            instance.run()
+        }
 
         // Assert the output contains expected fields from JSONPlaceholder
-        val output = instance.current?.state?.rawOutput.toString()
+        val output = instance.current?.rawOutput.toString()
+        println("current = ${instance.current}")
+        println("output = $output")
         assertTrue(output.contains("id"))
         assertTrue(output.contains("title"))
         assertTrue(output.contains("body"))
@@ -49,8 +60,14 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
+        }
+
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskCompletedException> {
+            instance.run()
+        }
 
         // Assert we get an array of comments for post 1
         val output = instance.current?.state?.rawOutput.toString()
@@ -75,8 +92,14 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
+        }
+
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskCompletedException> {
+            instance.run()
+        }
 
         // Assert the response contains the data we sent plus an ID
         val outputStr = instance.current?.state?.rawOutput.toString()
@@ -105,8 +128,14 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
+        }
+
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskCompletedException> {
+            instance.run()
+        }
 
         // Assert the response contains our updated data
         val outputStr = instance.current?.state?.rawOutput.toString()
@@ -127,11 +156,17 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
+        }
+
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskCompletedException> {
+            instance.run()
+        }
 
         // For JSONPlaceholder, DELETE requests return an empty object
-        val output = instance.rootInstance.transformedOutput
+        val output = instance.current?.state?.rawOutput
         assertTrue(output is JsonObject)
     }
 
@@ -151,8 +186,14 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
+        }
+
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskCompletedException> {
+            instance.run()
+        }
 
         // Verify we got a response
         val outputStr = instance.current?.state?.rawOutput.toString()
@@ -173,8 +214,14 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
+        }
+
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskCompletedException> {
+            instance.run()
+        }
 
         // With raw output, we should get a base64 encoded string
         val outputStr = instance.current?.state?.rawOutput.toString()
@@ -200,7 +247,7 @@ class CallHttpTest {
                         call: http
                         with:
                           method: GET
-                          endpoint: https://httpstat.us/404
+                          endpoint: https://google.com/404
                   catch:
                     errors:
                       with:
@@ -214,7 +261,6 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the workflow
         instance.run()
 
         // Verify the workflow completed successfully (error was caught)
@@ -394,8 +440,14 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the task
-        instance.run()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
+        }
+
+        // Run the workflow
+        shouldThrow<TaskCompletedException> {
+            instance.run()
+        }
 
         // Verify there was no Error
         instance.status shouldBe WorkflowStatus.RUNNING
@@ -427,11 +479,14 @@ class CallHttpTest {
         """
         val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
 
-        // Run the task
-        instance.run()
+        instance.onTaskCompleted { task ->
+            if (task.node.isActivity()) throw TaskCompletedException()
+        }
 
-        // Verify there was no Error
-        instance.status shouldBe WorkflowStatus.RUNNING
+        // Run the workflow
+        shouldThrow<TaskCompletedException> {
+            instance.run()
+        }
 
         // Verify call completed normally (no error was caught)
         val rawOutput = instance.current?.state?.rawOutput.toString()
@@ -464,13 +519,13 @@ class CallHttpTest {
         instance.run()
 
         // Verify there was no Error
-        instance.status shouldBe WorkflowStatus.RUNNING
+        instance.status shouldBe WorkflowStatus.COMPLETED
 
         // The response should contain at least one of our custom headers, case-insensitive
-        val outputStr = instance.current?.state?.rawOutput.toString()
+        val output = instance.rootInstance.transformedOutput.toString()
         assertTrue(
-            outputStr.contains("x-api-key", ignoreCase = true) ||
-                outputStr.contains("authorization", ignoreCase = true),
+            output.contains("x-api-key", ignoreCase = true) ||
+                output.contains("authorization", ignoreCase = true),
         )
     }
 
@@ -484,11 +539,6 @@ class CallHttpTest {
     @Test
     fun `test HTTP Authentication with named policy`() = runTest {
         val workflowYaml = """
-            document:
-              dsl: '1.0.0'
-              namespace: test
-              name: auth-test
-              version: '0.1.0'
             use:
               authentications:
                 httpBinAuth:
@@ -511,11 +561,11 @@ class CallHttpTest {
         instance.run()
 
         // Verify there was no Error
-        instance.status shouldBe WorkflowStatus.RUNNING
+        instance.status shouldBe WorkflowStatus.COMPLETED
 
         // If there's an error caught, it will contain "errorCaught":true
-        val rawOutput = instance.current?.state?.rawOutput.toString()
-        assertTrue(rawOutput.contains("authenticated") || rawOutput.contains("user"))
+        val output = instance.rootInstance.transformedOutput.toString()
+        assertTrue(output.contains("authenticated") || output.contains("user"))
     }
 
     /**

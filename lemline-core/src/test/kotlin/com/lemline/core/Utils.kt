@@ -7,6 +7,7 @@ import com.lemline.core.workflows.Workflows
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
+import java.util.*
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -25,22 +26,27 @@ internal fun loadWorkflowFromYaml(resourcePath: String): Workflow {
     return validation().read(yamlContent, WorkflowFormat.YAML)
 }
 
-internal fun getWorkflowInstance(doYaml: String, input: JsonElement): WorkflowInstance {
-    val hash = doYaml.hashCode()
+internal fun getWorkflowInstance(
+    doYaml: String,
+    input: JsonElement,
+    name: String = "workflow-${doYaml.hashCode()}",
+    version: String = "0.1.0",
+    id: String = UUID.randomUUID().toString(),
+): WorkflowInstance {
     val document =
         """document:
               dsl: '1.0.0'
               namespace: test
-              name: do-nested-$hash
-              version: '0.1.0'
+              name: $name
+              version: $version
         """.trimIndent()
     val workflowYaml = document + "\n" + doYaml.trimIndent().replace("@", "$")
-    val workflow = Workflows.parseAndPut(workflowYaml)
+    Workflows.parseAndPut(workflowYaml)
 
     return WorkflowInstance.createNew(
-        name = workflow.document.name,
-        version = workflow.document.version,
-        id = "testId-$hash",
+        name = name,
+        version = version,
+        id = id,
         rawInput = input,
     )
 }

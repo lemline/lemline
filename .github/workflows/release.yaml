@@ -21,27 +21,60 @@ jobs:
   # 1) Check Changes
   #################################
   check-changes:
-    # Only run on schedule; version/tag pushes always proceed.
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read  # For actions/checkout
+      actions: read   # For gh api to read workflow runs
     outputs:
       changed: ${{ steps.diff.outputs.changed }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0 # Needed for comparing against older commits
 
-      - name: Detect changes under lemline-runner
+      - name: Determine if build is needed
         id: diff
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          latest_tag=$(git describe --tags --abbrev=0)
-          tag_commit=$(git rev-list -n1 "$latest_tag")
-          if git diff --quiet "$tag_commit"..HEAD; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+          # Default to requiring a build. It will be set to false only for scheduled runs with no relevant changes.
+          BUILD_REQUIRED="true"
+          echo "Event: ${{ github.event_name }}, Ref: ${{ github.ref }}, Current SHA: ${{ github.sha }}"
+
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "Scheduled run on branch '${{ github.ref_name }}'. Checking for changes since last successful execution of this workflow."
+            # Dynamically get the workflow file name (e.g., release.yaml)
+            WORKFLOW_FILE_NAME="$(basename "${{ github.workflow_path }}")"
+
+            # Fetch the commit SHA of the last successful *scheduled* run of *this* workflow on *this* branch
+            LAST_SUCCESSFUL_SHA=$(gh api \
+              "repos/${{ github.repository }}/actions/workflows/$WORKFLOW_FILE_NAME/runs?branch=${{ github.ref_name }}&status=success&event=schedule&per_page=1" \
+              --jq '.workflow_runs[0].head_sha // empty' 2>/dev/null) # Suppress gh api errors from output, jq handles empty input
+
+            if [[ -z "$LAST_SUCCESSFUL_SHA" ]]; then
+              echo "No previous successful scheduled run found for '$WORKFLOW_FILE_NAME' on branch '${{ github.ref_name }}', or failed to retrieve its SHA. Build will proceed."
+            elif [[ "${{ github.sha }}" == "$LAST_SUCCESSFUL_SHA" ]]; then
+              echo "Current commit SHA (${{ github.sha }}) matches the last successful scheduled run SHA ($LAST_SUCCESSFUL_SHA). No build needed."
+              BUILD_REQUIRED="false"
+            elif ! git rev-parse --quiet --verify "$LAST_SUCCESSFUL_SHA^{commit}" >/dev/null 2>&1; then
+              # This check ensures the SHA is a valid commit in the current history (fetch-depth: 0 is important)
+              echo "Commit SHA '$LAST_SUCCESSFUL_SHA' from the last successful run was not found in the current repository history. Build will proceed."
+            elif git diff --quiet "$LAST_SUCCESSFUL_SHA"..HEAD; then
+              # Add pathspec to git diff if you only care about changes in specific directories:
+              # e.g., git diff --quiet "$LAST_SUCCESSFUL_SHA"..HEAD -- lemline-runner/ lemline-core/
+              echo "No code changes detected since the last successful scheduled run (SHA: $LAST_SUCCESSFUL_SHA). No build needed."
+              BUILD_REQUIRED="false"
+            else
+              echo "Code changes detected since the last successful scheduled run (SHA: $LAST_SUCCESSFUL_SHA). Build will proceed."
+            fi
           else
-            echo "changed=true"  >> "$GITHUB_OUTPUT"
+            # For non-scheduled events (tag pushes, manual dispatch, etc.), always require a build.
+            echo "Triggered by '${{ github.event_name }}' (not 'schedule'). Build will proceed."
           fi
+
+          echo "changed=$BUILD_REQUIRED" >> "$GITHUB_OUTPUT"
 
   build:
     needs: check-changes

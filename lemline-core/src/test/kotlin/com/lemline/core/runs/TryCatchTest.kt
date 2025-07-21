@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.runs
 
+import com.lemline.core.errors.WorkflowException
 import com.lemline.core.getWorkflowInstance
-import com.lemline.core.nodes.flows.TryInstance
+import com.lemline.core.instances.TryInstance
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
 import kotlin.time.Duration.Companion.seconds
@@ -12,6 +14,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
 class TryCatchTest {
+
+    class TaskRetriedException() : RuntimeException()
 
     @Test
     fun `check catch all`() = runTest {
@@ -91,7 +95,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -149,7 +153,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -181,15 +185,20 @@ class TryCatchTest {
         """
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
+        instance.onTaskRetried {
+            throw TaskRetriedException()
+        }
+
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskRetriedException> { instance.run() }
 
         (instance.current as TryInstance).delay shouldBe 1.seconds
         (instance.current as TryInstance).attemptIndex shouldBe 1
         instance.status shouldBe WorkflowStatus.RUNNING
         println("Retrying...")
+
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskRetriedException> { instance.run() }
 
         (instance.current as TryInstance).delay shouldBe 1.seconds
         (instance.current as TryInstance).attemptIndex shouldBe 2
@@ -225,8 +234,12 @@ class TryCatchTest {
         """
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
+        instance.onTaskRetried {
+            throw TaskRetriedException()
+        }
+
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskRetriedException> { instance.run() }
 
         (instance.current as TryInstance).delay shouldBe 1.seconds
         (instance.current as TryInstance).attemptIndex shouldBe 1
@@ -234,7 +247,7 @@ class TryCatchTest {
         println("Retrying...")
 
         // Run the workflow
-        instance.run()
+        shouldThrow<TaskRetriedException> { instance.run() }
 
         (instance.current as TryInstance).delay shouldBe 1.seconds
         (instance.current as TryInstance).attemptIndex shouldBe 2
@@ -242,7 +255,7 @@ class TryCatchTest {
         println("Retrying...")
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -296,7 +309,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -352,7 +365,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -406,7 +419,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -443,7 +456,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf("firstName" to JsonPrimitive("Gilles"))))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -517,7 +530,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -583,7 +596,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -639,7 +652,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -695,7 +708,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -753,7 +766,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED
@@ -810,7 +823,7 @@ class TryCatchTest {
         val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
-        instance.run()
+        shouldThrow<WorkflowException> { instance.run() }
 
         // Verify the workflow status
         instance.status shouldBe WorkflowStatus.FAULTED

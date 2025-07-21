@@ -16,39 +16,37 @@ import kotlinx.serialization.json.JsonObject
  */
 @Serializable
 data class NodeState(
-    @SerialName(VARIABLES)
-    var variables: JsonObject = LemlineJson.jsonObject,
-    @SerialName(ATTEMPT_INDEX)
-    var attemptIndex: Int = ATTEMPT_INDEX_DEFAULT,
-    @SerialName(CHILD_INDEX)
-    var childIndex: Int = CHILD_INDEX_DEFAULT,
-    @SerialName(RAW_INPUT)
-    var rawInput: JsonElement? = null,
-    @SerialName(RAW_OUTPUT)
-    var rawOutput: JsonElement? = null,
-    @SerialName(CONTEXT)
-    var context: JsonObject = LemlineJson.jsonObject,
-    @SerialName(WORKFLOW_ID)
-    var workflowId: String? = null,
-    @SerialName(STARTED_AT)
-    @Contextual
-    var startedAt: Instant? = null,
-    @SerialName(FOR_INDEX)
-    var forIndex: Int = FOR_INDEX_DEFAULT,
+    @SerialName(ATTEMPT_INDEX) var attemptIndex: Int = ATTEMPT_INDEX_DEFAULT,
+    @SerialName(CHILD_INDEX) var childIndex: Int = CHILD_INDEX_DEFAULT,
+    @SerialName(RAW_INPUT) var rawInput: JsonElement? = null,
+    @SerialName(RAW_OUTPUT) var rawOutput: JsonElement? = null,
+    @SerialName(CONTEXT) var context: JsonObject = LemlineJson.jsonObject,
+    @SerialName(WORKFLOW_ID) var workflowId: String? = null,
+    @SerialName(PARENT) var parent: Parent? = null,
+    @SerialName(STARTED_AT) @Contextual var startedAt: Instant? = null,
+    @SerialName(FOR_INDEX) var forIndex: Int = FOR_INDEX_DEFAULT,
 ) {
+
+    @Serializable
+    data class Parent(
+        @SerialName(WORKFLOW_ID) var workflowId: String,
+        @SerialName(IS_WAITING) var isWaiting: Boolean
+    )
+
     /**
      * Those constants MUST NOT be changed to ensure backward compatibility of messages
      */
     companion object {
-        const val CHILD_INDEX = "i"
+        const val CHILD_INDEX = "idx"
         const val ATTEMPT_INDEX = "try"
-        const val VARIABLES = "var"
         const val RAW_INPUT = "inp"
         const val RAW_OUTPUT = "out"
         const val CONTEXT = "ctx"
         const val WORKFLOW_ID = "wid"
+        const val PARENT = "par"
+        const val IS_WAITING = "wai"
         const val STARTED_AT = "sat"
-        const val FOR_INDEX = "fori"
+        const val FOR_INDEX = "for"
 
         const val CHILD_INDEX_DEFAULT = -1
         const val ATTEMPT_INDEX_DEFAULT = 0

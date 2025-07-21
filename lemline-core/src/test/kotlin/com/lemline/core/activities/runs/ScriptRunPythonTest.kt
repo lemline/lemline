@@ -23,7 +23,7 @@ class ScriptRunPythonTest {
             import sys; sys.exit(0)
         """.trimIndent()
 
-        val scriptRun = ScriptRun(
+        val scriptRun = Script(
             script = script,
             language = "python"
         )
@@ -52,7 +52,7 @@ class ScriptRunPythonTest {
             sys.exit(0)
         """.trimIndent()
 
-        val scriptRun = ScriptRun(
+        val scriptRun = Script(
             script = script,
             language = "python",
             arguments = mapOf("--name" to "TestUser")
@@ -78,7 +78,7 @@ class ScriptRunPythonTest {
             sys.exit(0)
         """.trimIndent()
 
-        val scriptRun = ScriptRun(
+        val scriptRun = Script(
             script = script,
             language = "python",
             environment = mapOf(
@@ -107,7 +107,7 @@ class ScriptRunPythonTest {
             sys.exit(0)
         """.trimIndent()
 
-        val scriptRun = ScriptRun(
+        val scriptRun = Script(
             script = script,
             language = "python"
         )
@@ -131,7 +131,7 @@ class ScriptRunPythonTest {
             sys.exit(1)
         """.trimIndent()
 
-        val scriptRun = ScriptRun(
+        val scriptRun = Script(
             script = script,
             language = "python"
         )
@@ -153,7 +153,7 @@ class ScriptRunPythonTest {
             import sys; sys.exit(0)
         """.trimIndent()
 
-        val scriptRun = ScriptRun(
+        val scriptRun = Script(
             script = script,
             language = "python"
         )
@@ -183,7 +183,7 @@ class ScriptRunPythonTest {
         val testFile = tempDir.resolve("testfile.txt")
         testFile.toFile().writeText("test")
 
-        val scriptRun = ScriptRun(
+        val scriptRun = Script(
             script = script,
             language = "python",
             workingDir = tempDir
@@ -202,7 +202,7 @@ class ScriptRunPythonTest {
     fun `should throw exception for unsupported language`() = runTest {
         // Given
         val script = "console.log('This is JS, but we'll say it's elixir')"
-        val scriptRun = ScriptRun(
+        val scriptRun = Script(
             script = script,
             language = "elixir"
         )

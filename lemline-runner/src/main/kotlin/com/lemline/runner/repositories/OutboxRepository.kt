@@ -56,7 +56,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
     override fun PreparedStatement.bindUpdateWith(entity: T) = apply {
         setString(1, entity.message) // Sets the message content
         setString(2, entity.status.name) // Sets the status as a string
-        setTimestamp(3, java.sql.Timestamp.from(entity.delayedUntil)) // Sets the delayed until timestamp
+        setTimestamp(3, entity.delayedUntil?.let { java.sql.Timestamp.from(it) }) // Sets the delayed until timestamp
         setInt(4, entity.attemptCount) // Sets the attempt count
         setString(5, entity.lastError) // Sets the last error message, if any
         setString(6, entity.id) // Sets the last error message, if any
@@ -66,7 +66,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         setString(1, entity.id) // Sets the ID of the entity
         setString(2, entity.message) // Sets the message content
         setString(3, entity.status.name) // Sets the status as a string
-        setTimestamp(4, java.sql.Timestamp.from(entity.delayedUntil)) // Sets the delayed until timestamp
+        setTimestamp(4, entity.delayedUntil?.let { java.sql.Timestamp.from(it) })  // Sets the delayed until timestamp
         setInt(5, entity.attemptCount) // Sets the attempt count
         setString(6, entity.lastError) // Sets the last error message, if any
     }
@@ -106,7 +106,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         id: String,
         message: String,
         status: OutBoxStatus,
-        delayedUntil: Instant,
+        delayedUntil: Instant?,
         attemptCount: Int,
         lastError: String?,
     ): T

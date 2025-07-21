@@ -1,0 +1,34 @@
+document:
+  dsl: '1.0.0'
+  namespace: test
+  name: factorial
+  version: '0.1.0'
+do:
+  - checkBaseCase:
+      switch:
+        - base:
+            when: ${ .n == 1 }
+            then: returnOne
+
+        - default:
+            then: computeRecursive
+
+  - returnOne:
+      set:
+        n: 1
+      then: end
+
+  - computeRecursive:
+      do:
+        - callFactorialNMinus1:
+            run:
+              workflow:
+                namespace: test
+                name: factorial
+                version: '0.1.0'
+                input:
+                  n: ${ .n - 1 }
+        - multiplyResults:
+            set:
+              n: ${ .n * $workflow.input.n }
+            then: end

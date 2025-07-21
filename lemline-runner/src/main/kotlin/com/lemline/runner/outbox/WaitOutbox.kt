@@ -16,7 +16,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
  * It extends AbstractOutbox to leverage the common outbox pattern implementation.
  *
  * This class specifically handles wait messages with configuration optimized for
- * the wait use case, including:
+ * the wait use case, including
  * - Processing batch size
  * - Maximum retry attempts
  * - Initial delay between retries

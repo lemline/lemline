@@ -72,7 +72,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         now: Instant = Instant.now(),
         maxAttempts: Int = Int.MAX_VALUE
     ): List<T> = filter {
-        it.status == PENDING && it.delayedUntil <= now && it.attemptCount < maxAttempts
+        it.status == PENDING && it.delayedUntil?.isBefore(now) == true && it.attemptCount < maxAttempts
     }
 
     /**
@@ -84,7 +84,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     private fun List<T>.filterToDelete(
         cutoffDate: Instant = Instant.now()
     ): List<T> = filter {
-        it.status == SENT && it.delayedUntil < cutoffDate
+        it.status == SENT && it.delayedUntil?.isBefore(cutoffDate) == true
     }
 
     /**

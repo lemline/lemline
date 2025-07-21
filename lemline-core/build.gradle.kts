@@ -45,7 +45,15 @@ dependencies {
     implementation("io.ktor:ktor-client-cio")
     implementation("io.ktor:ktor-client-content-negotiation")
     implementation("io.ktor:ktor-serialization-kotlinx-json")
+    implementation("io.ktor:ktor-serialization-jackson")
     implementation("io.ktor:ktor-client-auth")
+
+    // YAML support for Kotlin serialization
+    implementation("com.charleskorn.kaml:kaml:0.82.0")
+
+    // XML support for Kotlin serialization
+    implementation("io.github.pdvrieze.xmlutil:core-jvmcommon:0.91.1")
+    implementation("io.github.pdvrieze.xmlutil:serialization-jvm:0.91.1")
 
     // Auth0 for JWT token generation and validation
     implementation("com.auth0:java-jwt:4.4.0")

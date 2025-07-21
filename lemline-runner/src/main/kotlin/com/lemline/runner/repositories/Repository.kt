@@ -81,8 +81,7 @@ abstract class Repository<T : UuidV7Entity> {
      */
     internal fun <T> withTransaction(block: (connection: Connection) -> T): T {
         // Acquire a JDBC connection from the pool and begin a transaction
-        val connection = databaseManager.datasource.connection
-        connection.autoCommit = false
+        val connection = databaseManager.datasource.connection.apply { autoCommit = false }
 
         val out: T
         try {
@@ -417,5 +416,5 @@ abstract class Repository<T : UuidV7Entity> {
         else -> block(connection)
     }
 
-    protected fun ResultSet.getInstant(column: String): Instant = getTimestamp(column).toInstant()
+    protected fun ResultSet.getInstant(column: String): Instant? = getTimestamp(column)?.toInstant()
 }

@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.HTTPHeaders
-import io.serverlessworkflow.api.types.HTTPQuery
 import io.serverlessworkflow.api.types.InputFrom
 import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.api.types.SetTaskConfiguration
@@ -15,6 +14,7 @@ import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -35,7 +35,7 @@ object LemlineJson {
         configure(JsonParser.Feature.ALLOW_COMMENTS, true)
     }
 
-    // Expose Jackson YAMLMapper - configure as needed
+    // Expose Jackson YAMLMapper
     val yamlMapper = YAMLMapper()
 
     // simply create a new JsonObject
@@ -120,12 +120,6 @@ object LemlineJson {
     fun encodeToElement(outputAs: OutputAs) = outputAs.get().toJsonElement()
 
     /**
-     * Encodes an `HTTPQuery` object into a `Map<String, String>`.
-     */
-    fun encodeToString(httpQuery: HTTPQuery?): Map<String, String> =
-        httpQuery?.additionalProperties?.mapValues { it.value.toJsonPrimitive().content } ?: emptyMap()
-
-    /**
      * Encodes an `HTTPHeaders` object into a `Map<String, String>`.
      */
     fun encodeToString(httpHeaders: HTTPHeaders?): Map<String, String> = httpHeaders?.additionalProperties?.mapValues {
@@ -137,8 +131,14 @@ object LemlineJson {
      */
     fun encodeToElement(dateTimeDescriptor: DateTimeDescriptor) = dateTimeDescriptor.toJsonElement() as JsonObject
 
+    /**
+     * Converts a `JsonElement` to a `JsonNode` using Jackson.
+     */
     fun JsonElement.toJsonNode(): JsonNode = jacksonMapper.readTree(toString())
 
+    /**
+     * Converts a `JsonNode` to a `JsonElement` using kotlinx.serialization.
+     */
     fun JsonNode.toJsonElement(): JsonElement = decodeFromString(toString())
 
     internal fun Any?.toJsonElement(): JsonElement = when (this) {
@@ -151,13 +151,14 @@ object LemlineJson {
             this@toJsonElement.forEach { (key, value) -> put(key as String, value.toJsonElement()) }
         }
 
+        is Collection<*> -> JsonArray(this.map { it.toJsonElement() })
         is DateTimeDescriptor -> decodeFromString(jacksonMapper.writeValueAsString(this))
 
         else -> throw IllegalArgumentException("Unsupported type: ${this::class}")
     }
 
-    private fun Any?.toJsonPrimitive(): JsonPrimitive = when (val element = this.toJsonElement()) {
+    internal fun Any?.toJsonPrimitive(): JsonPrimitive = when (val element = this.toJsonElement()) {
         is JsonPrimitive -> element
-        else -> JsonPrimitive(toString())
+        else -> JsonPrimitive(element.toString())
     }
 }

@@ -2,6 +2,7 @@
 package com.lemline.runner.models
 
 import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.outbox.OutboxProcessor
 import java.time.Instant
 
 /**
@@ -58,7 +59,7 @@ abstract class OutboxModel : UuidV7Entity() {
      * Timestamp indicating when the message should be processed next.
      * Used for implementing retry delays with exponential backoff.
      *
-     * @see OutboxProcessor.calculateNextRetryDelay for delay calculation
+     * @see OutboxProcessor for delay calculation
      */
-    abstract var delayedUntil: Instant
+    abstract var delayedUntil: Instant?
 }
