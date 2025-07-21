@@ -34,7 +34,7 @@ internal object NodeChecker {
                     break
                 }
             } catch (_: Exception) {
-                // Try next command
+                // Try the next command
             }
         }
         // If no Node.js executable found,  return null
