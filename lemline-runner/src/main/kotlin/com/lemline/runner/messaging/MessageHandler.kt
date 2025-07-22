@@ -26,8 +26,9 @@ import jakarta.annotation.PreDestroy
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.io.IOException
+import java.sql.SQLException
 import java.time.Instant
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import org.eclipse.microprofile.config.inject.ConfigProperty
@@ -45,7 +46,7 @@ internal const val WORKFLOW_OUT = "workflows-out"
  */
 @Startup
 @ApplicationScoped
-internal class MessageConsumer @Inject constructor(
+internal class MessageHandler @Inject constructor(
     @ConfigProperty(name = MESSAGING_PARALLELISM) private val maxParallelism: Int,
     @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
     @Channel(WORKFLOW_IN) private val publisher: Publisher<ReactiveMessage<String>>,
@@ -99,10 +100,10 @@ internal class MessageConsumer @Inject constructor(
                 Message.fromJsonString(payload)
             } catch (e: Exception) {
                 logger.error(e) { "Failed to deserialize message" }
-                metrics.failed("deserialization", "unknown", "unknown")
+                metrics.processingFailed("deserialization", "unknown", "unknown")
                 // we store the message as failed for further inspection
                 saveMsgAsFailed(payload, e)
-                // as the message is saved as failed, we do not do more
+                // as the message is saved as failed, there is nothing more to do
                 return
             }
 
@@ -121,14 +122,14 @@ internal class MessageConsumer @Inject constructor(
                     nextMessage = metrics.recordTimed(workflowName, workflowVersion) {
                         process(message)
                     }
-                    metrics.processed(workflowName, workflowVersion)
+                    metrics.processingCompleted(workflowName, workflowVersion)
 
                 } catch (e: Exception) {
                     // --- Handle Processing Failures ---
                     logger.error(e) { "Failed to process message" }
-                    metrics.failed(getFailureReason(e), workflowName, workflowVersion)
+                    metrics.processingFailed(getFailureReason(e), workflowName, workflowVersion)
                     saveMsgAsFailed(payload, e)
-                    // as the message is saved as failed, we do not do more
+                    // as the message is saved as failed, there is nothing more to do
                     return
                 }
 
@@ -141,9 +142,9 @@ internal class MessageConsumer @Inject constructor(
                         // --- Handle Emission Failures ---
                         // This is a critical error. The workflow is now stalled.
                         logger.error(e) { "Failed to emit next message. The workflow may be stalled." }
-                        metrics.failed("messaging_emission_error", workflowName, workflowVersion)
+                        metrics.processingFailed("messaging_emission_error", workflowName, workflowVersion)
                         saveMsgForRetry(payload, e)
-                        // as the message is saved for retry, we do not do more
+                        // as the message is saved for retry, there is nothing more to do
                         return
                     }
                 }
@@ -161,13 +162,17 @@ internal class MessageConsumer @Inject constructor(
      */
     private fun getFailureReason(e: Throwable): String = when (e) {
         // Domain-specific errors from the workflow engine
+
         is WorkflowException -> "workflow_${e.error.type.lowercase()}" // e.g., "workflow_runtime"
 
+        // General persistence/SQL errors
+        is SQLException -> "database_error"
+
         // --- I/O and Network Errors ---
-        is IOException -> "io_error" // General network/file issues
+        is IOException -> "io_error"
 
         // --- Application State Errors ---
-        is IllegalStateException -> "invalid_state" // Often indicates a programming error
+        is IllegalStateException -> "invalid_state"
 
         // --- Fallback for any other uncategorized exception ---
         else -> "processing_error"
@@ -186,14 +191,6 @@ internal class MessageConsumer @Inject constructor(
         }
 
         return stepByStepRunner.run(message, Secrets.getForWorkflow(workflow))
-    }
-
-    private fun saveMsgAsFailed(msg: String, e: Exception) {
-        with(stepByStepRunner) {
-            saveMsgAsFailed(msg, e)
-            // for testing, set the CompletableFuture to a failed state
-            processingMessages.remove(msg)?.completeExceptionally(e)
-        }
     }
 
 
