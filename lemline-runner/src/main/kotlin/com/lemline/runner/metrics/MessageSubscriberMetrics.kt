@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.metrics
 
 import io.micrometer.core.instrument.Counter
@@ -173,5 +174,17 @@ class MessageSubscriberMetrics @Inject constructor(
         private const val TAG_REASON = "reason"
         private const val TAG_WORKFLOW_NAME = "workflow_name"
         private const val TAG_WORKFLOW_VERSION = "workflow_version"
+
+        // Tag Values for 'reason'
+        object FailureReasons {
+            const val DEFINITION_NOT_FOUND = "definition_not_found"
+            const val SECRETS_RETRIEVAL_FAILED = "secrets_retrieval_failed"
+            const val MESSAGE_EMISSION_ERROR = "message_emission_error"
+            const val DATABASE_ERROR = "database_error"
+            const val IO_ERROR = "io_error"
+            const val INVALID_STATE = "invalid_state"
+            const val PROCESSING_ERROR = "processing_error"
+            const val WORKFLOW_ERROR_PREFIX = "workflow_"
+        }
     }
 }
