@@ -1,6 +1,6 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.warn
@@ -27,8 +27,8 @@ import org.slf4j.Logger
  *
  * This subscriber implements the Reactive Streams Subscriber interface and provides:
  * - Controlled parallel processing using a semaphore
- * - Metrics tracking for monitoring message processing
- * - Error handling and logging
+ * - Basic, non-dimensional metrics tracking (received, active, saturated)
+ * - Error handling and logging for the message lifecycle
  * - Backpressure management
  *
  * @param P The type of the message payload
@@ -91,15 +91,13 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
 
             metrics.incrementActive()
             try {
-                metrics.recordTimed {
-                    handleMessage(item.payload)
-                }
-                metrics.processed()
-                logger.debug { "Successful processing of message: $item" }
+                // The handler is now fully responsible for its own detailed, dimensional metrics.
+                handleMessage(item.payload)
+                // If the handler completes without an exception, we acknowledge the message.
                 acknowledge(item)
             } catch (e: Exception) {
-                metrics.failed()
-                logger.error(e) { "Error during processing of message: $item" }
+                // The handler should have already recorded the specific failure metric.
+                // We just ensure the message is unacknowledged.
                 unacknowledge(item, e)
             } finally {
                 semaphore.release()
