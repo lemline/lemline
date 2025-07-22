@@ -30,6 +30,7 @@ import jakarta.inject.Inject
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.toJavaDuration
+import kotlinx.serialization.json.JsonElement
 
 /**
  * WorkflowConsumer is responsible for consuming workflow messages from the incoming channel,
@@ -64,7 +65,9 @@ internal class StepByStepRunner @Inject constructor(
         }
     }
 
-    suspend fun run(instance: WorkflowInstance): Message? {
+    suspend fun run(message: Message, secrets: Map<String, JsonElement>): Message? {
+
+        val instance = message.toWorkflowInstance(secrets)
 
         instance.onTaskCompleted { onTaskCompleted(it) }
         instance.onTaskStarted { onTaskStarted(it) }
