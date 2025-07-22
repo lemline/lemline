@@ -25,16 +25,13 @@ import org.slf4j.Logger
 /**
  * A reactive message subscriber that processes messages asynchronously with controlled parallelism.
  *
- * This subscriber implements the Reactive Streams Subscriber interface and provides:
- * - Controlled parallel processing using a semaphore
- * - Basic, non-dimensional metrics tracking (received, active, saturated)
- * - Error handling and logging for the message lifecycle
- * - Backpressure management
+ * This subscriber is a generic dispatcher. It delegates the entire message lifecycle,
+ * including processing and acknowledgement, to the provided `handleMessage` function.
  *
  * @param P The type of the message payload
  * @param T The type of the reactive message that wraps the payload
  * @param publisher The source of messages to subscribe to
- * @param handleMessage Suspending function that processes each message payload
+ * @param handleMessage Suspending function that handles the full lifecycle of each message.
  * @param maxParallelism Maximum number of messages that can be processed concurrently
  * @param metrics Metrics collector for monitoring processing statistics
  * @param logger Logger instance for recording events and errors
@@ -42,7 +39,7 @@ import org.slf4j.Logger
 
 internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
     private val publisher: Publisher<T>,
-    private val handleMessage: suspend (payload: P) -> Unit,
+    private val handleMessage: suspend (item: T) -> Unit, // Changed signature
     private val maxParallelism: Int,
     private val metrics: MessageSubscriberMetrics,
     private val logger: Logger
@@ -80,20 +77,19 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
     }
 
     override fun onNext(item: T) {
+        // Record metric as soon as the message is received from the stream.
+        metrics.received()
+
         // Check if we are already shutting down before launching a new coroutine.
         if (isShutdown) {
             // The scope is shutting down. We cannot process this message.
             // By not acknowledging or unacknowledging it, we rely on the broker's
-            // standard redelivery mechanism, which is triggered when this consumer's
-            // connection is closed. This correctly handles the transient nature of the failure.
+            // standard redelivery mechanism.
             logger.warn { "Received message after subscriber shutdown. It will be redelivered by the broker. Message: $item" }
             return
         }
 
         scope.launch {
-            // One message received
-            metrics.received()
-
             if (!semaphore.tryAcquire()) {
                 metrics.saturated()
                 // Wait for a slot to become available
@@ -102,15 +98,13 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
 
             metrics.incrementActive()
             try {
-                // If handleMessage throws an exception, it indicates that the message could not be processed
-                // successfully and could not be saved into the database.
-                //In such cases, the message is marked as "unacknowledged" to trigger the dead-letter strategy.
-                handleMessage(item.payload)
-                acknowledge(item)
+                // Delegate the entire message lifecycle to the handler.
+                // The handler is now responsible for processing, ack/nack, and its own error handling.
+                handleMessage(item)
             } catch (e: Exception) {
-                // This is a genuine processing failure. Unacknowledge the message
-                // to trigger the configured failure strategy (e.g., dead-letter-queue).
-                unacknowledge(item, e)
+                // This is a safety net. The handler should not throw exceptions.
+                // If it does, it indicates a bug in the handler's own try/catch logic.
+                logger.error(e) { "CRITICAL: Unhandled exception from message handler. The message's state is now unknown and it may be redelivered or lost." }
             } finally {
                 semaphore.release()
                 metrics.decrementActive()
@@ -146,21 +140,7 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
         }
     }
 
-    private fun acknowledge(item: T) = try {
-        item.ack()
-        metrics.acknowledgementCompleted()
-    } catch (e: Exception) {
-        metrics.acknowledgementFailed(e.message ?: "unknown")
-        logger.error(e) { "CRITICAL ERROR: Failed to acknowledge message. This may result in duplicate processing. Message details: $item" }
-    }
-
-    private fun unacknowledge(item: T, reason: Exception) = try {
-        item.nack(reason)
-        metrics.unAcknowledgementCompleted()
-    } catch (e: Exception) {
-        metrics.unAcknowledgementFailed(e.message ?: "unknown")
-        logger.error(e) { "Failed to nack message (after ${reason.message}): $item" }
-    }
+    // acknowledge and unacknowledge methods are now removed from this class.
 
     private fun cancelSubscription() {
         if (::subscription.isInitialized) {
