@@ -22,59 +22,52 @@ class MessageSubscriberMetrics @Inject constructor(
     /** Tracks the number of messages currently being processed */
     private val activeMessages = AtomicInteger(0)
 
-    /** Counts total received messages */
-    private val receivedCounter: Counter =
-        registry.counter("lemline.message.received.total")
+    // Non-dimensional counters that don't need to be created on the fly.
+    private val receivedCounter: Counter = registry.counter(METRIC_RECEIVED_TOTAL)
+    private val acknowledgementCompletedCounter: Counter = registry.counter(METRIC_ACK_COMPLETED_TOTAL)
+    private val acknowledgementFailedCounter: Counter = registry.counter(METRIC_ACK_FAILED_TOTAL)
+    private val unAcknowledgementCompletedCounter: Counter = registry.counter(METRIC_NACK_COMPLETED_TOTAL)
+    private val unAcknowledgementFailedCounter: Counter = registry.counter(METRIC_NACK_FAILED_TOTAL)
+    private val saturationCounter: Counter = registry.counter(METRIC_SATURATION_TOTAL)
 
-    /** Counts total acknowledged message */
-    private val acknowledgedCounter: Counter =
-        registry.counter("lemline.message.acknowledged.total")
-
-    /** Counts total unacknowledged message */
-    private val unacknowledgedCounter: Counter =
-        registry.counter("lemline.message.unacknowledged.total")
-
-    /** Counts occurrences of processing saturation (max parallelism reached) */
-    private val saturationCounter: Counter =
-        registry.counter("lemline.message.parallelism.saturation.total")
 
     init {
-        Gauge.builder("lemline.message.active", activeMessages) { it.toDouble() }
-            .description("Current number of workflow messages being processed")
+        Gauge.builder(METRIC_ACTIVE_MESSAGES, activeMessages) { it.toDouble() }
+            .description("Current number of messages being processed")
             .register(registry)
     }
 
     /** Increments the count of active messages. */
-    fun incrementActive() {
-        activeMessages.incrementAndGet()
-    }
+    fun incrementActive() = activeMessages.incrementAndGet()
 
     /** Decrements the count of active messages. */
-    fun decrementActive() {
-        activeMessages.decrementAndGet()
-    }
+    fun decrementActive() = activeMessages.decrementAndGet()
 
     /** Increments the counter for received messages. */
     fun received() = receivedCounter.increment()
 
     /** Increments the counter for acknowledged messages. */
-    fun acknowledged() = acknowledgedCounter.increment()
+    fun acknowledgementCompleted() = acknowledgementCompletedCounter.increment()
 
     /** Increments the counter for unacknowledged messages. */
-    fun unacknowledged() = unacknowledgedCounter.increment()
+    fun unAcknowledgementCompleted() = unAcknowledgementCompletedCounter.increment()
+
+    /** Increments the counter for failed acknowledgment attempts. */
+    fun acknowledgementFailed() = acknowledgementFailedCounter.increment()
+
+    /** Increments the counter for failed negative-acknowledgment attempts. */
+    fun unAcknowledgementFailed() = unAcknowledgementFailedCounter.increment()
 
     /**
      * Increments the counter for successfully processed messages, tagged by workflow name and version.
      * @param workflowName The name of the workflow that was processed.
      * @param workflowVersion The version of the workflow that was processed.
      */
-    fun processed(workflowName: String, workflowVersion: String) {
-        registry.counter(
-            "lemline.message.processed.total",
-            "workflow_name", workflowName,
-            "workflow_version", workflowVersion
-        ).increment()
-    }
+    fun processingCompleted(workflowName: String, workflowVersion: String) = registry.counter(
+        METRIC_PROCESSING_COMPLETED_TOTAL,
+        TAG_WORKFLOW_NAME, workflowName,
+        TAG_WORKFLOW_VERSION, workflowVersion
+    ).increment()
 
     /**
      * Increments the counter for failed message processing attempts, tagged by a reason.
@@ -82,14 +75,12 @@ class MessageSubscriberMetrics @Inject constructor(
      * @param workflowName The name of the workflow that failed, if known.
      * @param workflowVersion The version of the workflow that was processed.
      */
-    fun failed(reason: String, workflowName: String, workflowVersion: String) {
-        registry.counter(
-            "lemline.message.failed.total",
-            "reason", reason,
-            "workflow_name", workflowName,
-            "workflow_version", workflowVersion
-        ).increment()
-    }
+    fun processingFailed(reason: String, workflowName: String, workflowVersion: String) = registry.counter(
+        METRIC_PROCESSING_FAILED_TOTAL,
+        TAG_REASON, reason,
+        TAG_WORKFLOW_NAME, workflowName,
+        TAG_WORKFLOW_VERSION, workflowVersion
+    ).increment()
 
     /** Increments the counter for processing saturation events. */
     fun saturated() = saturationCounter.increment()
@@ -106,9 +97,9 @@ class MessageSubscriberMetrics @Inject constructor(
      */
     suspend fun <T> recordTimed(workflowName: String, workflowVersion: String, block: suspend () -> T): T {
         val timer = registry.timer(
-            "lemline.message.processing.duration",
-            "workflow_name", workflowName,
-            "workflow_version", workflowVersion
+            METRIC_PROCESSING_DURATION,
+            TAG_WORKFLOW_NAME, workflowName,
+            TAG_WORKFLOW_VERSION, workflowVersion
         )
         var result: T
         val duration: Duration = measureTime {
@@ -116,5 +107,25 @@ class MessageSubscriberMetrics @Inject constructor(
         }
         timer.record(duration.toJavaDuration())
         return result
+    }
+
+    companion object {
+        // Metric Names
+        private const val METRIC_PREFIX = "lemline.message"
+        private const val METRIC_ACTIVE_MESSAGES = "$METRIC_PREFIX.active"
+        private const val METRIC_RECEIVED_TOTAL = "$METRIC_PREFIX.received.total"
+        private const val METRIC_PROCESSING_COMPLETED_TOTAL = "$METRIC_PREFIX.processing.completed.total"
+        private const val METRIC_PROCESSING_FAILED_TOTAL = "$METRIC_PREFIX.processing.failed.total"
+        private const val METRIC_ACK_COMPLETED_TOTAL = "$METRIC_PREFIX.ack.completed.total"
+        private const val METRIC_ACK_FAILED_TOTAL = "$METRIC_PREFIX.ack.failed.total"
+        private const val METRIC_NACK_COMPLETED_TOTAL = "$METRIC_PREFIX.nack.completed.total"
+        private const val METRIC_NACK_FAILED_TOTAL = "$METRIC_PREFIX.nack.failed.total"
+        private const val METRIC_SATURATION_TOTAL = "$METRIC_PREFIX.parallelism.saturation.total"
+        private const val METRIC_PROCESSING_DURATION = "$METRIC_PREFIX.processing.duration"
+
+        // Tag Keys
+        private const val TAG_REASON = "reason"
+        private const val TAG_WORKFLOW_NAME = "workflow_name"
+        private const val TAG_WORKFLOW_VERSION = "workflow_version"
     }
 }

@@ -80,9 +80,20 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
     }
 
     override fun onNext(item: T) {
-        metrics.received()
+        // Check if we are already shutting down before launching a new coroutine.
+        if (isShutdown) {
+            // The scope is shutting down. We cannot process this message.
+            // By not acknowledging or unacknowledging it, we rely on the broker's
+            // standard redelivery mechanism, which is triggered when this consumer's
+            // connection is closed. This correctly handles the transient nature of the failure.
+            logger.warn { "Received message after subscriber shutdown. It will be redelivered by the broker. Message: $item" }
+            return
+        }
 
-        val job = scope.launch {
+        scope.launch {
+            // One message received
+            metrics.received()
+
             if (!semaphore.tryAcquire()) {
                 metrics.saturated()
                 // Wait for a slot to become available
@@ -91,24 +102,20 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
 
             metrics.incrementActive()
             try {
-                // The handler is now fully responsible for its own detailed, dimensional metrics.
+                // If handleMessage throws an exception, it indicates that the message could not be processed
+                // successfully and could not be saved into the database.
+                //In such cases, the message is marked as "unacknowledged" to trigger the dead-letter strategy.
                 handleMessage(item.payload)
-                // If the handler completes without an exception, we acknowledge the message.
                 acknowledge(item)
             } catch (e: Exception) {
-                // The handler should have already recorded the specific failure metric.
-                // We just ensure the message is unacknowledged.
+                // This is a genuine processing failure. Unacknowledge the message
+                // to trigger the configured failure strategy (e.g., dead-letter-queue).
                 unacknowledge(item, e)
             } finally {
                 semaphore.release()
                 metrics.decrementActive()
                 requestNext()
             }
-        }
-        // Check if the job was canceled immediately (meaning the scope was already canceled)
-        if (job.isCancelled) {
-            logger.warn { "Received message after subscriber shutdown, rejecting: $item" }
-            unacknowledge(item, IllegalStateException("Subscriber already shut down"))
         }
     }
 
@@ -130,23 +137,28 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
         gracePeriod(timeoutMs)
     }
 
-    private fun requestNext() = try {
-        subscription.request(1)
-    } catch (e: Exception) {
-        logger.warn(e) { "Failed to request next message" }
+    private fun requestNext() {
+        try {
+            // Only request more if we are not shutting down
+            if (!isShutdown) subscription.request(1)
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to request next message" }
+        }
     }
 
     private fun acknowledge(item: T) = try {
         item.ack()
-        metrics.acknowledged()
+        metrics.acknowledgementCompleted()
     } catch (e: Exception) {
-        logger.error(e) { "Failed to ack message: $item" }
+        metrics.acknowledgementFailed(e.message ?: "unknown")
+        logger.error(e) { "CRITICAL ERROR: Failed to acknowledge message. This may result in duplicate processing. Message details: $item" }
     }
 
     private fun unacknowledge(item: T, reason: Exception) = try {
         item.nack(reason)
-        metrics.unacknowledged()
+        metrics.unAcknowledgementCompleted()
     } catch (e: Exception) {
+        metrics.unAcknowledgementFailed(e.message ?: "unknown")
         logger.error(e) { "Failed to nack message (after ${reason.message}): $item" }
     }
 
