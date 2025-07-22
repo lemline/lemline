@@ -27,7 +27,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
  */
 @Startup
 @ApplicationScoped
-internal class RunOutbox : AbstractOutbox<RunWorkflowModel>() {
+internal class RunWorkflowOutbox : AbstractOutbox<RunWorkflowModel>() {
 
     @Inject
     @Channel(WORKFLOW_OUT)
