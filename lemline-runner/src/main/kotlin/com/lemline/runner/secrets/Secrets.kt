@@ -29,7 +29,7 @@ object Secrets {
                 ?: error("Required secret '$secretName' not found in environment variables")
             try {
                 Json.decodeFromString<JsonObject>(value)
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 JsonPrimitive(value)
             }
         } ?: emptyMap()
