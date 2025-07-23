@@ -4,8 +4,8 @@ package com.lemline.runner.metrics
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
-import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import jakarta.inject.Singleton
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration
 import kotlin.time.measureTime
@@ -16,7 +16,7 @@ import kotlin.time.toJavaDuration
  * Provides metrics for monitoring workflow message processing.
  * Uses Micrometer for metrics collection and reporting.
  */
-@ApplicationScoped
+@Singleton
 class MessageSubscriberMetrics @Inject constructor(
     private val registry: MeterRegistry
 ) {
