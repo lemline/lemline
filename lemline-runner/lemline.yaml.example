@@ -125,30 +125,3 @@ lemline:
       # Optional: TLS/SSL configuration
       # ssl-enabled: false
 
-  # --- Service Settings ---
-  # Configure internal task scheduling parameters (advanced).
-  # Change only if you understand the implications.
-
-  # --- Wait Service Settings ---
-  wait:
-    outbox:
-      every: "10s"
-      batch-size: 1000
-      initial-delay: "30s"
-      max-attempts: 5 # Max attempts for processing a message
-    cleanup:
-      every: "1h"
-      after: "7d"
-      batch-size: 1000
-
-  # --- Retry Service Settings ---
-  retry:
-    outbox:
-      every: "10s"
-      batch-size: 1000
-      initial-delay: "30s"
-      max-attempts: 5
-    cleanup:
-      every: "1h"
-      after: "7d"
-      batch-size: 1000
