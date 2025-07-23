@@ -99,7 +99,7 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
             metrics.incrementActive()
             try {
                 // Delegate the entire message lifecycle to the handler.
-                // The handler is now responsible for processing, ack/nack, and its own error handling.
+                // The handler is responsible for processing, ack/nack, and its own error handling.
                 handleMessage(item)
             } catch (e: Exception) {
                 // This is a safety net. The handler should not throw exceptions.
