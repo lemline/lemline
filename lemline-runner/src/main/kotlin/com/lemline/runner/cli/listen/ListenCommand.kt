@@ -68,7 +68,7 @@ class ListenCommand : Runnable {
 
         mascotLines.forEach { line -> logger.info(line) }
 
-        logger.info("Start listening...")
+        logger.info("Start consuming messages...")
         Quarkus.waitForExit()
     }
 }

@@ -204,4 +204,3 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                 }
     }.joinToString("\n")
 }
-
