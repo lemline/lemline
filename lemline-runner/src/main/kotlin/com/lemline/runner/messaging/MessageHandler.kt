@@ -303,7 +303,7 @@ internal class MessageHandler @Inject constructor(
         // as the responsibility of the message is transferred to the database, we acknowledge the message
         ack(current, workflowName, workflowVersion)
     } catch (e: Exception) {
-        logger.error(e) { "Failed to insert next message for retry, the initial message will be neg-acknowledged: $next" }
+        logger.error(e) { "Failed to insert next message for retry, neg-acknowledging the initial message: $next" }
         nack(current, e, workflowName, workflowVersion)
     }
 
