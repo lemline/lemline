@@ -45,11 +45,6 @@ internal class StepByStepRunner @Inject constructor(
 
     private val onTaskCompleted = { task: NodeInstance<*> ->
         if (task.node.isActivity()) throw TaskCompletedException()
-//            when (task) {
-//                is WaitInstance -> Unit
-//                is RunInstance -> if (task.node.task.run.get() !is RunWorkflow) throw TaskCompletedException()
-//                else -> if (task.node.isActivity()) throw TaskCompletedException()
-//            }
     }
 
     private val onTaskStarted = { task: NodeInstance<*> ->
@@ -163,7 +158,7 @@ internal class StepByStepRunner @Inject constructor(
                     message = message.toJsonString()
                 )
             )
-            logger.info("Restarting parent workflow:\n${message.toPrettyString()}")
+            logger.debug { "Restarting parent workflow:\n${message.toPrettyString()}" }
         }
     }
 

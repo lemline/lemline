@@ -62,6 +62,7 @@ interface LemlineConfiguration {
     fun wait(): WaitConfig
     fun retry(): RetryConfig
     fun runWorkflow(): RunWorkflowConfig
+    fun metrics(): MetricsConfig
 
     /**
      * Database configuration mapping.
@@ -494,5 +495,28 @@ interface LemlineConfiguration {
         @WithDefault("1000")
         @Min(1)
         fun batchSize(): Int
+    }
+
+    /**
+     * Metrics configuration
+     * Defines configuration properties for metrics collection.
+     */
+    interface MetricsConfig {
+        @WithDefault("8080")
+        fun port(): Int
+
+        @WithDefault("/q/metrics")
+        fun path(): String
+
+        companion object {
+            fun toQuarkusProperties(config: MetricsConfig): Map<String, String> {
+                val props = mutableMapOf<String, String>()
+                props["quarkus.http.port"] = config.port().toString()
+                props["quarkus.http.ssl-port"] = config.port().toString()
+                props["quarkus.micrometer.export.prometheus.path"] = config.path()
+
+                return props
+            }
+        }
     }
 }

@@ -43,9 +43,7 @@ dependencies {
     implementation("io.quarkus:quarkus-jdbc-mysql")
     implementation("io.quarkus:quarkus-hibernate-validator")
     implementation("io.quarkus:quarkus-micrometer")
-    // Metrics
-    implementation("org.eclipse.microprofile.metrics:microprofile-metrics-api")
-    implementation("io.micrometer:micrometer-core")
+    implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
 
     // Messaging
     implementation("io.quarkus:quarkus-messaging-kafka")
