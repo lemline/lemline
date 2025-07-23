@@ -77,9 +77,15 @@ class LemlineApplication : QuarkusApplication {
 
                 // for the listen command (not overridden by --help or --version)
                 // enable the consumer and producer
-                if (parseResults.any { it.commandSpec().userObject() is ListenCommand && !helpOrVersion }) {
+                // else disable the metrics endpoint
+                val listen = parseResults.firstOrNull { it.commandSpec().userObject() is ListenCommand }
+                    ?.commandSpec()?.userObject() as? ListenCommand
+                if (listen != null) {
                     System.setProperty(CONSUMER_ENABLED, "true")
                     System.setProperty(PRODUCER_ENABLED, "true")
+                    listen.port?.let { setMetricsEndpointPort(it) }
+                } else {
+                    disableMetricsEndpoint()
                 }
 
                 // for the start command (not overridden by --help or --version)
@@ -224,6 +230,18 @@ private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
         return true
     }
     return false
+}
+
+private fun setMetricsEndpointPort(port: Int) {
+    System.setProperty("quarkus.http.port", port.toString())
+    System.setProperty("quarkus.http.ssl-port", port.toString())
+}
+
+private fun disableMetricsEndpoint() {
+    System.setProperty("quarkus.http.port", "0")
+    System.setProperty("quarkus.http.ssl-port", "0")
+    System.setProperty("quarkus.micrometer.enabled", "false")
+    System.setProperty("quarkus.micrometer.export.prometheus.enabled", "false")
 }
 
 private fun setLogLevel(level: Level) = level.name.let {

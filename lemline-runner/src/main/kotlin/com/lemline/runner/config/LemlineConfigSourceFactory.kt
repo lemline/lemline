@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
-import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.runner.LemlineApplication
 import com.lemline.runner.config.LemlineConfiguration.DatabaseConfig
 import com.lemline.runner.config.LemlineConfiguration.MessagingConfig
+import com.lemline.runner.config.LemlineConfiguration.MetricsConfig
 import io.quarkus.runtime.annotations.ConfigPhase
 import io.quarkus.runtime.annotations.ConfigRoot
 import io.smallrye.config.ConfigSourceContext
@@ -108,7 +108,7 @@ import org.eclipse.microprofile.config.spi.ConfigSource
 @ConfigRoot(phase = ConfigPhase.BUILD_TIME)
 class LemlineConfigSourceFactory : ConfigSourceFactory {
 
-    private val log = logger()
+    private val logger = logger()
 
     /**
      * Retrieves configuration sources based on the provided context.
@@ -130,7 +130,9 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
         for (name in context.iterateNames()) {
             if (name.startsWith("lemline.")) {
                 // Retrieve the value for the property and add it to the map
-                context.getValue(name)?.value?.let { lemlineProps[name] = it.split("#").first().trim() }
+                context.getValue(name)?.value?.let {
+                    lemlineProps[name] = it.split("#").first().trim()
+                }
             }
         }
 
@@ -142,17 +144,17 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         // Override properties from the config file, if any
         LemlineApplication.configPath?.let {
-            log.debug { "Lemline config file location=$it" }
+            logger.info { "Retrieve Lemline config from file: $it" }
             ExtraFileConfigFactory().getConfig(it).properties.forEach { (name, value) ->
                 if (name.startsWith("lemline.")) {
                     lemlineProps[name] = value.split("#").first().trim()
                 } else {
-                    log.info { "Skipping not lemline property $name" }
+                    logger.info { "Skipping non-Lemline property: $name" }
                 }
             }
         }
 
-        log.debug { "Lemline properties found: $lemlineProps" }
+        logger.info { "Lemline properties:\n${lemlineProps.toPrint()}" }
 
         try {
             // Create a SmallRyeConfig instance with the collected properties
@@ -170,10 +172,9 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
             val generatedProps = mutableMapOf<String, String>()
             generatedProps.putAll(DatabaseConfig.toQuarkusProperties(lemlineConfig.database()))
             generatedProps.putAll(MessagingConfig.toQuarkusProperties(lemlineConfig.messaging()))
+            generatedProps.putAll(MetricsConfig.toQuarkusProperties(lemlineConfig.metrics()))
 
-            log.debug {
-                "Generated properties: ${generatedProps.map { "${it.key}=${it.value}" }.joinToString()}"
-            }
+            logger.info { "Generated properties:\n${generatedProps.toPrint()}" }
 
             // Combine both generated Quarkus properties and original Lemline properties
             val allProps = mutableMapOf<String, String>()
@@ -188,8 +189,18 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                 )
             )
         } catch (e: Exception) {
-            log.error(e) { "Error transforming Lemline configuration" }
+            logger.error(e) { "Error transforming Lemline configuration" }
             throw e
         }
     }
+
+    private fun Map<String, String>.toPrint() = toSortedMap().map {
+        "\t${it.key}=${it.value}" +
+            mapOf("system" to System.getProperty(it.key), "env" to System.getenv(it.key))
+                .filter { it.value != null }
+                .toList()
+                .let { list ->
+                    if (list.isEmpty()) "" else list.joinToString(", ", " (", ")") { "${it.first}=${it.second}" }
+                }
+    }.joinToString("\n")
 }

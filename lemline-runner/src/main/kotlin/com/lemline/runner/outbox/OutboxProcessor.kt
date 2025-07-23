@@ -3,7 +3,6 @@ package com.lemline.runner.outbox
 
 import com.lemline.common.debug
 import com.lemline.common.error
-import com.lemline.common.info
 import com.lemline.common.warn
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.OutboxRepository
@@ -78,7 +77,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                 val messages = repository.findMessagesToProcess(maxAttempts, batchSize, connection)
 
                 if (messages.isEmpty()) {
-                    logger.info { "Empty processing batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
+                    logger.debug { "Empty processing batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
                     consecutiveEmptyBatches++
                     Thread.sleep(Random.nextLong(10, 200))
                     continue
@@ -120,7 +119,7 @@ internal class OutboxProcessor<T : OutboxModel>(
             }
 
             if (totalProcessed > 0) {
-                logger.info { "Completed processing $totalProcessed messages in $batchNumber batches" }
+                logger.debug { "Completed processing $totalProcessed messages in $batchNumber batches" }
             }
         }
     } catch (e: Exception) {
@@ -154,10 +153,10 @@ internal class OutboxProcessor<T : OutboxModel>(
             while (consecutiveEmptyBatches < maxConsecutiveEmptyChunks) {
                 // Find and lock a chunk of messages for deletion
                 val messagesToDelete = repository.findMessagesToDelete(cutoffDate, batchSize, connection)
-                logger.info { "Cleaned up chunk $batchNumber: retrieved ${messagesToDelete.size} messages to delete" }
+                logger.debug { "Cleaned up chunk $batchNumber: retrieved ${messagesToDelete.size} messages to delete" }
 
                 if (messagesToDelete.isEmpty()) {
-                    logger.info { "Empty cleaning batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
+                    logger.debug { "Empty cleaning batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
                     consecutiveEmptyBatches++
                     Thread.sleep(Random.nextLong(10, 200))
                     continue
@@ -171,11 +170,11 @@ internal class OutboxProcessor<T : OutboxModel>(
                 repository.delete(messagesToDelete, connection)
                 totalDeleted += chunkDeleted
 
-                logger.info { "Cleaned up chunk $batchNumber: $chunkDeleted messages (total: $totalDeleted)" }
+                logger.debug { "Cleaned up chunk $batchNumber: $chunkDeleted messages (total: $totalDeleted)" }
             }
 
             if (totalDeleted > 0) {
-                logger.info {
+                logger.debug {
                     "Completed cleanup of $totalDeleted messages in $batchNumber chunks (older than $cutoffDate)"
                 }
             }

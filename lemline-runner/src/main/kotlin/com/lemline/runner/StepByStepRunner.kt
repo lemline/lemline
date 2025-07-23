@@ -2,7 +2,6 @@
 package com.lemline.runner
 
 import com.lemline.common.debug
-import com.lemline.common.error
 import com.lemline.common.logger
 import com.lemline.core.activities.runs.getInputFor
 import com.lemline.core.instances.RunInstance
@@ -46,11 +45,6 @@ internal class StepByStepRunner @Inject constructor(
 
     private val onTaskCompleted = { task: NodeInstance<*> ->
         if (task.node.isActivity()) throw TaskCompletedException()
-//            when (task) {
-//                is WaitInstance -> Unit
-//                is RunInstance -> if (task.node.task.run.get() !is RunWorkflow) throw TaskCompletedException()
-//                else -> if (task.node.isActivity()) throw TaskCompletedException()
-//            }
     }
 
     private val onTaskStarted = { task: NodeInstance<*> ->
@@ -93,24 +87,9 @@ internal class StepByStepRunner @Inject constructor(
             // Store the message to the run workflow repository
             instance.onRunWorkflow(e.runWorkflow)
             null
-        } catch (e: Exception) {
-            // Store the message in retry in a failed state (for information)
-            instance.onFault(e)
-            null
         }
 
         return nextMessage
-    }
-
-    /**
-     * Handles fault scenarios for the workflow instance by saving the current message as a failed message.
-     * This method serializes the workflow instance into a message string, associates it with the provided
-     * exception details, and stores it in the retry repository with a `FAILED` status.
-     *
-     * @param e The exception that caused the fault. Its stack trace will be saved for debugging purposes.
-     */
-    private fun WorkflowInstance.onFault(e: Exception) {
-        toMessage().toJsonString().saveMsgAsFailed(e)
     }
 
     /**
@@ -179,7 +158,7 @@ internal class StepByStepRunner @Inject constructor(
                     message = message.toJsonString()
                 )
             )
-            logger.info("Restarting parent workflow:\n${message.toPrettyString()}")
+            logger.debug { "Restarting parent workflow:\n${message.toPrettyString()}" }
         }
     }
 
@@ -215,26 +194,5 @@ internal class StepByStepRunner @Inject constructor(
         )
         // Save the message to the wait table
         waitRepository.insert(waitModel)
-    }
-
-    /**
-     * Saves the current message (`String`) as a failed message in the retry repository.
-     * A `RetryModel` is created with the message, the current timestamp as `delayedUntil`,
-     * the stack trace string of the provided exception (if any) as `lastError`, and the status set to `FAILED`.
-     * The created `RetryModel` is then inserted into the retry repository.
-     *
-     * @param e An optional exception that caused the failure. If provided, its stack trace will be stored
-     *          as the `lastError` in the `RetryModel`.
-     */
-    internal fun String.saveMsgAsFailed(e: Exception?) {
-        logger.error(e) { "Failed to process message: $this" }
-
-        val retryModel = RetryModel(
-            message = this@saveMsgAsFailed,
-            delayedUntil = Instant.now(),
-            lastError = e?.stackTraceToString(),
-            status = OutBoxStatus.FAILED,
-        )
-        retryRepository.insert(retryModel)
     }
 }

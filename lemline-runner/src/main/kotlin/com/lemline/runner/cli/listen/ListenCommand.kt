@@ -6,6 +6,7 @@ import com.lemline.runner.cli.GlobalMixin
 import io.quarkus.arc.Unremovable
 import io.quarkus.runtime.Quarkus
 import jakarta.enterprise.context.Dependent
+import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
 
@@ -19,6 +20,9 @@ class ListenCommand : Runnable {
 
     @Mixin
     lateinit var mixin: GlobalMixin
+
+    @CommandLine.Option(names = ["-p", "--port"], description = ["The metrics port to use"])
+    var port: Int? = null
 
     val logger = logger()
 
@@ -64,7 +68,7 @@ class ListenCommand : Runnable {
 
         mascotLines.forEach { line -> logger.info(line) }
 
-        logger.info("Starting listening...")
+        logger.info("Start consuming messages...")
         Quarkus.waitForExit()
     }
 }
