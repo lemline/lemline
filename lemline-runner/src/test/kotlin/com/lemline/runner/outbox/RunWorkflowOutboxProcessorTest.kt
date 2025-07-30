@@ -9,6 +9,7 @@ import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
+import java.time.Instant
 import kotlin.reflect.KClass
 
 /**
@@ -22,14 +23,14 @@ internal class RunWorkflowOutboxProcessorTest : OutboxProcessorTest<RunWorkflowM
     lateinit var runWorkflowRepository: RunWorkflowRepository
 
     // Implement the abstract repository property
-    override val testRepository: OutboxRepository<RunWorkflowModel>
-        get() = runWorkflowRepository
+    override val testRepository: OutboxRepository<RunWorkflowModel> by lazy { runWorkflowRepository }
 
     // Implement the abstract KClass property
     override val modelClass: KClass<RunWorkflowModel> = RunWorkflowModel::class
 
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = RunWorkflowModel(
-        message = "Test Retry Message: $payload",
+        message = "Test Run Workflow Message: $payload",
+        delayedUntil = Instant.now()
     )
 }

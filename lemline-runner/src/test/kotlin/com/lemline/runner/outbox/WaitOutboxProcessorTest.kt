@@ -22,8 +22,7 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitModel>() {
     lateinit var waitRepository: WaitRepository
 
     // Implement the abstract repository property
-    override val testRepository: OutboxRepository<WaitModel>
-        get() = waitRepository
+    override val testRepository: OutboxRepository<WaitModel> by lazy { waitRepository }
 
     // Implement the abstract KClass property
     override val modelClass: KClass<WaitModel> = WaitModel::class
