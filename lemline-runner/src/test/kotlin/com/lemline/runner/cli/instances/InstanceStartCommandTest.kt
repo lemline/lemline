@@ -3,7 +3,6 @@ package com.lemline.runner.cli.instances
 
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
-import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.messaging.Message
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
@@ -37,7 +36,6 @@ class InstanceStartCommandTest {
 
     private lateinit var command: InstanceStartCommand
     private lateinit var definitionRepository: DefinitionRepository
-    private lateinit var selector: InteractiveWorkflowSelector
     private lateinit var emitter: Emitter<String>
 
     private lateinit var workflowName: String
@@ -54,13 +52,11 @@ class InstanceStartCommandTest {
     fun setup() = runTest {
         // Create mocks
         definitionRepository = mockk()
-        selector = mockk()
         emitter = mockk()
 
         // Create command and inject mocks
         command = InstanceStartCommand()
         injectField(command, "definitionRepository", definitionRepository)
-        injectField(command, "selector", selector)
         injectField(command, "emitter", emitter)
 
         workflowName = "testWorkflow"

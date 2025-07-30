@@ -22,8 +22,7 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryModel>() {
     lateinit var retryRepository: RetryRepository
 
     // Implement the abstract repository property
-    override val testRepository: OutboxRepository<RetryModel>
-        get() = retryRepository
+    override val testRepository: OutboxRepository<RetryModel> by lazy { retryRepository }
 
     // Implement the abstract KClass property
     override val modelClass: KClass<RetryModel> = RetryModel::class

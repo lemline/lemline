@@ -33,7 +33,6 @@ abstract class Repository<T : UuidV7Entity> {
     /**
      * Defines the columns that constitute the primary or unique key for the entity.
      * Used for UPSERT's ON CONFLICT clause and UPDATE's WHERE clause.
-     * Defaults to `listOf("id")`.
      */
     protected abstract val keyColumns: List<String>
 
@@ -111,13 +110,11 @@ abstract class Repository<T : UuidV7Entity> {
     /**
      * Inserts a new entity.
      */
-    suspend fun insert(entity: T, connection: Connection? = null): Int {
+    suspend fun insert(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
         val sql = getInsertSql()
-        return withConnection(connection) { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.bindInsertWith(entity)
-                stmt.executeUpdate()
-            }
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.bindInsertWith(entity)
+            stmt.executeUpdate()
         }
     }
 
@@ -126,18 +123,15 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The number of rows affected (0 or greater).
      */
-    suspend fun insert(entities: List<T>, connection: Connection? = null): Int {
-        if (entities.isEmpty()) return 0
-
+    suspend fun insert(entities: List<T>, connection: Connection? = null): Int = withConnection(connection) { conn ->
+        if (entities.isEmpty()) return@withConnection 0
         val sql = getInsertSql()
-        return withConnection(connection) { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                for (entity in entities) {
-                    stmt.bindInsertWith(entity)
-                    stmt.addBatch()
-                }
-                stmt.executeBatch().count { it != 0 }
+        conn.prepareStatement(sql).use { stmt ->
+            for (entity in entities) {
+                stmt.bindInsertWith(entity)
+                stmt.addBatch()
             }
+            stmt.executeBatch().count { it != 0 }
         }
     }
 
@@ -146,13 +140,11 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The number of rows affected (0 or 1).
      */
-    suspend fun update(entity: T, connection: Connection? = null): Int {
+    suspend fun update(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
         val sql = getUpdateSql()
-        return withConnection(connection) { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.bindUpdateWith(entity)
-                stmt.executeUpdate()
-            }
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.bindUpdateWith(entity)
+            stmt.executeUpdate()
         }
     }
 
@@ -161,18 +153,15 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The number of rows affected (0 or greater).
      */
-    suspend fun update(entities: List<T>, connection: Connection? = null): Int {
-        if (entities.isEmpty()) return 0
-
+    suspend fun update(entities: List<T>, connection: Connection? = null): Int = withConnection(connection) { conn ->
+        if (entities.isEmpty()) return@withConnection 0
         val sql = getUpdateSql()
-        return withConnection(connection) { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                for (entity in entities) {
-                    stmt.bindUpdateWith(entity)
-                    stmt.addBatch()
-                }
-                stmt.executeBatch().count { it != 0 }
+        conn.prepareStatement(sql).use { stmt ->
+            for (entity in entities) {
+                stmt.bindUpdateWith(entity)
+                stmt.addBatch()
             }
+            stmt.executeBatch().count { it != 0 }
         }
     }
 
@@ -181,14 +170,12 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The entity with the specified ID, or null if not found.
      */
-    suspend fun findById(id: String, connection: Connection? = null): T? {
+    suspend fun findById(id: String, connection: Connection? = null): T? = withConnection(connection) { conn ->
         val sql = "SELECT * FROM $tableName WHERE id = ? LIMIT 1"
-        return withConnection(connection) { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.setString(1, id)
-                stmt.executeQuery().use { rs ->
-                    if (rs.next()) createModel(rs) else null
-                }
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, id)
+            stmt.executeQuery().use { rs ->
+                if (rs.next()) createModel(rs) else null
             }
         }
     }
@@ -200,15 +187,13 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return A list of all entities in the table.
      */
-    suspend fun listAll(connection: Connection? = null): List<T> {
+    suspend fun listAll(connection: Connection? = null): List<T> = withConnection(connection) { conn ->
         val sql = "SELECT * FROM $tableName"
-        return withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
-                stmt.executeQuery().use { rs ->
-                    buildList {
-                        while (rs.next()) {
-                            add(createModel(rs))
-                        }
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.executeQuery().use { rs ->
+                buildList {
+                    while (rs.next()) {
+                        add(createModel(rs))
                     }
                 }
             }
@@ -220,13 +205,11 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The number of rows affected (0 or 1).
      */
-    suspend fun delete(entity: T, connection: Connection? = null): Int {
+    suspend fun delete(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
         val sql = getDeleteSql()
-        return withConnection(connection) { conn ->
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.bindDeleteWith(entity)
-                stmt.executeUpdate()
-            }
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.bindDeleteWith(entity)
+            stmt.executeUpdate()
         }
     }
 
@@ -237,18 +220,15 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The number of rows affected (0 or greater).
      */
-    suspend fun delete(entities: List<T>, connection: Connection? = null): Int {
-        if (entities.isEmpty()) return 0
-
+    suspend fun delete(entities: List<T>, connection: Connection? = null): Int = withConnection(connection) { conn ->
+        if (entities.isEmpty()) return@withConnection 0
         val sql = getDeleteSql()
-        return withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
-                for (entity in entities) {
-                    stmt.bindDeleteWith(entity)
-                    stmt.addBatch()
-                }
-                stmt.executeBatch().count { it != 0 }
+        conn.prepareStatement(sql).use { stmt ->
+            for (entity in entities) {
+                stmt.bindDeleteWith(entity)
+                stmt.addBatch()
             }
+            stmt.executeBatch().count { it != 0 }
         }
     }
 
@@ -259,12 +239,10 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The number of workflows deleted
      */
-    suspend fun deleteAll(connection: Connection? = null): Int {
+    suspend fun deleteAll(connection: Connection? = null): Int = withConnection(connection) { conn ->
         val sql = "DELETE FROM $tableName"
-        return withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
-                stmt.executeUpdate()
-            }
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.executeUpdate()
         }
     }
 
@@ -274,13 +252,11 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The total number of records in the table
      */
-    suspend fun count(connection: Connection? = null): Long {
+    suspend fun count(connection: Connection? = null): Long = withConnection(connection) { conn ->
         val sql = "SELECT COUNT(id) FROM $tableName"
-        return withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
-                stmt.executeQuery().use { rs ->
-                    if (rs.next()) rs.getLong(1) else 0L
-                }
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.executeQuery().use { rs ->
+                if (rs.next()) rs.getLong(1) else 0L
             }
         }
     }

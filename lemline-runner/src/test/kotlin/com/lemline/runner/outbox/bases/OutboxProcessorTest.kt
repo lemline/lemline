@@ -13,15 +13,17 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.Runs
-import io.mockk.every
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.verify
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import kotlin.reflect.KClass
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -63,7 +65,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     abstract fun createTestModel(payload: String = "{}"): T
 
     // Mock and processor using the generic type T
-    private val mockProcessorFunction = mockk<(T) -> Unit>()
+    private val mockProcessorFunction = mockk<suspend (T) -> Unit>()
     private val outboxProcessor: OutboxProcessor<T> by lazy {
         OutboxProcessor(
             logger = LoggerFactory.getLogger(this::class.java),
@@ -78,12 +80,11 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     private val initialDelay: Duration = Duration.ofSeconds(1) // 1 second
 
     @BeforeEach
-    fun setUp() = runTest {
+    fun setup() = runTest {
         // Reset mock before each test, default to success
-        every { mockProcessorFunction(any(modelClass)) } just Runs
+        coEvery { mockProcessorFunction(any(modelClass)) } just Runs
 
         testRepository.deleteAll()
-        delay(100)
     }
 
     // --- Test methods --- //
@@ -116,7 +117,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert
         // Verify the mock was called (at least once, type checked by any())
-        verify(atLeast = 1) { mockProcessorFunction(any(modelClass)) }
+        coVerify(atLeast = 1) { mockProcessorFunction(any(modelClass)) }
 
         val processedMessage = testRepository.findById(message.id)
         processedMessage shouldNotBe null
@@ -152,21 +153,21 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
      * - Checks DB state: status SENT, attemptCount still 1, lastError remains.
      */
     @Test
-    fun `process should handle retry logic on first failure then success`() = runTest {
+    fun `process should handle retry logic on first failure then success`() = runBlocking(Dispatchers.IO) {
         // Arrange
         val original = createTestModel(payload = "RetryPayload")
         testRepository.insert(original)
 
         val failureException = RuntimeException("Processing failed on purpose!")
         // Setup mock to fail the first time it's called in this sequence
-        every { mockProcessorFunction(any(modelClass)) } throws failureException
+        coEvery { mockProcessorFunction(any(modelClass)) } throws failureException
 
         // Act: First process call (fails)
         val now = Instant.now()
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: First attempt failed - Check DB state
-        verify(exactly = 1) { mockProcessorFunction(any(modelClass)) } // Verify it was called once
+        coVerify(exactly = 1) { mockProcessorFunction(any(modelClass)) } // Verify it was called once
         val updated = testRepository.findById(original.id)!!
 
         updated.status shouldBe PENDING
@@ -181,18 +182,20 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         delay(Duration.between(now, updated.delayedUntil).toMillis())
 
         // Arrange: Setup mock to succeed on subsequent calls
-        every { mockProcessorFunction(any(modelClass)) } just Runs
+        coEvery { mockProcessorFunction(any(modelClass)) } just Runs
 
         // Act: Second process call (should succeed now)
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: A second attempt succeeded - Check DB state
-        verify(exactly = 2) { mockProcessorFunction(any(modelClass)) } // Verify it was called again
+        coVerify(exactly = 2) { mockProcessorFunction(any(modelClass)) } // Verify it was called again
         val final = testRepository.findById(original.id)!!
 
         final.status shouldBe SENT // Status updated
         final.attemptCount shouldBe 2
         final.lastError shouldContain failureException.message!! // Error remains
+
+        Unit
     }
 
     /**
@@ -213,7 +216,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
      * - Verifies the final status in the DB is FAILED and attemptCount is `maxAttempts`.
      */
     @Test
-    fun `process should mark message as FAILED after max attempts`() = runTest {
+    fun `process should mark message as FAILED after max attempts`() = runBlocking(Dispatchers.IO) {
         // Arrange
         val original = createTestModel(payload = "FailPayload")
         testRepository.insert(original)
@@ -221,7 +224,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         val failureException = RuntimeException("Persistent failure!")
         // Set up the mock to always fail
-        every { mockProcessorFunction(any(modelClass)) } throws failureException
+        coEvery { mockProcessorFunction(any(modelClass)) } throws failureException
 
         // Act & Assert intermediate attempts by checking DB state
         var lastDelayedUntil = originalDelayedUntil
@@ -229,10 +232,8 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
             val now = Instant.now()
             // when
             outboxProcessor.process(batchSize, maxAttempts, initialDelay)
-
             // then
             val updated = testRepository.findById(original.id)!!
-
             if (attempt < maxAttempts) {
                 updated.status shouldBe PENDING
                 updated.attemptCount shouldBe attempt
@@ -279,7 +280,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
-        verify(exactly = 5) { mockProcessorFunction(any(modelClass)) }
+        coVerify(exactly = 5) { mockProcessorFunction(any(modelClass)) }
         val processedMessages = testRepository.listAll()
         processedMessages shouldHaveSize 5
         processedMessages.forEach { msg ->
@@ -363,7 +364,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
-        verify(exactly = 0) { mockProcessorFunction(any(modelClass)) }
+        coVerify(exactly = 0) { mockProcessorFunction(any(modelClass)) }
         testRepository.count() shouldBe 0
     }
 
