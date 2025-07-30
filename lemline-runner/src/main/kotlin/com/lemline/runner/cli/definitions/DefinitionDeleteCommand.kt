@@ -7,6 +7,7 @@ import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
+import kotlinx.coroutines.runBlocking
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
@@ -58,8 +59,7 @@ open class DefinitionDeleteCommand : Runnable {
     )
     var force: Boolean = false
 
-    override fun run() {
-
+    override fun run() = runBlocking {
         try {
             if (force) {
                 handleForcedDeletion()
@@ -71,7 +71,7 @@ open class DefinitionDeleteCommand : Runnable {
         }
     }
 
-    private fun handleForcedDeletion() {
+    private suspend fun handleForcedDeletion() {
         when {
             name == null -> deleteAllWorkflows()
             version == null -> deleteAllVersionsByName(name!!)
@@ -79,7 +79,7 @@ open class DefinitionDeleteCommand : Runnable {
         }
     }
 
-    private fun handleInteractiveDeletion() {
+    private suspend fun handleInteractiveDeletion() {
 
         // --- Prepare and display list ONCE ---
         var currentSelectionList = selector.prepareSelection(filterName = name)?.toMutableList()
@@ -151,7 +151,7 @@ open class DefinitionDeleteCommand : Runnable {
 
     // --- Methods used for BOTH Forced & Intercative Deletion --- //
 
-    private fun deleteAllWorkflows() {
+    private suspend fun deleteAllWorkflows() {
         val workflowCount = definitionRepository.count()
         if (workflowCount == 0L) {
             println("No workflows found to delete.")
@@ -164,7 +164,7 @@ open class DefinitionDeleteCommand : Runnable {
         println("Successfully deleted $deletedCount workflows." + if (force) " (forced)" else "")
     }
 
-    private fun deleteAllVersionsByName(name: String): Boolean {
+    private suspend fun deleteAllVersionsByName(name: String): Boolean {
         val workflowsToDelete = definitionRepository.listByName(name)
         if (workflowsToDelete.isEmpty()) {
             println("No workflows found with name '$name'.")
@@ -184,7 +184,7 @@ open class DefinitionDeleteCommand : Runnable {
         }
     }
 
-    private fun deleteSpecificVersion(name: String, version: String): Boolean {
+    private suspend fun deleteSpecificVersion(name: String, version: String): Boolean {
         val workflowToDelete = definitionRepository.findByNameAndVersion(name, version)
             ?: run {
                 println("Workflow '$name' version '$version' not found.")
@@ -205,7 +205,10 @@ open class DefinitionDeleteCommand : Runnable {
     }
 
     // --- Method ONLY for INTERACTIVE Deletion (called when '*' selected) --- //
-    private fun handleDeleteAllListed(selectionList: List<Pair<Int, DefinitionModel>>, filterName: String?): Boolean {
+    private suspend fun handleDeleteAllListed(
+        selectionList: List<Pair<Int, DefinitionModel>>,
+        filterName: String?
+    ): Boolean {
         val workflowsToDelete = selectionList.map { it.second } // Extract models
         val count = workflowsToDelete.size
         val subject = if (filterName != null) {

@@ -10,6 +10,8 @@ import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.time.Instant
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 abstract class Repository<T : UuidV7Entity> {
 
@@ -79,26 +81,22 @@ abstract class Repository<T : UuidV7Entity> {
      * @return The result of the block execution.
      * @throws Exception If an error occurs during the execution of the block or transaction management.
      */
-    internal fun <T> withTransaction(block: (connection: Connection) -> T): T {
-        // Acquire a JDBC connection from the pool and begin a transaction
-        val connection = databaseManager.datasource.connection.apply { autoCommit = false }
-
-        val out: T
-        try {
-            out = block(connection)
-            // Commit the transaction to release locks and persist changes
-            connection.commit()
-        } catch (e: Exception) {
-            // On any error, roll back the transaction to release locks and avoid partial processing
-            connection.rollback()
-            throw e  // rethrow
-        } finally {
-            // Return connection to the pool
-            connection.close()
+    internal suspend fun <T> withTransaction(block: suspend (Connection) -> T): T =
+        withContext(Dispatchers.IO) {
+            databaseManager.datasource.connection.use { connection ->
+                connection.autoCommit = false
+                try {
+                    block(connection).also {
+                        // Commit the transaction to release locks and persist changes
+                        connection.commit()
+                    }
+                } catch (t: Throwable) {
+                    // On any error, roll back the transaction to release locks and avoid partial processing
+                    connection.rollback()
+                    throw t
+                }
+            }
         }
-
-        return out
-    }
 
     /**
      * Creates a model instance from a ResultSet.
@@ -111,118 +109,82 @@ abstract class Repository<T : UuidV7Entity> {
     internal abstract fun createModel(rs: ResultSet): T
 
     /**
-     * Inserts a new entity
-     *
-     * @param entity The entity to insert
-     * @return The number of rows inserted (1 if successful, 0 if not)
+     * Inserts a new entity.
      */
-    fun insert(entity: T, connection: Connection? = null): Int {
+    suspend fun insert(entity: T, connection: Connection? = null): Int {
         val sql = getInsertSql()
-        var updated = 0
-
-        withConnection(connection) { conn ->
+        return withConnection(connection) { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 stmt.bindInsertWith(entity)
-                updated += stmt.executeUpdate()
+                stmt.executeUpdate()
             }
         }
-
-        return updated
     }
 
     /**
-     * Inserts a list of new entities
+     * Inserts a list of new entities using a batch operation.
      *
-     * @param entities The list of entities to insert
-     * @return The number of rows inserted
+     * @return The number of rows affected (0 or greater).
      */
-    fun insert(entities: List<T>, connection: Connection? = null): Int {
+    suspend fun insert(entities: List<T>, connection: Connection? = null): Int {
         if (entities.isEmpty()) return 0
-        val sql = getInsertSql()
-        var updated = 0
 
-        withConnection(connection) { conn ->
+        val sql = getInsertSql()
+        return withConnection(connection) { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 for (entity in entities) {
                     stmt.bindInsertWith(entity)
                     stmt.addBatch()
                 }
-                // execute once, receive one update‑count per row
-                val counts = stmt.executeBatch()
-                // JDBC spec: 0 → row not found, ≥1 → row(s) modified
-                updated += counts.count { it > 0 }
+                stmt.executeBatch().count { it != 0 }
             }
         }
-
-        return updated
     }
-
 
     /**
      * Updates an existing entity.
      *
-     * @param entity The entity to upsert
-     * @return The number of rows updated (1 if successful, 0 if not)
+     * @return The number of rows affected (0 or 1).
      */
-    fun update(entity: T, connection: Connection? = null): Int {
+    suspend fun update(entity: T, connection: Connection? = null): Int {
         val sql = getUpdateSql()
-        var updated = 0
-
-        withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
+        return withConnection(connection) { conn ->
+            conn.prepareStatement(sql).use { stmt ->
                 stmt.bindUpdateWith(entity)
-                updated += stmt.executeUpdate()
+                stmt.executeUpdate()
             }
         }
-
-        return updated
     }
 
     /**
-     * Updates a list of existing entities.
+     * Updates a list of existing entities using a batch operation.
      *
-     * Warning: this method does not throw but returns the number of successful requests
-     *
-     * @param entities The list of entities to upsert
-     * @return The number of rows updated
+     * @return The number of rows affected (0 or greater).
      */
-    fun update(entities: List<T>, connection: Connection? = null): Int {
+    suspend fun update(entities: List<T>, connection: Connection? = null): Int {
         if (entities.isEmpty()) return 0
-        val sql = getUpdateSql()
-        var updated = 0
 
-        withConnection(connection) { conn ->
+        val sql = getUpdateSql()
+        return withConnection(connection) { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 for (entity in entities) {
                     stmt.bindUpdateWith(entity)
                     stmt.addBatch()
                 }
-                // execute once, receive one update‑count per row
-                val counts: IntArray = stmt.executeBatch()
-                // JDBC spec: 0 → row not found, ≥1 → row(s) modified
-                updated += counts.count { it > 0 }
+                stmt.executeBatch().count { it != 0 }
             }
         }
-
-        return updated
     }
 
     /**
      * Retrieves an entity by its ID.
-     * This method uses a native SQL query to fetch the record.
      *
-     * @param id The ID of the entity to find
-     * @return The entity if found, null otherwise
+     * @return The entity with the specified ID, or null if not found.
      */
-    fun findById(id: String, connection: Connection? = null): T? {
-        val sql = """
-            SELECT * FROM $tableName
-            WHERE id = ?
-            LIMIT 1
-        """.trimIndent()
-
-        return withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
+    suspend fun findById(id: String, connection: Connection? = null): T? {
+        val sql = "SELECT * FROM $tableName WHERE id = ? LIMIT 1"
+        return withConnection(connection) { conn ->
+            conn.prepareStatement(sql).use { stmt ->
                 stmt.setString(1, id)
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) createModel(rs) else null
@@ -236,11 +198,10 @@ abstract class Repository<T : UuidV7Entity> {
      * This method uses a native SQL query to fetch all records.
      * Use with caution as this operation can be expensive for large tables.
      *
-     * @return List of all entities in the table
+     * @return A list of all entities in the table.
      */
-    fun listAll(connection: Connection? = null): List<T> {
+    suspend fun listAll(connection: Connection? = null): List<T> {
         val sql = "SELECT * FROM $tableName"
-
         return withConnection(connection) {
             it.prepareStatement(sql).use { stmt ->
                 stmt.executeQuery().use { rs ->
@@ -255,38 +216,18 @@ abstract class Repository<T : UuidV7Entity> {
     }
 
     /**
-     * Creates a list of model instances from a ResultSet.
-     * This method must be implemented by concrete repositories to handle
-     * the specific mapping of database columns to model properties.
-     *
-     * @param rs The ResultSet containing the current row
-     * @return A list of new model instance populated with data from the ResultSet
-     */
-    protected fun createModels(rs: ResultSet): List<T> = buildList {
-        while (rs.next()) {
-            add(createModel(rs))
-        }
-    }
-
-    /**
      * Deletes an entity based on its key columns.
      *
-     * @param entity The entity to delete. Key column values are used for identification.
-     * @param connection An optional existing database connection.
      * @return The number of rows affected (0 or 1).
      */
-    fun delete(entity: T, connection: Connection? = null): Int {
+    suspend fun delete(entity: T, connection: Connection? = null): Int {
         val sql = getDeleteSql()
-        var deleted = 0
-
-        withConnection(connection) { conn ->
+        return withConnection(connection) { conn ->
             conn.prepareStatement(sql).use { stmt ->
                 stmt.bindDeleteWith(entity)
-                deleted = stmt.executeUpdate()
+                stmt.executeUpdate()
             }
         }
-
-        return deleted
     }
 
     /**
@@ -294,28 +235,21 @@ abstract class Repository<T : UuidV7Entity> {
      * This method uses batch operations for better performance.
      * The operation is transactional and will be rolled back if any deletion fails.
      *
-     * @param entities The list of messages to delete
-     * @return The number of messages successfully deleted
+     * @return The number of rows affected (0 or greater).
      */
-    fun delete(entities: List<T>, connection: Connection? = null): Int {
+    suspend fun delete(entities: List<T>, connection: Connection? = null): Int {
         if (entities.isEmpty()) return 0
 
         val sql = getDeleteSql()
-        var deleted = 0
-
-        withConnection(connection) {
+        return withConnection(connection) {
             it.prepareStatement(sql).use { stmt ->
                 for (entity in entities) {
                     stmt.bindDeleteWith(entity)
                     stmt.addBatch()
                 }
-                // execute once, receive one update‑count per row
-                val counts: IntArray = stmt.executeBatch()
-                // JDBC spec: 0 → row not found, ≥1 → row(s) modified
-                deleted += counts.count { it > 0 }
+                stmt.executeBatch().count { it != 0 }
             }
         }
-        return deleted
     }
 
     /**
@@ -325,9 +259,8 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The number of workflows deleted
      */
-    fun deleteAll(connection: Connection? = null): Int {
+    suspend fun deleteAll(connection: Connection? = null): Int {
         val sql = "DELETE FROM $tableName"
-
         return withConnection(connection) {
             it.prepareStatement(sql).use { stmt ->
                 stmt.executeUpdate()
@@ -341,9 +274,8 @@ abstract class Repository<T : UuidV7Entity> {
      *
      * @return The total number of records in the table
      */
-    fun count(connection: Connection? = null): Long {
+    suspend fun count(connection: Connection? = null): Long {
         val sql = "SELECT COUNT(id) FROM $tableName"
-
         return withConnection(connection) {
             it.prepareStatement(sql).use { stmt ->
                 stmt.executeQuery().use { rs ->
@@ -353,16 +285,11 @@ abstract class Repository<T : UuidV7Entity> {
         }
     }
 
-
     private fun getUpdateSql(): String {
         val setClause = columns.filterNot { it in (keyColumns + "id") }.joinToString { "${q(it)} = ?" }
         val whereClause = keyColumns.joinToString(separator = " AND ") { "${q(it)} = ?" }
 
-        return """
-            UPDATE $tableName
-            SET $setClause
-            WHERE $whereClause
-        """.trimIndent()
+        return "UPDATE $tableName SET $setClause WHERE $whereClause"
     }
 
     private fun getInsertSql(): String {
@@ -388,10 +315,7 @@ abstract class Repository<T : UuidV7Entity> {
     private fun getDeleteSql(): String {
         val whereClause = keyColumns.joinToString(separator = " AND ") { "$it = ?" }
 
-        return """
-            DELETE FROM $tableName
-            WHERE $whereClause
-        """.trimIndent()
+        return "DELETE FROM $tableName WHERE $whereClause"
     }
 
     // Helper that returns the dialect-specific quoting of an SQL identifier.
@@ -402,19 +326,24 @@ abstract class Repository<T : UuidV7Entity> {
         else -> id
     }
 
+
     /**
-     * Executes a block of code with a database connection.
-     * If a connection is provided, it uses that connection; otherwise, it retrieves a connection
-     * from the `databaseManager`'s datasource and ensures it is properly closed after use.
+     * Executes a block of code with a database connection. If a connection is provided, it uses that connection;
+     * otherwise, it acquires a new one from the datasource. This function ensures the appropriate context is utilized
+     * for IO operations, and manages the connection lifecycle if a new connection is acquired.
      *
-     * @param connection An optional database connection to use. If null, a new connection is obtained.
-     * @param block The block of code to execute with the connection.
-     * @return The result of the block execution.
+     * @param connection An optional `Connection` instance. If null, a new connection is obtained from the datasource.
+     * @param block A lambda function that takes a `Connection` as a parameter and returns a result of type `R`.
+     * @return The result of executing the provided block with a `Connection`.
+     * @throws SQLException If an error occurs while acquiring or using the connection from the datasource.
      */
-    protected fun <R> withConnection(connection: Connection?, block: (Connection) -> R): R = when (connection) {
-        null -> databaseManager.datasource.connection.use { block(it) }
-        else -> block(connection)
-    }
+    protected suspend fun <R> withConnection(connection: Connection?, block: (Connection) -> R): R =
+        withContext(Dispatchers.IO) {
+            when (connection) {
+                null -> databaseManager.datasource.connection.use { block(it) }
+                else -> block(connection)
+            }
+        }
 
     protected fun ResultSet.getInstant(column: String): Instant? = getTimestamp(column)?.toInstant()
 }

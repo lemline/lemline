@@ -9,6 +9,7 @@ import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -18,6 +19,7 @@ import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.lang.reflect.Field
 import java.util.concurrent.CompletableFuture
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
@@ -49,7 +51,7 @@ class InstanceStartCommandTest {
     private val messageSlot = slot<String>()
 
     @BeforeEach
-    fun setup() {
+    fun setup() = runTest {
         // Create mocks
         definitionRepository = mockk()
         selector = mockk()
@@ -78,8 +80,8 @@ class InstanceStartCommandTest {
             """.trimIndent()
         )
 
-        every { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
-        every { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
+        coEvery { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
+        coEvery { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
         every { emitter.send(any<String>()) } returns CompletableFuture.completedFuture(null)
 
         // Save original streams
@@ -329,7 +331,7 @@ class InstanceStartCommandTest {
         private lateinit var workflowWithSchema: DefinitionModel
 
         @BeforeEach
-        fun setupSchemaTest() {
+        fun setupSchemaTest() = runTest {
             // Create a workflow with schema validation
             workflowWithSchema = DefinitionModel(
                 name = workflowName,
@@ -360,7 +362,7 @@ class InstanceStartCommandTest {
             )
 
             // Configure repository to return this workflow
-            every {
+            coEvery {
                 definitionRepository.findByNameAndVersion(
                     workflowName,
                     workflowVersion

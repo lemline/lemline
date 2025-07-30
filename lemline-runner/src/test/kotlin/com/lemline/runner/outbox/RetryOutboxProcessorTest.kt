@@ -9,7 +9,6 @@ import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
-import java.time.Instant
 import kotlin.reflect.KClass
 
 /**
@@ -30,11 +29,7 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryModel>() {
     override val modelClass: KClass<RetryModel> = RetryModel::class
 
     // Implement the abstract factory method
-    override fun createTestModel(payload: String): RetryModel {
-        // Use the RetryModel companion object factory method
-        return RetryModel(
-            message = "Test Retry Message: $payload",
-            delayedUntil = Instant.now() // Ensure ready for processing
-        )
-    }
+    override fun createTestModel(payload: String) = RetryModel(
+        message = "Test Retry Message: $payload",
+    )
 }

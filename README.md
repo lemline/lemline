@@ -80,6 +80,23 @@ The runner will start, connect to the database/broker, and begin processing work
 You can find more information about database and message broker configuration in
 the [lemline-runner README](lemline-runner/README.md).
 
+### CLI Commands
+
+The `lemline-runner` provides several command-line interface (CLI) commands to manage and interact with the Lemline runtime.
+
+*   **`listen`**: Starts the Lemline runner, which listens for triggers (e.g., messages) and orchestrates task execution according to defined workflows.
+    *   Usage: `./lemline-runner listen [OPTIONS]`
+    *   Options:
+        *   `-p`, `--port <port>`: Specifies the metrics port to use. Overrides the `lemline.metrics.port` configuration.
+*   **`config`**: Displays the current configuration of the Lemline runner.
+    *   Usage: `./lemline-runner config [OPTIONS]`
+    *   Options:
+        *   `-f`, `--format <format>`: Specifies the output format (e.g., `yaml`, `properties`). Default is `yaml`.
+        *   `-a`, `--all`: Shows all properties, including Quarkus-specific properties, not just `lemline.*`.
+*   **`definition`**: Manages workflow definitions. (Further subcommands and options would be detailed here if applicable)
+*   **`instance`**: Manages workflow instances. (Further subcommands and options would be detailed here if applicable)
+*   **`migrate`**: Handles database migrations. (Further subcommands and options would be detailed here if applicable)
+
 ### Running Tests
 
 ```bash
@@ -178,7 +195,7 @@ Currently implemented features are:
 ### Control & Data Flow
 
 - [x] Status
-
+-
 - [x] Error Management
 
 - Directives:

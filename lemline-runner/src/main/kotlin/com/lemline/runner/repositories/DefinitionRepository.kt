@@ -62,11 +62,8 @@ class DefinitionRepository : Repository<DefinitionModel>() {
      * @param connection An optional database connection. If null, a new connection will be created.
      * @return A list of `WorkflowModel` instances matching the given name.
      */
-    fun listByName(name: String, connection: Connection? = null): List<DefinitionModel> {
-        val sql = """
-            SELECT * FROM $tableName
-            WHERE name = ?
-        """.trimIndent()
+    suspend fun listByName(name: String, connection: Connection? = null): List<DefinitionModel> {
+        val sql = "SELECT * FROM $tableName WHERE name = ?"
 
         return withConnection(connection) {
             it.prepareStatement(sql).use { stmt ->
@@ -92,13 +89,8 @@ class DefinitionRepository : Repository<DefinitionModel>() {
      * @param version The version of the workflow
      * @return The workflow model if found, null otherwise
      */
-    fun findByNameAndVersion(name: String, version: String, connection: Connection? = null): DefinitionModel? {
-        val sql = """
-            SELECT * FROM $tableName
-            WHERE name = ?
-            AND version = ?
-            LIMIT 1
-        """.trimIndent()
+    suspend fun findByNameAndVersion(name: String, version: String, connection: Connection? = null): DefinitionModel? {
+        val sql = "SELECT * FROM $tableName WHERE name = ? AND version = ? LIMIT 1"
 
         return withConnection(connection) {
             it.prepareStatement(sql).use { stmt ->

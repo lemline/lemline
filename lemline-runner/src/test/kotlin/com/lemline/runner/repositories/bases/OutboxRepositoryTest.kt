@@ -6,6 +6,7 @@ import com.lemline.runner.outbox.OutBoxStatus.FAILED
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
 import com.lemline.runner.repositories.OutboxRepository
+import io.kotest.common.runBlocking
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.comparables.shouldBeLessThan
@@ -25,6 +26,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.random.Random
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.toJavaDuration
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -57,7 +59,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * This is crucial for maintaining test isolation and reliability.
      */
     @BeforeEach
-    fun setupTest() {
+    fun setupTest() = runTest {
         repository.deleteAll()
     }
 
@@ -116,7 +118,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * After finding the messages, marks them as FAILED to prevent reprocessing.
      * This simulates a real-world scenario where messages are processed and their status is updated.
      */
-    protected open fun findMessagesToProcess(
+    protected open suspend fun findMessagesToProcess(
         maxAttempts: Int = Int.MAX_VALUE,
         limit: Int = Int.MAX_VALUE,
         connection: Connection? = null
@@ -127,7 +129,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * After finding the messages, marks them as FAILED to prevent reprocessing.
      * This simulates a real-world scenario where messages are deleted after processing.
      */
-    protected open fun findMessagesToDelete(
+    protected open suspend fun findMessagesToDelete(
         cutoffDate: Instant = Instant.now(),
         limit: Int = Int.MAX_VALUE,
         connection: Connection? = null
@@ -141,7 +143,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - Within attempt limits
      */
     @Test
-    fun `findMessagesToProcess should return all eligible pending messages that are ready for processing`() {
+    fun `findMessagesToProcess should return all eligible pending messages that are ready for processing`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
         val expected = messages.filterToProcess()
@@ -159,7 +161,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that messages exceeding the attempt limit are not returned.
      */
     @Test
-    fun `findMessagesToProcess should exclude messages that have exceeded maxAttempts`() {
+    fun `findMessagesToProcess should exclude messages that have exceeded maxAttempts`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
         val expected = messages.filterToProcess(maxAttempts = maxAttempts)
@@ -179,7 +181,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * and that all returned messages are valid candidates for processing.
      */
     @Test
-    fun `findMessagesToProcess should respect the limit parameter and only return valid candidates`() {
+    fun `findMessagesToProcess should respect the limit parameter and only return valid candidates`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
         val expected = messages.filterToProcess()
@@ -202,7 +204,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - Past their cutoff date
      */
     @Test
-    fun `findMessagesToDelete should return all sent messages that are past their cutoff date`() {
+    fun `findMessagesToDelete should return all sent messages that are past their cutoff date`() = runTest {
         val now = Instant.now()
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
@@ -222,7 +224,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that only messages older than the cutoff date are returned.
      */
     @Test
-    fun `findMessagesToDelete should only return messages older than the specified cutoff date`() {
+    fun `findMessagesToDelete should only return messages older than the specified cutoff date`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
         val expected = messages.filterToDelete(cutoffDate = cutoffDate)
@@ -242,7 +244,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * and that all returned messages are valid candidates for deletion.
      */
     @Test
-    fun `findMessagesToDelete should respect the limit parameter and only return valid candidates`() {
+    fun `findMessagesToDelete should respect the limit parameter and only return valid candidates`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
         val expected = messages.filterToDelete()
@@ -266,7 +268,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - The operation completes within a reasonable time
      */
     @Test
-    fun `findMessagesToProcess should handle concurrent requests without duplicate processing`() {
+    fun `findMessagesToProcess should handle concurrent requests without duplicate processing`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
         val expectedProcessed = messages.filterToProcess(maxAttempts = maxAttempts).size
@@ -278,16 +280,18 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
             repeat(concurrentRequests) {
                 executor.submit {
                     try {
-                        // run inside a transaction
-                        repository.withTransaction { connection ->
-                            // get messages to process
-                            val results = findMessagesToProcess(maxAttempts, limit, connection)
-                            // mark messages as sent
-                            results.forEach { it.status = SENT }
-                            // save them
-                            repository.update(results, connection)
-                            // record processed messages
-                            synchronized(processedMessages) { processedMessages.addAll(results.filter { it.id in messagesIds }) }
+                        runBlocking {
+                            // run inside a transaction
+                            repository.withTransaction { connection ->
+                                // get messages to process
+                                val results = findMessagesToProcess(maxAttempts, limit, connection)
+                                // mark messages as sent
+                                results.forEach { it.status = SENT }
+                                // save them
+                                repository.update(results, connection)
+                                // record processed messages
+                                synchronized(processedMessages) { processedMessages.addAll(results.filter { it.id in messagesIds }) }
+                            }
                         }
                     } catch (e: Exception) {
                         println(e.printStackTrace())
@@ -314,7 +318,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - The operation completes within a reasonable time
      */
     @Test
-    fun `findMessagesToDelete should handle concurrent requests without duplicate deletion`() {
+    fun `findMessagesToDelete should handle concurrent requests without duplicate deletion`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
         val expectedDeleted = messages.filterToDelete(cutoffDate).size
@@ -326,14 +330,16 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
             repeat(concurrentRequests) {
                 executor.submit {
                     try {
-                        // run inside a transaction
-                        repository.withTransaction { connection ->
-                            // get messages to delete
-                            val results = findMessagesToDelete(cutoffDate, limit, connection)
-                            // delete them
-                            repository.delete(results, connection)
-                            // record deleted messages
-                            synchronized(deletedMessages) { deletedMessages.addAll(results.filter { it.id in messagesIds }) }
+                        runBlocking {
+                            // run inside a transaction
+                            repository.withTransaction { connection ->
+                                // get messages to delete
+                                val results = findMessagesToDelete(cutoffDate, limit, connection)
+                                // delete them
+                                repository.delete(results, connection)
+                                // record deleted messages
+                                synchronized(deletedMessages) { deletedMessages.addAll(results.filter { it.id in messagesIds }) }
+                            }
                         }
                     } catch (e: Exception) {
                         println(e.printStackTrace())
@@ -361,7 +367,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - The operation completes within a reasonable time
      */
     @Test
-    fun `should handle mixed concurrent processing and deletion operations without conflicts`() {
+    fun `should handle mixed concurrent processing and deletion operations without conflicts`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
         val expectedProcessed = messages.filterToProcess(maxAttempts = maxAttempts).size
@@ -376,31 +382,33 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                 executor.submit {
                     try {
                         // run inside a transaction
-                        repository.withTransaction { connection ->
-                            when (Random.nextInt(0, 2)) {
-                                0 -> {
-                                    println("Processing...")
-                                    // get messages to process
-                                    val results = findMessagesToProcess(maxAttempts, limit, connection)
-                                    // mark messages as sent
-                                    results.forEach { it.status = SENT }
-                                    // delete them
-                                    repository.delete(results, connection)
-                                    // record processed messages
-                                    synchronized(processedMessages) { processedMessages.addAll(results.filter { it.id in messagesIds }) }
-                                }
+                        runBlocking {
+                            repository.withTransaction { connection ->
+                                when (Random.nextInt(0, 2)) {
+                                    0 -> {
+                                        println("Processing...")
+                                        // get messages to process
+                                        val results = findMessagesToProcess(maxAttempts, limit, connection)
+                                        // mark messages as sent
+                                        results.forEach { it.status = SENT }
+                                        // delete them
+                                        repository.delete(results, connection)
+                                        // record processed messages
+                                        synchronized(processedMessages) { processedMessages.addAll(results.filter { it.id in messagesIds }) }
+                                    }
 
-                                1 -> {
-                                    println("Deleting...")
-                                    // get messages to delete
-                                    val results = findMessagesToDelete(cutoffDate, limit, connection)
-                                    // delete them
-                                    repository.delete(results, connection)
-                                    // record deleted messages
-                                    synchronized(deletedMessages) { deletedMessages.addAll(results.filter { it.id in messagesIds }) }
-                                }
+                                    1 -> {
+                                        println("Deleting...")
+                                        // get messages to delete
+                                        val results = findMessagesToDelete(cutoffDate, limit, connection)
+                                        // delete them
+                                        repository.delete(results, connection)
+                                        // record deleted messages
+                                        synchronized(deletedMessages) { deletedMessages.addAll(results.filter { it.id in messagesIds }) }
+                                    }
 
-                                else -> {}
+                                    else -> {}
+                                }
                             }
                         }
                     } catch (e: Exception) {
@@ -433,7 +441,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that all fields are properly mapped and converted.
      */
     @Test
-    fun `createModel should correctly map ResultSet data to model properties`() {
+    fun `createModel should correctly map ResultSet data to model properties`() = runTest {
         // Given
         val expectedId = "test-id"
         val expectedMessage = "test message"
@@ -468,7 +476,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that concurrent operations don't corrupt the data.
      */
     @Test
-    fun `should handle concurrent access correctly`() {
+    fun `should handle concurrent access correctly`() = runTest {
         // Given
         val messages = List(10) { createWithMessage("test") }
         val nThreads = 5
@@ -482,7 +490,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                 try {
                     val start = threadIndex * 2
                     val end = start + 2
-                    repository.insert(messages.subList(start, end))
+                    runBlocking { repository.insert(messages.subList(start, end)) }
                 } catch (e: Exception) {
                     synchronized(exceptions) { exceptions.add(e) }
                 } finally {
@@ -504,7 +512,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that the repository properly handles concurrent inserts.
      */
     @Test
-    fun `insert should handle concurrent transactions correctly`() {
+    fun `insert should handle concurrent transactions correctly`() = runTest {
         // Given
         val message = createWithMessage().apply {
             status = PENDING
@@ -521,7 +529,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         repeat(nThreads) {
             executor.submit {
                 try {
-                    repository.insert(message)
+                    runBlocking { repository.insert(message) }
                 } catch (e: Exception) {
                     synchronized(exceptions) { exceptions.add(e) }
                 } finally {
@@ -542,7 +550,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that the repository properly handles concurrent updates.
      */
     @Test
-    fun `update should handle concurrent transactions correctly`() {
+    fun `update should handle concurrent transactions correctly`() = runTest {
         // Given
         val original = insertWithMessage("original")
         val updated = copyModel(original, message = "updated")
@@ -556,7 +564,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         repeat(nThreads) {
             executor.submit {
                 try {
-                    repository.update(updated)
+                    runBlocking { repository.update(updated) }
                 } catch (e: Exception) {
                     synchronized(exceptions) { exceptions.add(e) }
                 } finally {
@@ -577,7 +585,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that the count is incremented after messages insertion
      */
     @Test
-    fun `count should return 0 for an empty table`() {
+    fun `count should return 0 for an empty table`() = runTest {
         // Given
         val count = repository.count()
 
@@ -593,7 +601,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Verifies that the count matches the number of records returned by listAll.
      */
     @Test
-    fun `count should be consistent with listAll`() {
+    fun `count should be consistent with listAll`() = runTest {
         // Given
         insertMessages(10)
 
@@ -609,7 +617,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Tests messages deletion
      */
     @Test
-    fun `batch delete should successful`() {
+    fun `batch delete should successful`() = runTest {
         // Given
         val messages = insertMessages(10)
         val messagesToDelete = messages.take(5)
@@ -630,7 +638,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Tests messages creation.
      */
     @Test
-    fun `batch updates should successful`() {
+    fun `batch updates should successful`() = runTest {
         // Given
         val messages = insertMessages(10)
         val messagesToUpdate = messages.take(5)
@@ -654,7 +662,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     // --- Tests for persist(entity, force) ---
 
     @Test
-    fun `insert new entity should be successful`() {
+    fun `insert new entity should be successful`() = runTest {
         val original = createWithMessage("original")
 
         repository.insert(original) shouldBe 1
@@ -665,7 +673,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
-    fun `insert existing entity should fail`() {
+    fun `insert existing entity should fail`() = runTest {
         val original = insertWithMessage("original")
         val updated = copyModel(original, message = "updated")
 
@@ -677,7 +685,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
-    fun `update existing entity should be successful`() {
+    fun `update existing entity should be successful`() = runTest {
         val original = insertWithMessage("original")
         val updated = copyModel(original, message = "updated")
 
@@ -689,7 +697,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
-    fun `update new entity should fail`() {
+    fun `update new entity should fail`() = runTest {
         val original = createWithMessage("original")
 
         repository.update(original) shouldBe 0
@@ -701,7 +709,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     // --- Tests for persist(entities, force) ---
 
     @Test
-    fun `update list should update only existing`() {
+    fun `update list should update only existing`() = runTest {
         val original = insertWithMessage("original-0")
         val updated = copyModel(original, message = "updated")
         val newEntity1 = createWithMessage("original-1")
@@ -721,7 +729,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
-    fun `insert list should insert only non-existing`() {
+    fun `insert list should insert only non-existing`() = runTest {
         val original = insertWithMessage("original-0")
         val updated = copyModel(original, message = "updated")
         val newEntity1 = createWithMessage("original-1")
@@ -741,7 +749,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
-    fun `delete should remove an existing message`() {
+    fun `delete should remove an existing message`() = runTest {
         // Given
         val message = createWithMessage("to-delete")
         repository.insert(message)
@@ -755,7 +763,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
-    fun `delete should return 0 if message does not exist`() {
+    fun `delete should return 0 if message does not exist`() = runTest {
         // Given
         val existingMessage = createWithMessage("existing")
         val nonExistentMessage = createWithMessage("non-existent")
@@ -770,7 +778,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
-    fun `batch delete should remove multiple existing messages`() {
+    fun `batch delete should remove multiple existing messages`() = runTest {
         // Given
         val messagesToDelete = List(5) { createWithMessage("delete-$it") }
         val otherMessage = createWithMessage("keep-me")
@@ -788,7 +796,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
-    fun `batch delete should return correct count when some messages do not exist`() {
+    fun `batch delete should return correct count when some messages do not exist`() = runTest {
         // Given
         val existingMessages = List(3) { createWithMessage("existing-$it") }
         val nonExistentMessages = List(2) { createWithMessage("non-existent-$it") }
@@ -807,7 +815,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
-    fun `batch delete should return 0 for an empty list`() {
+    fun `batch delete should return 0 for an empty list`() = runTest {
         // Given
         repository.insert(createWithMessage("existing"))
         val emptyList = emptyList<T>()
@@ -827,7 +835,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - Random attempt count
      * - Sequential message content
      */
-    private fun insertMessages(count: Int): List<T> {
+    private suspend fun insertMessages(count: Int): List<T> {
         val now = Instant.now()
         val messages = List(count) { i ->
             val duration = randomNonZero(1000).hours.toJavaDuration()
@@ -849,7 +857,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     // --- Helper to persist an entity for setup ---
-    private fun insertWithMessage(message: String): T {
+    private suspend fun insertWithMessage(message: String): T {
         val entity = createWithMessage(message)
         repository.insert(entity)
         return entity
