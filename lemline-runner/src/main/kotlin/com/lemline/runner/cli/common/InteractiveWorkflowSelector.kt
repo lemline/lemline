@@ -19,7 +19,7 @@ class InteractiveWorkflowSelector @Inject constructor(
      * and returns the list of pairs (number, WorkflowModel) for selection.
      * Returns null if no workflows are found.
      */
-    fun prepareSelection(filterName: String? = null): List<Pair<Int, DefinitionModel>>? {
+    suspend fun prepareSelection(filterName: String? = null): List<Pair<Int, DefinitionModel>>? {
         val workflows = if (filterName != null) {
             definitionRepository.listByName(filterName)
         } else {

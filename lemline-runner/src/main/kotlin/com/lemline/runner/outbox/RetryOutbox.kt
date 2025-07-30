@@ -8,6 +8,7 @@ import com.lemline.runner.repositories.RetryRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import kotlin.jvm.optionals.getOrNull
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
@@ -29,7 +30,6 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
 @ApplicationScoped
 internal class RetryOutbox : AbstractOutbox<RetryModel>() {
 
-    @Inject
     @Channel(WORKFLOW_OUT)
     override lateinit var emitter: Emitter<String>
 
@@ -39,18 +39,22 @@ internal class RetryOutbox : AbstractOutbox<RetryModel>() {
     @Inject
     override lateinit var repository: RetryRepository
 
-    override val enabled by lazy { lemlineConfig.messaging().consumer().enabled() }
+    override val enabled by lazy {
+        lemlineConfig.outbox().retry().enabled().getOrNull()
+            ?: lemlineConfig.outbox().enabled().getOrNull()
+            ?: lemlineConfig.messaging().consumer().enabled()
+    }
 
     // Outbox processing configuration
-    private val outboxConf by lazy { lemlineConfig.retry().outbox() }
-    override val outboxBatchSize by lazy { outboxConf.batchSize() }
-    override val outboxMaxAttempts by lazy { outboxConf.maxAttempts() }
-    override val outboxInitialDelay by lazy { outboxConf.initialDelay() }
-    override val outboxExecutionPeriod by lazy { outboxConf.every() }
+    private val outboxConf by lazy { lemlineConfig.outbox().retry().outbox() }
+    override val processingBatchSize by lazy { outboxConf.batchSize() }
+    override val processingMaxAttempts by lazy { outboxConf.maxAttempts() }
+    override val processingInitialDelayAttempt by lazy { outboxConf.initialDelay() }
+    override val processingPeriod by lazy { outboxConf.every() }
 
     // Cleanup configuration
-    private val cleanupConf by lazy { lemlineConfig.retry().cleanup() }
+    private val cleanupConf by lazy { lemlineConfig.outbox().retry().cleanup() }
     override val cleanupAfter by lazy { cleanupConf.after() }
     override val cleanupBatchSize by lazy { cleanupConf.batchSize() }
-    override val cleanupExecutionPeriod by lazy { cleanupConf.every() }
+    override val cleanupPeriod by lazy { cleanupConf.every() }
 }

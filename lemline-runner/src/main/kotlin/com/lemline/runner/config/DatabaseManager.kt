@@ -3,6 +3,7 @@ package com.lemline.runner.config
 
 import com.lemline.common.debug
 import com.lemline.common.logger
+import com.lemline.common.trace
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
@@ -20,7 +21,6 @@ import org.flywaydb.core.Flyway
 class DatabaseManager {
     private val log = logger()
 
-    @Inject
     @ConfigProperty(name = DATABASE_TYPE)
     internal lateinit var dbType: String
 
@@ -38,9 +38,9 @@ class DatabaseManager {
 
     val datasource: AgroalDataSource by lazy {
         log.debug { "Resolving datasource for type: $dbType" }
-        log.debug { "- PostgreSQL datasource resolvable: ${postgresDataSource.isResolvable}" }
-        log.debug { "-      MySQL datasource resolvable: ${mysqlDataSource.isResolvable}" }
-        log.debug { "-    Default datasource resolvable: ${h2DataSource.isResolvable}" }
+        log.trace { "- PostgreSQL datasource resolvable: ${postgresDataSource.isResolvable}" }
+        log.trace { "-      MySQL datasource resolvable: ${mysqlDataSource.isResolvable}" }
+        log.trace { "-    Default datasource resolvable: ${h2DataSource.isResolvable}" }
 
         when (dbType) {
             DB_TYPE_POSTGRESQL -> {

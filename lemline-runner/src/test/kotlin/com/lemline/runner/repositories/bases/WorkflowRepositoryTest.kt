@@ -4,11 +4,13 @@ package com.lemline.runner.repositories.bases
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.assertions.throwables.shouldNotThrowAny
+import io.kotest.common.runBlocking
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import jakarta.inject.Inject
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -45,7 +47,7 @@ abstract class WorkflowRepositoryTest {
      * The cleanup is performed within a transaction to ensure atomicity.
      */
     @BeforeEach
-    fun setupTest() {
+    fun setupTest() = runTest {
         repository.deleteAll()
     }
 
@@ -61,7 +63,7 @@ abstract class WorkflowRepositoryTest {
      * 3. All properties (id, name, version, definition) are preserved
      */
     @Test
-    fun `should successfully persist and retrieve a complete workflow model with all properties`() {
+    fun `should successfully persist and retrieve a complete workflow model with all properties`() = runTest {
         // Given
         val definitionModel = DefinitionModel(
             name = "test-workflow",
@@ -91,7 +93,7 @@ abstract class WorkflowRepositoryTest {
      * 3. The correct null response is returned
      */
     @Test
-    fun `should return null when querying for a non-existent workflow name and version combination`() {
+    fun `should return null when querying for a non-existent workflow name and version combination`() = runTest {
         // When
         val result = repository.findByNameAndVersion("non-existent", "1.0.0")
 
@@ -112,7 +114,7 @@ abstract class WorkflowRepositoryTest {
      * 3. Other properties remain unchanged
      */
     @Test
-    fun `should successfully insert a new workflow version`() {
+    fun `should successfully insert a new workflow version`() = runTest {
         // Given
         val original = DefinitionModel(
             name = "updatable-workflow",
@@ -139,7 +141,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `should successfully updating an existing workflow definition`() {
+    fun `should successfully updating an existing workflow definition`() = runTest {
         // Given
         val original = DefinitionModel(
             name = "updatable-workflow",
@@ -158,7 +160,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `should fail inserting a new workflow with same name and version`() {
+    fun `should fail inserting a new workflow with same name and version`() = runTest {
         // Given
         val original = DefinitionModel(
             name = "updatable-workflow",
@@ -183,7 +185,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `listByName should return all versions for a given name`() {
+    fun `listByName should return all versions for a given name`() = runTest {
         // Given
         val name = "multi-version-workflow"
         val workflowV1 = DefinitionModel(name = name, version = "1.0.0", definition = "def-v1")
@@ -201,7 +203,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `listByName should return an empty list if name does not exist`() {
+    fun `listByName should return an empty list if name does not exist`() = runTest {
         // Given
         val existingWorkflow = DefinitionModel(name = "existing", version = "1.0.0", definition = "def")
         repository.insert(existingWorkflow)
@@ -214,7 +216,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `listByName should return a single item list if only one version exists for the name`() {
+    fun `listByName should return a single item list if only one version exists for the name`() = runTest {
         // Given
         val name = "single-version-workflow"
         val workflowV1 = DefinitionModel(name = name, version = "1.0.0", definition = "def-v1")
@@ -231,7 +233,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `should successfully insert a batch of workflows`() {
+    fun `should successfully insert a batch of workflows`() = runTest {
         // Given
         val workflows = List(5) { i ->
             DefinitionModel(
@@ -257,7 +259,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `should successfully update a batch of workflows`() {
+    fun `should successfully update a batch of workflows`() = runTest {
         // Given
         val originals = List(5) { i ->
             DefinitionModel(
@@ -280,7 +282,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `should successfully update a batch of workflows, returning the number of success`() {
+    fun `should successfully update a batch of workflows, returning the number of success`() = runTest {
         // Given
         val originals = List(5) { i ->
             DefinitionModel(
@@ -316,7 +318,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `should successfully insert a batch of workflows, returning the number of success`() {
+    fun `should successfully insert a batch of workflows, returning the number of success`() = runTest {
         // Given
         val originals = List(5) { i ->
             DefinitionModel(
@@ -356,7 +358,7 @@ abstract class WorkflowRepositoryTest {
      * - All properties are correctly preserved
      */
     @Test
-    fun `should retrieve workflow by ID`() {
+    fun `should retrieve workflow by ID`() = runTest {
         // Given
         val workflow = DefinitionModel(
             name = "id-test-workflow",
@@ -384,7 +386,7 @@ abstract class WorkflowRepositoryTest {
      * - All properties of each workflow are preserved
      */
     @Test
-    fun `should retrieve all workflows`() {
+    fun `should retrieve all workflows`() = runTest {
         // Given
         val workflows = List(3) { i ->
             DefinitionModel(
@@ -416,7 +418,7 @@ abstract class WorkflowRepositoryTest {
      * - No data corruption occurs during concurrent operations
      */
     @Test
-    fun `should handle concurrent access safely`() {
+    fun `should handle concurrent access safely`() = runTest {
         // Given
         val threadCount = 5
         val workflowsPerThread = 10
@@ -429,12 +431,14 @@ abstract class WorkflowRepositoryTest {
                         definition = "definition-$threadIndex-$i"
                     )
                 }
-                repository.insert(workflowsToPersist)
+                runBlocking {
+                    repository.insert(workflowsToPersist)
 
-                workflowsToPersist.forEach { workflow ->
-                    val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version)
-                    retrieved shouldNotBe null
-                    retrieved?.id shouldBe workflow.id
+                    workflowsToPersist.forEach { workflow ->
+                        val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version)
+                        retrieved shouldNotBe null
+                        retrieved?.id shouldBe workflow.id
+                    }
                 }
             }
         }
@@ -449,7 +453,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `delete should remove an existing workflow`() {
+    fun `delete should remove an existing workflow`() = runTest {
         // Given
         val workflow = DefinitionModel(name = "to-delete", version = "1.0.0", definition = "delete-me")
         repository.insert(workflow)
@@ -463,7 +467,7 @@ abstract class WorkflowRepositoryTest {
     }
 
     @Test
-    fun `delete should return 0 if workflow does not exist`() {
+    fun `delete should return 0 if workflow does not exist`() = runTest {
         // Given
         val existingWorkflow = DefinitionModel(name = "existing", version = "1.0.0", definition = "def")
         val nonExistentWorkflow = DefinitionModel(name = "non-existent", version = "1.0.0", definition = "def")

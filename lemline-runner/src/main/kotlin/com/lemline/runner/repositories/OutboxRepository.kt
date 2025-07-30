@@ -119,7 +119,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      * @param maxAttempts Maximum number of retry attempts allowed
      * @return List of locked messages ready for processing
      */
-    fun findMessagesToProcess(maxAttempts: Int, limit: Int, connection: Connection? = null): List<T> {
+    suspend fun findMessagesToProcess(maxAttempts: Int, limit: Int, connection: Connection? = null): List<T> {
         val sql = """
             SELECT * FROM $tableName
             WHERE status = ?
@@ -152,7 +152,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      * @param limit Maximum number of messages to retrieve
      * @return List of locked messages ready for deletion
      */
-    fun findMessagesToDelete(cutoffDate: Instant, limit: Int, connection: Connection? = null): List<T> {
+    suspend fun findMessagesToDelete(cutoffDate: Instant, limit: Int, connection: Connection? = null): List<T> {
         val sql = """
             SELECT * FROM $tableName
             WHERE status = ?

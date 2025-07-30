@@ -9,7 +9,6 @@ import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
-import java.time.Instant
 import kotlin.reflect.KClass
 
 /**
@@ -32,6 +31,5 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitModel>() {
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = WaitModel(
         message = "Test Wait Message: $payload",
-        delayedUntil = Instant.now() // Ensure ready for processing
     )
 }

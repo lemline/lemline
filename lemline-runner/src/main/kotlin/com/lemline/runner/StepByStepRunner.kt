@@ -104,7 +104,7 @@ internal class StepByStepRunner @Inject constructor(
      * @return Always returns null to indicate that the processing of the current workflow instance
      *         has been stopped post-handling of the child workflow setup.
      */
-    private fun WorkflowInstance.onRunWorkflow(runWorkflow: RunWorkflow) {
+    private suspend fun WorkflowInstance.onRunWorkflow(runWorkflow: RunWorkflow) {
 
         // in the same transaction, we need to insert the parent workflow (waiting) and the child workflow (running)
         runWorkflowRepository.withTransaction { connection ->
@@ -143,7 +143,7 @@ internal class StepByStepRunner @Inject constructor(
      * the workflow by performing the necessary cleanup or post-processing actions as applicable.
      * Once this method is called, no further processing will occur for the current workflow instance.
      */
-    private fun WorkflowInstance.onWorkflowCompleted() {
+    private suspend fun WorkflowInstance.onWorkflowCompleted() {
         if (parent?.isWaiting == true) {
             // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
             val runModel = runWorkflowRepository.findById(parent!!.workflowId)!!
@@ -169,7 +169,7 @@ internal class StepByStepRunner @Inject constructor(
      * halted temporarily, with the expectation that further processing will be resumed asynchronously
      * via an external mechanism like an outbox system.
      */
-    private fun WorkflowInstance.onRetry() {
+    private suspend fun WorkflowInstance.onRetry() {
         val delay = (current as TryInstance).delay?.toJavaDuration()
 
         val retryModel = RetryModel(
@@ -187,7 +187,7 @@ internal class StepByStepRunner @Inject constructor(
      * The workflow instance's processing is halted temporarily, and further processing is expected to resume
      * asynchronously through an external mechanism such as an outbox system.
      */
-    private fun WorkflowInstance.onWait(delay: Duration) {
+    private suspend fun WorkflowInstance.onWait(delay: Duration) {
         val waitModel = WaitModel(
             message = toMessage().toJsonString(),
             delayedUntil = Instant.now().plus(delay.toJavaDuration()),

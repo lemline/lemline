@@ -59,9 +59,7 @@ interface LemlineConfiguration {
     fun config(): Optional<String>
     fun database(): DatabaseConfig
     fun messaging(): MessagingConfig
-    fun wait(): WaitConfig
-    fun retry(): RetryConfig
-    fun runWorkflow(): RunWorkflowConfig
+    fun outbox(): OutboxConfig
     fun metrics(): MetricsConfig
 
     /**
@@ -406,38 +404,48 @@ interface LemlineConfiguration {
         fun sslEnabled(): Optional<Boolean>
     }
 
+    interface OutboxConfig {
+        fun enabled(): Optional<Boolean>
+        fun wait(): WaitOutboxConfig
+        fun retry(): RetryOutboxConfig
+        fun runWorkflow(): RunWorkflowOutboxConfig
+    }
+
     /**
      * Wait service configuration.
      * Controls the behavior of the wait message processing.
      */
-    interface WaitConfig {
-        fun outbox(): OutboxConfig
-        fun cleanup(): CleanupConfig
+    interface WaitOutboxConfig {
+        fun enabled(): Optional<Boolean>
+        fun outbox(): OutboxProcessingConfig
+        fun cleanup(): OutboxCleanupConfig
     }
 
     /**
      * Retry service configuration.
      * Controls the behavior of the retry message processing.
      */
-    interface RetryConfig {
-        fun outbox(): OutboxConfig
-        fun cleanup(): CleanupConfig
+    interface RetryOutboxConfig {
+        fun enabled(): Optional<Boolean>
+        fun outbox(): OutboxProcessingConfig
+        fun cleanup(): OutboxCleanupConfig
     }
 
     /**
      * Run Workflow service configuration.
      * Controls the behavior of the run workflow message processing.
      */
-    interface RunWorkflowConfig {
-        fun outbox(): OutboxConfig
-        fun cleanup(): CleanupConfig
+    interface RunWorkflowOutboxConfig {
+        fun enabled(): Optional<Boolean>
+        fun outbox(): OutboxProcessingConfig
+        fun cleanup(): OutboxCleanupConfig
     }
 
     /**
      * Outbox pattern configuration.
      * Controls the behavior of message processing in the outbox pattern.
      */
-    interface OutboxConfig {
+    interface OutboxProcessingConfig {
         /**
          * Processing interval
          * Default: 10 second
@@ -473,7 +481,7 @@ interface LemlineConfiguration {
      * Cleanup configuration.
      * Controls the behavior of message cleanup in the outbox pattern.
      */
-    interface CleanupConfig {
+    interface OutboxCleanupConfig {
         /**
          * Cleanup interval
          * Default: 1 hour
