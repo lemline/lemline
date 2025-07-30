@@ -8,6 +8,7 @@ import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import java.io.File
+import kotlinx.coroutines.runBlocking
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
@@ -53,7 +54,7 @@ class DefinitionPostCommand : Runnable {
     )
     var force: Boolean = false
 
-    override fun run() {
+    override fun run() = runBlocking {
 
         // Validate that the recursive option is used with directories
         if (recursive && directories.isEmpty()) {
@@ -82,7 +83,7 @@ class DefinitionPostCommand : Runnable {
         }
     }
 
-    private fun processSingleFile(file: File) {
+    private suspend fun processSingleFile(file: File) {
         if (!file.exists()) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
@@ -98,7 +99,7 @@ class DefinitionPostCommand : Runnable {
         processWorkflowFile(file)
     }
 
-    internal fun processDirectory(directory: File) {
+    internal suspend fun processDirectory(directory: File) {
         if (!directory.exists()) {
             throw CommandLine.ParameterException(
                 CommandLine(this),
@@ -132,7 +133,7 @@ class DefinitionPostCommand : Runnable {
     /**
      * Processes a single workflow definition file.
      */
-    internal fun processWorkflowFile(file: File) {
+    internal suspend fun processWorkflowFile(file: File) {
         val prefix = "  ->"
         try {
             val content = file.readText()

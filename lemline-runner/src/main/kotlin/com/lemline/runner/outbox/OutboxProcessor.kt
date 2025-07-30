@@ -9,14 +9,15 @@ import com.lemline.runner.repositories.OutboxRepository
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import kotlin.random.Random
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import org.jetbrains.annotations.VisibleForTesting
 import org.slf4j.Logger
 
 /**
  * OutboxProcessor is a generic processor for handling outbox pattern operations.
  * It provides a reusable implementation for processing and managing messages in an outbox table,
- * supporting both wait and retry scenarios.
  *
  * The processor implements the outbox pattern to ensure reliable message delivery by:
  * 1. Storing messages in a database before attempting to send them
@@ -39,7 +40,7 @@ import org.slf4j.Logger
 internal class OutboxProcessor<T : OutboxModel>(
     private val logger: Logger,
     private val repository: OutboxRepository<T>,
-    private val processor: (T) -> Unit,
+    private val processor: suspend (T) -> Unit,
 ) {
     /**
      * Processes messages from the outbox table in batches.
@@ -65,68 +66,75 @@ internal class OutboxProcessor<T : OutboxModel>(
      * @param maxAttempts Maximum number of attempts before giving up (>=1)
      * @param initialDelay Initial delay in seconds before first retry
      */
-    fun process(batchSize: Int, maxAttempts: Int, initialDelay: Duration) = try {
-        repository.withTransaction { connection ->
-            var totalProcessed = 0
-            var batchNumber = 0
-            var consecutiveEmptyBatches = 0
-            val maxConsecutiveEmptyBatches = 3 // Prevent infinite loops
+    suspend fun process(batchSize: Int, maxAttempts: Int, initialDelay: Duration) = try {
+        var totalToProcess = 0
+        var totalProcessed = 0
+        var batchNumber = 0
 
-            while (consecutiveEmptyBatches < maxConsecutiveEmptyBatches) {
+        do {
+            batchNumber++
+            var toProcess = 0
+            // Find and process messages in the same transaction
+            repository.withTransaction { connection ->
                 // Find and lock messages ready to process
                 val messages = repository.findMessagesToProcess(maxAttempts, batchSize, connection)
+                toProcess = messages.size
 
-                if (messages.isEmpty()) {
-                    logger.debug { "Empty processing batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
-                    consecutiveEmptyBatches++
-                    Thread.sleep(Random.nextLong(10, 200))
-                    continue
-                }
+                if (toProcess > 0) {
+                    totalToProcess += toProcess
+                    logger.debug { "Processing batch $batchNumber of $toProcess messages" }
 
-                consecutiveEmptyBatches = 0
-                batchNumber++
-                logger.debug { "Processing batch $batchNumber with ${messages.size} messages" }
-
-                for (message in messages) {
-                    try {
-                        // Increment attempt count
-                        message.attemptCount++
-                        // Process the message
-                        processor(message)
-                        // Update the status to SENT in the same transaction
-                        message.status = OutBoxStatus.SENT
-                        logger.debug { "Successfully processed message ${message.id}" }
-                        totalProcessed++
-                    } catch (e: Exception) {
-                        logger.warn(e) { "Failed to process message ${message.id}: ${e.message}" }
-                        message.lastError = e.message ?: "Unknown error"
-
-                        if (message.attemptCount >= maxAttempts) {
-                            message.status = OutBoxStatus.FAILED
-                            logger.error { "Message ${message.id} has reached maximum retry attempts" }
-                        } else {
-                            // Calculate next retry time using exponential backoff
-                            val nextDelay = calculateNextAttemptDelay(message.attemptCount, initialDelay)
-                            message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.MILLIS)
-                            logger.debug {
-                                "Message ${message.id} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})"
-                            }
+                    // Process each message in a separate coroutine for improved performance
+                    val processed = coroutineScope {
+                        messages.map {
+                            async { processMessage(it, maxAttempts, initialDelay) }
                         }
-                    }
-                }
-                // update the messages in the same transaction
-                repository.update(messages, connection)
-            }
+                    }.awaitAll().count { it }
 
-            if (totalProcessed > 0) {
-                logger.debug { "Completed processing $totalProcessed messages in $batchNumber batches" }
+                    // once done, update the messages in the same transaction
+                    repository.update(messages, connection)
+
+                    totalProcessed += processed
+                    logger.debug { "Processed batch $batchNumber with $processed/$toProcess messages processed successfully" }
+                }
             }
-        }
+        } while (toProcess >= batchSize)
+
+        logger.debug { "Processed all $batchNumber batches with $totalProcessed/$totalToProcess messages processed successfully" }
     } catch (e: Exception) {
-        logger.error(e) { "Error processing delayed messages: ${e.message}" }
+        logger.error(e) { "💥Error during scheduled outbox processing" }
         // Don't throw the exception to prevent scheduler from stopping
         // The next scheduled run will try again
     }
+
+    /**
+     * Processes a given message with retry handling, exponential backoff, and status update.
+     *
+     * The method increments the message's attempt count, processes the message,
+     * and updates its status accordingly. If the processing fails, it implements
+     * retries with a delayed schedule based on exponential backoff. Once the maximum
+     * attempts have been reached, the message's status is set to FAILED.
+     */
+    private suspend fun processMessage(message: T, maxAttempts: Int, initialDelay: Duration): Boolean = try {
+        message.attemptCount++
+        processor(message)
+        message.status = OutBoxStatus.SENT
+        true // <- return true (success)
+    } catch (e: Exception) {
+        logger.warn(e) { "Failed to process message ${message.id}" }
+        message.lastError = e.stackTraceToString()
+
+        if (message.attemptCount >= maxAttempts) {
+            message.status = OutBoxStatus.FAILED
+            logger.error { "Message ${message.id} has reached maximum retry attempts" }
+        } else {
+            val nextDelay = calculateNextAttemptDelay(message.attemptCount, initialDelay)
+            message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.MILLIS)
+            logger.debug { "Message ${message.id} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})" }
+        }
+        false // <- return false (failure)
+    }
+
 
     /**
      * Cleans up old sent messages from the outbox table.
@@ -142,45 +150,37 @@ internal class OutboxProcessor<T : OutboxModel>(
      * @param afterDelay Delay after which sent messages should be deleted
      * @param batchSize Maximum number of messages to delete in one batch
      */
-    fun cleanup(afterDelay: Duration, batchSize: Int) = try {
-        repository.withTransaction { connection ->
-            val cutoffDate = Instant.now().minusMillis(afterDelay.toMillis())
-            var totalDeleted = 0
-            var batchNumber = 0
-            var consecutiveEmptyBatches = 0
-            val maxConsecutiveEmptyChunks = 3 // Prevent infinite loops
+    suspend fun cleanup(afterDelay: Duration, batchSize: Int) = try {
 
-            while (consecutiveEmptyBatches < maxConsecutiveEmptyChunks) {
-                // Find and lock a chunk of messages for deletion
-                val messagesToDelete = repository.findMessagesToDelete(cutoffDate, batchSize, connection)
-                logger.debug { "Cleaned up chunk $batchNumber: retrieved ${messagesToDelete.size} messages to delete" }
+        val cutoffDate = Instant.now().minusMillis(afterDelay.toMillis())
 
-                if (messagesToDelete.isEmpty()) {
-                    logger.debug { "Empty cleaning batch $batchNumber ($consecutiveEmptyBatches consecutive)" }
-                    consecutiveEmptyBatches++
-                    Thread.sleep(Random.nextLong(10, 200))
-                    continue
-                }
+        var totalToDelete = 0
+        var totalDeleted = 0
+        var batchNumber = 0
 
-                consecutiveEmptyBatches = 0
-                batchNumber++
-                val chunkDeleted = messagesToDelete.size
+        do {
+            batchNumber++
+            var toDelete = 0
+            // Find and delete messages in the same transaction
+            repository.withTransaction { connection ->
+                val messages = repository.findMessagesToDelete(cutoffDate, batchSize, connection)
+                toDelete = messages.size
 
-                // Delete the chunk
-                repository.delete(messagesToDelete, connection)
-                totalDeleted += chunkDeleted
-
-                logger.debug { "Cleaned up chunk $batchNumber: $chunkDeleted messages (total: $totalDeleted)" }
-            }
-
-            if (totalDeleted > 0) {
-                logger.debug {
-                    "Completed cleanup of $totalDeleted messages in $batchNumber chunks (older than $cutoffDate)"
+                if (toDelete > 0) {
+                    totalToDelete += toDelete
+                    logger.debug { "Deleting batch $batchNumber with $toDelete messages" }
+                    val deleted = repository.delete(messages, connection)
+                    totalDeleted += deleted
+                    logger.debug { "Deleted batch $batchNumber with $toDelete/$deleted messages successfully deleted" }
                 }
             }
+        } while (toDelete >= batchSize)
+
+        logger.debug {
+            "Deleted all $batchNumber batches with $totalDeleted/$totalToDelete messages successfully deleted (older than $cutoffDate)"
         }
     } catch (e: Exception) {
-        logger.error(e) { "Error during cleanup of delayed messages: ${e.message}" }
+        logger.error(e) { "💥 Error during scheduled outbox cleanup" }
         // Don't throw the exception to prevent scheduler from stopping
         // The next scheduled run will try again
     }

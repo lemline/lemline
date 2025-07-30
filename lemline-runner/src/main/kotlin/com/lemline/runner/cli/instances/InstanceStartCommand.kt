@@ -7,7 +7,6 @@ import com.lemline.core.nodes.NodePosition
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.cli.GlobalMixin
-import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.messaging.Message
 import com.lemline.runner.messaging.WORKFLOW_OUT
 import com.lemline.runner.models.DefinitionModel
@@ -15,6 +14,7 @@ import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import kotlin.system.exitProcess
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonElement
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
@@ -35,9 +35,6 @@ class InstanceStartCommand : Runnable {
 
     @Inject
     lateinit var definitionRepository: DefinitionRepository
-
-    @Inject
-    lateinit var selector: InteractiveWorkflowSelector
 
     @Inject
     @Channel(WORKFLOW_OUT)
@@ -63,7 +60,7 @@ class InstanceStartCommand : Runnable {
     )
     var input: String? = null
 
-    override fun run() {
+    override fun run() = runBlocking {
         if (name.isNullOrBlank()) error("Workflow name must be provided")
 
         // Parse input JSON if provided, or use an empty object if not provided.
@@ -114,7 +111,7 @@ class InstanceStartCommand : Runnable {
         }
     }
 
-    private fun getDefinition(name: String, version: String?): DefinitionModel = version?.let {
+    private suspend fun getDefinition(name: String, version: String?): DefinitionModel = version?.let {
         definitionRepository.findByNameAndVersion(name, it)
             ?: error("Workflow with name '$name' and version '$it' not found")
     } ?: run {

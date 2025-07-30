@@ -3,12 +3,12 @@ package com.lemline.runner.cli.instances
 
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
-import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.messaging.Message
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
@@ -18,6 +18,7 @@ import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.lang.reflect.Field
 import java.util.concurrent.CompletableFuture
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
@@ -35,7 +36,6 @@ class InstanceStartCommandTest {
 
     private lateinit var command: InstanceStartCommand
     private lateinit var definitionRepository: DefinitionRepository
-    private lateinit var selector: InteractiveWorkflowSelector
     private lateinit var emitter: Emitter<String>
 
     private lateinit var workflowName: String
@@ -49,16 +49,14 @@ class InstanceStartCommandTest {
     private val messageSlot = slot<String>()
 
     @BeforeEach
-    fun setup() {
+    fun setup() = runTest {
         // Create mocks
         definitionRepository = mockk()
-        selector = mockk()
         emitter = mockk()
 
         // Create command and inject mocks
         command = InstanceStartCommand()
         injectField(command, "definitionRepository", definitionRepository)
-        injectField(command, "selector", selector)
         injectField(command, "emitter", emitter)
 
         workflowName = "testWorkflow"
@@ -78,8 +76,8 @@ class InstanceStartCommandTest {
             """.trimIndent()
         )
 
-        every { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
-        every { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
+        coEvery { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
+        coEvery { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
         every { emitter.send(any<String>()) } returns CompletableFuture.completedFuture(null)
 
         // Save original streams
@@ -329,7 +327,7 @@ class InstanceStartCommandTest {
         private lateinit var workflowWithSchema: DefinitionModel
 
         @BeforeEach
-        fun setupSchemaTest() {
+        fun setupSchemaTest() = runTest {
             // Create a workflow with schema validation
             workflowWithSchema = DefinitionModel(
                 name = workflowName,
@@ -360,7 +358,7 @@ class InstanceStartCommandTest {
             )
 
             // Configure repository to return this workflow
-            every {
+            coEvery {
                 definitionRepository.findByNameAndVersion(
                     workflowName,
                     workflowVersion

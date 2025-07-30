@@ -21,9 +21,9 @@ class LemlineConfigurationTest {
         assertEquals(DB_TYPE_IN_MEMORY, lemlineConfig.database().type())
         assertEquals(MSG_TYPE_IN_MEMORY, lemlineConfig.messaging().type())
 
-        assertEquals(5, lemlineConfig.retry().outbox().maxAttempts())
-        assertEquals(1000, lemlineConfig.retry().outbox().batchSize())
-        assertEquals(Duration.ofSeconds(30), lemlineConfig.retry().outbox().initialDelay().toDuration())
-        assertEquals(Duration.ofHours(1), lemlineConfig.wait().cleanup().every().toDuration())
+        assertEquals(5, lemlineConfig.outbox().retry().outbox().maxAttempts())
+        assertEquals(1000, lemlineConfig.outbox().retry().outbox().batchSize())
+        assertEquals(Duration.ofSeconds(30), lemlineConfig.outbox().retry().outbox().initialDelay().toDuration())
+        assertEquals(Duration.ofHours(1), lemlineConfig.outbox().wait().cleanup().every().toDuration())
     }
 }

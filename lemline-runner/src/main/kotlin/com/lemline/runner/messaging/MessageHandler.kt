@@ -264,7 +264,7 @@ internal class MessageHandler @Inject constructor(
         else -> PROCESSING_ERROR
     }
 
-    private fun saveMsgAsFailed(
+    private suspend fun saveMsgAsFailed(
         current: ReactiveMessage<String>,
         next: String,
         cause: Exception?,
@@ -285,7 +285,7 @@ internal class MessageHandler @Inject constructor(
         nack(current, e, workflowName, workflowVersion)
     }
 
-    private fun saveMsgForRetry(
+    private suspend fun saveMsgForRetry(
         current: ReactiveMessage<String>,
         next: String,
         cause: Exception,

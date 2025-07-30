@@ -293,21 +293,12 @@ Execute the test suite using:
 ./gradlew :lemline-runner:test
 ```
 
-By default, tests run using a specific configuration profile defined in the test resources. You can run tests against
-different configurations by activating specific Quarkus test profiles:
-
-```bash
-# Example: Running tests with a specific profile (adjust profile name)
-./gradlew :lemline-runner:test -Dquarkus.test.profile=mysql-test
-```
-
 Refer to the `build.gradle.kts` and test configuration files for the exact profile names and setup.
 
 ## 🔗 Dependencies
 
 * **`lemline-core`:** Provides the Serverless Workflow DSL models and core logic used by the runner.
 * **Quarkus:** The runtime framework.
-* **Hibernate/Panache:** For database interaction.
 * **SmallRye Reactive Messaging:** For Kafka/RabbitMQ integration.
 * **Flyway:** For database migrations.
 * **Kotlin Coroutines:** For asynchronous operations. 

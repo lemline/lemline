@@ -20,6 +20,7 @@ import java.util.concurrent.TimeUnit.SECONDS
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -57,7 +58,7 @@ internal abstract class WorkflowConsumerTest {
     lateinit var messageConsumer: MessageHandler
 
     @BeforeEach
-    fun setup() {
+    fun setup() = runTest {
         // Clear the database
         definitionRepository.deleteAll()
         retryRepository.deleteAll()
@@ -157,7 +158,7 @@ internal abstract class WorkflowConsumerTest {
      * - Verifies that *no* messages were stored in the retry or wait repositories, as the workflow executed directly.
      */
     @Test
-    fun `should process valid workflow message and send to output topic`() {
+    fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
         val message = Message.newInstance(
             name = "test-workflow",
@@ -201,7 +202,7 @@ internal abstract class WorkflowConsumerTest {
      * - Verifies that the wait repository remains empty.
      */
     @Test
-    fun `invalid message should be stored in retry table as Failed`() {
+    fun `invalid message should be stored in retry table as Failed`() = runTest {
         // Given
         val invalidMessage = "invalid json message"
 
@@ -239,7 +240,7 @@ internal abstract class WorkflowConsumerTest {
      * - Asserts the attempt count is 0 initially.
      */
     @Test
-    fun `should store instance with retry in retry repository`() {
+    fun `should store instance with retry in retry repository`() = runTest {
         // Given
         val message = Message.newInstance(
             "test-workflow",
@@ -280,7 +281,7 @@ internal abstract class WorkflowConsumerTest {
      * - Asserts that the `delayedUntil` timestamp is set correctly (approximately 30 seconds in the future, based on the test workflow definition).
      */
     @Test
-    fun `should store waiting instance in wait repository`() {
+    fun `should store waiting instance in wait repository`() = runTest {
         // Given
         val message = Message.newInstance(
             "test-workflow",
@@ -329,7 +330,7 @@ internal abstract class WorkflowConsumerTest {
      * - Verifies that both the retry and wait repositories remain empty.
      */
     @Test
-    fun `should handle completed workflow without sending message`() {
+    fun `should handle completed workflow without sending message`() = runTest {
         // Given
         val message = Message.newInstance(
             "test-workflow",

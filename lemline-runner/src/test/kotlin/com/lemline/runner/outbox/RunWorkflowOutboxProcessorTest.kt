@@ -17,24 +17,20 @@ import kotlin.reflect.KClass
  */
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class RunOutboxProcessorTest : OutboxProcessorTest<RunWorkflowModel>() {
+internal class RunWorkflowOutboxProcessorTest : OutboxProcessorTest<RunWorkflowModel>() {
 
     @Inject // Inject the specific repository
     lateinit var runWorkflowRepository: RunWorkflowRepository
 
     // Implement the abstract repository property
-    override val testRepository: OutboxRepository<RunWorkflowModel>
-        get() = runWorkflowRepository
+    override val testRepository: OutboxRepository<RunWorkflowModel> by lazy { runWorkflowRepository }
 
     // Implement the abstract KClass property
     override val modelClass: KClass<RunWorkflowModel> = RunWorkflowModel::class
 
     // Implement the abstract factory method
-    override fun createTestModel(payload: String): RunWorkflowModel {
-        // Use the RunModel companion object factory method
-        return RunWorkflowModel(
-            message = "Test Retry Message: $payload",
-            delayedUntil = Instant.now() // Ensure ready for processing
-        )
-    }
+    override fun createTestModel(payload: String) = RunWorkflowModel(
+        message = "Test Run Workflow Message: $payload",
+        delayedUntil = Instant.now()
+    )
 }

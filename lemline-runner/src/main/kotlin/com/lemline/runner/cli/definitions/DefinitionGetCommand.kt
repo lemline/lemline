@@ -9,6 +9,7 @@ import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
+import kotlinx.coroutines.runBlocking
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
@@ -58,7 +59,7 @@ class DefinitionGetCommand : Runnable {
     )
     var format: OutputFormat = OutputFormat.YAML
 
-    override fun run() {
+    override fun run() = runBlocking {
 
         try {
             if (name != null && version != null) {
@@ -66,7 +67,7 @@ class DefinitionGetCommand : Runnable {
                 val selectedWorkflow = definitionRepository.findByNameAndVersion(name!!, version!!)
                 if (selectedWorkflow == null) {
                     System.err.println("ERROR: Workflow '$name' version '$version' not found.")
-                    return // Exit if direct fetch fails
+                    return@runBlocking // Exit if direct fetch fails
                 }
                 displayWorkflowDefinition(selectedWorkflow)
             } else {
@@ -74,12 +75,12 @@ class DefinitionGetCommand : Runnable {
 
                 // Prepare selection (displays the list if needed)
                 val selectionList = selector.prepareSelection(filterName = name)
-                    ?: return // Exit if nothing found
+                    ?: return@runBlocking // Exit if nothing found
 
                 // Handle a single result directly
                 if (selectionList.size == 1) {
                     displayWorkflowDefinition(selectionList.first().second)
-                    return // Only one option, so we exit after displaying
+                    return@runBlocking // Only one option, so we exit after displaying
                 }
 
                 // --- Prompt loop if multiple results ---
