@@ -39,6 +39,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
+          # Authenticate GitHub CLI, do not fail if gh is missing or token is invalid
+          if command -v gh >/dev/null 2>&1; then
+            echo "$GITHUB_TOKEN" | gh auth login --with-token || echo "⚠️ gh login failed"
+            gh auth status || echo "⚠️ gh status failed"
+          else
+            echo "⚠️ GitHub CLI (gh) not found!"
+          fi
+          
           # Authenticate GitHub CLI (gh)
           echo "$GITHUB_TOKEN" | gh auth login --with-token >/dev/null 2>&1
           gh auth status
