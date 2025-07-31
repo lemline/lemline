@@ -147,7 +147,7 @@ jobs:
           ./gradlew -p lemline-runner quarkusBuild \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
-            -Dquarkus.native.native-image-xmx=6g
+            -Dquarkus.native.native-image-xmx=5g
 
       # **🍎 MacOS**
       - name: Build native image (MacOs)
@@ -156,7 +156,7 @@ jobs:
           ./gradlew -p lemline-runner quarkusBuild \
             -Dquarkus.native.enabled=true \
             -Dquarkus.package.jar.enabled=false \
-            -Dquarkus.native.native-image-xmx=7g 
+            -Dquarkus.native.native-image-xmx=5g 
 
       # **🪟 Windows**
       - name: Build native image (Windows)
@@ -166,7 +166,7 @@ jobs:
           gradlew.bat -p lemline-runner quarkusBuild ^
             -Dquarkus.native.enabled=true ^
             -Dquarkus.package.jar.enabled=false ^
-            -Dquarkus.native.native-image-xmx=6g
+            -Dquarkus.native.native-image-xmx=5g
 
       #################################
       # 6) Packaging
