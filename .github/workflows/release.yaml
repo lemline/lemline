@@ -48,7 +48,7 @@ jobs:
           # Resolve workflow id
           WORKFLOW_ID=$(gh api repos/${{ github.repository }}/actions/workflows \
             --jq '.workflows[] | select(.name=="${{ github.workflow }}") | .id')
-          echo "Workflow name: ${{ github.workflow }}", Workflow Id: $WORKFLOW_ID"
+          echo "Workflow name: ${{ github.workflow }}, Workflow Id: $WORKFLOW_ID"
           
           echo "Checking for changes on branch '${{ github.ref_name }}'..."
           
@@ -72,8 +72,6 @@ jobs:
           fi
           
           echo "changed=$BUILD_REQUIRED" >> "$GITHUB_OUTPUT"
-  
-  
 
   build:
     needs: check-changes
