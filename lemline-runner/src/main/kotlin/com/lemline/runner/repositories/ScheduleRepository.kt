@@ -2,7 +2,8 @@
 package com.lemline.runner.repositories
 
 import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.models.WAIT_TABLE
+import com.lemline.runner.models.SCHEDULE_TABLE
+import com.lemline.runner.models.ScheduleModel
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
@@ -24,14 +25,17 @@ import java.sql.ResultSet
  * @see OutboxProcessor for the processing logic
  */
 @ApplicationScoped
-internal class WaitRepository : OutboxRepository<WaitModel>() {
+internal class ScheduleRepository : OutboxRepository<ScheduleModel>() {
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
-    override val tableName = WAIT_TABLE
+    override val tableName = SCHEDULE_TABLE
 
-    override fun createModel(rs: ResultSet) = WaitModel(
+    override fun createModel(rs: ResultSet) = ScheduleModel(
         id = rs.getString("id"),
+        cron = rs.getString("cron"),
+        after = rs.getString("after"),
+        every = rs.getString("every"),
         message = rs.getString("message"),
         status = OutBoxStatus.valueOf(rs.getString("status")),
         delayedUntil = rs.getInstant("delayed_until"),

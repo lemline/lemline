@@ -3,8 +3,8 @@ package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.WORKFLOW_OUT
-import com.lemline.runner.models.RunWorkflowModel
-import com.lemline.runner.repositories.RunWorkflowRepository
+import com.lemline.runner.models.ScheduleModel
+import com.lemline.runner.repositories.ScheduleRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -13,14 +13,14 @@ import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
 /**
- * RunOutbox is responsible for processing and managing run messages in the system.
+ * ScheduleOutbox is responsible for processing and managing wait messages in the system.
  * It extends AbstractOutbox to leverage the common outbox pattern implementation.
  *
- * This class specifically handles run messages with configuration optimized for
- * the run use case, including
+ * This class specifically handles wait messages with configuration optimized for
+ * the wait use case, including
  * - Processing batch size
  * - Maximum retry attempts
- * - Initial delay between runs
+ * - Initial delay between retries
  * - Cleanup retention period
  *
  * @see AbstractOutbox for the base implementation
@@ -28,7 +28,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
  */
 @Startup
 @ApplicationScoped
-internal class RunWorkflowOutbox : AbstractOutbox<RunWorkflowModel>() {
+internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
 
     @Channel(WORKFLOW_OUT)
     override lateinit var emitter: Emitter<String>
@@ -37,17 +37,17 @@ internal class RunWorkflowOutbox : AbstractOutbox<RunWorkflowModel>() {
     private lateinit var lemlineConfig: LemlineConfiguration
 
     @Inject
-    override lateinit var repository: RunWorkflowRepository
+    override lateinit var repository: ScheduleRepository
 
     override val enabled by lazy {
-        lemlineConfig.outbox().retry().enabled().getOrNull()
+        lemlineConfig.outbox().schedule().enabled().getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()
             ?: lemlineConfig.messaging().consumer().enabled()
     }
 
     // Outbox processing configuration
-    override val outboxConf by lazy { lemlineConfig.outbox().runWorkflow().outbox() }
+    override val outboxConf by lazy { lemlineConfig.outbox().schedule().outbox() }
 
     // Cleanup configuration
-    override val cleanupConf by lazy { lemlineConfig.outbox().runWorkflow().cleanup() }
+    override val cleanupConf by lazy { lemlineConfig.outbox().schedule().cleanup() }
 }

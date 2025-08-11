@@ -46,15 +46,8 @@ internal class RetryOutbox : AbstractOutbox<RetryModel>() {
     }
 
     // Outbox processing configuration
-    private val outboxConf by lazy { lemlineConfig.outbox().retry().outbox() }
-    override val processingBatchSize by lazy { outboxConf.batchSize() }
-    override val processingMaxAttempts by lazy { outboxConf.maxAttempts() }
-    override val processingInitialDelayAttempt by lazy { outboxConf.initialDelay() }
-    override val processingPeriod by lazy { outboxConf.every() }
+    override val outboxConf by lazy { lemlineConfig.outbox().retry().outbox() }
 
     // Cleanup configuration
-    private val cleanupConf by lazy { lemlineConfig.outbox().retry().cleanup() }
-    override val cleanupAfter by lazy { cleanupConf.after() }
-    override val cleanupBatchSize by lazy { cleanupConf.batchSize() }
-    override val cleanupPeriod by lazy { cleanupConf.every() }
+    override val cleanupConf by lazy { lemlineConfig.outbox().retry().cleanup() }
 }

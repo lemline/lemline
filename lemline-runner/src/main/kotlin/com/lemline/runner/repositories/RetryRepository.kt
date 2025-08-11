@@ -7,7 +7,7 @@ import com.lemline.runner.models.RetryModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.time.Instant
+import java.sql.ResultSet
 
 /**
  * Repository for managing retry messages in the outbox pattern.
@@ -31,19 +31,12 @@ internal class RetryRepository : OutboxRepository<RetryModel>() {
 
     override val tableName = RETRY_TABLE
 
-    override fun createModel(
-        id: String,
-        message: String,
-        status: OutBoxStatus,
-        delayedUntil: Instant?,
-        attemptCount: Int,
-        lastError: String?,
-    ) = RetryModel(
-        id = id,
-        message = message,
-        status = status,
-        delayedUntil = delayedUntil,
-        attemptCount = attemptCount,
-        lastError = lastError
+    override fun createModel(rs: ResultSet) = RetryModel(
+        id = rs.getString("id"),
+        message = rs.getString("message"),
+        status = OutBoxStatus.valueOf(rs.getString("status")),
+        delayedUntil = rs.getInstant("delayed_until"),
+        attemptCount = rs.getInt("attempt_count"),
+        lastError = rs.getString("last_error"),
     )
 }

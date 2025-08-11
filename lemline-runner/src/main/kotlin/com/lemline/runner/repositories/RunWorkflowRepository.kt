@@ -8,7 +8,7 @@ import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxProcessor
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.time.Instant
+import java.sql.ResultSet
 
 /**
  * Repository for managing run messages in the outbox pattern.
@@ -32,19 +32,12 @@ internal class RunWorkflowRepository : OutboxRepository<RunWorkflowModel>() {
 
     override val tableName = RUN_WORKFLOW_TABLE
 
-    override fun createModel(
-        id: String,
-        message: String,
-        status: OutBoxStatus,
-        delayedUntil: Instant?,
-        attemptCount: Int,
-        lastError: String?,
-    ) = RunWorkflowModel(
-        id = id,
-        message = message,
-        status = status,
-        delayedUntil = delayedUntil,
-        attemptCount = attemptCount,
-        lastError = lastError
+    override fun createModel(rs: ResultSet) = RunWorkflowModel(
+        id = rs.getString("id"),
+        message = rs.getString("message"),
+        status = OutBoxStatus.valueOf(rs.getString("status")),
+        delayedUntil = rs.getInstant("delayed_until"),
+        attemptCount = rs.getInt("attempt_count"),
+        lastError = rs.getString("last_error"),
     )
 }

@@ -2,7 +2,6 @@
 package com.lemline.runner.repositories
 
 import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
 import java.sql.Connection
@@ -76,42 +75,6 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
     }
 
     /**
-     * Creates a model instance from a ResultSet.
-     * Maps the database columns to the outbox model properties.
-     *
-     * @param rs The ResultSet containing the current row
-     * @return A new outbox model instance populated with data from the ResultSet
-     */
-    override fun createModel(rs: ResultSet): T = createModel(
-        id = rs.getString("id"),
-        message = rs.getString("message"),
-        status = OutBoxStatus.valueOf(rs.getString("status")),
-        delayedUntil = rs.getInstant("delayed_until"),
-        attemptCount = rs.getInt("attempt_count"),
-        lastError = rs.getString("last_error"),
-    )
-
-    /**
-     * Creates a new instance of the message model with the specified properties.
-     *
-     * @param id The unique identifier of the message
-     * @param message The message content
-     * @param status The current status of the message
-     * @param delayedUntil The timestamp when the message should be processed
-     * @param attemptCount The number of processing attempts made
-     * @param lastError The last error message, if any
-     * @return A new instance of the message model
-     */
-    abstract fun createModel(
-        id: String,
-        message: String,
-        status: OutBoxStatus,
-        delayedUntil: Instant?,
-        attemptCount: Int,
-        lastError: String?,
-    ): T
-
-    /**
      * Finds and locks messages that are ready to be processed.
      * This method uses a native SQL query with SKIP LOCKED because Hibernate does not support this feature.
      *
@@ -177,16 +140,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
 
     private fun ResultSet.toModels(): List<T> = buildList {
         while (next()) {
-            add(
-                createModel(
-                    id = getString("id"),
-                    message = getString("message"),
-                    status = OutBoxStatus.valueOf(getString("status")),
-                    attemptCount = getInt("attempt_count"),
-                    lastError = getString("last_error"),
-                    delayedUntil = getInstant("delayed_until"),
-                )
-            )
+            add(createModel(this@toModels))
         }
     }
 }

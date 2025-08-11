@@ -409,6 +409,7 @@ interface LemlineConfiguration {
         fun wait(): WaitOutboxConfig
         fun retry(): RetryOutboxConfig
         fun runWorkflow(): RunWorkflowOutboxConfig
+        fun schedule(): ScheduleOutboxConfig
     }
 
     /**
@@ -436,6 +437,16 @@ interface LemlineConfiguration {
      * Controls the behavior of the run workflow message processing.
      */
     interface RunWorkflowOutboxConfig {
+        fun enabled(): Optional<Boolean>
+        fun outbox(): OutboxProcessingConfig
+        fun cleanup(): OutboxCleanupConfig
+    }
+
+    /**
+     * Schedule service configuration.
+     * Controls the behavior of the schedule message processing.
+     */
+    interface ScheduleOutboxConfig {
         fun enabled(): Optional<Boolean>
         fun outbox(): OutboxProcessingConfig
         fun cleanup(): OutboxCleanupConfig

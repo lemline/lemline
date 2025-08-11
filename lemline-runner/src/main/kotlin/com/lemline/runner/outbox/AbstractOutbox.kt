@@ -3,6 +3,7 @@ package com.lemline.runner.outbox
 
 import com.lemline.common.error
 import com.lemline.common.logger
+import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.toDuration
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.OutboxRepository
@@ -40,17 +41,20 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
     protected abstract val enabled: Boolean
 
-    protected abstract val processingBatchSize: Int
-    protected abstract val processingPeriod: String
-    protected abstract val processingMaxAttempts: Int
-    protected abstract val processingInitialDelayAttempt: String
-
-    protected abstract val cleanupAfter: String
-    protected abstract val cleanupBatchSize: Int
-    protected abstract val cleanupPeriod: String
 
     protected abstract val repository: OutboxRepository<T>
     protected abstract val emitter: Emitter<String>
+
+    protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig
+    protected val processingBatchSize by lazy { outboxConf.batchSize() }
+    protected val processingMaxAttempts by lazy { outboxConf.maxAttempts() }
+    protected val processingInitialDelayAttempt by lazy { outboxConf.initialDelay() }
+    protected val processingPeriod by lazy { outboxConf.every() }
+
+    protected abstract val cleanupConf: LemlineConfiguration.OutboxCleanupConfig
+    protected val cleanupAfter by lazy { cleanupConf.after() }
+    protected val cleanupBatchSize by lazy { cleanupConf.batchSize() }
+    protected val cleanupPeriod by lazy { cleanupConf.every() }
 
     private val outboxProcessor by lazy {
         OutboxProcessor(
