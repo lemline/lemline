@@ -23,7 +23,7 @@ import io.serverlessworkflow.api.types.UriTemplate
  */
 internal fun NodeInstance<*>.getAuthenticationPolicyByName(name: String): AuthenticationPolicy =
     rootInstance.node.task.use?.authentications?.additionalProperties?.get(name)?.get()
-        ?: onError(CONFIGURATION, "Named authentification not found: $name", null, null)
+        ?: raiseError(CONFIGURATION, "Named authentification not found: $name", null, null)
 
 /**
  * Extracts authentication information from the endpoint configuration if available.
@@ -38,13 +38,13 @@ internal fun NodeInstance<*>.toAuthenticationPolicy(endpointUnion: Endpoint): Au
         // Expression
         is String -> null
         // Direct String or another unsupported type
-        else -> onError(RUNTIME, "Unsupported EndPoint type: ${endpoint.javaClass.name}")
+        else -> raiseError(RUNTIME, "Unsupported EndPoint type: ${endpoint.javaClass.name}")
     }
 
     return when (val authPolicy = authPolicyUnion?.get()) {
         null -> null
         is AuthenticationPolicyReference -> getAuthenticationPolicyByName(authPolicy.use)
         is AuthenticationPolicyUnion -> authPolicy.get()
-        else -> onError(RUNTIME, "Unsupported AuthenticationPolicy type: ${authPolicy.javaClass.name}")
+        else -> raiseError(RUNTIME, "Unsupported AuthenticationPolicy type: ${authPolicy.javaClass.name}")
     }
 }

@@ -24,7 +24,7 @@ internal fun NodeInstance<*>.toUrl(uriTemplate: UriTemplate): String = when (val
     is URI -> templateValue.toString()
     // TODO literalUriTemplate
     is String -> templateValue
-    else -> onError(RUNTIME, "Unsupported UriTemplate type: ${templateValue?.javaClass?.name}")
+    else -> raiseError(RUNTIME, "Unsupported UriTemplate type: ${templateValue?.javaClass?.name}")
 }
 
 /**

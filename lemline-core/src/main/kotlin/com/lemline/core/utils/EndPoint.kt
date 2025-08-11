@@ -17,9 +17,9 @@ internal fun NodeInstance<*>.toUrl(endpointUnion: Endpoint): String = when (val 
     is EndpointConfiguration -> when (val uriValue = endpoint.uri.get()) {
         is UriTemplate -> toUrl(uriValue)
         is String -> toUrl(uriValue)
-        else -> onError(RUNTIME, "Unsupported EndpointUri type: ${uriValue?.javaClass?.name}")
+        else -> raiseError(RUNTIME, "Unsupported EndpointUri type: ${uriValue?.javaClass?.name}")
     }
 
     is String -> toUrl(endpoint)
-    else -> onError(RUNTIME, "Unsupported Endpoint type: ${endpoint?.javaClass?.name}")
+    else -> raiseError(RUNTIME, "Unsupported Endpoint type: ${endpoint?.javaClass?.name}")
 }

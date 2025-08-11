@@ -83,6 +83,6 @@ internal suspend fun RunInstance.runShell(runShell: RunShell): JsonElement {
     } catch (e: Exception) {
         logError(e) { "Failed to execute shell command" }
         val errorMsg = "Shell command execution failed: ${e.message}"
-        onError(COMMUNICATION, errorMsg)
+        raiseError(COMMUNICATION, errorMsg)
     }
 }

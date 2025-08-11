@@ -36,19 +36,19 @@ internal suspend fun RunInstance.runScript(runScript: RunScript): JsonElement {
             val filePath = Paths.get(URI.create(uri))
             if (!Files.exists(filePath)) {
                 val errorMsg = "File not found from $uri"
-                onError(CONFIGURATION, errorMsg)
+                raiseError(CONFIGURATION, errorMsg)
             }
             try {
                 Files.readString(filePath)
             } catch (e: Exception) {
                 val errorMsg = "Failed to read script from $uri: ${e.message}"
-                onError(COMMUNICATION, errorMsg)
+                raiseError(COMMUNICATION, errorMsg)
             }
         }
 
         else -> {
             val errorMsg = "Unsupported script type: ${script?.javaClass?.simpleName}"
-            onError(RUNTIME, errorMsg)
+            raiseError(RUNTIME, errorMsg)
         }
     }
 
@@ -118,6 +118,6 @@ internal suspend fun RunInstance.runScript(runScript: RunScript): JsonElement {
     } catch (e: Exception) {
         logError(e) { "Failed to execute script" }
         val errorMsg = "Script execution failed: ${e.message}"
-        onError(COMMUNICATION, errorMsg)
+        raiseError(COMMUNICATION, errorMsg)
     }
 }

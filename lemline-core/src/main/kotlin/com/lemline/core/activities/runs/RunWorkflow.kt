@@ -63,7 +63,7 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
         // If run() throws an exception, the sub-workflow has faulted.
         logError(e) { "Sub-workflow ${subWorkflowInstance.id} faulted." }
         // Propagate the error to the parent workflow.
-        onError(
+        raiseError(
             WorkflowErrorType.RUNTIME,
             "Sub-workflow execution failed: ${e.error.type}",
             e.error.details,

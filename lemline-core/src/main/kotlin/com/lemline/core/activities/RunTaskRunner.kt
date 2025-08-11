@@ -23,7 +23,7 @@ class RunTaskRunner : ActivityRunner<RunInstance> {
             is RunScript -> instance.runScript(run)
             is RunShell -> instance.runShell(run)
             is RunWorkflow -> instance.runWorkflow(run)
-            else -> instance.onError(RUNTIME, "Unsupported run type: ${run.javaClass.simpleName}")
+            else -> instance.raiseError(RUNTIME, "Unsupported run type: ${run.javaClass.simpleName}")
         }
     }
 }

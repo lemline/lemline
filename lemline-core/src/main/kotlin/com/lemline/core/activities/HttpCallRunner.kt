@@ -20,7 +20,7 @@ class HttpCallRunner : ActivityRunner<CallHttpInstance> {
         val httpCall = HttpCall(
             getSecretByName = instance::toSecret,
             getAuthenticationPolicyByName = instance::getAuthenticationPolicyByName,
-            onError = instance::onError,
+            onError = instance::raiseError,
         )
 
         instance.logInfo { "Executing HTTP call: ${instance.node.name}" }
@@ -33,7 +33,7 @@ class HttpCallRunner : ActivityRunner<CallHttpInstance> {
             "GET" -> HttpMethod.Get
             "PUT" -> HttpMethod.Put
             "DELETE" -> HttpMethod.Delete
-            else -> instance.onError(WorkflowErrorType.CONFIGURATION, "Unsupported HTTP method: ${httpArgs.method}")
+            else -> instance.raiseError(WorkflowErrorType.CONFIGURATION, "Unsupported HTTP method: ${httpArgs.method}")
         }
 
         // Extract other arguments using the instance

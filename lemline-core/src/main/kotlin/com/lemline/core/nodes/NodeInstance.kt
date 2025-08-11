@@ -65,7 +65,8 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     /**
      * Local info function that sets the workflow context each time it's called
      */
-    internal fun logInfo(e: Throwable? = null, message: () -> String) = withWorkflowContext { logger.info(e, message) }
+    internal fun logInfo(e: Throwable? = null, message: () -> String) =
+        withWorkflowContext { logger.info(e, message) }
 
     /**
      * Local warn function that sets the workflow context each time it's called
@@ -101,7 +102,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         when (this) {
             is RootInstance -> this
             else -> parent?.rootInstance
-                ?: onError(RUNTIME, "$this is not root, but does not have a parent")
+                ?: raiseError(RUNTIME, "$this is not root, but does not have a parent")
         }
     }
 
@@ -260,7 +261,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
                 FlowDirectiveEnum.END -> rootInstance
             }
 
-            else -> onError(CONFIGURATION, "Unknown directive: $directive")
+            else -> raiseError(CONFIGURATION, "Unknown directive: $directive")
         }
     }
 
@@ -269,7 +270,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
      */
     private fun gotoByName(name: String): NodeInstance<*> {
         val target = children.indexOfFirst { it.node.name == name }
-        if (target == -1) onError(CONFIGURATION, "'.then' directive '$name' not found")
+        if (target < 0) raiseError(CONFIGURATION, "'.then' directive '$name' not found")
         childIndex = target
         return children[target]
     }
@@ -354,15 +355,14 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
      * It evaluates the `if` condition against the transformed input and returns true if the task should start,
      * or false if it should be skipped.
      *
-     * The `if` condition is evaluated using the transformed input, which is set during the `onStart()` method.
-     *
      * @return true if the task should start, false otherwise
      */
     open fun shouldStart(): Boolean {
         // Test if the task should be executed
-        val shouldStart = node.task.`if`
-            ?.let { evalBoolean(transformedInput, it, ".if") }
-            ?: true
+        val shouldStart = when (val `if` = node.task.`if`) {
+            null -> true
+            else -> evalBoolean(transformedInput, `if`, ".if", scope)
+        }
 
         return shouldStart
     }
@@ -382,7 +382,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     private fun validate(data: JsonElement, schemaUnion: SchemaUnion) = try {
         SchemaValidator.validate(data, schemaUnion)
     } catch (e: Exception) {
-        onError(VALIDATION, e.message, e.stackTraceToString())
+        raiseError(VALIDATION, e.message, e.stackTraceToString())
     }
 
     /**
@@ -392,7 +392,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonPrimitive && it.isString) {
                 true -> it.content
-                false -> onError(EXPRESSION, "'.$name' expression must be a string, but is '$it'")
+                false -> raiseError(EXPRESSION, "'.$name' expression must be a string, but is '$it'")
             }
         }
 
@@ -400,7 +400,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonPrimitive && it.booleanOrNull != null) {
                 true -> it.boolean
-                false -> onError(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
+                false -> raiseError(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
             }
         }
 
@@ -408,7 +408,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonArray) {
                 true -> it.toList()
-                false -> onError(EXPRESSION, "'.$name' expression must be an array, but is '$it'")
+                false -> raiseError(EXPRESSION, "'.$name' expression must be an array, but is '$it'")
             }
         }
 
@@ -416,7 +416,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonObject) {
                 true -> it
-                false -> onError(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
+                false -> raiseError(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
             }
         }
 
@@ -435,14 +435,14 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     private fun eval(data: JsonElement, expr: String, scope: JsonObject = this.scope) = try {
         JQExpression.eval(data, JsonPrimitive(expr), scope, false)
     } catch (e: Exception) {
-        onError(EXPRESSION, e.message, e.stackTraceToString())
+        raiseError(EXPRESSION, e.message, e.stackTraceToString())
     }
 
     protected fun eval(data: JsonElement, expr: JsonElement, scope: JsonObject = this.scope, force: Boolean = false) =
         try {
             JQExpression.eval(data, expr, scope, force)
         } catch (e: Exception) {
-            onError(EXPRESSION, e.message, e.stackTraceToString())
+            raiseError(EXPRESSION, e.message, e.stackTraceToString())
         }
 
     /**
@@ -459,7 +459,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     /**
      * Create an error and raise it
      */
-    internal fun onError(
+    internal fun raiseError(
         type: WorkflowErrorType,
         title: String?,
         details: String? = null,

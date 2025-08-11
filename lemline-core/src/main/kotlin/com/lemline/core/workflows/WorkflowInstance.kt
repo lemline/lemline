@@ -401,7 +401,7 @@ class WorkflowInstance(
      * @return The final result of the workflow as a [JsonElement].
      * @throws WorkflowException If a non-retryable error occurs during execution.
      */
-    fun runBlocking(): JsonElement = runBlocking {
+    fun runBlocking(): JsonElement = runBlocking(scope.coroutineContext) {
         run()
     }
 
