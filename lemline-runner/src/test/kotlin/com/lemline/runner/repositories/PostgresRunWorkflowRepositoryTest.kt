@@ -2,7 +2,7 @@
 package com.lemline.runner.repositories
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
-import com.lemline.runner.repositories.bases.RunRepositoryTest
+import com.lemline.runner.repositories.bases.RunWorkflowRepositoryTest
 import com.lemline.runner.tests.profiles.PostgresProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -15,4 +15,4 @@ import org.junit.jupiter.api.TestInstance
 @TestProfile(PostgresProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @EnabledOnlyIfDockerAvailable
-internal class PostgresRunRepositoryTest : RunRepositoryTest()
+internal class PostgresRunWorkflowRepositoryTest : RunWorkflowRepositoryTest()

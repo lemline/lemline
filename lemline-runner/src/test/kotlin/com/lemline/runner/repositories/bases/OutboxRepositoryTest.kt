@@ -70,7 +70,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - Its delayedUntil time has passed
      * - It hasn't exceeded maxAttempts
      */
-    private fun List<T>.filterToProcess(
+    private fun List<T>.filterEntitiesToProcess(
         now: Instant = Instant.now(),
         maxAttempts: Int = Int.MAX_VALUE
     ): List<T> = filter {
@@ -83,7 +83,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - It has SENT status
      * - Its delayedUntil time is before the cutoff date
      */
-    private fun List<T>.filterToDelete(
+    private fun List<T>.filterEntitiesToDelete(
         cutoffDate: Instant = Instant.now()
     ): List<T> = filter {
         it.status == SENT && it.delayedUntil?.isBefore(cutoffDate) == true
@@ -146,7 +146,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `findMessagesToProcess should return all eligible pending messages that are ready for processing`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
-        val expected = messages.filterToProcess()
+        val expected = messages.filterEntitiesToProcess()
         val expectedIds = expected.map { it.id }
         val actual = findMessagesToProcess().filter { it.id in messagesIds }
 
@@ -164,7 +164,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `findMessagesToProcess should exclude messages that have exceeded maxAttempts`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
-        val expected = messages.filterToProcess(maxAttempts = maxAttempts)
+        val expected = messages.filterEntitiesToProcess(maxAttempts = maxAttempts)
         val expectedIds = expected.map { it.id }
 
         val actual = findMessagesToProcess(maxAttempts = maxAttempts).filter { it.id in messagesIds }
@@ -184,7 +184,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `findMessagesToProcess should respect the limit parameter and only return valid candidates`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
-        val expected = messages.filterToProcess()
+        val expected = messages.filterEntitiesToProcess()
         val expectedIds = expected.map { it.id }
 
         val actual = findMessagesToProcess(limit = limit).filter { it.id in messagesIds }
@@ -208,7 +208,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         val now = Instant.now()
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
-        val expected = messages.filterToDelete(cutoffDate = now)
+        val expected = messages.filterEntitiesToDelete(cutoffDate = now)
         val expectedIds = expected.map { it.id }
 
         val actual = findMessagesToDelete(cutoffDate = now).filter { it.id in messagesIds }
@@ -227,7 +227,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `findMessagesToDelete should only return messages older than the specified cutoff date`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
-        val expected = messages.filterToDelete(cutoffDate = cutoffDate)
+        val expected = messages.filterEntitiesToDelete(cutoffDate = cutoffDate)
         val expectedIds = expected.map { it.id }
 
         val actual = findMessagesToDelete(cutoffDate = cutoffDate).filter { it.id in messagesIds }
@@ -247,7 +247,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `findMessagesToDelete should respect the limit parameter and only return valid candidates`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
-        val expected = messages.filterToDelete()
+        val expected = messages.filterEntitiesToDelete()
         val expectedIds = expected.map { it.id }
 
         val actual = findMessagesToDelete(limit = limit).filter { it.id in messagesIds }
@@ -271,7 +271,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `findMessagesToProcess should handle concurrent requests without duplicate processing`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
-        val expectedProcessed = messages.filterToProcess(maxAttempts = maxAttempts).size
+        val expectedProcessed = messages.filterEntitiesToProcess(maxAttempts = maxAttempts).size
         val processedMessages = mutableListOf<T>()
         val executor = Executors.newFixedThreadPool(concurrentRequests)
         val timeout = Instant.now().plus(1, ChronoUnit.SECONDS)
@@ -321,7 +321,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `findMessagesToDelete should handle concurrent requests without duplicate deletion`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
-        val expectedDeleted = messages.filterToDelete(cutoffDate).size
+        val expectedDeleted = messages.filterEntitiesToDelete(cutoffDate).size
         val deletedMessages = mutableListOf<T>()
         val executor = Executors.newFixedThreadPool(concurrentRequests)
         val timeout = Instant.now().plus(1, ChronoUnit.SECONDS)
@@ -370,8 +370,8 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `should handle mixed concurrent processing and deletion operations without conflicts`() = runTest {
         val messages = insertMessages(messageCount)
         val messagesIds = messages.map { it.id }
-        val expectedProcessed = messages.filterToProcess(maxAttempts = maxAttempts).size
-        val expectedDeleted = messages.filterToDelete(cutoffDate).size
+        val expectedProcessed = messages.filterEntitiesToProcess(maxAttempts = maxAttempts).size
+        val expectedDeleted = messages.filterEntitiesToDelete(cutoffDate).size
         val processedMessages = mutableListOf<T>()
         val deletedMessages = mutableListOf<T>()
         val executor = Executors.newFixedThreadPool(concurrentRequests)
@@ -451,6 +451,8 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         val expectedLastError = "test error"
 
         val mockResultSet = mockk<ResultSet> {
+            // this default behavior will be overwritten by the specific value below
+            every { getString(any<String>()) } returns Random.nextBytes(16).toString()
             every { getString("id") } returns expectedId
             every { getString("message") } returns expectedMessage
             every { getString("status") } returns expectedStatus.name
