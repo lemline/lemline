@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.github.f4b6a3.uuid.UuidCreator
+import com.lemline.common.utils.IdGenerator
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
@@ -34,7 +34,7 @@ data class Message(
             name: String,
             version: String,
             input: JsonElement,
-            id: String = UuidCreator.getTimeOrderedEpoch().toString(),
+            id: String = IdGenerator.generateTimeBasedId(),
             parentId: String? = null,
             parentIsWaiting: Boolean = false,
         ) = Message(

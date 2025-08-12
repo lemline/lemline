@@ -77,7 +77,7 @@ internal class OutboxProcessor<T : OutboxModel>(
             // Find and process messages in the same transaction
             repository.withTransaction { connection ->
                 // Find and lock messages ready to process
-                val messages = repository.findMessagesToProcess(maxAttempts, batchSize, connection)
+                val messages = repository.findEntitiesToProcess(maxAttempts, batchSize, connection)
                 toProcess = messages.size
 
                 if (toProcess > 0) {
@@ -163,7 +163,7 @@ internal class OutboxProcessor<T : OutboxModel>(
             var toDelete = 0
             // Find and delete messages in the same transaction
             repository.withTransaction { connection ->
-                val messages = repository.findMessagesToDelete(cutoffDate, batchSize, connection)
+                val messages = repository.findEntitiesToDelete(cutoffDate, batchSize, connection)
                 toDelete = messages.size
 
                 if (toDelete > 0) {

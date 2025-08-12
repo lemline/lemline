@@ -122,7 +122,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         maxAttempts: Int = Int.MAX_VALUE,
         limit: Int = Int.MAX_VALUE,
         connection: Connection? = null
-    ): List<T> = repository.findMessagesToProcess(maxAttempts = maxAttempts, limit = limit, connection)
+    ): List<T> = repository.findEntitiesToProcess(maxAttempts = maxAttempts, limit = limit, connection)
 
     /**
      * Finds and locks messages that are ready to be deleted.
@@ -133,7 +133,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         cutoffDate: Instant = Instant.now(),
         limit: Int = Int.MAX_VALUE,
         connection: Connection? = null
-    ): List<T> = repository.findMessagesToDelete(cutoffDate = cutoffDate, limit = limit, connection)
+    ): List<T> = repository.findEntitiesToDelete(cutoffDate = cutoffDate, limit = limit, connection)
 
     /**
      * Tests that findMessagesToProcess returns the correct messages for processing.

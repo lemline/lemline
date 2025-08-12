@@ -55,7 +55,6 @@ dependencies {
     implementation(libs.serverlessworkflow.impl.core)
 
     // Utilities
-    implementation(libs.uuidCreator)
     implementation(libs.javaSemver)
 
     // Jackson for JSON serialization/deserialization

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.github.f4b6a3.uuid.UuidCreator
+import com.lemline.common.utils.IdGenerator
 import com.lemline.runner.outbox.OutBoxStatus
 import java.time.Instant
 import kotlinx.serialization.Contextual
@@ -11,7 +11,7 @@ const val RETRY_TABLE = "lemline_retries"
 
 @Serializable
 data class RetryModel(
-    override val id: String = UuidCreator.getTimeOrderedEpoch().toString(),
+    override val id: String = IdGenerator.generateTimeBasedId(),
 
     override val message: String,
 
