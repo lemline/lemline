@@ -4,7 +4,7 @@ package com.lemline.runner.messaging
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
-import kotlinx.datetime.Clock
+import java.time.Instant
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -54,7 +54,7 @@ internal class WorkflowModelMessageTest {
                 NodePosition.root to NodeState(
                     workflowId = "test-id",
                     rawInput = JsonObject(mapOf("test" to JsonPrimitive("value"))),
-                    startedAt = Clock.System.now(),
+                    startedAt = Instant.now(),
                 ),
             ),
             position = NodePosition.root,
