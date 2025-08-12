@@ -6,7 +6,7 @@ import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
 import com.lemline.core.workflows.WorkflowInstance
-import kotlinx.datetime.Clock
+import java.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -45,7 +45,7 @@ data class Message(
                     parent = parentId?.let { NodeState.Parent(it, parentIsWaiting) },
                     workflowId = id,
                     rawInput = input,
-                    startedAt = Clock.System.now(),
+                    startedAt = Instant.now(),
                 ),
             ),
             position = NodePosition.root,

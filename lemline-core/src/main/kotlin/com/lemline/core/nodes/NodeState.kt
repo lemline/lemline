@@ -2,7 +2,7 @@
 package com.lemline.core.nodes
 
 import com.lemline.core.json.LemlineJson
-import kotlinx.datetime.Instant
+import java.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

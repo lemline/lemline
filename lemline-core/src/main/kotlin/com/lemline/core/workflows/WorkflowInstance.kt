@@ -53,15 +53,13 @@ import io.serverlessworkflow.api.types.WaitTask
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import java.time.Instant
 import java.util.concurrent.CompletableFuture
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.future
 import kotlinx.coroutines.runBlocking
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
-import kotlinx.datetime.toJavaInstant
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -117,7 +115,7 @@ class WorkflowInstance(
                 NodePosition.root to NodeState(
                     workflowId = id,
                     rawInput = rawInput,
-                    startedAt = Clock.System.now(),
+                    startedAt = Instant.now(),
                 ),
             ),
             position = NodePosition.root,
@@ -338,7 +336,7 @@ class WorkflowInstance(
             id = id,
             definition = LemlineJson.encodeToElement(workflow),
             input = rawInput,
-            startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant())),
+            startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt)),
         )
 
         // init nodes instance
@@ -492,7 +490,7 @@ class WorkflowInstance(
                 node.startedAt == null -> when (node.shouldStart()) {
                     // run the current task
                     true -> {
-                        node.startedAt = Clock.System.now()
+                        node.startedAt = Instant.now()
                         if (node is WaitInstance) status = WorkflowStatus.WAITING
                         if (node == rootInstance) onWorkflowStarted() else onTaskStarted(node)
                         node.run()

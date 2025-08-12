@@ -22,11 +22,10 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
 
     // Add Kotlin Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.2")
+    implementation(libs.kotlinxSerializationJson)
 
     // UUID Creator
-    implementation("com.github.f4b6a3:uuid-creator:6.0.0")
+    implementation(libs.uuidCreator)
 
     // Testing
     testFixturesImplementation(kotlin("test"))

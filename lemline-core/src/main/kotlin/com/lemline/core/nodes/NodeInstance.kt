@@ -32,8 +32,7 @@ import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.api.types.SubflowInput
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import kotlinx.datetime.Instant
-import kotlinx.datetime.toJavaInstant
+import java.time.Instant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -212,7 +211,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
             name = node.name,
             reference = node.reference,
             definition = node.definition,
-            startedAt = startedAt?.let { LemlineJson.encodeToElement(DateTimeDescriptor.from(it.toJavaInstant())) },
+            startedAt = startedAt?.let { LemlineJson.encodeToElement(DateTimeDescriptor.from(it)) },
             input = rawInput,
             output = rawOutput,
         )
