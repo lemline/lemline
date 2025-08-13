@@ -77,7 +77,7 @@ class InstanceStartCommand : Runnable {
 
         // Synchronously send the message to the workflow-out channel
         try {
-            emitter.send(message.toJsonString()).toCompletableFuture().get()
+            emitter.send(message.jsonString).toCompletableFuture().get()
             println("Instance ${message.states[NodePosition.root]?.workflowId} started successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement)")
         } catch (e: Exception) {
             error("Failed to start workflow instance: ${e.message}")

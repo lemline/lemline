@@ -112,7 +112,7 @@ internal class StepByStepRunner @Inject constructor(
             runWorkflowRepository.insert(
                 RunWorkflowModel(
                     id = id,
-                    message = toMessage().toJsonString(),
+                    message = toMessage().jsonString,
                     status = OutBoxStatus.PENDING,
                     delayedUntil = null
                 ),
@@ -130,7 +130,7 @@ internal class StepByStepRunner @Inject constructor(
             )
             runWorkflowRepository.insert(
                 RunWorkflowModel(
-                    message = child.toJsonString(),
+                    message = child.jsonString,
                     delayedUntil = Instant.now(),
                 ),
                 connection
@@ -155,10 +155,10 @@ internal class StepByStepRunner @Inject constructor(
             runWorkflowRepository.update(
                 runModel.copy(
                     delayedUntil = Instant.now(),
-                    message = message.toJsonString()
+                    message = message.jsonString
                 )
             )
-            logger.debug { "Restarting parent workflow:\n${message.toPrettyString()}" }
+            logger.debug { "Restarting parent workflow:\n${message.jsonPrettyString}" }
         }
     }
 
@@ -173,7 +173,7 @@ internal class StepByStepRunner @Inject constructor(
         val delay = (current as TryInstance).delay?.toJavaDuration()
 
         val retryModel = RetryModel(
-            message = toMessage().toJsonString(),
+            message = toMessage().jsonString,
             delayedUntil = Instant.now().plus(delay ?: error("No delay set in for $this"))
         )
         // Save the message to the retry table
@@ -189,7 +189,7 @@ internal class StepByStepRunner @Inject constructor(
      */
     private suspend fun WorkflowInstance.onWait(delay: Duration) {
         val waitModel = WaitModel(
-            message = toMessage().toJsonString(),
+            message = toMessage().jsonString,
             delayedUntil = Instant.now().plus(delay.toJavaDuration()),
         )
         // Save the message to the wait table

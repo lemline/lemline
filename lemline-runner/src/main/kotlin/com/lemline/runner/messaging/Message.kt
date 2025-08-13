@@ -29,6 +29,10 @@ data class Message(
     @SerialName("s") val states: Map<NodePosition, NodeState>,
     @SerialName("p") val position: NodePosition,
 ) {
+    internal val jsonString: String by lazy { LemlineJson.encodeToString(this) }
+
+    internal val jsonPrettyString: String by lazy { LemlineJson.encodeToPrettyString(this) }
+
     companion object {
         fun newInstance(
             name: String,
@@ -53,10 +57,6 @@ data class Message(
 
         fun fromJsonString(json: String): Message = LemlineJson.decodeFromString(json)
     }
-
-    fun toJsonString(): String = LemlineJson.encodeToString(this)
-
-    fun toPrettyString(): String = LemlineJson.encodeToPrettyString(this)
 
     fun toWorkflowInstance(secrets: Map<String, JsonElement>) = WorkflowInstance(
         name = name,

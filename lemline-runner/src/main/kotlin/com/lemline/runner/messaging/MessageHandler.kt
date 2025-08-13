@@ -75,8 +75,8 @@ internal class MessageHandler @Inject constructor(
     @PostConstruct
     fun init() {
         if (enabled) {
-            subscriber.subscribe()
             logger.info { "✅ Consumer enabled" }
+            subscriber.subscribe()
         } else {
             logger.info { "❌ Consumer disabled" }
         }
@@ -103,13 +103,13 @@ internal class MessageHandler @Inject constructor(
         val workflowName = message.name
         val workflowVersion = message.version
 
-        withLoggingContext(
-            LogContext.WORKFLOW_ID to message.states[NodePosition.root]?.workflowId,
-            LogContext.WORKFLOW_NAME to workflowName,
-            LogContext.WORKFLOW_VERSION to workflowVersion,
-            LogContext.NODE_POSITION to message.position.toString(),
-        ) {
-            metrics.recordProcessingDuration(workflowName, workflowVersion) {
+        metrics.recordProcessingDuration(workflowName, workflowVersion) {
+            withLoggingContext(
+                LogContext.WORKFLOW_ID to message.states[NodePosition.root]?.workflowId,
+                LogContext.WORKFLOW_NAME to workflowName,
+                LogContext.WORKFLOW_VERSION to workflowVersion,
+                LogContext.NODE_POSITION to message.position.toString(),
+            ) {
                 try {
                     // --- Step 2: Get Workflow Definition ---
                     val workflow = findWorkflowDefinition(item, workflowName, workflowVersion)
@@ -123,7 +123,7 @@ internal class MessageHandler @Inject constructor(
                     metrics.processingCompleted(workflowName, workflowVersion)
                     ack(item, workflowName, workflowVersion)
                     // For testing: complete the future
-                    processingMessages.remove(item.payload)?.complete(nextMessage?.toJsonString())
+                    processingMessages.remove(item.payload)?.complete(nextMessage?.jsonString)
                 } catch (e: ProcessingException) {
                     // For testing: complete the future
                     processingMessages.remove(item.payload)?.completeExceptionally(e.cause)
@@ -213,7 +213,7 @@ internal class MessageHandler @Inject constructor(
         } catch (e: Exception) {
             logger.error(e) { "Failed to run instance. Storing current state in the retry table for manual inspection." }
             metrics.processingFailed(getFailureReason(e), message.name, message.version)
-            saveMsgAsFailed(item, instance.toMessage().toJsonString(), e, message.name, message.version)
+            saveMsgAsFailed(item, instance.toMessage().jsonString, e, message.name, message.version)
             throw ProcessingException(cause = e)
         }
     }
@@ -230,7 +230,7 @@ internal class MessageHandler @Inject constructor(
         item: ReactiveMessage<String>,
         nextMessage: Message?
     ) {
-        val msg = nextMessage?.toJsonString() ?: return
+        val msg = nextMessage?.jsonString ?: return
         return try {
             emitter.send(msg).await()
             logger.debug { "Emitted next message: $msg" }
