@@ -25,10 +25,10 @@ class MessageSubscriberMetrics @Inject constructor(
 
     // Non-dimensional counters that don't need to be created on the fly.
     private val receivedCounter: Counter = registry.counter(METRIC_RECEIVED_TOTAL)
-    private val saturationCounter: Counter = registry.counter(METRIC_SATURATION_TOTAL)
+    private val saturationCounter: Counter = registry.counter(METRIC_CONCURRENCY_SATURATION_TOTAL)
 
     init {
-        Gauge.builder(METRIC_ACTIVE_MESSAGES, activeMessages) { it.toDouble() }
+        Gauge.builder(METRIC_ACTIVE, activeMessages) { it.toDouble() }
             .description("Current number of messages being processed")
             .register(registry)
     }
@@ -151,7 +151,7 @@ class MessageSubscriberMetrics @Inject constructor(
     companion object {
         // Metric Names
         private const val METRIC_PREFIX = "lemline.message"
-        private const val METRIC_ACTIVE_MESSAGES = "$METRIC_PREFIX.active"
+        private const val METRIC_ACTIVE = "$METRIC_PREFIX.active"
         private const val METRIC_RECEIVED_TOTAL = "$METRIC_PREFIX.received.total"
 
         private const val METRIC_DESERIALIZATION_COMPLETED_TOTAL = "$METRIC_PREFIX.deserialization.completed.total"
@@ -168,7 +168,7 @@ class MessageSubscriberMetrics @Inject constructor(
         private const val METRIC_NACK_COMPLETED_TOTAL = "$METRIC_PREFIX.nack.completed.total"
         private const val METRIC_NACK_FAILED_TOTAL = "$METRIC_PREFIX.nack.failed.total"
 
-        private const val METRIC_SATURATION_TOTAL = "$METRIC_PREFIX.parallelism.saturation.total"
+        private const val METRIC_CONCURRENCY_SATURATION_TOTAL = "$METRIC_PREFIX.concurrency.saturation.total"
 
         // Tag Keys
         private const val TAG_REASON = "reason"

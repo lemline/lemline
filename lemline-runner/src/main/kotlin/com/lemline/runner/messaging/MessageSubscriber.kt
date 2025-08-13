@@ -23,7 +23,7 @@ import org.reactivestreams.Subscription
 import org.slf4j.Logger
 
 /**
- * A reactive message subscriber that processes messages asynchronously with controlled parallelism.
+ * A reactive message subscriber that processes messages asynchronously with controlled concurrency.
  *
  * This subscriber is a generic dispatcher. It delegates the entire message lifecycle,
  * including processing and acknowledgement, to the provided `handleMessage` function.
@@ -32,7 +32,7 @@ import org.slf4j.Logger
  * @param T The type of the reactive message that wraps the payload
  * @param publisher The source of messages to subscribe to
  * @param handleMessage Suspending function that handles the full lifecycle of each message.
- * @param maxParallelism Maximum number of messages that can be processed concurrently
+ * @param maxConcurrency Maximum number of messages that can be processed concurrently
  * @param metrics Metrics collector for monitoring processing statistics
  * @param logger Logger instance for recording events and errors
  */
@@ -40,7 +40,7 @@ import org.slf4j.Logger
 internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
     private val publisher: Publisher<T>,
     private val handleMessage: suspend (item: T) -> Unit, // Changed signature
-    private val maxParallelism: Int,
+    private val maxConcurrency: Int,
     private val metrics: MessageSubscriberMetrics,
     private val logger: Logger
 ) : Subscriber<T> {
@@ -49,7 +49,7 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
         logger.error(throwable) { "Unhandled coroutine exception in consumer" }
     })
 
-    private val semaphore = Semaphore(maxParallelism)
+    private val semaphore = Semaphore(maxConcurrency)
 
     private lateinit var subscription: Subscription
 
@@ -73,7 +73,7 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
             return
         }
         subscription = s
-        subscription.request(maxParallelism.toLong())
+        subscription.request(maxConcurrency.toLong())
     }
 
     override fun onNext(item: T) {

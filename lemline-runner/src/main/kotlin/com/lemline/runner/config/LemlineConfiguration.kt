@@ -25,7 +25,7 @@ const val PRODUCER_ENABLED = "lemline.messaging.producer.enabled"
 const val CONSUMER_ENABLED = "lemline.messaging.consumer.enabled"
 const val DATABASE_TYPE = "lemline.database.type"
 const val MESSAGING_TYPE = "lemline.messaging.type"
-const val MESSAGING_CONSUMER_PARALLELISM = "lemline.messaging.consumer.parallelism"
+const val MESSAGING_CONSUMER_CONCURRENCY = "lemline.messaging.consumer.concurrency"
 const val MIGRATE_AT_START = "lemline.database.migrate-at-start"
 
 /**
@@ -342,7 +342,7 @@ interface LemlineConfiguration {
         fun enabled(): Boolean
 
         @WithDefault("64")
-        fun parallelism(): Int
+        fun concurrency(): Int
     }
 
     /**

@@ -13,7 +13,7 @@ import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.StepByStepRunner
 import com.lemline.runner.config.CONSUMER_ENABLED
-import com.lemline.runner.config.MESSAGING_CONSUMER_PARALLELISM
+import com.lemline.runner.config.MESSAGING_CONSUMER_CONCURRENCY
 import com.lemline.runner.metrics.MessageSubscriberMetrics
 import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.DATABASE_ERROR
 import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.DEFINITION_NOT_FOUND
@@ -58,7 +58,7 @@ internal const val WORKFLOW_OUT = "workflows-out"
 @Startup
 @ApplicationScoped
 internal class MessageHandler @Inject constructor(
-    @ConfigProperty(name = MESSAGING_CONSUMER_PARALLELISM) private val maxParallelism: Int,
+    @ConfigProperty(name = MESSAGING_CONSUMER_CONCURRENCY) private val maxConcurrency: Int,
     @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
     @Channel(WORKFLOW_IN) private val publisher: Publisher<ReactiveMessage<String>>,
     @Channel(WORKFLOW_OUT) private val emitter: Emitter<String>,
@@ -70,7 +70,7 @@ internal class MessageHandler @Inject constructor(
     val logger = logger()
 
     // The subscriber is now initialized with the new handleMessage signature
-    private val subscriber = MessageSubscriber(publisher, ::handleMessage, maxParallelism, metrics, logger)
+    private val subscriber = MessageSubscriber(publisher, ::handleMessage, maxConcurrency, metrics, logger)
 
     @PostConstruct
     fun init() {
