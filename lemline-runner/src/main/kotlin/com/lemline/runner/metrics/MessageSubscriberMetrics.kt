@@ -25,7 +25,6 @@ class MessageSubscriberMetrics @Inject constructor(
 
     // Non-dimensional counters that don't need to be created on the fly.
     private val receivedCounter: Counter = registry.counter(METRIC_RECEIVED_TOTAL)
-    private val saturationCounter: Counter = registry.counter(METRIC_CONCURRENCY_SATURATION_TOTAL)
 
     init {
         Gauge.builder(METRIC_ACTIVE, activeMessages) { it.toDouble() }
@@ -114,9 +113,6 @@ class MessageSubscriberMetrics @Inject constructor(
         TAG_WORKFLOW_VERSION, workflowVersion
     ).increment()
 
-    /** Increments the counter for processing saturation events. */
-    fun saturated() = saturationCounter.increment()
-
     /** Returns the current count of active messages. */
     fun getActiveCount(): Int = activeMessages.get()
 
@@ -168,7 +164,6 @@ class MessageSubscriberMetrics @Inject constructor(
         private const val METRIC_NACK_COMPLETED_TOTAL = "$METRIC_PREFIX.nack.completed.total"
         private const val METRIC_NACK_FAILED_TOTAL = "$METRIC_PREFIX.nack.failed.total"
 
-        private const val METRIC_CONCURRENCY_SATURATION_TOTAL = "$METRIC_PREFIX.concurrency.saturation.total"
 
         // Tag Keys
         private const val TAG_REASON = "reason"

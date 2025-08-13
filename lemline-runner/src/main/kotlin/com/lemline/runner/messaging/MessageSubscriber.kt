@@ -5,6 +5,7 @@ import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.warn
 import com.lemline.runner.metrics.MessageSubscriberMetrics
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,7 +15,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.future
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.withTimeout
 import org.eclipse.microprofile.reactive.messaging.Message as ReactiveMessage
 import org.reactivestreams.Publisher
@@ -49,26 +49,23 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
         logger.error(throwable) { "Unhandled coroutine exception in consumer" }
     })
 
-    private val semaphore = Semaphore(maxConcurrency)
-
     private lateinit var subscription: Subscription
 
     // Add state tracking
-    private var isSubscribed = false
-    private var isShutdown = false
+    private var isSubscribed = AtomicBoolean(false)
+    private var isShutdown = AtomicBoolean(false)
 
 
-    fun subscribe() = synchronized(this) {
-        if (isSubscribed) {
+    internal fun subscribe() {
+        if (!isSubscribed.compareAndSet(false, true)) {
             logger.warn { "Subscribe called more than once - ignoring" }
             return
         }
-        isSubscribed = true
         publisher.subscribe(this)
     }
 
-    override fun onSubscribe(s: Subscription) = synchronized(this) {
-        if (isShutdown) {
+    override fun onSubscribe(s: Subscription) {
+        if (isShutdown.get()) {
             s.cancel()
             return
         }
@@ -81,21 +78,15 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
         metrics.received()
 
         // Check if we are already shutting down before launching a new coroutine.
-        if (isShutdown) {
+        if (isShutdown.get()) {
             // The scope is shutting down. We cannot process this message.
-            // By not acknowledging or unacknowledging it, we rely on the broker's
-            // standard redelivery mechanism.
+            // By not acknowledging or unacknowledging it, we rely on the broker's standard redelivery mechanism.
             logger.warn { "Received message after subscriber shutdown. It will be redelivered by the broker. Message: $item" }
             return
         }
 
+        // Delegate the message processing to a coroutine.
         scope.launch {
-            if (!semaphore.tryAcquire()) {
-                metrics.saturated()
-                // Wait for a slot to become available
-                semaphore.acquire()
-            }
-
             metrics.incrementActive()
             try {
                 // Delegate the entire message lifecycle to the handler.
@@ -106,7 +97,6 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
                 // If it does, it indicates a bug in the handler's own try/catch logic.
                 logger.error(e) { "CRITICAL: Unhandled exception from message handler. The message's state is now unknown and it may be redelivered or lost." }
             } finally {
-                semaphore.release()
                 metrics.decrementActive()
                 requestNext()
             }
@@ -123,9 +113,8 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
         onShutdown()
     }
 
-    internal fun onShutdown(timeoutMs: Long = 5000) = synchronized(this) {
-        if (isShutdown) return
-        isShutdown = true
+    internal fun onShutdown(timeoutMs: Long = 5000) {
+        if (!isShutdown.compareAndSet(false, true)) return
         cancelSubscription()
         // wait for active messages to complete
         gracePeriod(timeoutMs)
@@ -134,7 +123,7 @@ internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
     private fun requestNext() {
         try {
             // Only request more if we are not shutting down
-            if (!isShutdown) subscription.request(1)
+            if (!isShutdown.get()) subscription.request(1)
         } catch (e: Exception) {
             logger.warn(e) { "Failed to request next message" }
         }
