@@ -32,9 +32,10 @@ internal class RetryRepository : OutboxRepository<RetryModel>() {
     override val tableName = RETRY_TABLE
 
     override fun createModel(rs: ResultSet) = RetryModel(
-        id = rs.getString("id"),
+        workflowId = rs.getString("id"),
         message = rs.getString("message"),
         status = OutBoxStatus.valueOf(rs.getString("status")),
+        scheduledFor = rs.getInstant("scheduled_for"),
         delayedUntil = rs.getInstant("delayed_until"),
         attemptCount = rs.getInt("attempt_count"),
         lastError = rs.getString("last_error"),

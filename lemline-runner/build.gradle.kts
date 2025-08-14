@@ -56,6 +56,7 @@ dependencies {
 
     // Utilities
     implementation(libs.javaSemver)
+    implementation("com.cronutils:cron-utils:9.2.1")
 
     // Jackson for JSON serialization/deserialization
     implementation(libs.jackson.bom)

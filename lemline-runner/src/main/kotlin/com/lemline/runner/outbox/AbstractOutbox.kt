@@ -70,8 +70,9 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     private val outboxCleaningExecutor = Executors.newSingleThreadScheduledExecutor()
     private val outboxCleaning = AtomicBoolean(false)
 
-    open suspend fun process(model: T) {
-        emitter.sendSuspending(model.message)
+    open suspend fun process(entity: T) {
+        emitter.sendSuspending(entity.message)
+        entity.status = OutBoxStatus.SENT
     }
 
     @PostConstruct

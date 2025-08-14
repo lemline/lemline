@@ -7,7 +7,7 @@ import com.lemline.core.nodes.NodePosition
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.cli.GlobalMixin
-import com.lemline.runner.messaging.Message
+import com.lemline.runner.messaging.MessageBody
 import com.lemline.runner.messaging.WORKFLOW_OUT
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
@@ -73,12 +73,13 @@ class InstanceStartCommand : Runnable {
         checkInput(workflowDefinition.definition, inputJsonElement)
 
         // create the message
-        val message = Message.newInstance(name!!, workflowDefinition.version, inputJsonElement)
+        val messageBody =
+            MessageBody.newInstance(name = name!!, version = workflowDefinition.version, input = inputJsonElement)
 
         // Synchronously send the message to the workflow-out channel
         try {
-            emitter.send(message.jsonString).toCompletableFuture().get()
-            println("Instance ${message.states[NodePosition.root]?.workflowId} started successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement)")
+            emitter.send(messageBody.jsonString).toCompletableFuture().get()
+            println("Instance ${messageBody.states[NodePosition.root]?.workflowId} started successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement)")
         } catch (e: Exception) {
             error("Failed to start workflow instance: ${e.message}")
         }

@@ -77,7 +77,7 @@ abstract class WorkflowRepositoryTest {
         // Then
         val retrievedModel = repository.findByNameAndVersion(definitionModel.name, definitionModel.version)
         retrievedModel shouldNotBe null
-        retrievedModel?.id shouldBe definitionModel.id
+        retrievedModel?.workflowId shouldBe definitionModel.workflowId
         retrievedModel?.name shouldBe definitionModel.name
         retrievedModel?.version shouldBe definitionModel.version
         retrievedModel?.definition shouldContain definitionModel.definition
@@ -155,7 +155,7 @@ abstract class WorkflowRepositoryTest {
 
         // Then
         shouldNotThrowAny { repository.update(updated) }
-        repository.findById(original.id)?.definition shouldBe "updated definition"
+        repository.findById(original.workflowId)?.definition shouldBe "updated definition"
         repository.count() shouldBe 1L
     }
 
@@ -179,8 +179,8 @@ abstract class WorkflowRepositoryTest {
         // Then
         repository.insert(updated) shouldBe 0
 
-        repository.findById(original.id) shouldNotBe null
-        repository.findById(updated.id) shouldBe null
+        repository.findById(original.workflowId) shouldNotBe null
+        repository.findById(updated.workflowId) shouldBe null
         repository.count() shouldBe 1L
     }
 
@@ -250,7 +250,7 @@ abstract class WorkflowRepositoryTest {
         workflows.forEach { workflow ->
             val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version)
             retrieved shouldNotBe null
-            retrieved?.id shouldBe workflow.id
+            retrieved?.workflowId shouldBe workflow.workflowId
             retrieved?.name shouldBe workflow.name
             retrieved?.version shouldBe workflow.version
             retrieved?.definition shouldBe workflow.definition
@@ -276,7 +276,7 @@ abstract class WorkflowRepositoryTest {
         // Then
         shouldNotThrowAny { repository.update(updated) }
         originals.forEachIndexed { i, model ->
-            repository.findById(model.id)?.definition shouldBe "updated definition-$i"
+            repository.findById(model.workflowId)?.definition shouldBe "updated definition-$i"
         }
         repository.count() shouldBe originals.size.toLong()
     }
@@ -368,11 +368,11 @@ abstract class WorkflowRepositoryTest {
         repository.insert(workflow)
 
         // When
-        val retrieved = repository.findById(workflow.id)
+        val retrieved = repository.findById(workflow.workflowId)
 
         // Then
         retrieved shouldNotBe null
-        retrieved?.id shouldBe workflow.id
+        retrieved?.workflowId shouldBe workflow.workflowId
         retrieved?.name shouldBe workflow.name
         retrieved?.version shouldBe workflow.version
         retrieved?.definition shouldBe workflow.definition
@@ -403,7 +403,7 @@ abstract class WorkflowRepositoryTest {
         // Then
         retrieved shouldHaveSize workflows.size
         workflows.forEach { workflow ->
-            val found = retrieved.find { it.id == workflow.id }
+            val found = retrieved.find { it.workflowId == workflow.workflowId }
             found shouldNotBe null
             found?.name shouldBe workflow.name
             found?.version shouldBe workflow.version
@@ -437,7 +437,7 @@ abstract class WorkflowRepositoryTest {
                     workflowsToPersist.forEach { workflow ->
                         val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version)
                         retrieved shouldNotBe null
-                        retrieved?.id shouldBe workflow.id
+                        retrieved?.workflowId shouldBe workflow.workflowId
                     }
                 }
             }

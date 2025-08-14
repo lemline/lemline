@@ -33,9 +33,10 @@ internal class RunWorkflowRepository : OutboxRepository<RunWorkflowModel>() {
     override val tableName = RUN_WORKFLOW_TABLE
 
     override fun createModel(rs: ResultSet) = RunWorkflowModel(
-        id = rs.getString("id"),
+        workflowId = rs.getString("id"),
         message = rs.getString("message"),
         status = OutBoxStatus.valueOf(rs.getString("status")),
+        scheduledFor = rs.getInstant("scheduled_for"),
         delayedUntil = rs.getInstant("delayed_until"),
         attemptCount = rs.getInt("attempt_count"),
         lastError = rs.getString("last_error"),

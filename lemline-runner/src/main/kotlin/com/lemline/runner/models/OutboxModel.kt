@@ -17,9 +17,9 @@ import java.time.Instant
  * 4. Cleaning up successfully processed messages
  *
  * @see OutboxProcessor for the processing logic
- * @see UuidV7Entity for the base entity functionality
+ * @see InstanceModel for the base entity functionality
  */
-abstract class OutboxModel : UuidV7Entity() {
+abstract class OutboxModel : InstanceModel() {
     /**
      * The actual message content to be processed.
      * This is typically a JSON serialized representation of the message payload.
@@ -37,6 +37,12 @@ abstract class OutboxModel : UuidV7Entity() {
      * @see OutBoxStatus for possible status values
      */
     abstract var status: OutBoxStatus
+
+    /**
+     * The specific timestamp indicating when a message or task is scheduled for processing or execution.
+     * If null, the message or task is not yet scheduled or has no specific scheduled time.
+     */
+    abstract var scheduledFor: Instant?
 
     /**
      * Number of processing attempts made for this message.

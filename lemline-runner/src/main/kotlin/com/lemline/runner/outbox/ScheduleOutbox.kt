@@ -10,8 +10,6 @@ import io.quarkus.runtime.Startup
 import io.quarkus.smallrye.reactivemessaging.sendSuspending
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.time.Duration
-import java.time.Instant
 import kotlin.jvm.optionals.getOrNull
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
@@ -55,34 +53,36 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     // Cleanup configuration
     override val cleanupConf by lazy { lemlineConfig.outbox().schedule().cleanup() }
 
-    override suspend fun process(model: ScheduleModel) {
+    override suspend fun process(entity: ScheduleModel) {
         // delayedUntil is never null within the scope of this method
-        val now = model.delayedUntil!!
+        val now = entity.delayedUntil!!
 
-        // start new instance of the workflow
-        send(model.message)
+        // start a new instance of the workflow
+        send(entity.message)
 
-        model.delayedUntil = when {
-            model.cron != null -> getNextInstantCron(model.cron)
+        // update the schedule model with the next instant to be processed
+        val delayedUntil = when {
+            entity.after != null -> null // <- next instant remains undefined. It's set only after the instance's completion
 
-            // here next instant remains undefined as it is set only after the completion of the current instance
-            model.after != null -> null
+            entity.cron != null -> entity.getNextScheduledExecutionInstant().also {
+                // if there is no more occurrence, we set the status to SENT for allowing cleaning
+                if (it == null) entity.status = OutBoxStatus.SENT
+            }
 
-            model.every != null -> now + getDuration(model.every)
+            entity.every != null -> now + entity.every
 
             else -> error("Invalid schedule model")
         }
+
+        // Note: we don't update the status to SENT as the schedule model is still waiting for the next execution.
+        entity.delayedUntil = delayedUntil
+        if (delayedUntil != null) entity.scheduledFor = delayedUntil
     }
-
-    // get next instant according to the provided cron expression
-    private fun getNextInstantCron(cron: String): Instant? = TODO()
-
-    private fun getDuration(d: String): Duration? = Duration.parse(d)
 
     private suspend fun send(message: String) =
         emitter.sendSuspending(message.replace(ID_PLACEHOLDER, IdGenerator.generateTimeBasedId()))
 
     companion object {
-        private const val ID_PLACEHOLDER = "`ID`"
+        private const val ID_PLACEHOLDER = "`WORKFLOW_ID`"
     }
 }

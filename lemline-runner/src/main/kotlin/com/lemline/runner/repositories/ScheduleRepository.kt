@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.cronutils.model.CronType
+import com.cronutils.model.definition.CronDefinitionBuilder
+import com.cronutils.parser.CronParser
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.SCHEDULE_TABLE
 import com.lemline.runner.models.ScheduleModel
@@ -9,6 +12,7 @@ import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.ResultSet
+import java.time.Duration
 
 /**
  * Repository for managing wait messages in the outbox pattern.
@@ -32,14 +36,21 @@ internal class ScheduleRepository : OutboxRepository<ScheduleModel>() {
     override val tableName = SCHEDULE_TABLE
 
     override fun createModel(rs: ResultSet) = ScheduleModel(
-        id = rs.getString("id"),
-        cron = rs.getString("cron"),
-        after = rs.getString("after"),
-        every = rs.getString("every"),
+        workflowId = rs.getString("id"),
+        cron = rs.getString("cron")?.let { cronParser.parse(it) },
+        after = rs.getString("after")?.let { Duration.parse(it) },
+        every = rs.getString("every")?.let { Duration.parse(it) },
         message = rs.getString("message"),
         status = OutBoxStatus.valueOf(rs.getString("status")),
+        scheduledFor = rs.getInstant("scheduled_for"),
         delayedUntil = rs.getInstant("delayed_until"),
         attemptCount = rs.getInt("attempt_count"),
         lastError = rs.getString("last_error"),
     )
+
+
+    companion object {
+        private val cronParser by lazy { CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX)) }
+    }
+
 }

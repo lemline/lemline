@@ -15,7 +15,7 @@ internal class WorkflowModelMessageTest {
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {
         // Given
-        val message = Message(
+        val messageBody = MessageBody(
             name = "test-workflow",
             version = "1.0.0",
             states = mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive(""))),
@@ -25,14 +25,14 @@ internal class WorkflowModelMessageTest {
         // When
         assertEquals(
             """{"n":"test-workflow","v":"1.0.0","s":{"":{"inp":""}},"p":""}""",
-            message.toJsonString(),
+            messageBody.toJsonString(),
         )
     }
 
     @Test
     fun `should be JSON serializable and deserializable`() {
         // Given
-        val message = Message(
+        val messageBody = MessageBody(
             name = "test-workflow",
             version = "1.0.0",
             states = mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive(""))),
@@ -40,14 +40,14 @@ internal class WorkflowModelMessageTest {
         )
 
         // When
-        val jsonString = message.toJsonString()
-        assertEquals(message, Message.fromJsonString(jsonString))
+        val jsonString = messageBody.toJsonString()
+        assertEquals(messageBody, MessageBody.fromJsonString(jsonString))
     }
 
     @Test
     fun `should serialize and deserialize WorkflowMessage`() {
         // Given
-        val message = Message(
+        val messageBody = MessageBody(
             name = "test-workflow",
             version = "1.0.0",
             states = mapOf(
@@ -61,11 +61,11 @@ internal class WorkflowModelMessageTest {
         )
 
         // When
-        val json = LemlineJson.encodeToString(message)
-        val deserialized = LemlineJson.decodeFromString<Message>(json)
+        val json = LemlineJson.encodeToString(messageBody)
+        val deserialized = LemlineJson.decodeFromString<MessageBody>(json)
 
         // Then
-        assertEquals(message, deserialized)
+        assertEquals(messageBody, deserialized)
     }
 
     @Test
@@ -82,20 +82,20 @@ internal class WorkflowModelMessageTest {
         )
 
         // When
-        val message = Message.newInstance(name, version, input, id)
+        val messageBody = MessageBody.newInstance(id, name, version, input)
 
         // Then
         val expectedStates = mapOf(
             NodePosition.root to NodeState(
                 workflowId = id,
                 rawInput = input,
-                startedAt = message.states[NodePosition.root]!!.startedAt,
+                startedAt = messageBody.states[NodePosition.root]!!.startedAt,
             ),
         )
 
-        assertEquals(name, message.name)
-        assertEquals(version, message.version)
-        assertEquals(expectedStates, message.states)
-        assertEquals(NodePosition.root, message.position)
+        assertEquals(name, messageBody.name)
+        assertEquals(version, messageBody.version)
+        assertEquals(expectedStates, messageBody.states)
+        assertEquals(NodePosition.root, messageBody.position)
     }
 }

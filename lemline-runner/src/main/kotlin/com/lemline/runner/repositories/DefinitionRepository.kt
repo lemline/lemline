@@ -29,10 +29,9 @@ class DefinitionRepository : Repository<DefinitionModel>() {
     }
 
     override fun PreparedStatement.bindInsertWith(entity: DefinitionModel) = apply {
-        setString(1, entity.id) // Sets the workflow definition
-        setString(2, entity.definition) // Sets the workflow definition
-        setString(3, entity.name) // Sets the workflow name
-        setString(4, entity.version) // Sets the workflow version
+        setString(1, entity.definition) // Sets the workflow definition
+        setString(2, entity.name) // Sets the workflow name
+        setString(3, entity.version) // Sets the workflow version
     }
 
     override fun PreparedStatement.bindDeleteWith(entity: DefinitionModel) = apply {
@@ -48,7 +47,6 @@ class DefinitionRepository : Repository<DefinitionModel>() {
      * @return A new workflow model instance populated with data from the ResultSet
      */
     override fun createModel(rs: ResultSet): DefinitionModel = DefinitionModel(
-        id = rs.getString("id"),
         name = rs.getString("name"),
         version = rs.getString("version"),
         definition = rs.getString("definition")

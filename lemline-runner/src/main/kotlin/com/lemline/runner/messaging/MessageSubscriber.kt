@@ -16,7 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.future
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
-import org.eclipse.microprofile.reactive.messaging.Message as ReactiveMessage
+import org.eclipse.microprofile.reactive.messaging.Message
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
@@ -37,7 +37,7 @@ import org.slf4j.Logger
  * @param logger Logger instance for recording events and errors
  */
 
-internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
+internal class MessageSubscriber<P, T : Message<P>>(
     private val publisher: Publisher<T>,
     private val handleMessage: suspend (item: T) -> Unit, // Changed signature
     private val maxConcurrency: Int,

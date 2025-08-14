@@ -119,7 +119,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Verify the mock was called (at least once, type checked by any())
         coVerify(atLeast = 1) { mockProcessorFunction(any(modelClass)) }
 
-        val processedMessage = testRepository.findById(message.id)
+        val processedMessage = testRepository.findById(message.workflowId)
         processedMessage shouldNotBe null
         processedMessage!!.status shouldBe SENT
         processedMessage.attemptCount shouldBe 1
@@ -168,7 +168,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert: First attempt failed - Check DB state
         coVerify(exactly = 1) { mockProcessorFunction(any(modelClass)) } // Verify it was called once
-        val updated = testRepository.findById(original.id)!!
+        val updated = testRepository.findById(original.workflowId)!!
 
         updated.status shouldBe PENDING
         updated.attemptCount shouldBe 1
@@ -189,7 +189,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert: A second attempt succeeded - Check DB state
         coVerify(exactly = 2) { mockProcessorFunction(any(modelClass)) } // Verify it was called again
-        val final = testRepository.findById(original.id)!!
+        val final = testRepository.findById(original.workflowId)!!
 
         final.status shouldBe SENT // Status updated
         final.attemptCount shouldBe 2
@@ -233,7 +233,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
             // when
             outboxProcessor.process(batchSize, maxAttempts, initialDelay)
             // then
-            val updated = testRepository.findById(original.id)!!
+            val updated = testRepository.findById(original.workflowId)!!
             if (attempt < maxAttempts) {
                 updated.status shouldBe PENDING
                 updated.attemptCount shouldBe attempt
@@ -328,10 +328,10 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         }
         testRepository.insert(listOf(oldSentMessage, recentSentMessage, pendingMessage, failedMessage))
 
-        val oldSentId = oldSentMessage.id
-        val recentSentId = recentSentMessage.id
-        val pendingId = pendingMessage.id
-        val failedId = failedMessage.id
+        val oldSentId = oldSentMessage.workflowId
+        val recentSentId = recentSentMessage.workflowId
+        val pendingId = pendingMessage.workflowId
+        val failedId = failedMessage.workflowId
 
         // Act
         outboxProcessor.cleanup(retentionDelay, 2) // Use small batch size for testing

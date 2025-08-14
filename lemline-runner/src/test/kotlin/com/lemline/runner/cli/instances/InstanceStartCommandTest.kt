@@ -3,7 +3,7 @@ package com.lemline.runner.cli.instances
 
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
-import com.lemline.runner.messaging.Message
+import com.lemline.runner.messaging.MessageBody
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.matchers.shouldBe
@@ -104,7 +104,7 @@ class InstanceStartCommandTest {
      * Helper method to execute command and verify basic success conditions
      * Returns the captured Message for further assertions
      */
-    private fun executeCommandAndVerify(vararg args: String): Message {
+    private fun executeCommandAndVerify(vararg args: String): MessageBody {
         // When
         val exitCode = cmd.execute(*args)
 
@@ -119,11 +119,11 @@ class InstanceStartCommandTest {
 
         verify { emitter.send(capture(messageSlot)) }
 
-        val sentMessage = LemlineJson.decodeFromString<Message>(messageSlot.captured)
-        sentMessage.name shouldBe workflowName
-        sentMessage.version shouldBe workflowVersion
+        val sentMessageBody = LemlineJson.decodeFromString<MessageBody>(messageSlot.captured)
+        sentMessageBody.name shouldBe workflowName
+        sentMessageBody.version shouldBe workflowVersion
 
-        return sentMessage
+        return sentMessageBody
     }
 
     @Nested

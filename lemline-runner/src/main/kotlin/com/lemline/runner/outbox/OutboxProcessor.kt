@@ -118,19 +118,18 @@ internal class OutboxProcessor<T : OutboxModel>(
     private suspend fun processMessage(message: T, maxAttempts: Int, initialDelay: Duration): Boolean = try {
         message.attemptCount++
         processor(message)
-        message.status = OutBoxStatus.SENT
         true // <- return true (success)
     } catch (e: Exception) {
-        logger.warn(e) { "Failed to process message ${message.id}" }
+        logger.warn(e) { "Failed to process message ${message.workflowId}" }
         message.lastError = e.stackTraceToString()
 
         if (message.attemptCount >= maxAttempts) {
             message.status = OutBoxStatus.FAILED
-            logger.error { "Message ${message.id} has reached maximum retry attempts" }
+            logger.error { "Message ${message.workflowId} has reached maximum retry attempts" }
         } else {
             val nextDelay = calculateNextAttemptDelay(message.attemptCount, initialDelay)
             message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.MILLIS)
-            logger.debug { "Message ${message.id} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})" }
+            logger.debug { "Message ${message.workflowId} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})" }
         }
         false // <- return false (failure)
     }

@@ -3,6 +3,7 @@ package com.lemline.runner
 
 import com.lemline.common.debug
 import com.lemline.common.logger
+import com.lemline.common.utils.IdGenerator
 import com.lemline.core.activities.runs.getInputFor
 import com.lemline.core.instances.RunInstance
 import com.lemline.core.instances.TryInstance
@@ -13,12 +14,11 @@ import com.lemline.runner.exceptions.RunWorkflowStartedException
 import com.lemline.runner.exceptions.TaskCompletedException
 import com.lemline.runner.exceptions.TaskRetriedException
 import com.lemline.runner.exceptions.WaitStartedException
-import com.lemline.runner.messaging.Message
+import com.lemline.runner.messaging.MessageBody
 import com.lemline.runner.messaging.toMessage
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.RunWorkflowModel
 import com.lemline.runner.models.WaitModel
-import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.RunWorkflowRepository
 import com.lemline.runner.repositories.WaitRepository
@@ -58,7 +58,7 @@ internal class StepByStepRunner @Inject constructor(
         }
     }
 
-    suspend fun run(instance: WorkflowInstance): Message? {
+    suspend fun run(instance: WorkflowInstance): MessageBody? {
 
         instance.onTaskCompleted { onTaskCompleted(it) }
         instance.onTaskStarted { onTaskStarted(it) }
@@ -106,30 +106,34 @@ internal class StepByStepRunner @Inject constructor(
      */
     private suspend fun WorkflowInstance.onRunWorkflow(runWorkflow: RunWorkflow) {
 
-        // in the same transaction, we need to insert the parent workflow (waiting) and the child workflow (running)
         runWorkflowRepository.withTransaction { connection ->
-            // insert the parent workflow (waiting) without date for delayedUntil
+            // in the same transaction!
+
+            // insert the parent workflow (waiting) without delayedUntil
             runWorkflowRepository.insert(
                 RunWorkflowModel(
-                    id = id,
+                    workflowId = this.id,
                     message = toMessage().jsonString,
-                    status = OutBoxStatus.PENDING,
                     delayedUntil = null
                 ),
                 connection
             )
 
-            // insert the child workflow (running) to start right away (the id must NOT be the workflow id)
-            val child = Message.newInstance(
+            // insert the child workflow (running) to start right away
+            val childId = IdGenerator.generateTimeBasedId()
+
+            val child = MessageBody.newInstance(
+                workflowId = childId,
                 name = runWorkflow.workflow.name,
                 version = runWorkflow.workflow.version,
                 input = runWorkflow.getInputFor(current as RunInstance),
-                parentId = id,
+                parentId = this.id,
                 parentIsWaiting = runWorkflow.isAwait
 
             )
             runWorkflowRepository.insert(
                 RunWorkflowModel(
+                    workflowId = childId,
                     message = child.jsonString,
                     delayedUntil = Instant.now(),
                 ),
@@ -148,17 +152,17 @@ internal class StepByStepRunner @Inject constructor(
             // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
             val runModel = runWorkflowRepository.findById(parent!!.workflowId)!!
             // Deserialize the message
-            val message = Message.fromJsonString(runModel.message)
+            val messageBody = MessageBody.fromJsonString(runModel.message)
             // set the workflow output at the rawOutput at the current position of the parent workflow
-            message.states[message.position]!!.rawOutput = getOutput()
+            messageBody.states[messageBody.position]!!.rawOutput = getOutput()
             // by adding a delayedUntil value, the outbox pattern will send the message asap to restart the parent workflow
             runWorkflowRepository.update(
                 runModel.copy(
                     delayedUntil = Instant.now(),
-                    message = message.jsonString
+                    message = messageBody.jsonString
                 )
             )
-            logger.debug { "Restarting parent workflow:\n${message.jsonPrettyString}" }
+            logger.debug { "Restarting parent workflow:\n${messageBody.jsonPrettyString}" }
         }
     }
 
@@ -173,6 +177,7 @@ internal class StepByStepRunner @Inject constructor(
         val delay = (current as TryInstance).delay?.toJavaDuration()
 
         val retryModel = RetryModel(
+            workflowId = this.id,
             message = toMessage().jsonString,
             delayedUntil = Instant.now().plus(delay ?: error("No delay set in for $this"))
         )
@@ -189,6 +194,7 @@ internal class StepByStepRunner @Inject constructor(
      */
     private suspend fun WorkflowInstance.onWait(delay: Duration) {
         val waitModel = WaitModel(
+            workflowId = this.id,
             message = toMessage().jsonString,
             delayedUntil = Instant.now().plus(delay.toJavaDuration()),
         )

@@ -5,7 +5,6 @@ import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
-import com.lemline.runner.models.UuidV7Entity
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -13,7 +12,7 @@ import java.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-abstract class Repository<T : UuidV7Entity> {
+abstract class Repository<T> {
 
     internal abstract val databaseManager: DatabaseManager
 

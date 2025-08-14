@@ -1,21 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.common.utils.IdGenerator
 import com.lemline.core.json.LemlineJson
 import io.serverlessworkflow.api.types.Workflow
 
 const val DEFINITION_TABLE = "lemline_definitions"
 
 data class DefinitionModel(
-    override val id: String = IdGenerator.generateTimeBasedId(),
-
     val name: String,
 
     val version: String,
 
     val definition: String
-) : UuidV7Entity() {
+) {
     companion object {
         fun from(workflow: Workflow) = DefinitionModel(
             name = workflow.document.name,

@@ -48,30 +48,33 @@ import java.time.Instant
  */
 abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
 
-    override val columns = listOf("id", "message", "status", "delayed_until", "attempt_count", "last_error")
+    override val columns =
+        listOf("id", "message", "status", "scheduled_for", "delayed_until", "attempt_count", "last_error")
 
     override val keyColumns: List<String> = listOf("id")
 
     override fun PreparedStatement.bindUpdateWith(entity: T) = apply {
-        setString(1, entity.message) // Sets the message content
-        setString(2, entity.status.name) // Sets the status as a string
-        setTimestamp(3, entity.delayedUntil?.let { java.sql.Timestamp.from(it) }) // Sets the delayed until timestamp
-        setInt(4, entity.attemptCount) // Sets the attempt count
-        setString(5, entity.lastError) // Sets the last error message, if any
-        setString(6, entity.id) // Sets the last error message, if any
+        setString(1, entity.message)
+        setString(2, entity.status.name)
+        setTimestamp(3, entity.scheduledFor?.let { java.sql.Timestamp.from(it) })
+        setTimestamp(4, entity.delayedUntil?.let { java.sql.Timestamp.from(it) })
+        setInt(5, entity.attemptCount)
+        setString(6, entity.lastError)
+        setString(7, entity.workflowId)
     }
 
     override fun PreparedStatement.bindInsertWith(entity: T) = apply {
-        setString(1, entity.id) // Sets the ID of the entity
-        setString(2, entity.message) // Sets the message content
-        setString(3, entity.status.name) // Sets the status as a string
-        setTimestamp(4, entity.delayedUntil?.let { java.sql.Timestamp.from(it) })  // Sets the delayed until timestamp
-        setInt(5, entity.attemptCount) // Sets the attempt count
-        setString(6, entity.lastError) // Sets the last error message, if any
+        setString(1, entity.workflowId)
+        setString(2, entity.message)
+        setString(3, entity.status.name)
+        setTimestamp(4, entity.scheduledFor?.let { java.sql.Timestamp.from(it) })
+        setTimestamp(5, entity.delayedUntil?.let { java.sql.Timestamp.from(it) })
+        setInt(6, entity.attemptCount)
+        setString(7, entity.lastError)
     }
 
     override fun PreparedStatement.bindDeleteWith(entity: T) = apply {
-        setString(1, entity.id) // Bind id to the first parameter
+        setString(1, entity.workflowId) // Bind id to the first parameter
     }
 
     /**

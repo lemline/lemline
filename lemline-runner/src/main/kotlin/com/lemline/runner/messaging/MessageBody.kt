@@ -23,31 +23,33 @@ import kotlinx.serialization.json.JsonElement
  * @property position The current active initial position
  */
 @Serializable
-data class Message(
+data class MessageBody(
     @SerialName("n") val name: String,
     @SerialName("v") val version: String,
     @SerialName("s") val states: Map<NodePosition, NodeState>,
     @SerialName("p") val position: NodePosition,
 ) {
+    // Message is immutable, so we can cache the JSON string representation
     internal val jsonString: String by lazy { LemlineJson.encodeToString(this) }
 
+    // Message is immutable, so we can cache the JSON string representation in pretty format
     internal val jsonPrettyString: String by lazy { LemlineJson.encodeToPrettyString(this) }
 
     companion object {
         fun newInstance(
+            workflowId: String = IdGenerator.generateTimeBasedId(),
             name: String,
             version: String,
             input: JsonElement,
-            id: String = IdGenerator.generateTimeBasedId(),
             parentId: String? = null,
             parentIsWaiting: Boolean = false,
-        ) = Message(
+        ) = MessageBody(
             name = name,
             version = version,
             states = mapOf(
                 NodePosition.root to NodeState(
                     parent = parentId?.let { NodeState.Parent(it, parentIsWaiting) },
-                    workflowId = id,
+                    workflowId = workflowId,
                     rawInput = input,
                     startedAt = Instant.now(),
                 ),
@@ -55,7 +57,7 @@ data class Message(
             position = NodePosition.root,
         )
 
-        fun fromJsonString(json: String): Message = LemlineJson.decodeFromString(json)
+        fun fromJsonString(json: String): MessageBody = LemlineJson.decodeFromString(json)
     }
 
     fun toWorkflowInstance(secrets: Map<String, JsonElement>) = WorkflowInstance(
@@ -67,7 +69,7 @@ data class Message(
     )
 }
 
-internal fun WorkflowInstance.toMessage() = Message(
+internal fun WorkflowInstance.toMessage() = MessageBody(
     name = this.name,
     version = this.version,
     states = this.states,

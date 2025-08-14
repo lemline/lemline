@@ -2,7 +2,7 @@
 package com.lemline.runner.messaging.bases
 
 import com.lemline.core.json.LemlineJson
-import com.lemline.runner.messaging.Message
+import com.lemline.runner.messaging.MessageBody
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.outbox.OutBoxStatus
@@ -160,13 +160,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
-        val message = Message.newInstance(
+        val messageBody = MessageBody.newInstance(
+            workflowId = "test-id",
             name = "test-workflow",
             version = "1.0.0",
             input = JsonPrimitive("task"),
-            id = "test-id",
         )
-        val messageJson = LemlineJson.encodeToString(message)
+        val messageJson = LemlineJson.encodeToString(messageBody)
 
         // When
         val future = sendMessageFuture(messageJson)
@@ -242,13 +242,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should store instance with retry in retry repository`() = runTest {
         // Given
-        val message = Message.newInstance(
+        val messageBody = MessageBody.newInstance(
+            "test-id",
             "test-workflow",
             "1.0.0",
             JsonPrimitive("retry"),
-            "test-id",
         )
-        val messageJson = LemlineJson.encodeToString(message)
+        val messageJson = LemlineJson.encodeToString(messageBody)
 
         // When
         val future = sendMessageFuture(messageJson)
@@ -283,13 +283,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should store waiting instance in wait repository`() = runTest {
         // Given
-        val message = Message.newInstance(
+        val messageBody = MessageBody.newInstance(
+            "test-id",
             "test-workflow",
             "1.0.0",
             JsonPrimitive("wait"),
-            "test-id",
         )
-        val messageJson = LemlineJson.encodeToString(message)
+        val messageJson = LemlineJson.encodeToString(messageBody)
 
         // When
         val future = sendMessageFuture(messageJson)
@@ -332,13 +332,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should handle completed workflow without sending message`() = runTest {
         // Given
-        val message = Message.newInstance(
+        val messageBody = MessageBody.newInstance(
+            "test-id",
             "test-workflow",
             "1.0.0",
             JsonPrimitive("completed"),
-            "test-id",
         )
-        val messageJson = LemlineJson.encodeToString(message)
+        val messageJson = LemlineJson.encodeToString(messageBody)
 
         // When
         val future = sendMessageFuture(messageJson)
