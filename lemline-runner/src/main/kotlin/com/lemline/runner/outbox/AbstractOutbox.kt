@@ -71,8 +71,8 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     private val outboxCleaning = AtomicBoolean(false)
 
     open suspend fun process(entity: T) {
-        emitter.sendSuspending(entity.message)
-        entity.status = OutBoxStatus.SENT
+        emitter.sendSuspending(entity.toMessageBody().jsonString)
+        entity.outBoxStatus = OutBoxStatus.SENT
     }
 
     @PostConstruct
@@ -83,7 +83,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         }
 
         // Schedule outbox processing
-        val outboxPeriodSeconds = processingPeriod.toDuration().toSeconds()
+        val outboxPeriodSeconds = processingPeriod.toDuration().inWholeSeconds
         outboxProcessingExecutor.scheduleAtFixedRate(
             { scope.launch { outbox() } },
             0,
@@ -93,7 +93,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         logger.info("⏱️ Outbox processing scheduled every ${outboxPeriodSeconds}s")
 
         // Schedule cleanup
-        val cleanupPeriodSeconds = cleanupPeriod.toDuration().toSeconds()
+        val cleanupPeriodSeconds = cleanupPeriod.toDuration().inWholeSeconds
         outboxCleaningExecutor.scheduleAtFixedRate(
             { scope.launch { cleanup() } },
             0,

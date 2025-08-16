@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import java.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
@@ -21,7 +21,6 @@ data class NodeState(
     @SerialName(RAW_INPUT) var rawInput: JsonElement? = null,
     @SerialName(RAW_OUTPUT) var rawOutput: JsonElement? = null,
     @SerialName(CONTEXT) var context: JsonObject = LemlineJson.jsonObject,
-    @SerialName(WORKFLOW_ID) var workflowId: String? = null,
     @SerialName(PARENT) var parent: Parent? = null,
     @SerialName(STARTED_AT) @Contextual var startedAt: Instant? = null,
     @SerialName(FOR_INDEX) var forIndex: Int = FOR_INDEX_DEFAULT,

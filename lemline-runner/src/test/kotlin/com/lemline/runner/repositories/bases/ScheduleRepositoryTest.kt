@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
+import com.lemline.common.ids.IdGenerator
 import com.lemline.runner.models.ScheduleModel
 import com.lemline.runner.repositories.ScheduleRepository
 import jakarta.inject.Inject
+import java.time.Duration
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import kotlin.random.Random
 
 /**
@@ -16,11 +19,12 @@ internal abstract class ScheduleRepositoryTest : OutboxRepositoryTest<ScheduleMo
     override lateinit var repository: ScheduleRepository
 
     override fun createWithMessage(message: String) = ScheduleModel(
+        workflowId = IdGenerator.generateTimeBasedId(),
         message = message,
-        cron = Random.nextBytes(16).toString(),
-        after = Random.nextBytes(16).toString(),
-        every = Random.nextBytes(16).toString(),
-        delayedUntil = Instant.now()
+        cron = null,
+        after = null,
+        every = Duration.of(Random.nextLong(), ChronoUnit.MILLIS),
+        outboxScheduledFor = Instant.now()
     )
 
     override fun copyModel(model: ScheduleModel, message: String) = model.copy(message = message)

@@ -2,8 +2,8 @@
 package com.lemline.runner
 
 import com.lemline.common.debug
+import com.lemline.common.ids.IdGenerator
 import com.lemline.common.logger
-import com.lemline.common.utils.IdGenerator
 import com.lemline.core.activities.runs.getInputFor
 import com.lemline.core.instances.RunInstance
 import com.lemline.core.instances.TryInstance
@@ -26,14 +26,15 @@ import io.quarkus.runtime.Startup
 import io.serverlessworkflow.api.types.RunWorkflow
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.time.Instant
+import kotlin.time.Clock
 import kotlin.time.Duration
-import kotlin.time.toJavaDuration
+import kotlin.time.ExperimentalTime
 
 /**
  * WorkflowConsumer is responsible for consuming workflow messages from the incoming channel,
  * processing them, and sending the results to the outgoing channel.
  */
+@OptIn(ExperimentalTime::class)
 @Startup
 @ApplicationScoped
 internal class StepByStepRunner @Inject constructor(
@@ -112,9 +113,11 @@ internal class StepByStepRunner @Inject constructor(
             // insert the parent workflow (waiting) without delayedUntil
             runWorkflowRepository.insert(
                 RunWorkflowModel(
-                    workflowId = this.id,
-                    message = toMessage().jsonString,
-                    delayedUntil = null
+                    workflowId = id,
+                    workflowName = name,
+                    workflowVersion = version,
+                    workflowPosition = position!!.toString(),
+                    workflowState = state.toJsonString()
                 ),
                 connection
             )
@@ -123,19 +126,22 @@ internal class StepByStepRunner @Inject constructor(
             val childId = IdGenerator.generateTimeBasedId()
 
             val child = MessageBody.newInstance(
-                workflowId = childId,
+                id = childId,
                 name = runWorkflow.workflow.name,
                 version = runWorkflow.workflow.version,
                 input = runWorkflow.getInputFor(current as RunInstance),
-                parentId = this.id,
+                parentId = id,
                 parentIsWaiting = runWorkflow.isAwait
 
             )
             runWorkflowRepository.insert(
                 RunWorkflowModel(
                     workflowId = childId,
-                    message = child.jsonString,
-                    delayedUntil = Instant.now(),
+                    workflowName = child.workflowName,
+                    workflowVersion = child.workflowVersion,
+                    workflowPosition = child.workflowPosition.serialized,
+                    workflowState = child.workflowState.serialized,
+                    outboxScheduledFor = Clock.System.now(),
                 ),
                 connection
             )
@@ -150,19 +156,19 @@ internal class StepByStepRunner @Inject constructor(
     private suspend fun WorkflowInstance.onWorkflowCompleted() {
         if (parent?.isWaiting == true) {
             // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
-            val runModel = runWorkflowRepository.findById(parent!!.workflowId)!!
-            // Deserialize the message
-            val messageBody = MessageBody.fromJsonString(runModel.message)
+            val entity: RunWorkflowModel = runWorkflowRepository.findById(parent!!.workflowId)!!
+            // Get current state of the parent workflow
+            val state = entity.state
             // set the workflow output at the rawOutput at the current position of the parent workflow
-            messageBody.states[messageBody.position]!!.rawOutput = getOutput()
+            state[entity.position]!!.rawOutput = getOutput()
             // by adding a delayedUntil value, the outbox pattern will send the message asap to restart the parent workflow
             runWorkflowRepository.update(
-                runModel.copy(
-                    delayedUntil = Instant.now(),
-                    message = messageBody.jsonString
+                entity.copy(
+                    outboxDelayedUntil = Clock.System.now(),
+                    workflowState = state.toJsonString()
                 )
             )
-            logger.debug { "Restarting parent workflow:\n${messageBody.jsonPrettyString}" }
+            logger.debug { "Restarting parent workflow:\n${entity.toMessageBody().jsonPrettyString}" }
         }
     }
 
@@ -173,13 +179,18 @@ internal class StepByStepRunner @Inject constructor(
      * halted temporarily, with the expectation that further processing will be resumed asynchronously
      * via an external mechanism like an outbox system.
      */
+    @OptIn(ExperimentalTime::class)
     private suspend fun WorkflowInstance.onRetry() {
-        val delay = (current as TryInstance).delay?.toJavaDuration()
+        val delay = (current as TryInstance).delay ?: error("No delay set in for $this")
 
         val retryModel = RetryModel(
-            workflowId = this.id,
-            message = toMessage().jsonString,
-            delayedUntil = Instant.now().plus(delay ?: error("No delay set in for $this"))
+            workflowId = id,
+            workflowName = name,
+            workflowVersion = version,
+            workflowPosition = position.toString(),
+            workflowState = state.toJsonString(),
+            message = null,
+            outboxDelayedUntil = Clock.System.now().plus(delay)
         )
         // Save the message to the retry table
         retryRepository.insert(retryModel)
@@ -194,9 +205,12 @@ internal class StepByStepRunner @Inject constructor(
      */
     private suspend fun WorkflowInstance.onWait(delay: Duration) {
         val waitModel = WaitModel(
-            workflowId = this.id,
-            message = toMessage().jsonString,
-            delayedUntil = Instant.now().plus(delay.toJavaDuration()),
+            workflowId = id,
+            workflowName = name,
+            workflowVersion = version,
+            workflowPosition = position!!.toString(),
+            workflowState = state.toJsonString(),
+            outboxDelayedUntil = Clock.System.now().plus(delay),
         )
         // Save the message to the wait table
         waitRepository.insert(waitModel)

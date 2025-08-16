@@ -3,7 +3,8 @@ package com.lemline.runner.models
 
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxProcessor
-import java.time.Instant
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Base class for outbox pattern message models.
@@ -19,13 +20,8 @@ import java.time.Instant
  * @see OutboxProcessor for the processing logic
  * @see InstanceModel for the base entity functionality
  */
-abstract class OutboxModel : InstanceModel() {
-    /**
-     * The actual message content to be processed.
-     * This is typically a JSON serialized representation of the message payload.
-     */
-    abstract val message: String
-
+@OptIn(ExperimentalTime::class)
+abstract class OutboxModel() : InstanceModel() {
     /**
      * Current status of the message in the outbox. Possible values:
      * - PENDING: Message is ready to be processed
@@ -36,13 +32,21 @@ abstract class OutboxModel : InstanceModel() {
      *
      * @see OutBoxStatus for possible status values
      */
-    abstract var status: OutBoxStatus
+    abstract var outBoxStatus: OutBoxStatus
 
     /**
      * The specific timestamp indicating when a message or task is scheduled for processing or execution.
      * If null, the message or task is not yet scheduled or has no specific scheduled time.
      */
-    abstract var scheduledFor: Instant?
+    abstract var outboxScheduledFor: Instant?
+
+    /**
+     * Timestamp indicating when the message should be processed next.
+     * Used for implementing retry delays with exponential backoff.
+     *
+     * @see OutboxProcessor for delay calculation
+     */
+    abstract var outboxDelayedUntil: Instant?
 
     /**
      * Number of processing attempts made for this message.
@@ -51,7 +55,7 @@ abstract class OutboxModel : InstanceModel() {
      *
      * @see OutboxProcessor.process for retry logic
      */
-    abstract var attemptCount: Int
+    abstract var outboxAttemptCount: Int
 
     /**
      * Last error message encountered during processing.
@@ -59,13 +63,5 @@ abstract class OutboxModel : InstanceModel() {
      * It helps with debugging and monitoring message processing issues.
      * Null if no errors have occurred yet.
      */
-    abstract var lastError: String?
-
-    /**
-     * Timestamp indicating when the message should be processed next.
-     * Used for implementing retry delays with exponential backoff.
-     *
-     * @see OutboxProcessor for delay calculation
-     */
-    abstract var delayedUntil: Instant?
+    abstract var outboxLastError: String?
 }

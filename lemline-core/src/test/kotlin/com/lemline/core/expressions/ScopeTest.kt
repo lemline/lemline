@@ -1,22 +1,22 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.expressions
 
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.RuntimeDescriptor
 import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
-import com.lemline.core.json.LemlineJson
 import com.lemline.core.loadWorkflowFromYaml
 import com.lemline.core.set
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import java.time.Instant
+import java.util.*
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import java.time.Instant
-import java.util.*
 
 class ScopeTest :
     StringSpec({

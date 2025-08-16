@@ -13,6 +13,7 @@ import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.WaitTask
+import kotlin.time.Duration
 
 /**
  * Sealed base class for all activity node instances.
@@ -61,5 +62,5 @@ class WaitInstance(node: Node<WaitTask>, parent: NodeInstance<*>) :
      * Duration for which the workflow should wait before resuming.
      * The duration is extracted from the WaitTask and converted to a Duration using ISO-8601 duration format.
      * Examples: "PT15S" (15 seconds), "PT1H" (1 hour), "P1D" (1 day) */
-    val delay by lazy { node.task.wait.toDuration() }
+    val delay: Duration by lazy { node.task.wait.toDuration() }
 }

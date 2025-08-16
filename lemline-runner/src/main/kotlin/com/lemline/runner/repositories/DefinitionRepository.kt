@@ -13,28 +13,37 @@ import java.sql.ResultSet
 @ApplicationScoped
 class DefinitionRepository : Repository<DefinitionModel>() {
 
+    companion object {
+        internal const val WORKFLOW_DEFINITION_COLUMN = "definition"
+        internal const val WORKFLOW_NAME_COLUMN = "name"
+        internal const val WORKFLOW_VERSION_COLUMN = "version"
+    }
+
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = DEFINITION_TABLE
 
-    override val columns = listOf("id", "definition", "name", "version")
+    override val insertColumns = listOf(WORKFLOW_DEFINITION_COLUMN, WORKFLOW_NAME_COLUMN, WORKFLOW_VERSION_COLUMN)
 
-    override val keyColumns: List<String> = listOf("name", "version")
+    override val updateColumns = listOf(WORKFLOW_DEFINITION_COLUMN)
 
-    override fun PreparedStatement.bindUpdateWith(entity: DefinitionModel) = apply {
+    override val keyColumns: List<String> = listOf(WORKFLOW_NAME_COLUMN, WORKFLOW_VERSION_COLUMN)
+
+    // MUST be in the same order as insertColumns
+    override fun bindInsertWith(stmt: PreparedStatement, entity: DefinitionModel) = stmt.apply {
         setString(1, entity.definition) // Sets the workflow definition
         setString(2, entity.name) // Sets the workflow name
         setString(3, entity.version) // Sets the workflow version
     }
 
-    override fun PreparedStatement.bindInsertWith(entity: DefinitionModel) = apply {
+    // MUST be in the same order as updateColumns
+    override fun bindUpdateWith(stmt: PreparedStatement, entity: DefinitionModel) = stmt.apply {
         setString(1, entity.definition) // Sets the workflow definition
-        setString(2, entity.name) // Sets the workflow name
-        setString(3, entity.version) // Sets the workflow version
     }
 
-    override fun PreparedStatement.bindDeleteWith(entity: DefinitionModel) = apply {
+    // MUST be in the same order as keyColumns
+    override fun bindDeleteWith(stmt: PreparedStatement, entity: DefinitionModel) = stmt.apply {
         setString(1, entity.name) // Bind name to the first parameter
         setString(2, entity.version) // Bind the version to the second parameter
     }
@@ -47,9 +56,9 @@ class DefinitionRepository : Repository<DefinitionModel>() {
      * @return A new workflow model instance populated with data from the ResultSet
      */
     override fun createModel(rs: ResultSet): DefinitionModel = DefinitionModel(
-        name = rs.getString("name"),
-        version = rs.getString("version"),
-        definition = rs.getString("definition")
+        name = rs.getString(WORKFLOW_NAME_COLUMN),
+        version = rs.getString(WORKFLOW_VERSION_COLUMN),
+        definition = rs.getString(WORKFLOW_DEFINITION_COLUMN)
     )
 
     /**
@@ -60,11 +69,9 @@ class DefinitionRepository : Repository<DefinitionModel>() {
      * @param connection An optional database connection. If null, a new connection will be created.
      * @return A list of `WorkflowModel` instances matching the given name.
      */
-    suspend fun listByName(name: String, connection: Connection? = null): List<DefinitionModel> {
-        val sql = "SELECT * FROM $tableName WHERE name = ?"
-
-        return withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
+    suspend fun listByName(name: String, connection: Connection? = null): List<DefinitionModel> =
+        withConnection(connection) {
+            it.prepareStatement(listByNameSql).use { stmt ->
                 stmt.apply {
                     setString(1, name)
                 }
@@ -77,7 +84,8 @@ class DefinitionRepository : Repository<DefinitionModel>() {
                 }
             }
         }
-    }
+
+    private val listByNameSql by lazy { "SELECT * FROM $tableName WHERE name = ?" }
 
     /**
      * Finds a workflow by its name and version.
@@ -87,11 +95,9 @@ class DefinitionRepository : Repository<DefinitionModel>() {
      * @param version The version of the workflow
      * @return The workflow model if found, null otherwise
      */
-    suspend fun findByNameAndVersion(name: String, version: String, connection: Connection? = null): DefinitionModel? {
-        val sql = "SELECT * FROM $tableName WHERE name = ? AND version = ? LIMIT 1"
-
-        return withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
+    suspend fun findByNameAndVersion(name: String, version: String, connection: Connection? = null): DefinitionModel? =
+        withConnection(connection) {
+            it.prepareStatement(findByNameAndVersionSql).use { stmt ->
                 stmt.apply {
                     setString(1, name)
                     setString(2, version)
@@ -101,5 +107,6 @@ class DefinitionRepository : Repository<DefinitionModel>() {
                 }
             }
         }
-    }
+
+    private val findByNameAndVersionSql by lazy { "SELECT * FROM $tableName WHERE name = ? AND version = ? LIMIT 1" }
 }

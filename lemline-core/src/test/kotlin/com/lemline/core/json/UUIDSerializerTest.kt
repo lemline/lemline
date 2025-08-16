@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.json
 
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.assertThrows
+import com.lemline.common.json.LemlineJson
 import java.util.*
 import kotlin.test.assertEquals
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 
 class UUIDSerializerTest {
     @Test

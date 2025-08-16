@@ -3,7 +3,7 @@ package com.lemline.core.expressions
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ObjectNode
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

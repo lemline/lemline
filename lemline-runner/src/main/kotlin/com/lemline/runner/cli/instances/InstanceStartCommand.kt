@@ -2,8 +2,7 @@
 package com.lemline.runner.cli.instances
 
 import com.github.zafarkhaja.semver.Version
-import com.lemline.core.json.LemlineJson
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.cli.GlobalMixin
@@ -45,20 +44,20 @@ class InstanceStartCommand : Runnable {
         arity = "0..1",
         description = ["Name of the workflow to start."]
     )
-    var name: String? = null
+    val name: String? = null
 
     @Parameters(
         index = "1",
         arity = "0..1",
         description = ["Optional version of the workflow."]
     )
-    var version: String? = null
+    val version: String? = null
 
     @Option(
         names = ["--input", "-i"],
         description = ["Input of the workflow instance (JSON format)."],
     )
-    var input: String? = null
+    val input: String? = null
 
     override fun run() = runBlocking {
         if (name.isNullOrBlank()) error("Workflow name must be provided")
@@ -67,19 +66,19 @@ class InstanceStartCommand : Runnable {
         val inputJsonElement = getInput(input)
 
         // Retrieve the workflow definition from the repository
-        val workflowDefinition = getDefinition(name!!, version)
+        val workflowDefinition = getDefinition(name, version)
 
         // Check if the workflow input is valid against the workflow definition
         checkInput(workflowDefinition.definition, inputJsonElement)
 
         // create the message
         val messageBody =
-            MessageBody.newInstance(name = name!!, version = workflowDefinition.version, input = inputJsonElement)
+            MessageBody.newInstance(name = name, version = workflowDefinition.version, input = inputJsonElement)
 
         // Synchronously send the message to the workflow-out channel
         try {
             emitter.send(messageBody.jsonString).toCompletableFuture().get()
-            println("Instance ${messageBody.states[NodePosition.root]?.workflowId} started successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement)")
+            println("Instance ${messageBody.workflowId} started successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement)")
         } catch (e: Exception) {
             error("Failed to start workflow instance: ${e.message}")
         }

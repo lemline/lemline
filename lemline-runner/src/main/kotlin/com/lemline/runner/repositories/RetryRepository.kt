@@ -7,7 +7,9 @@ import com.lemline.runner.models.RetryModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.PreparedStatement
 import java.sql.ResultSet
+import kotlin.time.ExperimentalTime
 
 /**
  * Repository for managing retry messages in the outbox pattern.
@@ -26,18 +28,40 @@ import java.sql.ResultSet
 @ApplicationScoped
 internal class RetryRepository : OutboxRepository<RetryModel>() {
 
+    companion object {
+        internal const val MESSAGE_COLUMN = "message"
+    }
+
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = RETRY_TABLE
 
+    // add the message colum
+    override val insertColumns = super.insertColumns + MESSAGE_COLUMN
+
+    // add the message colum
+    override fun bindInsertWith(stmt: PreparedStatement, entity: RetryModel): PreparedStatement = stmt.apply {
+        super.bindInsertWith(this, entity)
+        setString(super.insertColumns.size + 1, entity.message)
+    }
+
+    @ExperimentalTime
     override fun createModel(rs: ResultSet) = RetryModel(
-        workflowId = rs.getString("id"),
+        id = rs.getString(ID_COLUMN),
+
+        workflowId = rs.getString(WORKFLOW_ID_COLUMN),
+        workflowName = rs.getString(WORKFLOW_NAME_COLUMN),
+        workflowVersion = rs.getString(WORKFLOW_VERSION_COLUMN),
+        workflowPosition = rs.getString(WORKFLOW_POSITION_COLUMN),
+        workflowState = rs.getString(WORKFLOW_STATE_COLUMN),
+
+        outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
+        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
+        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
+        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
+        outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
+
         message = rs.getString("message"),
-        status = OutBoxStatus.valueOf(rs.getString("status")),
-        scheduledFor = rs.getInstant("scheduled_for"),
-        delayedUntil = rs.getInstant("delayed_until"),
-        attemptCount = rs.getInt("attempt_count"),
-        lastError = rs.getString("last_error"),
     )
 }

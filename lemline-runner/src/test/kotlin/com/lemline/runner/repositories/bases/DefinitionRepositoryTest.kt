@@ -35,7 +35,7 @@ import org.junit.jupiter.api.Test
  * @see DefinitionRepository
  * @see DefinitionModel
  */
-abstract class WorkflowRepositoryTest {
+abstract class DefinitionRepositoryTest {
 
     /** The repository implementation being tested */
     @Inject
@@ -77,7 +77,6 @@ abstract class WorkflowRepositoryTest {
         // Then
         val retrievedModel = repository.findByNameAndVersion(definitionModel.name, definitionModel.version)
         retrievedModel shouldNotBe null
-        retrievedModel?.workflowId shouldBe definitionModel.workflowId
         retrievedModel?.name shouldBe definitionModel.name
         retrievedModel?.version shouldBe definitionModel.version
         retrievedModel?.definition shouldContain definitionModel.definition
@@ -155,7 +154,7 @@ abstract class WorkflowRepositoryTest {
 
         // Then
         shouldNotThrowAny { repository.update(updated) }
-        repository.findById(original.workflowId)?.definition shouldBe "updated definition"
+        repository.findByNameAndVersion(original.name, original.version)?.definition shouldBe "updated definition"
         repository.count() shouldBe 1L
     }
 
@@ -179,9 +178,9 @@ abstract class WorkflowRepositoryTest {
         // Then
         repository.insert(updated) shouldBe 0
 
-        repository.findById(original.workflowId) shouldNotBe null
-        repository.findById(updated.workflowId) shouldBe null
-        repository.count() shouldBe 1L
+        val found = repository.findByNameAndVersion(original.name, original.version)
+        found shouldNotBe null
+        found!!.definition shouldBe original.definition
     }
 
     @Test
@@ -250,7 +249,6 @@ abstract class WorkflowRepositoryTest {
         workflows.forEach { workflow ->
             val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version)
             retrieved shouldNotBe null
-            retrieved?.workflowId shouldBe workflow.workflowId
             retrieved?.name shouldBe workflow.name
             retrieved?.version shouldBe workflow.version
             retrieved?.definition shouldBe workflow.definition
@@ -276,7 +274,7 @@ abstract class WorkflowRepositoryTest {
         // Then
         shouldNotThrowAny { repository.update(updated) }
         originals.forEachIndexed { i, model ->
-            repository.findById(model.workflowId)?.definition shouldBe "updated definition-$i"
+            repository.findByNameAndVersion(model.name, model.version)?.definition shouldBe "updated definition-$i"
         }
         repository.count() shouldBe originals.size.toLong()
     }
@@ -358,7 +356,7 @@ abstract class WorkflowRepositoryTest {
      * - All properties are correctly preserved
      */
     @Test
-    fun `should retrieve workflow by ID`() = runTest {
+    fun `should retrieve definition by ID`() = runTest {
         // Given
         val workflow = DefinitionModel(
             name = "id-test-workflow",
@@ -368,11 +366,10 @@ abstract class WorkflowRepositoryTest {
         repository.insert(workflow)
 
         // When
-        val retrieved = repository.findById(workflow.workflowId)
+        val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version)
 
         // Then
         retrieved shouldNotBe null
-        retrieved?.workflowId shouldBe workflow.workflowId
         retrieved?.name shouldBe workflow.name
         retrieved?.version shouldBe workflow.version
         retrieved?.definition shouldBe workflow.definition
@@ -402,13 +399,8 @@ abstract class WorkflowRepositoryTest {
 
         // Then
         retrieved shouldHaveSize workflows.size
-        workflows.forEach { workflow ->
-            val found = retrieved.find { it.workflowId == workflow.workflowId }
-            found shouldNotBe null
-            found?.name shouldBe workflow.name
-            found?.version shouldBe workflow.version
-            found?.definition shouldBe workflow.definition
-        }
+
+        retrieved.toSet() shouldBe workflows.toSet()
     }
 
     /**
@@ -437,7 +429,6 @@ abstract class WorkflowRepositoryTest {
                     workflowsToPersist.forEach { workflow ->
                         val retrieved = repository.findByNameAndVersion(workflow.name, workflow.version)
                         retrieved shouldNotBe null
-                        retrieved?.workflowId shouldBe workflow.workflowId
                     }
                 }
             }

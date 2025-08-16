@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.calls
 
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.OnError
 import com.lemline.core.errors.WorkflowErrorType
-import com.lemline.core.json.LemlineJson
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*

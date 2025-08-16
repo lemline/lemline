@@ -2,42 +2,68 @@
 package com.lemline.runner.models
 
 import com.cronutils.model.Cron
+import com.cronutils.model.CronType
+import com.cronutils.model.definition.CronDefinitionBuilder
 import com.cronutils.model.time.ExecutionTime
+import com.cronutils.parser.CronParser
+import com.lemline.common.ids.IdGenerator
 import com.lemline.runner.outbox.OutBoxStatus
-import java.time.Duration
-import java.time.Instant
 import java.time.ZoneId
+import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
+import kotlin.time.toKotlinInstant
 
 const val SCHEDULE_TABLE = "lemline_schedules"
 
+@OptIn(ExperimentalTime::class)
 data class ScheduleModel(
+    override val id: String = IdGenerator.generateTimeBasedId(),
+
     override val workflowId: String,
 
-    override val message: String,
+    override val workflowVersion: String,
 
-    override var status: OutBoxStatus = OutBoxStatus.PENDING,
+    override val workflowName: String,
 
-    override var scheduledFor: Instant?,
+    override val workflowPosition: String,
 
-    override var delayedUntil: Instant? = scheduledFor,
+    override val workflowState: String,
 
-    override var attemptCount: Int = 0,
+    override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
-    override var lastError: String? = null,
+    override var outboxScheduledFor: Instant?,
 
-    val cron: Cron?,
+    override var outboxDelayedUntil: Instant? = outboxScheduledFor,
 
-    val after: Duration?,
+    override var outboxAttemptCount: Int = 0,
 
-    val every: Duration?,
+    override var outboxLastError: String? = null,
+
+    val scheduleAfter: String?,
+
+    val scheduleCron: String?,
+
+    val scheduleEvery: String?,
 
     ) : OutboxModel() {
 
+    val cron: Cron? by lazy { scheduleCron?.let { cronParser.parse(it) } }
+
+    val after: Duration? by lazy { scheduleAfter?.let { Duration.parse(it) } }
+
+    val every: Duration? by lazy { scheduleEvery?.let { Duration.parse(it) } }
+
     // get the next instant according to the provided cron expression for the current time zone of the system
-    fun getNextScheduledExecutionInstant(zoneId: ZoneId = ZoneId.systemDefault()): Instant? = scheduledFor?.let {
+    fun getNextScheduledExecutionInstant(zoneId: ZoneId = ZoneId.systemDefault()): Instant? = outboxScheduledFor?.let {
         ExecutionTime.forCron(cron)
-            .nextExecution(it.atZone(zoneId))
-            .map { it.toInstant() }
+            .nextExecution(it.toJavaInstant().atZone(zoneId))
+            .map { it.toInstant().toKotlinInstant() }
             .orElse(null)
+    }
+
+    companion object {
+        private val cronParser by lazy { CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX)) }
     }
 }

@@ -6,9 +6,10 @@ import com.lemline.common.error
 import com.lemline.common.warn
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.OutboxRepository
-import java.time.Duration
-import java.time.Instant
-import java.time.temporal.ChronoUnit
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -37,6 +38,7 @@ import org.slf4j.Logger
  * @param processor Function that processes individual messages
  * @param T Type of the message entity (must implement OutboxModel interface)
  */
+@OptIn(ExperimentalTime::class)
 internal class OutboxProcessor<T : OutboxModel>(
     private val logger: Logger,
     private val repository: OutboxRepository<T>,
@@ -116,20 +118,20 @@ internal class OutboxProcessor<T : OutboxModel>(
      * attempts have been reached, the message's status is set to FAILED.
      */
     private suspend fun processMessage(message: T, maxAttempts: Int, initialDelay: Duration): Boolean = try {
-        message.attemptCount++
+        message.outboxAttemptCount++
         processor(message)
         true // <- return true (success)
     } catch (e: Exception) {
         logger.warn(e) { "Failed to process message ${message.workflowId}" }
-        message.lastError = e.stackTraceToString()
+        message.outboxLastError = e.stackTraceToString()
 
-        if (message.attemptCount >= maxAttempts) {
-            message.status = OutBoxStatus.FAILED
+        if (message.outboxAttemptCount >= maxAttempts) {
+            message.outBoxStatus = OutBoxStatus.FAILED
             logger.error { "Message ${message.workflowId} has reached maximum retry attempts" }
         } else {
-            val nextDelay = calculateNextAttemptDelay(message.attemptCount, initialDelay)
-            message.delayedUntil = Instant.now().plus(nextDelay, ChronoUnit.MILLIS)
-            logger.debug { "Message ${message.workflowId} will be retried in ${nextDelay}ms (attempt ${message.attemptCount})" }
+            val nextDelay = calculateNextAttemptDelay(message.outboxAttemptCount, initialDelay)
+            message.outboxDelayedUntil = Clock.System.now() + nextDelay
+            logger.debug { "Message ${message.workflowId} will be retried in ${nextDelay}ms (attempt ${message.outboxAttemptCount})" }
         }
         false // <- return false (failure)
     }
@@ -151,7 +153,7 @@ internal class OutboxProcessor<T : OutboxModel>(
      */
     suspend fun cleanup(afterDelay: Duration, batchSize: Int) = try {
 
-        val cutoffDate = Instant.now().minusMillis(afterDelay.toMillis())
+        val cutoffDate = Clock.System.now() - afterDelay
 
         var totalToDelete = 0
         var totalDeleted = 0
@@ -185,19 +187,19 @@ internal class OutboxProcessor<T : OutboxModel>(
     }
 
     @VisibleForTesting
-    internal fun calculateNextAttemptDelay(attemptCount: Int, initialDelay: Duration): Long {
+    internal fun calculateNextAttemptDelay(attemptCount: Int, initialDelay: Duration): Duration {
         // Exponential backoff: initialDelay * 2^(attemptCount-1)
         // e.g., with initialDelay=1000ms (10s):
         // attempt 1: 1000ms * 2^0 = 1000ms +/- 20%
         // attempt 2: 1000ms * 2^1 = 2000ms +/- 20%
         // attempt 3: 1000ms * 2^2 = 4000ms +/- 20%
-        val baseDelay = initialDelay.toMillis() * (1L shl (attemptCount - 1))
+        val baseDelay = initialDelay.inWholeMilliseconds * (1L shl (attemptCount - 1))
 
         // Add jitter of ±20%
         val jitterRange = baseDelay * 0.2 // 20% of base delay
         val jitter = (Math.random() - 0.5) * 2 * jitterRange // Random value between -1 and 1, multiplied by range
 
         // Ensure we never return less than .1 second (100ms)
-        return (baseDelay + jitter).toLong().coerceAtLeast(100L)
+        return (baseDelay + jitter).toLong().coerceAtLeast(100L).milliseconds
     }
 }

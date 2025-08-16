@@ -33,7 +33,7 @@ data class WorkflowError(
     ) : this(
         type = "$URI_BASE/${errorType.type}",
         status = status,
-        instance = position.jsonPointer.toString(),
+        instance = position.positionPointer.toString(),
         title = title,
         details = details,
     )

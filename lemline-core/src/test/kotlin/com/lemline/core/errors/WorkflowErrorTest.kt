@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
 
-import com.lemline.core.json.LemlineJson
-import com.lemline.core.nodes.JsonPointer
-import org.junit.jupiter.api.Test
+import com.lemline.common.json.LemlineJson
+import com.lemline.core.nodes.PositionPointer
 import kotlin.test.assertEquals
+import org.junit.jupiter.api.Test
 
 class WorkflowErrorTest {
     @Test
@@ -14,7 +14,7 @@ class WorkflowErrorTest {
             title = "Invalid_input",
             status = 400,
             details = "The_input_data_does_not_match_the_required_schema",
-            position = JsonPointer("/do/0").toPosition(),
+            position = PositionPointer("/do/0").toPosition(),
         )
 
         val json = LemlineJson.encodeToString(error)
@@ -58,7 +58,7 @@ class WorkflowErrorTest {
             errorType = WorkflowErrorType.RUNTIME,
             title = "Internal_error",
             details = "An_unexpected_error_occurred",
-            position = JsonPointer("/do/2").toPosition(),
+            position = PositionPointer("/do/2").toPosition(),
         )
 
         val json = LemlineJson.encodeToString(error)

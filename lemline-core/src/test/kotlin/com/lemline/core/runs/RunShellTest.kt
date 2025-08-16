@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.runs
 
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.getWorkflowInstance
-import com.lemline.core.json.LemlineJson
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
 import kotlin.test.assertEquals

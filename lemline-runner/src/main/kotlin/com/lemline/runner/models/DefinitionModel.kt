@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import io.serverlessworkflow.api.types.Workflow
 
 const val DEFINITION_TABLE = "lemline_definitions"

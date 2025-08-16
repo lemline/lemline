@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
+import com.lemline.common.ids.IdGenerator
 import com.lemline.runner.models.RunWorkflowModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.repositories.OutboxRepository
@@ -30,7 +31,8 @@ internal class RunWorkflowOutboxProcessorTest : OutboxProcessorTest<RunWorkflowM
 
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = RunWorkflowModel(
+        workflowId = IdGenerator.generateTimeBasedId(),
         message = "Test Run Workflow Message: $payload",
-        delayedUntil = Instant.now()
+        outboxDelayedUntil = Instant.now()
     )
 }

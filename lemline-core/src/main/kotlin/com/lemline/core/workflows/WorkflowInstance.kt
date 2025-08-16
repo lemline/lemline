@@ -4,6 +4,7 @@ package com.lemline.core.workflows
 import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
+import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger
 import com.lemline.common.warn
 import com.lemline.common.withWorkflowContext
@@ -27,7 +28,6 @@ import com.lemline.core.instances.SetInstance
 import com.lemline.core.instances.SwitchInstance
 import com.lemline.core.instances.TryInstance
 import com.lemline.core.instances.WaitInstance
-import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.nodes.NodePosition
@@ -67,15 +67,16 @@ import kotlinx.serialization.json.JsonElement
  *
  * @property name The name of the workflow.
  * @property version The version of the workflow.
- * @property states A map of node positions to their corresponding node states.
+ * @property state A map of node positions to their corresponding node states.
  * @property position The current position in the workflow.
  * @property secrets A map of secrets used in the workflow.
  */
 @Suppress("unused")
 class WorkflowInstance(
+    val id: String,
     val name: String,
     val version: String,
-    states: Map<NodePosition, NodeState>,
+    state: WorkflowState,
     position: NodePosition,
     secrets: Map<String, JsonElement>,
     var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
@@ -109,15 +110,10 @@ class WorkflowInstance(
             secrets: Map<String, JsonElement> = emptyMap(),
             activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
         ) = WorkflowInstance(
+            id = id,
             name = name,
             version = version,
-            states = mapOf(
-                NodePosition.root to NodeState(
-                    workflowId = id,
-                    rawInput = rawInput,
-                    startedAt = Instant.now(),
-                ),
-            ),
+            state = WorkflowState.startWith(rawInput),
             position = NodePosition.root,
             secrets = secrets,
             activityRunnerProvider = activityRunnerProvider
@@ -302,11 +298,6 @@ class WorkflowInstance(
     var status = WorkflowStatus.PENDING
 
     /**
-     * The unique identifier of the workflow instance.
-     */
-    val id: String
-
-    /**
      * The starting date and time of the workflow instance.
      */
     internal val startedAt: Instant
@@ -320,15 +311,14 @@ class WorkflowInstance(
         workflow = Workflows.getOrNull(name, version) ?: error("workflow $name (version $version) not found")
 
         // init workflow data
-        val rootState = states[NodePosition.root] ?: error("no initial state provided for the root node")
+        val rootState = state[NodePosition.root] ?: error("no initial state provided for the root node")
         val errorStr by lazy { "provided in the root node of the initial state" }
-        this.id = rootState.workflowId ?: error("no workflow id $errorStr")
         this.startedAt = rootState.startedAt ?: error("no startedAt $errorStr")
         this.rawInput = rootState.rawInput ?: error("no raw input $errorStr")
 
         // init root instance and workflow scope
         val rootNode = Workflows.getRootNode(workflow)
-        rootInstance = rootNode.createInstance(states, null) as RootInstance
+        rootInstance = rootNode.createInstance(state, null) as RootInstance
         rootInstance.workflowInstance = this
         rootInstance.secrets = secrets
         rootInstance.runtimeDescriptor = RuntimeDescriptor
@@ -368,7 +358,7 @@ class WorkflowInstance(
      *
      * @return A map of node positions to their corresponding node states.
      */
-    val states: Map<NodePosition, NodeState>
+    val state: WorkflowState
         get() {
             val currentStates = mutableMapOf<NodePosition, NodeState>()
             fun collectStates(nodeInstance: NodeInstance<*>) {
@@ -378,7 +368,7 @@ class WorkflowInstance(
                 nodeInstance.children.forEach { collectStates(it) }
             }
             collectStates(rootInstance)
-            return currentStates
+            return WorkflowState(currentStates)
         }
 
     /**
@@ -550,14 +540,14 @@ class WorkflowInstance(
     /**
      * Creates a node instance based on the node type and recursively builds the node tree.
      *
-     * @param initialStates Map of saved states by position to restore workflow state.
+     * @param initialState Map of saved states by position to restore workflow state.
      * @param parent The parent node instance (null only for root nodes).
      * @return The created node instance with its complete subtree.
      * @throws IllegalArgumentException If an unknown task type is encountered.
      */
     @Suppress("UNCHECKED_CAST")
     private fun Node<*>.createInstance(
-        initialStates: Map<NodePosition, NodeState>,
+        initialState: WorkflowState,
         parent: NodeInstance<*>?,
     ): NodeInstance<*> = when (task) {
         is RootTask -> RootInstance(this as Node<RootTask>)
@@ -579,11 +569,11 @@ class WorkflowInstance(
         else -> throw IllegalArgumentException("Unknown task type: ${task.javaClass.name}")
     }
         // apply initialStates for this new node position
-        .apply { initialStates[node.position]?.let { state = it } }
+        .apply { initialState[node.position]?.let { state = it } }
         // create all children node instances
         .also { nodeInstance ->
             nodeInstance.children =
-                this.children?.map { child -> child.createInstance(initialStates, nodeInstance) } ?: emptyList()
+                this.children?.map { child -> child.createInstance(initialState, nodeInstance) } ?: emptyList()
         }
 
     /**

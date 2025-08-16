@@ -11,7 +11,7 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 @JvmInline
-value class JsonPointer(private val path: String) {
+value class PositionPointer(private val path: String) {
 
     /**
      * Returns the path string.
@@ -32,6 +32,6 @@ value class JsonPointer(private val path: String) {
     )
 
     companion object {
-        val root = JsonPointer("")
+        val root = PositionPointer("")
     }
 }

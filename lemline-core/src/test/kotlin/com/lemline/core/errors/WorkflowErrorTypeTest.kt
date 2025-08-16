@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
 
-import com.lemline.core.json.LemlineJson
-import org.junit.jupiter.api.Test
+import com.lemline.common.json.LemlineJson
 import kotlin.test.assertEquals
+import org.junit.jupiter.api.Test
 
 class WorkflowErrorTypeTest {
 

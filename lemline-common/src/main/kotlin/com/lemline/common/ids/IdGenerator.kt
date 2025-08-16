@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.common.utils
+package com.lemline.common.ids
 
 import com.github.f4b6a3.uuid.UuidCreator
 import java.util.*

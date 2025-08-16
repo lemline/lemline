@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.bases
 
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import com.lemline.runner.messaging.MessageBody
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.models.DefinitionModel
@@ -161,15 +161,14 @@ internal abstract class WorkflowConsumerTest {
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
         val messageBody = MessageBody.newInstance(
-            workflowId = "test-id",
+            id = "test-id",
             name = "test-workflow",
             version = "1.0.0",
             input = JsonPrimitive("task"),
         )
-        val messageJson = LemlineJson.encodeToString(messageBody)
 
         // When
-        val future = sendMessageFuture(messageJson)
+        val future = sendMessageFuture(messageBody.jsonString)
 
         // Then
         // Wait for the message to be processed
@@ -214,7 +213,7 @@ internal abstract class WorkflowConsumerTest {
 
         val retryMessages = retryRepository.listAll()
         retryMessages[0].message shouldBe invalidMessage
-        retryMessages[0].status shouldBe OutBoxStatus.FAILED
+        retryMessages[0].outBoxStatus shouldBe OutBoxStatus.FAILED
 
         // Verify no message was stored in the wait repository
         val waitMessages = waitRepository.listAll()
@@ -248,10 +247,9 @@ internal abstract class WorkflowConsumerTest {
             "1.0.0",
             JsonPrimitive("retry"),
         )
-        val messageJson = LemlineJson.encodeToString(messageBody)
 
         // When
-        val future = sendMessageFuture(messageJson)
+        val future = sendMessageFuture(messageBody.jsonString)
 
         // Wait for the message to be processed
         future.get(2, SECONDS)
@@ -260,8 +258,8 @@ internal abstract class WorkflowConsumerTest {
         val retryMessages = retryRepository.listAll()
 
         assertTrue(retryMessages.isNotEmpty(), "No messages found in retry repository")
-        assertEquals(OutBoxStatus.PENDING, retryMessages[0].status, "Retry message status is not PENDING")
-        assertEquals(0, retryMessages[0].attemptCount, "Retry message attempt count is not 0")
+        assertEquals(OutBoxStatus.PENDING, retryMessages[0].outBoxStatus, "Retry message status is not PENDING")
+        assertEquals(0, retryMessages[0].outboxAttemptCount, "Retry message attempt count is not 0")
     }
 
     /**
@@ -289,10 +287,9 @@ internal abstract class WorkflowConsumerTest {
             "1.0.0",
             JsonPrimitive("wait"),
         )
-        val messageJson = LemlineJson.encodeToString(messageBody)
 
         // When
-        val future = sendMessageFuture(messageJson)
+        val future = sendMessageFuture(messageBody.jsonString)
 
         // Then
         // Wait for the message to be processed
@@ -302,12 +299,12 @@ internal abstract class WorkflowConsumerTest {
         val waitMessages = waitRepository.listAll()
 
         assertTrue(waitMessages.isNotEmpty(), "No messages found in wait repository")
-        assertEquals(OutBoxStatus.PENDING, waitMessages[0].status, "Wait message status is not PENDING")
-        assertEquals(0, waitMessages[0].attemptCount, "Wait message attempt count is not 0")
+        assertEquals(OutBoxStatus.PENDING, waitMessages[0].outBoxStatus, "Wait message status is not PENDING")
+        assertEquals(0, waitMessages[0].outboxAttemptCount, "Wait message attempt count is not 0")
 
         // Verify delay was set correctly (within 1 second of expected)
         val expectedDelay = Instant.now().plus(30, ChronoUnit.SECONDS)
-        val actualDelay = waitMessages[0].delayedUntil!!
+        val actualDelay = waitMessages[0].outboxDelayedUntil!!
         assertTrue(
             actualDelay.isAfter(expectedDelay.minus(1, ChronoUnit.SECONDS)) &&
                 actualDelay.isBefore(expectedDelay.plus(1, ChronoUnit.SECONDS)),
@@ -338,10 +335,9 @@ internal abstract class WorkflowConsumerTest {
             "1.0.0",
             JsonPrimitive("completed"),
         )
-        val messageJson = LemlineJson.encodeToString(messageBody)
 
         // When
-        val future = sendMessageFuture(messageJson)
+        val future = sendMessageFuture(messageBody.jsonString)
 
         // Then
         // Wait for the message to be processed

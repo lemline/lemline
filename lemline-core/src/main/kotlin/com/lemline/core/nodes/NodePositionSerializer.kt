@@ -1,8 +1,5 @@
-// SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.json
+package com.lemline.core.nodes
 
-import com.lemline.core.nodes.JsonPointer
-import com.lemline.core.nodes.NodePosition
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.descriptors.PrimitiveKind
 import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
@@ -11,7 +8,7 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * Custom kotlinx.serialization serializer for [NodePosition].
+ * Custom kotlinx.serialization serializer for [com.lemline.core.nodes.NodePosition].
  * Serializes to/from the string representation of its JsonPointer.
  */
 internal object NodePositionSerializer : KSerializer<NodePosition> {
@@ -21,12 +18,12 @@ internal object NodePositionSerializer : KSerializer<NodePosition> {
 
     override fun serialize(encoder: Encoder, value: NodePosition) {
         // Use the jsonPointer's string representation for serialization
-        encoder.encodeString(value.jsonPointer.toString())
+        encoder.encodeString(value.positionPointer.toString())
     }
 
     override fun deserialize(decoder: Decoder): NodePosition {
         // Read the string, create a JsonPointer, then convert to NodePosition
         val jsonPointerString = decoder.decodeString()
-        return JsonPointer(jsonPointerString).toPosition()
+        return PositionPointer(jsonPointerString).toPosition()
     }
 }

@@ -9,6 +9,7 @@ import com.lemline.runner.outbox.OutboxProcessor
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.ResultSet
+import kotlin.time.ExperimentalTime
 
 /**
  * Repository for managing run messages in the outbox pattern.
@@ -32,13 +33,20 @@ internal class RunWorkflowRepository : OutboxRepository<RunWorkflowModel>() {
 
     override val tableName = RUN_WORKFLOW_TABLE
 
+    @ExperimentalTime
     override fun createModel(rs: ResultSet) = RunWorkflowModel(
-        workflowId = rs.getString("id"),
-        message = rs.getString("message"),
-        status = OutBoxStatus.valueOf(rs.getString("status")),
-        scheduledFor = rs.getInstant("scheduled_for"),
-        delayedUntil = rs.getInstant("delayed_until"),
-        attemptCount = rs.getInt("attempt_count"),
-        lastError = rs.getString("last_error"),
+        id = rs.getString(ID_COLUMN),
+
+        workflowId = rs.getString(WORKFLOW_ID_COLUMN),
+        workflowName = rs.getString(WORKFLOW_NAME_COLUMN),
+        workflowVersion = rs.getString(WORKFLOW_VERSION_COLUMN),
+        workflowPosition = rs.getString(WORKFLOW_POSITION_COLUMN),
+        workflowState = rs.getString(WORKFLOW_STATE_COLUMN),
+
+        outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
+        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
+        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
+        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
+        outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
     )
 }

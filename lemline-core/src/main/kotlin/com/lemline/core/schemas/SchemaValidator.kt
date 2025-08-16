@@ -2,7 +2,7 @@
 package com.lemline.core.schemas
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion.VersionFlag
 import com.networknt.schema.ValidationMessage

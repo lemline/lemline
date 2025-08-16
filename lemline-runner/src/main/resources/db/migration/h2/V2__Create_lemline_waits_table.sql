@@ -1,13 +1,17 @@
 -- Use the table name from com.lemline.runner.models.WaitModel
 CREATE TABLE IF NOT EXISTS lemline_waits
 (
-    workflow_id   VARCHAR(36) NOT NULL,
-    message       CLOB        NOT NULL,
-    status        VARCHAR(50) NOT NULL,
-    scheduled_for TIMESTAMP   NOT NULL,
-    delayed_until TIMESTAMP   NOT NULL,
-    attempt_count INTEGER     NOT NULL DEFAULT 0,
-    last_error    CLOB
+    id                   VARCHAR(36) PRIMARY KEY,
+    workflow_id          VARCHAR(36)  NOT NULL,
+    workflow_name        VARCHAR(255) NOT NULL,
+    workflow_version     VARCHAR(255) NOT NULL,
+    workflow_position    CLOB         NOT NULL,
+    workflow_state       CLOB         NOT NULL,
+    outbox_status        VARCHAR(50)  NOT NULL,
+    outbox_scheduled_for TIMESTAMP    NOT NULL,
+    outbox_delayed_until TIMESTAMP    NOT NULL,
+    outbox_attempt_count INTEGER      NOT NULL DEFAULT 0,
+    outbox_last_error    CLOB
 );
 
 -- Create an index for efficient querying on workflow_id
@@ -16,4 +20,4 @@ CREATE INDEX idx_lemline_waits_workflow_id
 
 -- Create an index for efficient querying on status and delayed_until
 CREATE INDEX idx_lemline_waits_status_delayed_until
-    ON lemline_waits (status, delayed_until);
+    ON lemline_waits (outbox_status, outbox_delayed_until);

@@ -7,7 +7,10 @@ import com.lemline.runner.outbox.OutBoxStatus.SENT
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 
 /**
  * Base interface for outbox pattern repositories.
@@ -46,35 +49,80 @@ import java.time.Instant
  * @see OutboxModel for the base message model
  * @see OutboxProcessor for the processing logic
  */
+@OptIn(ExperimentalTime::class)
 abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
 
-    override val columns =
-        listOf("id", "message", "status", "scheduled_for", "delayed_until", "attempt_count", "last_error")
+    companion object {
+        internal const val ID_COLUMN = "id"
 
-    override val keyColumns: List<String> = listOf("id")
+        internal const val WORKFLOW_ID_COLUMN = "workflow_id"
+        internal const val WORKFLOW_NAME_COLUMN = "workflow_name"
+        internal const val WORKFLOW_VERSION_COLUMN = "workflow_version"
+        internal const val WORKFLOW_POSITION_COLUMN = "workflow_position"
+        internal const val WORKFLOW_STATE_COLUMN = "workflow_state"
 
-    override fun PreparedStatement.bindUpdateWith(entity: T) = apply {
-        setString(1, entity.message)
-        setString(2, entity.status.name)
-        setTimestamp(3, entity.scheduledFor?.let { java.sql.Timestamp.from(it) })
-        setTimestamp(4, entity.delayedUntil?.let { java.sql.Timestamp.from(it) })
-        setInt(5, entity.attemptCount)
-        setString(6, entity.lastError)
-        setString(7, entity.workflowId)
+        internal const val OUTBOX_STATUS_COLUMN = "status"
+        internal const val OUTBOX_SCHEDULED_FOR_COLUMN = "scheduled_for"
+        internal const val OUTBOX_DELAYED_UNTIL_COLUMN = "delayed_until"
+        internal const val OUTBOX_ATTEMPT_COUNT_COLUMN = "attempt_count"
+        internal const val OUTBOX_LAST_ERROR_COLUMN = "last_error"
     }
 
-    override fun PreparedStatement.bindInsertWith(entity: T) = apply {
-        setString(1, entity.workflowId)
-        setString(2, entity.message)
-        setString(3, entity.status.name)
-        setTimestamp(4, entity.scheduledFor?.let { java.sql.Timestamp.from(it) })
-        setTimestamp(5, entity.delayedUntil?.let { java.sql.Timestamp.from(it) })
-        setInt(6, entity.attemptCount)
-        setString(7, entity.lastError)
+    override val insertColumns = listOf(
+        ID_COLUMN,
+
+        WORKFLOW_ID_COLUMN,
+        WORKFLOW_NAME_COLUMN,
+        WORKFLOW_VERSION_COLUMN,
+        WORKFLOW_POSITION_COLUMN,
+        WORKFLOW_STATE_COLUMN,
+
+        OUTBOX_STATUS_COLUMN,
+        OUTBOX_SCHEDULED_FOR_COLUMN,
+        OUTBOX_DELAYED_UNTIL_COLUMN,
+        OUTBOX_ATTEMPT_COUNT_COLUMN,
+        OUTBOX_LAST_ERROR_COLUMN
+    )
+
+    override val updateColumns = listOf(
+        OUTBOX_STATUS_COLUMN,
+        OUTBOX_SCHEDULED_FOR_COLUMN,
+        OUTBOX_DELAYED_UNTIL_COLUMN,
+        OUTBOX_ATTEMPT_COUNT_COLUMN,
+        OUTBOX_LAST_ERROR_COLUMN
+    )
+
+    override val keyColumns: List<String> = listOf(ID_COLUMN)
+
+    // MUST be in the same order as insertColumns
+    override fun bindInsertWith(stmt: PreparedStatement, entity: T): PreparedStatement = stmt.apply {
+        setString(1, entity.id)
+
+        setString(2, entity.workflowId)
+        setString(3, entity.workflowName)
+        setString(4, entity.workflowVersion)
+        setString(5, entity.workflowPosition)
+        setString(6, entity.workflowState)
+
+        setString(7, entity.outBoxStatus.name)
+        setTimestamp(8, entity.outboxScheduledFor?.let { java.sql.Timestamp.from(it.toJavaInstant()) })
+        setTimestamp(9, entity.outboxDelayedUntil?.let { java.sql.Timestamp.from(it.toJavaInstant()) })
+        setInt(10, entity.outboxAttemptCount)
+        setString(11, entity.outboxLastError)
     }
 
-    override fun PreparedStatement.bindDeleteWith(entity: T) = apply {
-        setString(1, entity.workflowId) // Bind id to the first parameter
+    // MUST be in the same order as updateColumns
+    override fun bindUpdateWith(stmt: PreparedStatement, entity: T) = stmt.apply {
+        setString(1, entity.outBoxStatus.name)
+        setTimestamp(2, entity.outboxScheduledFor?.let { java.sql.Timestamp.from(it.toJavaInstant()) })
+        setTimestamp(3, entity.outboxDelayedUntil?.let { java.sql.Timestamp.from(it.toJavaInstant()) })
+        setInt(4, entity.outboxAttemptCount)
+        setString(5, entity.outboxLastError)
+    }
+
+    // MUST be in the same order as KeyColumns
+    override fun bindDeleteWith(stmt: PreparedStatement, entity: T) = stmt.apply {
+        setString(1, entity.id) // Bind id to the first parameter
     }
 
     /**
@@ -85,30 +133,28 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      * @param maxAttempts Maximum number of retry attempts allowed
      * @return List of locked messages ready for processing
      */
-    suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection? = null): List<T> {
-        val sql = """
-            SELECT * FROM $tableName
-            WHERE status = ?
-            AND delayed_until <= ?
-            AND attempt_count < ?
-            ORDER BY delayed_until ASC
-            LIMIT ?
-            FOR UPDATE SKIP LOCKED
-        """.trimIndent()
-
-        return withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
+    suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection? = null): List<T> =
+        withConnection(connection) {
+            it.prepareStatement(findEntitiesToProcessSQL).use { stmt ->
                 stmt.apply {
-                    setString(1, PENDING.name)
-                    setTimestamp(2, java.sql.Timestamp.from(Instant.now()))
-                    setInt(3, maxAttempts)
-                    setInt(4, limit)
+                    setTimestamp(1, java.sql.Timestamp.from(Clock.System.now().toJavaInstant()))
+                    setInt(2, maxAttempts)
+                    setInt(3, limit)
                 }
 
                 stmt.executeQuery().use { it.toModels() }
             }
         }
-    }
+
+    private val findEntitiesToProcessSQL = """
+            SELECT * FROM $tableName
+            WHERE $OUTBOX_STATUS_COLUMN = $PENDING
+            AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
+            AND $OUTBOX_ATTEMPT_COUNT_COLUMN < ?
+            ORDER BY $OUTBOX_DELAYED_UNTIL_COLUMN ASC
+            LIMIT ?
+            FOR UPDATE SKIP LOCKED
+        """.trimIndent()
 
     /**
      * Finds and locks messages that are ready to be deleted.
@@ -118,28 +164,42 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      * @param limit Maximum number of messages to retrieve
      * @return List of locked messages ready for deletion
      */
-    suspend fun findEntitiesToDelete(cutoffDate: Instant, limit: Int, connection: Connection? = null): List<T> {
-        val sql = """
-            SELECT * FROM $tableName
-            WHERE status = ?
-            AND delayed_until <= ?
-            ORDER BY delayed_until ASC
-            LIMIT ?
-            FOR UPDATE SKIP LOCKED
-        """.trimIndent()
-
-        return withConnection(connection) {
-            it.prepareStatement(sql).use { stmt ->
+    suspend fun findEntitiesToDelete(cutoffDate: Instant, limit: Int, connection: Connection? = null): List<T> =
+        withConnection(connection) {
+            it.prepareStatement(findEntitiesToDeleteSQL).use { stmt ->
                 stmt.apply {
-                    setString(1, SENT.name)
-                    setTimestamp(2, java.sql.Timestamp.from(cutoffDate))
-                    setInt(3, limit)
+                    setTimestamp(1, java.sql.Timestamp.from(cutoffDate.toJavaInstant()))
+                    setInt(2, limit)
                 }
 
                 stmt.executeQuery().use { it.toModels() }
             }
         }
+
+    /**
+     * Retrieves an entity by its ID.
+     *
+     * @return The entity with the specified ID, or null if not found.
+     */
+    suspend fun findById(id: String, connection: Connection? = null): T? = withConnection(connection) { conn ->
+        conn.prepareStatement(findByIdSql).use { stmt ->
+            stmt.setString(1, id)
+            stmt.executeQuery().use { rs ->
+                if (rs.next()) createModel(rs) else null
+            }
+        }
     }
+
+    private val findByIdSql by lazy { "SELECT * FROM $tableName WHERE $ID_COLUMN = ? LIMIT 1" }
+
+    private val findEntitiesToDeleteSQL = """
+            SELECT * FROM $tableName
+            WHERE $OUTBOX_STATUS_COLUMN = $SENT
+            AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
+            ORDER BY $OUTBOX_DELAYED_UNTIL_COLUMN ASC
+            LIMIT ?
+            FOR UPDATE SKIP LOCKED
+        """.trimIndent()
 
     private fun ResultSet.toModels(): List<T> = buildList {
         while (next()) {

@@ -2,7 +2,7 @@
 package com.lemline.core.nodes
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.set
 import java.time.Instant
 import org.junit.jupiter.api.Assertions.assertEquals

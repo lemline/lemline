@@ -21,7 +21,7 @@ class RaiseInstance(override val node: Node<RaiseTask>, override val parent: Nod
         val error = WorkflowError(
             type = error.getErrorType(),
             status = error.status,
-            instance = node.position.jsonPointer.toString(),
+            instance = node.position.positionPointer.toString(),
             title = error.title,
             details = error.detail,
         )

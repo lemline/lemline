@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core
 
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.Workflows
 import io.serverlessworkflow.api.WorkflowFormat

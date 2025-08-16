@@ -121,9 +121,9 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         val processedMessage = testRepository.findById(message.workflowId)
         processedMessage shouldNotBe null
-        processedMessage!!.status shouldBe SENT
-        processedMessage.attemptCount shouldBe 1
-        processedMessage.lastError shouldBe null
+        processedMessage!!.outBoxStatus shouldBe SENT
+        processedMessage.outboxAttemptCount shouldBe 1
+        processedMessage.outboxLastError shouldBe null
     }
 
     /**
@@ -170,16 +170,16 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         coVerify(exactly = 1) { mockProcessorFunction(any(modelClass)) } // Verify it was called once
         val updated = testRepository.findById(original.workflowId)!!
 
-        updated.status shouldBe PENDING
-        updated.attemptCount shouldBe 1
-        updated.lastError shouldContain failureException.message!!
+        updated.outBoxStatus shouldBe PENDING
+        updated.outboxAttemptCount shouldBe 1
+        updated.outboxLastError shouldContain failureException.message!!
 
         // Calculate expected delay using exponential backoff - 20% jitter
         val expectedMinDelay = initialDelay.toMillis() * 0.8
-        updated.delayedUntil!! shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
+        updated.outboxDelayedUntil!! shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
 
         // waiting for the next attempt
-        delay(Duration.between(now, updated.delayedUntil).toMillis())
+        delay(Duration.between(now, updated.outboxDelayedUntil).toMillis())
 
         // Arrange: Setup mock to succeed on subsequent calls
         coEvery { mockProcessorFunction(any(modelClass)) } just Runs
@@ -191,9 +191,9 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         coVerify(exactly = 2) { mockProcessorFunction(any(modelClass)) } // Verify it was called again
         val final = testRepository.findById(original.workflowId)!!
 
-        final.status shouldBe SENT // Status updated
-        final.attemptCount shouldBe 2
-        final.lastError shouldContain failureException.message!! // Error remains
+        final.outBoxStatus shouldBe SENT // Status updated
+        final.outboxAttemptCount shouldBe 2
+        final.outboxLastError shouldContain failureException.message!! // Error remains
 
         Unit
     }
@@ -220,7 +220,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Arrange
         val original = createTestModel(payload = "FailPayload")
         testRepository.insert(original)
-        val originalDelayedUntil = original.delayedUntil!!
+        val originalDelayedUntil = original.outboxDelayedUntil!!
 
         val failureException = RuntimeException("Persistent failure!")
         // Set up the mock to always fail
@@ -235,22 +235,22 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
             // then
             val updated = testRepository.findById(original.workflowId)!!
             if (attempt < maxAttempts) {
-                updated.status shouldBe PENDING
-                updated.attemptCount shouldBe attempt
-                updated.lastError shouldContain failureException.message!!
-                updated.delayedUntil!! shouldBeAfter lastDelayedUntil
+                updated.outBoxStatus shouldBe PENDING
+                updated.outboxAttemptCount shouldBe attempt
+                updated.outboxLastError shouldContain failureException.message!!
+                updated.outboxDelayedUntil!! shouldBeAfter lastDelayedUntil
                 // Calculate expected delay using exponential backoff - 20% jitter
                 val expectedMinDelay = initialDelay.toMillis() * (1L shl (attempt - 1)) * 0.8
-                updated.delayedUntil!! shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
-                lastDelayedUntil = updated.delayedUntil!!
+                updated.outboxDelayedUntil!! shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
+                lastDelayedUntil = updated.outboxDelayedUntil!!
                 // waiting for the next attempt
-                delay(Duration.between(now, updated.delayedUntil).toMillis())
+                delay(Duration.between(now, updated.outboxDelayedUntil).toMillis())
             } else {
                 // Final attempt check
-                updated.status shouldBe FAILED
-                updated.attemptCount shouldBe maxAttempts
-                updated.lastError shouldContain failureException.message!!
-                updated.delayedUntil shouldBe lastDelayedUntil
+                updated.outBoxStatus shouldBe FAILED
+                updated.outboxAttemptCount shouldBe maxAttempts
+                updated.outboxLastError shouldContain failureException.message!!
+                updated.outboxDelayedUntil shouldBe lastDelayedUntil
             }
         }
     }
@@ -284,8 +284,8 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         val processedMessages = testRepository.listAll()
         processedMessages shouldHaveSize 5
         processedMessages.forEach { msg ->
-            msg.status shouldBe SENT
-            msg.attemptCount shouldBe 1
+            msg.outBoxStatus shouldBe SENT
+            msg.outboxAttemptCount shouldBe 1
         }
     }
 
@@ -311,20 +311,20 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Create messages using abstract factory
         val oldSentMessage = createTestModel("old_sent").apply {
-            status = SENT
-            delayedUntil = wayBeforeCutoff
+            outBoxStatus = SENT
+            outboxDelayedUntil = wayBeforeCutoff
         }
         val recentSentMessage = createTestModel("recent_sent").apply {
-            status = SENT
-            delayedUntil = Instant.now()
+            outBoxStatus = SENT
+            outboxDelayedUntil = Instant.now()
         }
         val pendingMessage = createTestModel("pending").apply {
-            status = PENDING
-            delayedUntil = wayBeforeCutoff
+            outBoxStatus = PENDING
+            outboxDelayedUntil = wayBeforeCutoff
         }
         val failedMessage = createTestModel("failed").apply {
-            status = FAILED
-            delayedUntil = wayBeforeCutoff
+            outBoxStatus = FAILED
+            outboxDelayedUntil = wayBeforeCutoff
         }
         testRepository.insert(listOf(oldSentMessage, recentSentMessage, pendingMessage, failedMessage))
 
@@ -418,8 +418,8 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         val totalMessages = batchSize * 50 // More than 3 chunks worth of messages
         val messages = List(totalMessages) { index ->
             createTestModel("message_$index").apply {
-                status = SENT
-                delayedUntil = wayBeforeCutoff
+                outBoxStatus = SENT
+                outboxDelayedUntil = wayBeforeCutoff
             }
         }
 

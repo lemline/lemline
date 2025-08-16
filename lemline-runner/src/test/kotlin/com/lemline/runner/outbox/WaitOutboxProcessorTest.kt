@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
+import com.lemline.common.ids.IdGenerator
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.repositories.OutboxRepository
@@ -29,6 +30,7 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitModel>() {
 
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = WaitModel(
+        workflowId = IdGenerator.generateTimeBasedId(),
         message = "Test Wait Message: $payload",
     )
 }

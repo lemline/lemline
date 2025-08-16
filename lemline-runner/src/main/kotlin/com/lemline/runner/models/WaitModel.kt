@@ -1,24 +1,36 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.lemline.common.ids.IdGenerator
 import com.lemline.runner.outbox.OutBoxStatus
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 const val WAIT_TABLE = "lemline_waits"
 
+@OptIn(ExperimentalTime::class)
 data class WaitModel(
+    override val id: String = IdGenerator.generateTimeBasedId(),
+
     override val workflowId: String,
 
-    override val message: String,
+    override val workflowVersion: String,
 
-    override var status: OutBoxStatus = OutBoxStatus.PENDING,
+    override val workflowName: String,
 
-    override var scheduledFor: Instant? = Instant.now(),
+    override val workflowPosition: String,
 
-    override var delayedUntil: Instant? = scheduledFor,
+    override val workflowState: String,
 
-    override var attemptCount: Int = 0,
+    override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
-    override var lastError: String? = null
+    override var outboxScheduledFor: Instant? = Clock.System.now(),
+
+    override var outboxDelayedUntil: Instant? = outboxScheduledFor,
+
+    override var outboxAttemptCount: Int = 0,
+
+    override var outboxLastError: String? = null
 
 ) : OutboxModel()

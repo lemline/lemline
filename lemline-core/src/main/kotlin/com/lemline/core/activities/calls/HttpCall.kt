@@ -3,13 +3,13 @@ package com.lemline.core.activities.calls
 
 import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
+import com.lemline.common.json.LemlineJson
+import com.lemline.common.json.LemlineJson.toJsonElement
 import com.lemline.core.OnError
 import com.lemline.core.errors.WorkflowErrorType.AUTHENTICATION
 import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
-import com.lemline.core.json.LemlineJson
-import com.lemline.core.json.LemlineJson.toJsonElement
 import com.lemline.core.utils.toUrl
 import io.ktor.client.*
 import io.ktor.client.call.*

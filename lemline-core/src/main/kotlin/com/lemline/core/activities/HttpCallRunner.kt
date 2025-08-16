@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities
 
+import com.lemline.common.json.LemlineJson
+import com.lemline.common.json.LemlineJson.toJsonPrimitive
 import com.lemline.core.activities.calls.HttpCall
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.instances.CallHttpInstance
-import com.lemline.core.json.LemlineJson
-import com.lemline.core.json.LemlineJson.toJsonPrimitive
 import com.lemline.core.utils.getAuthenticationPolicyByName
 import com.lemline.core.utils.toAuthenticationPolicy
 import com.lemline.core.utils.toSecret

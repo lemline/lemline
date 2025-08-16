@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.cronutils.model.CronType
-import com.cronutils.model.definition.CronDefinitionBuilder
-import com.cronutils.parser.CronParser
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.SCHEDULE_TABLE
 import com.lemline.runner.models.ScheduleModel
@@ -11,8 +8,9 @@ import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.PreparedStatement
 import java.sql.ResultSet
-import java.time.Duration
+import kotlin.time.ExperimentalTime
 
 /**
  * Repository for managing wait messages in the outbox pattern.
@@ -30,27 +28,47 @@ import java.time.Duration
  */
 @ApplicationScoped
 internal class ScheduleRepository : OutboxRepository<ScheduleModel>() {
+
+    companion object {
+        internal const val SCHEDULE_AFTER_COLUMN = "schedule_after"
+        internal const val SCHEDULE_CRON_COLUMN = "schedule_cron"
+        internal const val SCHEDULE_EVERY_COLUMN = "schedule_every"
+    }
+
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = SCHEDULE_TABLE
 
-    override fun createModel(rs: ResultSet) = ScheduleModel(
-        workflowId = rs.getString("id"),
-        cron = rs.getString("cron")?.let { cronParser.parse(it) },
-        after = rs.getString("after")?.let { Duration.parse(it) },
-        every = rs.getString("every")?.let { Duration.parse(it) },
-        message = rs.getString("message"),
-        status = OutBoxStatus.valueOf(rs.getString("status")),
-        scheduledFor = rs.getInstant("scheduled_for"),
-        delayedUntil = rs.getInstant("delayed_until"),
-        attemptCount = rs.getInt("attempt_count"),
-        lastError = rs.getString("last_error"),
-    )
+    override val insertColumns = super.insertColumns +
+        SCHEDULE_AFTER_COLUMN + SCHEDULE_CRON_COLUMN + SCHEDULE_EVERY_COLUMN
 
-
-    companion object {
-        private val cronParser by lazy { CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX)) }
+    override fun bindInsertWith(stmt: PreparedStatement, entity: ScheduleModel): PreparedStatement = stmt.apply {
+        super.bindInsertWith(this, entity)
+        val base = super.insertColumns.size
+        setString(base + 1, entity.scheduleAfter)
+        setString(base + 2, entity.scheduleCron)
+        setString(base + 3, entity.scheduleEvery)
     }
 
+    @ExperimentalTime
+    override fun createModel(rs: ResultSet) = ScheduleModel(
+        id = rs.getString(ID_COLUMN),
+
+        workflowId = rs.getString(WORKFLOW_ID_COLUMN),
+        workflowName = rs.getString(WORKFLOW_NAME_COLUMN),
+        workflowVersion = rs.getString(WORKFLOW_VERSION_COLUMN),
+        workflowPosition = rs.getString(WORKFLOW_POSITION_COLUMN),
+        workflowState = rs.getString(WORKFLOW_STATE_COLUMN),
+
+        outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
+        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
+        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
+        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
+        outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
+
+        scheduleAfter = rs.getString(SCHEDULE_AFTER_COLUMN),
+        scheduleCron = rs.getString(SCHEDULE_CRON_COLUMN),
+        scheduleEvery = rs.getString(SCHEDULE_EVERY_COLUMN)
+    )
 }

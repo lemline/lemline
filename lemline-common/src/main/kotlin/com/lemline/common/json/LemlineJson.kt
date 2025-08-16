@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.json
+package com.lemline.common.json
 
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind.JsonNode
@@ -141,7 +141,7 @@ object LemlineJson {
      */
     fun JsonNode.toJsonElement(): JsonElement = decodeFromString(toString())
 
-    internal fun Any?.toJsonElement(): JsonElement = when (this) {
+    fun Any?.toJsonElement(): JsonElement = when (this) {
         null -> JsonNull
         is JsonElement -> this
         is Number -> JsonPrimitive(this)
@@ -157,7 +157,7 @@ object LemlineJson {
         else -> throw IllegalArgumentException("Unsupported type: ${this::class}")
     }
 
-    internal fun Any?.toJsonPrimitive(): JsonPrimitive = when (val element = this.toJsonElement()) {
+    fun Any?.toJsonPrimitive(): JsonPrimitive = when (val element = this.toJsonElement()) {
         is JsonPrimitive -> element
         else -> JsonPrimitive(element.toString())
     }

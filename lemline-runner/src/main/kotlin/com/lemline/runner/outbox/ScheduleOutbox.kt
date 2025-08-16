@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.common.utils.IdGenerator
+import com.lemline.common.ids.IdGenerator
 import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.messaging.MessageBody
 import com.lemline.runner.messaging.WORKFLOW_OUT
 import com.lemline.runner.models.ScheduleModel
 import com.lemline.runner.repositories.ScheduleRepository
@@ -11,6 +12,7 @@ import io.quarkus.smallrye.reactivemessaging.sendSuspending
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
+import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
@@ -53,12 +55,13 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     // Cleanup configuration
     override val cleanupConf by lazy { lemlineConfig.outbox().schedule().cleanup() }
 
+    @ExperimentalTime
     override suspend fun process(entity: ScheduleModel) {
         // delayedUntil is never null within the scope of this method
-        val now = entity.delayedUntil!!
+        val now = entity.outboxDelayedUntil!!
 
         // start a new instance of the workflow
-        send(entity.message)
+        send(entity.toMessageBody())
 
         // update the schedule model with the next instant to be processed
         val delayedUntil = when {
@@ -66,21 +69,21 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
 
             entity.cron != null -> entity.getNextScheduledExecutionInstant().also {
                 // if there is no more occurrence, we set the status to SENT for allowing cleaning
-                if (it == null) entity.status = OutBoxStatus.SENT
+                if (it == null) entity.outBoxStatus = OutBoxStatus.SENT
             }
 
-            entity.every != null -> now + entity.every
+            entity.every != null -> now + entity.every!!
 
             else -> error("Invalid schedule model")
         }
 
         // Note: we don't update the status to SENT as the schedule model is still waiting for the next execution.
-        entity.delayedUntil = delayedUntil
-        if (delayedUntil != null) entity.scheduledFor = delayedUntil
+        entity.outboxDelayedUntil = delayedUntil
+        if (delayedUntil != null) entity.outboxScheduledFor = delayedUntil
     }
 
-    private suspend fun send(message: String) =
-        emitter.sendSuspending(message.replace(ID_PLACEHOLDER, IdGenerator.generateTimeBasedId()))
+    private suspend fun send(body: MessageBody) =
+        emitter.sendSuspending(body.jsonString.replace(ID_PLACEHOLDER, IdGenerator.generateTimeBasedId()))
 
     companion object {
         private const val ID_PLACEHOLDER = "`WORKFLOW_ID`"
