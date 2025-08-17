@@ -20,7 +20,7 @@ import kotlin.time.Instant
  * @see OutboxProcessor for the processing logic
  * @see InstanceModel for the base entity functionality
  */
-@OptIn(ExperimentalTime::class)
+@ExperimentalTime
 abstract class OutboxModel() : InstanceModel() {
     /**
      * Current status of the message in the outbox. Possible values:

@@ -9,7 +9,7 @@ import kotlin.time.Instant
 
 const val RETRY_TABLE = "lemline_retries"
 
-@OptIn(ExperimentalTime::class)
+@ExperimentalTime
 data class RetryModel(
     override val id: String = IdGenerator.generateTimeBasedId(),
 

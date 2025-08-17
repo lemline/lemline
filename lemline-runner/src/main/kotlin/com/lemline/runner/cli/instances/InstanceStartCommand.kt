@@ -44,20 +44,20 @@ class InstanceStartCommand : Runnable {
         arity = "0..1",
         description = ["Name of the workflow to start."]
     )
-    val name: String? = null
+    var name: String? = null
 
     @Parameters(
         index = "1",
         arity = "0..1",
         description = ["Optional version of the workflow."]
     )
-    val version: String? = null
+    var version: String? = null
 
     @Option(
         names = ["--input", "-i"],
         description = ["Input of the workflow instance (JSON format)."],
     )
-    val input: String? = null
+    var input: String? = null
 
     override fun run() = runBlocking {
         if (name.isNullOrBlank()) error("Workflow name must be provided")
@@ -66,14 +66,14 @@ class InstanceStartCommand : Runnable {
         val inputJsonElement = getInput(input)
 
         // Retrieve the workflow definition from the repository
-        val workflowDefinition = getDefinition(name, version)
+        val workflowDefinition = getDefinition(name!!, version)
 
         // Check if the workflow input is valid against the workflow definition
         checkInput(workflowDefinition.definition, inputJsonElement)
 
         // create the message
         val messageBody =
-            MessageBody.newInstance(name = name, version = workflowDefinition.version, input = inputJsonElement)
+            MessageBody.newInstance(name = name!!, version = workflowDefinition.version, input = inputJsonElement)
 
         // Synchronously send the message to the workflow-out channel
         try {

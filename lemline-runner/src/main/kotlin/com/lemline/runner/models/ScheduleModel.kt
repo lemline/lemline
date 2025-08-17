@@ -17,7 +17,7 @@ import kotlin.time.toKotlinInstant
 
 const val SCHEDULE_TABLE = "lemline_schedules"
 
-@OptIn(ExperimentalTime::class)
+@ExperimentalTime
 data class ScheduleModel(
     override val id: String = IdGenerator.generateTimeBasedId(),
 

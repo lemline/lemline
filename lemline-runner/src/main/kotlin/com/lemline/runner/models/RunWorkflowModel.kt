@@ -8,7 +8,7 @@ import kotlin.time.Instant
 
 const val RUN_WORKFLOW_TABLE = "lemline_run_workflows"
 
-@OptIn(ExperimentalTime::class)
+@ExperimentalTime
 data class RunWorkflowModel(
     override val id: String = IdGenerator.generateTimeBasedId(),
 

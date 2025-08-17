@@ -32,6 +32,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
  */
 @Startup
 @ApplicationScoped
+@ExperimentalTime
 internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
 
     @Channel(WORKFLOW_OUT)

@@ -9,7 +9,7 @@ import kotlin.time.Instant
 
 const val WAIT_TABLE = "lemline_waits"
 
-@OptIn(ExperimentalTime::class)
+@ExperimentalTime
 data class WaitModel(
     override val id: String = IdGenerator.generateTimeBasedId(),
 

@@ -5,27 +5,31 @@ import com.lemline.common.ids.IdGenerator
 import com.lemline.runner.models.ScheduleModel
 import com.lemline.runner.repositories.ScheduleRepository
 import jakarta.inject.Inject
-import java.time.Duration
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import kotlin.random.Random
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.ExperimentalTime
 
 /**
  * Abstract base class for wait repository tests.
  */
+@ExperimentalTime
 internal abstract class ScheduleRepositoryTest : OutboxRepositoryTest<ScheduleModel>() {
 
     @Inject
     override lateinit var repository: ScheduleRepository
 
-    override fun createWithMessage(message: String) = ScheduleModel(
+    override fun createWithState(state: String) = ScheduleModel(
         workflowId = IdGenerator.generateTimeBasedId(),
-        message = message,
-        cron = null,
-        after = null,
-        every = Duration.of(Random.nextLong(), ChronoUnit.MILLIS),
-        outboxScheduledFor = Instant.now()
+        workflowName = Random.nextBytes(10).toString(),
+        workflowVersion = Random.nextBytes(10).toString(),
+        workflowPosition = Random.nextBytes(10).toString(),
+        workflowState = state,
+        scheduleAfter = null,
+        scheduleCron = null,
+        scheduleEvery = Random.nextLong().milliseconds.toString(),
+        outboxScheduledFor = Clock.System.now()
     )
 
-    override fun copyModel(model: ScheduleModel, message: String) = model.copy(message = message)
+    override fun copyModel(model: ScheduleModel, state: String) = model.copy(workflowState = state)
 }

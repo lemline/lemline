@@ -13,6 +13,7 @@ import jakarta.annotation.PreDestroy
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,6 +35,7 @@ import org.slf4j.Logger
  * @param T Type of the message entity (must implement OutboxModel interface)
  * @see OutboxProcessor for the core message processing logic
  */
+@ExperimentalTime
 internal abstract class AbstractOutbox<T : OutboxModel>() {
     protected val logger: Logger by lazy { logger() }
 

@@ -27,6 +27,7 @@ import kotlin.time.ExperimentalTime
  * @see OutboxProcessor for the processing logic
  */
 @ApplicationScoped
+@ExperimentalTime
 internal class ScheduleRepository : OutboxRepository<ScheduleModel>() {
 
     companion object {

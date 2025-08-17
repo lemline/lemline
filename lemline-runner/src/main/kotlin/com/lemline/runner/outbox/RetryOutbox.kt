@@ -9,6 +9,7 @@ import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
+import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
@@ -28,6 +29,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
  */
 @Startup
 @ApplicationScoped
+@ExperimentalTime
 internal class RetryOutbox : AbstractOutbox<RetryModel>() {
 
     @Channel(WORKFLOW_OUT)

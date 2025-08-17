@@ -25,6 +25,7 @@ import kotlin.time.ExperimentalTime
  * @see OutboxProcessor for the processing logic
  */
 @ApplicationScoped
+@ExperimentalTime
 internal class WaitRepository : OutboxRepository<WaitModel>() {
     @Inject
     override lateinit var databaseManager: DatabaseManager
