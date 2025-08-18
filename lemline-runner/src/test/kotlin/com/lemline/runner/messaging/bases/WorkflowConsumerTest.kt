@@ -163,10 +163,10 @@ internal abstract class WorkflowConsumerTest {
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
         val messageBody = MessageBody.newInstance(
-            id = "test-id",
-            name = "test-workflow",
-            version = "1.0.0",
-            input = JsonPrimitive("task"),
+            workflowId = "test-id",
+            workflowName = "test-workflow",
+            workflowVersion = "1.0.0",
+            workflowInput = JsonPrimitive("task"),
         )
 
         // When
@@ -244,10 +244,10 @@ internal abstract class WorkflowConsumerTest {
     fun `should store instance with retry in retry repository`() = runTest {
         // Given
         val messageBody = MessageBody.newInstance(
-            id = "test-id",
-            name = "test-workflow",
-            version = "1.0.0",
-            input = JsonPrimitive("retry"),
+            workflowId = "test-id",
+            workflowName = "test-workflow",
+            workflowVersion = "1.0.0",
+            workflowInput = JsonPrimitive("retry"),
         )
 
         // When

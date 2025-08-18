@@ -75,7 +75,11 @@ class InstanceStartCommand : Runnable {
 
         // create the message
         val messageBody =
-            MessageBody.newInstance(name = name!!, version = workflowDefinition.version, input = inputJsonElement)
+            MessageBody.newInstance(
+                workflowName = name!!,
+                workflowVersion = workflowDefinition.version,
+                workflowInput = inputJsonElement
+            )
 
         // Synchronously send the message to the workflow-out channel
         try {

@@ -126,10 +126,10 @@ internal class StepByStepRunner @Inject constructor(
             val childId = IdGenerator.generateTimeBasedId()
 
             val child = MessageBody.newInstance(
-                id = childId,
-                name = runWorkflow.workflow.name,
-                version = runWorkflow.workflow.version,
-                input = runWorkflow.getInputFor(current as RunInstance),
+                workflowId = childId,
+                workflowName = runWorkflow.workflow.name,
+                workflowVersion = runWorkflow.workflow.version,
+                workflowInput = runWorkflow.getInputFor(current as RunInstance),
                 parentId = id,
                 parentIsWaiting = runWorkflow.isAwait
 
@@ -156,7 +156,7 @@ internal class StepByStepRunner @Inject constructor(
     private suspend fun WorkflowInstance.onWorkflowCompleted() {
         if (parent?.isWaiting == true) {
             // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
-            val entity: RunWorkflowModel = runWorkflowRepository.findById(parent!!.workflowId)!!
+            val entity: RunWorkflowModel = runWorkflowRepository.findByWorkflowId(parent!!.workflowId)!!
             // Get current state of the parent workflow
             val state = entity.state
             // set the workflow output at the rawOutput at the current position of the parent workflow
@@ -165,7 +165,7 @@ internal class StepByStepRunner @Inject constructor(
             runWorkflowRepository.update(
                 entity.copy(
                     outboxDelayedUntil = Clock.System.now(),
-                    workflowState = state.toJsonString()
+                    workflowState = state.toJsonString() // <- TODO workflow state should by mutable
                 )
             )
             logger.debug { "Restarting parent workflow:\n${entity.toMessageBody().jsonPrettyString}" }

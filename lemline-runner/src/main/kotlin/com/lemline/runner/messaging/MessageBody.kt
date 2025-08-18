@@ -80,18 +80,18 @@ class MessageBody(
         )
 
         fun newInstance(
-            id: String = IdGenerator.generateTimeBasedId(),
-            name: String,
-            version: String,
-            input: JsonElement,
+            workflowId: String = IdGenerator.generateTimeBasedId(),
+            workflowName: String,
+            workflowVersion: String,
+            workflowInput: JsonElement,
             parentId: String? = null,
             parentIsWaiting: Boolean = false,
         ) = fromObjects(
-            workflowId = id,
-            workflowName = name,
-            workflowVersion = version,
+            workflowId = workflowId,
+            workflowName = workflowName,
+            workflowVersion = workflowVersion,
             workflowPosition = NodePosition.root,
-            workflowState = WorkflowState.newInstance(input, parentId, parentIsWaiting),
+            workflowState = WorkflowState.newInstance(workflowInput, parentId, parentIsWaiting),
         )
 
         fun fromJsonString(json: String): MessageBody = LemlineJson.decodeFromString(json)
