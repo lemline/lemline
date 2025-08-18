@@ -42,16 +42,17 @@ internal class ScheduleRepository : OutboxRepository<ScheduleModel>() {
     override val tableName = SCHEDULE_TABLE
 
     // add the after, cron and every column
-    override val entityMap: Map<String, (PreparedStatement, ScheduleModel, Int) -> Unit> = super.entityMap + (
-        SCHEDULE_AFTER_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
-            stmt.setString(idx, entity.scheduleAfter)
-        }) + (
-        SCHEDULE_CRON_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
-            stmt.setString(idx, entity.scheduleCron)
-        }) + (
-        SCHEDULE_EVERY_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
-            stmt.setString(idx, entity.scheduleEvery)
-        })
+    override val prepareStatementMap: Map<String, (PreparedStatement, ScheduleModel, Int) -> Unit> =
+        super.prepareStatementMap + (
+            SCHEDULE_AFTER_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
+                stmt.setString(idx, entity.scheduleAfter)
+            }) + (
+            SCHEDULE_CRON_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
+                stmt.setString(idx, entity.scheduleCron)
+            }) + (
+            SCHEDULE_EVERY_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
+                stmt.setString(idx, entity.scheduleEvery)
+            })
 
     @ExperimentalTime
     override fun createModel(rs: ResultSet) = ScheduleModel(

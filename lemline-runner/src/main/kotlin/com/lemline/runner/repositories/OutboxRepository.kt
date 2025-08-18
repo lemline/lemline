@@ -69,7 +69,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         internal const val OUTBOX_LAST_ERROR_COLUMN = "outbox_last_error"
     }
 
-    override val entityMap: Map<String, (PreparedStatement, T, Int) -> Unit> = mapOf(
+    override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> = mapOf(
         ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
             stmt.setString(idx, entity.id)
         },

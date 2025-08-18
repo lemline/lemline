@@ -30,7 +30,7 @@ abstract class Repository<T> {
      * A map associating column names with functions responsible for binding column values
      * to the respective placeholders in a SQL `PreparedStatement`.
      */
-    protected abstract val entityMap: Map<String, (PreparedStatement, T, Int) -> Unit>
+    protected abstract val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit>
 
 
     /**
@@ -41,7 +41,7 @@ abstract class Repository<T> {
     /**
      * A list of all columns in the table
      */
-    private val allColumns by lazy { entityMap.keys }
+    private val allColumns by lazy { prepareStatementMap.keys }
 
     /**
      * A list of columns that are not part of the primary or unique key.
@@ -50,15 +50,15 @@ abstract class Repository<T> {
 
 
     private fun bindAll(stmt: PreparedStatement, entity: T) {
-        allColumns.mapIndexed { index, column -> entityMap[column]!!(stmt, entity, index + 1) }
+        allColumns.mapIndexed { index, column -> prepareStatementMap[column]!!(stmt, entity, index + 1) }
     }
 
     private fun bindNonKeys(stmt: PreparedStatement, entity: T) {
-        nonKeyColumns.mapIndexed { index, column -> entityMap[column]!!(stmt, entity, index + 1) }
+        nonKeyColumns.mapIndexed { index, column -> prepareStatementMap[column]!!(stmt, entity, index + 1) }
     }
 
     private fun bindKeys(stmt: PreparedStatement, entity: T, startIndex: Int = 0) {
-        keyColumns.mapIndexed { index, column -> entityMap[column]!!(stmt, entity, startIndex + index + 1) }
+        keyColumns.mapIndexed { index, column -> prepareStatementMap[column]!!(stmt, entity, startIndex + index + 1) }
     }
 
     /**

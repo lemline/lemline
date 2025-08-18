@@ -39,10 +39,11 @@ internal class RetryRepository : OutboxRepository<RetryModel>() {
     override val tableName = RETRY_TABLE
 
     // add the message colum
-    override val entityMap: Map<String, (PreparedStatement, RetryModel, Int) -> Unit> = super.entityMap + (
-        MESSAGE_COLUMN to { stmt: PreparedStatement, entity: RetryModel, idx: Int ->
-            stmt.setString(idx, entity.message)
-        })
+    override val prepareStatementMap: Map<String, (PreparedStatement, RetryModel, Int) -> Unit> =
+        super.prepareStatementMap + (
+            MESSAGE_COLUMN to { stmt: PreparedStatement, entity: RetryModel, idx: Int ->
+                stmt.setString(idx, entity.message)
+            })
 
     @ExperimentalTime
     override fun createModel(rs: ResultSet) = RetryModel(

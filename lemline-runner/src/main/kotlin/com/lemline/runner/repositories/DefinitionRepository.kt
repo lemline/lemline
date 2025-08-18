@@ -24,7 +24,7 @@ class DefinitionRepository : Repository<DefinitionModel>() {
 
     override val tableName = DEFINITION_TABLE
 
-    override val entityMap: Map<String, (PreparedStatement, DefinitionModel, Int) -> Unit> = mapOf(
+    override val prepareStatementMap: Map<String, (PreparedStatement, DefinitionModel, Int) -> Unit> = mapOf(
         WORKFLOW_DEFINITION_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
             stmt.setString(idx, entity.definition)
         },
