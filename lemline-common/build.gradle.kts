@@ -28,10 +28,9 @@ dependencies {
     implementation(libs.uuidCreator)
 
     // Testing
-    testFixturesImplementation(kotlin("test"))
-    testFixturesImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
+    testImplementation(kotlin("test"))
+
+    // Tests Fixtures
+    testFixturesImplementation(enforcedPlatform(libs.kotest.bom))
     testFixturesImplementation("io.kotest:kotest-runner-junit5")
-    testFixturesImplementation("io.kotest:kotest-assertions-core")
-    testFixturesImplementation("io.kotest:kotest-framework-api")
-    testFixturesImplementation("io.mockk:mockk:1.13.9")
 }

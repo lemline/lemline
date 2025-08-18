@@ -299,7 +299,7 @@ abstract class Repository<T> {
      * @param connection An optional `Connection` instance. If null, a new connection is obtained from the datasource.
      * @param block A lambda function that takes a `Connection` as a parameter and returns a result of type `R`.
      * @return The result of executing the provided block with a `Connection`.
-     * @throws SQLException If an error occurs while acquiring or using the connection from the datasource.
+     * @throws java.sql.SQLException If an error occurs while acquiring or using the connection from the datasource.
      */
     protected suspend fun <R> withConnection(connection: Connection?, block: (Connection) -> R): R =
         withContext(Dispatchers.IO) {

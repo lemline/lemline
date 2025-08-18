@@ -31,34 +31,18 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 
-/**
- * Abstract base class for testing the core logic of [OutboxProcessor].
- *
- * This class provides a generic test suite that covers common outbox scenarios,
- * independent of the specific entity (`OutboxModel`) being processed.
- * Concrete subclasses must provide:
- *  - The specific [OutboxRepository] implementation.
- *  - The [KClass] of the entity being tested.
- *  - An implementation of `createTestModel` to generate test entities.
- *
- * The following scenarios are tested:
- * - `process should handle successful message processing`: Happy path, message processed and marked SENT.
- * - `process should handle retry logic on first failure then success`: Message fails once, is retried after delay, then succeeds.
- * - `process should mark message as FAILED after max attempts`: Message fails repeatedly and is marked FAILED.
- * - `process should handle batch processing correctly`: Multiple messages are processed successfully in one batch.
- * - `cleanup should remove old SENT messages`: Old SENT messages are deleted, others are retained.
- * - `process should do nothing when outbox is empty`: Handles empty table gracefully during processing.
- * - `cleanup should do nothing when outbox is empty`: Handles empty table gracefully during cleanup.
- *
- * It utilizes MockK for mocking the actual processing function (`processor`) passed to `OutboxProcessor`
- * and Kotest for assertions against the database state managed via a concrete `OutboxRepository` provided by the subclass.
- *
- * @param T The specific type of [OutboxModel] entity being tested.
- */
 
 @ExperimentalTime
 infix fun Instant.shouldBeAfter(date: Instant) = (this > date) shouldBe true
 
+/**
+ * Test class for validating the behavior of `OutboxProcessor` through various test scenarios.
+ *
+ * This test class defines multiple test cases to ensure the functionality of the
+ * `OutboxProcessor`, including message processing, retry logic, cleanup, and batch handling.
+ *
+ * @param T The generic type parameter representing the model class being tested.
+ */
 @ExperimentalTime
 internal abstract class OutboxProcessorTest<T : OutboxModel> {
 

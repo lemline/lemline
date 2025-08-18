@@ -46,7 +46,7 @@ class ForInstance(override val node: Node<ForTask>, override val parent: NodeIns
         childIndex++
     }
 
-    override fun `continue`(): NodeInstance<*>? {
+    override fun `continue`(): NodeInstance<*> {
         forIndex++
 
         // if we reached the end, follow the then directive

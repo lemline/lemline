@@ -5,7 +5,8 @@ import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import io.quarkus.test.junit.QuarkusTest
 import jakarta.inject.Inject
-import java.time.Duration
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
@@ -23,7 +24,7 @@ class LemlineConfigurationTest {
 
         assertEquals(5, lemlineConfig.outbox().retry().outbox().maxAttempts())
         assertEquals(1000, lemlineConfig.outbox().retry().outbox().batchSize())
-        assertEquals(Duration.ofSeconds(30), lemlineConfig.outbox().retry().outbox().initialDelay().toDuration())
-        assertEquals(Duration.ofHours(1), lemlineConfig.outbox().wait().cleanup().every().toDuration())
+        assertEquals(30.seconds, lemlineConfig.outbox().retry().outbox().initialDelay().toDuration())
+        assertEquals(1.hours, lemlineConfig.outbox().wait().cleanup().every().toDuration())
     }
 }

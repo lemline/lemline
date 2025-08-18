@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.common.flexible.FlexibleField
+import com.lemline.common.flexible.LazyParsedField
 import com.lemline.common.ids.IdGenerator
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
@@ -25,13 +25,22 @@ import kotlinx.serialization.json.JsonElement
  */
 @ExperimentalTime
 @Serializable
-data class MessageBody(
+class MessageBody(
     @SerialName("i") val workflowId: String,
     @SerialName("n") val workflowName: String,
     @SerialName("v") val workflowVersion: String,
-    @SerialName("p") val workflowPosition: FlexibleField<NodePosition>,
-    @SerialName("s") val workflowState: FlexibleField<WorkflowState>,
+    @SerialName("p") val workflowPosition: LazyParsedField<NodePosition>,
+    @SerialName("s") val workflowState: LazyParsedField<WorkflowState>,
 ) {
+
+    override fun equals(other: Any?): Boolean = (other is MessageBody) && this.workflowId == other.workflowId &&
+        this.workflowName == other.workflowName &&
+        this.workflowVersion == other.workflowVersion &&
+        this.workflowPosition.serialized == other.workflowPosition.serialized &&
+        this.workflowState.serialized == other.workflowState.serialized
+
+
+    override fun toString() = jsonString
 
     companion object {
         fun fromObjects(
@@ -44,8 +53,8 @@ data class MessageBody(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
-            workflowPosition = FlexibleField(workflowPosition, NodePosition.serializer()),
-            workflowState = FlexibleField(workflowState, WorkflowState.serializer()),
+            workflowPosition = LazyParsedField(workflowPosition, NodePosition.serializer()),
+            workflowState = LazyParsedField(workflowState, WorkflowState.serializer()),
         )
 
         fun fromStrings(
@@ -58,8 +67,8 @@ data class MessageBody(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
-            workflowPosition = FlexibleField(workflowPosition, NodePosition.serializer()),
-            workflowState = FlexibleField(workflowState, WorkflowState.serializer()),
+            workflowPosition = LazyParsedField(workflowPosition, NodePosition.serializer()),
+            workflowState = LazyParsedField(workflowState, WorkflowState.serializer()),
         )
 
         fun newInstance(

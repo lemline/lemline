@@ -91,11 +91,13 @@ internal class MessageBodyTest {
         val messageBody = MessageBody.newInstance(id, name, version, input)
 
         // Then
-        val expectedStates = mapOf(
-            NodePosition.root to NodeState(
-                rawInput = input,
-                startedAt = messageBody.workflowState.parsed[NodePosition.root]!!.startedAt,
-            ),
+        val expectedStates = WorkflowState(
+            mapOf(
+                NodePosition.root to NodeState(
+                    rawInput = input,
+                    startedAt = messageBody.workflowState.parsed[NodePosition.root]!!.startedAt,
+                ),
+            )
         )
 
         assertEquals(name, messageBody.workflowName)
