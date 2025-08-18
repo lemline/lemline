@@ -56,12 +56,12 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     abstract fun createTestModel(payload: String = "{}"): T
 
     // Mock and processor using the generic type T
-    private val mockProcessorFunction = mockk<suspend (T) -> Unit>()
+    private val mockedProcessor = mockk<suspend (T) -> Unit>()
     private val outboxProcessor: OutboxProcessor<T> by lazy {
         OutboxProcessor(
             logger = LoggerFactory.getLogger(this::class.java),
             repository = testRepository,
-            processor = mockProcessorFunction,
+            processor = mockedProcessor,
         )
     }
 
@@ -73,7 +73,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     @BeforeEach
     fun setup() = runTest {
         // Reset mock before each test, default to success
-        coEvery { mockProcessorFunction(any(modelClass)) } just Runs
+        coEvery { mockedProcessor(any(modelClass)) } just Runs
 
         testRepository.deleteAll()
     }
@@ -107,14 +107,14 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
-        // Verify the mock was called (at least once, type checked by any())
-        coVerify(atLeast = 1) { mockProcessorFunction(any(modelClass)) }
+        // Verify the mock was called at least once
+        coVerify(exactly = 1) { mockedProcessor(any(modelClass)) }
 
         val processedMessage = testRepository.findById(message.id)
         processedMessage shouldNotBe null
-        processedMessage!!.outBoxStatus shouldBe SENT
-        processedMessage.outboxAttemptCount shouldBe 1
-        processedMessage.outboxLastError shouldBe null
+        processedMessage?.outBoxStatus shouldBe SENT
+        processedMessage?.outboxAttemptCount shouldBe 1
+        processedMessage?.outboxLastError shouldBe null
     }
 
     /**
@@ -151,15 +151,15 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         val failureException = RuntimeException("Processing failed on purpose!")
         // Setup mock to fail the first time it's called in this sequence
-        coEvery { mockProcessorFunction(any(modelClass)) } throws failureException
+        coEvery { mockedProcessor(any(modelClass)) } throws failureException
 
         // Act: First process call (fails)
         val now = Clock.System.now()
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: First attempt failed - Check DB state
-        coVerify(exactly = 1) { mockProcessorFunction(any(modelClass)) } // Verify it was called once
-        val updated = testRepository.findById(original.workflowId)!!
+        coVerify(exactly = 1) { mockedProcessor(any(modelClass)) } // Verify it was called once
+        val updated = testRepository.findById(original.id)!!
 
         updated.outBoxStatus shouldBe PENDING
         updated.outboxAttemptCount shouldBe 1
@@ -173,14 +173,14 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         delay(updated.outboxDelayedUntil!! - now)
 
         // Arrange: Setup mock to succeed on subsequent calls
-        coEvery { mockProcessorFunction(any(modelClass)) } just Runs
+        coEvery { mockedProcessor(any(modelClass)) } just Runs
 
         // Act: Second process call (should succeed now)
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: A second attempt succeeded - Check DB state
-        coVerify(exactly = 2) { mockProcessorFunction(any(modelClass)) } // Verify it was called again
-        val final = testRepository.findById(original.workflowId)!!
+        coVerify(exactly = 2) { mockedProcessor(any(modelClass)) } // Verify it was called again
+        val final = testRepository.findById(original.id)!!
 
         final.outBoxStatus shouldBe SENT // Status updated
         final.outboxAttemptCount shouldBe 2
@@ -215,7 +215,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         val failureException = RuntimeException("Persistent failure!")
         // Set up the mock to always fail
-        coEvery { mockProcessorFunction(any(modelClass)) } throws failureException
+        coEvery { mockedProcessor(any(modelClass)) } throws failureException
 
         // Act & Assert intermediate attempts by checking DB state
         var lastDelayedUntil = originalDelayedUntil
@@ -224,7 +224,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
             // when
             outboxProcessor.process(batchSize, maxAttempts, initialDelay)
             // then
-            val updated = testRepository.findById(original.workflowId)!!
+            val updated = testRepository.findById(original.id)!!
             if (attempt < maxAttempts) {
                 updated.outBoxStatus shouldBe PENDING
                 updated.outboxAttemptCount shouldBe attempt
@@ -271,7 +271,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
-        coVerify(exactly = 5) { mockProcessorFunction(any(modelClass)) }
+        coVerify(exactly = 5) { mockedProcessor(any(modelClass)) }
         val processedMessages = testRepository.listAll()
         processedMessages shouldHaveSize 5
         processedMessages.forEach { msg ->
@@ -319,19 +319,14 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         }
         testRepository.insert(listOf(oldSentMessage, recentSentMessage, pendingMessage, failedMessage))
 
-        val oldSentId = oldSentMessage.workflowId
-        val recentSentId = recentSentMessage.workflowId
-        val pendingId = pendingMessage.workflowId
-        val failedId = failedMessage.workflowId
-
         // Act
         outboxProcessor.cleanup(retentionDelay, 2) // Use small batch size for testing
 
         // Assert
-        testRepository.findById(oldSentId) shouldBe null // Should be deleted
-        testRepository.findById(recentSentId) shouldNotBe null // Should remain
-        testRepository.findById(pendingId) shouldNotBe null // Should remain (not SENT)
-        testRepository.findById(failedId) shouldNotBe null // Should remain (not SENT)
+        testRepository.findById(oldSentMessage.id) shouldBe null // Should be deleted
+        testRepository.findById(recentSentMessage.id) shouldNotBe null // Should remain
+        testRepository.findById(pendingMessage.id) shouldNotBe null // Should remain (not SENT)
+        testRepository.findById(failedMessage.id) shouldNotBe null // Should remain (not SENT)
     }
 
     /**
@@ -355,7 +350,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
-        coVerify(exactly = 0) { mockProcessorFunction(any(modelClass)) }
+        coVerify(exactly = 0) { mockedProcessor(any(modelClass)) }
         testRepository.count() shouldBe 0
     }
 

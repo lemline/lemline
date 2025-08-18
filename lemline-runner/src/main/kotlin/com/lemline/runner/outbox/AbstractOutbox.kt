@@ -74,7 +74,6 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
     open suspend fun process(entity: T) {
         emitter.sendSuspending(entity.toMessageBody().jsonString)
-        entity.outBoxStatus = OutBoxStatus.SENT
     }
 
     @PostConstruct

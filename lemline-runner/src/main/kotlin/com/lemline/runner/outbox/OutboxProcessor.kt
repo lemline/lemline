@@ -119,10 +119,12 @@ internal class OutboxProcessor<T : OutboxModel>(
      */
     private suspend fun processMessage(message: T, maxAttempts: Int, initialDelay: Duration): Boolean = try {
         message.outboxAttemptCount++
+        message.outBoxStatus = OutBoxStatus.SENT
         processor(message)
         true // <- return true (success)
     } catch (e: Exception) {
         logger.warn(e) { "Failed to process message ${message.workflowId}" }
+        message.outBoxStatus = OutBoxStatus.PENDING
         message.outboxLastError = e.stackTraceToString()
 
         if (message.outboxAttemptCount >= maxAttempts) {
