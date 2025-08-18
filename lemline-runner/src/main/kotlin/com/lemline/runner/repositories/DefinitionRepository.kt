@@ -32,14 +32,16 @@ class DefinitionRepository : Repository<DefinitionModel>() {
 
     // MUST be in the same order as insertColumns
     override fun bindInsertWith(stmt: PreparedStatement, entity: DefinitionModel) = stmt.apply {
-        setString(1, entity.definition) // Sets the workflow definition
-        setString(2, entity.name) // Sets the workflow name
-        setString(3, entity.version) // Sets the workflow version
+        setString(1, entity.definition)
+        setString(2, entity.name)
+        setString(3, entity.version)
     }
 
     // MUST be in the same order as updateColumns
     override fun bindUpdateWith(stmt: PreparedStatement, entity: DefinitionModel) = stmt.apply {
-        setString(1, entity.definition) // Sets the workflow definition
+        setString(1, entity.definition)
+        setString(2, entity.name)
+        setString(3, entity.version)
     }
 
     // MUST be in the same order as keyColumns

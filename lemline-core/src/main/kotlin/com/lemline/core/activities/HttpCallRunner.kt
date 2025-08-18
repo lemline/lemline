@@ -12,8 +12,10 @@ import com.lemline.core.utils.toSecret
 import com.lemline.core.utils.toUrl
 import io.ktor.http.*
 import io.serverlessworkflow.api.types.HTTPArguments
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
+@ExperimentalTime
 class HttpCallRunner : ActivityRunner<CallHttpInstance> {
     override suspend fun run(instance: CallHttpInstance): JsonElement {
         // The HttpCall helper is instantiated here, using method references from the instance

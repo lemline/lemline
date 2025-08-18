@@ -53,8 +53,11 @@ import io.serverlessworkflow.api.types.WaitTask
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import java.time.Instant
 import java.util.concurrent.CompletableFuture
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -71,6 +74,7 @@ import kotlinx.serialization.json.JsonElement
  * @property position The current position in the workflow.
  * @property secrets A map of secrets used in the workflow.
  */
+@ExperimentalTime
 @Suppress("unused")
 class WorkflowInstance(
     val id: String,
@@ -326,7 +330,7 @@ class WorkflowInstance(
             id = id,
             definition = LemlineJson.encodeToElement(workflow),
             input = rawInput,
-            startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt)),
+            startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant())),
         )
 
         // init nodes instance
@@ -480,7 +484,7 @@ class WorkflowInstance(
                 node.startedAt == null -> when (node.shouldStart()) {
                     // run the current task
                     true -> {
-                        node.startedAt = Instant.now()
+                        node.startedAt = Clock.System.now()
                         if (node is WaitInstance) status = WorkflowStatus.WAITING
                         if (node == rootInstance) onWorkflowStarted() else onTaskStarted(node)
                         node.run()

@@ -5,7 +5,6 @@ import com.lemline.common.ids.IdGenerator
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.repositories.WaitRepository
 import jakarta.inject.Inject
-import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 
 /**
@@ -17,13 +16,13 @@ internal abstract class WaitRepositoryTest : OutboxRepositoryTest<WaitModel>() {
     @Inject
     override lateinit var repository: WaitRepository
 
-    override fun createWithState(state: String) = WaitModel(
+    override fun createRandomEntity() = WaitModel(
         workflowId = IdGenerator.generateTimeBasedId(),
-        workflowName = Random.nextBytes(10).toString(),
-        workflowVersion = Random.nextBytes(10).toString(),
-        workflowPosition = Random.nextBytes(10).toString(),
-        workflowState = state
+        workflowName = randomString,
+        workflowVersion = randomString,
+        workflowPosition = randomString,
+        workflowState = randomString,
     )
 
-    override fun copyModel(model: WaitModel, state: String) = model.copy(workflowState = state)
+    override fun changeDelayedUntil(model: WaitModel) = model.copy(outboxDelayedUntil = randomInstant)
 }

@@ -13,6 +13,7 @@ import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import kotlin.system.exitProcess
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonElement
 import org.eclipse.microprofile.reactive.messaging.Channel
@@ -22,6 +23,7 @@ import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 
+@ExperimentalTime
 @Unremovable
 @Command(
     name = "start",

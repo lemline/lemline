@@ -6,11 +6,13 @@ import com.lemline.core.nodes.NodeInstance
 import io.serverlessworkflow.api.types.Endpoint
 import io.serverlessworkflow.api.types.EndpointConfiguration
 import io.serverlessworkflow.api.types.UriTemplate
+import kotlin.time.ExperimentalTime
 
 
 /**
  * Get a URL string from an Endpoint
  */
+@ExperimentalTime
 internal fun NodeInstance<*>.toUrl(endpointUnion: Endpoint): String = when (val endpoint = endpointUnion.get()) {
     is UriTemplate -> toUrl(endpoint)
 

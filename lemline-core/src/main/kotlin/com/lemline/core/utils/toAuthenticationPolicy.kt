@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.core.utils
 
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
@@ -10,6 +12,7 @@ import io.serverlessworkflow.api.types.AuthenticationPolicyUnion
 import io.serverlessworkflow.api.types.Endpoint
 import io.serverlessworkflow.api.types.EndpointConfiguration
 import io.serverlessworkflow.api.types.UriTemplate
+import kotlin.time.ExperimentalTime
 
 /**
  * Resolves an authentication policy based on the provided name.

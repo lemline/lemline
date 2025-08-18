@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.core.instances
 
 import com.lemline.core.nodes.Node
@@ -14,6 +16,7 @@ import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.WaitTask
 import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
 
 /**
  * Sealed base class for all activity node instances.

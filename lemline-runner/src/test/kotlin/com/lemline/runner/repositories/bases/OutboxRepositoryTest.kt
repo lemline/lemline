@@ -13,11 +13,7 @@ import io.kotest.matchers.comparables.shouldBeLessThan
 import io.kotest.matchers.comparables.shouldBeLessThanOrEqualTo
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.mockk.every
-import io.mockk.mockk
 import java.sql.Connection
-import java.sql.ResultSet
-import java.sql.Timestamp
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -28,7 +24,6 @@ import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlin.time.toJavaInstant
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -53,10 +48,10 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     internal abstract val repository: OutboxRepository<T>
 
     /** Method to create a new instance of the model being tested */
-    internal abstract fun createWithState(state: String = "test"): T
+    internal abstract fun createRandomEntity(): T
 
     /** Method to create a new instance of the model being tested */
-    internal abstract fun copyModel(model: T, state: String): T
+    internal abstract fun changeDelayedUntil(model: T): T
 
     /**
      * Cleans up the database before each test to ensure a clean state.
@@ -150,7 +145,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      */
     @Test
     fun `findMessagesToProcess should return all eligible pending messages that are ready for processing`() = runTest {
-        val messages = insertMessages(messageCount)
+        val messages = insertEntities(messageCount)
         val messagesIds = messages.map { it.workflowId }
         val expected = messages.filterEntitiesToProcess(Int.MAX_VALUE)
         val expectedIds = expected.map { it.workflowId }
@@ -168,7 +163,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      */
     @Test
     fun `findMessagesToProcess should exclude messages that have exceeded maxAttempts`() = runTest {
-        val messages = insertMessages(messageCount)
+        val messages = insertEntities(messageCount)
         val messagesIds = messages.map { it.workflowId }
         val expected = messages.filterEntitiesToProcess(maxAttempts = maxAttempts)
         val expectedIds = expected.map { it.workflowId }
@@ -188,7 +183,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      */
     @Test
     fun `findMessagesToProcess should respect the limit parameter and only return valid candidates`() = runTest {
-        val messages = insertMessages(messageCount)
+        val messages = insertEntities(messageCount)
         val messagesIds = messages.map { it.workflowId }
         val expected = messages.filterEntitiesToProcess(Int.MAX_VALUE)
         val expectedIds = expected.map { it.workflowId }
@@ -212,7 +207,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `findMessagesToDelete should return all sent messages that are past their cutoff date`() = runTest {
         val now = Clock.System.now()
-        val messages = insertMessages(messageCount)
+        val messages = insertEntities(messageCount)
         val messagesIds = messages.map { it.workflowId }
         val expected = messages.filterEntitiesToDelete(cutoffDate = now)
         val expectedIds = expected.map { it.workflowId }
@@ -231,7 +226,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      */
     @Test
     fun `findMessagesToDelete should only return messages older than the specified cutoff date`() = runTest {
-        val messages = insertMessages(messageCount)
+        val messages = insertEntities(messageCount)
         val messagesIds = messages.map { it.workflowId }
         val expected = messages.filterEntitiesToDelete(cutoffDate = cutoffDate)
         val expectedIds = expected.map { it.workflowId }
@@ -251,7 +246,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      */
     @Test
     fun `findMessagesToDelete should respect the limit parameter and only return valid candidates`() = runTest {
-        val messages = insertMessages(messageCount)
+        val messages = insertEntities(messageCount)
         val messagesIds = messages.map { it.workflowId }
         val expected = messages.filterEntitiesToDelete()
         val expectedIds = expected.map { it.workflowId }
@@ -275,7 +270,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      */
     @Test
     fun `findMessagesToProcess should handle concurrent requests without duplicate processing`() = runTest {
-        val messages = insertMessages(messageCount)
+        val messages = insertEntities(messageCount)
         val messagesIds = messages.map { it.workflowId }
         val expectedProcessed = messages.filterEntitiesToProcess(maxAttempts = maxAttempts).size
         val processedMessages = mutableListOf<T>()
@@ -325,7 +320,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      */
     @Test
     fun `findMessagesToDelete should handle concurrent requests without duplicate deletion`() = runTest {
-        val messages = insertMessages(messageCount)
+        val messages = insertEntities(messageCount)
         val messagesIds = messages.map { it.workflowId }
         val expectedDeleted = messages.filterEntitiesToDelete(cutoffDate).size
         val deletedMessages = mutableListOf<T>()
@@ -374,7 +369,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      */
     @Test
     fun `should handle mixed concurrent processing and deletion operations without conflicts`() = runTest {
-        val messages = insertMessages(messageCount)
+        val messages = insertEntities(messageCount)
         val messagesIds = messages.map { it.workflowId }
         val expectedProcessed = messages.filterEntitiesToProcess(maxAttempts = maxAttempts).size
         val expectedDeleted = messages.filterEntitiesToDelete(cutoffDate).size
@@ -443,47 +438,13 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     /**
-     * Tests that createModel correctly maps ResultSet data to model properties.
-     * Verifies that all fields are properly mapped and converted.
-     */
-    @Test
-    fun `createModel should correctly map ResultSet data to model properties`() = runTest {
-        // Given
-        val expectedId = "test-id"
-        val expectedStatus = PENDING
-        val expectedDelayedUntil = Clock.System.now() // Truncate for DB precision
-        val expectedAttemptCount = 2
-        val expectedLastError = "test error"
-
-        val mockResultSet = mockk<ResultSet> {
-            // this default behavior will be overwritten by the specific value below
-            every { getString(any<String>()) } returns Random.nextBytes(16).toString()
-            every { getString("id") } returns expectedId
-            every { getString("status") } returns expectedStatus.name
-            every { getTimestamp("delayed_until") } returns Timestamp.from(expectedDelayedUntil.toJavaInstant())
-            every { getInt("attempt_count") } returns expectedAttemptCount
-            every { getString("last_error") } returns expectedLastError
-        }
-
-        // When
-        val model = repository.createModel(mockResultSet)
-
-        // Then
-        model.workflowId shouldBe expectedId
-        model.outBoxStatus shouldBe expectedStatus
-        model.outboxDelayedUntil shouldBe expectedDelayedUntil
-        model.outboxAttemptCount shouldBe expectedAttemptCount
-        model.outboxLastError shouldBe expectedLastError
-    }
-
-    /**
      * Tests that the repository handles concurrent access correctly.
      * Verifies that concurrent operations don't corrupt the data.
      */
     @Test
-    fun `should handle concurrent access correctly`() = runTest {
+    fun `should handle concurrent insert correctly`() = runTest {
         // Given
-        val messages = List(10) { createWithState("test") }
+        val messages = List(10) { createRandomEntity() }
         val nThreads = 5
         val executor = Executors.newFixedThreadPool(nThreads)
         val latch = CountDownLatch(nThreads)
@@ -519,7 +480,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `insert should handle concurrent transactions correctly`() = runTest {
         // Given
-        val message = createWithState().apply {
+        val message = createRandomEntity().apply {
             outBoxStatus = PENDING
             outboxDelayedUntil = Clock.System.now()
             outboxAttemptCount = 0
@@ -547,7 +508,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
         // Then
         exceptions.shouldBeEmpty()
-        val persistedMessage = repository.findById(message.workflowId)
+        val persistedMessage = repository.findById(message.id)
         persistedMessage shouldNotBe null
     }
 
@@ -557,8 +518,8 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `update should handle concurrent transactions correctly`() = runTest {
         // Given
-        val original = insertWithState("original")
-        val updated = copyModel(original, state = "updated")
+        val original = insertRandomEntity()
+        val updated = changeDelayedUntil(original)
 
         val nThreads = 5
         val executor = Executors.newFixedThreadPool(nThreads)
@@ -582,8 +543,8 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
         // Then
         exceptions.shouldBeEmpty()
-        val persistedMessage = repository.findById(original.workflowId)
-        persistedMessage?.workflowState shouldBe "updated"
+        val persistedMessage = repository.findById(original.id)
+        persistedMessage?.outboxDelayedUntil shouldBe updated.outboxDelayedUntil
     }
 
     /**
@@ -595,7 +556,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         val count = repository.count()
 
         // When
-        insertMessages(10)
+        insertEntities(10)
 
         // Then
         repository.count() shouldBe count + 10
@@ -608,7 +569,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `count should be consistent with listAll`() = runTest {
         // Given
-        insertMessages(10)
+        insertEntities(10)
 
         // When
         val count = repository.count()
@@ -624,7 +585,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `batch delete should successful`() = runTest {
         // Given
-        val messages = insertMessages(10)
+        val messages = insertEntities(10)
         val messagesToDelete = messages.take(5)
 
         // When
@@ -633,9 +594,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         // Then
         messages.forEachIndexed { index, message ->
             if (index < 5)
-                repository.findById(message.workflowId) shouldBe null
+                repository.findById(message.id) shouldBe null
             else
-                repository.findById(message.workflowId) shouldNotBe null
+                repository.findById(message.id) shouldNotBe null
         }
     }
 
@@ -645,7 +606,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `batch updates should successful`() = runTest {
         // Given
-        val messages = insertMessages(10)
+        val messages = insertEntities(10)
         val messagesToUpdate = messages.take(5)
         repository.insert(messages)
 
@@ -658,9 +619,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         // Then
         messages.forEachIndexed { index, message ->
             if (index < 5)
-                repository.findById(message.workflowId)!!.outboxAttemptCount shouldBe 100
+                repository.findById(message.id)!!.outboxAttemptCount shouldBe 100
             else
-                repository.findById(message.workflowId)!!.outboxAttemptCount shouldBeLessThan 100
+                repository.findById(message.id)!!.outboxAttemptCount shouldBeLessThan 100
         }
     }
 
@@ -668,46 +629,46 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
     @Test
     fun `insert new entity should be successful`() = runTest {
-        val original = createWithState("original")
+        val original = createRandomEntity()
 
         repository.insert(original) shouldBe 1
 
-        val retrieved = repository.findById(original.workflowId)
+        val retrieved = repository.findById(original.id)
         retrieved shouldNotBe null
         retrieved?.workflowState shouldBe original.workflowState
     }
 
     @Test
     fun `insert existing entity should fail`() = runTest {
-        val original = insertWithState("original")
-        val updated = copyModel(original, state = "updated")
+        val original = insertRandomEntity()
+        val updated = changeDelayedUntil(original)
 
         repository.insert(updated) shouldBe 0
 
-        val retrieved = repository.findById(original.workflowId)
+        val retrieved = repository.findById(original.id)
         retrieved shouldNotBe null
-        retrieved?.workflowState shouldBe original.workflowState
+        retrieved?.outboxDelayedUntil shouldBe original.outboxDelayedUntil
     }
 
     @Test
     fun `update existing entity should be successful`() = runTest {
-        val original = insertWithState("original")
-        val updated = copyModel(original, state = "updated")
+        val original: T = insertRandomEntity()
+        val updated = changeDelayedUntil(original)
 
         repository.update(updated) shouldBe 1
 
-        val retrieved = repository.findById(original.workflowId)
+        val retrieved = repository.findById(original.id)
         retrieved shouldNotBe null
-        retrieved?.workflowState shouldBe "updated"
+        retrieved?.outboxDelayedUntil shouldBe updated.outboxDelayedUntil
     }
 
     @Test
     fun `update new entity should fail`() = runTest {
-        val original = createWithState("original")
+        val original = createRandomEntity()
 
         repository.update(original) shouldBe 0
 
-        val retrieved = repository.findById(original.workflowId)
+        val retrieved = repository.findById(original.id)
         retrieved shouldBe null
     }
 
@@ -715,63 +676,62 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
     @Test
     fun `update list should update only existing`() = runTest {
-        val original = insertWithState("original-0")
-        val updated = copyModel(original, state = "updated")
-        val newEntity1 = createWithState("original-1")
-        val newEntity2 = createWithState("original-2")
+        val original = insertRandomEntity()
+        val updated = changeDelayedUntil(original)
+        val newEntity1 = createRandomEntity()
+        val newEntity2 = createRandomEntity()
 
         val entitiesToPersist = listOf(newEntity1, updated, newEntity2)
 
         repository.update(entitiesToPersist) shouldBe 1
 
         // Verify updates
-        val retrievedUpdated = repository.findById(original.workflowId)
-        retrievedUpdated?.workflowState shouldBe "updated"
+        val retrievedUpdated = repository.findById(original.id)
+        retrievedUpdated?.outboxDelayedUntil shouldBe updated.outboxDelayedUntil
 
         // Verify inserts
-        repository.findById(newEntity1.workflowId) shouldBe null
-        repository.findById(newEntity2.workflowId) shouldBe null
+        repository.findById(newEntity1.id) shouldBe null
+        repository.findById(newEntity2.id) shouldBe null
     }
 
     @Test
     fun `insert list should insert only non-existing`() = runTest {
-        val original = insertWithState("original-0")
-        val updated = copyModel(original, state = "updated")
-        val newEntity1 = createWithState("original-1")
-        val newEntity2 = createWithState("original-2")
+        val original = insertRandomEntity()
+        val updated = changeDelayedUntil(original)
+        val newEntity1 = createRandomEntity()
+        val newEntity2 = createRandomEntity()
 
         val entitiesToPersist = listOf(newEntity1, updated, newEntity2)
 
         repository.insert(entitiesToPersist) shouldBe 2
 
         // Verify updates
-        val retrievedUpdated = repository.findById(original.workflowId)
-        retrievedUpdated?.workflowState shouldBe "original-0"
+        val retrievedUpdated = repository.findById(original.id)
+        retrievedUpdated?.outboxDelayedUntil shouldBe original.outboxDelayedUntil
 
         // Verify inserts
-        repository.findById(newEntity1.workflowId) shouldNotBe null
-        repository.findById(newEntity2.workflowId) shouldNotBe null
+        repository.findById(newEntity1.id) shouldNotBe null
+        repository.findById(newEntity2.id) shouldNotBe null
     }
 
     @Test
     fun `delete should remove an existing message`() = runTest {
         // Given
-        val message = createWithState("to-delete")
-        repository.insert(message)
+        val message = insertRandomEntity()
 
         // When
         val deletedCount = repository.delete(message)
 
         // Then
         deletedCount shouldBe 1
-        repository.findById(message.workflowId) shouldBe null
+        repository.findById(message.id) shouldBe null
     }
 
     @Test
     fun `delete should return 0 if message does not exist`() = runTest {
         // Given
-        val existingMessage = createWithState("existing")
-        val nonExistentMessage = createWithState("non-existent")
+        val existingMessage = createRandomEntity()
+        val nonExistentMessage = createRandomEntity()
         repository.insert(existingMessage)
 
         // When
@@ -779,14 +739,14 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
         // Then
         deletedCount shouldBe 0
-        repository.findById(existingMessage.workflowId) shouldNotBe null
+        repository.findById(existingMessage.id) shouldNotBe null
     }
 
     @Test
     fun `batch delete should remove multiple existing messages`() = runTest {
         // Given
-        val messagesToDelete = List(5) { createWithState("delete-$it") }
-        val otherMessage = createWithState("keep-me")
+        val messagesToDelete = List(5) { createRandomEntity() }
+        val otherMessage = createRandomEntity()
         repository.insert(messagesToDelete + otherMessage)
 
         // When
@@ -794,17 +754,17 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
         // Then
         deletedCount shouldBe 5
-        repository.findById(otherMessage.workflowId) shouldNotBe null
+        repository.findById(otherMessage.id) shouldNotBe null
         messagesToDelete.forEach {
-            repository.findById(it.workflowId) shouldBe null
+            repository.findById(it.id) shouldBe null
         }
     }
 
     @Test
     fun `batch delete should return correct count when some messages do not exist`() = runTest {
         // Given
-        val existingMessages = List(3) { createWithState("existing-$it") }
-        val nonExistentMessages = List(2) { createWithState("non-existent-$it") }
+        val existingMessages = List(3) { createRandomEntity() }
+        val nonExistentMessages = List(2) { createRandomEntity() }
         repository.insert(existingMessages)
 
         val batchToDelete = existingMessages.take(2) + nonExistentMessages
@@ -814,15 +774,15 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
         // Then
         deletedCount shouldBe 2 // Only the 2 existing messages should be counted as deleted
-        repository.findById(existingMessages[0].workflowId) shouldBe null
-        repository.findById(existingMessages[1].workflowId) shouldBe null
-        repository.findById(existingMessages[2].workflowId) shouldNotBe null
+        repository.findById(existingMessages[0].id) shouldBe null
+        repository.findById(existingMessages[1].id) shouldBe null
+        repository.findById(existingMessages[2].id) shouldNotBe null
     }
 
     @Test
     fun `batch delete should return 0 for an empty list`() = runTest {
         // Given
-        repository.insert(createWithState("existing"))
+        repository.insert(createRandomEntity())
         val emptyList = emptyList<T>()
 
         // When
@@ -840,7 +800,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * - Random attempt count
      * - Sequential message content
      */
-    private suspend fun insertMessages(count: Int): List<T> {
+    private suspend fun insertEntities(count: Int): List<T> {
         val now = Clock.System.now()
         val messages = List(count) { i ->
             val duration = randomNonZero(1000).hours
@@ -851,7 +811,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
             }
             val attemptCount = Random.nextInt(0, 5)
 
-            createWithState("test$i").apply {
+            createRandomEntity().apply {
                 this.outBoxStatus = status
                 this.outboxDelayedUntil = now + duration
                 this.outboxAttemptCount = attemptCount
@@ -862,9 +822,18 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     // --- Helper to persist an entity for setup ---
-    private suspend fun insertWithState(state: String): T {
-        val entity = createWithState(state)
+    private suspend fun insertRandomEntity(): T {
+        val entity = createRandomEntity()
         repository.insert(entity)
         return entity
     }
+
+    val randomInstant: Instant
+        get() = Clock.System.now() + Random.nextInt(-1000, 1000).days
+
+    val randomString: String
+        get() = Random.nextBytes(32).toString()
+
+    val randomNullableString: String?
+        get() = if (Random.nextBoolean()) null else randomString
 }

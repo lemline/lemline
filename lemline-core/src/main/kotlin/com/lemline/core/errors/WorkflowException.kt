@@ -3,6 +3,7 @@ package com.lemline.core.errors
 
 import com.lemline.core.instances.TryInstance
 import com.lemline.core.nodes.NodeInstance
+import kotlin.time.ExperimentalTime
 
 /**
  * Internal Exception thrown during the execution of a workflow.
@@ -14,6 +15,7 @@ import com.lemline.core.nodes.NodeInstance
  * @property catching The try instance that is catching the exception, if any.
  * @property error The workflow error associated with this exception.
  */
+@ExperimentalTime
 class WorkflowException(
     val raising: NodeInstance<*>,
     val catching: TryInstance?,

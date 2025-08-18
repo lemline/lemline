@@ -61,11 +61,11 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         internal const val WORKFLOW_POSITION_COLUMN = "workflow_position"
         internal const val WORKFLOW_STATE_COLUMN = "workflow_state"
 
-        internal const val OUTBOX_STATUS_COLUMN = "status"
-        internal const val OUTBOX_SCHEDULED_FOR_COLUMN = "scheduled_for"
-        internal const val OUTBOX_DELAYED_UNTIL_COLUMN = "delayed_until"
-        internal const val OUTBOX_ATTEMPT_COUNT_COLUMN = "attempt_count"
-        internal const val OUTBOX_LAST_ERROR_COLUMN = "last_error"
+        internal const val OUTBOX_STATUS_COLUMN = "outbox_status"
+        internal const val OUTBOX_SCHEDULED_FOR_COLUMN = "outbox_scheduled_for"
+        internal const val OUTBOX_DELAYED_UNTIL_COLUMN = "outbox_delayed_until"
+        internal const val OUTBOX_ATTEMPT_COUNT_COLUMN = "outbox_attempt_count"
+        internal const val OUTBOX_LAST_ERROR_COLUMN = "outbox_last_error"
     }
 
     override val insertColumns = listOf(
@@ -118,6 +118,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         setTimestamp(3, entity.outboxDelayedUntil?.let { java.sql.Timestamp.from(it.toJavaInstant()) })
         setInt(4, entity.outboxAttemptCount)
         setString(5, entity.outboxLastError)
+        setString(6, entity.id)
     }
 
     // MUST be in the same order as KeyColumns
@@ -146,15 +147,17 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
             }
         }
 
-    private val findEntitiesToProcessSQL = """
+    private val findEntitiesToProcessSQL by lazy {
+        """
             SELECT * FROM $tableName
-            WHERE $OUTBOX_STATUS_COLUMN = $PENDING
+            WHERE $OUTBOX_STATUS_COLUMN = '$PENDING'
             AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
             AND $OUTBOX_ATTEMPT_COUNT_COLUMN < ?
             ORDER BY $OUTBOX_DELAYED_UNTIL_COLUMN ASC
             LIMIT ?
             FOR UPDATE SKIP LOCKED
         """.trimIndent()
+    }
 
     /**
      * Finds and locks messages that are ready to be deleted.
@@ -192,14 +195,16 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
 
     private val findByIdSql by lazy { "SELECT * FROM $tableName WHERE $ID_COLUMN = ? LIMIT 1" }
 
-    private val findEntitiesToDeleteSQL = """
+    private val findEntitiesToDeleteSQL by lazy {
+        """
             SELECT * FROM $tableName
-            WHERE $OUTBOX_STATUS_COLUMN = $SENT
+            WHERE $OUTBOX_STATUS_COLUMN = '$SENT'
             AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
             ORDER BY $OUTBOX_DELAYED_UNTIL_COLUMN ASC
             LIMIT ?
             FOR UPDATE SKIP LOCKED
         """.trimIndent()
+    }
 
     private fun ResultSet.toModels(): List<T> = buildList {
         while (next()) {

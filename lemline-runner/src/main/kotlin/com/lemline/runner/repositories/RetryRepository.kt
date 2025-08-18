@@ -63,6 +63,6 @@ internal class RetryRepository : OutboxRepository<RetryModel>() {
         outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
         outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
 
-        message = rs.getString("message"),
+        message = rs.getString(MESSAGE_COLUMN),
     )
 }

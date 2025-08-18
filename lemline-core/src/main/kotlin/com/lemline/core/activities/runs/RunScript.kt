@@ -15,8 +15,10 @@ import java.io.File
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Paths
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
+@ExperimentalTime
 internal suspend fun RunInstance.runScript(runScript: RunScript): JsonElement {
     logInfo { "Executing run script: ${node.name}" }
 

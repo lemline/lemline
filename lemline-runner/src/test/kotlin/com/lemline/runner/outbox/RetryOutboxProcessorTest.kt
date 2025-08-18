@@ -10,13 +10,16 @@ import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
+import kotlin.random.Random
 import kotlin.reflect.KClass
+import kotlin.time.ExperimentalTime
 
 /**
  * Runs the OutboxProcessorTest suite for RetryModel
  */
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
+@ExperimentalTime
 internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryModel>() {
 
     @Inject // Inject the specific repository
@@ -31,6 +34,10 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryModel>() {
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = RetryModel(
         workflowId = IdGenerator.generateTimeBasedId(),
-        message = "Test Retry Message: $payload",
+        workflowName = Random.nextBytes(10).toString(),
+        workflowVersion = Random.nextBytes(10).toString(),
+        workflowPosition = Random.nextBytes(10).toString(),
+        workflowState = "Test Retry Message: $payload",
+        message = null,
     )
 }

@@ -7,6 +7,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.WorkflowState
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -22,6 +23,7 @@ import kotlinx.serialization.json.JsonElement
  * @property workflowState A map of the internal initial states (per position).
  * @property workflowPosition The current active initial position
  */
+@ExperimentalTime
 @Serializable
 data class MessageBody(
     @SerialName("i") val workflowId: String,
@@ -94,6 +96,7 @@ data class MessageBody(
     )
 }
 
+@ExperimentalTime
 internal fun WorkflowInstance.toMessage() = MessageBody.fromObjects(
     workflowId = this.id,
     workflowName = this.name,

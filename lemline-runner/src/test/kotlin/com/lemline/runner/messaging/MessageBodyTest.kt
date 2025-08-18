@@ -4,23 +4,26 @@ package com.lemline.runner.messaging
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
-import java.time.Instant
+import com.lemline.core.workflows.WorkflowState
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 internal class MessageBodyTest {
 
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {
         // Given
-        val messageBody = MessageBody(
+        val messageBody = MessageBody.fromObjects(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
-            workflowState = mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive(""))),
+            workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
         )
 
         // When
@@ -33,12 +36,12 @@ internal class MessageBodyTest {
     @Test
     fun `should be JSON serializable and deserializable`() {
         // Given
-        val messageBody = MessageBody(
+        val messageBody = MessageBody.fromObjects(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
-            workflowState = mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive(""))),
+            workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
         )
 
         // When
@@ -48,15 +51,17 @@ internal class MessageBodyTest {
     @Test
     fun `should serialize and deserialize MessageBody`() {
         // Given
-        val messageBody = MessageBody(
+        val messageBody = MessageBody.fromObjects(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
-            workflowState = mapOf(
-                NodePosition.root to NodeState(
-                    rawInput = JsonObject(mapOf("test" to JsonPrimitive("value"))),
-                    startedAt = Instant.now(),
+            workflowState = WorkflowState(
+                mapOf(
+                    NodePosition.root to NodeState(
+                        rawInput = JsonObject(mapOf("test" to JsonPrimitive("value"))),
+                        startedAt = Clock.System.now(),
+                    )
                 ),
             ),
         )
@@ -89,13 +94,13 @@ internal class MessageBodyTest {
         val expectedStates = mapOf(
             NodePosition.root to NodeState(
                 rawInput = input,
-                startedAt = messageBody._workflowStateStr[NodePosition.root]!!.startedAt,
+                startedAt = messageBody.workflowState.parsed[NodePosition.root]!!.startedAt,
             ),
         )
 
         assertEquals(name, messageBody.workflowName)
         assertEquals(version, messageBody.workflowVersion)
-        assertEquals(expectedStates, messageBody._workflowStateStr)
-        assertEquals(NodePosition.root, messageBody._workflowPositionStr)
+        assertEquals(expectedStates, messageBody.workflowState.parsed)
+        assertEquals(NodePosition.root, messageBody.workflowPosition.parsed)
     }
 }

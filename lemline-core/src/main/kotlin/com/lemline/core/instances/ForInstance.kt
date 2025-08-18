@@ -4,10 +4,12 @@ package com.lemline.core.instances
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import io.serverlessworkflow.api.types.ForTask
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
+@ExperimentalTime
 class ForInstance(override val node: Node<ForTask>, override val parent: NodeInstance<*>) :
     NodeInstance<ForTask>(node, parent) {
 

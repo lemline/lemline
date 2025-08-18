@@ -10,9 +10,11 @@ import com.lemline.core.nodes.NodeState
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.workflows.WorkflowInstance
 import io.serverlessworkflow.api.types.RetryPolicy
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
+@ExperimentalTime
 class RootInstance(override val node: Node<RootTask>) : NodeInstance<RootTask>(node, null) {
 
     override lateinit var workflowInstance: WorkflowInstance

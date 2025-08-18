@@ -3,10 +3,12 @@ package com.lemline.core.workflows
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
-import java.time.Instant
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
+@ExperimentalTime
 @Serializable
 @JvmInline
 value class WorkflowState(private val state: Map<NodePosition, NodeState>) {
@@ -21,7 +23,7 @@ value class WorkflowState(private val state: Map<NodePosition, NodeState>) {
                     NodePosition.root to NodeState(
                         parent = parentId?.let { NodeState.Parent(it, parentIsWaiting) },
                         rawInput = rawInput,
-                        startedAt = Instant.now(),
+                        startedAt = Clock.System.now(),
                     ),
                 ),
             )

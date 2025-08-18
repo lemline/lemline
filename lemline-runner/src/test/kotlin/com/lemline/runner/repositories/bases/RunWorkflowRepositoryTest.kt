@@ -5,7 +5,6 @@ import com.lemline.common.ids.IdGenerator
 import com.lemline.runner.models.RunWorkflowModel
 import com.lemline.runner.repositories.RunWorkflowRepository
 import jakarta.inject.Inject
-import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 
 
@@ -18,13 +17,13 @@ internal abstract class RunWorkflowRepositoryTest : OutboxRepositoryTest<RunWork
     @Inject
     override lateinit var repository: RunWorkflowRepository
 
-    override fun createWithState(state: String) = RunWorkflowModel(
+    override fun createRandomEntity() = RunWorkflowModel(
         workflowId = IdGenerator.generateTimeBasedId(),
-        workflowName = Random.nextBytes(10).toString(),
-        workflowVersion = Random.nextBytes(10).toString(),
-        workflowPosition = Random.nextBytes(10).toString(),
-        workflowState = state,
+        workflowName = randomString,
+        workflowVersion = randomString,
+        workflowPosition = randomString,
+        workflowState = randomString,
     )
 
-    override fun copyModel(model: RunWorkflowModel, state: String) = model.copy(workflowState = state)
+    override fun changeDelayedUntil(model: RunWorkflowModel) = model.copy(outboxDelayedUntil = randomInstant)
 }

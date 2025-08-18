@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.core.nodes
 
 import com.lemline.common.debug
@@ -32,7 +34,9 @@ import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.api.types.SubflowInput
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import java.time.Instant
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -44,6 +48,7 @@ import kotlinx.serialization.json.booleanOrNull
  * Base class for all task instances.
  * Task instances maintain the initialStates of a task during execution.
  */
+@ExperimentalTime
 abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val parent: NodeInstance<*>?) {
     private val logger = logger()
 
@@ -211,7 +216,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
             name = node.name,
             reference = node.reference,
             definition = node.definition,
-            startedAt = startedAt?.let { LemlineJson.encodeToElement(DateTimeDescriptor.from(it)) },
+            startedAt = startedAt?.let { LemlineJson.encodeToElement(DateTimeDescriptor.from(it.toJavaInstant())) },
             input = rawInput,
             output = rawOutput,
         )

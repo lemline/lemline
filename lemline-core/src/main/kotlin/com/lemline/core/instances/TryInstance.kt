@@ -17,9 +17,11 @@ import kotlin.math.pow
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.DurationUnit
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 
+@ExperimentalTime
 class TryInstance(override val node: Node<TryTask>, override val parent: NodeInstance<*>) :
     NodeInstance<TryTask>(node, parent) {
 

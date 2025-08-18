@@ -8,6 +8,7 @@ import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import java.time.Duration
 import java.util.concurrent.TimeUnit
+import kotlin.time.ExperimentalTime
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.clients.producer.KafkaProducer
@@ -25,6 +26,7 @@ import org.junit.jupiter.api.Tag
 @TestProfile(KafkaProfile::class)
 @Tag("integration")
 @EnabledOnlyIfDockerAvailable
+@ExperimentalTime
 internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
 
     @ConfigProperty(name = "kafka.bootstrap.servers")

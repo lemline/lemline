@@ -12,14 +12,15 @@ import com.lemline.runner.repositories.WaitRepository
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.matchers.shouldBe
 import jakarta.inject.Inject
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit.SECONDS
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.AfterEach
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.Test
  * - Storing instances requiring a wait state.
  * - Handling workflows that complete without further output.
  */
+@ExperimentalTime
 internal abstract class WorkflowConsumerTest {
     @Inject
     lateinit var retryRepository: RetryRepository
@@ -242,10 +244,10 @@ internal abstract class WorkflowConsumerTest {
     fun `should store instance with retry in retry repository`() = runTest {
         // Given
         val messageBody = MessageBody.newInstance(
-            "test-id",
-            "test-workflow",
-            "1.0.0",
-            JsonPrimitive("retry"),
+            id = "test-id",
+            name = "test-workflow",
+            version = "1.0.0",
+            input = JsonPrimitive("retry"),
         )
 
         // When
@@ -303,11 +305,10 @@ internal abstract class WorkflowConsumerTest {
         assertEquals(0, waitMessages[0].outboxAttemptCount, "Wait message attempt count is not 0")
 
         // Verify delay was set correctly (within 1 second of expected)
-        val expectedDelay = Instant.now().plus(30, ChronoUnit.SECONDS)
+        val expectedDelay = Clock.System.now() + 30.seconds
         val actualDelay = waitMessages[0].outboxDelayedUntil!!
         assertTrue(
-            actualDelay.isAfter(expectedDelay.minus(1, ChronoUnit.SECONDS)) &&
-                actualDelay.isBefore(expectedDelay.plus(1, ChronoUnit.SECONDS)),
+            actualDelay < (expectedDelay + 1.seconds) && actualDelay > (expectedDelay - 1.seconds),
             "Wait message delay is not set correctly",
         )
     }

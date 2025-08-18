@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS lemline_retries
     workflow_position    TEXT         NOT NULL,
     workflow_state       MEDIUMTEXT   NOT NULL,
     outbox_status        VARCHAR(50)  NOT NULL,
-    outbox_scheduled_for TIMESTAMP    NOT NULL,
-    outbox_delayed_until TIMESTAMP    NOT NULL,
+    outbox_scheduled_for TIMESTAMP(6) NOT NULL,
+    outbox_delayed_until TIMESTAMP(6) NOT NULL,
     outbox_attempt_count INTEGER      NOT NULL DEFAULT 0,
     outbox_last_error    MEDIUMTEXT,
     message              MEDIUMTEXT

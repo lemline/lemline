@@ -6,6 +6,7 @@ import com.lemline.runner.repositories.bases.RetryRepositoryTest
 import com.lemline.runner.tests.profiles.MySQLProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
+import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.TestInstance
 
 /**
@@ -15,4 +16,5 @@ import org.junit.jupiter.api.TestInstance
 @TestProfile(MySQLProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @EnabledOnlyIfDockerAvailable
+@ExperimentalTime
 internal class MySQLRetryRepositoryTest : RetryRepositoryTest()

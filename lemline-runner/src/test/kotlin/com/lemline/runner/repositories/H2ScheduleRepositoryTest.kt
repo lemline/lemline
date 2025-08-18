@@ -5,6 +5,7 @@ import com.lemline.runner.repositories.bases.ScheduleRepositoryTest
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
+import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.TestInstance
 
 /**
@@ -13,4 +14,5 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@ExperimentalTime
 internal class H2ScheduleRepositoryTest : ScheduleRepositoryTest()

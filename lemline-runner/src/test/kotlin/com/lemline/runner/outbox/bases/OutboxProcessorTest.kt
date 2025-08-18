@@ -8,7 +8,6 @@ import com.lemline.runner.outbox.OutBoxStatus.SENT
 import com.lemline.runner.outbox.OutboxProcessor
 import com.lemline.runner.repositories.OutboxRepository
 import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.date.shouldBeAfter
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
@@ -17,10 +16,13 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockk
-import java.time.Duration
-import java.time.Instant
-import java.time.temporal.ChronoUnit
 import kotlin.reflect.KClass
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -53,6 +55,11 @@ import org.slf4j.LoggerFactory
  *
  * @param T The specific type of [OutboxModel] entity being tested.
  */
+
+@ExperimentalTime
+infix fun Instant.shouldBeAfter(date: Instant) = (this > date) shouldBe true
+
+@ExperimentalTime
 internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
     // Abstract repository to be provided by subclasses
@@ -77,7 +84,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     // Default test configuration
     private val batchSize = 10
     private val maxAttempts = 3
-    private val initialDelay: Duration = Duration.ofSeconds(1) // 1 second
+    private val initialDelay = 1.seconds // 1 second
 
     @BeforeEach
     fun setup() = runTest {
@@ -119,7 +126,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Verify the mock was called (at least once, type checked by any())
         coVerify(atLeast = 1) { mockProcessorFunction(any(modelClass)) }
 
-        val processedMessage = testRepository.findById(message.workflowId)
+        val processedMessage = testRepository.findById(message.id)
         processedMessage shouldNotBe null
         processedMessage!!.outBoxStatus shouldBe SENT
         processedMessage.outboxAttemptCount shouldBe 1
@@ -163,7 +170,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         coEvery { mockProcessorFunction(any(modelClass)) } throws failureException
 
         // Act: First process call (fails)
-        val now = Instant.now()
+        val now = Clock.System.now()
         outboxProcessor.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: First attempt failed - Check DB state
@@ -175,11 +182,11 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         updated.outboxLastError shouldContain failureException.message!!
 
         // Calculate expected delay using exponential backoff - 20% jitter
-        val expectedMinDelay = initialDelay.toMillis() * 0.8
-        updated.outboxDelayedUntil!! shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
+        val expectedMinDelay = initialDelay.inWholeMilliseconds * 0.8
+        updated.outboxDelayedUntil!! shouldBeAfter (now + expectedMinDelay.milliseconds)
 
         // waiting for the next attempt
-        delay(Duration.between(now, updated.outboxDelayedUntil).toMillis())
+        delay(updated.outboxDelayedUntil!! - now)
 
         // Arrange: Setup mock to succeed on subsequent calls
         coEvery { mockProcessorFunction(any(modelClass)) } just Runs
@@ -229,7 +236,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Act & Assert intermediate attempts by checking DB state
         var lastDelayedUntil = originalDelayedUntil
         for (attempt in 1..maxAttempts) {
-            val now = Instant.now()
+            val now = Clock.System.now()
             // when
             outboxProcessor.process(batchSize, maxAttempts, initialDelay)
             // then
@@ -240,11 +247,11 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
                 updated.outboxLastError shouldContain failureException.message!!
                 updated.outboxDelayedUntil!! shouldBeAfter lastDelayedUntil
                 // Calculate expected delay using exponential backoff - 20% jitter
-                val expectedMinDelay = initialDelay.toMillis() * (1L shl (attempt - 1)) * 0.8
-                updated.outboxDelayedUntil!! shouldBeAfter (now.plusMillis(expectedMinDelay.toLong()))
+                val expectedMinDelay = (initialDelay.inWholeMilliseconds * (1L shl (attempt - 1)) * 0.8).toLong()
+                updated.outboxDelayedUntil!! shouldBeAfter (now + expectedMinDelay.milliseconds)
                 lastDelayedUntil = updated.outboxDelayedUntil!!
                 // waiting for the next attempt
-                delay(Duration.between(now, updated.outboxDelayedUntil).toMillis())
+                delay(updated.outboxDelayedUntil!! - now)
             } else {
                 // Final attempt check
                 updated.outBoxStatus shouldBe FAILED
@@ -306,8 +313,8 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     @Test
     fun `cleanup should remove old SENT messages`() = runTest {
         // Arrange
-        val retentionDelay = Duration.ofDays(7)
-        val wayBeforeCutoff = Instant.now().minus(8, ChronoUnit.DAYS)
+        val retentionDelay = 7.days
+        val wayBeforeCutoff = Clock.System.now() - 8.days
 
         // Create messages using abstract factory
         val oldSentMessage = createTestModel("old_sent").apply {
@@ -316,7 +323,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         }
         val recentSentMessage = createTestModel("recent_sent").apply {
             outBoxStatus = SENT
-            outboxDelayedUntil = Instant.now()
+            outboxDelayedUntil = Clock.System.now()
         }
         val pendingMessage = createTestModel("pending").apply {
             outBoxStatus = PENDING
@@ -383,7 +390,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     @Test
     fun `cleanup should do nothing when outbox is empty`() = runTest {
         // Arrange: No messages persisted (due to setup)
-        val retentionDelay = Duration.ofDays(7)
+        val retentionDelay = 7.days
 
         // Act
         outboxProcessor.cleanup(retentionDelay, batchSize)
@@ -409,9 +416,9 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     @Test
     fun `cleanup should process all messages even if it requires more than 3 chunks`() = runTest {
         // Arrange
-        val afterDelay = Duration.ofDays(7)
-        val cutoff = Instant.now().minusSeconds(afterDelay.toSeconds() + 24 * 60 * 60)
-        val wayBeforeCutoff = cutoff.minus(1, ChronoUnit.DAYS)
+        val afterDelay = 7.days
+        val cutoff = Clock.System.now() - afterDelay - 1.days
+        val wayBeforeCutoff = cutoff - 1.days
 
         // Create more messages than can be processed in 3 chunks
         val batchSize = 10 // Small batch size to ensure multiple chunks

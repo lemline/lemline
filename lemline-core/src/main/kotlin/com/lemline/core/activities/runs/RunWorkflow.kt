@@ -7,9 +7,11 @@ import com.lemline.core.instances.RunInstance
 import com.lemline.core.workflows.WorkflowInstance
 import io.serverlessworkflow.api.types.RunWorkflow
 import java.util.*
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 
+@ExperimentalTime
 internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElement {
     logInfo { "Executing run workflow command: ${node.name}" }
 

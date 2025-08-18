@@ -5,7 +5,9 @@ import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.PositionPointer
 import com.lemline.core.workflows.WorkflowState
 import com.lemline.runner.messaging.MessageBody
+import kotlin.time.ExperimentalTime
 
+@ExperimentalTime
 abstract class InstanceModel : IdModel() {
     abstract val workflowId: String
     abstract val workflowVersion: String

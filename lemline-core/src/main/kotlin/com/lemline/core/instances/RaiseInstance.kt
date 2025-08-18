@@ -11,7 +11,9 @@ import io.serverlessworkflow.api.types.RaiseTask
 import io.serverlessworkflow.api.types.RaiseTaskError
 import io.serverlessworkflow.api.types.UriTemplate
 import java.net.URI
+import kotlin.time.ExperimentalTime
 
+@ExperimentalTime
 class RaiseInstance(override val node: Node<RaiseTask>, override val parent: NodeInstance<*>) :
     NodeInstance<RaiseTask>(node, parent) {
 

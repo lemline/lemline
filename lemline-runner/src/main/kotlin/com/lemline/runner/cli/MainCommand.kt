@@ -9,6 +9,7 @@ import com.lemline.runner.cli.migrate.MigrateCommand
 import io.quarkus.arc.Unremovable
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import jakarta.enterprise.context.Dependent
+import kotlin.time.ExperimentalTime
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
 
@@ -17,6 +18,7 @@ import picocli.CommandLine.Mixin
  * This class is annotated with @TopCommand to identify it as the main command.
  * It doesn't implement QuarkusApplication - it's purely for command parsing.
  */
+@ExperimentalTime
 @TopCommand
 @Command(
     name = "lemline",

@@ -4,7 +4,9 @@ package com.lemline.core.instances
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import io.serverlessworkflow.api.types.ForkTask
+import kotlin.time.ExperimentalTime
 
+@ExperimentalTime
 class ForkInstance(override val node: Node<ForkTask>, override val parent: NodeInstance<*>) :
     NodeInstance<ForkTask>(node, parent) {
 

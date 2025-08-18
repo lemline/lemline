@@ -164,7 +164,7 @@ abstract class Repository<T> {
      *
      * @return The number of rows affected (0 or 1).
      */
-    suspend fun update(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
+    open suspend fun update(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
         conn.prepareStatement(updateSql).use { stmt ->
             bindUpdateWith(stmt, entity)
             stmt.executeUpdate()

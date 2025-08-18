@@ -6,6 +6,7 @@ import com.lemline.runner.repositories.bases.WaitRepositoryTest
 import com.lemline.runner.tests.profiles.PostgresProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
+import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.TestInstance
 
 /**
@@ -15,4 +16,5 @@ import org.junit.jupiter.api.TestInstance
 @TestProfile(PostgresProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @EnabledOnlyIfDockerAvailable
+@ExperimentalTime
 internal class PostgresWaitRepositoryTest : WaitRepositoryTest()

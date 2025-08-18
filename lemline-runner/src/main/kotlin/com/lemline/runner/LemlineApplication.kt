@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.runner
 
 import com.lemline.runner.LemlineApplication.Companion.configPath
@@ -18,6 +20,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
+import kotlin.time.ExperimentalTime
 import org.jboss.logging.Logger
 import org.jboss.logging.Logger.Level
 import picocli.CommandLine
