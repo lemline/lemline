@@ -8,6 +8,7 @@ import io.serverlessworkflow.impl.WorkflowStatus
 import java.io.File
 import java.nio.file.Path
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.io.TempDir
 
+@ExperimentalTime
 class RunScriptPythonTest {
 
     @TempDir

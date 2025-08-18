@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
 import com.lemline.common.json.LemlineJson
@@ -17,7 +18,7 @@ value class WorkflowState(private val state: Map<NodePosition, NodeState>) {
     operator fun get(key: NodePosition): NodeState? = state[key]
 
     companion object {
-        fun startWith(rawInput: JsonElement, parentId: String? = null, parentIsWaiting: Boolean = false) =
+        fun newInstance(rawInput: JsonElement, parentId: String? = null, parentIsWaiting: Boolean = false) =
             WorkflowState(
                 mapOf(
                     NodePosition.root to NodeState(

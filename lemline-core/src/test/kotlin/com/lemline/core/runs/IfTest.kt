@@ -3,10 +3,12 @@ package com.lemline.core.runs
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.getWorkflowInstance
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class IfTest {
 
     @Test

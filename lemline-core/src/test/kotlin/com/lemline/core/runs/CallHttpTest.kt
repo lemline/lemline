@@ -7,10 +7,12 @@ import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class CallHttpTest {
 
     class TaskCompletedException : RuntimeException("Task completed")

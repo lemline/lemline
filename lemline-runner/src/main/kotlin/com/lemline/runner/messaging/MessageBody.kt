@@ -39,6 +39,14 @@ class MessageBody(
         this.workflowPosition.serialized == other.workflowPosition.serialized &&
         this.workflowState.serialized == other.workflowState.serialized
 
+    override fun hashCode(): Int {
+        var result = workflowId.hashCode()
+        result = 31 * result + workflowName.hashCode()
+        result = 31 * result + workflowVersion.hashCode()
+        result = 31 * result + workflowPosition.serialized.hashCode()
+        result = 31 * result + workflowState.serialized.hashCode()
+        return result
+    }
 
     override fun toString() = jsonString
 
@@ -83,7 +91,7 @@ class MessageBody(
             workflowName = name,
             workflowVersion = version,
             workflowPosition = NodePosition.root,
-            workflowState = WorkflowState.startWith(input, parentId, parentIsWaiting),
+            workflowState = WorkflowState.newInstance(input, parentId, parentIsWaiting),
         )
 
         fun fromJsonString(json: String): MessageBody = LemlineJson.decodeFromString(json)

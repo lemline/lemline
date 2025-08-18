@@ -11,12 +11,14 @@ import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonNull
 import org.junit.jupiter.api.Test
 
 private class WaitStartedException() : RuntimeException()
 
+@ExperimentalTime
 class WaitTest {
 
     @Test

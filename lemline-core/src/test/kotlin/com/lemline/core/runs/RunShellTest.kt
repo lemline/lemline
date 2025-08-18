@@ -7,6 +7,7 @@ import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
 
+@ExperimentalTime
 class RunShellTest {
 
     @Test

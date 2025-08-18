@@ -13,9 +13,9 @@ class LazyParsedSerializer<T>(
     override val descriptor = PrimitiveSerialDescriptor("LazyParsedField", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: LazyParsedField<T>) {
-        encoder.encodeString(value.serialized)
+        encoder.encodeSerializableValue(serializer, value.parsed)
     }
 
     override fun deserialize(decoder: Decoder): LazyParsedField<T> =
-        LazyParsedField(decoder.decodeString(), serializer)
+        LazyParsedField(decoder.decodeSerializableValue(serializer), serializer)
 }

@@ -8,6 +8,7 @@ import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
 import java.util.*
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -26,6 +27,7 @@ internal fun loadWorkflowFromYaml(resourcePath: String): Workflow {
     return validation().read(yamlContent, WorkflowFormat.YAML)
 }
 
+@ExperimentalTime
 internal fun getWorkflowInstance(
     doYaml: String,
     input: JsonElement,

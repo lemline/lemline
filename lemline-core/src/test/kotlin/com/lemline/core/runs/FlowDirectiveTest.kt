@@ -3,10 +3,12 @@ package com.lemline.core.runs
 
 import com.lemline.core.getWorkflowInstance
 import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class FlowDirectiveTest {
 
     @Test

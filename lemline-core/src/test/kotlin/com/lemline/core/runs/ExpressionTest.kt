@@ -7,11 +7,13 @@ import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.getWorkflowInstance
 import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class ExpressionTest {
 
     @Test

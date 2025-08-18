@@ -28,7 +28,7 @@ internal class MessageBodyTest {
 
         // When
         assertEquals(
-            """{"i":"test-id","n":"test-workflow","v":"1.0.0","s":{"":{"inp":""}},"p":""}""",
+            """{"i":"test-id","n":"test-workflow","v":"1.0.0","p":"","s":{"":{"inp":""}}}""",
             messageBody.jsonString,
         )
     }
@@ -51,7 +51,7 @@ internal class MessageBodyTest {
     @Test
     fun `should serialize and deserialize MessageBody`() {
         // Given
-        val messageBody = MessageBody.fromObjects(
+        val original = MessageBody.fromObjects(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
@@ -67,11 +67,11 @@ internal class MessageBodyTest {
         )
 
         // When
-        val json = LemlineJson.encodeToString(messageBody)
+        val json = LemlineJson.encodeToString(original)
         val deserialized = LemlineJson.decodeFromString<MessageBody>(json)
 
         // Then
-        assertEquals(messageBody, deserialized)
+        assertEquals(original, deserialized)
     }
 
     @Test

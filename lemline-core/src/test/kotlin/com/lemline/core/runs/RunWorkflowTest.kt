@@ -4,11 +4,13 @@ package com.lemline.core.runs
 import com.lemline.core.getWorkflowInstance
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class RunWorkflowTest {
 
     val factorialWorkflowYaml = """

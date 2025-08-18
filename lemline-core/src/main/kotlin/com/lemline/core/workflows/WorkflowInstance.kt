@@ -117,7 +117,7 @@ class WorkflowInstance(
             id = id,
             name = name,
             version = version,
-            state = WorkflowState.startWith(rawInput),
+            state = WorkflowState.newInstance(rawInput),
             position = NodePosition.root,
             secrets = secrets,
             activityRunnerProvider = activityRunnerProvider
