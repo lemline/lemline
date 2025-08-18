@@ -56,12 +56,13 @@ data class ScheduleModel(
     val every: Duration? by lazy { scheduleEvery?.let { Duration.parse(it) } }
 
     // get the next instant according to the provided cron expression for the current time zone of the system
-    fun getNextScheduledExecutionInstant(zoneId: ZoneId = ZoneId.systemDefault()): Instant? = outboxScheduledFor?.let {
-        ExecutionTime.forCron(cron)
-            .nextExecution(it.toJavaInstant().atZone(zoneId))
-            .map { it.toInstant().toKotlinInstant() }
-            .orElse(null)
-    }
+    fun getNextScheduledExecutionInstant(zoneId: ZoneId = ZoneId.systemDefault()): Instant? =
+        outboxScheduledFor?.let { now ->
+            ExecutionTime.forCron(cron)
+                .nextExecution(now.toJavaInstant().atZone(zoneId))
+                .map { it.toInstant().toKotlinInstant() }
+                .orElse(null)
+        }
 
     companion object {
         private val cronParser by lazy { CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX)) }

@@ -48,15 +48,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     protected abstract val emitter: Emitter<String>
 
     protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig
-    protected val processingBatchSize by lazy { outboxConf.batchSize() }
-    protected val processingMaxAttempts by lazy { outboxConf.maxAttempts() }
-    protected val processingInitialDelayAttempt by lazy { outboxConf.initialDelay() }
-    protected val processingPeriod by lazy { outboxConf.every() }
-
     protected abstract val cleanupConf: LemlineConfiguration.OutboxCleanupConfig
-    protected val cleanupAfter by lazy { cleanupConf.after() }
-    protected val cleanupBatchSize by lazy { cleanupConf.batchSize() }
-    protected val cleanupPeriod by lazy { cleanupConf.every() }
 
     private val outboxProcessor by lazy {
         OutboxProcessor(
@@ -84,7 +76,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         }
 
         // Schedule outbox processing
-        val outboxPeriodSeconds = processingPeriod.toDuration().inWholeSeconds
+        val outboxPeriodSeconds = outboxConf.every().toDuration().inWholeSeconds
         outboxProcessingExecutor.scheduleAtFixedRate(
             { scope.launch { outbox() } },
             0,
@@ -94,7 +86,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         logger.info("⏱️ Outbox processing scheduled every ${outboxPeriodSeconds}s")
 
         // Schedule cleanup
-        val cleanupPeriodSeconds = cleanupPeriod.toDuration().inWholeSeconds
+        val cleanupPeriodSeconds = cleanupConf.every().toDuration().inWholeSeconds
         outboxCleaningExecutor.scheduleAtFixedRate(
             { scope.launch { cleanup() } },
             0,
@@ -128,9 +120,9 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
         try {
             outboxProcessor.process(
-                processingBatchSize,
-                processingMaxAttempts,
-                processingInitialDelayAttempt.toDuration(),
+                outboxConf.batchSize(),
+                outboxConf.maxAttempts(),
+                outboxConf.initialDelay().toDuration(),
             )
         } catch (e: Exception) {
             logger.error(e) { "💥 Error during outbox processing" }
@@ -151,8 +143,8 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
         try {
             outboxProcessor.cleanup(
-                cleanupAfter.toDuration(),
-                cleanupBatchSize,
+                cleanupConf.after().toDuration(),
+                cleanupConf.batchSize(),
             )
         } catch (e: Exception) {
             logger.error(e) { "💥 Error during outbox cleaning" }

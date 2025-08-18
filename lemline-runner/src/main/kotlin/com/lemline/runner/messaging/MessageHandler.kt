@@ -138,7 +138,9 @@ internal class MessageHandler @Inject constructor(
      * Handles its own metrics, logging, and persistence of failed messages.
      */
     private suspend fun Message<String>.deserializeMessage(): MessageBody? = try {
-        val body = metrics.recordDeserializationDuration { MessageBody.fromJsonString(payload) }
+        val body = metrics.recordDeserializationDuration {
+            MessageBody.fromJsonString(payload)
+        }
         metrics.deserializationCompleted(body.workflowName, body.workflowVersion)
         body
     } catch (e: Exception) {

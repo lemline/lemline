@@ -58,7 +58,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
 
     @ExperimentalTime
     override suspend fun process(entity: ScheduleModel) {
-        // delayedUntil is never null within the scope of this method
+        // outboxDelayedUntil is never null within the scope of this method
         val now = entity.outboxDelayedUntil!!
 
         // start a new instance of the workflow
@@ -67,26 +67,25 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
         // update the schedule model with the next instant to be processed
         val delayedUntil = when {
             entity.after != null -> null // <- next instant remains undefined. It's set only after the instance's completion
-
-            entity.cron != null -> entity.getNextScheduledExecutionInstant().also {
-                // if there is no more occurrence, we set the status to SENT for allowing cleaning
-                if (it == null) entity.outBoxStatus = OutBoxStatus.SENT
-            }
-
+            entity.cron != null -> entity.getNextScheduledExecutionInstant()
             entity.every != null -> now + entity.every!!
-
             else -> error("Invalid schedule model")
         }
 
-        // Note: we don't update the status to SENT as the schedule model is still waiting for the next execution.
         entity.outboxDelayedUntil = delayedUntil
         if (delayedUntil != null) entity.outboxScheduledFor = delayedUntil
+
+        entity.outBoxStatus = when {
+            delayedUntil == null && entity.cron != null -> OutBoxStatus.SENT // <- only case when the schedule is completed
+            else -> OutBoxStatus.PENDING
+        }
     }
 
+    // TODO Manage idempotency by providing a deterministic workflow id
     private suspend fun send(body: MessageBody) =
-        emitter.sendSuspending(body.jsonString.replace(ID_PLACEHOLDER, IdGenerator.generateTimeBasedId()))
+        emitter.sendSuspending(body.jsonString.replace(WORKFLOW_ID_PLACEHOLDER, IdGenerator.generateTimeBasedId()))
 
     companion object {
-        private const val ID_PLACEHOLDER = "`WORKFLOW_ID`"
+        private const val WORKFLOW_ID_PLACEHOLDER = "`WORKFLOW_ID`"
     }
 }
