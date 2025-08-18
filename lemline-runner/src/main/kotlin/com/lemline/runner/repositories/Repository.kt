@@ -16,18 +16,21 @@ import kotlinx.coroutines.withContext
 
 abstract class Repository<T> {
 
-    internal abstract val databaseManager: DatabaseManager
+    /**
+     * The database manager instance used to access the database.
+     */
+    protected abstract val databaseManager: DatabaseManager
 
     /**
      * The name of the database table associated with this repository.
      */
-    internal abstract val tableName: String
+    protected abstract val tableName: String
 
     /**
      * A map associating column names with functions responsible for binding column values
      * to the respective placeholders in a SQL `PreparedStatement`.
      */
-    abstract val entityMap: Map<String, (PreparedStatement, T, Int) -> Unit>
+    protected abstract val entityMap: Map<String, (PreparedStatement, T, Int) -> Unit>
 
 
     /**

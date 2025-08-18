@@ -24,7 +24,7 @@ import kotlin.time.ExperimentalTime
  *
  * @see OutboxRepository for base functionality and documentation
  * @see WaitModel for the message model
- * @see OutboxProcessor for the processing logic
+ * @see com.lemline.runner.outbox.OutboxProcessor for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime
