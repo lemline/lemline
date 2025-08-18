@@ -9,7 +9,6 @@ import com.lemline.runner.outbox.OutboxProcessor
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
-import java.sql.PreparedStatement
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
 
@@ -51,16 +50,6 @@ internal class RunWorkflowRepository : OutboxRepository<RunWorkflowModel>() {
         outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
         outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
     )
-
-    // add the message colum to the updates
-    override val updateColumns = super.updateColumns + WORKFLOW_STATE_COLUMN
-
-    // add the workflowState colum to the updates
-    override fun bindUpdateWith(stmt: PreparedStatement, entity: RunWorkflowModel): PreparedStatement = stmt.apply {
-        super.bindUpdateWith(this, entity)
-        setString(super.updateColumns.size + 1, entity.workflowState)
-        setString(super.updateColumns.size + 2, entity.id)
-    }
 
     // Retrieves an entity by its workflow ID.
     suspend fun findByWorkflowId(workflowId: String, connection: Connection? = null): RunWorkflowModel? =

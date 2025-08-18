@@ -20,58 +20,43 @@ abstract class Repository<T> {
 
     /**
      * The name of the database table associated with this repository.
-     * This property must be implemented by concrete repositories to specify
-     * the table name used for database operations.
      */
     internal abstract val tableName: String
 
     /**
-     * Returns the column names for the table, comma-separated.
+     * A map associating column names with functions responsible for binding column values
+     * to the respective placeholders in a SQL `PreparedStatement`.
      */
-    protected abstract val insertColumns: List<String>
+    abstract val entityMap: Map<String, (PreparedStatement, T, Int) -> Unit>
+
 
     /**
-     * Defines the columns that constitute the primary or unique key for the entity.
-     * Used for INSERT, UPSERT's ON CONFLICT clause, and UPDATE's WHERE clause.
+     * A list of column names that are part of the primary keys of the table.
      */
     protected abstract val keyColumns: List<String>
 
     /**
-     * Returns the column names for the table, comma-separated.
-     * This should include all columns that are part of an update operation.
+     * A list of all columns in the table
      */
-    protected abstract val updateColumns: List<String>
+    private val allColumns by lazy { entityMap.keys }
 
     /**
-     * Populates the `PreparedStatement` with the values from the given entity for an update operation.
-     * This method must be implemented by concrete repositories to map the entity's properties
-     * to the corresponding SQL parameters in the prepared statement.
-     *
-     * @param entity The entity containing the values to set in the statement
-     * @return The `PreparedStatement` with the populated values
+     * A list of columns that are not part of the primary or unique key.
      */
-    protected abstract fun bindUpdateWith(stmt: PreparedStatement, entity: T): PreparedStatement
+    private val nonKeyColumns by lazy { allColumns.filter { !keyColumns.contains(it) } }
 
 
-    /**
-     * Populates the `PreparedStatement` with the values from the given entity for an insert operation.
-     * This method must be implemented by concrete repositories to map the entity's properties
-     * to the corresponding SQL parameters in the prepared statement.
-     *
-     * @param entity The entity containing the values to set in the statement
-     * @return The `PreparedStatement` with the populated values
-     */
-    protected abstract fun bindInsertWith(stmt: PreparedStatement, entity: T): PreparedStatement
+    private fun bindAll(stmt: PreparedStatement, entity: T) {
+        allColumns.mapIndexed { index, column -> entityMap[column]!!(stmt, entity, index + 1) }
+    }
 
-    /**
-     * Populates the `PreparedStatement` with the values from the given entity for a delete operation.
-     * This method must be implemented by concrete repositories to map the entity's properties
-     * to the corresponding SQL parameters in the prepared statement.
-     *
-     * @param entity The entity containing the key values.
-     * @return The PreparedStatement with key values bound.
-     */
-    protected abstract fun bindDeleteWith(stmt: PreparedStatement, entity: T): PreparedStatement
+    private fun bindNonKeys(stmt: PreparedStatement, entity: T) {
+        nonKeyColumns.mapIndexed { index, column -> entityMap[column]!!(stmt, entity, index + 1) }
+    }
+
+    private fun bindKeys(stmt: PreparedStatement, entity: T, startIndex: Int = 0) {
+        keyColumns.mapIndexed { index, column -> entityMap[column]!!(stmt, entity, startIndex + index + 1) }
+    }
 
     /**
      * Executes a block of code within a database transaction.
@@ -105,11 +90,6 @@ abstract class Repository<T> {
 
     /**
      * Creates a model instance from a ResultSet.
-     * This method must be implemented by concrete repositories to handle
-     * the specific mapping of database columns to model properties.
-     *
-     * @param rs The ResultSet containing the current row
-     * @return A new model instance populated with data from the ResultSet
      */
     internal abstract fun createModel(rs: ResultSet): T
 
@@ -118,14 +98,14 @@ abstract class Repository<T> {
      */
     suspend fun insert(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
         conn.prepareStatement(insertSql).use { stmt ->
-            bindInsertWith(stmt, entity)
+            bindAll(stmt, entity)
             stmt.executeUpdate()
         }
     }
 
     private val insertSql by lazy {
-        val colsCsv = insertColumns.joinToString { q(it) }  // Comma-separated column names, e.g., "id","message",…
-        val valsCsv = insertColumns.joinToString { "?" }    // Comma-separated placeholders, e.g., ?,?,?
+        val colsCsv = allColumns.joinToString { q(it) }  // Comma-separated column names, e.g., "id","message",…
+        val valsCsv = allColumns.joinToString { "?" }    // Comma-separated placeholders, e.g., ?,?,?
 
         when (databaseManager.dbType) {
             DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> """
@@ -152,7 +132,7 @@ abstract class Repository<T> {
         if (entities.isEmpty()) return@withConnection 0
         conn.prepareStatement(insertSql).use { stmt ->
             for (entity in entities) {
-                bindInsertWith(stmt, entity)
+                bindAll(stmt, entity)
                 stmt.addBatch()
             }
             stmt.executeBatch().count { it != 0 }
@@ -166,13 +146,14 @@ abstract class Repository<T> {
      */
     open suspend fun update(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
         conn.prepareStatement(updateSql).use { stmt ->
-            bindUpdateWith(stmt, entity)
+            bindNonKeys(stmt, entity)
+            bindKeys(stmt, entity, nonKeyColumns.size)
             stmt.executeUpdate()
         }
     }
 
     private val updateSql by lazy {
-        val setClause = updateColumns.joinToString { "${q(it)} = ?" }
+        val setClause = nonKeyColumns.joinToString { "${q(it)} = ?" }
         val whereClause = keyColumns.joinToString(separator = " AND ") { "${q(it)} = ?" }
 
         "UPDATE $tableName SET $setClause WHERE $whereClause"
@@ -187,7 +168,8 @@ abstract class Repository<T> {
         if (entities.isEmpty()) return@withConnection 0
         conn.prepareStatement(updateSql).use { stmt ->
             for (entity in entities) {
-                bindUpdateWith(stmt, entity)
+                bindNonKeys(stmt, entity)
+                bindKeys(stmt, entity, nonKeyColumns.size)
                 stmt.addBatch()
             }
             stmt.executeBatch().count { it != 0 }
@@ -222,7 +204,7 @@ abstract class Repository<T> {
      */
     suspend fun delete(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
         conn.prepareStatement(deleteSql).use { stmt ->
-            bindDeleteWith(stmt, entity)
+            bindKeys(stmt, entity)
             stmt.executeUpdate()
         }
     }
@@ -244,7 +226,7 @@ abstract class Repository<T> {
         if (entities.isEmpty()) return@withConnection 0
         conn.prepareStatement(deleteSql).use { stmt ->
             for (entity in entities) {
-                bindDeleteWith(stmt, entity)
+                bindKeys(stmt, entity)
                 stmt.addBatch()
             }
             stmt.executeBatch().count { it != 0 }

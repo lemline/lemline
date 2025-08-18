@@ -24,31 +24,19 @@ class DefinitionRepository : Repository<DefinitionModel>() {
 
     override val tableName = DEFINITION_TABLE
 
-    override val insertColumns = listOf(WORKFLOW_DEFINITION_COLUMN, WORKFLOW_NAME_COLUMN, WORKFLOW_VERSION_COLUMN)
-
-    override val updateColumns = listOf(WORKFLOW_DEFINITION_COLUMN)
+    override val entityMap: Map<String, (PreparedStatement, DefinitionModel, Int) -> Unit> = mapOf(
+        WORKFLOW_DEFINITION_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
+            stmt.setString(idx, entity.definition)
+        },
+        WORKFLOW_NAME_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
+            stmt.setString(idx, entity.name)
+        },
+        WORKFLOW_VERSION_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
+            stmt.setString(idx, entity.version)
+        }
+    )
 
     override val keyColumns: List<String> = listOf(WORKFLOW_NAME_COLUMN, WORKFLOW_VERSION_COLUMN)
-
-    // MUST be in the same order as insertColumns
-    override fun bindInsertWith(stmt: PreparedStatement, entity: DefinitionModel) = stmt.apply {
-        setString(1, entity.definition)
-        setString(2, entity.name)
-        setString(3, entity.version)
-    }
-
-    // MUST be in the same order as updateColumns
-    override fun bindUpdateWith(stmt: PreparedStatement, entity: DefinitionModel) = stmt.apply {
-        setString(1, entity.definition)
-        setString(2, entity.name)
-        setString(3, entity.version)
-    }
-
-    // MUST be in the same order as keyColumns
-    override fun bindDeleteWith(stmt: PreparedStatement, entity: DefinitionModel) = stmt.apply {
-        setString(1, entity.name) // Bind name to the first parameter
-        setString(2, entity.version) // Bind the version to the second parameter
-    }
 
     /**
      * Creates a model instance from a ResultSet.

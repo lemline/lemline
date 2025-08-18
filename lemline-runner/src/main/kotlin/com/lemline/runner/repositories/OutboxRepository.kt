@@ -7,6 +7,7 @@ import com.lemline.runner.outbox.OutBoxStatus.SENT
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
+import java.sql.Timestamp
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -47,7 +48,7 @@ import kotlin.time.toJavaInstant
  * 5. Processing order is maintained within each batch
  *
  * @see OutboxModel for the base message model
- * @see OutboxProcessor for the processing logic
+ * @see com.lemline.runner.outbox.OutboxProcessor for the processing logic
  */
 @OptIn(ExperimentalTime::class)
 abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
@@ -68,63 +69,43 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         internal const val OUTBOX_LAST_ERROR_COLUMN = "outbox_last_error"
     }
 
-    override val insertColumns = listOf(
-        ID_COLUMN,
-
-        WORKFLOW_ID_COLUMN,
-        WORKFLOW_NAME_COLUMN,
-        WORKFLOW_VERSION_COLUMN,
-        WORKFLOW_POSITION_COLUMN,
-        WORKFLOW_STATE_COLUMN,
-
-        OUTBOX_STATUS_COLUMN,
-        OUTBOX_SCHEDULED_FOR_COLUMN,
-        OUTBOX_DELAYED_UNTIL_COLUMN,
-        OUTBOX_ATTEMPT_COUNT_COLUMN,
-        OUTBOX_LAST_ERROR_COLUMN
-    )
-
-    override val updateColumns = listOf(
-        OUTBOX_STATUS_COLUMN,
-        OUTBOX_SCHEDULED_FOR_COLUMN,
-        OUTBOX_DELAYED_UNTIL_COLUMN,
-        OUTBOX_ATTEMPT_COUNT_COLUMN,
-        OUTBOX_LAST_ERROR_COLUMN
+    override val entityMap: Map<String, (PreparedStatement, T, Int) -> Unit> = mapOf(
+        ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setString(idx, entity.id)
+        },
+        WORKFLOW_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setString(idx, entity.workflowId)
+        },
+        WORKFLOW_NAME_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setString(idx, entity.workflowName)
+        },
+        WORKFLOW_VERSION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setString(idx, entity.workflowVersion)
+        },
+        WORKFLOW_POSITION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setString(idx, entity.workflowPosition)
+        },
+        WORKFLOW_STATE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setString(idx, entity.workflowState)
+        },
+        OUTBOX_STATUS_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setString(idx, entity.outBoxStatus.name)
+        },
+        OUTBOX_SCHEDULED_FOR_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setTimestamp(idx, entity.outboxScheduledFor?.let { Timestamp.from(it.toJavaInstant()) })
+        },
+        OUTBOX_DELAYED_UNTIL_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setTimestamp(idx, entity.outboxDelayedUntil?.let { Timestamp.from(it.toJavaInstant()) })
+        },
+        OUTBOX_ATTEMPT_COUNT_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setInt(idx, entity.outboxAttemptCount)
+        },
+        OUTBOX_LAST_ERROR_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+            stmt.setString(idx, entity.outboxLastError)
+        },
     )
 
     override val keyColumns: List<String> = listOf(ID_COLUMN)
-
-    // MUST be in the same order as insertColumns
-    override fun bindInsertWith(stmt: PreparedStatement, entity: T): PreparedStatement = stmt.apply {
-        setString(1, entity.id)
-
-        setString(2, entity.workflowId)
-        setString(3, entity.workflowName)
-        setString(4, entity.workflowVersion)
-        setString(5, entity.workflowPosition)
-        setString(6, entity.workflowState)
-
-        setString(7, entity.outBoxStatus.name)
-        setTimestamp(8, entity.outboxScheduledFor?.let { java.sql.Timestamp.from(it.toJavaInstant()) })
-        setTimestamp(9, entity.outboxDelayedUntil?.let { java.sql.Timestamp.from(it.toJavaInstant()) })
-        setInt(10, entity.outboxAttemptCount)
-        setString(11, entity.outboxLastError)
-    }
-
-    // MUST be in the same order as updateColumns
-    override fun bindUpdateWith(stmt: PreparedStatement, entity: T) = stmt.apply {
-        setString(1, entity.outBoxStatus.name)
-        setTimestamp(2, entity.outboxScheduledFor?.let { java.sql.Timestamp.from(it.toJavaInstant()) })
-        setTimestamp(3, entity.outboxDelayedUntil?.let { java.sql.Timestamp.from(it.toJavaInstant()) })
-        setInt(4, entity.outboxAttemptCount)
-        setString(5, entity.outboxLastError)
-        setString(6, entity.id)
-    }
-
-    // MUST be in the same order as KeyColumns
-    override fun bindDeleteWith(stmt: PreparedStatement, entity: T) = stmt.apply {
-        setString(1, entity.id) // Bind id to the first parameter
-    }
 
     /**
      * Finds and locks messages that are ready to be processed.
@@ -138,7 +119,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         withConnection(connection) {
             it.prepareStatement(findEntitiesToProcessSQL).use { stmt ->
                 stmt.apply {
-                    setTimestamp(1, java.sql.Timestamp.from(Clock.System.now().toJavaInstant()))
+                    setTimestamp(1, Timestamp.from(Clock.System.now().toJavaInstant()))
                     setInt(2, maxAttempts)
                     setInt(3, limit)
                 }
@@ -171,7 +152,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         withConnection(connection) {
             it.prepareStatement(findEntitiesToDeleteSQL).use { stmt ->
                 stmt.apply {
-                    setTimestamp(1, java.sql.Timestamp.from(cutoffDate.toJavaInstant()))
+                    setTimestamp(1, Timestamp.from(cutoffDate.toJavaInstant()))
                     setInt(2, limit)
                 }
 
