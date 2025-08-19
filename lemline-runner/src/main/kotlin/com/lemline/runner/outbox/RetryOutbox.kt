@@ -14,18 +14,14 @@ import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
 /**
- * RetryOutbox is responsible for processing and managing retry messages in the system.
- * It extends AbstractOutbox to leverage the common outbox pattern implementation.
+ * `RetryOutbox` specializes `AbstractOutbox` to implement the outbox pattern for retrying failed operations.
  *
- * This class specifically handles retry messages with configuration optimized for
- * the retry use case, including
- * - Processing batch size
- * - Maximum retry attempts
- * - Initial delay between retries
- * - Cleanup retention period
- *
- * @see AbstractOutbox for the base implementation
- * @see OutboxProcessor for the core message processing logic
+ * This class coordinates retry logic in two main areas:
+ * - In workflow execution via [com.lemline.runner.StepByStepRunner]:
+ *   - Uses `WorkflowInstance.onRetry()` to handle retries defined by the workflow itself.
+ * - In message processing via [com.lemline.runner.messaging.MessageHandler]:
+ *   - `Message<String>.saveAsFailed()` records non-recoverable failures.
+ *   - `Message<String>.saveForRetry()` schedules recoverable failures for future retry attempts.
  */
 @Startup
 @ApplicationScoped
@@ -41,6 +37,7 @@ internal class RetryOutbox : AbstractOutbox<RetryModel>() {
     @Inject
     override lateinit var repository: RetryRepository
 
+    // Is this outbox enabled?
     override val enabled by lazy {
         lemlineConfig.outbox().retry().enabled().getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()

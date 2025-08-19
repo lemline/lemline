@@ -17,18 +17,14 @@ import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
 /**
- * ScheduleOutbox is responsible for processing and managing wait messages in the system.
- * It extends AbstractOutbox to leverage the common outbox pattern implementation.
+ * `ScheduleOutbox` specializes `AbstractOutbox` to implement the outbox pattern for scheduled workflow executions.
  *
- * This class specifically handles wait messages with configuration optimized for
- * the wait use case, including
- * - Processing batch size
- * - Maximum retry attempts
- * - Initial delay between retries
- * - Cleanup retention period
- *
- * @see AbstractOutbox for the base implementation
- * @see OutboxProcessor for the core message processing logic
+ * It handles publishing messages when a scheduled workflow is triggered.
+ * Supported schedule types:
+ * - cron: Schedules workflow execution based on a cron expression.
+ * - every: Executes the workflow at fixed intervals.
+ * - after: Triggers the workflow after a previous workflow completes,
+ *   managed via `WorkflowInstance.onWorkflowCompleted()` in [com.lemline.runner.StepByStepRunner].
  */
 @Startup
 @ApplicationScoped
@@ -44,6 +40,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     @Inject
     override lateinit var repository: ScheduleRepository
 
+    // Is this outbox enabled?
     override val enabled by lazy {
         lemlineConfig.outbox().schedule().enabled().getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()

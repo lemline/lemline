@@ -14,18 +14,12 @@ import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
 /**
- * RunOutbox is responsible for processing and managing run messages in the system.
- * It extends AbstractOutbox to leverage the common outbox pattern implementation.
+ * `RunWorkflowOutbox` specializes `AbstractOutbox` to implement the outbox pattern for child workflow execution events.
  *
- * This class specifically handles run messages with configuration optimized for
- * the run use case, including
- * - Processing batch size
- * - Maximum retry attempts
- * - Initial delay between runs
- * - Cleanup retention period
- *
- * @see AbstractOutbox for the base implementation
- * @see OutboxProcessor for the core message processing logic
+ * It is responsible for publishing messages when:
+ * - A child workflow is started via `WorkflowInstance.onRunWorkflow()`
+ * - A parent workflow is restarted after completion via `WorkflowInstance.onWorkflowCompleted()`
+ * in [com.lemline.runner.StepByStepRunner]
  */
 @Startup
 @ApplicationScoped
@@ -41,6 +35,7 @@ internal class RunWorkflowOutbox : AbstractOutbox<RunWorkflowModel>() {
     @Inject
     override lateinit var repository: RunWorkflowRepository
 
+    // Is this outbox enabled?
     override val enabled by lazy {
         lemlineConfig.outbox().retry().enabled().getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()

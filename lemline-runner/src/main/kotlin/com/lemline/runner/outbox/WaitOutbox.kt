@@ -14,18 +14,10 @@ import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 
 /**
- * WaitOutbox is responsible for processing and managing wait messages in the system.
- * It extends AbstractOutbox to leverage the common outbox pattern implementation.
+ * `WaitOutbox` specializes `AbstractOutbox` to implement the outbox pattern for wait tasks in workflows.
  *
- * This class specifically handles wait messages with configuration optimized for
- * the wait use case, including
- * - Processing batch size
- * - Maximum retry attempts
- * - Initial delay between retries
- * - Cleanup retention period
- *
- * @see AbstractOutbox for the base implementation
- * @see OutboxProcessor for the core message processing logic
+ * It manages the restart of workflow instances after a wait task.
+ * Integration occurs via the `WorkflowInstance.onWait` method in [com.lemline.runner.StepByStepRunner].
  */
 @Startup
 @ApplicationScoped
@@ -41,6 +33,7 @@ internal class WaitOutbox : AbstractOutbox<WaitModel>() {
     @Inject
     override lateinit var repository: WaitRepository
 
+    // Is this outbox enabled?
     override val enabled by lazy {
         lemlineConfig.outbox().wait().enabled().getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()
