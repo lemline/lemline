@@ -7,7 +7,7 @@ import kotlinx.serialization.json.Json
 
 /**
  * A generic class that encapsulates a value that can either be in serialized string format
- * or in its parsed object representation. It ensures that at least one of the representations
+ * or in its object representation. It ensures that at least one of the representations
  * must be provided during initialization and avoids recalculations of the serialized or parsed value.
  *
  * @param T The type of the parsed value.
@@ -18,7 +18,7 @@ import kotlinx.serialization.json.Json
  * @constructor Initializes LazyParsedField with a parsed value and serializer.
  * @throws IllegalArgumentException If neither the serialized nor the parsed value is provided.
  */
-@Serializable(with = LazyParsedSerializer::class)
+@Serializable(with = LazyParsedFieldSerializer::class)
 class LazyParsedField<T>(
     private val _serialized: String? = null,
     private val _parsed: T? = null,
@@ -31,6 +31,10 @@ class LazyParsedField<T>(
             else "At least one of _serialized or _parsed must be provided"
         }
     }
+
+    override fun equals(other: Any?) = (other is LazyParsedField<T>) && serialized == other.serialized
+
+    override fun hashCode() = serialized.hashCode()
 
     constructor(serialized: String, serializer: KSerializer<T>) : this(
         _serialized = serialized,

@@ -7,7 +7,7 @@ import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
-class LazyParsedSerializer<T>(
+class LazyParsedFieldSerializer<T>(
     private val serializer: KSerializer<T>
 ) : KSerializer<LazyParsedField<T>> {
     override val descriptor = PrimitiveSerialDescriptor("LazyParsedField", PrimitiveKind.STRING)

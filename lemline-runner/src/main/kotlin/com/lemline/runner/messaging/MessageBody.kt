@@ -25,28 +25,13 @@ import kotlinx.serialization.json.JsonElement
  */
 @ExperimentalTime
 @Serializable
-class MessageBody(
+data class MessageBody(
     @SerialName("i") val workflowId: String,
     @SerialName("n") val workflowName: String,
     @SerialName("v") val workflowVersion: String,
     @SerialName("p") val workflowPosition: LazyParsedField<NodePosition>,
     @SerialName("s") val workflowState: LazyParsedField<WorkflowState>,
 ) {
-
-    override fun equals(other: Any?): Boolean = (other is MessageBody) && this.workflowId == other.workflowId &&
-        this.workflowName == other.workflowName &&
-        this.workflowVersion == other.workflowVersion &&
-        this.workflowPosition.serialized == other.workflowPosition.serialized &&
-        this.workflowState.serialized == other.workflowState.serialized
-
-    override fun hashCode(): Int {
-        var result = workflowId.hashCode()
-        result = 31 * result + workflowName.hashCode()
-        result = 31 * result + workflowVersion.hashCode()
-        result = 31 * result + workflowPosition.serialized.hashCode()
-        result = 31 * result + workflowState.serialized.hashCode()
-        return result
-    }
 
     override fun toString() = jsonString
 
@@ -97,10 +82,10 @@ class MessageBody(
         fun fromJsonString(json: String): MessageBody = LemlineJson.decodeFromString(json)
     }
 
-    // Message is immutable, so we can cache the JSON string representation
+    // MessageBody is immutable, so we can cache the JSON string representation
     val jsonString: String by lazy { LemlineJson.encodeToString(this) }
 
-    // Message is immutable, so we can cache the JSON string representation in pretty format
+    // MessageBody is immutable, so we can cache the JSON string representation in pretty format
     val jsonPrettyString: String by lazy { LemlineJson.encodeToPrettyString(this) }
 
     fun toWorkflowInstance(secrets: Map<String, JsonElement>) = WorkflowInstance(
