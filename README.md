@@ -220,7 +220,7 @@ Currently implemented features are:
     - [ ] Workflow
     - [ ] Task
 
-- [ ] Schedule
+- [x] Schedule
 
 ### Lifecycle events
 

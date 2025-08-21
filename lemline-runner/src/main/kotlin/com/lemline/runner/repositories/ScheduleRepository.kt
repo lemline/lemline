@@ -28,12 +28,13 @@ import kotlin.time.ExperimentalTime
  */
 @ApplicationScoped
 @ExperimentalTime
-internal class ScheduleRepository : OutboxRepository<ScheduleModel>() {
+class ScheduleRepository : OutboxRepository<ScheduleModel>() {
 
     companion object {
         internal const val SCHEDULE_AFTER_COLUMN = "schedule_after"
         internal const val SCHEDULE_CRON_COLUMN = "schedule_cron"
         internal const val SCHEDULE_EVERY_COLUMN = "schedule_every"
+        internal const val SCHEDULE_ZONE_COLUMN = "schedule_zone"
     }
 
     @Inject
@@ -47,11 +48,14 @@ internal class ScheduleRepository : OutboxRepository<ScheduleModel>() {
             SCHEDULE_AFTER_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
                 stmt.setString(idx, entity.scheduleAfter)
             }) + (
+            SCHEDULE_EVERY_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
+                stmt.setString(idx, entity.scheduleEvery)
+            }) + (
             SCHEDULE_CRON_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
                 stmt.setString(idx, entity.scheduleCron)
             }) + (
-            SCHEDULE_EVERY_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
-                stmt.setString(idx, entity.scheduleEvery)
+            SCHEDULE_ZONE_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
+                stmt.setString(idx, entity.scheduleZone)
             })
 
     @ExperimentalTime
@@ -71,7 +75,8 @@ internal class ScheduleRepository : OutboxRepository<ScheduleModel>() {
         outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
 
         scheduleAfter = rs.getString(SCHEDULE_AFTER_COLUMN),
+        scheduleEvery = rs.getString(SCHEDULE_EVERY_COLUMN),
         scheduleCron = rs.getString(SCHEDULE_CRON_COLUMN),
-        scheduleEvery = rs.getString(SCHEDULE_EVERY_COLUMN)
+        scheduleZone = rs.getString(SCHEDULE_ZONE_COLUMN),
     )
 }

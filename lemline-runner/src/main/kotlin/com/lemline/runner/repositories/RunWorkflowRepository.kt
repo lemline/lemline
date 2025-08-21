@@ -8,7 +8,6 @@ import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxProcessor
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.sql.Connection
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
 
@@ -50,18 +49,4 @@ internal class RunWorkflowRepository : OutboxRepository<RunWorkflowModel>() {
         outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
         outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
     )
-
-    // Retrieves an entity by its workflow ID.
-    suspend fun findByWorkflowId(workflowId: String, connection: Connection? = null): RunWorkflowModel? =
-        withConnection(connection) { conn ->
-            conn.prepareStatement(findByWorkflowIdSql).use { stmt ->
-                stmt.setString(1, workflowId)
-                stmt.executeQuery().use { rs ->
-                    if (rs.next()) createModel(rs) else null
-                }
-            }
-        }
-
-    private val findByWorkflowIdSql by lazy { "SELECT * FROM $tableName WHERE $WORKFLOW_ID_COLUMN = ? LIMIT 1" }
-
 }

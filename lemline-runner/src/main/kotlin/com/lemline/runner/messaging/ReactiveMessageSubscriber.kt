@@ -37,7 +37,7 @@ import org.slf4j.Logger
  * @param logger Logger instance for recording events and errors
  */
 
-internal class MessageSubscriber<P, T : Message<P>>(
+internal class ReactiveMessageSubscriber<P, T : Message<P>>(
     private val publisher: Publisher<T>,
     private val handleMessage: suspend (item: T) -> Unit, // Changed signature
     private val maxConcurrency: Int,

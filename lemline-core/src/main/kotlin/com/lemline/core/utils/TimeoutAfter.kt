@@ -13,11 +13,11 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Converts a TimeoutAfter object to a Duration.
  */
-internal fun TimeoutAfter.toDuration() = when (val da = get()) {
+fun TimeoutAfter.toDuration() = when (val da = get()) {
     is String -> Duration.parse(da)
     is DurationInline -> da.toDuration()
     else -> error("Unknown TimeoutAfter: $da")
 }
 
-internal fun DurationInline.toDuration(): Duration =
+fun DurationInline.toDuration(): Duration =
     days.days + hours.hours + minutes.minutes + seconds.seconds + milliseconds.milliseconds

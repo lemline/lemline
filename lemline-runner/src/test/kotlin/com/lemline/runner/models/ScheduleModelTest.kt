@@ -2,9 +2,8 @@
 package com.lemline.runner.models
 
 import com.lemline.runner.outbox.OutBoxStatus
-import java.time.ZoneId
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
+import kotlin.test.assertFails
 import kotlin.test.assertNull
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -14,8 +13,11 @@ import org.junit.jupiter.api.Test
 class ScheduleModelTest {
 
     private fun createModel(
+        scheduleAfter: String? = null,
+        scheduleEvery: String? = null,
         scheduleCron: String? = null,
-        outboxScheduledFor: Instant? = Instant.parse("2023-01-01T00:00:00Z")
+        outboxScheduledFor: Instant? = null,
+        scheduleZone: String? = null
     ) = ScheduleModel(
         workflowId = "wf-1",
         workflowVersion = "1.0",
@@ -25,33 +27,32 @@ class ScheduleModelTest {
         outBoxStatus = OutBoxStatus.PENDING,
         outboxScheduledFor = outboxScheduledFor,
         scheduleCron = scheduleCron,
-        scheduleAfter = null,
-        scheduleEvery = null
+        scheduleAfter = scheduleAfter,
+        scheduleEvery = scheduleEvery,
+        scheduleZone = scheduleZone
     )
 
     @Test
     fun `should return next execution instant for valid cron`() {
         // cron for every minute
-        val model = createModel(scheduleCron = "* * * * *")
-        val nextExecution = model.getNextScheduledExecutionInstant()
-        assertNotNull(nextExecution)
+        val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = Instant.parse("2023-01-01T00:00:00Z"))
+        model.updateScheduledExecutionInstant()
         // The next execution should be exactly one minute after the outboxScheduledFor time
         val expected = Instant.parse("2023-01-01T00:01:00Z")
-        assertEquals(expected, nextExecution)
+        assertEquals(expected, model.outboxScheduledFor)
     }
 
     @Test
-    fun `should return null when cron is null`() {
-        val model = createModel(scheduleCron = null)
-        val nextExecution = model.getNextScheduledExecutionInstant()
-        assertNull(nextExecution)
+    fun `should fail when badly defined`() {
+        val model = createModel()
+        assertFails { model.updateScheduledExecutionInstant() }
     }
 
     @Test
     fun `should return null when outboxScheduledFor is null`() {
         val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = null)
-        val nextExecution = model.getNextScheduledExecutionInstant()
-        assertNull(nextExecution)
+        model.updateScheduledExecutionInstant()
+        assertNull(model.outboxScheduledFor)
     }
 
     @Test
@@ -61,23 +62,23 @@ class ScheduleModelTest {
             scheduleCron = "0 0 1 1 *", // At 00:00 on day-of-month 1 and on month 1
             outboxScheduledFor = Instant.parse("2023-01-01T01:00:00Z") // after the cron time
         )
-        val nextExecution = model.getNextScheduledExecutionInstant(ZoneId.of("UTC"))
+        model.updateScheduledExecutionInstant()
         // The next execution should be the next year
         val expected = Instant.parse("2024-01-01T00:00:00Z")
-        assertEquals(expected, nextExecution)
+        assertEquals(expected, model.outboxScheduledFor)
     }
 
     @Test
     fun `should respect the time zone`() {
         val model = createModel(
             scheduleCron = "0 9 * * *", // 9 AM every day
-            outboxScheduledFor = Instant.parse("2023-01-01T08:00:00Z")
+            outboxScheduledFor = Instant.parse("2023-01-01T08:00:00Z"),
+            scheduleZone = "America/New_York"
         )
-        val zoneId = ZoneId.of("America/New_York") // UTC-5 for EST in January
-        val nextExecution = model.getNextScheduledExecutionInstant(zoneId)
+        model.updateScheduledExecutionInstant()
 
         // 9 AM in New York on Jan 1st is 14:00 UTC
         val expected = Instant.parse("2023-01-01T14:00:00Z")
-        assertEquals(expected, nextExecution)
+        assertEquals(expected, model.outboxScheduledFor)
     }
 }

@@ -3,9 +3,11 @@ package com.lemline.runner.cli.instances
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
-import com.lemline.runner.messaging.MessageBody
+import com.lemline.runner.messaging.LemlineMessage
 import com.lemline.runner.models.DefinitionModel
+import com.lemline.runner.models.ScheduleModel
 import com.lemline.runner.repositories.DefinitionRepository
+import com.lemline.runner.repositories.ScheduleRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.coEvery
@@ -38,6 +40,7 @@ class InstanceStartCommandTest {
 
     private lateinit var command: InstanceStartCommand
     private lateinit var definitionRepository: DefinitionRepository
+    private lateinit var scheduleRepository: ScheduleRepository
     private lateinit var emitter: Emitter<String>
 
     private lateinit var workflowName: String
@@ -54,11 +57,13 @@ class InstanceStartCommandTest {
     fun setup() = runTest {
         // Create mocks
         definitionRepository = mockk()
+        scheduleRepository = mockk()
         emitter = mockk()
 
         // Create command and inject mocks
         command = InstanceStartCommand()
         injectField(command, "definitionRepository", definitionRepository)
+        injectField(command, "scheduleRepository", scheduleRepository)
         injectField(command, "emitter", emitter)
 
         workflowName = "testWorkflow"
@@ -80,6 +85,7 @@ class InstanceStartCommandTest {
 
         coEvery { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
         coEvery { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
+        coEvery { scheduleRepository.insert(any<ScheduleModel>()) } returns 1
         every { emitter.send(any<String>()) } returns CompletableFuture.completedFuture(null)
 
         // Save original streams
@@ -106,7 +112,7 @@ class InstanceStartCommandTest {
      * Helper method to execute command and verify basic success conditions
      * Returns the captured Message for further assertions
      */
-    private fun executeCommandAndVerify(vararg args: String): MessageBody {
+    private fun executeCommandAndVerify(vararg args: String): LemlineMessage {
         // When
         val exitCode = cmd.execute(*args)
 
@@ -121,11 +127,11 @@ class InstanceStartCommandTest {
 
         verify { emitter.send(capture(messageSlot)) }
 
-        val sentMessageBody = LemlineJson.decodeFromString<MessageBody>(messageSlot.captured)
-        sentMessageBody.workflowName shouldBe workflowName
-        sentMessageBody.workflowVersion shouldBe workflowVersion
+        val sentLemlineMessage = LemlineJson.decodeFromString<LemlineMessage>(messageSlot.captured)
+        sentLemlineMessage.workflowName shouldBe workflowName
+        sentLemlineMessage.workflowVersion shouldBe workflowVersion
 
-        return sentMessageBody
+        return sentLemlineMessage
     }
 
     @Nested
@@ -385,7 +391,7 @@ class InstanceStartCommandTest {
 
             // Create a spy of the command that intercepts calls to error()
             val spyCommand = spyk(command) {
-                every { error(capture(errorSlot)) } answers {
+                every { cliError(capture(errorSlot)) } answers {
                     throw RuntimeException("Error: ${errorSlot.captured}")
                 }
             }

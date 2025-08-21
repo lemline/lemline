@@ -65,7 +65,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     private val outboxCleaning = AtomicBoolean(false)
 
     open suspend fun process(entity: T) {
-        emitter.sendSuspending(entity.toMessageBody().jsonString)
+        emitter.sendSuspending(entity.toLemlineMessage().jsonString)
     }
 
     @PostConstruct

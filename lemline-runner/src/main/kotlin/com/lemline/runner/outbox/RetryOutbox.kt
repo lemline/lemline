@@ -19,7 +19,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
  * This class coordinates retry logic in two main areas:
  * - In workflow execution via [com.lemline.runner.StepByStepRunner]:
  *   - Uses `WorkflowInstance.onRetry()` to handle retries defined by the workflow itself.
- * - In message processing via [com.lemline.runner.messaging.MessageHandler]:
+ * - In message processing via [com.lemline.runner.messaging.ReactiveMessageHandler]:
  *   - `Message<String>.saveAsFailed()` records non-recoverable failures.
  *   - `Message<String>.saveForRetry()` schedules recoverable failures for future retry attempts.
  */

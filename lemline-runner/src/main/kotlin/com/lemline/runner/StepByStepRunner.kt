@@ -2,6 +2,7 @@
 package com.lemline.runner
 
 import com.lemline.common.debug
+import com.lemline.common.error
 import com.lemline.common.ids.IdGenerator
 import com.lemline.common.logger
 import com.lemline.core.activities.runs.getInputFor
@@ -14,13 +15,16 @@ import com.lemline.runner.exceptions.RunWorkflowStartedException
 import com.lemline.runner.exceptions.TaskCompletedException
 import com.lemline.runner.exceptions.TaskRetriedException
 import com.lemline.runner.exceptions.WaitStartedException
-import com.lemline.runner.messaging.MessageBody
+import com.lemline.runner.messaging.LemlineMessage
 import com.lemline.runner.messaging.toMessage
+import com.lemline.runner.models.RUN_WORKFLOW_TABLE
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.RunWorkflowModel
+import com.lemline.runner.models.SCHEDULE_TABLE
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.RunWorkflowRepository
+import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.repositories.WaitRepository
 import io.quarkus.runtime.Startup
 import io.serverlessworkflow.api.types.RunWorkflow
@@ -41,6 +45,7 @@ internal class StepByStepRunner @Inject constructor(
     private val retryRepository: RetryRepository,
     private val waitRepository: WaitRepository,
     private val runWorkflowRepository: RunWorkflowRepository,
+    private val scheduleRepository: ScheduleRepository,
 ) {
     private val logger = logger()
 
@@ -59,7 +64,7 @@ internal class StepByStepRunner @Inject constructor(
         }
     }
 
-    suspend fun run(instance: WorkflowInstance): MessageBody? {
+    suspend fun run(instance: WorkflowInstance): LemlineMessage? {
 
         instance.onTaskCompleted { onTaskCompleted(it) }
         instance.onTaskStarted { onTaskStarted(it) }
@@ -125,7 +130,7 @@ internal class StepByStepRunner @Inject constructor(
             // insert the child workflow (running) to start right away
             val childId = IdGenerator.generateTimeBasedId()
 
-            val child = MessageBody.newInstance(
+            val child = LemlineMessage.create(
                 workflowId = childId,
                 workflowName = runWorkflow.workflow.name,
                 workflowVersion = runWorkflow.workflow.version,
@@ -154,22 +159,37 @@ internal class StepByStepRunner @Inject constructor(
      * Once this method is called, no further processing will occur for the current workflow instance.
      */
     private suspend fun WorkflowInstance.onWorkflowCompleted() {
-        if (parent?.isWaiting == true) {
+
+        // Case of child workflow completion
+        if (parent?.isWaiting == true) runWorkflowRepository.withTransaction { conn ->
             // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
-            val entity: RunWorkflowModel = runWorkflowRepository.findByWorkflowId(parent!!.workflowId)!!
-            // Get current state of the parent workflow
-            val state = entity.state
-            // set the workflow output at the rawOutput at the current position of the parent workflow
-            state[entity.position]!!.rawOutput = getOutput()
-            // by adding a delayedUntil value, the outbox pattern will send the message asap to restart the parent workflow
-            runWorkflowRepository.update(
-                entity.copy(
-                    outboxDelayedUntil = Clock.System.now(),
-                    workflowState = state.toJsonString() // <- TODO workflow state should by mutable
+            runWorkflowRepository.findByWorkflowId(parent!!.workflowId, conn)?.let { entity ->
+                // Get current state of the parent workflow
+                val state = entity.state
+                // set the workflow output at the rawOutput at the current position of the parent workflow
+                state[entity.position]!!.rawOutput = getOutput()
+                // by updating delayedUntil to now, we force the outbox to restart the parent workflow
+                runWorkflowRepository.update(
+                    entity.copy(
+                        outboxDelayedUntil = Clock.System.now(),
+                        workflowState = state.toJsonString()
+                    ),
+                    conn
                 )
-            )
-            logger.debug { "Restarting parent workflow:\n${entity.toMessageBody().jsonPrettyString}" }
+                logger.debug { "Restarting parent workflow:\n${entity.toLemlineMessage().jsonPrettyString}" }
+            }
+                ?: logger.error { "Unable to find parent ${parent!!.workflowId} of workflow $id ($name) in $RUN_WORKFLOW_TABLE table" }
         }
+
+        // Case of workflow completion with scheduled after
+        if (isScheduledAfter) scheduleRepository.withTransaction { conn ->
+            scheduleRepository.findByWorkflowId(id, conn)?.let { entity ->
+                entity.updateScheduledForAfterCompletion()
+                scheduleRepository.update(entity, conn)
+                logger.debug { "Rescheduled workflow ${entity.workflowName} for ${entity.outboxScheduledFor}" }
+            } ?: logger.error { "Unable to find scheduled entity for workflow $id ($name) in $SCHEDULE_TABLE table" }
+        }
+
     }
 
     /**

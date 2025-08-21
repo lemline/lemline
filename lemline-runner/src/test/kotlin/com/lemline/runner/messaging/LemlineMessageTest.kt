@@ -13,45 +13,47 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 @ExperimentalTime
-internal class MessageBodyTest {
+internal class LemlineMessageTest {
 
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {
         // Given
-        val messageBody = MessageBody.fromObjects(
+        val lemlineMessage = LemlineMessage.fromObjects(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
             workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            isScheduledAfter = false
         )
 
         // When
         assertEquals(
             """{"i":"test-id","n":"test-workflow","v":"1.0.0","p":"","s":{"":{"inp":""}}}""",
-            messageBody.jsonString,
+            lemlineMessage.jsonString,
         )
     }
 
     @Test
     fun `should be JSON serializable and deserializable`() {
         // Given
-        val messageBody = MessageBody.fromObjects(
+        val lemlineMessage = LemlineMessage.fromObjects(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
             workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            isScheduledAfter = false
         )
 
         // When
-        assertEquals(messageBody, MessageBody.fromJsonString(messageBody.jsonString))
+        assertEquals(lemlineMessage, LemlineMessage.fromJsonString(lemlineMessage.jsonString))
     }
 
     @Test
     fun `should serialize and deserialize MessageBody`() {
         // Given
-        val original = MessageBody.fromObjects(
+        val original = LemlineMessage.fromObjects(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
@@ -64,11 +66,12 @@ internal class MessageBodyTest {
                     )
                 ),
             ),
+            isScheduledAfter = false
         )
 
         // When
         val json = LemlineJson.encodeToString(original)
-        val deserialized = LemlineJson.decodeFromString<MessageBody>(json)
+        val deserialized = LemlineJson.decodeFromString<LemlineMessage>(json)
 
         // Then
         assertEquals(original, deserialized)
@@ -88,21 +91,21 @@ internal class MessageBodyTest {
         )
 
         // When
-        val messageBody = MessageBody.newInstance(id, name, version, input)
+        val lemlineMessage = LemlineMessage.create(id, name, version, input)
 
         // Then
         val expectedStates = WorkflowState(
             mapOf(
                 NodePosition.root to NodeState(
                     rawInput = input,
-                    startedAt = messageBody.workflowState.parsed[NodePosition.root]!!.startedAt,
+                    startedAt = lemlineMessage.workflowState.parsed[NodePosition.root]!!.startedAt,
                 ),
             )
         )
 
-        assertEquals(name, messageBody.workflowName)
-        assertEquals(version, messageBody.workflowVersion)
-        assertEquals(expectedStates, messageBody.workflowState.parsed)
-        assertEquals(NodePosition.root, messageBody.workflowPosition.parsed)
+        assertEquals(name, lemlineMessage.workflowName)
+        assertEquals(version, lemlineMessage.workflowVersion)
+        assertEquals(expectedStates, lemlineMessage.workflowState.parsed)
+        assertEquals(NodePosition.root, lemlineMessage.workflowPosition.parsed)
     }
 }

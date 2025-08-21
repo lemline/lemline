@@ -25,7 +25,8 @@ internal abstract class ScheduleRepositoryTest : OutboxRepositoryTest<ScheduleMo
         scheduleAfter = randomNullableString,
         scheduleCron = randomNullableString,
         scheduleEvery = randomNullableString,
-        outboxScheduledFor = randomInstant
+        outboxScheduledFor = randomInstant,
+        scheduleZone = randomNullableString,
     )
 
     override fun changeDelayedUntil(model: ScheduleModel) = model.copy(outboxDelayedUntil = randomInstant)

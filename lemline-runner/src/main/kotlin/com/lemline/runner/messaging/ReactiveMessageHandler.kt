@@ -59,7 +59,7 @@ internal const val WORKFLOW_OUT = "workflows-out"
 @OptIn(ExperimentalTime::class)
 @Startup
 @ApplicationScoped
-internal class MessageHandler @Inject constructor(
+internal class ReactiveMessageHandler @Inject constructor(
     @ConfigProperty(name = MESSAGING_CONSUMER_CONCURRENCY) private val maxConcurrency: Int,
     @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
     @Channel(WORKFLOW_IN) private val publisher: Publisher<Message<String>>,
@@ -72,7 +72,7 @@ internal class MessageHandler @Inject constructor(
     val logger = logger()
 
     // The subscriber is now initialized with the new handleMessage signature
-    private val subscriber = MessageSubscriber(publisher, ::handleMessage, maxConcurrency, metrics, logger)
+    private val subscriber = ReactiveMessageSubscriber(publisher, ::handleMessage, maxConcurrency, metrics, logger)
 
     @PostConstruct
     fun init() {
@@ -137,9 +137,9 @@ internal class MessageHandler @Inject constructor(
      * Deserializes the message payload. Returns the Message object on success, or null on failure.
      * Handles its own metrics, logging, and persistence of failed messages.
      */
-    private suspend fun Message<String>.deserializeMessage(): MessageBody? = try {
+    private suspend fun Message<String>.deserializeMessage(): LemlineMessage? = try {
         val body = metrics.recordDeserializationDuration {
-            MessageBody.fromJsonString(payload)
+            LemlineMessage.fromJsonString(payload)
         }
         metrics.deserializationCompleted(body.workflowName, body.workflowVersion)
         body
@@ -157,7 +157,7 @@ internal class MessageHandler @Inject constructor(
      * it retrieves the definition from a repository, parses it, and stores it in the cache.
      * If the workflow is still not found, it handles the error and returns null.
      */
-    private suspend fun Message<String>.findWorkflowDefinition(body: MessageBody): Workflow = try {
+    private suspend fun Message<String>.findWorkflowDefinition(body: LemlineMessage): Workflow = try {
         // Try to get from cache first, then from repository if not found
         val workflow = Workflows.getOrNull(body.workflowName, body.workflowVersion)
             ?: definitionRepository.findByNameAndVersion(body.workflowName, body.workflowVersion)
@@ -187,7 +187,7 @@ internal class MessageHandler @Inject constructor(
      */
     private suspend fun Message<String>.findSecrets(
         workflow: Workflow,
-        body: MessageBody
+        body: LemlineMessage
     ): Map<String, JsonElement> = try {
         Secrets.getForWorkflow(workflow)
     } catch (e: Exception) {
@@ -206,8 +206,8 @@ internal class MessageHandler @Inject constructor(
      */
     private suspend fun Message<String>.runInstance(
         secrets: Map<String, JsonElement>,
-        body: MessageBody
-    ): MessageBody? {
+        body: LemlineMessage
+    ): LemlineMessage? {
         val instance = body.toWorkflowInstance(secrets)
         return try {
             stepByStepRunner.run(instance)
@@ -227,7 +227,7 @@ internal class MessageHandler @Inject constructor(
      * and the message is stored in the retry table for reprocessing.
      * The method ensures that no unhandled exceptions are propagated.
      */
-    private suspend fun Message<String>.emit(body: MessageBody) = try {
+    private suspend fun Message<String>.emit(body: LemlineMessage) = try {
         emitter.send(body.jsonString).await()
         logger.debug { "Emitted next message: ${body.jsonString}" }
     } catch (e: Exception) {
@@ -261,7 +261,7 @@ internal class MessageHandler @Inject constructor(
 
     private suspend fun Message<String>.saveAsFailed(
         cause: Exception?,
-        body: MessageBody?,
+        body: LemlineMessage?,
     ) = try {
         val retryModel = RetryModel(
             workflowId = body?.workflowId ?: "",
@@ -284,7 +284,7 @@ internal class MessageHandler @Inject constructor(
 
     private suspend fun Message<String>.saveForRetry(
         cause: Exception,
-        body: MessageBody
+        body: LemlineMessage
     ) = try {
         // save the next message for re-emission
         val retryModel = RetryModel(
@@ -310,7 +310,7 @@ internal class MessageHandler @Inject constructor(
      * Acknowledges a reactive message to indicate successful processing.
      * If the acknowledgment fails, logs the error and increments the failure metrics counter.
      *
-     * @param item The reactive message being acknowledged.
+     * @param this The reactive message being acknowledged.
      * @param workflowName The name of the workflow associated with the message.
      * @param workflowVersion The version of the workflow associated with the message.
      */
@@ -329,7 +329,7 @@ internal class MessageHandler @Inject constructor(
      * Handles the negative acknowledgment (NACK) for a reactive message, including logging,
      * metrics increment, and exception handling if the NACK operation fails.
      *
-     * @param item The reactive message to be negatively acknowledged.
+     * @param this The reactive message to be negatively acknowledged.
      * @param reason The exception that triggered the negative acknowledgment.
      * @param workflowName The name of the workflow associated with the message.
      * @param workflowVersion The version of the workflow associated with the message.

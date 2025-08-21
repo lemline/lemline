@@ -176,6 +176,24 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
 
     private val findByIdSql by lazy { "SELECT * FROM $tableName WHERE $ID_COLUMN = ? LIMIT 1" }
 
+    /**
+     * Retrieves an entity by its WorkflowId.
+     *
+     * @return The entity with the specified WorkflowId, or null if not found.
+     */
+    suspend fun findByWorkflowId(workflowId: String, connection: Connection? = null): T? =
+        withConnection(connection) { conn ->
+            conn.prepareStatement(findByWorkflowIdSql).use { stmt ->
+                stmt.setString(1, workflowId)
+                stmt.executeQuery().use { rs ->
+                    if (rs.next()) createModel(rs) else null
+                }
+            }
+        }
+
+    private val findByWorkflowIdSql by lazy { "SELECT * FROM $tableName WHERE $WORKFLOW_ID_COLUMN = ? LIMIT 1" }
+
+
     private val findEntitiesToDeleteSQL by lazy {
         """
             SELECT * FROM $tableName

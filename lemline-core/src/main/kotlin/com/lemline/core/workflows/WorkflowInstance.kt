@@ -83,6 +83,7 @@ class WorkflowInstance(
     state: WorkflowState,
     position: NodePosition,
     secrets: Map<String, JsonElement>,
+    val isScheduledAfter: Boolean,
     var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
 ) {
 
@@ -112,6 +113,7 @@ class WorkflowInstance(
             id: String,
             rawInput: JsonElement,
             secrets: Map<String, JsonElement> = emptyMap(),
+            scheduledAfter: Boolean = false,
             activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
         ) = WorkflowInstance(
             id = id,
@@ -120,6 +122,7 @@ class WorkflowInstance(
             state = WorkflowState.newInstance(rawInput),
             position = NodePosition.root,
             secrets = secrets,
+            isScheduledAfter = scheduledAfter,
             activityRunnerProvider = activityRunnerProvider
         )
 

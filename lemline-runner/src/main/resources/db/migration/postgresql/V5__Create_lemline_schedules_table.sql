@@ -13,8 +13,9 @@ CREATE TABLE lemline_schedules
     outbox_attempt_count INTEGER      NOT NULL DEFAULT 0,
     outbox_last_error    TEXT,
     schedule_after       VARCHAR(255),
+    schedule_every       VARCHAR(255),
     schedule_cron        VARCHAR(255),
-    schedule_every       VARCHAR(255)
+    schedule_zone        VARCHAR(64)
 );
 
 -- Create an index for efficient querying on workflow_id
