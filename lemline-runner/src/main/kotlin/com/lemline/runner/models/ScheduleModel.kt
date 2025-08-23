@@ -10,7 +10,7 @@ import com.lemline.common.ids.IdGenerator
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.utils.toDuration
 import com.lemline.core.workflows.WorkflowState
-import com.lemline.runner.messaging.LemlineMessage
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import io.serverlessworkflow.api.types.Schedule
 import java.time.ZoneId
@@ -28,15 +28,7 @@ const val SCHEDULE_TABLE = "lemline_schedules"
 data class ScheduleModel(
     override val id: String = IdGenerator.generateTimeBasedId(),
 
-    override var workflowId: String,
-
-    override val workflowVersion: String,
-
-    override val workflowName: String,
-
-    override val workflowPosition: String,
-
-    override val workflowState: String,
+    override var instance: InstanceMessage,
 
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
@@ -66,14 +58,6 @@ data class ScheduleModel(
 
     val zone: ZoneId? by lazy { scheduleZone?.let { ZoneId.of(it) } }
 
-    override fun toLemlineMessage() = LemlineMessage.fromStrings(
-        workflowId = workflowId,
-        workflowName = workflowName,
-        workflowVersion = workflowVersion,
-        workflowPosition = workflowPosition,
-        workflowState = workflowState,
-        isScheduledAfter = scheduleAfter != null,
-    )
 
     /**
      * Updates the scheduled execution instant from the schedule properties.
@@ -94,8 +78,9 @@ data class ScheduleModel(
             else -> OutBoxStatus.PENDING
         }
         // set a new id for the next workflow instance
-        // TODO Manage idempotency by providing a deterministic workflow id
-        workflowId = IdGenerator.generateTimeBasedId()
+        instance = instance.copy(
+            workflowId = IdGenerator.generateTimeBasedId(), // <- TODO Manage idempotency by providing a deterministic workflow id
+        )
     }
 
     /**
@@ -103,7 +88,7 @@ data class ScheduleModel(
      *
      * This is called by [com.lemline.runner.StepByStepRunner], after the current workflow instance has completed
      */
-    fun updateScheduledForAfterCompletion() {
+    fun rescheduleAfterCompletion() {
         outboxDelayedUntil = Clock.System.now() + after!!
         outboxScheduledFor = outboxDelayedUntil
     }
@@ -134,15 +119,20 @@ data class ScheduleModel(
 
             val scheduleModel = ScheduleModel(
                 id = workflowId,
-                workflowId = workflowId,
-                workflowName = workflowName,
-                workflowVersion = workflowVersion,
+                instance = InstanceMessage.fromObjects(
+                    workflowId = workflowId,
+                    workflowName = workflowName,
+                    workflowVersion = workflowVersion,
+                    workflowPosition = NodePosition.root,
+                    workflowState = WorkflowState.newInstance(workflowInput),
+                    parentId = null,
+                    scheduleId = workflowId,
+                ),
                 scheduleEvery = scheduleEvery,
                 scheduleAfter = scheduleAfter,
                 scheduleCron = scheduleCron,
                 scheduleZone = zoneId?.id,
-                workflowPosition = NodePosition.root.toString(),
-                workflowState = WorkflowState.newInstance(workflowInput).toJsonString(),
+
                 outboxScheduledFor = scheduledFor
             )
 

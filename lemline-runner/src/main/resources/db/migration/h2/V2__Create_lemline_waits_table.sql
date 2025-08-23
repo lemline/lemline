@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS lemline_waits
     workflow_version     VARCHAR(255)             NOT NULL,
     workflow_position    CLOB                     NOT NULL,
     workflow_state       CLOB                     NOT NULL,
+    schedule_id          VARCHAR(36),
+    parent_id            VARCHAR(36),
     outbox_status        VARCHAR(50)              NOT NULL,
     outbox_scheduled_for TIMESTAMP WITH TIME ZONE NOT NULL,
     outbox_delayed_until TIMESTAMP WITH TIME ZONE NOT NULL,

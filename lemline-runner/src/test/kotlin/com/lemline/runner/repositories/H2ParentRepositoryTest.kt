@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.repositories.bases.RunWorkflowRepositoryTest
+import com.lemline.runner.repositories.bases.ParentRepositoryTest
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -15,4 +15,4 @@ import org.junit.jupiter.api.TestInstance
 @TestProfile(InMemoryProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExperimentalTime
-internal class H2RunWorkflowRepositoryTest : RunWorkflowRepositoryTest()
+internal class H2ParentRepositoryTest : ParentRepositoryTest()

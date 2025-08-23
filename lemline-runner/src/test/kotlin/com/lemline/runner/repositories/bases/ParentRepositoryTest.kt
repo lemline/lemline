@@ -2,8 +2,8 @@
 package com.lemline.runner.repositories.bases
 
 import com.lemline.common.ids.IdGenerator
-import com.lemline.runner.models.RunWorkflowModel
-import com.lemline.runner.repositories.RunWorkflowRepository
+import com.lemline.runner.models.ParentModel
+import com.lemline.runner.repositories.ParentRepository
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
 
@@ -12,12 +12,12 @@ import kotlin.time.ExperimentalTime
  * Abstract base class for retry repository tests.
  */
 @ExperimentalTime
-internal abstract class RunWorkflowRepositoryTest : OutboxRepositoryTest<RunWorkflowModel>() {
+internal abstract class ParentRepositoryTest : OutboxRepositoryTest<ParentModel>() {
 
     @Inject
-    override lateinit var repository: RunWorkflowRepository
+    override lateinit var repository: ParentRepository
 
-    override fun createRandomEntity() = RunWorkflowModel(
+    override fun createRandomEntity() = ParentModel(
         workflowId = IdGenerator.generateTimeBasedId(),
         workflowName = randomString,
         workflowVersion = randomString,
@@ -25,5 +25,5 @@ internal abstract class RunWorkflowRepositoryTest : OutboxRepositoryTest<RunWork
         workflowState = randomString,
     )
 
-    override fun changeDelayedUntil(model: RunWorkflowModel) = model.copy(outboxDelayedUntil = randomInstant)
+    override fun changeDelayedUntil(model: ParentModel) = model.copy(outboxDelayedUntil = randomInstant)
 }

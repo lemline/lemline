@@ -1,5 +1,5 @@
--- Use the table name from com.lemline.runner.models.ScheduleModel
-CREATE TABLE lemline_schedules
+-- Use the table name from com.lemline.runner.models.RunModel
+CREATE TABLE IF NOT EXISTS lemline_parent_workflows
 (
     id                   VARCHAR(36) PRIMARY KEY,
     workflow_id          VARCHAR(36)  NOT NULL,
@@ -13,17 +13,13 @@ CREATE TABLE lemline_schedules
     outbox_scheduled_for TIMESTAMPTZ(6),
     outbox_delayed_until TIMESTAMPTZ(6),
     outbox_attempt_count INTEGER      NOT NULL DEFAULT 0,
-    outbox_last_error    TEXT,
-    schedule_after       VARCHAR(255),
-    schedule_every       VARCHAR(255),
-    schedule_cron        VARCHAR(255),
-    schedule_zone        VARCHAR(64)
+    outbox_last_error    TEXT
 );
 
 -- Create an index for efficient querying on workflow_id
-CREATE INDEX IF NOT EXISTS idx_lemline_schedules_workflow_id
-    ON lemline_schedules (workflow_id);
+CREATE INDEX IF NOT EXISTS idx_lemline_parent_workflows_workflow_id
+    ON lemline_parent_workflows (workflow_id);
 
--- Add index for status for more efficient queries
-CREATE INDEX IF NOT EXISTS idx_lemline_schedules_status_delayed_until
-    ON lemline_schedules (outbox_status, outbox_delayed_until);
+-- Create an index for efficient querying on status and delayed_until
+CREATE INDEX IF NOT EXISTS idx_lemline_parent_workflows_status_delayed_until
+    ON lemline_parent_workflows (outbox_status, outbox_delayed_until);

@@ -2,7 +2,7 @@
 package com.lemline.runner.messaging.bases
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.runner.messaging.LemlineMessage
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.ReactiveMessageHandler
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.outbox.OutBoxStatus
@@ -162,7 +162,7 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
-        val lemlineMessage = LemlineMessage.create(
+        val instanceMessage = InstanceMessage.forNewWorkflow(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
@@ -170,7 +170,7 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(lemlineMessage.jsonString)
+        val future = sendMessageFuture(instanceMessage.payload)
 
         // Then
         // Wait for the message to be processed
@@ -243,7 +243,7 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should store instance with retry in retry repository`() = runTest {
         // Given
-        val lemlineMessage = LemlineMessage.create(
+        val instanceMessage = InstanceMessage.forNewWorkflow(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
@@ -251,7 +251,7 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(lemlineMessage.jsonString)
+        val future = sendMessageFuture(instanceMessage.payload)
 
         // Wait for the message to be processed
         future.get(2, SECONDS)
@@ -283,7 +283,7 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should store waiting instance in wait repository`() = runTest {
         // Given
-        val lemlineMessage = LemlineMessage.create(
+        val instanceMessage = InstanceMessage.forNewWorkflow(
             "test-id",
             "test-workflow",
             "1.0.0",
@@ -291,7 +291,7 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(lemlineMessage.jsonString)
+        val future = sendMessageFuture(instanceMessage.payload)
 
         // Then
         // Wait for the message to be processed
@@ -330,7 +330,7 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should handle completed workflow without sending message`() = runTest {
         // Given
-        val lemlineMessage = LemlineMessage.create(
+        val instanceMessage = InstanceMessage.forNewWorkflow(
             "test-id",
             "test-workflow",
             "1.0.0",
@@ -338,7 +338,7 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(lemlineMessage.jsonString)
+        val future = sendMessageFuture(instanceMessage.payload)
 
         // Then
         // Wait for the message to be processed

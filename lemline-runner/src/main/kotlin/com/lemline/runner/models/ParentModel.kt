@@ -2,29 +2,22 @@
 package com.lemline.runner.models
 
 import com.lemline.common.ids.IdGenerator
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-const val RUN_WORKFLOW_TABLE = "lemline_run_workflows"
+const val PARENT_TABLE = "lemline_parent_workflows"
 
 @ExperimentalTime
-data class RunWorkflowModel(
+data class ParentModel(
     override val id: String = IdGenerator.generateTimeBasedId(),
 
-    override val workflowId: String,
-
-    override val workflowName: String,
-
-    override val workflowVersion: String,
-
-    override val workflowPosition: String,
-
-    override val workflowState: String,
+    override val instance: InstanceMessage,
 
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
-    override var outboxScheduledFor: Instant? = null,
+    override var outboxScheduledFor: Instant?,
 
     override var outboxDelayedUntil: Instant? = outboxScheduledFor,
 

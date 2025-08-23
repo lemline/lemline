@@ -38,7 +38,7 @@ import org.slf4j.Logger
  * @param processor Function that processes individual messages
  * @param T Type of the message entity (must implement OutboxModel interface)
  */
-@OptIn(ExperimentalTime::class)
+@ExperimentalTime
 internal class OutboxProcessor<T : OutboxModel>(
     private val logger: Logger,
     private val repository: OutboxRepository<T>,
@@ -89,7 +89,7 @@ internal class OutboxProcessor<T : OutboxModel>(
                     // Process each message in a separate coroutine for improved performance
                     val processed = coroutineScope {
                         messages.map {
-                            async { processMessage(it, maxAttempts, initialDelay) }
+                            async { processOutboxEntity(it, maxAttempts, initialDelay) }
                         }
                     }.awaitAll().count { it }
 
@@ -117,23 +117,23 @@ internal class OutboxProcessor<T : OutboxModel>(
      * retries with a delayed schedule based on exponential backoff. Once the maximum
      * attempts have been reached, the message's status is set to FAILED.
      */
-    private suspend fun processMessage(message: T, maxAttempts: Int, initialDelay: Duration): Boolean = try {
-        message.outboxAttemptCount++
-        message.outBoxStatus = OutBoxStatus.SENT
-        processor(message)
+    private suspend fun processOutboxEntity(outboxEntity: T, maxAttempts: Int, initialDelay: Duration): Boolean = try {
+        outboxEntity.outboxAttemptCount++
+        outboxEntity.outBoxStatus = OutBoxStatus.SENT
+        processor(outboxEntity)
         true // <- return true (success)
     } catch (e: Exception) {
-        logger.warn(e) { "Failed to process message ${message.workflowId}" }
-        message.outBoxStatus = OutBoxStatus.PENDING
-        message.outboxLastError = e.stackTraceToString()
+        logger.warn(e) { "Failed to process outbox entity for workflow ${outboxEntity.instance?.workflowId}" }
+        outboxEntity.outBoxStatus = OutBoxStatus.PENDING
+        outboxEntity.outboxLastError = e.stackTraceToString()
 
-        if (message.outboxAttemptCount >= maxAttempts) {
-            message.outBoxStatus = OutBoxStatus.FAILED
-            logger.error { "Message ${message.workflowId} has reached maximum retry attempts" }
+        if (outboxEntity.outboxAttemptCount >= maxAttempts) {
+            outboxEntity.outBoxStatus = OutBoxStatus.FAILED
+            logger.error { "Message ${outboxEntity.instance?.workflowId} has reached maximum retry attempts" }
         } else {
-            val nextDelay = calculateNextAttemptDelay(message.outboxAttemptCount, initialDelay)
-            message.outboxDelayedUntil = Clock.System.now() + nextDelay
-            logger.debug { "Message ${message.workflowId} will be retried in ${nextDelay}ms (attempt ${message.outboxAttemptCount})" }
+            val nextDelay = calculateNextAttemptDelay(outboxEntity.outboxAttemptCount, initialDelay)
+            outboxEntity.outboxDelayedUntil = Clock.System.now() + nextDelay
+            logger.debug { "Message ${outboxEntity.instance?.workflowId} will be retried in ${nextDelay}ms (attempt ${outboxEntity.outboxAttemptCount})" }
         }
         false // <- return false (failure)
     }

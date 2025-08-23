@@ -18,11 +18,10 @@ value class WorkflowState(private val state: Map<NodePosition, NodeState>) {
     operator fun get(key: NodePosition): NodeState? = state[key]
 
     companion object {
-        fun newInstance(rawInput: JsonElement, parentId: String? = null, parentIsWaiting: Boolean = false) =
+        fun newInstance(rawInput: JsonElement) =
             WorkflowState(
                 mapOf(
                     NodePosition.root to NodeState(
-                        parent = parentId?.let { NodeState.Parent(it, parentIsWaiting) },
                         rawInput = rawInput,
                         startedAt = Clock.System.now(),
                     ),

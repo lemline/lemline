@@ -2,11 +2,12 @@
 package com.lemline.runner.cli.instances
 
 import com.github.zafarkhaja.semver.Version
+import com.lemline.common.ids.IdGenerator
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.cli.GlobalMixin
-import com.lemline.runner.messaging.LemlineMessage
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.WORKFLOW_OUT
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.models.ScheduleModel
@@ -100,28 +101,25 @@ class InstanceStartCommand : Runnable {
             }
         }
 
-        // create the message
-        val lemlineMessage = LemlineMessage.create(
-            workflowName = workflowName,
-            workflowVersion = workflowDefinition.version,
-            workflowInput = inputJsonElement,
-            isScheduledAfter = workflow.schedule?.after != null,
-        )
-
         // start workflow
         try {
             when (workflow.schedule) {
                 null -> {
+                    val instanceMessage = InstanceMessage.forNewWorkflow(
+                        workflowName = workflowName,
+                        workflowVersion = workflowDefinition.version,
+                        workflowInput = inputJsonElement,
+                    )
                     // Synchronously send the message to the workflow-out channel
-                    emitter.send(lemlineMessage.jsonString).await()
-                    println("Instance ${lemlineMessage.workflowId} started successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement)")
+                    emitter.send(instanceMessage.payload).await()
+                    println("Instance ${instanceMessage.workflowId} started successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement)")
                 }
 
                 else -> {
                     val zoneId = getZoneId()
 
                     val scheduleModel = ScheduleModel.create(
-                        workflowId = lemlineMessage.workflowId,
+                        workflowId = IdGenerator.generateTimeBasedId(),
                         workflowName = workflowName,
                         workflowVersion = workflowDefinition.version,
                         workflowInput = inputJsonElement,
@@ -129,8 +127,9 @@ class InstanceStartCommand : Runnable {
                         zoneId = zoneId
                     )
                     scheduleRepository.insert(scheduleModel)
+                    //
                     println(
-                        "Instance ${lemlineMessage.workflowId} scheduled successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement, schedule: ${workflow.schedule}, zone: ${
+                        "Instance ${scheduleModel.id} scheduled successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement, schedule: ${workflow.schedule}, zone: ${
                             zoneId ?: ZoneId.of("UTC")
                         })"
                     )
@@ -139,6 +138,69 @@ class InstanceStartCommand : Runnable {
         } catch (e: Exception) {
             cliError("Failed to start workflow instance: ${e.message}")
         }
+    }
+
+    companion object {
+//        fun start(workflowName: String, version: String, inputJsonElement: JsonElement) {
+//            // Retrieve the workflow definition from the repository
+//            val workflowDefinition = getDefinition(workflowName, version)
+//
+//            // Parse workflow definition into a Workflow object
+//            val workflow = try {
+//                Workflows.parse(workflowDefinition.definition)
+//            } catch (e: Exception) {
+//                cliError("Invalid workflow definition: ${e.message}")
+//            }
+//
+//            // Validate input against schema, if the workflow has an input schema
+//            workflow.input?.schema?.let { schema ->
+//                try {
+//                    SchemaValidator.validate(inputJsonElement, schema)
+//                } catch (e: Exception) {
+//                    cliError("Input validation failed against workflow schema: ${e.message}")
+//                }
+//            }
+//
+//            // create the message
+//            val instanceMessage = InstanceMessage.forNewWorkflow(
+//                workflowName = workflowName,
+//                workflowVersion = workflowDefinition.version,
+//                workflowInput = inputJsonElement,
+//                isScheduledAfter = workflow.schedule?.after != null,
+//            )
+//
+//            // start workflow
+//            try {
+//                when (workflow.schedule) {
+//                    null -> {
+//                        // Synchronously send the message to the workflow-out channel
+//                        emitter.send(instanceMessage.payload).await()
+//                        println("Instance ${instanceMessage.workflowId} started successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement)")
+//                    }
+//
+//                    else -> {
+//                        val zoneId = getZoneId()
+//
+//                        val scheduleModel = ScheduleModel.create(
+//                            workflowId = instanceMessage.workflowId,
+//                            workflowName = workflowName,
+//                            workflowVersion = workflowDefinition.version,
+//                            workflowInput = inputJsonElement,
+//                            schedule = workflow.schedule,
+//                            zoneId = zoneId
+//                        )
+//                        scheduleRepository.insert(scheduleModel)
+//                        println(
+//                            "Instance ${instanceMessage.workflowId} scheduled successfully (name: ${workflowDefinition.name}, version: ${workflowDefinition.version}, input: $inputJsonElement, schedule: ${workflow.schedule}, zone: ${
+//                                zoneId ?: ZoneId.of("UTC")
+//                            })"
+//                        )
+//                    }
+//                }
+//            } catch (e: Exception) {
+//                cliError("Failed to start workflow instance: ${e.message}")
+//            }
+//        }
     }
 
     private fun getInput(input: String?): JsonElement = input?.let {

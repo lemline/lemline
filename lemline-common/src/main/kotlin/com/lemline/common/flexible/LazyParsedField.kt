@@ -41,7 +41,7 @@ class LazyParsedField<T>(
         serializer = serializer
     )
 
-    constructor(parsed: T, serializer: KSerializer<T>) : this(
+    constructor(parsed: T?, serializer: KSerializer<T>) : this(
         _parsed = parsed,
         serializer = serializer
     )

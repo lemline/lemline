@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.lemline.core.nodes.NodePosition
+import com.lemline.core.workflows.WorkflowState
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxProcessor
 import kotlin.time.ExperimentalTime
@@ -18,10 +21,12 @@ import kotlin.time.Instant
  * 4. Cleaning up successfully processed messages
  *
  * @see OutboxProcessor for the processing logic
- * @see InstanceModel for the base entity functionality
  */
 @ExperimentalTime
-abstract class OutboxModel() : InstanceModel() {
+abstract class OutboxModel() : IdModel() {
+
+    abstract val instance: InstanceMessage?
+
     /**
      * Current status of the message in the outbox. Possible values:
      * - PENDING: Message is ready to be processed
@@ -64,4 +69,39 @@ abstract class OutboxModel() : InstanceModel() {
      * Null if no errors have occurred yet.
      */
     abstract var outboxLastError: String?
+
+    /**
+     * The ID of the workflow.
+     */
+    val workflowId: String by lazy { instance!!.workflowId }
+
+    /**
+     * The name of the workflow.
+     */
+    val workflowName: String by lazy { instance!!.workflowName }
+
+    /**
+     * The version of the workflow.
+     */
+    val workflowVersion: String by lazy { instance!!.workflowVersion }
+
+    /**
+     * The current active initial position
+     */
+    val workflowPosition: NodePosition by lazy { instance!!.workflowPosition.parsed }
+
+    /**
+     * A map of the internal initial states (per position)
+     */
+    val workflowState: WorkflowState by lazy { instance!!.workflowState.parsed }
+
+    /**
+     * Indicates the id of the schedule model describing how this workflow should restart after its completion, if any
+     */
+    val scheduleId: String? by lazy { instance!!.scheduleId }
+
+    /**
+     * Indicates the id of the parent model describing the workflow waiting for this workflow completion, if any.
+     */
+    val parentId: String? by lazy { instance!!.parentId }
 }

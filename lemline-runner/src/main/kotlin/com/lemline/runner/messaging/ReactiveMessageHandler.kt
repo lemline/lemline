@@ -9,6 +9,7 @@ import com.lemline.common.logger
 import com.lemline.common.warn
 import com.lemline.common.withLoggingContext
 import com.lemline.core.errors.WorkflowException
+import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.Workflows
 import com.lemline.runner.StepByStepRunner
 import com.lemline.runner.config.CONSUMER_ENABLED
@@ -22,6 +23,7 @@ import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReas
 import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.PROCESSING_ERROR
 import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.SECRETS_RETRIEVAL_FAILED
 import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.WORKFLOW_ERROR_PREFIX
+import com.lemline.runner.models.RETRY_TABLE
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.DefinitionRepository
@@ -99,32 +101,34 @@ internal class ReactiveMessageHandler @Inject constructor(
      * @param message The raw reactive message from the messaging system.
      */
     suspend fun handleMessage(message: Message<String>) {
-        // --- Step 1: Deserialization ---
-        val body = message.deserializeMessage() ?: return
+        // --- Deserialization ---
+        val instanceMessage = message.deserialize() ?: return
 
         try {
-            metrics.recordProcessingDuration(body.workflowName, body.workflowVersion) {
-                withLoggingContext(
-                    LogContext.WORKFLOW_ID to body.workflowId,
-                    LogContext.WORKFLOW_NAME to body.workflowName,
-                    LogContext.WORKFLOW_VERSION to body.workflowVersion,
-                    LogContext.NODE_POSITION to body.workflowPosition.serialized,
-                ) {
-                    with(message) {
-                        // --- Step 2: Get Workflow Definition ---
-                        val workflow = findWorkflowDefinition(body)
-                        // --- Step 3: Get secrets for this workflow ---
-                        val secrets = findSecrets(workflow, body)
-                        // --- Step 4: Run instance ---
-                        val nextMessage = runInstance(secrets, body)
-                        // --- Step 5: Emit next message if any ---
-                        nextMessage?.let { emit(it) }
-                        // --- Step 6: Acknowledgment (Success Path) ---
-                        ack(body.workflowName, body.workflowVersion)
+            with(instanceMessage) {
+                metrics.recordProcessingDuration(workflowName, workflowVersion) {
+                    withLoggingContext(
+                        LogContext.WORKFLOW_ID to workflowId,
+                        LogContext.WORKFLOW_NAME to workflowName,
+                        LogContext.WORKFLOW_VERSION to workflowVersion,
+                        LogContext.NODE_POSITION to workflowPosition.serialized,
+                    ) {
+                        // --- Get Workflow Definition ---
+                        val workflow = findWorkflowDefinition()
+                        // --- Get secrets for this workflow ---
+                        val secrets = findSecrets(workflow)
+                        // --- Get an instance of this workflow ---
+                        val workflowInstance = getWorkflowInstance(secrets)
+                        // --- Run this instance ---
+                        val nextMessage = run(workflowInstance)
+                        // --- Emit next message if any ---
+                        nextMessage?.emit()
+                        // --- Acknowledgment (Success Path) ---
+                        message.ack(workflowName, workflowVersion)
                         // For testing: complete the future
-                        processingMessages.remove(message.payload)?.complete(nextMessage?.jsonString)
+                        processingMessages.remove(message.payload)?.complete(nextMessage?.payload)
                     }
-                    metrics.processingCompleted(body.workflowName, body.workflowVersion)
+                    metrics.processingCompleted(workflowName, workflowVersion)
                 }
             }
         } catch (e: ProcessingException) {
@@ -137,9 +141,9 @@ internal class ReactiveMessageHandler @Inject constructor(
      * Deserializes the message payload. Returns the Message object on success, or null on failure.
      * Handles its own metrics, logging, and persistence of failed messages.
      */
-    private suspend fun Message<String>.deserializeMessage(): LemlineMessage? = try {
+    private suspend fun Message<String>.deserialize(): InstanceMessage? = try {
         val body = metrics.recordDeserializationDuration {
-            LemlineMessage.fromJsonString(payload)
+            InstanceMessage.fromMessage(this)
         }
         metrics.deserializationCompleted(body.workflowName, body.workflowVersion)
         body
@@ -147,55 +151,76 @@ internal class ReactiveMessageHandler @Inject constructor(
         logger.error(e) { "Failed to deserialize message: $payload" }
         metrics.deserializationFailed(getFailureReason(e))
         // Deserialization failure is fatal for this message. Save and ACK.
-        saveAsFailed(e, null)
+        deserializationFailed(e)
         null
     }
 
     /**
      * Retrieves a workflow definition based on the provided name and version.
+     *
      * This method first attempts to fetch the workflow from a cache. If not found,
      * it retrieves the definition from a repository, parses it, and stores it in the cache.
-     * If the workflow is still not found, it handles the error and returns null.
+     * If the workflow is still not found,
+     * metrics are updated to reflect the failure, and the message is saved for manual inspection.
      */
-    private suspend fun Message<String>.findWorkflowDefinition(body: LemlineMessage): Workflow = try {
+    private suspend fun InstanceMessage.findWorkflowDefinition(): Workflow = try {
         // Try to get from cache first, then from repository if not found
-        val workflow = Workflows.getOrNull(body.workflowName, body.workflowVersion)
-            ?: definitionRepository.findByNameAndVersion(body.workflowName, body.workflowVersion)
+        Workflows.getOrNull(workflowName, workflowVersion)
+            ?: definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
                 ?.definition
                 ?.let { Workflows.parseAndPut(it) }
-        // If `workflow` is null, handle the error
-        if (workflow == null) {
-            metrics.processingFailed(DEFINITION_NOT_FOUND, body.workflowName, body.workflowVersion)
-            val cause = IllegalStateException("Workflow ${body.workflowName}:${body.workflowVersion} not found")
-            saveAsFailed(cause, body)
-            throw ProcessingException(cause)
-        }
-        // return the workflow definition
-        workflow
     } catch (e: Exception) {
         logger.error(e) { "Error during workflow definition retrieval" }
-        metrics.processingFailed(getFailureReason(e), body.workflowName, body.workflowVersion)
-        saveForRetry(e, body)
+        metrics.processingFailed(getFailureReason(e), workflowName, workflowVersion)
+        saveForRetry(e)
         throw ProcessingException(e)
+    } ?: run {
+        // If `workflow` is null
+        metrics.processingFailed(DEFINITION_NOT_FOUND, workflowName, workflowVersion)
+        val cause = IllegalStateException("Workflow ${workflowName}:${workflowVersion} not found")
+        saveAsFailed(cause)
+        throw ProcessingException(cause)
     }
 
     /**
      * Retrieves the necessary secrets for a workflow and handles any errors that occur during the process.
      *
-     * If an error occurs while obtaining the secrets, the error is logged,
+     * If an error occurs while getting the secrets, the error is logged,
      * metrics are updated to reflect the failure, and the message is saved for manual inspection.
      */
-    private suspend fun Message<String>.findSecrets(
+    private suspend fun InstanceMessage.findSecrets(
         workflow: Workflow,
-        body: LemlineMessage
     ): Map<String, JsonElement> = try {
         Secrets.getForWorkflow(workflow)
     } catch (e: Exception) {
-        logger.error(e) { "Unable to retrieve needed secret" }
-        metrics.processingFailed(SECRETS_RETRIEVAL_FAILED, body.workflowName, body.workflowVersion)
-        saveAsFailed(e, body)
+        logger.error(e) { "Unable to retrieve needed secret. Storing the message in the $RETRY_TABLE table for manual inspection." }
+        metrics.processingFailed(SECRETS_RETRIEVAL_FAILED, workflowName, workflowVersion)
+        saveAsFailed(e)
         throw ProcessingException(e)
     }
+
+    /**
+     * Constructs a workflow instance based on the provided message and secrets.
+     *
+     * If an error occurs while constructing the instance, the error is logged,
+     * metrics are updated to reflect the failure, and the message is saved for manual inspection.
+     */
+    private suspend fun InstanceMessage.getWorkflowInstance(secrets: Map<String, JsonElement>): WorkflowInstance = try {
+        WorkflowInstance(
+            id = workflowId,
+            name = workflowName,
+            version = workflowVersion,
+            state = workflowState.parsed,
+            position = workflowPosition.parsed,
+            secrets = secrets,
+        )
+    } catch (e: Exception) {
+        logger.error(e) { "Failed to convert the message to a workflow instance. Storing it in the $RETRY_TABLE table for manual inspection." }
+        metrics.processingFailed(getFailureReason(e), workflowName, workflowVersion)
+        saveAsFailed(e)
+        throw ProcessingException(e)
+    }
+
 
     /**
      * Executes a workflow instance constructed from the provided message, state, and secrets.
@@ -204,17 +229,13 @@ internal class ReactiveMessageHandler @Inject constructor(
      * If execution fails, it logs the failure, updates processing metrics, and stores the message
      * in the retry table for manual inspection.
      */
-    private suspend fun Message<String>.runInstance(
-        secrets: Map<String, JsonElement>,
-        body: LemlineMessage
-    ): LemlineMessage? {
-        val instance = body.toWorkflowInstance(secrets)
+    private suspend fun InstanceMessage.run(instance: WorkflowInstance): InstanceMessage? {
         return try {
-            stepByStepRunner.run(instance)
+            with(stepByStepRunner) { run(instance) }
         } catch (e: Exception) {
-            logger.error(e) { "Failed to run instance. Storing current state in the retry table for manual inspection." }
-            metrics.processingFailed(getFailureReason(e), body.workflowName, body.workflowVersion)
-            saveAsFailed(e, instance.toMessage()) // TODO what if toMessage() throws?
+            logger.error(e) { "Failed to run instance. Storing current state in the $RETRY_TABLE table for manual inspection." }
+            metrics.processingFailed(getFailureReason(e), workflowName, workflowVersion)
+            runFailed(e, instance)
             throw ProcessingException(e)
         }
     }
@@ -227,13 +248,13 @@ internal class ReactiveMessageHandler @Inject constructor(
      * and the message is stored in the retry table for reprocessing.
      * The method ensures that no unhandled exceptions are propagated.
      */
-    private suspend fun Message<String>.emit(body: LemlineMessage) = try {
-        emitter.send(body.jsonString).await()
-        logger.debug { "Emitted next message: ${body.jsonString}" }
+    private suspend fun InstanceMessage.emit() = try {
+        emitter.send(payload).await()
+        logger.debug { "Emitted next message: ${payload}" }
     } catch (e: Exception) {
         logger.warn(e) { "Failed to emit next message. Message will be stored in the retry table instead to be re-emit later" }
-        metrics.processingFailed(MESSAGE_EMISSION_ERROR, body.workflowName, body.workflowVersion)
-        saveForRetry(e, body)
+        metrics.processingFailed(MESSAGE_EMISSION_ERROR, workflowName, workflowVersion)
+        saveForRetry(e)
         throw ProcessingException(e)
     }
 
@@ -259,51 +280,74 @@ internal class ReactiveMessageHandler @Inject constructor(
         else -> PROCESSING_ERROR
     }
 
-    private suspend fun Message<String>.saveAsFailed(
-        cause: Exception?,
-        body: LemlineMessage?,
-    ) = try {
+    private suspend fun Message<String>.deserializationFailed(cause: Exception) = try {
         val retryModel = RetryModel(
-            workflowId = body?.workflowId ?: "",
-            workflowName = body?.workflowName ?: "",
-            workflowVersion = body?.workflowVersion ?: "",
-            workflowPosition = body?.workflowPosition?.serialized ?: "",
-            workflowState = body?.workflowState?.serialized ?: "",
-            message = if (body == null) payload else null,
-            outboxLastError = cause?.stackTraceToString(),
-            outboxDelayedUntil = Clock.System.now(),
+            instance = null,
+            message = payload,
+            outboxLastError = cause.stackTraceToString(),
+            outboxScheduledFor = Clock.System.now(),
             outBoxStatus = OutBoxStatus.FAILED,
         )
         retryRepository.insert(retryModel)
         // as the responsibility of the message is transferred to the database, we acknowledge the message
-        ack(body?.workflowName ?: UNKNOWN, body?.workflowVersion ?: UNKNOWN)
+        ack(UNKNOWN, UNKNOWN)
     } catch (e: Exception) {
-        logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: $this" }
-        nack(e, body?.workflowName ?: UNKNOWN, body?.workflowVersion ?: UNKNOWN)
+        logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: ${this.payload}" }
+        nack(e, UNKNOWN, UNKNOWN)
     }
 
-    private suspend fun Message<String>.saveForRetry(
-        cause: Exception,
-        body: LemlineMessage
-    ) = try {
+    private suspend fun InstanceMessage.runFailed(cause: Exception?, workflowInstance: WorkflowInstance) {
+        val message = try {
+            // create a new message with the current state (add the original message for (neg)acknowledgment)
+            InstanceMessage.fromObjects(
+                workflowId = workflowId,
+                workflowName = workflowName,
+                workflowVersion = workflowVersion,
+                workflowPosition = workflowInstance.position!!,
+                workflowState = workflowInstance.state,
+                scheduleId = scheduleId,
+                parentId = parentId,
+            ).also { it.message = message }
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to convert the current instance to a message. We save the original message for manual inspection: $payload" }
+            // if toLemlineMessage fails, we save the entire message for manual inspection
+            saveAsFailed(cause)
+            return
+        }
+        message.saveAsFailed(cause)
+    }
+
+    private suspend fun InstanceMessage.saveAsFailed(cause: Exception?) = try {
+        val retryModel = RetryModel(
+            instance = this,
+            message = null,
+            outboxLastError = cause?.stackTraceToString(),
+            outboxScheduledFor = Clock.System.now(),
+            outBoxStatus = OutBoxStatus.FAILED,
+        )
+        retryRepository.insert(retryModel)
+        // as the responsibility of the message is transferred to the database, we acknowledge the message
+        message.ack(workflowName, workflowVersion)
+    } catch (e: Exception) {
+        logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: $this" }
+        message.nack(e, workflowName, workflowVersion)
+    }
+
+    private suspend fun InstanceMessage.saveForRetry(cause: Exception) = try {
         // save the next message for re-emission
         val retryModel = RetryModel(
-            workflowId = body.workflowId,
-            workflowName = body.workflowName,
-            workflowVersion = body.workflowVersion,
-            workflowPosition = body.workflowPosition.serialized,
-            workflowState = body.workflowState.serialized,
+            instance = this,
             outboxLastError = cause.stackTraceToString(),
-            outboxDelayedUntil = Clock.System.now(),
+            outboxScheduledFor = Clock.System.now(), // <- TODO check first date
             outBoxStatus = OutBoxStatus.PENDING,
             message = null,
         )
         retryRepository.insert(retryModel)
         // as the responsibility of the message is transferred to the database, we acknowledge the message
-        ack(body.workflowName, body.workflowVersion)
+        message.ack(workflowName, workflowVersion)
     } catch (e: Exception) {
-        logger.error(e) { "Failed to insert next message for retry, neg-acknowledging the initial message: $payload" }
-        nack(e, body.workflowName, body.workflowVersion)
+        logger.error(e) { "Failed to insert next message for retry, neg-acknowledging the initial message: ${message.payload}" }
+        message.nack(e, workflowName, workflowVersion)
     }
 
     /**
@@ -314,7 +358,7 @@ internal class ReactiveMessageHandler @Inject constructor(
      * @param workflowName The name of the workflow associated with the message.
      * @param workflowVersion The version of the workflow associated with the message.
      */
-    private fun Message<String>.ack(workflowName: String, workflowVersion: String) {
+    private fun Message<*>.ack(workflowName: String, workflowVersion: String) {
         try {
             logger.debug { "ACKing message: $payload" }
             ack()
@@ -334,7 +378,7 @@ internal class ReactiveMessageHandler @Inject constructor(
      * @param workflowName The name of the workflow associated with the message.
      * @param workflowVersion The version of the workflow associated with the message.
      */
-    private fun Message<String>.nack(reason: Exception, workflowName: String, workflowVersion: String) {
+    private fun Message<*>.nack(reason: Exception, workflowName: String, workflowVersion: String) {
         try {
             logger.debug { "NACKing message: $payload" }
             nack(reason)

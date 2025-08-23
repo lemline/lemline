@@ -21,9 +21,9 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
     logDebug { "Sub-workflow name: $subWorkflowName, version: $subWorkflowVersion" }
 
     // Determine the input for the sub-workflow by evaluating the 'input' expression if it exists
-    val subWorkflowInput = runWorkflow.getInputFor(this)
+    val childWorkflowInput = runWorkflow.getInputFor(this)
 
-    logDebug { "Sub-workflow input data: $subWorkflowInput" }
+    logDebug { "Sub-workflow input data: $childWorkflowInput" }
 
     val awaitCompletion = runWorkflow.isAwait
     logDebug { "Await sub-workflow completion: $awaitCompletion" }
@@ -33,7 +33,7 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
         name = subWorkflowName,
         version = subWorkflowVersion,
         id = UUID.randomUUID().toString(),
-        rawInput = subWorkflowInput,
+        rawInput = childWorkflowInput,
         secrets = rootInstance.secrets,
         activityRunnerProvider = workflowInstance.activityRunnerProvider,
     )

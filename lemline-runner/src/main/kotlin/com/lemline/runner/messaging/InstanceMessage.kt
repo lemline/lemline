@@ -5,12 +5,12 @@ import com.lemline.common.flexible.LazyParsedField
 import com.lemline.common.ids.IdGenerator
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.WorkflowState
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import org.eclipse.microprofile.reactive.messaging.Message
 
 /**
  * Represents a message containing information about a workflow execution.
@@ -22,7 +22,7 @@ import kotlinx.serialization.json.JsonElement
  */
 @ExperimentalTime
 @Serializable
-data class LemlineMessage(
+data class InstanceMessage(
     /**
      * The ID of the workflow.
      */
@@ -44,11 +44,26 @@ data class LemlineMessage(
      */
     @SerialName("s") val workflowState: LazyParsedField<WorkflowState>,
     /**
-     * Indicates whether the workflow is scheduled to restart after its completion.
+     * Indicates the id of the schedule model describing how this workflow should restart after its completion, if any
      */
-    @SerialName("a") val isScheduledAfter: Boolean = false,
+    @SerialName("a") val scheduleId: String? = null,
+    /**
+     * Indicates the id of the parent model describing the workflow waiting for this workflow completion, if any.
+     */
+    @SerialName("w") val parentId: String? = null,
 ) {
-    override fun toString() = jsonString
+    /**
+     * The reactive message that has been deserialized to create this instance
+     */
+    lateinit var message: Message<*>
+
+    // InstanceMessage is immutable, so we can cache the JSON string representation
+    val payload: String by lazy { LemlineJson.encodeToString(this) }
+
+    fun updateWith(workflowState: WorkflowState, workflowPosition: NodePosition?) = copy(
+        workflowPosition = LazyParsedField(workflowPosition, NodePosition.serializer()),
+        workflowState = LazyParsedField(workflowState, WorkflowState.serializer()),
+    )
 
     companion object {
         fun fromObjects(
@@ -57,14 +72,16 @@ data class LemlineMessage(
             workflowVersion: String,
             workflowPosition: NodePosition,
             workflowState: WorkflowState,
-            isScheduledAfter: Boolean,
-        ) = LemlineMessage(
+            scheduleId: String?,
+            parentId: String?,
+        ) = InstanceMessage(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
             workflowPosition = LazyParsedField(workflowPosition, NodePosition.serializer()),
             workflowState = LazyParsedField(workflowState, WorkflowState.serializer()),
-            isScheduledAfter = isScheduledAfter,
+            scheduleId = scheduleId,
+            parentId = parentId,
         )
 
         fun fromStrings(
@@ -73,59 +90,36 @@ data class LemlineMessage(
             workflowVersion: String,
             workflowPosition: String,
             workflowState: String,
-            isScheduledAfter: Boolean,
-        ) = LemlineMessage(
+            scheduleId: String?,
+            parentId: String?,
+        ) = InstanceMessage(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
             workflowPosition = LazyParsedField(workflowPosition, NodePosition.serializer()),
             workflowState = LazyParsedField(workflowState, WorkflowState.serializer()),
-            isScheduledAfter = isScheduledAfter,
+            scheduleId = scheduleId,
+            parentId = parentId,
         )
 
-        fun create(
+        fun forNewWorkflow(
             workflowId: String = IdGenerator.generateTimeBasedId(),
             workflowName: String,
             workflowVersion: String,
             workflowInput: JsonElement,
+            scheduleId: String? = null,
             parentId: String? = null,
-            parentIsWaiting: Boolean = false,
-            isScheduledAfter: Boolean = false,
         ) = fromObjects(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
             workflowPosition = NodePosition.root,
-            workflowState = WorkflowState.newInstance(workflowInput, parentId, parentIsWaiting),
-            isScheduledAfter = isScheduledAfter,
+            workflowState = WorkflowState.newInstance(workflowInput),
+            scheduleId = scheduleId,
+            parentId = parentId,
         )
 
-        fun fromJsonString(json: String): LemlineMessage = LemlineJson.decodeFromString(json)
+        fun fromMessage(message: Message<String>) = LemlineJson.decodeFromString<InstanceMessage>(message.payload)
+            .also { it.message = message }
     }
-
-    // MessageBody is immutable, so we can cache the JSON string representation
-    val jsonString: String by lazy { LemlineJson.encodeToString(this) }
-
-    // MessageBody is immutable, so we can cache the JSON string representation in pretty format
-    val jsonPrettyString: String by lazy { LemlineJson.encodeToPrettyString(this) }
-
-    fun toWorkflowInstance(secrets: Map<String, JsonElement>) = WorkflowInstance(
-        id = workflowId,
-        name = workflowName,
-        version = workflowVersion,
-        state = workflowState.parsed,
-        position = workflowPosition.parsed,
-        secrets = secrets,
-        isScheduledAfter = isScheduledAfter,
-    )
 }
-
-@ExperimentalTime
-internal fun WorkflowInstance.toMessage() = LemlineMessage.fromObjects(
-    workflowId = this.id,
-    workflowName = this.name,
-    workflowVersion = this.version,
-    workflowPosition = this.position!!,
-    workflowState = this.state,
-    isScheduledAfter = this.isScheduledAfter
-)

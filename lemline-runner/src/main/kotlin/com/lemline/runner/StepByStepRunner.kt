@@ -3,7 +3,6 @@ package com.lemline.runner
 
 import com.lemline.common.debug
 import com.lemline.common.error
-import com.lemline.common.ids.IdGenerator
 import com.lemline.common.logger
 import com.lemline.core.activities.runs.getInputFor
 import com.lemline.core.instances.RunInstance
@@ -15,15 +14,14 @@ import com.lemline.runner.exceptions.RunWorkflowStartedException
 import com.lemline.runner.exceptions.TaskCompletedException
 import com.lemline.runner.exceptions.TaskRetriedException
 import com.lemline.runner.exceptions.WaitStartedException
-import com.lemline.runner.messaging.LemlineMessage
-import com.lemline.runner.messaging.toMessage
-import com.lemline.runner.models.RUN_WORKFLOW_TABLE
+import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.models.PARENT_TABLE
+import com.lemline.runner.models.ParentModel
 import com.lemline.runner.models.RetryModel
-import com.lemline.runner.models.RunWorkflowModel
 import com.lemline.runner.models.SCHEDULE_TABLE
 import com.lemline.runner.models.WaitModel
+import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.RetryRepository
-import com.lemline.runner.repositories.RunWorkflowRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.repositories.WaitRepository
 import io.quarkus.runtime.Startup
@@ -44,7 +42,7 @@ import kotlin.time.ExperimentalTime
 internal class StepByStepRunner @Inject constructor(
     private val retryRepository: RetryRepository,
     private val waitRepository: WaitRepository,
-    private val runWorkflowRepository: RunWorkflowRepository,
+    private val parentRepository: ParentRepository,
     private val scheduleRepository: ScheduleRepository,
 ) {
     private val logger = logger()
@@ -64,38 +62,37 @@ internal class StepByStepRunner @Inject constructor(
         }
     }
 
-    suspend fun run(instance: WorkflowInstance): LemlineMessage? {
+    suspend fun InstanceMessage.run(workflowInstance: WorkflowInstance): InstanceMessage? {
 
-        instance.onTaskCompleted { onTaskCompleted(it) }
-        instance.onTaskStarted { onTaskStarted(it) }
-        instance.onTaskRetried { throw TaskRetriedException() }
+        workflowInstance.onTaskCompleted { onTaskCompleted(it) }
+        workflowInstance.onTaskStarted { onTaskStarted(it) }
+        workflowInstance.onTaskRetried { throw TaskRetriedException() }
 
         val nextMessage = try {
-            instance.run()
-            instance.onWorkflowCompleted()
+            workflowInstance.run()
+            onWorkflowCompleted(workflowInstance)
             null
         } catch (_: TaskCompletedException) {
-            logger.debug { "Task completed at ${instance.position}" }
+            logger.debug { "Task completed at ${workflowInstance.position}" }
             // next message
-            instance.toMessage()
+            updateWith(workflowInstance.state, workflowInstance.position)
         } catch (_: TaskRetriedException) {
-            logger.debug { "Task retried at ${instance.position}" }
+            logger.debug { "Task retried at ${workflowInstance.position}" }
             // Store the message to the retry repository
-            instance.onRetry()
+            onRetry(workflowInstance)
             null
         } catch (e: WaitStartedException) {
-            logger.debug { "Task waiting at ${instance.position}" }
+            logger.debug { "Task waiting at ${workflowInstance.position}" }
             // Store the message to the wait repository
-            instance.onWait(e.delay)
+            onWait(workflowInstance, e.delay)
             null
         } catch (e: RunWorkflowStartedException) {
-            logger.debug { "run Workflow at ${instance.position}" }
+            logger.debug { "run Workflow at ${workflowInstance.position}" }
             // Store the message to the run workflow repository
-            instance.onRunWorkflow(e.runWorkflow)
-            null
+            onRunWorkflow(workflowInstance, e.runWorkflow)
         }
 
-        return nextMessage
+        return nextMessage?.also { it.message = message }
     }
 
     /**
@@ -110,86 +107,63 @@ internal class StepByStepRunner @Inject constructor(
      * @return Always returns null to indicate that the processing of the current workflow instance
      *         has been stopped post-handling of the child workflow setup.
      */
-    private suspend fun WorkflowInstance.onRunWorkflow(runWorkflow: RunWorkflow) {
+    private suspend fun InstanceMessage.onRunWorkflow(
+        workflowInstance: WorkflowInstance,
+        runWorkflow: RunWorkflow
+    ): InstanceMessage {
 
-        runWorkflowRepository.withTransaction { connection ->
-            // in the same transaction!
+        // insert the parent workflow (waiting) without delayedUntil
+        val parent = ParentModel(
+            instance = updateWith(workflowInstance.state, workflowInstance.position),
+            outboxScheduledFor = null,
+        )
+        parentRepository.insert(parent)
 
-            // insert the parent workflow (waiting) without delayedUntil
-            runWorkflowRepository.insert(
-                RunWorkflowModel(
-                    workflowId = id,
-                    workflowName = name,
-                    workflowVersion = version,
-                    workflowPosition = position!!.toString(),
-                    workflowState = state.toJsonString()
-                ),
-                connection
-            )
-
-            // insert the child workflow (running) to start right away
-            val childId = IdGenerator.generateTimeBasedId()
-
-            val child = LemlineMessage.create(
-                workflowId = childId,
-                workflowName = runWorkflow.workflow.name,
-                workflowVersion = runWorkflow.workflow.version,
-                workflowInput = runWorkflow.getInputFor(current as RunInstance),
-                parentId = id,
-                parentIsWaiting = runWorkflow.isAwait
-
-            )
-            runWorkflowRepository.insert(
-                RunWorkflowModel(
-                    workflowId = childId,
-                    workflowName = child.workflowName,
-                    workflowVersion = child.workflowVersion,
-                    workflowPosition = child.workflowPosition.serialized,
-                    workflowState = child.workflowState.serialized,
-                    outboxScheduledFor = Clock.System.now(),
-                ),
-                connection
-            )
-        }
+        // return this message to start the child workflow right away
+        return InstanceMessage.forNewWorkflow(
+            workflowName = workflowName,
+            workflowVersion = workflowVersion,
+            workflowInput = runWorkflow.getInputFor(workflowInstance.current as RunInstance),
+            parentId = workflowId,
+            scheduleId = null,
+        )
     }
+
 
     /**
      * Handles the completion of the workflow instance. This method finalizes the processing of
      * the workflow by performing the necessary cleanup or post-processing actions as applicable.
      * Once this method is called, no further processing will occur for the current workflow instance.
      */
-    private suspend fun WorkflowInstance.onWorkflowCompleted() {
+    private suspend fun InstanceMessage.onWorkflowCompleted(workflowInstance: WorkflowInstance) {
 
         // Case of child workflow completion
-        if (parent?.isWaiting == true) runWorkflowRepository.withTransaction { conn ->
+        parentId?.let { parentId ->
             // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
-            runWorkflowRepository.findByWorkflowId(parent!!.workflowId, conn)?.let { entity ->
-                // Get current state of the parent workflow
-                val state = entity.state
+            parentRepository.findById(parentId)?.let { parent ->
+                // Get the current state of the parent workflow
+                val state = parent.workflowState
                 // set the workflow output at the rawOutput at the current position of the parent workflow
-                state[entity.position]!!.rawOutput = getOutput()
-                // by updating delayedUntil to now, we force the outbox to restart the parent workflow
-                runWorkflowRepository.update(
-                    entity.copy(
-                        outboxDelayedUntil = Clock.System.now(),
-                        workflowState = state.toJsonString()
-                    ),
-                    conn
-                )
-                logger.debug { "Restarting parent workflow:\n${entity.toLemlineMessage().jsonPrettyString}" }
+                val output = workflowInstance.getOutput()
+                state[parent.workflowPosition]!!.rawOutput = output
+                // Set delayedUntil to restart parent workflow via the ParentOutbox
+                parent.outboxDelayedUntil = Clock.System.now()
+                // save the updated parent model
+                parentRepository.update(parent)
+                logger.debug { "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId ($workflowName), set up to restart at position ${parent.workflowPosition} with output $output" }
             }
-                ?: logger.error { "Unable to find parent ${parent!!.workflowId} of workflow $id ($name) in $RUN_WORKFLOW_TABLE table" }
+                ?: logger.error { "CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted." }
         }
 
         // Case of workflow completion with scheduled after
-        if (isScheduledAfter) scheduleRepository.withTransaction { conn ->
-            scheduleRepository.findByWorkflowId(id, conn)?.let { entity ->
-                entity.updateScheduledForAfterCompletion()
-                scheduleRepository.update(entity, conn)
-                logger.debug { "Rescheduled workflow ${entity.workflowName} for ${entity.outboxScheduledFor}" }
-            } ?: logger.error { "Unable to find scheduled entity for workflow $id ($name) in $SCHEDULE_TABLE table" }
+        scheduleId?.let { scheduleId ->
+            scheduleRepository.findById(scheduleId)?.let { schedule ->
+                schedule.rescheduleAfterCompletion()
+                scheduleRepository.update(schedule)
+                logger.debug { "Rescheduled workflow ${schedule.instance.workflowName} for ${schedule.outboxScheduledFor}" }
+            }
+                ?: logger.error { "CRITICAL - Unable to find schedule $scheduleId of workflow $workflowId ($workflowName) in $SCHEDULE_TABLE table. The workflow will not be restarted." }
         }
-
     }
 
     /**
@@ -200,17 +174,12 @@ internal class StepByStepRunner @Inject constructor(
      * via an external mechanism like an outbox system.
      */
     @OptIn(ExperimentalTime::class)
-    private suspend fun WorkflowInstance.onRetry() {
-        val delay = (current as TryInstance).delay ?: error("No delay set in for $this")
+    private suspend fun InstanceMessage.onRetry(workflowInstance: WorkflowInstance) {
+        val delay = (workflowInstance.current as TryInstance).delay ?: error("No delay set in for $this")
 
         val retryModel = RetryModel(
-            workflowId = id,
-            workflowName = name,
-            workflowVersion = version,
-            workflowPosition = position.toString(),
-            workflowState = state.toJsonString(),
-            message = null,
-            outboxDelayedUntil = Clock.System.now().plus(delay)
+            instance = updateWith(workflowInstance.state, workflowInstance.position),
+            outboxScheduledFor = Clock.System.now().plus(delay),
         )
         // Save the message to the retry table
         retryRepository.insert(retryModel)
@@ -223,14 +192,10 @@ internal class StepByStepRunner @Inject constructor(
      * The workflow instance's processing is halted temporarily, and further processing is expected to resume
      * asynchronously through an external mechanism such as an outbox system.
      */
-    private suspend fun WorkflowInstance.onWait(delay: Duration) {
+    private suspend fun InstanceMessage.onWait(workflowInstance: WorkflowInstance, delay: Duration) {
         val waitModel = WaitModel(
-            workflowId = id,
-            workflowName = name,
-            workflowVersion = version,
-            workflowPosition = position!!.toString(),
-            workflowState = state.toJsonString(),
-            outboxDelayedUntil = Clock.System.now().plus(delay),
+            instance = updateWith(workflowInstance.state, workflowInstance.position),
+            outboxScheduledFor = Clock.System.now().plus(delay),
         )
         // Save the message to the wait table
         waitRepository.insert(waitModel)

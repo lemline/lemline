@@ -2,8 +2,8 @@
 package com.lemline.runner.repositories
 
 import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.models.RUN_WORKFLOW_TABLE
-import com.lemline.runner.models.RunWorkflowModel
+import com.lemline.runner.models.PARENT_TABLE
+import com.lemline.runner.models.ParentModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxProcessor
 import jakarta.enterprise.context.ApplicationScoped
@@ -22,27 +22,21 @@ import kotlin.time.ExperimentalTime
  * ensuring reliable message delivery in distributed systems.
  *
  * @see OutboxRepository for base functionality and documentation
- * @see RunWorkflowModel for the message model
+ * @see ParentModel for the message model
  * @see OutboxProcessor for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime
-internal class RunWorkflowRepository : OutboxRepository<RunWorkflowModel>() {
+internal class ParentRepository : OutboxRepository<ParentModel>() {
 
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
-    override val tableName = RUN_WORKFLOW_TABLE
+    override val tableName = PARENT_TABLE
 
-    override fun createModel(rs: ResultSet) = RunWorkflowModel(
+    override fun createModel(rs: ResultSet) = ParentModel(
         id = rs.getString(ID_COLUMN),
-
-        workflowId = rs.getString(WORKFLOW_ID_COLUMN),
-        workflowName = rs.getString(WORKFLOW_NAME_COLUMN),
-        workflowVersion = rs.getString(WORKFLOW_VERSION_COLUMN),
-        workflowPosition = rs.getString(WORKFLOW_POSITION_COLUMN),
-        workflowState = rs.getString(WORKFLOW_STATE_COLUMN),
-
+        instance = rs.getInstanceMessage(),
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
         outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),

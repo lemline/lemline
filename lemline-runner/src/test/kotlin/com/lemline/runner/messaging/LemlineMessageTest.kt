@@ -18,7 +18,7 @@ internal class LemlineMessageTest {
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {
         // Given
-        val lemlineMessage = LemlineMessage.fromObjects(
+        val instanceMessage = InstanceMessage.fromObjects(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
@@ -30,14 +30,14 @@ internal class LemlineMessageTest {
         // When
         assertEquals(
             """{"i":"test-id","n":"test-workflow","v":"1.0.0","p":"","s":{"":{"inp":""}}}""",
-            lemlineMessage.jsonString,
+            instanceMessage.payload,
         )
     }
 
     @Test
     fun `should be JSON serializable and deserializable`() {
         // Given
-        val lemlineMessage = LemlineMessage.fromObjects(
+        val instanceMessage = InstanceMessage.fromObjects(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
@@ -47,13 +47,13 @@ internal class LemlineMessageTest {
         )
 
         // When
-        assertEquals(lemlineMessage, LemlineMessage.fromJsonString(lemlineMessage.jsonString))
+        assertEquals(instanceMessage, InstanceMessage.fromJsonString(instanceMessage.payload))
     }
 
     @Test
     fun `should serialize and deserialize MessageBody`() {
         // Given
-        val original = LemlineMessage.fromObjects(
+        val original = InstanceMessage.fromObjects(
             workflowId = "test-id",
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
@@ -71,7 +71,7 @@ internal class LemlineMessageTest {
 
         // When
         val json = LemlineJson.encodeToString(original)
-        val deserialized = LemlineJson.decodeFromString<LemlineMessage>(json)
+        val deserialized = LemlineJson.decodeFromString<InstanceMessage>(json)
 
         // Then
         assertEquals(original, deserialized)
@@ -91,21 +91,21 @@ internal class LemlineMessageTest {
         )
 
         // When
-        val lemlineMessage = LemlineMessage.create(id, name, version, input)
+        val instanceMessage = InstanceMessage.forNewWorkflow(id, name, version, input)
 
         // Then
         val expectedStates = WorkflowState(
             mapOf(
                 NodePosition.root to NodeState(
                     rawInput = input,
-                    startedAt = lemlineMessage.workflowState.parsed[NodePosition.root]!!.startedAt,
+                    startedAt = instanceMessage.workflowState.parsed[NodePosition.root]!!.startedAt,
                 ),
             )
         )
 
-        assertEquals(name, lemlineMessage.workflowName)
-        assertEquals(version, lemlineMessage.workflowVersion)
-        assertEquals(expectedStates, lemlineMessage.workflowState.parsed)
-        assertEquals(NodePosition.root, lemlineMessage.workflowPosition.parsed)
+        assertEquals(name, instanceMessage.workflowName)
+        assertEquals(version, instanceMessage.workflowVersion)
+        assertEquals(expectedStates, instanceMessage.workflowState.parsed)
+        assertEquals(NodePosition.root, instanceMessage.workflowPosition.parsed)
     }
 }

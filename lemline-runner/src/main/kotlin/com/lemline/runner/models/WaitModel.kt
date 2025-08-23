@@ -2,30 +2,22 @@
 package com.lemline.runner.models
 
 import com.lemline.common.ids.IdGenerator
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 const val WAIT_TABLE = "lemline_waits"
 
 @ExperimentalTime
-data class WaitModel(
+class WaitModel(
     override val id: String = IdGenerator.generateTimeBasedId(),
 
-    override val workflowId: String,
-
-    override val workflowVersion: String,
-
-    override val workflowName: String,
-
-    override val workflowPosition: String,
-
-    override val workflowState: String,
+    override val instance: InstanceMessage,
 
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
-    override var outboxScheduledFor: Instant? = Clock.System.now(),
+    override var outboxScheduledFor: Instant?,
 
     override var outboxDelayedUntil: Instant? = outboxScheduledFor,
 

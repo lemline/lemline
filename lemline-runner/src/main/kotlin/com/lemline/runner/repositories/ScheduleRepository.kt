@@ -61,19 +61,12 @@ class ScheduleRepository : OutboxRepository<ScheduleModel>() {
     @ExperimentalTime
     override fun createModel(rs: ResultSet) = ScheduleModel(
         id = rs.getString(ID_COLUMN),
-
-        workflowId = rs.getString(WORKFLOW_ID_COLUMN),
-        workflowName = rs.getString(WORKFLOW_NAME_COLUMN),
-        workflowVersion = rs.getString(WORKFLOW_VERSION_COLUMN),
-        workflowPosition = rs.getString(WORKFLOW_POSITION_COLUMN),
-        workflowState = rs.getString(WORKFLOW_STATE_COLUMN),
-
+        instance = rs.getInstanceMessage(),
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
         outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
         outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
         outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
-
         scheduleAfter = rs.getString(SCHEDULE_AFTER_COLUMN),
         scheduleEvery = rs.getString(SCHEDULE_EVERY_COLUMN),
         scheduleCron = rs.getString(SCHEDULE_CRON_COLUMN),

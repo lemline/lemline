@@ -83,7 +83,6 @@ class WorkflowInstance(
     state: WorkflowState,
     position: NodePosition,
     secrets: Map<String, JsonElement>,
-    val isScheduledAfter: Boolean,
     var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
 ) {
 
@@ -113,7 +112,6 @@ class WorkflowInstance(
             id: String,
             rawInput: JsonElement,
             secrets: Map<String, JsonElement> = emptyMap(),
-            scheduledAfter: Boolean = false,
             activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
         ) = WorkflowInstance(
             id = id,
@@ -122,7 +120,6 @@ class WorkflowInstance(
             state = WorkflowState.newInstance(rawInput),
             position = NodePosition.root,
             secrets = secrets,
-            isScheduledAfter = scheduledAfter,
             activityRunnerProvider = activityRunnerProvider
         )
 
@@ -277,12 +274,6 @@ class WorkflowInstance(
         WorkflowStatus.COMPLETED -> rootInstance.transformedOutput
         else -> null
     }
-
-    /**
-     * The property refers to the parent information as a [NodeState.Parent] object,
-     * which includes details such as the parent workflow's identifier and its waiting status.
-     */
-    val parent: NodeState.Parent? by lazy { rootInstance.state.parent }
 
     /**
      * The workflow definition associated with this instance.

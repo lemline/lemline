@@ -22,17 +22,9 @@ data class NodeState(
     @SerialName(RAW_INPUT) var rawInput: JsonElement? = null,
     @SerialName(RAW_OUTPUT) var rawOutput: JsonElement? = null,
     @SerialName(CONTEXT) var context: JsonObject = LemlineJson.jsonObject,
-    @SerialName(PARENT) var parent: Parent? = null,
     @SerialName(STARTED_AT) var startedAt: Instant? = null,
     @SerialName(FOR_INDEX) var forIndex: Int = FOR_INDEX_DEFAULT,
 ) {
-
-    @Serializable
-    data class Parent(
-        @SerialName(WORKFLOW_ID) var workflowId: String,
-        @SerialName(IS_WAITING) var isWaiting: Boolean
-    )
-
     /**
      * Those constants MUST NOT be changed to ensure backward compatibility of messages
      */
@@ -43,7 +35,6 @@ data class NodeState(
         const val RAW_OUTPUT = "out"
         const val CONTEXT = "ctx"
         const val WORKFLOW_ID = "wid"
-        const val PARENT = "par"
         const val IS_WAITING = "wai"
         const val STARTED_AT = "sat"
         const val FOR_INDEX = "for"

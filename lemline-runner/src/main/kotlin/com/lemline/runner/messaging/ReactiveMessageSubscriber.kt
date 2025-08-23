@@ -95,7 +95,7 @@ internal class ReactiveMessageSubscriber<P, T : Message<P>>(
             } catch (e: Exception) {
                 // This is a safety net. The handler should not throw exceptions.
                 // If it does, it indicates a bug in the handler's own try/catch logic.
-                logger.error(e) { "CRITICAL: Unhandled exception from message handler. The message's state is now unknown and it may be redelivered or lost." }
+                logger.error(e) { "CRITICAL: Unhandled exception from message handler. The message's state is now unknown and it may be redelivered or lost. Message: ${item.payload}" }
             } finally {
                 metrics.decrementActive()
                 requestNext()
