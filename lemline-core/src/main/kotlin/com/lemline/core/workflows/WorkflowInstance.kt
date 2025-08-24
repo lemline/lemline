@@ -2,13 +2,14 @@
 package com.lemline.core.workflows
 
 import com.lemline.core.nodes.NodePosition
+import java.util.*
 import kotlin.time.ExperimentalTime
 
 interface WorkflowInstance {
     /**
      * The unique ID of the workflow.
      */
-    val id: String
+    val id: UUID
 
     /**
      * The name of the workflow.

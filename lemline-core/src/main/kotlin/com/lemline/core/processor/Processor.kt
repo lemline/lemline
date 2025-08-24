@@ -57,6 +57,7 @@ import io.serverlessworkflow.api.types.WaitTask
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
+import java.util.*
 import java.util.concurrent.CompletableFuture
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -106,7 +107,7 @@ class Processor(
         fun createNew(
             name: String,
             version: String,
-            id: String,
+            id: UUID,
             rawInput: JsonElement,
             secrets: Map<String, JsonElement> = emptyMap(),
             activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
@@ -167,7 +168,7 @@ class Processor(
         rootInstance.secrets = secrets
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
-            id = instance.id,
+            id = instance.id.toString(),
             definition = LemlineJson.encodeToElement(workflow),
             input = rawInput,
             startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant())),
@@ -495,7 +496,7 @@ class Processor(
      * @param message Lambda providing the log message.
      */
     private fun logDebug(e: Throwable? = null, message: () -> String) = withWorkflowContext(
-        workflowId = instance.id,
+        workflowId = instance.id.toString(),
         workflowName = instance.name,
         workflowVersion = instance.version,
         nodePosition = position.toString(),
@@ -510,7 +511,7 @@ class Processor(
      * @param message Lambda providing the log message.
      */
     private fun logInfo(e: Throwable? = null, message: () -> String) = withWorkflowContext(
-        workflowId = instance.id,
+        workflowId = instance.id.toString(),
         workflowName = instance.name,
         workflowVersion = instance.version,
         nodePosition = position.toString(),
@@ -525,7 +526,7 @@ class Processor(
      * @param message Lambda providing the log message.
      */
     private fun logWarn(e: Throwable? = null, message: () -> String) = withWorkflowContext(
-        workflowId = instance.id,
+        workflowId = instance.id.toString(),
         workflowName = instance.name,
         workflowVersion = instance.version,
         nodePosition = position.toString(),
@@ -541,7 +542,7 @@ class Processor(
      */
     private fun logError(e: Throwable? = null, message: () -> String) {
         withWorkflowContext(
-            workflowId = instance.id,
+            workflowId = instance.id.toString(),
             workflowName = instance.name,
             workflowVersion = instance.version,
             nodePosition = position.toString(),

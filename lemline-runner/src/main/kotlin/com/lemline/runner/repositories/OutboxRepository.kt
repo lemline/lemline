@@ -1,14 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
+import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
+import java.nio.ByteBuffer
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
+import java.sql.Types
+import java.util.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -71,54 +77,95 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         internal const val OUTBOX_LAST_ERROR_COLUMN = "outbox_last_error"
     }
 
-    override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> = mapOf(
-        ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setString(idx, entity.id)
-        },
-        WORKFLOW_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setString(idx, entity.instance?.workflowId)
-        },
-        WORKFLOW_NAME_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setString(idx, entity.instance?.workflowName)
-        },
-        WORKFLOW_VERSION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setString(idx, entity.instance?.workflowVersion)
-        },
-        WORKFLOW_POSITION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setString(idx, entity.instance?.workflowPosition?.serialized)
-        },
-        WORKFLOW_STATE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setString(idx, entity.instance?.workflowState?.serialized)
-        },
-        PARENT_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setString(idx, entity.instance?.parentId)
-        },
-        OUTBOX_STATUS_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setString(idx, entity.outBoxStatus.name)
-        },
-        OUTBOX_SCHEDULED_FOR_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setTimestamp(idx, entity.outboxScheduledFor?.let { Timestamp.from(it.toJavaInstant()) })
-        },
-        OUTBOX_DELAYED_UNTIL_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setTimestamp(idx, entity.outboxDelayedUntil?.let { Timestamp.from(it.toJavaInstant()) })
-        },
-        OUTBOX_ATTEMPT_COUNT_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setInt(idx, entity.outboxAttemptCount)
-        },
-        OUTBOX_LAST_ERROR_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setString(idx, entity.outboxLastError)
-        },
-    )
+    protected val setUuid by lazy {
+        when (databaseManager.dbType) {
+            DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> { stmt: PreparedStatement, parameterIndex: Int, uuid: UUID? ->
+                when (uuid) {
+                    null -> stmt.setNull(parameterIndex, Types.OTHER)
+                    else -> stmt.setObject(parameterIndex, uuid)
+                }
+            }
+
+            DB_TYPE_MYSQL -> { stmt: PreparedStatement, parameterIndex: Int, uuid: UUID? ->
+                when (uuid) {
+                    null -> stmt.setNull(parameterIndex, Types.BINARY)
+                    else -> stmt.setBytes(parameterIndex, uuid.toBytes())
+                }
+            }
+
+            else -> error("Unsupported database type '${databaseManager.dbType}'")
+        }
+    }
+
+    protected val getUuid by lazy {
+        when (databaseManager.dbType) {
+            DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> { rs: ResultSet, columnName: String ->
+                rs.getObject(columnName, UUID::class.java)
+            }
+
+            DB_TYPE_MYSQL -> { rs: ResultSet, columnName: String ->
+                val bytes = rs.getBytes(columnName)
+                UUID.nameUUIDFromBytes(bytes)
+            }
+
+            else -> error("Unsupported database type '${databaseManager.dbType}'")
+        }
+    }
+
+    private fun UUID.toBytes(): ByteArray =
+        ByteBuffer.allocate(16).putLong(mostSignificantBits).putLong(leastSignificantBits).array()
+
+
+    override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
+        mapOf(
+            ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                setUuid(stmt, idx, entity.id)
+            },
+            WORKFLOW_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                setUuid(stmt, idx, entity.instance?.workflowId)
+            },
+            WORKFLOW_NAME_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setString(idx, entity.instance?.workflowName)
+            },
+            WORKFLOW_VERSION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setString(idx, entity.instance?.workflowVersion)
+            },
+            WORKFLOW_POSITION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setString(idx, entity.instance?.workflowPosition?.serialized)
+            },
+            WORKFLOW_STATE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setString(idx, entity.instance?.workflowState?.serialized)
+            },
+            PARENT_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                setUuid(stmt, idx, entity.instance?.parentId)
+            },
+            OUTBOX_STATUS_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setString(idx, entity.outBoxStatus.name)
+            },
+            OUTBOX_SCHEDULED_FOR_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setTimestamp(idx, entity.outboxScheduledFor?.let { Timestamp.from(it.toJavaInstant()) })
+            },
+            OUTBOX_DELAYED_UNTIL_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setTimestamp(idx, entity.outboxDelayedUntil?.let { Timestamp.from(it.toJavaInstant()) })
+            },
+            OUTBOX_ATTEMPT_COUNT_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setInt(idx, entity.outboxAttemptCount)
+            },
+            OUTBOX_LAST_ERROR_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setString(idx, entity.outboxLastError)
+            },
+        )
+    }
 
     override val keyColumns: List<String> = listOf(ID_COLUMN)
 
     protected fun ResultSet.getInstanceMessage() = InstanceMessage.fromStrings(
-        workflowId = getString(WORKFLOW_ID_COLUMN),
+        workflowId = getUuid(this, WORKFLOW_ID_COLUMN),
         workflowName = getString(WORKFLOW_NAME_COLUMN),
         workflowVersion = getString(WORKFLOW_VERSION_COLUMN),
         workflowPosition = getString(WORKFLOW_POSITION_COLUMN),
         workflowState = getString(WORKFLOW_STATE_COLUMN),
-        parentId = getString(PARENT_ID_COLUMN),
+        parentId = getUuid(this, PARENT_ID_COLUMN),
     )
 
     /**
@@ -179,9 +226,9 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      *
      * @return The entity with the specified ID, or null if not found.
      */
-    suspend fun findById(id: String, connection: Connection? = null): T? = withConnection(connection) { conn ->
+    suspend fun findById(id: UUID, connection: Connection? = null): T? = withConnection(connection) { conn ->
         conn.prepareStatement(findByIdSql).use { stmt ->
-            stmt.setString(1, id)
+            setUuid(stmt, 1, id)
             stmt.executeQuery().use { rs ->
                 if (rs.next()) createModel(rs) else null
             }
@@ -195,10 +242,10 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
      *
      * @return The entity with the specified WorkflowId, or null if not found.
      */
-    suspend fun findByWorkflowId(workflowId: String, connection: Connection? = null): T? =
+    suspend fun findByWorkflowId(workflowId: UUID, connection: Connection? = null): T? =
         withConnection(connection) { conn ->
             conn.prepareStatement(findByWorkflowIdSql).use { stmt ->
-                stmt.setString(1, workflowId)
+                setUuid(stmt, 1, workflowId)
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) createModel(rs) else null
                 }

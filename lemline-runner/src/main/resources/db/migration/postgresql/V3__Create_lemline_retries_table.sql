@@ -1,13 +1,13 @@
 -- Use the table name from com.lemline.runner.models.RetryModel
 CREATE TABLE IF NOT EXISTS lemline_retries
 (
-    id                   VARCHAR(36) PRIMARY KEY,
-    workflow_id          VARCHAR(36)    NOT NULL,
+    id                   uuid PRIMARY KEY,
+    workflow_id          uuid           NOT NULL,
     workflow_name        VARCHAR(255)   NOT NULL,
     workflow_version     VARCHAR(255)   NOT NULL,
     workflow_position    TEXT           NOT NULL,
     workflow_state       TEXT           NOT NULL,
-    parent_id            VARCHAR(36),
+    parent_id            uuid,
     outbox_status        VARCHAR(50)    NOT NULL,
     outbox_scheduled_for TIMESTAMPTZ(6) NOT NULL,
     outbox_delayed_until TIMESTAMPTZ(6) NOT NULL,

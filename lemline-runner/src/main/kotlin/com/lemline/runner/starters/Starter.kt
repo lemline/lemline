@@ -11,6 +11,7 @@ import com.lemline.runner.repositories.ScheduleRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.ZoneId
+import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
@@ -27,7 +28,7 @@ class Starter {
         workflowName: String,
         optionalVersion: String?,
         workflowInput: JsonElement,
-        parentId: String?,
+        parentId: UUID?,
         zoneId: ZoneId?,
         onDebug: (() -> String) -> Unit,
         onError: (() -> String) -> Nothing,
@@ -54,7 +55,7 @@ class Starter {
         }
 
         // create the message
-        val workflowId = IdGenerator.generateTimeBasedId() // <- TODO create idempotent id
+        val workflowId = IdGenerator.generateUUIDV7() // <- TODO create idempotent id
 
         val instanceMessage = InstanceMessage.forNewWorkflow(
             workflowId = workflowId,

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.runs
 
+import com.lemline.common.ids.IdGenerator
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.instances.RunInstance
 import com.lemline.core.processor.Processor
 import io.serverlessworkflow.api.types.RunWorkflow
-import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
@@ -32,7 +32,7 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
     val subProcessor: Processor = Processor.createNew(
         name = subWorkflowName,
         version = subWorkflowVersion,
-        id = UUID.randomUUID().toString(),
+        id = IdGenerator.generateUUIDV7(),
         rawInput = childWorkflowInput,
         secrets = rootInstance.secrets,
         activityRunnerProvider = processor.activityRunnerProvider,

@@ -5,9 +5,9 @@ import com.lemline.common.error
 import com.lemline.common.logger
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.config.toDuration
+import com.lemline.runner.messaging.ReactiveMessageEmitter
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.OutboxRepository
-import io.quarkus.smallrye.reactivemessaging.sendSuspending
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import java.util.concurrent.Executors
@@ -19,7 +19,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import org.eclipse.microprofile.reactive.messaging.Emitter
 import org.slf4j.Logger
 
 /**
@@ -45,7 +44,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
 
     protected abstract val repository: OutboxRepository<T>
-    protected abstract val emitter: Emitter<String>
+    protected abstract val emitter: ReactiveMessageEmitter
 
     protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig
     protected abstract val cleanupConf: LemlineConfiguration.OutboxCleanupConfig
@@ -65,7 +64,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     private val outboxCleaning = AtomicBoolean(false)
 
     open suspend fun process(entity: T) {
-        entity.instance?.payload?.let { emitter.sendSuspending(it) }
+        entity.instance?.payload?.let { emitter.send(it) }
     }
 
     @PostConstruct

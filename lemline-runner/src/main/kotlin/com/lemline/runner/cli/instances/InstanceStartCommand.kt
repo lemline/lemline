@@ -3,18 +3,15 @@ package com.lemline.runner.cli.instances
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.runner.cli.GlobalMixin
-import com.lemline.runner.messaging.WORKFLOW_OUT
+import com.lemline.runner.messaging.ReactiveMessageEmitter
 import com.lemline.runner.starters.Starter
 import io.quarkus.arc.Unremovable
-import io.quarkus.smallrye.reactivemessaging.sendSuspending
 import jakarta.inject.Inject
 import java.time.ZoneId
 import kotlin.system.exitProcess
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonElement
-import org.eclipse.microprofile.reactive.messaging.Channel
-import org.eclipse.microprofile.reactive.messaging.Emitter
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
@@ -35,8 +32,7 @@ class InstanceStartCommand : Runnable {
     lateinit var stater: Starter
 
     @Inject
-    @Channel(WORKFLOW_OUT)
-    private lateinit var emitter: Emitter<String>
+    private lateinit var emitter: ReactiveMessageEmitter
 
     @Parameters(
         index = "0",
@@ -79,9 +75,9 @@ class InstanceStartCommand : Runnable {
             ::cliError
         )
         instanceMessage?.let {
-            emitter.sendSuspending(it.payload)
+            emitter.send(it.payload)
             cliPrint {
-                "Instance ${it.workflowId} scheduled successfully (name: $workflowName, version: ${it.workflowVersion}, input: $workflowInput)"
+                "Instance ${it.workflowId} started successfully (name: $workflowName, version: ${it.workflowVersion}, input: $workflowInput)"
             }
         }
 

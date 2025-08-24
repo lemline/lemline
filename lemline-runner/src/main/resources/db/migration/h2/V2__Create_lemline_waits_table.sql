@@ -1,13 +1,13 @@
 -- Use the table name from com.lemline.runner.models.WaitModel
 CREATE TABLE IF NOT EXISTS lemline_waits
 (
-    id                   VARCHAR(36) PRIMARY KEY,
-    workflow_id          VARCHAR(36)              NOT NULL,
+    id                   UUID PRIMARY KEY,
+    workflow_id          UUID                     NOT NULL,
     workflow_name        VARCHAR(255)             NOT NULL,
     workflow_version     VARCHAR(255)             NOT NULL,
     workflow_position    CLOB                     NOT NULL,
     workflow_state       CLOB                     NOT NULL,
-    parent_id            VARCHAR(36),
+    parent_id            UUID,
     outbox_status        VARCHAR(50)              NOT NULL,
     outbox_scheduled_for TIMESTAMP WITH TIME ZONE NOT NULL,
     outbox_delayed_until TIMESTAMP WITH TIME ZONE NOT NULL,

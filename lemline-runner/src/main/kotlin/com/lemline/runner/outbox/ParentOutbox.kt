@@ -2,7 +2,7 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.WORKFLOW_OUT
+import com.lemline.runner.messaging.ReactiveMessageEmitter
 import com.lemline.runner.models.ParentModel
 import com.lemline.runner.repositories.ParentRepository
 import io.quarkus.runtime.Startup
@@ -10,8 +10,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
 import kotlin.time.ExperimentalTime
-import org.eclipse.microprofile.reactive.messaging.Channel
-import org.eclipse.microprofile.reactive.messaging.Emitter
 
 /**
  * `RunWorkflowOutbox` specializes `AbstractOutbox` to implement the outbox pattern for child workflow execution events.
@@ -26,8 +24,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
 @ExperimentalTime
 internal class ParentOutbox : AbstractOutbox<ParentModel>() {
 
-    @Channel(WORKFLOW_OUT)
-    override lateinit var emitter: Emitter<String>
+    override lateinit var emitter: ReactiveMessageEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration

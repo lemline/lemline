@@ -34,10 +34,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
-import kotlinx.coroutines.future.await
 import kotlinx.serialization.json.JsonElement
-import org.eclipse.microprofile.reactive.messaging.Channel
-import org.eclipse.microprofile.reactive.messaging.Emitter
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
 
@@ -52,7 +49,7 @@ internal const val WORKFLOW_OUT = "workflows-out"
 @ExperimentalTime
 @ApplicationScoped
 internal class ReactiveMessageHandler(
-    @Channel(WORKFLOW_OUT) private val emitter: Emitter<String>,
+    private val emitter: ReactiveMessageEmitter,
     private val definitionRepository: DefinitionRepository,
     private val retryRepository: RetryRepository,
     private val stepByStepRunner: StepByStepRunner,
@@ -77,7 +74,7 @@ internal class ReactiveMessageHandler(
             with(instanceMessage) {
                 metrics.recordProcessingDuration(workflowName, workflowVersion) {
                     withLoggingContext(
-                        LogContext.WORKFLOW_ID to workflowId,
+                        LogContext.WORKFLOW_ID to workflowId.toString(),
                         LogContext.WORKFLOW_NAME to workflowName,
                         LogContext.WORKFLOW_VERSION to workflowVersion,
                         LogContext.NODE_POSITION to workflowPosition.serialized,
@@ -211,7 +208,7 @@ internal class ReactiveMessageHandler(
      */
     private suspend fun InstanceMessage.emit() = try {
         logger.debug { "Emitting next message: $payload" }
-        emitter.send(payload).await()
+        emitter.send(payload)
     } catch (e: Exception) {
         logger.warn(e) { "Failed to emit next message. Message will be stored in the $RETRY_TABLE table instead to be re-emit later" }
         metrics.processingFailed(MESSAGE_EMISSION_ERROR, workflowName, workflowVersion)

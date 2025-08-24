@@ -14,6 +14,7 @@ import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import io.serverlessworkflow.api.types.Schedule
 import java.time.ZoneId
+import java.util.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
@@ -26,7 +27,7 @@ const val SCHEDULE_TABLE = "lemline_schedules"
 
 @ExperimentalTime
 data class ScheduleModel(
-    override val id: String = IdGenerator.generateTimeBasedId(),
+    override val id: UUID = IdGenerator.generateUUIDV7(),
 
     override var instance: InstanceMessage,
 
@@ -79,7 +80,7 @@ data class ScheduleModel(
         }
         // set a new id for the next workflow instance
         instance = instance.copy(
-            workflowId = IdGenerator.generateTimeBasedId(), // <- TODO Manage idempotency by providing a deterministic workflow id
+            workflowId = IdGenerator.generateUUIDV7(), // <- TODO Manage idempotency by providing a deterministic workflow id
         )
     }
 
@@ -97,7 +98,7 @@ data class ScheduleModel(
         private val cronParser by lazy { CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX)) }
 
         fun create(
-            workflowId: String,
+            workflowId: UUID,
             workflowName: String,
             workflowVersion: String,
             workflowInput: JsonElement,

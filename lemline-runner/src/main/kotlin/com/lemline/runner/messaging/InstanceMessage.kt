@@ -7,7 +7,9 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.WorkflowState
+import java.util.*
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -28,7 +30,7 @@ data class InstanceMessage(
     /**
      * The ID of the workflow.
      */
-    @SerialName("i") val workflowId: String,
+    @SerialName("i") @Contextual val workflowId: UUID,
     /**
      * The name of the workflow.
      */
@@ -48,7 +50,7 @@ data class InstanceMessage(
     /**
      * Indicates the id of the parent model describing the workflow waiting for this workflow completion, if any.
      */
-    @SerialName("w") val parentId: String? = null,
+    @SerialName("w") @Contextual val parentId: UUID? = null,
 ) : WorkflowInstance {
 
     override val initialState by lazy { workflowState.parsed }
@@ -73,12 +75,12 @@ data class InstanceMessage(
 
     companion object {
         fun fromObjects(
-            workflowId: String,
+            workflowId: UUID,
             workflowName: String,
             workflowVersion: String,
             workflowPosition: NodePosition,
             workflowState: WorkflowState,
-            parentId: String?,
+            parentId: UUID?,
         ) = InstanceMessage(
             workflowId = workflowId,
             workflowName = workflowName,
@@ -89,12 +91,12 @@ data class InstanceMessage(
         )
 
         fun fromStrings(
-            workflowId: String,
+            workflowId: UUID,
             workflowName: String,
             workflowVersion: String,
             workflowPosition: String,
             workflowState: String,
-            parentId: String?,
+            parentId: UUID?,
         ) = InstanceMessage(
             workflowId = workflowId,
             workflowName = workflowName,
@@ -105,11 +107,11 @@ data class InstanceMessage(
         )
 
         fun forNewWorkflow(
-            workflowId: String = IdGenerator.generateTimeBasedId(),
+            workflowId: UUID = IdGenerator.generateUUIDV7(),
             workflowName: String,
             workflowVersion: String,
             workflowInput: JsonElement,
-            parentId: String? = null,
+            parentId: UUID? = null,
         ) = fromObjects(
             workflowId = workflowId,
             workflowName = workflowName,

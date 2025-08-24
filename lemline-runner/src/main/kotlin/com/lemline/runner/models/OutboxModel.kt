@@ -6,6 +6,7 @@ import com.lemline.core.workflows.WorkflowState
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxProcessor
+import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
@@ -73,7 +74,7 @@ abstract class OutboxModel() : IdModel() {
     /**
      * The ID of the workflow.
      */
-    val workflowId: String by lazy { instance!!.workflowId }
+    val workflowId: UUID by lazy { instance!!.workflowId }
 
     /**
      * The name of the workflow.
@@ -98,5 +99,5 @@ abstract class OutboxModel() : IdModel() {
     /**
      * Indicates the id of the parent model describing the workflow waiting for this workflow completion, if any.
      */
-    val parentId: String? by lazy { instance!!.parentId }
+    val parentId: UUID? by lazy { instance!!.parentId }
 }

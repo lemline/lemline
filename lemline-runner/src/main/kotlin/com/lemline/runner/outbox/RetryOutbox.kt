@@ -2,7 +2,7 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.WORKFLOW_OUT
+import com.lemline.runner.messaging.ReactiveMessageEmitter
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.repositories.RetryRepository
 import io.quarkus.runtime.Startup
@@ -10,8 +10,6 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
 import kotlin.time.ExperimentalTime
-import org.eclipse.microprofile.reactive.messaging.Channel
-import org.eclipse.microprofile.reactive.messaging.Emitter
 
 /**
  * `RetryOutbox` specializes `AbstractOutbox` to implement the outbox pattern for retrying failed operations.
@@ -28,8 +26,7 @@ import org.eclipse.microprofile.reactive.messaging.Emitter
 @ExperimentalTime
 internal class RetryOutbox : AbstractOutbox<RetryModel>() {
 
-    @Channel(WORKFLOW_OUT)
-    override lateinit var emitter: Emitter<String>
+    override lateinit var emitter: ReactiveMessageEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
