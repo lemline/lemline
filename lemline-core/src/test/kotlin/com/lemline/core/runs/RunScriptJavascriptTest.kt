@@ -2,7 +2,7 @@
 package com.lemline.core.runs
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.getWorkflowInstance
+import com.lemline.core.getWorkflowProcessor
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
 import java.io.File
@@ -62,7 +62,7 @@ class RunScriptJavascriptTest {
                         console.log('Hello, World!');
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -88,7 +88,7 @@ class RunScriptJavascriptTest {
                           uri: "file://${testScriptFile.absolutePath}"
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -116,7 +116,7 @@ class RunScriptJavascriptTest {
                     return: stderr
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -151,7 +151,7 @@ class RunScriptJavascriptTest {
                         "key2": "value2"
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -184,7 +184,7 @@ class RunScriptJavascriptTest {
                         ANOTHER_VAR: "12345"
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -221,7 +221,7 @@ class RunScriptJavascriptTest {
         """.trimIndent()
 
         println(workflowYaml)
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
         instance.run()
@@ -261,7 +261,7 @@ class RunScriptJavascriptTest {
         """.trimIndent()
 
         println(workflowYaml)
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
         instance.run()
@@ -291,7 +291,7 @@ class RunScriptJavascriptTest {
                     return: stderr
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -319,7 +319,7 @@ class RunScriptJavascriptTest {
                     return: code
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -347,7 +347,7 @@ class RunScriptJavascriptTest {
                     return: all
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -377,7 +377,7 @@ class RunScriptJavascriptTest {
                     return: all
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 

@@ -7,7 +7,6 @@ CREATE TABLE lemline_schedules
     workflow_version     VARCHAR(255) NOT NULL,
     workflow_position    TEXT         NOT NULL,
     workflow_state       MEDIUMTEXT   NOT NULL,
-    schedule_id          VARCHAR(36),
     parent_id            VARCHAR(36),
     outbox_status        VARCHAR(50)  NOT NULL,
     outbox_scheduled_for TIMESTAMP(6),
@@ -15,8 +14,8 @@ CREATE TABLE lemline_schedules
     outbox_attempt_count INTEGER      NOT NULL DEFAULT 0,
     outbox_last_error    MEDIUMTEXT,
     schedule_after       VARCHAR(255),
-    schedule_every       VARCHAR(255),
     schedule_cron        VARCHAR(255),
+    schedule_every       VARCHAR(255),
     schedule_zone        VARCHAR(64)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;

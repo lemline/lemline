@@ -7,7 +7,6 @@ CREATE TABLE lemline_schedules
     workflow_version     VARCHAR(255) NOT NULL,
     workflow_position    TEXT         NOT NULL,
     workflow_state       TEXT         NOT NULL,
-    schedule_id          VARCHAR(36),
     parent_id            VARCHAR(36),
     outbox_status        VARCHAR(50)  NOT NULL,
     outbox_scheduled_for TIMESTAMPTZ(6),

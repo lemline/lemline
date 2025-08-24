@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.workflows
+package com.lemline.core.definitions
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.workflows.WorkflowIndex
+import com.lemline.core.workflows.index
 import io.serverlessworkflow.api.WorkflowFormat
-import io.serverlessworkflow.api.WorkflowReader.validation
+import io.serverlessworkflow.api.WorkflowReader
 import io.serverlessworkflow.api.types.Workflow
 import java.util.concurrent.ConcurrentHashMap
 
-object Workflows {
+object Definitions {
 
     private val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
     private val rootNodesCache = ConcurrentHashMap<WorkflowIndex, Node<RootTask>>()
@@ -52,10 +54,11 @@ object Workflows {
      * @throws IllegalStateException if the workflow definition is invalid.
      */
     @JvmStatic
-    fun parseAndPut(definition: String): Workflow = validation().read(definition, WorkflowFormat.YAML).also {
-        workflowCache[it.index] = it
-        rootNodesCache[it.index] = getRootNode(it)
-    }
+    fun parseAndPut(definition: String): Workflow =
+        WorkflowReader.validation().read(definition, WorkflowFormat.YAML).also {
+            workflowCache[it.index] = it
+            rootNodesCache[it.index] = getRootNode(it)
+        }
 
     /**
      * Retrieves a workflow definition by its name and version.
@@ -82,7 +85,7 @@ object Workflows {
     @JvmStatic
     fun getRootNode(workflow: Workflow): Node<RootTask> = rootNodesCache.getOrPut(workflow.index) {
         Node(
-            position = NodePosition.root,
+            position = NodePosition.Companion.root,
             task = RootTask(workflow.document, workflow.`do`, workflow.use).also {
                 it.output = workflow.output
                 it.input = workflow.input

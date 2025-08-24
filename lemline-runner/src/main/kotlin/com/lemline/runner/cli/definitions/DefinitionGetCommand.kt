@@ -2,7 +2,7 @@
 package com.lemline.runner.cli.definitions
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.lemline.core.workflows.Workflows
+import com.lemline.core.definitions.Definitions
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.DefinitionModel
@@ -130,7 +130,7 @@ class DefinitionGetCommand : Runnable {
     private fun displayWorkflowDefinition(definitionModel: DefinitionModel) = when (format) {
         // Re-parse the stored definition to ensure it's valid before serializing
         OutputFormat.JSON -> try {
-            val workflow = Workflows.parse(definitionModel.definition)
+            val workflow = Definitions.parse(definitionModel.definition)
             val workflowJson = objectMapper
                 .writerWithDefaultPrettyPrinter()
                 .writeValueAsString(workflow)

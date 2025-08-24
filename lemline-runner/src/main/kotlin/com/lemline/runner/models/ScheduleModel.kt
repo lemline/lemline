@@ -64,7 +64,7 @@ data class ScheduleModel(
      *
      * This is called by [com.lemline.runner.outbox.ScheduleOutbox], before sending the related message
      */
-    fun updateScheduledExecutionInstant() {
+    fun updateBeforeExecution() {
         // Calculate the next scheduled execution time
         outboxDelayedUntil = when {
             scheduleAfter != null -> null
@@ -88,7 +88,7 @@ data class ScheduleModel(
      *
      * This is called by [com.lemline.runner.StepByStepRunner], after the current workflow instance has completed
      */
-    fun rescheduleAfterCompletion() {
+    fun scheduleAfterCompletion() {
         outboxDelayedUntil = Clock.System.now() + after!!
         outboxScheduledFor = outboxDelayedUntil
     }
@@ -111,9 +111,9 @@ data class ScheduleModel(
             val now = Clock.System.now()
 
             val scheduledFor = when {
-                scheduleAfter != null -> now
+                scheduleAfter != null -> null
                 scheduleCron != null -> cronParser.parse(scheduleCron)!!.getNextCronExecutionInstant(now, zoneId)
-                scheduleEvery != null -> now
+                scheduleEvery != null -> now + Duration.parse(scheduleEvery)
                 else -> error("Invalid schedule model")
             }
 
@@ -126,7 +126,6 @@ data class ScheduleModel(
                     workflowPosition = NodePosition.root,
                     workflowState = WorkflowState.newInstance(workflowInput),
                     parentId = null,
-                    scheduleId = workflowId,
                 ),
                 scheduleEvery = scheduleEvery,
                 scheduleAfter = scheduleAfter,

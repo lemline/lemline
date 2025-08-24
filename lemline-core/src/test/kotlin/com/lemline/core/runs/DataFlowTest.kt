@@ -2,7 +2,7 @@
 package com.lemline.core.runs
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.getWorkflowInstance
+import com.lemline.core.getWorkflowProcessor
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
@@ -23,7 +23,7 @@ class DataFlowTest {
                   set:
                     value: @{ .in }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         instance.run()
 
@@ -44,7 +44,7 @@ class DataFlowTest {
                   set:
                     value: @{ .in }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive("foo"))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive("foo"))
 
         instance.run()
 
@@ -66,7 +66,7 @@ class DataFlowTest {
                   set:
                     value: @{ .in }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive("foo"))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive("foo"))
 
         instance.run()
 
@@ -88,7 +88,7 @@ class DataFlowTest {
             output:
               as: "@{ {out: .value} }"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -111,7 +111,7 @@ class DataFlowTest {
             output:
               as: "{out: .value}"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -135,7 +135,7 @@ class DataFlowTest {
               as:
                 out: .value
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -160,7 +160,7 @@ class DataFlowTest {
             output:
               as: "@{ {out: .value} }"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -183,7 +183,7 @@ class DataFlowTest {
                   set:
                     value: "@{ .in }"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -206,7 +206,7 @@ class DataFlowTest {
                   set:
                     value: "@{ .in }"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -230,7 +230,7 @@ class DataFlowTest {
                   set:
                     value: "@{ .in }"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -253,7 +253,7 @@ class DataFlowTest {
                   output:
                     as: "@{ {out: .value} }"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -276,7 +276,7 @@ class DataFlowTest {
                   output:
                     as: "{out: .value}"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -300,7 +300,7 @@ class DataFlowTest {
                     as:
                       out: .value
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -325,7 +325,7 @@ class DataFlowTest {
                   output:
                     as: "@{ {out: .value} }"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -357,7 +357,7 @@ class DataFlowTest {
                   output:
                     as: "@{ {out2: .value} }"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -393,7 +393,7 @@ class DataFlowTest {
             output:
               as: "@{ {out: .out2} }"
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -429,7 +429,7 @@ class DataFlowTest {
             output:
               as: {out: .out2}
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()
@@ -470,7 +470,7 @@ class DataFlowTest {
               as:
                 out: .out2
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(str))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(str))
 
         // run (one shot)
         instance.run()

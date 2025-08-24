@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.definitions
 
-import com.lemline.core.workflows.Workflows
+import com.lemline.core.definitions.Definitions
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
@@ -137,7 +137,7 @@ class DefinitionPostCommand : Runnable {
         val prefix = "  ->"
         try {
             val content = file.readText()
-            val workflow = Workflows.parse(content)
+            val workflow = Definitions.parse(content)
             val model = DefinitionModel.from(workflow)
             val workflowName = "'${model.name}' (version '${model.version}')"
             when (definitionRepository.insert(model)) {
@@ -162,6 +162,6 @@ class DefinitionPostCommand : Runnable {
 fun main() {
     val file = File("/Users/gilles/dev/lemline/lemline/lemline-runner/src/test/resources/examples/try-catch.yaml")
     val content = file.readText()
-    val workflow = Workflows.parse(content)
+    val workflow = Definitions.parse(content)
     println(workflow)
 }

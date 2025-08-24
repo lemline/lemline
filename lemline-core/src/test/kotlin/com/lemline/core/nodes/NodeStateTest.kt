@@ -47,7 +47,6 @@ class NodeStateTest {
         assertNull(state.rawOutput)
         assertTrue(state.context.isEmpty())
         assertNull(state.startedAt)
-        assertNull(state.parent)
         assertEquals(NodeState.FOR_INDEX_DEFAULT, state.forIndex)
     }
 
@@ -64,7 +63,6 @@ class NodeStateTest {
                 rawInput = LemlineJson.jsonObject.set("input", "test")
                 rawOutput = LemlineJson.jsonObject.set("output", "result")
                 context = LemlineJson.jsonObject.set("contextKey", "contextValue")
-                parent = NodeState.Parent("parent-test-workflow", true)
                 startedAt = testInstant
                 forIndex = 3
             }

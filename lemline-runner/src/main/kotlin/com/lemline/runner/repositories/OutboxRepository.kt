@@ -62,8 +62,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         internal const val WORKFLOW_VERSION_COLUMN = "workflow_version"
         internal const val WORKFLOW_POSITION_COLUMN = "workflow_position"
         internal const val WORKFLOW_STATE_COLUMN = "workflow_state"
-        internal const val SCHEDULE_ID_COLUMN = "schedule_id"
-        internal const val PARENT_ID_COLUMN = "parent_id"
+        internal const val PARENT_ID_COLUMN = "workflow_parent_id"
 
         internal const val OUTBOX_STATUS_COLUMN = "outbox_status"
         internal const val OUTBOX_SCHEDULED_FOR_COLUMN = "outbox_scheduled_for"
@@ -90,9 +89,6 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         },
         WORKFLOW_STATE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
             stmt.setString(idx, entity.instance?.workflowState?.serialized)
-        },
-        SCHEDULE_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-            stmt.setString(idx, entity.instance?.scheduleId)
         },
         PARENT_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
             stmt.setString(idx, entity.instance?.parentId)
@@ -122,7 +118,6 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         workflowVersion = getString(WORKFLOW_VERSION_COLUMN),
         workflowPosition = getString(WORKFLOW_POSITION_COLUMN),
         workflowState = getString(WORKFLOW_STATE_COLUMN),
-        scheduleId = getString(SCHEDULE_ID_COLUMN),
         parentId = getString(PARENT_ID_COLUMN),
     )
 

@@ -2,8 +2,8 @@
 package com.lemline.core
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.workflows.WorkflowInstance
-import com.lemline.core.workflows.Workflows
+import com.lemline.core.definitions.Definitions
+import com.lemline.core.processor.Processor
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
@@ -16,7 +16,7 @@ inline fun <reified T> JsonObject.set(key: String, value: T) =
     JsonObject(toMutableMap().apply { set(key, LemlineJson.encodeToElement(value)) })
 
 internal fun load(resourcePath: String): String {
-    val inputStream = Workflows::class.java.getResourceAsStream(resourcePath)
+    val inputStream = Definitions::class.java.getResourceAsStream(resourcePath)
         ?: throw IllegalArgumentException("Resource not found: $resourcePath")
 
     return inputStream.bufferedReader().use { it.readText() }
@@ -28,13 +28,13 @@ internal fun loadWorkflowFromYaml(resourcePath: String): Workflow {
 }
 
 @ExperimentalTime
-internal fun getWorkflowInstance(
+internal fun getWorkflowProcessor(
     doYaml: String,
     input: JsonElement,
     name: String = "workflow-${doYaml.hashCode()}",
     version: String = "0.1.0",
     id: String = UUID.randomUUID().toString(),
-): WorkflowInstance {
+): Processor {
     val document =
         """document:
               dsl: '1.0.0'
@@ -43,9 +43,9 @@ internal fun getWorkflowInstance(
               version: $version
         """.trimIndent()
     val workflowYaml = document + "\n" + doYaml.trimIndent().replace("@", "$")
-    Workflows.parseAndPut(workflowYaml)
+    Definitions.parseAndPut(workflowYaml)
 
-    return WorkflowInstance.createNew(
+    return Processor.createNew(
         name = name,
         version = version,
         id = id,

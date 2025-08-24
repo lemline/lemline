@@ -2,7 +2,7 @@
 package com.lemline.core.runs
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.getWorkflowInstance
+import com.lemline.core.getWorkflowProcessor
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
 import kotlin.test.assertEquals
@@ -33,7 +33,7 @@ class RunShellTest {
                       arguments:
                         "Hello": @{ .name }
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -59,7 +59,7 @@ class RunShellTest {
                       arguments:
                         "/c": echo Hello World
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -84,7 +84,7 @@ class RunShellTest {
                       command: echo Testing stdout
                     return: stdout
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -110,7 +110,7 @@ class RunShellTest {
                         "-c": echo Error message >&2
                     return: stderr
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -136,7 +136,7 @@ class RunShellTest {
                         "-c": exit 42
                     return: code
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -162,7 +162,7 @@ class RunShellTest {
                         "-c": echo stdout; echo stderr >&2; exit 5
                     return: all
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -193,7 +193,7 @@ class RunShellTest {
                       command: echo Nothing important
                     return: none
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -220,7 +220,7 @@ class RunShellTest {
                         "from": ""
                         "arguments": ""
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -250,7 +250,7 @@ class RunShellTest {
                       environment:
                         TEST_VAR: Hello Environment
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -273,7 +273,7 @@ class RunShellTest {
                     shell:
                       command: @{ "echo " + . }
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonPrimitive("Hello Expression"))
+        val instance = getWorkflowProcessor(workflowYaml, JsonPrimitive("Hello Expression"))
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -305,7 +305,7 @@ class RunShellTest {
                 "suffix" to JsonPrimitive("World")
             )
         )
-        val instance = getWorkflowInstance(workflowYaml, input)
+        val instance = getWorkflowProcessor(workflowYaml, input)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -332,7 +332,7 @@ class RunShellTest {
                       environment:
                         DYNAMIC_VAR: @{ . }
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonPrimitive("Dynamic Value"))
+        val instance = getWorkflowProcessor(workflowYaml, JsonPrimitive("Dynamic Value"))
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -358,7 +358,7 @@ class RunShellTest {
                         "-c": exit 1
                     await: false
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonPrimitive(42))
+        val instance = getWorkflowProcessor(workflowYaml, JsonPrimitive(42))
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -383,7 +383,7 @@ class RunShellTest {
                       arguments:
                         "-c": echo -e "line1\nline2\nline3" | grep line2
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -410,7 +410,7 @@ class RunShellTest {
                     shell:
                       command: echo Second
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow twice (2 messages)
         instance.run()
@@ -442,7 +442,7 @@ class RunShellTest {
                 "data" to JsonPrimitive("important-data")
             )
         )
-        val instance = getWorkflowInstance(workflowYaml, input)
+        val instance = getWorkflowProcessor(workflowYaml, input)
 
         // Run the workflow twice (2 messages)
         instance.run()

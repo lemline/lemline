@@ -3,9 +3,17 @@ package com.lemline.runner.messaging
 
 import com.lemline.common.error
 import com.lemline.common.info
+import com.lemline.common.logger
 import com.lemline.common.warn
+import com.lemline.runner.config.CONSUMER_ENABLED
+import com.lemline.runner.config.MESSAGING_CONSUMER_CONCURRENCY
 import com.lemline.runner.metrics.MessageSubscriberMetrics
+import io.quarkus.runtime.Startup
+import jakarta.annotation.PostConstruct
+import jakarta.annotation.PreDestroy
+import jakarta.enterprise.context.ApplicationScoped
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,38 +24,44 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.future
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import org.eclipse.microprofile.config.inject.ConfigProperty
+import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
-import org.slf4j.Logger
 
-/**
- * A reactive message subscriber that processes messages asynchronously with controlled concurrency.
- *
- * This subscriber is a generic dispatcher. It delegates the entire message lifecycle,
- * including processing and acknowledgement, to the provided `handleMessage` function.
- *
- * @param P The type of the message payload
- * @param T The type of the reactive message that wraps the payload
- * @param publisher The source of messages to subscribe to
- * @param handleMessage Suspending function that handles the full lifecycle of each message.
- * @param maxConcurrency Maximum number of messages that can be processed concurrently
- * @param metrics Metrics collector for monitoring processing statistics
- * @param logger Logger instance for recording events and errors
- */
-
-internal class ReactiveMessageSubscriber<P, T : Message<P>>(
-    private val publisher: Publisher<T>,
-    private val handleMessage: suspend (item: T) -> Unit, // Changed signature
-    private val maxConcurrency: Int,
+@OptIn(ExperimentalTime::class)
+@Startup
+@ApplicationScoped
+internal class ReactiveMessageSubscriber(
+    @ConfigProperty(name = MESSAGING_CONSUMER_CONCURRENCY) private val maxConcurrency: Int,
+    @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
+    @Channel(WORKFLOW_IN) private val publisher: Publisher<Message<String>>,
+    private val handler: ReactiveMessageHandler,
     private val metrics: MessageSubscriberMetrics,
-    private val logger: Logger
-) : Subscriber<T> {
+) : Subscriber<Message<String>> {
+
+    val logger = logger()
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, throwable ->
         logger.error(throwable) { "Unhandled coroutine exception in consumer" }
     })
+
+    @PostConstruct
+    fun init() {
+        if (enabled) {
+            logger.info { "✅ Consumer enabled" }
+            subscribe()
+        } else {
+            logger.info { "❌ Consumer disabled" }
+        }
+    }
+
+    @PreDestroy
+    fun shutdown() {
+        onShutdown()
+    }
 
     private lateinit var subscription: Subscription
 
@@ -73,7 +87,7 @@ internal class ReactiveMessageSubscriber<P, T : Message<P>>(
         subscription.request(maxConcurrency.toLong())
     }
 
-    override fun onNext(item: T) {
+    override fun onNext(item: Message<String>) {
         // Record metric as soon as the message is received from the stream.
         metrics.received()
 
@@ -91,7 +105,7 @@ internal class ReactiveMessageSubscriber<P, T : Message<P>>(
             try {
                 // Delegate the entire message lifecycle to the handler.
                 // The handler is responsible for processing, ack/nack, and its own error handling.
-                handleMessage(item)
+                handler.handleMessage(item)
             } catch (e: Exception) {
                 // This is a safety net. The handler should not throw exceptions.
                 // If it does, it indicates a bug in the handler's own try/catch logic.
@@ -129,8 +143,6 @@ internal class ReactiveMessageSubscriber<P, T : Message<P>>(
         }
     }
 
-    // acknowledge and unacknowledge methods are now removed from this class.
-
     private fun cancelSubscription() {
         if (::subscription.isInitialized) {
             try {
@@ -160,4 +172,5 @@ internal class ReactiveMessageSubscriber<P, T : Message<P>>(
             }
         }.join()
     }
+
 }

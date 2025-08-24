@@ -2,7 +2,7 @@
 package com.lemline.core.runs
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.getWorkflowInstance
+import com.lemline.core.getWorkflowProcessor
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -25,7 +25,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -52,7 +52,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -79,7 +79,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -107,7 +107,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -134,7 +134,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -161,7 +161,7 @@ class IfTest {
                 set:
                   in: @{ .in + 3}
         """
-        val high = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -195,7 +195,7 @@ class IfTest {
                 set:
                   in: @{ .in + 5}
         """
-        val high = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -230,7 +230,7 @@ class IfTest {
                 set:
                   in: @{ .in + 5}
         """
-        val high = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()
@@ -265,7 +265,7 @@ class IfTest {
                 set:
                   in: @{ .in + 5}
         """
-        val high = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
+        val high = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("in" to 0)))
 
         // run (one shot)
         high.run()

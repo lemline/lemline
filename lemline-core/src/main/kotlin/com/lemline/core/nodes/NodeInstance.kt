@@ -23,8 +23,8 @@ import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.instances.RootInstance
 import com.lemline.core.instances.TryInstance
+import com.lemline.core.processor.Processor
 import com.lemline.core.schemas.SchemaValidator
-import com.lemline.core.workflows.WorkflowInstance
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
@@ -113,8 +113,8 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     /**
      * Workflow instance that this node belongs to.
      */
-    open val workflowInstance: WorkflowInstance by lazy {
-        rootInstance.workflowInstance
+    open val processor: Processor by lazy {
+        rootInstance.processor
     }
 
     /**

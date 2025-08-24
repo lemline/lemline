@@ -7,7 +7,6 @@ CREATE TABLE IF NOT EXISTS lemline_waits
     workflow_version     VARCHAR(255)   NOT NULL,
     workflow_position    TEXT           NOT NULL,
     workflow_state       TEXT           NOT NULL,
-    schedule_id          VARCHAR(36),
     parent_id            VARCHAR(36),
     outbox_status        VARCHAR(50)    NOT NULL,
     outbox_scheduled_for TIMESTAMPTZ(6) NOT NULL,
@@ -19,7 +18,6 @@ CREATE TABLE IF NOT EXISTS lemline_waits
 -- Create an index for efficient querying on workflow_id
 CREATE INDEX IF NOT EXISTS idx_lemline_waits_workflow_id
     ON lemline_waits (workflow_id);
-
 
 -- Create an index for efficient querying on status and delayed_until
 CREATE INDEX IF NOT EXISTS idx_lemline_waits_status_delayed_until

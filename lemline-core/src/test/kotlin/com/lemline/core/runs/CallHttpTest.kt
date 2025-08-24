@@ -2,7 +2,7 @@
 package com.lemline.core.runs
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.getWorkflowInstance
+import com.lemline.core.getWorkflowProcessor
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
@@ -27,7 +27,7 @@ class CallHttpTest {
                     method: GET
                     endpoint: https://jsonplaceholder.typicode.com/posts/1
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         instance.onTaskCompleted { task ->
             if (task.node.isActivity()) throw TaskCompletedException()
@@ -60,7 +60,7 @@ class CallHttpTest {
                     query:
                       postId: 1
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         instance.onTaskCompleted { task ->
             if (task.node.isActivity()) throw TaskCompletedException()
@@ -92,7 +92,7 @@ class CallHttpTest {
                       body: "This is a test post"
                       userId: 1
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         instance.onTaskCompleted { task ->
             if (task.node.isActivity()) throw TaskCompletedException()
@@ -128,7 +128,7 @@ class CallHttpTest {
                       body: "Updated body content"
                       userId: 1
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         instance.onTaskCompleted { task ->
             if (task.node.isActivity()) throw TaskCompletedException()
@@ -156,7 +156,7 @@ class CallHttpTest {
                     method: DELETE
                     endpoint: https://jsonplaceholder.typicode.com/posts/1
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         instance.onTaskCompleted { task ->
             if (task.node.isActivity()) throw TaskCompletedException()
@@ -186,7 +186,7 @@ class CallHttpTest {
                     query:
                       userId: 1
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         instance.onTaskCompleted { task ->
             if (task.node.isActivity()) throw TaskCompletedException()
@@ -214,7 +214,7 @@ class CallHttpTest {
                     endpoint: https://jsonplaceholder.typicode.com/posts/1
                     output: raw
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         instance.onTaskCompleted { task ->
             if (task.node.isActivity()) throw TaskCompletedException()
@@ -261,7 +261,7 @@ class CallHttpTest {
                           set:
                             errorCaught: @{ @httpError }
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         instance.run()
 
@@ -307,7 +307,7 @@ class CallHttpTest {
                           set:
                             errorCaught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow
         instance.run()
@@ -352,7 +352,7 @@ class CallHttpTest {
                           set:
                             errorCaught: @{ @httpError }
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow
         instance.run()
@@ -400,7 +400,7 @@ class CallHttpTest {
                           set:
                             errorCaught: @{ @connectionError }
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow
         instance.run()
@@ -440,7 +440,7 @@ class CallHttpTest {
                             username: testuser
                             password: testpass
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         instance.onTaskCompleted { task ->
             if (task.node.isActivity()) throw TaskCompletedException()
@@ -479,7 +479,7 @@ class CallHttpTest {
                           bearer:
                             token: test-token-12345
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         instance.onTaskCompleted { task ->
             if (task.node.isActivity()) throw TaskCompletedException()
@@ -515,7 +515,7 @@ class CallHttpTest {
                       X-API-Key: api-key-12345
                       Authorization: Bearer custom-token-12345
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the task
         instance.run()
@@ -557,7 +557,7 @@ class CallHttpTest {
                         authentication:
                           use: httpBinAuth
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the task
         instance.run()
@@ -603,7 +603,7 @@ class CallHttpTest {
                             errorCaught: true
                             error: @{ @authError }
         """
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
 
         // Run the workflow
         instance.run()

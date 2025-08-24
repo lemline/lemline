@@ -4,16 +4,13 @@ package com.lemline.runner.messaging
 import com.lemline.common.LogContext
 import com.lemline.common.debug
 import com.lemline.common.error
-import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.common.warn
 import com.lemline.common.withLoggingContext
+import com.lemline.core.definitions.Definitions
 import com.lemline.core.errors.WorkflowException
-import com.lemline.core.workflows.WorkflowInstance
-import com.lemline.core.workflows.Workflows
+import com.lemline.core.processor.Processor
 import com.lemline.runner.StepByStepRunner
-import com.lemline.runner.config.CONSUMER_ENABLED
-import com.lemline.runner.config.MESSAGING_CONSUMER_CONCURRENCY
 import com.lemline.runner.metrics.MessageSubscriberMetrics
 import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.DATABASE_ERROR
 import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.DEFINITION_NOT_FOUND
@@ -29,12 +26,8 @@ import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.secrets.Secrets
-import io.quarkus.runtime.Startup
 import io.serverlessworkflow.api.types.Workflow
-import jakarta.annotation.PostConstruct
-import jakarta.annotation.PreDestroy
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.inject.Inject
 import java.io.IOException
 import java.sql.SQLException
 import java.util.concurrent.CompletableFuture
@@ -43,12 +36,10 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.future.await
 import kotlinx.serialization.json.JsonElement
-import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Emitter
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
-import org.reactivestreams.Publisher
 
 internal const val WORKFLOW_IN = "workflows-in"
 internal const val WORKFLOW_OUT = "workflows-out"
@@ -58,38 +49,16 @@ internal const val WORKFLOW_OUT = "workflows-out"
  * processing them, and sending the results to the outgoing channel. It orchestrates
  * the entire lifecycle of a message.
  */
-@OptIn(ExperimentalTime::class)
-@Startup
+@ExperimentalTime
 @ApplicationScoped
-internal class ReactiveMessageHandler @Inject constructor(
-    @ConfigProperty(name = MESSAGING_CONSUMER_CONCURRENCY) private val maxConcurrency: Int,
-    @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
-    @Channel(WORKFLOW_IN) private val publisher: Publisher<Message<String>>,
+internal class ReactiveMessageHandler(
     @Channel(WORKFLOW_OUT) private val emitter: Emitter<String>,
     private val definitionRepository: DefinitionRepository,
     private val retryRepository: RetryRepository,
     private val stepByStepRunner: StepByStepRunner,
-    private val metrics: MessageSubscriberMetrics
+    private val metrics: MessageSubscriberMetrics,
 ) {
     val logger = logger()
-
-    // The subscriber is now initialized with the new handleMessage signature
-    private val subscriber = ReactiveMessageSubscriber(publisher, ::handleMessage, maxConcurrency, metrics, logger)
-
-    @PostConstruct
-    fun init() {
-        if (enabled) {
-            logger.info { "✅ Consumer enabled" }
-            subscriber.subscribe()
-        } else {
-            logger.info { "❌ Consumer disabled" }
-        }
-    }
-
-    @PreDestroy
-    fun shutdown() {
-        subscriber.onShutdown()
-    }
 
     /**
      * Handles the entire lifecycle of an incoming reactive message. This includes deserialization,
@@ -118,7 +87,7 @@ internal class ReactiveMessageHandler @Inject constructor(
                         // --- Get secrets for this workflow ---
                         val secrets = findSecrets(workflow)
                         // --- Get an instance of this workflow ---
-                        val workflowInstance = getWorkflowInstance(secrets)
+                        val workflowInstance = getWorkflowProcessor(secrets)
                         // --- Run this instance ---
                         val nextMessage = run(workflowInstance)
                         // --- Emit next message if any ---
@@ -142,11 +111,9 @@ internal class ReactiveMessageHandler @Inject constructor(
      * Handles its own metrics, logging, and persistence of failed messages.
      */
     private suspend fun Message<String>.deserialize(): InstanceMessage? = try {
-        val body = metrics.recordDeserializationDuration {
+        metrics.recordDeserializationDuration {
             InstanceMessage.fromMessage(this)
-        }
-        metrics.deserializationCompleted(body.workflowName, body.workflowVersion)
-        body
+        }.also { metrics.deserializationCompleted(it.workflowName, it.workflowVersion) }
     } catch (e: Exception) {
         logger.error(e) { "Failed to deserialize message: $payload" }
         metrics.deserializationFailed(getFailureReason(e))
@@ -165,10 +132,10 @@ internal class ReactiveMessageHandler @Inject constructor(
      */
     private suspend fun InstanceMessage.findWorkflowDefinition(): Workflow = try {
         // Try to get from cache first, then from repository if not found
-        Workflows.getOrNull(workflowName, workflowVersion)
+        Definitions.getOrNull(workflowName, workflowVersion)
             ?: definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
                 ?.definition
-                ?.let { Workflows.parseAndPut(it) }
+                ?.let { Definitions.parseAndPut(it) }
     } catch (e: Exception) {
         logger.error(e) { "Error during workflow definition retrieval" }
         metrics.processingFailed(getFailureReason(e), workflowName, workflowVersion)
@@ -205,22 +172,16 @@ internal class ReactiveMessageHandler @Inject constructor(
      * If an error occurs while constructing the instance, the error is logged,
      * metrics are updated to reflect the failure, and the message is saved for manual inspection.
      */
-    private suspend fun InstanceMessage.getWorkflowInstance(secrets: Map<String, JsonElement>): WorkflowInstance = try {
-        WorkflowInstance(
-            id = workflowId,
-            name = workflowName,
-            version = workflowVersion,
-            state = workflowState.parsed,
-            position = workflowPosition.parsed,
-            secrets = secrets,
-        )
+    private suspend fun InstanceMessage.getWorkflowProcessor(
+        secrets: Map<String, JsonElement>
+    ): Processor = try {
+        Processor(instance = this, secrets = secrets)
     } catch (e: Exception) {
-        logger.error(e) { "Failed to convert the message to a workflow instance. Storing it in the $RETRY_TABLE table for manual inspection." }
+        logger.error(e) { "Failed to convert the message to a workflow processor. Storing it in the $RETRY_TABLE table for manual inspection." }
         metrics.processingFailed(getFailureReason(e), workflowName, workflowVersion)
         saveAsFailed(e)
         throw ProcessingException(e)
     }
-
 
     /**
      * Executes a workflow instance constructed from the provided message, state, and secrets.
@@ -229,13 +190,13 @@ internal class ReactiveMessageHandler @Inject constructor(
      * If execution fails, it logs the failure, updates processing metrics, and stores the message
      * in the retry table for manual inspection.
      */
-    private suspend fun InstanceMessage.run(instance: WorkflowInstance): InstanceMessage? {
+    private suspend fun run(processor: Processor): InstanceMessage? {
         return try {
-            with(stepByStepRunner) { run(instance) }
+            with(stepByStepRunner) { run(processor) }
         } catch (e: Exception) {
             logger.error(e) { "Failed to run instance. Storing current state in the $RETRY_TABLE table for manual inspection." }
-            metrics.processingFailed(getFailureReason(e), workflowName, workflowVersion)
-            runFailed(e, instance)
+            metrics.processingFailed(getFailureReason(e), processor.instance.name, processor.instance.version)
+            processor.runFailed(e)
             throw ProcessingException(e)
         }
     }
@@ -249,10 +210,10 @@ internal class ReactiveMessageHandler @Inject constructor(
      * The method ensures that no unhandled exceptions are propagated.
      */
     private suspend fun InstanceMessage.emit() = try {
+        logger.debug { "Emitting next message: $payload" }
         emitter.send(payload).await()
-        logger.debug { "Emitted next message: ${payload}" }
     } catch (e: Exception) {
-        logger.warn(e) { "Failed to emit next message. Message will be stored in the retry table instead to be re-emit later" }
+        logger.warn(e) { "Failed to emit next message. Message will be stored in the $RETRY_TABLE table instead to be re-emit later" }
         metrics.processingFailed(MESSAGE_EMISSION_ERROR, workflowName, workflowVersion)
         saveForRetry(e)
         throw ProcessingException(e)
@@ -296,25 +257,10 @@ internal class ReactiveMessageHandler @Inject constructor(
         nack(e, UNKNOWN, UNKNOWN)
     }
 
-    private suspend fun InstanceMessage.runFailed(cause: Exception?, workflowInstance: WorkflowInstance) {
-        val message = try {
-            // create a new message with the current state (add the original message for (neg)acknowledgment)
-            InstanceMessage.fromObjects(
-                workflowId = workflowId,
-                workflowName = workflowName,
-                workflowVersion = workflowVersion,
-                workflowPosition = workflowInstance.position!!,
-                workflowState = workflowInstance.state,
-                scheduleId = scheduleId,
-                parentId = parentId,
-            ).also { it.message = message }
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to convert the current instance to a message. We save the original message for manual inspection: $payload" }
-            // if toLemlineMessage fails, we save the entire message for manual inspection
-            saveAsFailed(cause)
-            return
-        }
-        message.saveAsFailed(cause)
+    private suspend fun Processor.runFailed(cause: Exception) {
+        (instance as InstanceMessage)
+            .updateWith(state, position)
+            .saveAsFailed(cause)
     }
 
     private suspend fun InstanceMessage.saveAsFailed(cause: Exception?) = try {

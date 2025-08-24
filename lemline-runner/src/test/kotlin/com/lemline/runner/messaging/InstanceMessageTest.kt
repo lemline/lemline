@@ -13,7 +13,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 @ExperimentalTime
-internal class LemlineMessageTest {
+internal class InstanceMessageTest {
 
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {
@@ -24,7 +24,8 @@ internal class LemlineMessageTest {
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
             workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
-            isScheduledAfter = false
+            scheduleId = "test-schedule-id",
+            parentId = "test-parent-id",
         )
 
         // When
@@ -43,7 +44,8 @@ internal class LemlineMessageTest {
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
             workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
-            isScheduledAfter = false
+            scheduleId = "test-schedule-id",
+            parentId = "test-parent-id",
         )
 
         // When
@@ -66,7 +68,8 @@ internal class LemlineMessageTest {
                     )
                 ),
             ),
-            isScheduledAfter = false
+            scheduleId = "test-schedule-id",
+            parentId = "test-parent-id",
         )
 
         // When

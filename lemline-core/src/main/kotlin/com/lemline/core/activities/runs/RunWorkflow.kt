@@ -4,7 +4,7 @@ package com.lemline.core.activities.runs
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.instances.RunInstance
-import com.lemline.core.workflows.WorkflowInstance
+import com.lemline.core.processor.Processor
 import io.serverlessworkflow.api.types.RunWorkflow
 import java.util.*
 import kotlin.time.ExperimentalTime
@@ -29,41 +29,41 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
     logDebug { "Await sub-workflow completion: $awaitCompletion" }
 
     // Create the sub-workflow instance. It will be used in both await and non-await cases.
-    val subWorkflowInstance = WorkflowInstance.createNew(
+    val subProcessor: Processor = Processor.createNew(
         name = subWorkflowName,
         version = subWorkflowVersion,
         id = UUID.randomUUID().toString(),
         rawInput = childWorkflowInput,
         secrets = rootInstance.secrets,
-        activityRunnerProvider = workflowInstance.activityRunnerProvider,
+        activityRunnerProvider = processor.activityRunnerProvider,
     )
 
     if (!awaitCompletion) {
         // For non-awaiting execution, we launch the workflow in a separate coroutine.
-        WorkflowInstance.scope.launch {
+        Processor.scope.launch {
             try {
-                subWorkflowInstance.run()
+                subProcessor.run()
             } catch (e: Exception) {
                 // It's important to log errors from async workflows.
-                logError(e) { "Asynchronous sub-workflow ${subWorkflowInstance.id} failed." }
+                logError(e) { "Asynchronous sub-workflow ${subProcessor.instance.id} failed." }
             }
         }
-        logInfo { "Launched sub-workflow ${subWorkflowInstance.id} asynchronously." }
+        logInfo { "Launched sub-workflow ${subProcessor.instance.id} asynchronously." }
         // As per DSL, output for await: false is the transformed input
         return transformedInput
     }
 
     // For awaiting execution, run the sub-workflow and handle its result or exception.
-    logInfo { "Starting sub-workflow instance ${subWorkflowInstance.id} and awaiting completion." }
+    logInfo { "Starting sub-workflow instance ${subProcessor.instance.id} and awaiting completion." }
 
     try {
         // The run() method now returns the result directly on success.
-        val subWorkflowResult = subWorkflowInstance.run()
-        logInfo { "Sub-workflow ${subWorkflowInstance.id} finished successfully." }
+        val subWorkflowResult = subProcessor.run()
+        logInfo { "Sub-workflow ${subProcessor.instance.id} finished successfully." }
         return subWorkflowResult
     } catch (e: WorkflowException) {
         // If run() throws an exception, the sub-workflow has faulted.
-        logError(e) { "Sub-workflow ${subWorkflowInstance.id} faulted." }
+        logError(e) { "Sub-workflow ${subProcessor.instance.id} faulted." }
         // Propagate the error to the parent workflow.
         raiseError(
             WorkflowErrorType.RUNTIME,

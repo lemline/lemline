@@ -96,11 +96,6 @@ abstract class OutboxModel() : IdModel() {
     val workflowState: WorkflowState by lazy { instance!!.workflowState.parsed }
 
     /**
-     * Indicates the id of the schedule model describing how this workflow should restart after its completion, if any
-     */
-    val scheduleId: String? by lazy { instance!!.scheduleId }
-
-    /**
      * Indicates the id of the parent model describing the workflow waiting for this workflow completion, if any.
      */
     val parentId: String? by lazy { instance!!.parentId }

@@ -2,7 +2,7 @@
 package com.lemline.core.runs
 
 import com.lemline.core.errors.WorkflowException
-import com.lemline.core.getWorkflowInstance
+import com.lemline.core.getWorkflowProcessor
 import com.lemline.core.instances.TryInstance
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
@@ -36,7 +36,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -65,7 +65,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -94,7 +94,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -123,7 +123,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -152,7 +152,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -185,7 +185,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         instance.onTaskRetried {
             throw TaskRetriedException()
@@ -234,7 +234,7 @@ class TryCatchTest {
                       backoff:
                         constant: {}
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         instance.onTaskRetried {
             throw TaskRetriedException()
@@ -281,7 +281,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -308,7 +308,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -336,7 +336,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -364,7 +364,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -391,7 +391,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -418,7 +418,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -455,7 +455,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf("firstName" to JsonPrimitive("Gilles"))))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf("firstName" to JsonPrimitive("Gilles"))))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -492,7 +492,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf("firstName" to JsonPrimitive("Gilles"))))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf("firstName" to JsonPrimitive("Gilles"))))
 
         // Run the workflow
         instance.run()
@@ -529,7 +529,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -566,7 +566,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -595,7 +595,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -624,7 +624,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -651,7 +651,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -678,7 +678,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -707,7 +707,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -736,7 +736,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -765,7 +765,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -794,7 +794,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()
@@ -822,7 +822,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         shouldThrow<WorkflowException> { instance.run() }
@@ -850,7 +850,7 @@ class TryCatchTest {
                           set:
                             caught: true
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
         // Run the workflow
         instance.run()

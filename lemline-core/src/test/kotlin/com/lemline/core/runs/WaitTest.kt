@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.runs
 
-import com.lemline.core.getWorkflowInstance
+import com.lemline.core.getWorkflowProcessor
 import com.lemline.core.instances.WaitInstance
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.shouldBe
@@ -32,7 +32,7 @@ class WaitTest {
                     minutes: 30
                     seconds: 15
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonNull)
+        val instance = getWorkflowProcessor(workflowYaml, JsonNull)
 
         instance.onTaskStarted {
             if (instance.current is WaitInstance) throw WaitStartedException()
@@ -61,7 +61,7 @@ class WaitTest {
               - wait_step:
                   wait: P1DT2H30M15S
         """
-        val instance = getWorkflowInstance(workflowYaml, JsonNull)
+        val instance = getWorkflowProcessor(workflowYaml, JsonNull)
 
         instance.onTaskStarted {
             if (instance.current is WaitInstance) throw WaitStartedException()

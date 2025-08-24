@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.runs
 
-import com.lemline.core.getWorkflowInstance
+import com.lemline.core.getWorkflowProcessor
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
@@ -40,7 +40,7 @@ class SwitchTest {
           output:
             as: @{ .out }
         """
-        val high = getWorkflowInstance(doYaml, JsonPrimitive("high"))
+        val high = getWorkflowProcessor(doYaml, JsonPrimitive("high"))
 
         // run (one shot)
         high.run()
@@ -51,7 +51,7 @@ class SwitchTest {
             high.rootInstance.transformedOutput, // actual
         )
 
-        val low = getWorkflowInstance(doYaml, JsonPrimitive("low"))
+        val low = getWorkflowProcessor(doYaml, JsonPrimitive("low"))
 
         // run (one shot)
         low.run()
@@ -62,7 +62,7 @@ class SwitchTest {
             low.rootInstance.transformedOutput, // actual
         )
 
-        val none = getWorkflowInstance(doYaml, JsonPrimitive("none"))
+        val none = getWorkflowProcessor(doYaml, JsonPrimitive("none"))
 
         // run (one shot)
         none.run()
@@ -103,7 +103,7 @@ class SwitchTest {
                   out: @{ . + "3" }
                 then: exit
         """
-        val high = getWorkflowInstance(doYaml, JsonPrimitive("high"))
+        val high = getWorkflowProcessor(doYaml, JsonPrimitive("high"))
 
         // run (one shot)
         high.run()
@@ -114,7 +114,7 @@ class SwitchTest {
             high.rootInstance.transformedOutput, // actual
         )
 
-        val low = getWorkflowInstance(doYaml, JsonPrimitive("low"))
+        val low = getWorkflowProcessor(doYaml, JsonPrimitive("low"))
 
         // run (one shot)
         low.run()
@@ -125,7 +125,7 @@ class SwitchTest {
             low.rootInstance.transformedOutput, // actual
         )
 
-        val none = getWorkflowInstance(doYaml, JsonPrimitive("none"))
+        val none = getWorkflowProcessor(doYaml, JsonPrimitive("none"))
 
         // run (one shot)
         none.run()
@@ -165,7 +165,7 @@ class SwitchTest {
             as: @{ .out }
         """
 
-        val none = getWorkflowInstance(doYaml, JsonPrimitive("none"))
+        val none = getWorkflowProcessor(doYaml, JsonPrimitive("none"))
 
         // run (one shot)
         none.run()

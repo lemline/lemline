@@ -32,7 +32,7 @@ sealed class ActivityInstance<T : TaskBase>(
     parent: NodeInstance<*>?,
 ) : NodeInstance<T>(node, parent) {
     final override suspend fun run() {
-        rawOutput = workflowInstance.activityRunnerProvider.run(this)
+        rawOutput = processor.activityRunnerProvider.run(this)
     }
 }
 
