@@ -74,30 +74,30 @@ abstract class OutboxModel() : IdModel() {
     /**
      * The ID of the workflow.
      */
-    val workflowId: UUID by lazy { instance!!.workflowId }
+    val workflowId: UUID get() = instance!!.workflowId
 
     /**
      * The name of the workflow.
      */
-    val workflowName: String by lazy { instance!!.workflowName }
+    val workflowName: String get() = instance!!.workflowName
 
     /**
      * The version of the workflow.
      */
-    val workflowVersion: String by lazy { instance!!.workflowVersion }
+    val workflowVersion: String get() = instance!!.workflowVersion
 
     /**
      * The current active initial position
      */
-    val workflowPosition: NodePosition by lazy { instance!!.workflowPosition.parsed }
+    val workflowPosition: NodePosition get() = instance!!.workflowPosition.parsed
 
     /**
      * A map of the internal initial states (per position)
      */
-    val workflowState: WorkflowState by lazy { instance!!.workflowState.parsed }
+    val workflowState: WorkflowState get() = instance!!.workflowState.parsed
 
     /**
      * Indicates the id of the parent model describing the workflow waiting for this workflow completion, if any.
      */
-    val parentId: UUID? by lazy { instance!!.parentId }
+    val parentId: UUID? get() = instance!!.parentId
 }

@@ -68,7 +68,7 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
         internal const val WORKFLOW_VERSION_COLUMN = "workflow_version"
         internal const val WORKFLOW_POSITION_COLUMN = "workflow_position"
         internal const val WORKFLOW_STATE_COLUMN = "workflow_state"
-        internal const val PARENT_ID_COLUMN = "workflow_parent_id"
+        internal const val PARENT_ID_COLUMN = "parent_id"
 
         internal const val OUTBOX_STATUS_COLUMN = "outbox_status"
         internal const val OUTBOX_SCHEDULED_FOR_COLUMN = "outbox_scheduled_for"

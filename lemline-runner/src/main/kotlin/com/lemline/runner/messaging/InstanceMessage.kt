@@ -68,7 +68,7 @@ data class InstanceMessage(
     // InstanceMessage is immutable, so we can cache the JSON string representation
     val payload: String by lazy { LemlineJson.encodeToString(this) }
 
-    fun updateWith(workflowState: WorkflowState, workflowPosition: NodePosition?): InstanceMessage = copy(
+    fun updateWith(workflowState: WorkflowState, workflowPosition: NodePosition): InstanceMessage = copy(
         workflowPosition = LazyParsedField(workflowPosition, NodePosition.serializer()),
         workflowState = LazyParsedField(workflowState, WorkflowState.serializer()),
     ).also { it.message = message }

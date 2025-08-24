@@ -22,6 +22,7 @@ import kotlin.time.ExperimentalTime
 @ExperimentalTime
 internal class WaitOutbox : AbstractOutbox<WaitModel>() {
 
+    @Inject
     override lateinit var emitter: ReactiveMessageEmitter
 
     @Inject

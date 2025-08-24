@@ -552,14 +552,11 @@ class Processor(
     }
 
     /**
-     * Retrieves the transformed output of the workflow if the workflow status is `COMPLETED`.
-     * Returns `null` for all other statuses.
-     *
-     * @return The transformed output of the workflow as a [JsonElement], or `null` if the workflow is not completed.
+     * Retrieves the final output of the workflow.
      */
-    fun getOutput(): JsonElement? = when (status) {
+    fun getOutput(): JsonElement = when (status) {
         WorkflowStatus.COMPLETED -> rootInstance.transformedOutput
-        else -> null
+        else -> error("Workflow is not completed yet")
     }
 
     /**

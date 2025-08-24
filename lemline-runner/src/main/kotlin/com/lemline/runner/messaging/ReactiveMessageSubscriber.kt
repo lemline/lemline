@@ -35,9 +35,9 @@ import org.reactivestreams.Subscription
 @Startup
 @ApplicationScoped
 internal class ReactiveMessageSubscriber(
-    @ConfigProperty(name = MESSAGING_CONSUMER_CONCURRENCY) private val maxConcurrency: Int,
-    @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
-    @Channel(WORKFLOW_IN) private val publisher: Publisher<Message<String>>,
+    @param:ConfigProperty(name = MESSAGING_CONSUMER_CONCURRENCY) private val maxConcurrency: Int,
+    @param:ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
+    @param:Channel(WORKFLOW_IN) private val publisher: Publisher<Message<String>>,
     private val handler: ReactiveMessageHandler,
     private val metrics: MessageSubscriberMetrics,
 ) : Subscriber<Message<String>> {

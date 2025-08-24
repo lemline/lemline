@@ -256,7 +256,7 @@ internal class ReactiveMessageHandler(
 
     private suspend fun Processor.runFailed(cause: Exception) {
         (instance as InstanceMessage)
-            .updateWith(state, position)
+            .updateWith(state, position!!)
             .saveAsFailed(cause)
     }
 

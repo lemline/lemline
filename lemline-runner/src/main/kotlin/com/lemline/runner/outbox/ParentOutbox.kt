@@ -24,6 +24,7 @@ import kotlin.time.ExperimentalTime
 @ExperimentalTime
 internal class ParentOutbox : AbstractOutbox<ParentModel>() {
 
+    @Inject
     override lateinit var emitter: ReactiveMessageEmitter
 
     @Inject

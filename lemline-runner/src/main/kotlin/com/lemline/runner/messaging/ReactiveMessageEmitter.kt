@@ -19,10 +19,13 @@ import org.eclipse.microprofile.reactive.messaging.Message
 
 @Startup
 @ApplicationScoped
-internal class ReactiveMessageEmitter(
-    @Channel(WORKFLOW_OUT) private val emitter: MutinyEmitter<String>,
-    @ConfigProperty(name = MESSAGING_TYPE) private val messagingType: String,
-) {
+internal class ReactiveMessageEmitter {
+    
+    @Channel(WORKFLOW_OUT)
+    private lateinit var emitter: MutinyEmitter<String>
+
+    @ConfigProperty(name = MESSAGING_TYPE)
+    private lateinit var messagingType: String
 
     suspend fun send(payload: String) {
         emit(payload, getMetaData())

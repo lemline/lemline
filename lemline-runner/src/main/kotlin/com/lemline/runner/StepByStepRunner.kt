@@ -73,7 +73,7 @@ internal class StepByStepRunner @Inject constructor(
 
         val nextMessage = try {
             processor.run()
-            processor.instanceMessage.onWorkflowCompleted(
+            processor.onWorkflowCompleted(
                 processor.getOutput(),
                 processor.workflow.schedule?.after != null
             )
@@ -81,24 +81,24 @@ internal class StepByStepRunner @Inject constructor(
         } catch (_: TaskCompletedException) {
             logger.debug { "Task completed at ${processor.position}" }
             // next message
-            processor.instanceMessage
+            processor.updatedInstanceMessage
         } catch (_: TaskRetriedException) {
             logger.debug { "Task retried at ${processor.position}" }
             // Store the message to the retry repository
-            processor.instanceMessage.onRetry(processor.current as TryInstance)
+            processor.updatedInstanceMessage.onRetry(processor.current as TryInstance)
             null
         } catch (e: WaitStartedException) {
             logger.debug { "Task waiting at ${processor.position}" }
             // Store the message to the wait repository
-            processor.instanceMessage.onWait(e.delay)
+            processor.updatedInstanceMessage.onWait(e.delay)
             null
         } catch (e: RunWorkflowStartedException) {
             logger.debug { "run Workflow at ${processor.position}" }
             // Store the message to the run workflow repository
-            processor.instanceMessage.onRunWorkflow(e.runWorkflow, processor.current as RunInstance)
+            processor.updatedInstanceMessage.onRunWorkflow(e.runWorkflow, processor.current as RunInstance)
         }
 
-        return nextMessage?.also { it.message = processor.instanceMessage.message }
+        return nextMessage?.also { it.message = processor.updatedInstanceMessage.message }
     }
 
     /**
@@ -132,35 +132,31 @@ internal class StepByStepRunner @Inject constructor(
     /**
      * Handles the completion of the workflow instance.
      */
-    private suspend fun InstanceMessage.onWorkflowCompleted(output: JsonElement?, isScheduledAfter: Boolean) {
-
-        // Case of child workflow completion
-        parentId?.let { parentId ->
-            // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
-            parentRepository.findById(parentId)?.let { parent ->
-                // Get the current state of the parent workflow
-                val state = parent.workflowState
-                // set the workflow output at the rawOutput at the current position of the parent workflow
-                state[parent.workflowPosition]!!.rawOutput = output
-                // Set delayedUntil to restart parent workflow via the ParentOutbox
-                parent.outboxDelayedUntil = Clock.System.now()
-                // save the updated parent model
-                parentRepository.update(parent)
-                logger.debug { "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId ($workflowName), set up to restart at position ${parent.workflowPosition} with output $output" }
+    private suspend fun Processor.onWorkflowCompleted(output: JsonElement, isScheduledAfter: Boolean) =
+        with(instance as InstanceMessage) {
+            // Case of child workflow completion
+            parentId?.let { parentId ->
+                // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
+                parentRepository.findById(parentId)?.let { parent ->
+                    // updates the parent with the output at the current position
+                    parent.completeWith(output)
+                    parentRepository.update(parent)
+                    logger.debug { "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId ($workflowName), set up to restart at position ${parent.workflowPosition} with output $output" }
+                }
+                    ?: logger.error { "CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted." }
             }
-                ?: logger.error { "CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted." }
-        }
 
-        // Case of workflow completion with scheduled after
-        if (isScheduledAfter) {
-            scheduleRepository.findByWorkflowId(workflowId)?.let { schedule ->
-                schedule.scheduleAfterCompletion()
-                scheduleRepository.update(schedule)
-                logger.debug { "Rescheduled workflow ${schedule.instance.workflowName} for ${schedule.outboxScheduledFor}" }
+            // Case of workflow completion with scheduled after
+            if (isScheduledAfter) {
+                scheduleRepository.findByWorkflowId(workflowId)?.let { schedule ->
+                    // updates the scheduled execution instant from the after property.
+                    schedule.scheduleAfterCompletion()
+                    scheduleRepository.update(schedule)
+                    logger.debug { "Rescheduled workflow ${schedule.instance.workflowName} for ${schedule.outboxScheduledFor}" }
+                }
+                    ?: logger.error { "CRITICAL - Unable to find workflow $workflowId ($workflowName) in $SCHEDULE_TABLE table. The workflow will not be restarted." }
             }
-                ?: logger.error { "CRITICAL - Unable to find workflow $workflowId ($workflowName) in $SCHEDULE_TABLE table. The workflow will not be restarted." }
         }
-    }
 
     /**
      * Handles the retry mechanism for the workflow instance by saving a RetryModel message to the retry repository
@@ -170,7 +166,7 @@ internal class StepByStepRunner @Inject constructor(
      */
     private suspend fun InstanceMessage.onRetry(tryInstance: TryInstance) {
         val delay = tryInstance.delay ?: error("No delay set in in $tryInstance")
-        
+
         val retryModel = RetryModel(
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
@@ -194,6 +190,6 @@ internal class StepByStepRunner @Inject constructor(
         waitRepository.insert(waitModel)
     }
 
-    private val Processor.instanceMessage
-        get() = (instance as InstanceMessage).updateWith(state, position)
+    private val Processor.updatedInstanceMessage
+        get() = (instance as InstanceMessage).updateWith(state, position!!)
 }
