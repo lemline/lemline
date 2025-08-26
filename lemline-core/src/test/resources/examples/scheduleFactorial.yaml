@@ -1,0 +1,18 @@
+document:
+  dsl: '1.0.0'
+  namespace: test
+  name: scheduleFactorial
+  version: '0.1.0'
+schedule:
+  every:
+    minutes: 1
+do:
+  - callFactorial:
+      run:
+        workflow:
+          namespace: test
+          name: factorial
+          version: '0.1.0'
+          input:
+            n: ${ .n }
+
