@@ -18,7 +18,7 @@ CREATE TABLE lemline_schedules
     schedule_cron        VARCHAR(255),
     schedule_zone        VARCHAR(64),
     created_at           TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at           TIMESTAMP WITH TIME ZONE,
+    updated_at           TIMESTAMP WITH TIME ZONE
 );
 
 -- Create an index for efficient querying on workflow_id

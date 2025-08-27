@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS lemline_retries
     outbox_last_error    CLOB,
     message              CLOB,
     created_at           TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at           TIMESTAMP WITH TIME ZONE,
+    updated_at           TIMESTAMP WITH TIME ZONE
 );
 
 -- Create an index for efficient querying on workflow_id

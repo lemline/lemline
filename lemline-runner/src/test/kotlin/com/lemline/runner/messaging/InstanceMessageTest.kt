@@ -5,6 +5,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
 import com.lemline.core.workflows.WorkflowState
+import java.util.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonObject
@@ -19,13 +20,12 @@ internal class InstanceMessageTest {
     fun `serialized keys maintain their values for messages backward compatibility`() {
         // Given
         val instanceMessage = InstanceMessage.fromObjects(
-            workflowId = "test-id",
+            workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
             workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
-            scheduleId = "test-schedule-id",
-            parentId = "test-parent-id",
+            parentId = UUID.randomUUID(),
         )
 
         // When
@@ -39,13 +39,12 @@ internal class InstanceMessageTest {
     fun `should be JSON serializable and deserializable`() {
         // Given
         val instanceMessage = InstanceMessage.fromObjects(
-            workflowId = "test-id",
+            workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
             workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
-            scheduleId = "test-schedule-id",
-            parentId = "test-parent-id",
+            parentId = UUID.randomUUID(),
         )
 
         // When
@@ -56,7 +55,7 @@ internal class InstanceMessageTest {
     fun `should serialize and deserialize MessageBody`() {
         // Given
         val original = InstanceMessage.fromObjects(
-            workflowId = "test-id",
+            workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
@@ -68,8 +67,7 @@ internal class InstanceMessageTest {
                     )
                 ),
             ),
-            scheduleId = "test-schedule-id",
-            parentId = "test-parent-id",
+            parentId = UUID.randomUUID(),
         )
 
         // When
@@ -83,7 +81,7 @@ internal class InstanceMessageTest {
     @Test
     fun `should create new instance with correct initial state`() {
         // Given
-        val id = "test-id"
+        val id = UUID.randomUUID()
         val name = "test-workflow"
         val version = "1.0.0"
         val input = JsonObject(

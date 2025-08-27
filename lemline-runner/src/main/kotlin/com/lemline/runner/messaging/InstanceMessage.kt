@@ -121,7 +121,8 @@ data class InstanceMessage(
             parentId = parentId,
         )
 
-        fun fromMessage(message: Message<String>) = LemlineJson.decodeFromString<InstanceMessage>(message.payload)
-            .also { it.message = message }
+        fun fromJsonString(jsonString: String) = LemlineJson.decodeFromString<InstanceMessage>(jsonString)
+
+        fun fromMessage(message: Message<String>) = fromJsonString(message.payload).also { it.message = message }
     }
 }

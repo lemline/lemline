@@ -11,7 +11,7 @@ import kotlin.time.Instant
 const val WAIT_TABLE = "lemline_waits"
 
 @ExperimentalTime
-class WaitModel(
+data class WaitModel(
     override val id: UUID = IdGenerator.generateUUIDV7(),
 
     override val instance: InstanceMessage,

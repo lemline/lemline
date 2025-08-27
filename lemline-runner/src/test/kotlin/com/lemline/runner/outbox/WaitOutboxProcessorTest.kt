@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.common.ids.IdGenerator
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.repositories.OutboxRepository
@@ -10,6 +10,7 @@ import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
+import java.util.*
 import kotlin.random.Random
 import kotlin.reflect.KClass
 import kotlin.time.ExperimentalTime
@@ -33,10 +34,14 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitModel>() {
 
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = WaitModel(
-        workflowId = IdGenerator.generateTimeBasedId(),
-        workflowName = Random.nextBytes(10).toString(),
-        workflowVersion = Random.nextBytes(10).toString(),
-        workflowPosition = Random.nextBytes(10).toString(),
-        workflowState = "Test Retry Message: $payload",
+        instance = InstanceMessage.fromStrings(
+            workflowId = UUID.randomUUID(),
+            workflowName = Random.nextBytes(10).toString(),
+            workflowVersion = Random.nextBytes(10).toString(),
+            workflowPosition = Random.nextBytes(10).toString(),
+            workflowState = "Test Retry Message: $payload",
+            parentId = null
+        ),
+        outboxScheduledFor = null,
     )
 }

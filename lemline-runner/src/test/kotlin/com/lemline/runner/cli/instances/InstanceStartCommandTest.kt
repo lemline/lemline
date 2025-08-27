@@ -387,7 +387,7 @@ class InstanceStartCommandTest {
         @Test
         fun `should fail when input validation fails`() {
             // Create an error slot to capture error messages
-            val errorSlot = slot<String>()
+            val errorSlot = slot<() -> String>()
 
             // Create a spy of the command that intercepts calls to error()
             val spyCommand = spyk(command) {
@@ -408,8 +408,8 @@ class InstanceStartCommandTest {
             spyCmd.execute(workflowName, workflowVersion, "--input", invalidInput)
 
             // Verify error message was captured
-            errorSlot.captured shouldContain "Input validation failed against workflow schema"
-            errorSlot.captured shouldContain "'lastName'"
+            errorSlot.captured() shouldContain "Input validation failed against workflow schema"
+            errorSlot.captured() shouldContain "'lastName'"
 
             // Verify emitter was NOT called (we failed before sending the message)
             verify(exactly = 0) { emitter.send(any()) }

@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
+import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertNull
@@ -19,11 +21,14 @@ class ScheduleModelTest {
         outboxScheduledFor: Instant? = null,
         scheduleZone: String? = null
     ) = ScheduleModel(
-        workflowId = "wf-1",
-        workflowVersion = "1.0",
-        workflowName = "test-workflow",
-        workflowPosition = "start",
-        workflowState = "{}",
+        instance = InstanceMessage.fromStrings(
+            workflowId = UUID.randomUUID(),
+            workflowVersion = "1.0",
+            workflowName = "test-workflow",
+            workflowPosition = "start",
+            workflowState = "{}",
+            parentId = null
+        ),
         outBoxStatus = OutBoxStatus.PENDING,
         outboxScheduledFor = outboxScheduledFor,
         scheduleCron = scheduleCron,

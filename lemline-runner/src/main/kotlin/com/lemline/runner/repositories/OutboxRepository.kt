@@ -105,11 +105,19 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
 
             DB_TYPE_MYSQL -> { rs: ResultSet, columnName: String ->
                 val bytes = rs.getBytes(columnName)
-                UUID.nameUUIDFromBytes(bytes)
+                bytes?.toUUID()
             }
 
             else -> error("Unsupported database type '${databaseManager.dbType}'")
         }
+    }
+
+    private fun ByteArray.toUUID(): UUID {
+        require(this.size == 16) { "ByteArray must be exactly 16 bytes for UUID conversion, but was ${this.size}" }
+        val bb = ByteBuffer.wrap(this)
+        val mostSignificantBits = bb.long
+        val leastSignificantBits = bb.long
+        return UUID(mostSignificantBits, leastSignificantBits)
     }
 
     private fun UUID.toBytes(): ByteArray =

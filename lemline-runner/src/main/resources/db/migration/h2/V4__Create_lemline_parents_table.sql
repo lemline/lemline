@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS lemline_parents
     outbox_attempt_count INTEGER                  NOT NULL DEFAULT 0,
     outbox_last_error    CLOB,
     created_at           TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at           TIMESTAMP WITH TIME ZONE,
+    updated_at           TIMESTAMP WITH TIME ZONE
 );
 
 -- Create an index for efficient querying on workflow_id

@@ -2,18 +2,20 @@
 package com.lemline.runner.cli.definitions
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.lemline.core.workflows.Workflows
+import com.lemline.core.definitions.Definitions as Workflows
 import com.lemline.runner.cli.GlobalMixin
-import io.serverlessworkflow.api.types.Workflow
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.verify
+import io.serverlessworkflow.api.types.Workflow
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.lang.reflect.Field
@@ -70,8 +72,8 @@ class DefinitionGetCommandTest {
             """.trimIndent()
         )
 
-        every { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
-        every { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
+        coEvery { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
+        coEvery { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
 
         // Save original streams
         originalOut = System.out
@@ -103,7 +105,7 @@ class DefinitionGetCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain workflowDefinition.definition
-            verify { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) }
+            coVerify { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) }
         }
 
         @Test
@@ -111,7 +113,7 @@ class DefinitionGetCommandTest {
             // Given
             val nonExistentName = "nonExistentWorkflow"
             val nonExistentVersion = "9.9.9"
-            every { definitionRepository.findByNameAndVersion(nonExistentName, nonExistentVersion) } returns null
+            coEvery { definitionRepository.findByNameAndVersion(nonExistentName, nonExistentVersion) } returns null
 
             // When
             val exitCode = cmd.execute(nonExistentName, nonExistentVersion)
@@ -119,13 +121,14 @@ class DefinitionGetCommandTest {
             // Then
             exitCode shouldBe 0 // Command doesn't throw, just prints error
             errStream.toString() shouldContain "not found"
-            verify { definitionRepository.findByNameAndVersion(nonExistentName, nonExistentVersion) }
+            coVerify { definitionRepository.findByNameAndVersion(nonExistentName, nonExistentVersion) }
         }
 
         @Test
         fun `should output in JSON format when requested`() {
             // Given
-            val jsonOutput = """{"document":{"dsl":"1.0.0","namespace":"test","name":"testWorkflow","version":"1.0.0"},"do":[{"wait30Seconds":{"wait":"PT30S"}}]}"""
+            val jsonOutput =
+                """{"document":{"dsl":"1.0.0","namespace":"test","name":"testWorkflow","version":"1.0.0"},"do":[{"wait30Seconds":{"wait":"PT30S"}}]}"""
             val workflow = mockk<Workflow>()
 
             // Mock static method
@@ -154,7 +157,7 @@ class DefinitionGetCommandTest {
         fun `should use selector when only name is provided`() {
             // Given
             val selectionList = listOf(1 to workflowDefinition)
-            every { selector.prepareSelection(filterName = workflowName) } returns selectionList
+            coEvery { selector.prepareSelection(filterName = workflowName) } returns selectionList
 
             // When
             val exitCode = cmd.execute(workflowName)
@@ -162,14 +165,14 @@ class DefinitionGetCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain workflowDefinition.definition
-            verify { selector.prepareSelection(filterName = workflowName) }
+            coVerify { selector.prepareSelection(filterName = workflowName) }
         }
 
         @Test
         fun `should use selector when no parameters are provided`() {
             // Given
             val selectionList = listOf(1 to workflowDefinition)
-            every { selector.prepareSelection(filterName = null) } returns selectionList
+            coEvery { selector.prepareSelection(filterName = null) } returns selectionList
 
             // When
             val exitCode = cmd.execute()
@@ -177,13 +180,13 @@ class DefinitionGetCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain workflowDefinition.definition
-            verify { selector.prepareSelection(filterName = null) }
+            coVerify { selector.prepareSelection(filterName = null) }
         }
 
         @Test
         fun `should handle empty selection list`() {
             // Given
-            every { selector.prepareSelection(filterName = null) } returns null
+            coEvery { selector.prepareSelection(filterName = null) } returns null
 
             // When
             val exitCode = cmd.execute()
@@ -191,7 +194,7 @@ class DefinitionGetCommandTest {
             // Then
             exitCode shouldBe 0
             // No output expected as selector already prints the "No workflows found" message
-            verify { selector.prepareSelection(filterName = null) }
+            coVerify { selector.prepareSelection(filterName = null) }
         }
     }
 

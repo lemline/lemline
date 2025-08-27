@@ -15,13 +15,7 @@ object IdGenerator {
      * Generates a time-ordered UUID string.
      * Uses UuidCreator to create a time-ordered UUID which provides both uniqueness
      * and chronological ordering.
-     *
-     * @return A string representation of a time-ordered UUID
      */
-    fun generateTimeBasedId(): String {
-        return UuidCreator.getTimeOrderedEpoch().toString()
-    }
-
     fun generateUUIDV7(): UUID {
         return UuidCreator.getTimeOrderedEpoch()
     }

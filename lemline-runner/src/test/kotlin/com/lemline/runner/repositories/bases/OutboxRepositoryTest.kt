@@ -634,8 +634,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         repository.insert(original) shouldBe 1
 
         val retrieved = repository.findById(original.id)
-        retrieved shouldNotBe null
-        retrieved?.workflowState shouldBe original.workflowState
+        retrieved shouldBe original
     }
 
     @Test

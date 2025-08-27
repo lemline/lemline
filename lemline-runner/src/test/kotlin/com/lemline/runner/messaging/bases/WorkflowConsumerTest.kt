@@ -12,6 +12,7 @@ import com.lemline.runner.repositories.WaitRepository
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.matchers.shouldBe
 import jakarta.inject.Inject
+import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeUnit.SECONDS
@@ -163,7 +164,7 @@ internal abstract class WorkflowConsumerTest {
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.forNewWorkflow(
-            workflowId = "test-id",
+            workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowInput = JsonPrimitive("task"),
@@ -244,7 +245,7 @@ internal abstract class WorkflowConsumerTest {
     fun `should store instance with retry in retry repository`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.forNewWorkflow(
-            workflowId = "test-id",
+            workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowInput = JsonPrimitive("retry"),
@@ -284,7 +285,7 @@ internal abstract class WorkflowConsumerTest {
     fun `should store waiting instance in wait repository`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.forNewWorkflow(
-            "test-id",
+            UUID.randomUUID(),
             "test-workflow",
             "1.0.0",
             JsonPrimitive("wait"),
@@ -331,7 +332,7 @@ internal abstract class WorkflowConsumerTest {
     fun `should handle completed workflow without sending message`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.forNewWorkflow(
-            "test-id",
+            UUID.randomUUID(),
             "test-workflow",
             "1.0.0",
             JsonPrimitive("completed"),
