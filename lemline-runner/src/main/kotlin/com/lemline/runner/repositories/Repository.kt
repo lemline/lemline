@@ -8,6 +8,8 @@ import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
+import java.sql.Timestamp
+import java.sql.Types
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
@@ -15,6 +17,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 abstract class Repository<T> {
+
+    companion object {
+        const val CREATED_AT_COLUMN = "created_at"
+        const val UPDATED_AT_COLUMN = "updated_at"
+    }
 
     /**
      * The database manager instance used to access the database.
@@ -41,20 +48,31 @@ abstract class Repository<T> {
     /**
      * A list of all columns in the table
      */
-    private val allColumns by lazy { prepareStatementMap.keys }
+    private val allColumns by lazy { prepareStatementMap.keys + CREATED_AT_COLUMN + UPDATED_AT_COLUMN }
 
     /**
      * A list of columns that are not part of the primary or unique key.
      */
-    private val nonKeyColumns by lazy { allColumns.filter { !keyColumns.contains(it) } }
+    private val updatableColumns by lazy { allColumns.filter { !keyColumns.contains(it) && it != CREATED_AT_COLUMN } }
 
 
-    private fun bindAll(stmt: PreparedStatement, entity: T) {
-        allColumns.mapIndexed { index, column -> prepareStatementMap[column]!!(stmt, entity, index + 1) }
+    private fun bindInsert(stmt: PreparedStatement, entity: T) {
+        allColumns.mapIndexed { index, column ->
+            when (column) {
+                CREATED_AT_COLUMN -> stmt.setTimestamp(index + 1, Timestamp.from(java.time.Instant.now()))
+                UPDATED_AT_COLUMN -> stmt.setNull(index + 1, Types.TIMESTAMP)
+                else -> prepareStatementMap[column]!!(stmt, entity, index + 1)
+            }
+        }
     }
 
-    private fun bindNonKeys(stmt: PreparedStatement, entity: T) {
-        nonKeyColumns.mapIndexed { index, column -> prepareStatementMap[column]!!(stmt, entity, index + 1) }
+    private fun bindUpdate(stmt: PreparedStatement, entity: T) {
+        updatableColumns.mapIndexed { index, column ->
+            when (column) {
+                UPDATED_AT_COLUMN -> stmt.setTimestamp(index + 1, Timestamp.from(java.time.Instant.now()))
+                else -> prepareStatementMap[column]!!(stmt, entity, index + 1)
+            }
+        }
     }
 
     private fun bindKeys(stmt: PreparedStatement, entity: T, startIndex: Int = 0) {
@@ -101,7 +119,7 @@ abstract class Repository<T> {
      */
     suspend fun insert(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
         conn.prepareStatement(insertSql).use { stmt ->
-            bindAll(stmt, entity)
+            bindInsert(stmt, entity)
             stmt.executeUpdate()
         }
     }
@@ -135,7 +153,7 @@ abstract class Repository<T> {
         if (entities.isEmpty()) return@withConnection 0
         conn.prepareStatement(insertSql).use { stmt ->
             for (entity in entities) {
-                bindAll(stmt, entity)
+                bindInsert(stmt, entity)
                 stmt.addBatch()
             }
             stmt.executeBatch().count { it != 0 }
@@ -149,14 +167,14 @@ abstract class Repository<T> {
      */
     open suspend fun update(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
         conn.prepareStatement(updateSql).use { stmt ->
-            bindNonKeys(stmt, entity)
-            bindKeys(stmt, entity, nonKeyColumns.size)
+            bindUpdate(stmt, entity)
+            bindKeys(stmt, entity, updatableColumns.size)
             stmt.executeUpdate()
         }
     }
 
     private val updateSql by lazy {
-        val setClause = nonKeyColumns.joinToString { "${q(it)} = ?" }
+        val setClause = updatableColumns.joinToString { "${q(it)} = ?" }
         val whereClause = keyColumns.joinToString(separator = " AND ") { "${q(it)} = ?" }
 
         "UPDATE $tableName SET $setClause WHERE $whereClause"
@@ -171,8 +189,8 @@ abstract class Repository<T> {
         if (entities.isEmpty()) return@withConnection 0
         conn.prepareStatement(updateSql).use { stmt ->
             for (entity in entities) {
-                bindNonKeys(stmt, entity)
-                bindKeys(stmt, entity, nonKeyColumns.size)
+                bindUpdate(stmt, entity)
+                bindKeys(stmt, entity, updatableColumns.size)
                 stmt.addBatch()
             }
             stmt.executeBatch().count { it != 0 }

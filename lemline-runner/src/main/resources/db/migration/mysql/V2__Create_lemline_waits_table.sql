@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS lemline_waits
     outbox_scheduled_for TIMESTAMP(6) NOT NULL,
     outbox_delayed_until TIMESTAMP(6) NOT NULL,
     outbox_attempt_count INTEGER      NOT NULL DEFAULT 0,
-    outbox_last_error    MEDIUMTEXT
+    outbox_last_error    MEDIUMTEXT,
+    created_at           TIMESTAMP(6) NOT NULL,
+    updated_at           TIMESTAMP(6)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 

@@ -158,10 +158,3 @@ class DefinitionPostCommand : Runnable {
         }
     }
 }
-
-fun main() {
-    val file = File("/Users/gilles/dev/lemline/lemline/lemline-runner/src/test/resources/examples/try-catch.yaml")
-    val content = file.readText()
-    val workflow = Definitions.parse(content)
-    println(workflow)
-}

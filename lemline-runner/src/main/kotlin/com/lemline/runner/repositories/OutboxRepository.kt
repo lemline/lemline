@@ -143,17 +143,17 @@ abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {
                 stmt.setString(idx, entity.outBoxStatus.name)
             },
             OUTBOX_SCHEDULED_FOR_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setTimestamp(idx, entity.outboxScheduledFor?.let { Timestamp.from(it.toJavaInstant()) })
+                stmt.setTimestamp(idx, entity.outboxScheduledFor?.toJavaInstant()?.let { Timestamp.from(it) })
             },
             OUTBOX_DELAYED_UNTIL_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setTimestamp(idx, entity.outboxDelayedUntil?.let { Timestamp.from(it.toJavaInstant()) })
+                stmt.setTimestamp(idx, entity.outboxDelayedUntil?.toJavaInstant()?.let { Timestamp.from(it) })
             },
             OUTBOX_ATTEMPT_COUNT_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 stmt.setInt(idx, entity.outboxAttemptCount)
             },
             OUTBOX_LAST_ERROR_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 stmt.setString(idx, entity.outboxLastError)
-            },
+            }
         )
     }
 

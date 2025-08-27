@@ -95,9 +95,4 @@ abstract class OutboxModel() : IdModel() {
      * A map of the internal initial states (per position)
      */
     val workflowState: WorkflowState get() = instance!!.workflowState.parsed
-
-    /**
-     * Indicates the id of the parent model describing the workflow waiting for this workflow completion, if any.
-     */
-    val parentId: UUID? get() = instance!!.parentId
 }

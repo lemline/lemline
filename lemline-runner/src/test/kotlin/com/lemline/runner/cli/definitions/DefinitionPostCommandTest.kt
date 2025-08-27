@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.definitions
 
-import com.lemline.core.workflows.Workflows
+import com.lemline.core.definitions.Definitions as Workflows
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.mockkObject
 import io.mockk.mockkStatic
-import io.mockk.verify
 import io.serverlessworkflow.api.types.Workflow
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -115,7 +116,7 @@ class DefinitionPostCommandTest {
         @Test
         fun `should create workflow from file`() {
             // Given
-            every { definitionRepository.insert(workflowModel) } returns 1
+            coEvery { definitionRepository.insert(workflowModel) } returns 1
 
             // When
             val exitCode = cmd.execute("--file", workflowFile.absolutePath)
@@ -123,13 +124,13 @@ class DefinitionPostCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "successfully created"
-            verify { definitionRepository.insert(workflowModel) }
+            coVerify { definitionRepository.insert(workflowModel) }
         }
 
         @Test
         fun `should handle existing workflow without force flag`() {
             // Given
-            every { definitionRepository.insert(workflowModel) } returns 0
+            coEvery { definitionRepository.insert(workflowModel) } returns 0
 
             // When
             val exitCode = cmd.execute("--file", workflowFile.absolutePath)
@@ -137,15 +138,15 @@ class DefinitionPostCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "already exists"
-            verify { definitionRepository.insert(workflowModel) }
-            verify(exactly = 0) { definitionRepository.update(any<DefinitionModel>()) }
+            coVerify { definitionRepository.insert(workflowModel) }
+            coVerify(exactly = 0) { definitionRepository.update(any<DefinitionModel>()) }
         }
 
         @Test
         fun `should update existing workflow with force flag`() {
             // Given
-            every { definitionRepository.insert(workflowModel) } returns 0
-            every { definitionRepository.update(workflowModel) } returns 1
+            coEvery { definitionRepository.insert(workflowModel) } returns 0
+            coEvery { definitionRepository.update(workflowModel) } returns 1
 
             // When
             val exitCode = cmd.execute("--file", workflowFile.absolutePath, "--force")
@@ -153,8 +154,8 @@ class DefinitionPostCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "successfully updated"
-            verify { definitionRepository.insert(workflowModel) }
-            verify { definitionRepository.update(workflowModel) }
+            coVerify { definitionRepository.insert(workflowModel) }
+            coVerify { definitionRepository.update(workflowModel) }
         }
 
         @Test
@@ -199,7 +200,7 @@ class DefinitionPostCommandTest {
             // Mock the entire chain of calls
             every { Workflows.parse(any()) } returns workflow
             every { DefinitionModel.from(any()) } returns workflowModel
-            every { definitionRepository.insert(workflowModel) } returns 1
+            coEvery { definitionRepository.insert(workflowModel) } returns 1
         }
 
         @Test
@@ -211,7 +212,7 @@ class DefinitionPostCommandTest {
             exitCode shouldBe 0
             outStream.toString() shouldContain "Processing files in directory"
             // Should process 2 files in the main directory but not the nested one
-            verify(exactly = 2) { definitionRepository.insert(workflowModel) }
+            coVerify(exactly = 2) { definitionRepository.insert(workflowModel) }
         }
 
         @Test
@@ -223,7 +224,7 @@ class DefinitionPostCommandTest {
             exitCode shouldBe 0
             outStream.toString() shouldContain "recursively"
             // Should process all 3 files (2 in main dir + 1 in nested dir)
-            verify(exactly = 3) { definitionRepository.insert(workflowModel) }
+            coVerify(exactly = 3) { definitionRepository.insert(workflowModel) }
         }
 
         @Test

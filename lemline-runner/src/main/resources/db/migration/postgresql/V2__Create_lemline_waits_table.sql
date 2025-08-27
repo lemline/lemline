@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS lemline_waits
     outbox_scheduled_for TIMESTAMPTZ(6) NOT NULL,
     outbox_delayed_until TIMESTAMPTZ(6) NOT NULL,
     outbox_attempt_count INTEGER        NOT NULL DEFAULT 0,
-    outbox_last_error    TEXT
+    outbox_last_error    TEXT,
+    created_at           TIMESTAMPTZ(6) NOT NULL,
+    updated_at           TIMESTAMPTZ(6)
 );
 
 -- Create an index for efficient querying on workflow_id

@@ -1,5 +1,5 @@
 -- Use the table name from com.lemline.runner.models.RunModel
-CREATE TABLE IF NOT EXISTS lemline_parent_workflows
+CREATE TABLE IF NOT EXISTS lemline_parents
 (
     id                   BINARY(16) PRIMARY KEY,
     workflow_id          BINARY(16)   NOT NULL,
@@ -12,14 +12,16 @@ CREATE TABLE IF NOT EXISTS lemline_parent_workflows
     outbox_scheduled_for TIMESTAMP(6),
     outbox_delayed_until TIMESTAMP(6),
     outbox_attempt_count INTEGER      NOT NULL DEFAULT 0,
-    outbox_last_error    MEDIUMTEXT
+    outbox_last_error    MEDIUMTEXT,
+    created_at           TIMESTAMP(6) NOT NULL,
+    updated_at           TIMESTAMP(6)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
 -- Create an index for efficient querying on workflow_id
-CREATE INDEX idx_lemline_parent_workflows_workflow_id
-    ON lemline_parent_workflows (workflow_id);
+CREATE INDEX idx_lemline_parents_workflow_id
+    ON lemline_parents (workflow_id);
 
 -- Create an index for efficient querying on status and delayed_until
-CREATE INDEX idx_lemline_parent_workflows_status_delayed_until
-    ON lemline_parent_workflows (outbox_status, outbox_delayed_until);
+CREATE INDEX idx_lemline_parents_status_delayed_until
+    ON lemline_parents (outbox_status, outbox_delayed_until);

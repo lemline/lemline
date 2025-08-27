@@ -4,6 +4,8 @@ CREATE TABLE IF NOT EXISTS lemline_definitions
     name       VARCHAR(255) COLLATE "C" NOT NULL,
     version    VARCHAR(255) COLLATE "C" NOT NULL,
     definition TEXT                     NOT NULL,
+    created_at TIMESTAMPTZ(6)           NOT NULL,
+    updated_at TIMESTAMPTZ(6),
     PRIMARY KEY (name, version)
 );
 

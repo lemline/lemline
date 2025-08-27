@@ -12,7 +12,7 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 
-const val PARENT_TABLE = "lemline_parent_workflows"
+const val PARENT_TABLE = "lemline_parents"
 
 @ExperimentalTime
 data class ParentModel(

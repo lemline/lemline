@@ -16,7 +16,9 @@ CREATE TABLE lemline_schedules
     schedule_after       VARCHAR(255),
     schedule_cron        VARCHAR(255),
     schedule_every       VARCHAR(255),
-    schedule_zone        VARCHAR(64)
+    schedule_zone        VARCHAR(64),
+    created_at           TIMESTAMP(6) NOT NULL,
+    updated_at           TIMESTAMP(6)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 
