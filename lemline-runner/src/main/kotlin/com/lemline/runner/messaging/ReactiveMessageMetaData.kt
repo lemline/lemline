@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY

@@ -20,7 +20,7 @@ import org.eclipse.microprofile.reactive.messaging.Message
 @Startup
 @ApplicationScoped
 internal class ReactiveMessageEmitter {
-    
+
     @Channel(WORKFLOW_OUT)
     private lateinit var emitter: MutinyEmitter<String>
 
