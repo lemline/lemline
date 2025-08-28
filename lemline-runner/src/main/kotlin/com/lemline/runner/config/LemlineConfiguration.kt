@@ -486,6 +486,11 @@ interface LemlineConfiguration {
         @WithDefault("5")
         @Min(1)
         fun maxAttempts(): Int
+
+        val every get() = every().toDuration()
+        val batchSize get() = batchSize()
+        val initialDelay get() = initialDelay().toDuration()
+        val maxAttempts get() = maxAttempts()
     }
 
     /**
@@ -514,6 +519,10 @@ interface LemlineConfiguration {
         @WithDefault("1000")
         @Min(1)
         fun batchSize(): Int
+
+        val every get() = every().toDuration()
+        val after get() = after().toDuration()
+        val batchSize get() = batchSize()
     }
 
     /**

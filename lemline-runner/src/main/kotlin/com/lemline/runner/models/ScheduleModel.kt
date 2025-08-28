@@ -65,7 +65,9 @@ data class ScheduleModel(
      *
      * This is called by [com.lemline.runner.outbox.ScheduleOutbox], before sending the related message
      */
-    fun updateBeforeExecution() {
+    internal fun updateBeforeProcessing() {
+        // Reset the attempt counter
+        outboxAttemptCount = 0
         // Calculate the next scheduled execution time
         outboxDelayedUntil = when {
             scheduleAfter != null -> null

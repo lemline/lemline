@@ -4,7 +4,6 @@ package com.lemline.runner.outbox
 import com.lemline.common.error
 import com.lemline.common.logger
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.config.toDuration
 import com.lemline.runner.messaging.ReactiveMessageEmitter
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.OutboxRepository
@@ -75,7 +74,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         }
 
         // Schedule outbox processing
-        val outboxPeriodSeconds = outboxConf.every().toDuration().inWholeSeconds
+        val outboxPeriodSeconds = outboxConf.every.inWholeSeconds
         outboxProcessingExecutor.scheduleAtFixedRate(
             { scope.launch { outbox() } },
             0,
@@ -85,7 +84,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         logger.info("⏱️ Outbox processing scheduled every ${outboxPeriodSeconds}s")
 
         // Schedule cleanup
-        val cleanupPeriodSeconds = cleanupConf.every().toDuration().inWholeSeconds
+        val cleanupPeriodSeconds = cleanupConf.every.inWholeSeconds
         outboxCleaningExecutor.scheduleAtFixedRate(
             { scope.launch { cleanup() } },
             0,
@@ -119,9 +118,9 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
         try {
             outboxProcessor.process(
-                outboxConf.batchSize(),
-                outboxConf.maxAttempts(),
-                outboxConf.initialDelay().toDuration(),
+                batchSize = outboxConf.batchSize,
+                maxAttempts = outboxConf.maxAttempts,
+                initialDelay = outboxConf.initialDelay,
             )
         } catch (e: Exception) {
             logger.error(e) { "💥 Error during outbox processing" }
@@ -142,8 +141,8 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
         try {
             outboxProcessor.cleanup(
-                cleanupConf.after().toDuration(),
-                cleanupConf.batchSize(),
+                afterDelay = cleanupConf.after,
+                batchSize = cleanupConf.batchSize,
             )
         } catch (e: Exception) {
             logger.error(e) { "💥 Error during outbox cleaning" }

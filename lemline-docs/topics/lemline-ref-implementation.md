@@ -11,11 +11,14 @@ Lemline implements a 3-layer approach for handling error:
 Note: If a failure is handled by the workflow definition (try/catch), Lemline does not see it as an error but a "normal"
 processing of the workflow.
 
-To avoid a coupling between the broker and the database, every uspset to the database is done through an `db_ingestion`
-topic.
-This way, the broker is not blocked by the database unavailability.
+To avoid a coupling between the broker and the database, every upsert to the database is done through an `db_ingestion`
+topic. Also, this way insert in the database can done by batch.
+If the database is not available when handling a message that needs it, the message will be saved in the `db_ingestion`
+topic and retried later.
 
-## Instance Message Processing
+In that way, the broker is never blocked by the database unavailability.
+
+## Instance Message Subscription
 
 Generally speaking, Lemline will read a message and:
 
@@ -72,7 +75,7 @@ time.
 
 TBD
 
-## Ingestion Message Processing
+## Ingestion Message Subscription
 
 Another process inside Lemline reads those messages from the `db_ingestion` topic and save them to different tables
 depending on their nature:

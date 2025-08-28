@@ -4,7 +4,7 @@ document:
   name: scheduleFactorial
   version: '0.1.0'
 schedule:
-  every:
+  after:
     minutes: 1
 do:
   - callFactorial:
