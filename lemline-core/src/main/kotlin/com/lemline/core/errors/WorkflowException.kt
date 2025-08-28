@@ -3,25 +3,30 @@ package com.lemline.core.errors
 
 import com.lemline.core.instances.TryInstance
 import com.lemline.core.nodes.NodeInstance
+import com.lemline.core.processor.Processor
 import kotlin.time.ExperimentalTime
 
 /**
  * Internal Exception thrown during the execution of a workflow.
  *
  * This exception is used to propagate errors that occur during the execution of a workflow.
- * It's caught inside the WorkflowInstance::run method and is used to determine the next step in the workflow.
+ * it's sent by the [NodeInstance]::raiseError method,
+ * and caught inside the [Processor]::run method.
  *
  * @property raising The node instance that raised the exception.
- * @property catching The try instance that is catching the exception, if any.
  * @property error The workflow error associated with this exception.
  */
 @ExperimentalTime
-class WorkflowException(
+open class WorkflowException(
     val raising: NodeInstance<*>,
-    val catching: TryInstance?,
     val error: WorkflowError
 ) : RuntimeException() {
 
+    /**
+     * Returns the try instance catching the exception, if any.
+     */
+    fun getTry(): TryInstance? = raising.getTry(error)
+
     override fun toString() =
-        "WorkflowException(raising=${raising.node.name}:${raising.node.position}, catching=${catching?.node?.name}:${catching?.node?.position}, error=$error)"
+        "WorkflowException(raising=${raising.node.name}:${raising.node.position}, error=$error)"
 }

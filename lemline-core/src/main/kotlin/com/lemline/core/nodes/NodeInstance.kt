@@ -463,37 +463,28 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     /**
      * Create an error and raise it
      */
-    internal fun raiseError(
+    internal open fun raiseError(
         type: WorkflowErrorType,
         title: String?,
         details: String? = null,
         status: Int? = null,
-    ): Nothing {
-        val error = WorkflowError(
+    ): Nothing = raise(
+        error = WorkflowError(
             errorType = type,
             title = title ?: "Unknown Error",
             details = details,
             status = status ?: type.defaultStatus,
             position = node.position,
         )
-
-        raise(error)
-    }
+    )
 
     /**
-     * Raise an error and propagate it to the parent
+     * send an exception that will be caught by the WorkflowInstance::run
      */
-    protected fun raise(error: WorkflowError): Nothing {
-        // get catching try
-        val catching: TryInstance? = getTry(error)
-
-        // send an exception that will be caught by the WorkflowInstance::run
-        throw WorkflowException(
-            raising = this,
-            catching = catching,
-            error = error,
-        )
-    }
+    protected fun raise(error: WorkflowError): Nothing = throw WorkflowException(
+        raising = this,
+        error = error,
+    )
 
     internal fun resetUpTo(node: NodeInstance<*>) {
         reset()
@@ -508,7 +499,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     /**
      * Get the try parent (if any)
      */
-    private fun getTry(error: WorkflowError): TryInstance? = when (this) {
+    fun getTry(error: WorkflowError): TryInstance? = when (this) {
         is TryInstance -> if (isCatching(error)) this else parent.getTry(error)
         else -> parent?.getTry(error)
     }

@@ -9,4 +9,4 @@ import com.lemline.core.errors.WorkflowErrorType
  *  details: String?
  *  status: Int?
  */
-internal typealias OnError = (WorkflowErrorType, String?, String?, Int?) -> Nothing
+internal typealias RaiseError = (WorkflowErrorType, String?, String?, Int?) -> Nothing

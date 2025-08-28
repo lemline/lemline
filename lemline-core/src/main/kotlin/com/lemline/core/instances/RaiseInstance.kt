@@ -19,17 +19,15 @@ class RaiseInstance(override val node: Node<RaiseTask>, override val parent: Nod
 
     private val error by lazy { node.task.raise.error.getError() }
 
-    override suspend fun run() {
-        val error = WorkflowError(
+    override suspend fun run() = raise(
+        WorkflowError(
             type = error.getErrorType(),
             status = error.status,
             instance = node.position.positionPointer.toString(),
             title = error.title,
             details = error.detail,
         )
-
-        raise(error)
-    }
+    )
 
     private fun Error.getErrorType() = when (val errorType = type.get()) {
         is UriTemplate -> errorType.getErrorType() // TODO interpret URI

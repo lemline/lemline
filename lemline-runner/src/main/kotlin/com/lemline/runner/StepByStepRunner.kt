@@ -79,21 +79,21 @@ internal class StepByStepRunner @Inject constructor(
             )
             null
         } catch (_: TaskCompletedException) {
-            logger.debug { "Task completed at ${processor.position}" }
+            logger.debug { "Task completed (${processor.position})" }
             // next message
             processor.updatedInstanceMessage
         } catch (_: TaskRetriedException) {
-            logger.debug { "Task retried at ${processor.position}" }
+            logger.debug { "Scheduling retry of task (${processor.position})" }
             // Store the message to the retry repository
             processor.updatedInstanceMessage.onRetry(processor.current as TryInstance)
             null
         } catch (e: WaitStartedException) {
-            logger.debug { "Task waiting at ${processor.position}" }
+            logger.debug { "Starting wait task (${processor.position})" }
             // Store the message to the wait repository
             processor.updatedInstanceMessage.onWait(e.delay)
             null
         } catch (e: RunWorkflowStartedException) {
-            logger.debug { "run Workflow at ${processor.position}" }
+            logger.debug { "Starting child workflow (${processor.position})" }
             // Store the message to the run workflow repository
             processor.updatedInstanceMessage.onRunWorkflow(e.runWorkflow, processor.current as RunInstance)
         }

@@ -256,7 +256,8 @@ class Processor(
             } catch (e: WorkflowException) {
                 onTaskFaulted(current!!)
 
-                val tryInstance = e.catching
+                // get the try instance catching this, if any
+                val tryInstance: TryInstance? = e.getTry()
 
                 // the error was not caught
                 if (tryInstance == null) {

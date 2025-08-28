@@ -3,6 +3,8 @@
 
 package com.lemline.core.instances
 
+import com.lemline.core.errors.WorkflowError
+import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.utils.toDuration
@@ -34,6 +36,21 @@ sealed class ActivityInstance<T : TaskBase>(
     final override suspend fun run() {
         rawOutput = processor.activityRunnerProvider.run(this)
     }
+
+    override fun raiseError(
+        type: WorkflowErrorType,
+        title: String?,
+        details: String?,
+        status: Int?,
+    ): Nothing = raise(
+        error = WorkflowError(
+            errorType = type,
+            title = title ?: "Unknown Error",
+            details = details,
+            status = status ?: type.defaultStatus,
+            position = node.position,
+        )
+    )
 }
 
 // --- Concrete Activity Instance Definitions ---

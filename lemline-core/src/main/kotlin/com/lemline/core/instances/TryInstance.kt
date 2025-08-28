@@ -86,11 +86,8 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
             state.attemptIndex = value
         }
 
-    override fun shouldStart(): Boolean {
-        // if has already started and is retrying
-        if (attemptIndex > 0) return true
-        return super.shouldStart()
-    }
+    // if it has already started and is retrying
+    override fun shouldStart() = if (attemptIndex > 0) true else super.shouldStart()
 
     /**
      * Determines if this tryInstance is catching the specified error.
@@ -161,7 +158,7 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
         // if no retry policy
         retryPolicy ?: return null
 
-        // if attempt limit is reached, we do not retry
+        // if the attempt limit is reached, we do not retry
         retryLimit?.let {
             if (attemptIndex > it) return null
         }

@@ -2,7 +2,7 @@
 package com.lemline.core.activities.calls
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.OnError
+import com.lemline.core.RaiseError
 import com.lemline.core.errors.WorkflowErrorType
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
@@ -43,7 +43,7 @@ class HttpCallTest {
     private fun createHttpCallWithMockEngine(
         getSecretByName: (String) -> String = { it },
         getAuthenticationPolicyByName: (String) -> AuthenticationPolicy = { error("Not implemented") },
-        onErrorImpl: OnError = { type, message, details, code ->
+        raiseErrorImpl: RaiseError = { type, message, details, code ->
             throw RuntimeException("onError called: $type, $message, $details, $code")
         },
         handler: MockRequestHandler,
@@ -53,7 +53,7 @@ class HttpCallTest {
             install(ContentNegotiation) { json(LemlineJson.json) }
         }
 
-        return HttpCall(getSecretByName, getAuthenticationPolicyByName, onErrorImpl, mockClient)
+        return HttpCall(getSecretByName, getAuthenticationPolicyByName, raiseErrorImpl, mockClient)
     }
 
     @Test
@@ -541,7 +541,7 @@ class HttpCallTest {
     fun `test HTTP error handling`() = runTest {
         val onErrorCalled = AtomicReference<Array<Any?>>()
         val httpCall = createHttpCallWithMockEngine(
-            onErrorImpl = { type, message, details, code ->
+            raiseErrorImpl = { type, message, details, code ->
                 onErrorCalled.set(arrayOf(type, message, details, code))
                 throw RuntimeException(message)
             },
@@ -573,7 +573,7 @@ class HttpCallTest {
     fun `test redirect handling without redirect flag`() = runTest {
         val onErrorCalled = AtomicReference<Array<Any?>>()
         val httpCall = createHttpCallWithMockEngine(
-            onErrorImpl = { type, message, details, code ->
+            raiseErrorImpl = { type, message, details, code ->
                 onErrorCalled.set(arrayOf(type, message, details, code))
                 throw RuntimeException(message)
             },
@@ -606,7 +606,7 @@ class HttpCallTest {
     fun `test redirect handling with redirect flag`() = runTest {
         val onErrorCalled = AtomicReference<Array<Any?>>()
         val httpCall = createHttpCallWithMockEngine(
-            onErrorImpl = { type, message, details, code ->
+            raiseErrorImpl = { type, message, details, code ->
                 onErrorCalled.set(arrayOf(type, message, details, code))
                 throw RuntimeException("onError should not be called")
             },

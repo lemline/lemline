@@ -5,7 +5,7 @@ import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonElement
-import com.lemline.core.OnError
+import com.lemline.core.RaiseError
 import com.lemline.core.errors.WorkflowErrorType.AUTHENTICATION
 import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
@@ -100,7 +100,7 @@ private val defaultClient by lazy {
 class HttpCall(
     private val getSecretByName: (String) -> String,
     private val getAuthenticationPolicyByName: (String) -> AuthenticationPolicy,
-    private val onError: OnError,
+    private val raiseError: RaiseError,
     private val client: HttpClient = defaultClient,
 ) {
     /**
@@ -146,7 +146,7 @@ class HttpCall(
             }
         } catch (e: Exception) {
             // Handle other exceptions (connection errors, etc.)
-            onError(COMMUNICATION, "HTTP call failed: ${e.message}", e.stackTraceToString(), null)
+            raiseError(COMMUNICATION, "HTTP call failed: ${e.message}", e.stackTraceToString(), null)
         }
 
         // Check for HTTP errors based on the redirect parameter
@@ -159,7 +159,7 @@ class HttpCall(
                 in 500..599 -> "Server error: $statusCode"
                 else -> "Unexpected HTTP error: $statusCode"
             }
-            onError(COMMUNICATION, message, responseBody, statusCode)
+            raiseError(COMMUNICATION, message, responseBody, statusCode)
         }
 
         // Return response as requested
@@ -218,7 +218,7 @@ class HttpCall(
                 else -> getRawContentAsJsonElement(response)
             }
         } catch (e: Exception) {
-            onError(COMMUNICATION, "Failed to parse response content as $contentType: ${e.message}", text, null)
+            raiseError(COMMUNICATION, "Failed to parse response content as $contentType: ${e.message}", text, null)
         }
     }
 
@@ -250,34 +250,34 @@ class HttpCall(
         is BasicAuthenticationPolicy -> when (val auth = authentication.basic.get()) {
             is BasicAuthenticationProperties -> applyBasicAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
-            else -> onError(RUNTIME, "Unsupported basic authentication type: ${auth::class.simpleName}", null, null)
+            else -> raiseError(RUNTIME, "Unsupported basic authentication type: ${auth::class.simpleName}", null, null)
         }
 
         is BearerAuthenticationPolicy -> when (val auth = authentication.bearer.get()) {
             is BearerAuthenticationProperties -> applyBearerAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
-            else -> onError(RUNTIME, "Unsupported bearer authentication type: ${auth::class.simpleName}", null, null)
+            else -> raiseError(RUNTIME, "Unsupported bearer authentication type: ${auth::class.simpleName}", null, null)
         }
 
         is OAuth2AuthenticationPolicy -> when (val auth = authentication.oauth2.get()) {
             is OAuth2AuthenticationPolicyConfiguration -> applyOauth2Auth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
-            else -> onError(RUNTIME, "Unsupported oauth2 authentication type: ${auth::class.simpleName}", null, null)
+            else -> raiseError(RUNTIME, "Unsupported oauth2 authentication type: ${auth::class.simpleName}", null, null)
         }
 
         is DigestAuthenticationPolicy -> when (val auth = authentication.digest.get()) {
             is DigestAuthenticationProperties -> applyDigestAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
-            else -> onError(RUNTIME, "Unsupported digest authentication type: ${auth::class.simpleName}", null, null)
+            else -> raiseError(RUNTIME, "Unsupported digest authentication type: ${auth::class.simpleName}", null, null)
         }
 
         is OpenIdConnectAuthenticationPolicy -> when (val auth = authentication.oidc.get()) {
             is OAuth2AutenthicationData -> applyOpenIdAuth(auth)
             is SecretBasedAuthenticationPolicy -> applySecretBasedAuth(auth, fromUse)
-            else -> onError(RUNTIME, "Unsupported openId authentication type: ${auth::class.simpleName}", null, null)
+            else -> raiseError(RUNTIME, "Unsupported openId authentication type: ${auth::class.simpleName}", null, null)
         }
 
-        else -> onError(RUNTIME, "Unsupported authentication type: ${authentication::class.simpleName}", null, null)
+        else -> raiseError(RUNTIME, "Unsupported authentication type: ${authentication::class.simpleName}", null, null)
     }
 
     /**
@@ -289,7 +289,7 @@ class HttpCall(
     ) {
         val name = secretBasedAuthenticationPolicy.use
         // Check if the authentication is circular
-        if (fromUse) onError(CONFIGURATION, "Circular definition of the named authentification: $name", null, null)
+        if (fromUse) raiseError(CONFIGURATION, "Circular definition of the named authentification: $name", null, null)
         // Check if the authentication is defined in the workflow's use section
         applyAuthentication(getAuthenticationPolicyByName(name), true)
     }
@@ -299,9 +299,9 @@ class HttpCall(
      */
     private fun HttpClientConfig<*>.applyDigestAuth(digestAuthenticationProperties: DigestAuthenticationProperties) {
         val username = digestAuthenticationProperties.username
-            ?: onError(CONFIGURATION, "Username is missing for Digest authentication", null, null)
+            ?: raiseError(CONFIGURATION, "Username is missing for Digest authentication", null, null)
         val password = digestAuthenticationProperties.password?.let { getSecretByName(it) }
-            ?: onError(CONFIGURATION, "Password is missing for Digest authentication", null, null)
+            ?: raiseError(CONFIGURATION, "Password is missing for Digest authentication", null, null)
 
         install(Auth) {
             digest {
@@ -320,9 +320,9 @@ class HttpCall(
      */
     private fun HttpClientConfig<*>.applyBasicAuth(basicAuthenticationProperties: BasicAuthenticationProperties) {
         val username = basicAuthenticationProperties.username
-            ?: onError(CONFIGURATION, "Username is missing for Basic authentication", null, null)
+            ?: raiseError(CONFIGURATION, "Username is missing for Basic authentication", null, null)
         val password = basicAuthenticationProperties.password?.let { getSecretByName(it) }
-            ?: onError(CONFIGURATION, "Password is missing for Basic authentication", null, null)
+            ?: raiseError(CONFIGURATION, "Password is missing for Basic authentication", null, null)
 
         install(Auth) {
             basic {
@@ -338,7 +338,7 @@ class HttpCall(
      */
     private fun HttpClientConfig<*>.applyBearerAuth(bearerAuthenticationProperties: BearerAuthenticationProperties) {
         val token = bearerAuthenticationProperties.token?.let { getSecretByName(it) }
-            ?: onError(CONFIGURATION, "Token is missing for Bearer authentication", null, null)
+            ?: raiseError(CONFIGURATION, "Token is missing for Bearer authentication", null, null)
 
         install(Auth) {
             bearer {
@@ -411,8 +411,8 @@ class HttpCall(
         authData: OAuth2AutenthicationData,
         endpoints: OAuth2AuthenticationPropertiesEndpoints,
     ): OAuthTokenResponse {
-        val authority = authData.authority?.toUrl(onError)
-            ?: onError(CONFIGURATION, "Authority is missing for OAuth2 authentification", null, null)
+        val authority = authData.authority?.toUrl(raiseError)
+            ?: raiseError(CONFIGURATION, "Authority is missing for OAuth2 authentification", null, null)
         val tokenUrl = URLBuilder(authority).apply { encodedPath += endpoints.token }.buildString()
 
         val params = Parameters.build {
@@ -422,18 +422,18 @@ class HttpCall(
             val authMethodError by lazy { "is required for ${authMethod.value()} of OAuth2 authentication" }
 
             val clientId = authData.client?.id
-                ?: onError(CONFIGURATION, "client.id $authMethodError", null, null)
+                ?: raiseError(CONFIGURATION, "client.id $authMethodError", null, null)
             val clientSecret = authData.client?.secret?.let { getSecretByName(it) }
 
             when (authMethod) {
                 CLIENT_SECRET_POST -> {
-                    clientSecret ?: onError(CONFIGURATION, "client.secret $authMethodError", null, null)
+                    clientSecret ?: raiseError(CONFIGURATION, "client.secret $authMethodError", null, null)
                     append("client_id", clientId)
                     append("client_secret", clientSecret)
                 }
 
                 CLIENT_SECRET_BASIC -> {
-                    clientSecret ?: onError(CONFIGURATION, "client.secret $authMethodError", null, null)
+                    clientSecret ?: raiseError(CONFIGURATION, "client.secret $authMethodError", null, null)
                     headers {
                         append(
                             HttpHeaders.Authorization,
@@ -447,7 +447,7 @@ class HttpCall(
                     append("client_id", clientId)
                     append("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer")
                     val jwtAssertion = authData.client.assertion
-                        ?: onError(CONFIGURATION, "client.assertion $authMethodError", null, null)
+                        ?: raiseError(CONFIGURATION, "client.assertion $authMethodError", null, null)
                     append("client_assertion", jwtAssertion)
                 }
 
@@ -466,7 +466,7 @@ class HttpCall(
 
             when (val grantType = authData.grant) {
                 AUTHORIZATION_CODE -> {
-                    onError(RUNTIME, "authorization_code grant is not yet supported", null, null) // TODO
+                    raiseError(RUNTIME, "authorization_code grant is not yet supported", null, null) // TODO
 
 //                    authData.request?.let { req ->
 //                        req.code?.let { append("code", it) }
@@ -481,31 +481,46 @@ class HttpCall(
 
                 PASSWORD -> {
                     val username = authData.username
-                        ?: onError(CONFIGURATION, "username is missing for ${grantType.value()} grant", null, null)
+                        ?: raiseError(CONFIGURATION, "username is missing for ${grantType.value()} grant", null, null)
                     val password = authData.password
-                        ?: onError(CONFIGURATION, "password is missing for ${grantType.value()} grant", null, null)
+                        ?: raiseError(CONFIGURATION, "password is missing for ${grantType.value()} grant", null, null)
                     append("username", username)
                     append("password", password)
                 }
 
                 REFRESH_TOKEN -> {
                     val refreshToken = authData.subject.token?.let { getSecretByName(it) }
-                        ?: onError(CONFIGURATION, "subject.token is missing for ${grantType.value()} grant", null, null)
+                        ?: raiseError(
+                            CONFIGURATION,
+                            "subject.token is missing for ${grantType.value()} grant",
+                            null,
+                            null
+                        )
                     append("refresh_token", refreshToken)
                 }
 
                 URN_IETF_PARAMS_OAUTH_GRANT_TYPE_TOKEN_EXCHANGE -> {
                     val subjectToken = authData.subject.token?.let { getSecretByName(it) }
-                        ?: onError(CONFIGURATION, "subject.token is missing for ${grantType.value()} grant", null, null)
+                        ?: raiseError(
+                            CONFIGURATION,
+                            "subject.token is missing for ${grantType.value()} grant",
+                            null,
+                            null
+                        )
                     val actorToken = authData.actor.token?.let { getSecretByName(it) }
-                        ?: onError(CONFIGURATION, "actor.token is missing for ${grantType.value()} grant", null, null)
+                        ?: raiseError(
+                            CONFIGURATION,
+                            "actor.token is missing for ${grantType.value()} grant",
+                            null,
+                            null
+                        )
                     append("subject_token", subjectToken)
                     append("actor_token", actorToken)
                     append("requested_token_type", "urn:ietf:params:oauth:token-type:access_token")
                     append("subject_token_type", "urn:ietf:params:oauth:token-type:access_token")
                 }
 
-                else -> onError(CONFIGURATION, "Unsupported grant type: $grantType", null, null)
+                else -> raiseError(CONFIGURATION, "Unsupported grant type: $grantType", null, null)
             }
         }
 
@@ -568,7 +583,7 @@ class HttpCall(
                     return@withLock refreshed
                 } catch (e: Exception) {
                     tokenCache.remove(key)
-                    onError(
+                    raiseError(
                         AUTHENTICATION,
                         "Failed to refresh OAuth2 token: ${e.message}",
                         e.stackTraceToString(),

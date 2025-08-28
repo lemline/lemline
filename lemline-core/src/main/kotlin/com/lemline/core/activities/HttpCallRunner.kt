@@ -22,7 +22,7 @@ class HttpCallRunner : ActivityRunner<CallHttpInstance> {
         val httpCall = HttpCall(
             getSecretByName = instance::toSecret,
             getAuthenticationPolicyByName = instance::getAuthenticationPolicyByName,
-            onError = instance::raiseError,
+            raiseError = instance::raiseError,
         )
 
         instance.logInfo { "Executing HTTP call: ${instance.node.name}" }
