@@ -137,7 +137,7 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
         attemptIndex++
 
         // get delay before retry
-        delay = getRetryDelay(error)
+        delay = getRetryDelay()
 
         return when (delay) {
             // if we don't retry, catch this error only if catchDoInstance is not null
@@ -153,14 +153,12 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
      * @param error The workflow error that occurred, which might influence the computed retry policies.
      * @return The duration to wait before the next retry attempt, or `null` if no retry should occur.
      */
-    private fun getRetryDelay(error: WorkflowError): Duration? {
+    private fun getRetryDelay(): Duration? {
         // if no retry policy
         retryPolicy ?: return null
 
         // if the attempt limit is reached, we do not retry
-        retryLimit?.let {
-            if (attemptIndex > it) return null
-        }
+        retryLimit?.let { if (attemptIndex > it) return null }
 
         // Max attempt duration before a task attempt timeout
         val attemptDurationLimit: Duration? = retryPolicy?.limit?.attempt?.duration?.toDuration()
@@ -196,6 +194,6 @@ class TryInstance(override val node: Node<TryTask>, override val parent: NodeIns
         // apply jitter if any
         delay += retryPolicy?.jitter.toRandomDuration()
 
-        return if (delay > Duration.ZERO) delay.also { this.delay = it } else Duration.ZERO
+        return if (delay > Duration.ZERO) delay else Duration.ZERO
     }
 }

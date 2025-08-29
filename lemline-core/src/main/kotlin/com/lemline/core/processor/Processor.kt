@@ -71,10 +71,7 @@ import kotlinx.serialization.json.JsonElement
 /**
  * Represents an instance of a workflow, including its state, position, secrets, and execution logic.
  *
- * @property name The name of the workflow.
- * @property version The version of the workflow.
- * @property state A map of node positions to their corresponding node states.
- * @property position The current position in the workflow.
+ * @property instance The workflow instance.
  * @property secrets A map of secrets used in the workflow.
  */
 @ExperimentalTime
