@@ -69,33 +69,14 @@ class LemlineApplication : QuarkusApplication {
          */
         @JvmStatic
         fun main(args: Array<String>) {
-            // Create a temporary CommandLine instance to parse the arguments
-            val tempCli = CommandLine(MainCommand()).setup()
-
             try {
-                val parseResults = getParseResults(tempCli, args)
+                // Create a temporary CommandLine instance to parse the arguments
+                val tempCli = CommandLine(MainCommand()).setup()
+
+                val parseResults: List<ParseResult> = getParseResults(tempCli, args)
 
                 // Check if the command line arguments contain help or version options
                 val helpOrVersion = parseResults.any { it.isUsageHelpRequested || it.isVersionHelpRequested }
-
-                // for the listen command (not overridden by --help or --version)
-                // enable the consumer and producer
-                // else disable the metrics endpoint
-                val listen = parseResults.firstOrNull { it.commandSpec().userObject() is ListenCommand }
-                    ?.commandSpec()?.userObject() as? ListenCommand
-                if (listen != null) {
-                    System.setProperty(CONSUMER_ENABLED, "true")
-                    System.setProperty(PRODUCER_ENABLED, "true")
-                    listen.port?.let { setMetricsEndpointPort(it) }
-                } else {
-                    disableMetricsEndpoint()
-                }
-
-                // for the start command (not overridden by --help or --version)
-                // enable the producer only
-                if (parseResults.any { it.commandSpec().userObject() is InstanceStartCommand && !helpOrVersion }) {
-                    System.setProperty(PRODUCER_ENABLED, "true")
-                }
 
                 // Set the logging level
                 setLoggingLevel(parseResults)
@@ -112,6 +93,32 @@ class LemlineApplication : QuarkusApplication {
                     System.err.println("5. Place a .lemline.yaml file in your home directory.")
                     exitProcess(1)
                 }
+
+                if (helpOrVersion) {
+                    disableMetricsEndpoint()
+                    System.setProperty(CONSUMER_ENABLED, "false")
+                    System.setProperty(PRODUCER_ENABLED, "false")
+                } else {
+                    // The listen command, if any
+                    val listen = parseResults.command<ListenCommand>()
+
+                    if (listen == null) {
+                        disableMetricsEndpoint()
+                        System.setProperty(CONSUMER_ENABLED, "false")
+                        System.setProperty(PRODUCER_ENABLED, "false")
+                    } else {
+                        listen.port?.let { setMetricsEndpointPort(it) }
+                        System.setProperty(CONSUMER_ENABLED, "true")
+                        System.setProperty(PRODUCER_ENABLED, "true")
+                    }
+
+                    // the instance start command, if any
+                    val start = parseResults.command<InstanceStartCommand>()
+                    if (start != null) {
+                        System.setProperty(PRODUCER_ENABLED, "true")
+                    }
+                }
+
             } catch (ex: Exception) {
                 // Handle all exceptions in a unified way
                 System.err.println("⚠️ ${ex.message}")
@@ -121,6 +128,12 @@ class LemlineApplication : QuarkusApplication {
             // --- Launch Quarkus ---
             Quarkus.run(LemlineApplication::class.java, *args)
         }
+
+        /**
+         * This function retrieves the first command of the specified type from the list of parse results.
+         */
+        private inline fun <reified T> List<ParseResult>.command() = firstOrNull { it.commandSpec().userObject() is T }
+            ?.commandSpec()?.userObject() as? T
 
         /**
          * This function collects the main parse result and any subcommand parse results into a list.
