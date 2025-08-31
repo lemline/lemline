@@ -10,7 +10,7 @@ import com.lemline.common.ids.IdGenerator
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.utils.toDuration
 import com.lemline.core.workflows.WorkflowState
-import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import io.serverlessworkflow.api.types.Schedule
 import java.time.ZoneId
@@ -26,7 +26,7 @@ import kotlinx.serialization.json.JsonElement
 const val SCHEDULE_TABLE = "lemline_schedules"
 
 @ExperimentalTime
-data class ScheduleModel(
+data class ScheduleOutboxModel(
     override val id: UUID = IdGenerator.generateUUIDV7(),
 
     override var instance: InstanceMessage,
@@ -49,7 +49,7 @@ data class ScheduleModel(
 
     val scheduleZone: String?,
 
-    ) : OutboxModel() {
+    ) : OutboxModel {
 
     val after: Duration? by lazy { scheduleAfter?.let { Duration.parse(it) } }
 
@@ -106,7 +106,7 @@ data class ScheduleModel(
             workflowInput: JsonElement,
             schedule: Schedule,
             zoneId: ZoneId?
-        ): ScheduleModel {
+        ): ScheduleOutboxModel {
             val scheduleEvery = schedule.every?.toDuration()?.toString()
             val scheduleAfter = schedule.after?.toDuration()?.toString()
             val scheduleCron = schedule.cron
@@ -120,7 +120,7 @@ data class ScheduleModel(
                 else -> error("Invalid schedule model")
             }
 
-            val scheduleModel = ScheduleModel(
+            val scheduleOutboxModel = ScheduleOutboxModel(
                 id = workflowId,
                 instance = InstanceMessage.fromObjects(
                     workflowId = workflowId,
@@ -138,7 +138,7 @@ data class ScheduleModel(
                 outboxScheduledFor = scheduledFor
             )
 
-            return scheduleModel
+            return scheduleOutboxModel
         }
     }
 }

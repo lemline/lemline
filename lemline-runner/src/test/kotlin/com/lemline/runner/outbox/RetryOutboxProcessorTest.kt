@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.RetryModel
+import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.repositories.OutboxRepository
 import com.lemline.runner.repositories.RetryRepository
@@ -21,19 +21,19 @@ import kotlin.time.ExperimentalTime
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
 @ExperimentalTime
-internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryModel>() {
+internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>() {
 
     @Inject // Inject the specific repository
     lateinit var retryRepository: RetryRepository
 
     // Implement the abstract repository property
-    override val testRepository: OutboxRepository<RetryModel> by lazy { retryRepository }
+    override val testRepository: OutboxRepository<RetryOutboxModel> by lazy { retryRepository }
 
     // Implement the abstract KClass property
-    override val modelClass: KClass<RetryModel> = RetryModel::class
+    override val modelClass: KClass<RetryOutboxModel> = RetryOutboxModel::class
 
     // Implement the abstract factory method
-    override fun createTestModel(payload: String) = RetryModel(
+    override fun createTestModel(payload: String) = RetryOutboxModel(
         instance = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = Random.nextBytes(10).toString(),

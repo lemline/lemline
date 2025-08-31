@@ -3,9 +3,9 @@ package com.lemline.runner.repositories
 
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.PARENT_TABLE
-import com.lemline.runner.models.ParentModel
+import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
-import com.lemline.runner.outbox.OutboxProcessor
+import com.lemline.runner.outbox.OutboxRelay
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.ResultSet
@@ -22,19 +22,19 @@ import kotlin.time.ExperimentalTime
  * ensuring reliable message delivery in distributed systems.
  *
  * @see OutboxRepository for base functionality and documentation
- * @see ParentModel for the message model
- * @see OutboxProcessor for the processing logic
+ * @see ParentOutboxModel for the message model
+ * @see OutboxRelay for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime
-internal class ParentRepository : OutboxRepository<ParentModel>() {
+internal class ParentRepository : OutboxRepository<ParentOutboxModel>() {
 
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = PARENT_TABLE
 
-    override fun createModel(rs: ResultSet) = ParentModel(
+    override fun createModel(rs: ResultSet) = ParentOutboxModel(
         id = getUuid(rs, ID_COLUMN),
         instance = rs.getInstanceMessage(),
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),

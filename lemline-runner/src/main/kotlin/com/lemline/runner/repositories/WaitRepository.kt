@@ -3,7 +3,7 @@ package com.lemline.runner.repositories
 
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.WAIT_TABLE
-import com.lemline.runner.models.WaitModel
+import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -21,19 +21,19 @@ import kotlin.time.ExperimentalTime
  * ensuring reliable message delivery in distributed systems.
  *
  * @see OutboxRepository for base functionality and documentation
- * @see WaitModel for the message model
+ * @see WaitOutboxModel for the message model
  * @see OutboxProcessor for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime
-internal class WaitRepository : OutboxRepository<WaitModel>() {
+internal class WaitRepository : OutboxRepository<WaitOutboxModel>() {
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = WAIT_TABLE
 
     @ExperimentalTime
-    override fun createModel(rs: ResultSet) = WaitModel(
+    override fun createModel(rs: ResultSet) = WaitOutboxModel(
         id = getUuid(rs, ID_COLUMN),
         instance = rs.getInstanceMessage(),
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),

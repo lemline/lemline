@@ -2,8 +2,8 @@
 package com.lemline.runner.messaging.bases
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.messaging.ReactiveMessageHandler
+import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.instances.InstanceMessageHandler
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.DefinitionRepository
@@ -29,7 +29,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
- * Abstract base class for testing the [ReactiveMessageHandler].
+ * Abstract base class for testing the [InstanceMessageHandler].
  *
  * This class sets up a common test environment including repositories (Retry, Wait, Workflow)
  * and provides helper methods for sending messages and waiting for processing.
@@ -58,7 +58,7 @@ internal abstract class WorkflowConsumerTest {
     lateinit var definitionRepository: DefinitionRepository
 
     @Inject
-    lateinit var messageConsumer: ReactiveMessageHandler
+    lateinit var instanceMessageHandler: InstanceMessageHandler
 
     @BeforeEach
     fun setup() = runTest {
@@ -140,7 +140,7 @@ internal abstract class WorkflowConsumerTest {
     protected abstract fun receiveMessage(timeout: Long, unit: TimeUnit): String?
 
     private fun sendMessageFuture(messageJson: String): CompletableFuture<String?> {
-        val future = messageConsumer.waitForProcessing(messageJson)
+        val future = instanceMessageHandler.waitForProcessing(messageJson)
         // Send the message to the input topic
         sendMessage(messageJson)
         return future

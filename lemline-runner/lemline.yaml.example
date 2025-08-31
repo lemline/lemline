@@ -9,26 +9,24 @@
 # 1. Rename this file to `application.yaml`.
 # 2. Place it in the same directory as the Lemline binary or in a standard
 #    configuration location (e.g., /etc/lemline/, ~/.config/lemline/).
-# 3. Configure the `lemline.database` and `lemline.messaging` sections below
-#    to match your environment. Choose ONE database `type` and ONE messaging `type`.
+# 3. Configure the `lemline.database` and `lemline.messaging` sections below.
+#    The database and messaging types are INFERRED automatically based on which
+#    configuration block you provide (e.g., `postgresql`, `kafka`).
 # 4. Set required environment variables (e.g., for passwords) or replace
 #    the `${VAR_NAME:default}` placeholders with your actual values.
 #
-# Lemline will automatically translate these settings into the required
-# framework configurations based on the `type` you specify.
-# Only the settings relevant to the selected `type` will be used
-# (e.g., `lemline.messaging.kafka.*` is ignored if `type=rabbitmq`).
+# Lemline automatically translates these settings into the required framework
+# configurations. Only the settings for the provided block will be used
+# (e.g., `lemline.messaging.kafka.*` is used if a `kafka:` block is present).
 #
 # ----------------------------------------------------------------------------
 # Quick Start Minimal Example (PostgreSQL + Kafka with defaults):
 # ----------------------------------------------------------------------------
 # lemline:
 #   database:
-#     type: postgresql
 #     postgresql:
 #       # Assumes PG on localhost:5432, user postgres, password via environment variable
 #   messaging:
-#     type: kafka
 #     kafka:
 #       # Assumes Kafka on localhost:9092
 #       # Optional: Set KAFKA_USER/PASSWORD env vars if needed
@@ -69,9 +67,8 @@ quarkus:
 # ----------------------------------------------------------------------------
 lemline:
   # --- Database Configuration ---
+  # The database type is inferred from the block you configure below (e.g., `postgresql` or `mysql`).
   database:
-    # Choose the database type you are using: postgresql | mysql
-    type: ${LEMLINE_DB_TYPE:postgresql} # <-- Can be overridden by LEMLINE_DB_TYPE env var
 
     # Create the schema history table if it doesn't exist: true | false
     baseline-on-migrate: true
@@ -79,7 +76,7 @@ lemline:
     # Apply database migrations at startup: true | false
     migrate-at-start: true
 
-    # --- PostgreSQL Settings (Only used if lemline.database.type=postgresql) ---
+    # --- PostgreSQL Settings (Uncomment and configure to use PostgreSQL) ---
     postgresql:
       host: ${LEMLINE_PG_HOST:localhost}
       port: ${LEMLINE_PG_PORT:5432}
@@ -87,7 +84,7 @@ lemline:
       password: ${LEMLINE_PG_PASSWORD:postgres} # RECOMMENDED: Set via LEMLINE_PG_PASSWORD env var!
       name: ${LEMLINE_PG_DB_NAME:lemline}
 
-    # --- MySQL Settings (Only used if lemline.database.type=mysql) ---
+    # --- MySQL Settings (Uncomment and configure to use MySQL) ---
     mysql:
       host: ${LEMLINE_MYSQL_HOST:localhost}
       port: ${LEMLINE_MYSQL_PORT:3306}
@@ -96,11 +93,9 @@ lemline:
       name: ${LEMLINE_MYSQL_DB_NAME:lemline}
 
   # --- Messaging Configuration ---
+  # The messaging type is inferred from the block you configure below (e.g., `kafka` or `rabbitmq`).
   messaging:
-    # Choose the message broker type you are using: kafka | rabbitmq
-    type: ${LEMLINE_MESSAGING_TYPE:kafka}
-
-    # --- Kafka Specific Settings (Only used if lemline.messaging.type=kafka) ---
+    # --- Kafka Specific Settings (Uncomment and configure to use Kafka) ---
     kafka:
       brokers: ${LEMLINE_KAFKA_BROKERS:localhost:9092}
       topic: ${LEMLINE_KAFKA_TOPIC:lemline}
@@ -112,7 +107,7 @@ lemline:
       # sasl-username: ${LEMLINE_KAFKA_USER}
       # sasl-password: ${LEMLINE_KAFKA_PASSWORD} # RECOMMENDED: Set via LEMLINE_KAFKA_PASSWORD env var!
 
-    # --- RabbitMQ Specific Settings (Only used if lemline.messaging.type=rabbitmq) ---
+    # --- RabbitMQ Specific Settings (Uncomment and configure to use RabbitMQ) ---
     rabbitmq:
       hostname: ${LEMLINE_RABBITMQ_HOST:localhost}
       port: ${LEMLINE_RABBITMQ_PORT:5672}
@@ -124,4 +119,3 @@ lemline:
       # exchange-name: my_exchange
       # Optional: TLS/SSL configuration
       # ssl-enabled: false
-

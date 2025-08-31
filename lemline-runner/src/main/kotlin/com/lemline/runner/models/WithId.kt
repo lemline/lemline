@@ -3,6 +3,6 @@ package com.lemline.runner.models
 
 import java.util.*
 
-abstract class IdModel {
-    abstract val id: UUID
+interface WithId {
+    val id: UUID
 }

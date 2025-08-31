@@ -2,6 +2,8 @@
 package com.lemline.runner.messaging
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
+import com.lemline.runner.instances.WORKFLOW_IN
+import com.lemline.runner.instances.WORKFLOW_OUT
 import com.lemline.runner.messaging.bases.WorkflowConsumerTest
 import com.lemline.runner.tests.profiles.KafkaProfile
 import io.quarkus.test.junit.QuarkusTest

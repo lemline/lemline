@@ -4,7 +4,7 @@ package com.lemline.runner.repositories
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
-import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
@@ -55,7 +55,7 @@ import kotlin.time.toJavaInstant
  * 5. Processing order is maintained within each batch
  *
  * @see OutboxModel for the base message model
- * @see com.lemline.runner.outbox.OutboxProcessor for the processing logic
+ * @see com.lemline.runner.outbox.OutboxRelay for the processing logic
  */
 @OptIn(ExperimentalTime::class)
 abstract class OutboxRepository<T : OutboxModel> : Repository<T>() {

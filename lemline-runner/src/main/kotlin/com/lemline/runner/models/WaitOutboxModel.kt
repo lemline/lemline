@@ -2,19 +2,19 @@
 package com.lemline.runner.models
 
 import com.lemline.common.ids.IdGenerator
-import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-const val RETRY_TABLE = "lemline_retries"
+const val WAIT_TABLE = "lemline_waits"
 
 @ExperimentalTime
-data class RetryModel(
+data class WaitOutboxModel(
     override val id: UUID = IdGenerator.generateUUIDV7(),
 
-    override val instance: InstanceMessage?,
+    override val instance: InstanceMessage,
 
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
@@ -24,7 +24,6 @@ data class RetryModel(
 
     override var outboxAttemptCount: Int = 0,
 
-    override var outboxLastError: String? = null,
+    override var outboxLastError: String? = null
 
-    val message: String? = null,
-) : OutboxModel()
+) : OutboxModel

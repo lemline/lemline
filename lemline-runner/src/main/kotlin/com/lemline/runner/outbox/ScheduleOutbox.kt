@@ -2,8 +2,8 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.ReactiveMessageEmitter
-import com.lemline.runner.models.ScheduleModel
+import com.lemline.runner.instances.InstanceMessageEmitter
+import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.repositories.ScheduleRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
@@ -24,10 +24,10 @@ import kotlin.time.ExperimentalTime
 @Startup
 @ApplicationScoped
 @ExperimentalTime
-internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
+internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
 
     @Inject
-    override lateinit var emitter: ReactiveMessageEmitter
+    override lateinit var emitter: InstanceMessageEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
@@ -48,7 +48,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     // Cleanup configuration
     override val cleanupConf by lazy { lemlineConfig.outbox().schedule().cleanup() }
 
-    override suspend fun process(entity: ScheduleModel) {
+    override suspend fun process(entity: ScheduleOutboxModel) {
         // update the schedule model with the next instant to be processed
         entity.updateBeforeProcessing()
         // start a new instance of the workflow (with new workflowId)

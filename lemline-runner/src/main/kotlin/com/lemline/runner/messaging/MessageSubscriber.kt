@@ -5,13 +5,8 @@ import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.common.warn
-import com.lemline.runner.config.CONSUMER_ENABLED
-import com.lemline.runner.config.MESSAGING_CONSUMER_CONCURRENCY
-import com.lemline.runner.metrics.MessageSubscriberMetrics
-import io.quarkus.runtime.Startup
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
-import jakarta.enterprise.context.ApplicationScoped
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -24,23 +19,19 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.future.future
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
-import org.eclipse.microprofile.config.inject.ConfigProperty
-import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 
-@OptIn(ExperimentalTime::class)
-@Startup
-@ApplicationScoped
-internal class ReactiveMessageSubscriber(
-    @param:ConfigProperty(name = MESSAGING_CONSUMER_CONCURRENCY) private val maxConcurrency: Int,
-    @param:ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
-    @param:Channel(WORKFLOW_IN) private val publisher: Publisher<Message<String>>,
-    private val handler: ReactiveMessageHandler,
-    private val metrics: MessageSubscriberMetrics,
-) : Subscriber<Message<String>> {
+@ExperimentalTime
+internal abstract class MessageSubscriber() : Subscriber<Message<String>> {
+
+    abstract val maxConcurrency: Int
+    abstract val enabled: Boolean
+    abstract val publisher: Publisher<Message<String>>
+    abstract val handler: MessageHandler
+    abstract val metrics: MessageSubscriberMetrics
 
     val logger = logger()
 

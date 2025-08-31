@@ -14,12 +14,12 @@ import com.lemline.runner.exceptions.RunWorkflowStartedException
 import com.lemline.runner.exceptions.TaskCompletedException
 import com.lemline.runner.exceptions.TaskRetriedException
 import com.lemline.runner.exceptions.WaitStartedException
-import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.PARENT_TABLE
-import com.lemline.runner.models.ParentModel
-import com.lemline.runner.models.RetryModel
+import com.lemline.runner.models.ParentOutboxModel
+import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.models.SCHEDULE_TABLE
-import com.lemline.runner.models.WaitModel
+import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.ScheduleRepository
@@ -112,7 +112,7 @@ internal class StepByStepRunner @Inject constructor(
     ): InstanceMessage? {
         // insert the parent workflow without delayedUntil
         // TODO make id idempotent
-        val parent = ParentModel(
+        val parent = ParentOutboxModel(
             instance = this,
             outboxScheduledFor = null,
         )
@@ -167,12 +167,12 @@ internal class StepByStepRunner @Inject constructor(
     private suspend fun InstanceMessage.onRetry(tryInstance: TryInstance) {
         val delay = tryInstance.delay ?: error("No delay set in in $tryInstance")
 
-        val retryModel = RetryModel(
+        val retryOutboxModel = RetryOutboxModel(
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
         )
         // Save the message to the retry table
-        retryRepository.insert(retryModel)
+        retryRepository.insert(retryOutboxModel)
     }
 
     /**
@@ -182,12 +182,12 @@ internal class StepByStepRunner @Inject constructor(
      * asynchronously through the WaitOutbox.
      */
     private suspend fun InstanceMessage.onWait(delay: Duration) {
-        val waitModel = WaitModel(
+        val waitOutboxModel = WaitOutboxModel(
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
         )
         // Save the message to the wait table
-        waitRepository.insert(waitModel)
+        waitRepository.insert(waitOutboxModel)
     }
 
     private val Processor.updatedInstanceMessage

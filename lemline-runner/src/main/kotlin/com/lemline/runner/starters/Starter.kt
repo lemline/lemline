@@ -5,8 +5,8 @@ import com.github.zafarkhaja.semver.Version
 import com.lemline.common.ids.IdGenerator
 import com.lemline.core.definitions.Definitions
 import com.lemline.core.schemas.SchemaValidator
-import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.ScheduleModel
+import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import jakarta.enterprise.context.ApplicationScoped
@@ -72,7 +72,7 @@ class Starter {
                 null -> instanceMessage
 
                 else -> {
-                    val scheduleModel = ScheduleModel.create(
+                    val scheduleOutboxModel = ScheduleOutboxModel.create(
                         workflowId = instanceMessage.workflowId,
                         workflowName = workflowName,
                         workflowVersion = workflowVersion,
@@ -80,9 +80,9 @@ class Starter {
                         schedule = workflow.schedule,
                         zoneId = zoneId
                     )
-                    scheduleRepository.insert(scheduleModel)
+                    scheduleRepository.insert(scheduleOutboxModel)
                     // start the message right away for scheduleAfter and scheduleEvery
-                    if (scheduleModel.scheduleCron != null) {
+                    if (scheduleOutboxModel.scheduleCron != null) {
                         onDebug {
                             "Instance $workflowId scheduled successfully " +
                                 "(name: $workflowName, version: $workflowVersion, input: $workflowInput, " +

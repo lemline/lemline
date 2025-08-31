@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging
+package com.lemline.runner.instances
 
 import com.lemline.common.flexible.LazyParsedField
 import com.lemline.common.ids.IdGenerator
@@ -59,18 +59,14 @@ data class InstanceMessage(
     override val name by lazy { workflowName }
     override val version by lazy { workflowVersion }
 
-    /**
-     * The reactive message that has been deserialized to create this instance
-     */
     @Transient
-    lateinit var message: Message<*>
+    lateinit var message: Message<String>
 
-    // InstanceMessage is immutable, so we can cache the JSON string representation
     val payload: String by lazy { LemlineJson.encodeToString(this) }
 
     fun updateWith(workflowState: WorkflowState, workflowPosition: NodePosition): InstanceMessage = copy(
-        workflowPosition = LazyParsedField(workflowPosition, NodePosition.serializer()),
-        workflowState = LazyParsedField(workflowState, WorkflowState.serializer()),
+        workflowPosition = LazyParsedField(workflowPosition, NodePosition.Companion.serializer()),
+        workflowState = LazyParsedField(workflowState, WorkflowState.Companion.serializer()),
     ).also { it.message = message }
 
     companion object {
@@ -85,8 +81,8 @@ data class InstanceMessage(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
-            workflowPosition = LazyParsedField(workflowPosition, NodePosition.serializer()),
-            workflowState = LazyParsedField(workflowState, WorkflowState.serializer()),
+            workflowPosition = LazyParsedField(workflowPosition, NodePosition.Companion.serializer()),
+            workflowState = LazyParsedField(workflowState, WorkflowState.Companion.serializer()),
             parentId = parentId,
         )
 
@@ -101,8 +97,8 @@ data class InstanceMessage(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
-            workflowPosition = LazyParsedField(workflowPosition, NodePosition.serializer()),
-            workflowState = LazyParsedField(workflowState, WorkflowState.serializer()),
+            workflowPosition = LazyParsedField(workflowPosition, NodePosition.Companion.serializer()),
+            workflowState = LazyParsedField(workflowState, WorkflowState.Companion.serializer()),
             parentId = parentId,
         )
 
@@ -116,8 +112,8 @@ data class InstanceMessage(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
-            workflowPosition = NodePosition.root,
-            workflowState = WorkflowState.newInstance(workflowInput),
+            workflowPosition = NodePosition.Companion.root,
+            workflowState = WorkflowState.Companion.newInstance(workflowInput),
             parentId = parentId,
         )
 

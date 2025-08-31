@@ -1,28 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
+import com.lemline.runner.config.LemlineConfigConstants
 import com.lemline.runner.config.MESSAGING_TYPE
-import io.quarkus.runtime.Startup
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
 import io.smallrye.reactive.messaging.kafka.api.OutgoingKafkaRecordMetadata
 import io.smallrye.reactive.messaging.rabbitmq.OutgoingRabbitMQMetadata
-import jakarta.enterprise.context.ApplicationScoped
 import java.time.Instant
 import java.time.ZoneId
 import org.eclipse.microprofile.config.inject.ConfigProperty
-import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
 
-@Startup
-@ApplicationScoped
-internal class ReactiveMessageEmitter {
+internal abstract class MessageEmitter {
 
-    @Channel(WORKFLOW_OUT)
-    private lateinit var emitter: MutinyEmitter<String>
+    protected abstract val emitter: MutinyEmitter<String>
 
     @ConfigProperty(name = MESSAGING_TYPE)
     private lateinit var messagingType: String
@@ -36,9 +28,9 @@ internal class ReactiveMessageEmitter {
 
     private fun getMetaData(): Any =
         when (messagingType) {
-            MSG_TYPE_KAFKA -> getKafkaMetaData()
-            MSG_TYPE_RABBITMQ -> getRabbitMQMeta()
-            MSG_TYPE_IN_MEMORY -> getInMemoryMeta()
+            LemlineConfigConstants.MSG_TYPE_KAFKA -> getKafkaMetaData()
+            LemlineConfigConstants.MSG_TYPE_RABBITMQ -> getRabbitMQMeta()
+            LemlineConfigConstants.MSG_TYPE_IN_MEMORY -> getInMemoryMeta()
             else -> error("Unknown messaging type: $messagingType")
         }
 

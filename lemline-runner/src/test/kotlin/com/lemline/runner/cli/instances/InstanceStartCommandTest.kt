@@ -3,9 +3,9 @@ package com.lemline.runner.cli.instances
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
-import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.models.ScheduleModel
+import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import io.kotest.matchers.shouldBe
@@ -85,7 +85,7 @@ class InstanceStartCommandTest {
 
         coEvery { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
         coEvery { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
-        coEvery { scheduleRepository.insert(any<ScheduleModel>()) } returns 1
+        coEvery { scheduleRepository.insert(any<ScheduleOutboxModel>()) } returns 1
         every { emitter.send(any<String>()) } returns CompletableFuture.completedFuture(null)
 
         // Save original streams

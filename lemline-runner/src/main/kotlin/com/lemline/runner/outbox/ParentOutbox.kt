@@ -2,8 +2,8 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.ReactiveMessageEmitter
-import com.lemline.runner.models.ParentModel
+import com.lemline.runner.instances.InstanceMessageEmitter
+import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.repositories.ParentRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
@@ -22,10 +22,10 @@ import kotlin.time.ExperimentalTime
 @Startup
 @ApplicationScoped
 @ExperimentalTime
-internal class ParentOutbox : AbstractOutbox<ParentModel>() {
+internal class ParentOutbox : AbstractOutbox<ParentOutboxModel>() {
 
     @Inject
-    override lateinit var emitter: ReactiveMessageEmitter
+    override lateinit var emitter: InstanceMessageEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration

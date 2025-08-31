@@ -2,8 +2,8 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.ReactiveMessageEmitter
-import com.lemline.runner.models.WaitModel
+import com.lemline.runner.instances.InstanceMessageEmitter
+import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.repositories.WaitRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
@@ -20,10 +20,10 @@ import kotlin.time.ExperimentalTime
 @Startup
 @ApplicationScoped
 @ExperimentalTime
-internal class WaitOutbox : AbstractOutbox<WaitModel>() {
+internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
 
     @Inject
-    override lateinit var emitter: ReactiveMessageEmitter
+    override lateinit var emitter: InstanceMessageEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration

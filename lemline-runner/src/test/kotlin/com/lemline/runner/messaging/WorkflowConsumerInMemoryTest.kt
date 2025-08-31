@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
+import com.lemline.runner.instances.WORKFLOW_IN
+import com.lemline.runner.instances.WORKFLOW_OUT
 import com.lemline.runner.messaging.bases.WorkflowConsumerTest
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest

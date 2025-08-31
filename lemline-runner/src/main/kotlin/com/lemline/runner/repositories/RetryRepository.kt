@@ -3,7 +3,7 @@ package com.lemline.runner.repositories
 
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.RETRY_TABLE
-import com.lemline.runner.models.RetryModel
+import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -22,12 +22,12 @@ import kotlin.time.ExperimentalTime
  * ensuring reliable message delivery in distributed systems.
  *
  * @see OutboxRepository for base functionality and documentation
- * @see RetryModel for the message model
- * @see com.lemline.runner.outbox.OutboxProcessor for the processing logic
+ * @see RetryOutboxModel for the message model
+ * @see com.lemline.runner.outbox.OutboxRelay for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime
-internal class RetryRepository : OutboxRepository<RetryModel>() {
+class RetryRepository : OutboxRepository<RetryOutboxModel>() {
 
     companion object {
         internal const val MESSAGE_COLUMN = "message"
@@ -39,14 +39,14 @@ internal class RetryRepository : OutboxRepository<RetryModel>() {
     override val tableName = RETRY_TABLE
 
     // add the message colum
-    override val prepareStatementMap: Map<String, (PreparedStatement, RetryModel, Int) -> Unit> =
+    override val prepareStatementMap: Map<String, (PreparedStatement, RetryOutboxModel, Int) -> Unit> =
         super.prepareStatementMap + (
-            MESSAGE_COLUMN to { stmt: PreparedStatement, entity: RetryModel, idx: Int ->
+            MESSAGE_COLUMN to { stmt: PreparedStatement, entity: RetryOutboxModel, idx: Int ->
                 stmt.setString(idx, entity.message)
             })
 
     @ExperimentalTime
-    override fun createModel(rs: ResultSet) = RetryModel(
+    override fun createModel(rs: ResultSet) = RetryOutboxModel(
         id = getUuid(rs, ID_COLUMN),
         instance = rs.getInstanceMessage(),
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),

@@ -51,7 +51,8 @@ class ConfigCommand : Runnable {
             .filter { it.isNotBlank() } // Skip empty property names
             .sorted()
             .associateWith {
-                lemlineConfig.getOptionalValue(it, String::class.java).orElse("")
+                lemlineConfig.getConfigValue(it).value
+                //lemlineConfig.getOptionalValue(it, String::class.java).orElse("")
             }
 
         println(

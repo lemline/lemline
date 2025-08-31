@@ -4,7 +4,7 @@ package com.lemline.runner.outbox
 import com.lemline.common.error
 import com.lemline.common.logger
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.ReactiveMessageEmitter
+import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.OutboxRepository
 import jakarta.annotation.PostConstruct
@@ -31,7 +31,7 @@ import org.slf4j.Logger
  * multiple instances of the same operation from running simultaneously.
  *
  * @param T Type of the message entity (must implement OutboxModel interface)
- * @see OutboxProcessor for the core message processing logic
+ * @see OutboxRelay for the core message processing logic
  */
 @ExperimentalTime
 internal abstract class AbstractOutbox<T : OutboxModel>() {
@@ -43,16 +43,16 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
 
     protected abstract val repository: OutboxRepository<T>
-    protected abstract val emitter: ReactiveMessageEmitter
+    protected abstract val emitter: InstanceMessageEmitter
 
     protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig
     protected abstract val cleanupConf: LemlineConfiguration.OutboxCleanupConfig
 
-    private val outboxProcessor by lazy {
-        OutboxProcessor(
+    private val outboxRelay by lazy {
+        OutboxRelay(
             logger = logger,
             repository = repository,
-            processor = ::process,
+            relay = ::process,
         )
     }
 
@@ -117,7 +117,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         }
 
         try {
-            outboxProcessor.process(
+            outboxRelay.process(
                 batchSize = outboxConf.batchSize,
                 maxAttempts = outboxConf.maxAttempts,
                 initialDelay = outboxConf.initialDelay,
@@ -140,7 +140,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         }
 
         try {
-            outboxProcessor.cleanup(
+            outboxRelay.cleanup(
                 afterDelay = cleanupConf.after,
                 batchSize = cleanupConf.batchSize,
             )

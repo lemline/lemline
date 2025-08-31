@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging
+package com.lemline.runner.instances
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
@@ -10,7 +10,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 
 @ExperimentalTime
@@ -23,13 +23,13 @@ internal class InstanceMessageTest {
             workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
-            workflowPosition = NodePosition.root,
-            workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            workflowPosition = NodePosition.Companion.root,
+            workflowState = WorkflowState(mapOf(NodePosition.Companion.root to NodeState(rawInput = JsonPrimitive("")))),
             parentId = UUID.randomUUID(),
         )
 
         // When
-        assertEquals(
+        Assertions.assertEquals(
             """{"i":"test-id","n":"test-workflow","v":"1.0.0","p":"","s":{"":{"inp":""}}}""",
             instanceMessage.payload,
         )
@@ -42,13 +42,13 @@ internal class InstanceMessageTest {
             workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
-            workflowPosition = NodePosition.root,
-            workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            workflowPosition = NodePosition.Companion.root,
+            workflowState = WorkflowState(mapOf(NodePosition.Companion.root to NodeState(rawInput = JsonPrimitive("")))),
             parentId = UUID.randomUUID(),
         )
 
         // When
-        assertEquals(instanceMessage, InstanceMessage.fromJsonString(instanceMessage.payload))
+        Assertions.assertEquals(instanceMessage, InstanceMessage.fromJsonString(instanceMessage.payload))
     }
 
     @Test
@@ -58,10 +58,10 @@ internal class InstanceMessageTest {
             workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
-            workflowPosition = NodePosition.root,
+            workflowPosition = NodePosition.Companion.root,
             workflowState = WorkflowState(
                 mapOf(
-                    NodePosition.root to NodeState(
+                    NodePosition.Companion.root to NodeState(
                         rawInput = JsonObject(mapOf("test" to JsonPrimitive("value"))),
                         startedAt = Clock.System.now(),
                     )
@@ -75,7 +75,7 @@ internal class InstanceMessageTest {
         val deserialized = LemlineJson.decodeFromString<InstanceMessage>(json)
 
         // Then
-        assertEquals(original, deserialized)
+        Assertions.assertEquals(original, deserialized)
     }
 
     @Test
@@ -97,16 +97,16 @@ internal class InstanceMessageTest {
         // Then
         val expectedStates = WorkflowState(
             mapOf(
-                NodePosition.root to NodeState(
+                NodePosition.Companion.root to NodeState(
                     rawInput = input,
-                    startedAt = instanceMessage.workflowState.parsed[NodePosition.root]!!.startedAt,
+                    startedAt = instanceMessage.workflowState.parsed[NodePosition.Companion.root]!!.startedAt,
                 ),
             )
         )
 
-        assertEquals(name, instanceMessage.workflowName)
-        assertEquals(version, instanceMessage.workflowVersion)
-        assertEquals(expectedStates, instanceMessage.workflowState.parsed)
-        assertEquals(NodePosition.root, instanceMessage.workflowPosition.parsed)
+        Assertions.assertEquals(name, instanceMessage.workflowName)
+        Assertions.assertEquals(version, instanceMessage.workflowVersion)
+        Assertions.assertEquals(expectedStates, instanceMessage.workflowState.parsed)
+        Assertions.assertEquals(NodePosition.Companion.root, instanceMessage.workflowPosition.parsed)
     }
 }

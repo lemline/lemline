@@ -2,8 +2,8 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.ReactiveMessageEmitter
-import com.lemline.runner.models.RetryModel
+import com.lemline.runner.instances.InstanceMessageEmitter
+import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.repositories.RetryRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
@@ -17,17 +17,17 @@ import kotlin.time.ExperimentalTime
  * This class coordinates retry logic in two main areas:
  * - In workflow execution via [com.lemline.runner.StepByStepRunner]:
  *   - Uses `WorkflowInstance.onRetry()` to handle retries defined by the workflow itself.
- * - In message processing via [com.lemline.runner.messaging.ReactiveMessageHandler]:
+ * - In message processing via [com.lemline.runner.instances.InstanceMessageHandler]:
  *   - `Message<String>.saveAsFailed()` records non-recoverable failures.
  *   - `Message<String>.saveForRetry()` schedules recoverable failures for future retry attempts.
  */
 @Startup
 @ApplicationScoped
 @ExperimentalTime
-internal class RetryOutbox : AbstractOutbox<RetryModel>() {
+internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
 
     @Inject
-    override lateinit var emitter: ReactiveMessageEmitter
+    override lateinit var emitter: InstanceMessageEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration

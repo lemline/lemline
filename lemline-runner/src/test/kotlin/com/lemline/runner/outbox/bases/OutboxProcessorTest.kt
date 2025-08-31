@@ -5,7 +5,7 @@ import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus.FAILED
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
-import com.lemline.runner.outbox.OutboxProcessor
+import com.lemline.runner.outbox.OutboxRelay
 import com.lemline.runner.repositories.OutboxRepository
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -57,11 +57,11 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
     // Mock and processor using the generic type T
     private val mockedProcessor = mockk<suspend (T) -> Unit>()
-    private val outboxProcessor: OutboxProcessor<T> by lazy {
-        OutboxProcessor(
+    private val outboxRelay: OutboxRelay<T> by lazy {
+        OutboxRelay(
             logger = LoggerFactory.getLogger(this::class.java),
             repository = testRepository,
-            processor = mockedProcessor,
+            relay = mockedProcessor,
         )
     }
 
@@ -104,7 +104,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         testRepository.insert(message)
 
         // Act
-        outboxProcessor.process(batchSize, maxAttempts, initialDelay)
+        outboxRelay.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
         // Verify the mock was called at least once
@@ -155,7 +155,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Act: First process call (fails)
         val now = Clock.System.now()
-        outboxProcessor.process(batchSize, maxAttempts, initialDelay)
+        outboxRelay.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: First attempt failed - Check DB state
         coVerify(exactly = 1) { mockedProcessor(any(modelClass)) } // Verify it was called once
@@ -176,7 +176,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         coEvery { mockedProcessor(any(modelClass)) } just Runs
 
         // Act: Second process call (should succeed now)
-        outboxProcessor.process(batchSize, maxAttempts, initialDelay)
+        outboxRelay.process(batchSize, maxAttempts, initialDelay)
 
         // Assert: A second attempt succeeded - Check DB state
         coVerify(exactly = 2) { mockedProcessor(any(modelClass)) } // Verify it was called again
@@ -222,7 +222,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         for (attempt in 1..maxAttempts) {
             val now = Clock.System.now()
             // when
-            outboxProcessor.process(batchSize, maxAttempts, initialDelay)
+            outboxRelay.process(batchSize, maxAttempts, initialDelay)
             // then
             val updated = testRepository.findById(original.id)!!
             if (attempt < maxAttempts) {
@@ -268,7 +268,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         testRepository.insert(messages)
 
         // Act
-        outboxProcessor.process(batchSize, maxAttempts, initialDelay)
+        outboxRelay.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
         coVerify(exactly = 5) { mockedProcessor(any(modelClass)) }
@@ -320,7 +320,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         testRepository.insert(listOf(oldSentMessage, recentSentMessage, pendingMessage, failedMessage))
 
         // Act
-        outboxProcessor.cleanup(retentionDelay, 2) // Use small batch size for testing
+        outboxRelay.cleanup(retentionDelay, 2) // Use small batch size for testing
 
         // Assert
         testRepository.findById(oldSentMessage.id) shouldBe null // Should be deleted
@@ -347,7 +347,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Arrange: No messages persisted (due to setup)
 
         // Act
-        outboxProcessor.process(batchSize, maxAttempts, initialDelay)
+        outboxRelay.process(batchSize, maxAttempts, initialDelay)
 
         // Assert
         coVerify(exactly = 0) { mockedProcessor(any(modelClass)) }
@@ -372,7 +372,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         val retentionDelay = 7.days
 
         // Act
-        outboxProcessor.cleanup(retentionDelay, batchSize)
+        outboxRelay.cleanup(retentionDelay, batchSize)
 
         // Assert
         testRepository.count() shouldBe 0
@@ -413,7 +413,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         testRepository.insert(messages)
 
         // Act
-        outboxProcessor.cleanup(afterDelay, batchSize)
+        outboxRelay.cleanup(afterDelay, batchSize)
 
         // Assert
         testRepository.count() shouldBe 0

@@ -10,7 +10,7 @@ import java.time.Instant
 import java.time.ZoneId
 import org.eclipse.microprofile.reactive.messaging.Message
 
-class ReactiveMessageMetaData(
+class MessageMetaData(
     private val messagingType: String,
 ) {
     private val Message<*>.meta: Pair<String, Instant>

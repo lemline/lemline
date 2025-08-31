@@ -1,25 +1,44 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.metrics
+package com.lemline.runner.messaging
 
+import com.lemline.core.errors.WorkflowException
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
-import jakarta.inject.Inject
-import jakarta.inject.Singleton
+import java.io.IOException
+import java.sql.SQLException
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.time.Duration
-import kotlin.time.measureTime
+import kotlin.time.ExperimentalTime
+import kotlin.time.TimeSource.Monotonic.markNow
 import kotlin.time.toJavaDuration
-
 
 /**
  * Provides metrics for monitoring workflow message processing.
  * Uses Micrometer for metrics collection and reporting.
  */
-@Singleton
-class MessageSubscriberMetrics @Inject constructor(
-    private val registry: MeterRegistry
-) {
+@Suppress("PropertyName")
+@ExperimentalTime
+internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
+
+    // Metric Names
+    protected abstract val METRIC_PREFIX: String
+    protected val METRIC_ACTIVE = "$METRIC_PREFIX.active"
+    protected val METRIC_RECEIVED_TOTAL = "$METRIC_PREFIX.received.total"
+
+    protected val METRIC_DESERIALIZATION_COMPLETED_TOTAL = "$METRIC_PREFIX.deserialization.completed.total"
+    protected val METRIC_DESERIALIZATION_FAILED_TOTAL = "$METRIC_PREFIX.deserialization.failed.total"
+    protected val METRIC_DESERIALIZATION_DURATION = "$METRIC_PREFIX.deserialization.duration"
+
+    protected val METRIC_PROCESSING_COMPLETED_TOTAL = "$METRIC_PREFIX.processing.completed.total"
+    protected val METRIC_PROCESSING_FAILED_TOTAL = "$METRIC_PREFIX.processing.failed.total"
+    protected val METRIC_PROCESSING_DURATION = "$METRIC_PREFIX.processing.duration"
+
+    protected val METRIC_ACK_COMPLETED_TOTAL = "$METRIC_PREFIX.ack.completed.total"
+    protected val METRIC_ACK_FAILED_TOTAL = "$METRIC_PREFIX.ack.failed.total"
+
+    protected val METRIC_NACK_COMPLETED_TOTAL = "$METRIC_PREFIX.nack.completed.total"
+    protected val METRIC_NACK_FAILED_TOTAL = "$METRIC_PREFIX.nack.failed.total"
+
     /** Tracks the number of messages currently being processed */
     private val activeMessages = AtomicInteger(0)
 
@@ -53,9 +72,9 @@ class MessageSubscriberMetrics @Inject constructor(
     /**
      * Increments the counter for failed deserialization.
      */
-    fun deserializationFailed(reason: String) = registry.counter(
+    fun deserializationFailed(e: Exception) = registry.counter(
         METRIC_DESERIALIZATION_FAILED_TOTAL,
-        TAG_REASON, reason,
+        TAG_REASON, getFailureReason(e),
     ).increment()
 
     /**
@@ -76,6 +95,9 @@ class MessageSubscriberMetrics @Inject constructor(
         TAG_WORKFLOW_NAME, workflowName,
         TAG_WORKFLOW_VERSION, workflowVersion
     ).increment()
+
+    fun processingFailed(e: Exception, workflowName: String, workflowVersion: String) =
+        processingFailed(getFailureReason(e), workflowName, workflowVersion)
 
     /**
      * Increments the counter for successfully acknowledged messages.
@@ -121,10 +143,13 @@ class MessageSubscriberMetrics @Inject constructor(
      */
     suspend fun <T> recordDeserializationDuration(block: suspend () -> T): T {
         val timer = registry.timer(METRIC_DESERIALIZATION_DURATION)
-        var result: T
-        val duration: Duration = measureTime { result = block() }
-        timer.record(duration.toJavaDuration())
-        return result
+        val start = markNow()
+        return try {
+            block()
+        } finally {
+            // Always record the duration, even if the block throws an exception.
+            timer.record(start.elapsedNow().toJavaDuration())
+        }
     }
 
     /**
@@ -133,38 +158,43 @@ class MessageSubscriberMetrics @Inject constructor(
     suspend fun <T> recordProcessingDuration(workflowName: String, workflowVersion: String, block: suspend () -> T): T {
         val timer = registry.timer(
             METRIC_PROCESSING_DURATION,
-            TAG_WORKFLOW_NAME, workflowName,
-            TAG_WORKFLOW_VERSION, workflowVersion
+            TAG_WORKFLOW_NAME,
+            workflowName,
+            TAG_WORKFLOW_VERSION,
+            workflowVersion
         )
-        var result: T
-        val duration: Duration = measureTime {
-            result = block()
+        val start = markNow()
+        return try {
+            block()
+        } finally {
+            // Always record the duration, even if the block throws an exception.
+            timer.record(start.elapsedNow().toJavaDuration())
         }
-        timer.record(duration.toJavaDuration())
-        return result
+    }
+
+    /**
+     * Determines a low-cardinality failure reason from an exception for use in metrics.
+     * This is crucial for creating actionable alerts and dashboards without overwhelming
+     * the metrics backend.
+     */
+    fun getFailureReason(e: Throwable): String = when (e) {
+        // Domain-specific errors from the workflow engine
+        is WorkflowException -> FailureReasons.WORKFLOW_ERROR_PREFIX + e.error.type.lowercase()
+
+        // --- Database & Persistence Errors ---
+        is SQLException -> FailureReasons.DATABASE_ERROR
+
+        // --- I/O and Network Errors ---
+        is IOException -> FailureReasons.IO_ERROR
+
+        // --- Application State Errors ---
+        is IllegalStateException -> FailureReasons.INVALID_STATE
+
+        // --- Fallback for any other uncategorized exception ---
+        else -> FailureReasons.PROCESSING_ERROR
     }
 
     companion object {
-        // Metric Names
-        private const val METRIC_PREFIX = "lemline.message"
-        private const val METRIC_ACTIVE = "$METRIC_PREFIX.active"
-        private const val METRIC_RECEIVED_TOTAL = "$METRIC_PREFIX.received.total"
-
-        private const val METRIC_DESERIALIZATION_COMPLETED_TOTAL = "$METRIC_PREFIX.deserialization.completed.total"
-        private const val METRIC_DESERIALIZATION_FAILED_TOTAL = "$METRIC_PREFIX.deserialization.failed.total"
-        private const val METRIC_DESERIALIZATION_DURATION = "$METRIC_PREFIX.deserialization.duration"
-
-        private const val METRIC_PROCESSING_COMPLETED_TOTAL = "$METRIC_PREFIX.processing.completed.total"
-        private const val METRIC_PROCESSING_FAILED_TOTAL = "$METRIC_PREFIX.processing.failed.total"
-        private const val METRIC_PROCESSING_DURATION = "$METRIC_PREFIX.processing.duration"
-
-        private const val METRIC_ACK_COMPLETED_TOTAL = "$METRIC_PREFIX.ack.completed.total"
-        private const val METRIC_ACK_FAILED_TOTAL = "$METRIC_PREFIX.ack.failed.total"
-
-        private const val METRIC_NACK_COMPLETED_TOTAL = "$METRIC_PREFIX.nack.completed.total"
-        private const val METRIC_NACK_FAILED_TOTAL = "$METRIC_PREFIX.nack.failed.total"
-
-
         // Tag Keys
         private const val TAG_REASON = "reason"
         private const val TAG_WORKFLOW_NAME = "workflow_name"

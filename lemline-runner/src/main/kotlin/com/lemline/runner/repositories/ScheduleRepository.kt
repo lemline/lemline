@@ -3,8 +3,8 @@ package com.lemline.runner.repositories
 
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.SCHEDULE_TABLE
-import com.lemline.runner.models.ScheduleModel
-import com.lemline.runner.models.WaitModel
+import com.lemline.runner.models.ScheduleOutboxModel
+import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -23,12 +23,12 @@ import kotlin.time.ExperimentalTime
  * ensuring reliable message delivery in distributed systems.
  *
  * @see OutboxRepository for base functionality and documentation
- * @see WaitModel for the message model
- * @see com.lemline.runner.outbox.OutboxProcessor for the processing logic
+ * @see WaitOutboxModel for the message model
+ * @see com.lemline.runner.outbox.OutboxRelay for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime
-class ScheduleRepository : OutboxRepository<ScheduleModel>() {
+class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
 
     companion object {
         internal const val SCHEDULE_AFTER_COLUMN = "schedule_after"
@@ -43,23 +43,23 @@ class ScheduleRepository : OutboxRepository<ScheduleModel>() {
     override val tableName = SCHEDULE_TABLE
 
     // add the after, cron and every column
-    override val prepareStatementMap: Map<String, (PreparedStatement, ScheduleModel, Int) -> Unit> =
+    override val prepareStatementMap: Map<String, (PreparedStatement, ScheduleOutboxModel, Int) -> Unit> =
         super.prepareStatementMap + (
-            SCHEDULE_AFTER_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
+            SCHEDULE_AFTER_COLUMN to { stmt: PreparedStatement, entity: ScheduleOutboxModel, idx: Int ->
                 stmt.setString(idx, entity.scheduleAfter)
             }) + (
-            SCHEDULE_EVERY_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
+            SCHEDULE_EVERY_COLUMN to { stmt: PreparedStatement, entity: ScheduleOutboxModel, idx: Int ->
                 stmt.setString(idx, entity.scheduleEvery)
             }) + (
-            SCHEDULE_CRON_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
+            SCHEDULE_CRON_COLUMN to { stmt: PreparedStatement, entity: ScheduleOutboxModel, idx: Int ->
                 stmt.setString(idx, entity.scheduleCron)
             }) + (
-            SCHEDULE_ZONE_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
+            SCHEDULE_ZONE_COLUMN to { stmt: PreparedStatement, entity: ScheduleOutboxModel, idx: Int ->
                 stmt.setString(idx, entity.scheduleZone)
             })
 
     @ExperimentalTime
-    override fun createModel(rs: ResultSet) = ScheduleModel(
+    override fun createModel(rs: ResultSet) = ScheduleOutboxModel(
         id = getUuid(rs, ID_COLUMN),
         instance = rs.getInstanceMessage(),
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),

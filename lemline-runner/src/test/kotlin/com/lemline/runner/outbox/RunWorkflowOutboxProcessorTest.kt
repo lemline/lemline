@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.ParentModel
+import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.repositories.OutboxRepository
 import com.lemline.runner.repositories.ParentRepository
@@ -21,19 +21,19 @@ import kotlin.time.ExperimentalTime
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
 @ExperimentalTime
-internal class RunWorkflowOutboxProcessorTest : OutboxProcessorTest<ParentModel>() {
+internal class RunWorkflowOutboxProcessorTest : OutboxProcessorTest<ParentOutboxModel>() {
 
     @Inject // Inject the specific repository
     lateinit var parentRepository: ParentRepository
 
     // Implement the abstract repository property
-    override val testRepository: OutboxRepository<ParentModel> by lazy { parentRepository }
+    override val testRepository: OutboxRepository<ParentOutboxModel> by lazy { parentRepository }
 
     // Implement the abstract KClass property
-    override val modelClass: KClass<ParentModel> = ParentModel::class
+    override val modelClass: KClass<ParentOutboxModel> = ParentOutboxModel::class
 
     // Implement the abstract factory method
-    override fun createTestModel(payload: String) = ParentModel(
+    override fun createTestModel(payload: String) = ParentOutboxModel(
         instance = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = Random.nextBytes(10).toString(),

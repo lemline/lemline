@@ -35,14 +35,14 @@ import org.slf4j.Logger
  *
  * @param logger Logger instance for tracking operations
  * @param repository Repository for accessing the outbox table
- * @param processor Function that processes individual messages
+ * @param relay Function that processes individual messages
  * @param T Type of the message entity (must implement OutboxModel interface)
  */
 @ExperimentalTime
-internal class OutboxProcessor<T : OutboxModel>(
+internal class OutboxRelay<T : OutboxModel>(
     private val logger: Logger,
     private val repository: OutboxRepository<T>,
-    private val processor: suspend (T) -> Unit,
+    private val relay: suspend (T) -> Unit,
 ) {
     /**
      * Processes messages from the outbox table in batches.
@@ -120,7 +120,7 @@ internal class OutboxProcessor<T : OutboxModel>(
     private suspend fun processOutboxEntity(outboxEntity: T, maxAttempts: Int, initialDelay: Duration): Boolean = try {
         outboxEntity.outboxAttemptCount++
         outboxEntity.outBoxStatus = OutBoxStatus.SENT
-        processor(outboxEntity)
+        relay(outboxEntity)
         true // <- return true (success)
     } catch (e: Exception) {
         logger.warn(e) { "Failed to process outbox entity for workflow ${outboxEntity.instance?.workflowId}" }

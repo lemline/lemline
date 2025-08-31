@@ -3,7 +3,7 @@ package com.lemline.runner.cli.instances
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.runner.cli.GlobalMixin
-import com.lemline.runner.messaging.ReactiveMessageEmitter
+import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.starters.Starter
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
@@ -32,7 +32,7 @@ class InstanceStartCommand : Runnable {
     lateinit var stater: Starter
 
     @Inject
-    private lateinit var emitter: ReactiveMessageEmitter
+    private lateinit var emitter: InstanceMessageEmitter
 
     @Parameters(
         index = "0",

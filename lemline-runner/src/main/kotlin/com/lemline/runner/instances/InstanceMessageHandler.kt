@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging
+package com.lemline.runner.instances
 
 import com.lemline.common.LogContext
 import com.lemline.common.debug
@@ -8,28 +8,18 @@ import com.lemline.common.logger
 import com.lemline.common.warn
 import com.lemline.common.withLoggingContext
 import com.lemline.core.definitions.Definitions
-import com.lemline.core.errors.WorkflowException
 import com.lemline.core.processor.Processor
 import com.lemline.runner.StepByStepRunner
-import com.lemline.runner.metrics.MessageSubscriberMetrics
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.DATABASE_ERROR
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.DEFINITION_NOT_FOUND
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.INVALID_STATE
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.IO_ERROR
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.MESSAGE_EMISSION_ERROR
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.PROCESSING_ERROR
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.SECRETS_RETRIEVAL_FAILED
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.WORKFLOW_ERROR_PREFIX
+import com.lemline.runner.messaging.MessageHandler
+import com.lemline.runner.messaging.MessageSubscriberMetrics.Companion.FailureReasons
 import com.lemline.runner.models.RETRY_TABLE
-import com.lemline.runner.models.RetryModel
+import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.secrets.Secrets
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
-import java.io.IOException
-import java.sql.SQLException
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
@@ -38,9 +28,6 @@ import kotlinx.serialization.json.JsonElement
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
 
-internal const val WORKFLOW_IN = "workflows-in"
-internal const val WORKFLOW_OUT = "workflows-out"
-
 /**
  * MessageHandler is responsible for consuming workflow messages from the incoming channel,
  * processing them, and sending the results to the outgoing channel. It orchestrates
@@ -48,13 +35,13 @@ internal const val WORKFLOW_OUT = "workflows-out"
  */
 @ExperimentalTime
 @ApplicationScoped
-internal class ReactiveMessageHandler(
-    private val emitter: ReactiveMessageEmitter,
+internal class InstanceMessageHandler(
+    private val emitter: InstanceMessageEmitter,
     private val definitionRepository: DefinitionRepository,
     private val retryRepository: RetryRepository,
     private val stepByStepRunner: StepByStepRunner,
-    private val metrics: MessageSubscriberMetrics,
-) {
+    private val metrics: InstanceMessageSubscriberMetrics,
+) : MessageHandler {
     val logger = logger()
 
     /**
@@ -66,7 +53,7 @@ internal class ReactiveMessageHandler(
      *
      * @param message The raw reactive message from the messaging system.
      */
-    suspend fun handleMessage(message: Message<String>) {
+    override suspend fun handleMessage(message: Message<String>) {
         // --- Deserialization ---
         val instanceMessage = message.deserialize() ?: return
 
@@ -92,16 +79,20 @@ internal class ReactiveMessageHandler(
                         // --- Acknowledgment (Success Path) ---
                         message.ack(workflowName, workflowVersion)
                         // For testing: complete the future
+
                         processingMessages.remove(message.payload)?.complete(nextMessage?.payload)
                     }
                     metrics.processingCompleted(workflowName, workflowVersion)
                 }
             }
         } catch (e: ProcessingException) {
+            onProcessingFailure(instanceMessage, e)
             // For testing: complete the future
             processingMessages.remove(message.payload)?.completeExceptionally(e.cause)
         }
     }
+
+    var onProcessingFailure = { _: InstanceMessage, _: Exception -> }
 
     /**
      * Deserializes the message payload. Returns the Message object on success, or null on failure.
@@ -110,10 +101,12 @@ internal class ReactiveMessageHandler(
     private suspend fun Message<String>.deserialize(): InstanceMessage? = try {
         metrics.recordDeserializationDuration {
             InstanceMessage.fromMessage(this)
-        }.also { metrics.deserializationCompleted(it.workflowName, it.workflowVersion) }
+        }.also {
+            metrics.deserializationCompleted(it.workflowName, it.workflowVersion)
+        }
     } catch (e: Exception) {
         logger.error(e) { "Failed to deserialize message: $payload" }
-        metrics.deserializationFailed(getFailureReason(e))
+        metrics.deserializationFailed(e)
         // Deserialization failure is fatal for this message. Save and ACK.
         deserializationFailed(e)
         null
@@ -135,12 +128,12 @@ internal class ReactiveMessageHandler(
                 ?.let { Definitions.parseAndPut(it) }
     } catch (e: Exception) {
         logger.error(e) { "Error during workflow definition retrieval" }
-        metrics.processingFailed(getFailureReason(e), workflowName, workflowVersion)
+        metrics.processingFailed(e, workflowName, workflowVersion)
         saveForRetry(e)
         throw ProcessingException(e)
     } ?: run {
         // If `workflow` is null
-        metrics.processingFailed(DEFINITION_NOT_FOUND, workflowName, workflowVersion)
+        metrics.processingFailed(FailureReasons.DEFINITION_NOT_FOUND, workflowName, workflowVersion)
         val cause = IllegalStateException("Workflow ${workflowName}:${workflowVersion} not found")
         saveAsFailed(cause)
         throw ProcessingException(cause)
@@ -158,7 +151,7 @@ internal class ReactiveMessageHandler(
         Secrets.getForWorkflow(workflow)
     } catch (e: Exception) {
         logger.error(e) { "Unable to retrieve needed secret. Storing the message in the $RETRY_TABLE table for manual inspection." }
-        metrics.processingFailed(SECRETS_RETRIEVAL_FAILED, workflowName, workflowVersion)
+        metrics.processingFailed(FailureReasons.SECRETS_RETRIEVAL_FAILED, workflowName, workflowVersion)
         saveAsFailed(e)
         throw ProcessingException(e)
     }
@@ -175,7 +168,7 @@ internal class ReactiveMessageHandler(
         Processor(instance = this, secrets = secrets)
     } catch (e: Exception) {
         logger.error(e) { "Failed to convert the message to a workflow processor. Storing it in the $RETRY_TABLE table for manual inspection." }
-        metrics.processingFailed(getFailureReason(e), workflowName, workflowVersion)
+        metrics.processingFailed(e, workflowName, workflowVersion)
         saveAsFailed(e)
         throw ProcessingException(e)
     }
@@ -192,7 +185,7 @@ internal class ReactiveMessageHandler(
             with(stepByStepRunner) { run(processor) }
         } catch (e: Exception) {
             logger.error(e) { "Failed to run instance. Storing current state in the $RETRY_TABLE table for manual inspection." }
-            metrics.processingFailed(getFailureReason(e), processor.instance.name, processor.instance.version)
+            metrics.processingFailed(e, processor.instance.name, processor.instance.version)
             processor.runFailed(e)
             throw ProcessingException(e)
         }
@@ -211,42 +204,20 @@ internal class ReactiveMessageHandler(
         emitter.send(payload)
     } catch (e: Exception) {
         logger.warn(e) { "Failed to emit next message. Message will be stored in the $RETRY_TABLE table instead to be re-emit later" }
-        metrics.processingFailed(MESSAGE_EMISSION_ERROR, workflowName, workflowVersion)
+        metrics.processingFailed(FailureReasons.MESSAGE_EMISSION_ERROR, workflowName, workflowVersion)
         saveForRetry(e)
         throw ProcessingException(e)
     }
 
-    /**
-     * Determines a low-cardinality failure reason from an exception for use in metrics.
-     * This is crucial for creating actionable alerts and dashboards without overwhelming
-     * the metrics backend.
-     */
-    private fun getFailureReason(e: Throwable): String = when (e) {
-        // Domain-specific errors from the workflow engine
-        is WorkflowException -> WORKFLOW_ERROR_PREFIX + e.error.type.lowercase()
-
-        // --- Database & Persistence Errors ---
-        is SQLException -> DATABASE_ERROR
-
-        // --- I/O and Network Errors ---
-        is IOException -> IO_ERROR
-
-        // --- Application State Errors ---
-        is IllegalStateException -> INVALID_STATE
-
-        // --- Fallback for any other uncategorized exception ---
-        else -> PROCESSING_ERROR
-    }
-
     private suspend fun Message<String>.deserializationFailed(cause: Exception) = try {
-        val retryModel = RetryModel(
+        val retryOutboxModel = RetryOutboxModel(
             instance = null,
             message = payload,
             outboxLastError = cause.stackTraceToString(),
             outboxScheduledFor = Clock.System.now(),
             outBoxStatus = OutBoxStatus.FAILED,
         )
-        retryRepository.insert(retryModel)
+        retryRepository.insert(retryOutboxModel)
         // as the responsibility of the message is transferred to the database, we acknowledge the message
         ack(UNKNOWN, UNKNOWN)
     } catch (e: Exception) {
@@ -261,14 +232,14 @@ internal class ReactiveMessageHandler(
     }
 
     private suspend fun InstanceMessage.saveAsFailed(cause: Exception?) = try {
-        val retryModel = RetryModel(
+        val retryOutboxModel = RetryOutboxModel(
             instance = this,
             message = null,
             outboxLastError = cause?.stackTraceToString(),
             outboxScheduledFor = Clock.System.now(),
             outBoxStatus = OutBoxStatus.FAILED,
         )
-        retryRepository.insert(retryModel)
+        retryRepository.insert(retryOutboxModel)
         // as the responsibility of the message is transferred to the database, we acknowledge the message
         message.ack(workflowName, workflowVersion)
     } catch (e: Exception) {
@@ -278,14 +249,14 @@ internal class ReactiveMessageHandler(
 
     private suspend fun InstanceMessage.saveForRetry(cause: Exception) = try {
         // save the next message for re-emission
-        val retryModel = RetryModel(
+        val retryOutboxModel = RetryOutboxModel(
             instance = this,
             outboxLastError = cause.stackTraceToString(),
             outboxScheduledFor = Clock.System.now(), // <- TODO check first date
             outBoxStatus = OutBoxStatus.PENDING,
             message = null,
         )
-        retryRepository.insert(retryModel)
+        retryRepository.insert(retryOutboxModel)
         // as the responsibility of the message is transferred to the database, we acknowledge the message
         message.ack(workflowName, workflowVersion)
     } catch (e: Exception) {
