@@ -9,11 +9,35 @@ import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
 import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_TOPIC_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USER_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_CONNECTOR
+import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_HOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PASSWORD_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_QUEUE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZER
+import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.instances.WORKFLOW_IN
 import com.lemline.runner.instances.WORKFLOW_OUT
 import io.quarkus.runtime.annotations.ConfigPhase
@@ -25,92 +49,13 @@ import org.eclipse.microprofile.config.spi.ConfigSource
 
 
 /**
- * Custom configuration source factory for Lemline.
- * This class transforms Lemline-specific configuration into Quarkus-compatible properties.
+ * Factory class responsible for creating configuration sources for Lemline-based properties.
+ * Used during Quarkus startup to process and transform Lemline-specific configuration into
+ * custom configuration sources.
  *
- * Configuration Transformation Process:
- * 1. Collects all properties starting with "lemline."
- * 2. Creates a type-safe configuration using SmallRyeConfig
- * 3. Uses companion object methods to generate Quarkus-specific properties
- *
- * Configuration Sources:
- * - Ordinal: 275 (higher than default sources)
- * - Priority: Takes precedence over application.properties
- * - Scope: Applies to all profiles
- *
- * Configuration Precedence:
- * - This ConfigSourceFactory adds a new configuration source with transformed properties
- * - The transformed properties take precedence over properties from sources with lower ordinals
- * - Properties from other sources (system properties, environment variables, etc.) are preserved
- * - Only properties that are transformed from lemline.* properties are overridden
- *
- * Configuration Timing:
- * - This factory runs during Quarkus's configuration phase
- * - Database configuration must be complete before Flyway runs
- * - To ensure proper timing:
- *   - Set quarkus.flyway.migrate-at-start=false if using custom database configuration
- *   - Configure database properties before Flyway initialization
- *   - Use quarkus.flyway.migrate-at-start=true only when database configuration is stable
- *
- * Database Initialization Order:
- * To ensure database properties are set before Flyway initialization:
- * 1. Configuration Profiles:
- *    - Create a 'db' profile with database configuration
- *    - Load it before the default profile: -Dquarkus.profile=db,default
- *    - Example application-db.properties:
- *      ```properties
- *      # Production/Development with custom configuration
- *      quarkus.flyway.migrate-at-start=false
- *      lemline.database.type=postgresql
- *      lemline.database.postgresql.host=localhost
- *      # ... other database properties
- *      ```
- *
- * 2. Manual Migration Control:
- *    - Disable automatic migration: quarkus.flyway.migrate-at-start=false
- *    - Create a StartupEvent observer to run migration after configuration:
- *    ```kotlin
- *    @ApplicationScoped
- *    class FlywayMigration {
- *        @Inject
- *        lateinit var flyway: Flyway
- *
- *        fun onStart(@Observes event: StartupEvent) {
- *            flyway.migrate()
- *        }
- *    }
- *    ```
- *
- * Best Practices:
- * - Always use 'none' when using Flyway (including in tests)
- * - Never mix Flyway with Hibernate schema generation
- * - For tests with Flyway:
- *   - Use a separate test database
- *   - Configure Flyway to clean the database before tests
- *   - Example test configuration (application-test.properties):
- *     ```properties
- *     # Tests use direct configuration, so migrate-at-start can be true
- *     quarkus.hibernate-orm.database.generation=none
- *     quarkus.flyway.clean-disabled=false
- *     quarkus.flyway.migrate-at-start=true
- *     quarkus.datasource.jdbc.url=jdbc:h2:mem:testdb
- *     quarkus.datasource.username=sa
- *     quarkus.datasource.password=
- *     ```
- *   - The `TestFlywayMigration` class ensures migrations are automatically run for the `test` profile by observing the `StartupEvent`, complementing the `application-test.properties` settings.
- * - For production/development with custom configuration:
- *   - Use migrate-at-start=false
- *   - Manually trigger migration after configuration
- * - Never use 'update' in production
- * - Use 'validate' to check schema-entity alignment
- *
- * Error Handling:
- * - Graceful degradation for missing properties
- * - Detailed logging of configuration issues
- * - Default values for optional properties
- *
- * @see LemlineConfiguration for type-safe configuration mapping
- * @see https://quarkus.io/guides/config-reference for Quarkus configuration details
+ * This class processes all configuration properties prefixed with `lemline.`, generates
+ * contextual settings for various modules such as database, messaging, and metrics, and
+ * transforms them into Quarkus-compatible configuration sources.
  */
 @ConfigRoot(phase = ConfigPhase.BUILD_TIME)
 class LemlineConfigSourceFactory : ConfigSourceFactory {
@@ -210,11 +155,11 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         if (usePostgres) {
             val prefix = "lemline.database.postgresql"
-            val host = props["$prefix.host"] ?: "localhost"
-            val port = props["$prefix.port"] ?: "5432"
-            val name = props["$prefix.name"] ?: "lemline"
-            val username = props["$prefix.username"] ?: "postgres"
-            val password = props["$prefix.password"] ?: "postgres"
+            val host = props["$prefix.host"] ?: POSTGRES_HOST_DEFAULT
+            val port = props["$prefix.port"] ?: POSTGRES_PORT_DEFAULT
+            val name = props["$prefix.name"] ?: POSTGRES_NAME_DEFAULT
+            val username = props["$prefix.username"] ?: POSTGRES_USER_DEFAULT
+            val password = props["$prefix.password"] ?: POSTGRES_PASSWORD_DEFAULT
 
             // apply defaults
             "$prefix.host".let { if (props[it] == null) generated[it] = host }
@@ -233,11 +178,11 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         if (useMysql) {
             val prefix = "lemline.database.mysql"
-            val host = props["$prefix.host"] ?: "localhost"
-            val port = props["$prefix.port"] ?: "3306"
-            val name = props["$prefix.name"] ?: "lemline"
-            val username = props["$prefix.username"] ?: "mysql"
-            val password = props["$prefix.password"] ?: "mysql"
+            val host = props["$prefix.host"] ?: MYSQL_HOST_DEFAULT
+            val port = props["$prefix.port"] ?: MYSQL_PORT_DEFAULT
+            val name = props["$prefix.name"] ?: MYSQL_NAME_DEFAULT
+            val username = props["$prefix.username"] ?: MYSQL_USER_DEFAULT
+            val password = props["$prefix.password"] ?: MYSQL_PASSWORD_DEFAULT
 
             // apply defaults
             "$prefix.host".let { if (props[it] == null) generated[it] = host }
@@ -260,10 +205,10 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         // apply quarkus properties
         if (type == DB_TYPE_IN_MEMORY) {
-            generated["quarkus.datasource.username"] = LemlineConfigConstants.DEFAULT_H2_USERNAME
-            generated["quarkus.datasource.password"] = LemlineConfigConstants.DEFAULT_H2_PASSWORD
+            generated["quarkus.datasource.username"] = LemlineConfigConstants.H2_USERNAME_DEFAULT
+            generated["quarkus.datasource.password"] = LemlineConfigConstants.H2_PASSWORD_DEFAULT
             generated["quarkus.datasource.jdbc.url"] =
-                "jdbc:h2:mem:${LemlineConfigConstants.DEFAULT_H2_DB_NAME};DB_CLOSE_DELAY=-1;MODE=PostgreSQL"
+                "jdbc:h2:mem:${LemlineConfigConstants.H2_DB_NAME_DEFAULT};DB_CLOSE_DELAY=-1;MODE=PostgreSQL"
         }
 
         return generated
@@ -298,10 +243,10 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         if (useKafka) {
             val prefix = "lemline.messaging.kafka"
-            val topic = props["$prefix.topic"] ?: "lemline"
-            val groupId = props["$prefix.group-id"] ?: "group-1"
-            val offsetReset = props["$prefix.offset-reset"] ?: "earliest"
-            val brokers = props["$prefix.brokers"] ?: "localhost:9092"
+            val brokers = props["$prefix.brokers"] ?: KAFKA_BROKERS_DEFAULT
+            val topic = props["$prefix.topic"] ?: KAFKA_TOPIC_DEFAULT
+            val groupId = props["$prefix.group-id"] ?: KAFKA_GROUP_ID_DEFAULT
+            val offsetReset = props["$prefix.offset-reset"] ?: KAFKA_OFFSET_RESET_DEFAULT
             val topicDLQ = props["$prefix.topic-dlq"] ?: "$topic-dlq"
             val topicOut = props["$prefix.topic-out"] ?: topic
 
@@ -323,15 +268,13 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                     generated["$incoming.auto.offset.reset"] = offsetReset
                     generated["$incoming.failure-strategy"] = "dead-letter-queue"
                     generated["$incoming.dead-letter-queue.topic"] = topicDLQ
-                    generated["$incoming.value.deserializer"] =
-                        "org.apache.kafka.common.serialization.StringDeserializer"
+                    generated["$incoming.value.deserializer"] = KAFKA_STRING_SERIALIZER
                 }
 
                 if (producerEnabled) {
                     generated["$outgoing.connector"] = KAFKA_CONNECTOR
                     generated["$outgoing.topic"] = topicOut
-                    generated["$outgoing.value.serializer"] =
-                        "org.apache.kafka.common.serialization.StringSerializer"
+                    generated["$outgoing.value.serializer"] = KAFKA_STRING_SERIALIZER
                 }
 
                 props["$prefix.security-protocol"]?.let { generated["kafka.security.protocol"] = it }
@@ -351,12 +294,12 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 
         if (useRabbit) {
             val prefix = "lemline.messaging.rabbitmq"
-            val hostname = props["$prefix.hostname"] ?: "localhost"
-            val port = props["$prefix.port"] ?: "5672"
-            val username = props["$prefix.username"] ?: "guest"
-            val password = props["$prefix.password"] ?: "guest"
-            val virtualHost = props["$prefix.virtual-host"] ?: "/"
-            val queue = props["$prefix.queue"] ?: "lemline"
+            val hostname = props["$prefix.hostname"] ?: RABBITMQ_HOST_DEFAULT
+            val port = props["$prefix.port"] ?: RABBITMQ_PORT_DEFAULT
+            val username = props["$prefix.username"] ?: RABBITMQ_USER_DEFAULT
+            val password = props["$prefix.password"] ?: RABBITMQ_PASSWORD_DEFAULT
+            val virtualHost = props["$prefix.virtual-host"] ?: RABBITMQ_VHOST_DEFAULT
+            val queue = props["$prefix.queue"] ?: RABBITMQ_QUEUE_DEFAULT
             val queueDLQ = props["$prefix.queue-dlq"] ?: "$queue-dlq"
             val queueOut = props["$prefix.queue-out"] ?: queue
 
@@ -381,7 +324,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                     generated["$incoming.queue.name"] = queue
                     generated["$incoming.queue.durable"] = "true"
                     generated["$incoming.auto-ack"] = "false"
-                    generated["$incoming.deserializer"] = "java.lang.String"
+                    generated["$incoming.deserializer"] = RABBITMQ_STRING_SERIALIZER
                     generated["$incoming.queue.arguments.x-dead-letter-exchange"] = "dlx"
                     generated["$incoming.queue.arguments.x-dead-letter-routing-key"] = queueDLQ
                 }
@@ -389,7 +332,7 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                 if (producerEnabled) {
                     generated["$outgoing.connector"] = RABBITMQ_CONNECTOR
                     generated["$outgoing.queue.name"] = queueOut
-                    generated["$outgoing.serializer"] = "java.lang.String"
+                    generated["$outgoing.serializer"] = RABBITMQ_STRING_SERIALIZER
                 }
 
                 props["$prefix.exchange-name"]?.let { generated["$outgoing.exchange.name"] = it }
@@ -408,8 +351,8 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
     private fun generateMetricsProperties(props: Map<String, String>): Map<String, String> {
         val generated = mutableMapOf<String, String>()
         val prefix = "lemline.metrics"
-        val port = props["$prefix.port"] ?: "8080"
-        val path = props["$prefix.path"] ?: "/q/metrics"
+        val port = props["$prefix.port"] ?: METRICS_PORT_DEFAULT
+        val path = props["$prefix.path"] ?: METRICS_PATH_DEFAULT
 
         // apply defaults
         "$prefix.port".let { if (props[it] == null) generated[it] = port }
