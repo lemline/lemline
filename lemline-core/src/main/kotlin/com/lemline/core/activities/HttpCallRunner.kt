@@ -25,7 +25,7 @@ class HttpCallRunner : ActivityRunner<CallHttpInstance> {
             raiseError = instance::raiseError,
         )
 
-        instance.logInfo { "Executing HTTP call: ${instance.node.name}" }
+        instance.logDebug { "Executing HTTP call: ${instance.node.name}" }
 
         val httpArgs = instance.node.task.with
 

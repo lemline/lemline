@@ -13,7 +13,7 @@ import kotlinx.serialization.json.JsonElement
 
 @ExperimentalTime
 internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElement {
-    logInfo { "Executing run workflow command: ${node.name}" }
+    logDebug { "Executing run workflow command: ${node.name}" }
 
     val subWorkflowName = runWorkflow.workflow.name
     val subWorkflowVersion = runWorkflow.workflow.version

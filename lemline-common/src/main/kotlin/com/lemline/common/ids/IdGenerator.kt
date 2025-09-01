@@ -16,9 +16,7 @@ object IdGenerator {
      * Uses UuidCreator to create a time-ordered UUID which provides both uniqueness
      * and chronological ordering.
      */
-    fun generateUUIDV7(): UUID {
-        return UuidCreator.getTimeOrderedEpoch()
-    }
+    fun generateUUIDV7(): UUID = UuidCreator.getTimeOrderedEpochFast()
 
     /**
      * Derive a new UUIDv7 deterministically from an existing UUIDv7.
@@ -28,9 +26,9 @@ object IdGenerator {
      * - Random bits are deterministically derived from SHA-256(salt || sourceV7 bytes),
      *   making the mapping idempotent for the same input and salt.
      *
-     * Use a non-empty salt to create a separate derivation namespace (recommended).
+     * Use a non-empty salt to create a separate derivation namespace when needed.
      */
-    fun deterministicUUIDV7(sourceV7: UUID, salt: String = ""): UUID {
+    fun deriveUuidV7FromV7(sourceV7: UUID, salt: String = ""): UUID {
         require(sourceV7.version() == 7) { "sourceV7 must be a UUID version 7" }
         // A UUIDv7 must use the IETF RFC 4122 variant, which is variant 2.
         require(sourceV7.variant() == 2) { "sourceV7 must have the RFC 4122 variant (2)" }
@@ -48,7 +46,7 @@ object IdGenerator {
             ByteBuffer.allocate(16)
                 .putLong(sourceV7.mostSignificantBits)
                 .putLong(sourceV7.leastSignificantBits)
-                .flip() // Prepare buffer for reading by the digest.
+                .flip() // Prepare a buffer for reading by the digest.
         )
         val digest = md.digest() // 32-byte hash; we will consume the first 10 bytes (80 bits).
 
@@ -72,20 +70,5 @@ object IdGenerator {
 
         return UUID(msb, lsb)
     }
-
-// ------- Example -------
-// val source = UUID.fromString("018fa0d6-9ec0-7c5e-8a64-9a3c2d8e7b4c")
-// val derived = deriveUuidV7FromV7(source, UUID.fromString("2c8e2d0c-9a53-4a30-8e6b-6b7b5ec7a1fb"))
-// println(derived)
-
 }
 
-
-fun main() {
-    val id = IdGenerator.generateUUIDV7()
-    println(id)
-    println(IdGenerator.deterministicUUIDV7(id, "test"))
-    println(IdGenerator.deterministicUUIDV7(id, "test"))
-    println(IdGenerator.deterministicUUIDV7(id))
-    println(IdGenerator.deterministicUUIDV7(id))
-}

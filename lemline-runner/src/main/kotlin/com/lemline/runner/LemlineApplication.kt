@@ -118,7 +118,6 @@ class LemlineApplication : QuarkusApplication {
                         System.setProperty(PRODUCER_ENABLED, "true")
                     }
                 }
-
             } catch (ex: Exception) {
                 // Handle all exceptions in a unified way
                 System.err.println("⚠️ ${ex.message}")

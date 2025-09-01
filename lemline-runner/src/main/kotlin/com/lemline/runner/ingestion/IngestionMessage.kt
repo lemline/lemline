@@ -20,7 +20,7 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 @Serializable
 @JsonClassDiscriminator("t") // <- type discriminator for polymorphic serialization
 sealed interface IngestionMessage : WithId {
-    @SerialName("i")
+    @SerialName("w")
     val instance: InstanceMessage?
 
     @SerialName("s")

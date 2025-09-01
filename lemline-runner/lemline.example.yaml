@@ -98,48 +98,36 @@ lemline:
     # --- Kafka Specific Settings (Uncomment and configure to use Kafka) ---
     kafka:
       brokers: ${LEMLINE_KAFKA_BROKERS:localhost:9092}
-      consumer:
-        enabled: true
-        workflow:
-          enabled: true
-          topic: ${LEMLINE_KAFKA_TOPIC_WORKFLOWS:lemline-workflows}
-          topic-dlq: ${LEMLINE_KAFKA_TOPIC_DLQ:lemline-dlq}
-          group-id: ${LEMLINE_KAFKA_GROUP_ID:lemline-runner-group}
-          offset-reset: earliest # Options: earliest | latest
-        ingestion:
-
-    kafka:
-      brokers: ${LEMLINE_KAFKA_BROKERS:localhost:9092}
-      # security-protocol: SASL_SSL # Options: PLAINTEXT | SSL | SASL_PLAINTEXT | SASL_SSL
-      # sasl-mechanism: PLAIN
-      # sasl-username: ${LEMLINE_KAFKA_USER}
-      # sasl-password: ${LEMLINE_KAFKA_PASSWORD} # RECOMMENDED: Set via LEMLINE_KAFKA_PASSWORD env var!
+      # security-protocol: ${LEMLINE_KAFKA_SECURITY_PROTOCOL:PLAINTEXT}  # PLAINTEXT|SSL|SASL_PLAINTEXT|SASL_SSL
+      # sasl-mechanism: ${LEMLINE_KAFKA_SASL_MECHANISM:}                 # e.g., PLAIN
+      # sasl-username: ${LEMLINE_KAFKA_USER:}
+      # sasl-password: ${LEMLINE_KAFKA_PASSWORD:}                        # set via env/secret manager
       workflows:
-        topic: ${LEMLINE_KAFKA_TOPIC_WORKFLOWS:lemline-workflows}
-        concurrency: 10
-        dlq: ${LEMLINE_KAFKA_TOPIC_DLQ:lemline-workflows-dlq}
-        group-id: ${LEMLINE_KAFKA_GROUP_ID:group-1}
-        offset-reset: earliest # Options: earliest | latest
-        enabled: true
-      ingestion:
-        topic: ${LEMLINE_KAFKA_TOPIC_WORKFLOWS:lemline-ingestion}
+        topic: ${LEMLINE_WORKFLOWS_TOPIC:lemline-workflows}
         consumer:
-          concurrency: 5
-          dlq: ${LEMLINE_KAFKA_INGESTION_DLQ:lemline-ingestion-dlq}
-          group-id: ${LEMLINE_KAFKA_GROUP_ID:group-1}
-          offset-reset: earliest # Options: earliest | latest
-          enabled: true
-
+          concurrency: ${LEMLINE_WORKFLOWS_CONCURRENCY:10}
+          dlq: ${LEMLINE_WORKFLOWS_DLQ:lemline-workflows-dlq}
+          group-id: ${LEMLINE_WORKFLOWS_KAFKA_GROUP_ID:lemline-workflows-g1}
+      ingestion:
+        topic: ${LEMLINE_INGESTION_TOPIC:lemline-ingestion}
+        consumer:
+          concurrency: ${LEMLINE_INGESTION_CONCURRENCY:5}
+          dlq: ${LEMLINE_INGESTION_DLQ:lemline-ingestion-dlq}
+          group-id: ${LEMLINE_INGESTION_KAFKA_GROUP_ID:lemline-ingestion-g1}
 
     # --- RabbitMQ Specific Settings (Uncomment and configure to use RabbitMQ) ---
-    #rabbitmq:
-    #  hostname: ${LEMLINE_RABBITMQ_HOST:localhost}
-    #  port: ${LEMLINE_RABBITMQ_PORT:5672}
-    #  username: ${LEMLINE_RABBITMQ_USER:guest}
-    #  password: ${LEMLINE_RABBITMQ_PASSWORD:guest} # RECOMMENDED: Set via LEMLINE_RABBITMQ_PASSWORD env var!
-    #  virtual-host: ${LEMLINE_RABBITMQ_VHOST:/}
-    #  queue: ${LEMLINE_RABBITMQ_QUEUE_IN:lemline}
-    #  # Optional: Configure exchange (if used, remove/comment out the 'queue:' line above)
-    #  # exchange-name: my_exchange
-    #  # Optional: TLS/SSL configuration
-    #  # ssl-enabled: false
+    rabbitmq:
+      hostname: ${LEMLINE_RABBITMQ_HOST:localhost}
+      port: ${LEMLINE_RABBITMQ_PORT:5672}
+      username: ${LEMLINE_RABBITMQ_USER:}
+      password: ${LEMLINE_RABBITMQ_PASSWORD:}
+      # Optional: Configure exchange (if used, remove/comment out the 'queue:' line above)
+      # exchange-name: my_exchange
+      # Optional: TLS/SSL configuration
+      # ssl-enabled: false
+      workflows:
+        virtual-host: ${LEMLINE_WORKFLOWS_RABBITMQ_VHOST:/}
+        queue: ${LEMLINE_WORKFLOWS_TOPIC:lemline}
+        consumer:
+          concurrency: ${LEMLINE_WORKFLOWS_CONCURRENCY:5}
+          dlq: ${LEMLINE_WORKFLOWS_DLQ:lemline-ingestion-dlq}

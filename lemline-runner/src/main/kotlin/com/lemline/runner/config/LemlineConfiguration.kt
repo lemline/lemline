@@ -50,18 +50,6 @@ interface LemlineConfiguration {
 
     /**
      * Database configuration mapping.
-     * Supports multiple database types with type-safe configuration.
-     *
-     * Configuration Example:
-     * ```yaml
-     * lemline:
-     *   database:
-     *     type: postgresql
-     *     migrateAtStart: true
-     *     postgresql:
-     *       host: localhost
-     *       port: 5432
-     * ```
      */
     interface DatabaseConfig {
 
@@ -128,17 +116,6 @@ interface LemlineConfiguration {
 
     /**
      * Messaging configuration mapping.
-     * Supports multiple messaging systems with type-safe configuration.
-     *
-     * Configuration Example:
-     * ```yaml
-     * lemline:
-     *   messaging:
-     *     type: kafka
-     *     kafka:
-     *       brokers: localhost:9092
-     *       topic: workflows-in
-     * ```
      */
     interface MessagingConfig {
 
@@ -189,6 +166,41 @@ interface LemlineConfiguration {
         fun saslMechanism(): Optional<String>
         fun saslUsername(): Optional<String>
         fun saslPassword(): Optional<String>
+//
+//        fun workflows(): Optional<KafkaTopicConfig>
+//        fun ingestion(): Optional<KafkaTopicConfig>
+//    }
+//
+//    interface KafkaTopicConfig {
+//        fun topic(): String
+//        fun consumer(): KafkaConsumerConfig
+//        fun producer(): KafkaProducerConfig
+//
+//        @TestOnly
+//        fun topicOut(): Optional<String>
+//    }
+//
+//    interface KafkaConsumerConfig {
+//        @WithDefault("false")
+//        fun enabled(): Boolean
+//
+//        @WithDefault("1")
+//        fun concurrency(): Int
+//
+//        @WithDefault("group-1")
+//        fun groupId(): String
+//
+//        @WithDefault("earliest")
+//        @Pattern(regexp = "earliest|latest")
+//        fun offsetReset(): String
+//
+//        @WithDefault("earliest")
+//        fun topicDlq(): String
+//    }
+//
+//    interface KafkaProducerConfig {
+//        @WithDefault("false")
+//        fun enabled(): Boolean
     }
 
     /**

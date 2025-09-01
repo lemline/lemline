@@ -25,6 +25,9 @@ object LemlineConfigConstants {
     const val KAFKA_CONNECTOR = "smallrye-kafka"
     const val RABBITMQ_CONNECTOR = "smallrye-rabbitmq"
 
+    const val WORKFLOWS_TOPIC_DEFAULT = "lemline-workflows"
+    const val INGESTION_TOPIC_DEFAULT = "lemline-ingestion"
+    
     // Postgres
     const val POSTGRES_HOST_DEFAULT = "localhost"
     const val POSTGRES_PORT_DEFAULT = "5432"
@@ -46,10 +49,10 @@ object LemlineConfigConstants {
 
     // Kafka
     const val KAFKA_BROKERS_DEFAULT = "localhost:9092"
-    const val KAFKA_TOPIC_DEFAULT = "lemline"
     const val KAFKA_GROUP_ID_DEFAULT = "group-1"
     const val KAFKA_OFFSET_RESET_DEFAULT = "earliest"
-    const val KAFKA_STRING_SERIALIZER = "org.apache.kafka.common.serialization.StringDeserializer"
+    const val KAFKA_STRING_SERIALIZER = "org.apache.kafka.common.serialization.StringSerializer"
+    const val KAFKA_STRING_DESERIALIZER = "org.apache.kafka.common.serialization.StringDeserializer"
 
     // RabbitMQ
     const val RABBITMQ_HOST_DEFAULT = "localhost"

@@ -20,7 +20,7 @@ import kotlinx.serialization.json.JsonElement
 
 @ExperimentalTime
 internal suspend fun RunInstance.runScript(runScript: RunScript): JsonElement {
-    logInfo { "Executing run script: ${node.name}" }
+    logDebug { "Executing run script: ${node.name}" }
 
     val scriptUnion = runScript.script
     val script: Script? = scriptUnion.get()

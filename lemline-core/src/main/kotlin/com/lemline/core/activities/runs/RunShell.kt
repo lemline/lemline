@@ -8,7 +8,7 @@ import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.ST
 import kotlinx.serialization.json.JsonElement
 
 internal suspend fun RunInstance.runShell(runShell: RunShell): JsonElement {
-    logInfo { "Executing run shell command: ${node.name}" }
+    logDebug { "Executing run shell command: ${node.name}" }
 
     val shellConfig = runShell.shell
     logDebug { "Shell config: $shellConfig" }
