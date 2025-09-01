@@ -2,8 +2,8 @@
 package com.lemline.runner.messaging
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
-import com.lemline.runner.instances.WORKFLOW_IN
-import com.lemline.runner.instances.WORKFLOW_OUT
+import com.lemline.runner.instances.WORKFLOWS_IN_CHANNEL
+import com.lemline.runner.instances.WORKFLOWS_OUT_CHANNEL
 import com.lemline.runner.messaging.bases.WorkflowConsumerTest
 import com.lemline.runner.tests.profiles.KafkaProfile
 import io.quarkus.test.junit.QuarkusTest
@@ -34,10 +34,10 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
     @ConfigProperty(name = "kafka.bootstrap.servers")
     lateinit var bootstrapServers: String
 
-    @ConfigProperty(name = "mp.messaging.incoming.$WORKFLOW_IN.topic")
+    @ConfigProperty(name = "mp.messaging.incoming.$WORKFLOWS_IN_CHANNEL.topic")
     lateinit var topicIn: String
 
-    @ConfigProperty(name = "mp.messaging.outgoing.$WORKFLOW_OUT.topic")
+    @ConfigProperty(name = "mp.messaging.outgoing.$WORKFLOWS_OUT_CHANNEL.topic")
     lateinit var topicOut: String
 
     private lateinit var producer: KafkaProducer<String, String>

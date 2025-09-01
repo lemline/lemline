@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.config
+package com.lemline.runner.repositories
 
 import com.lemline.common.debug
 import com.lemline.common.logger
 import com.lemline.common.trace
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
+import com.lemline.runner.config.DATABASE_TYPE
+import com.lemline.runner.config.LemlineConfigConstants
 import io.agroal.api.AgroalDataSource
 import io.quarkus.agroal.DataSource
 import io.quarkus.arc.profile.IfBuildProfile
@@ -43,17 +42,17 @@ class DatabaseManager {
         log.trace { "-    Default datasource resolvable: ${h2DataSource.isResolvable}" }
 
         when (dbType) {
-            DB_TYPE_POSTGRESQL -> {
+            LemlineConfigConstants.DB_TYPE_POSTGRESQL -> {
                 if (postgresDataSource.isResolvable) postgresDataSource.get()
                 else throw IllegalStateException("PostgreSQL datasource is not available.")
             }
 
-            DB_TYPE_MYSQL -> {
+            LemlineConfigConstants.DB_TYPE_MYSQL -> {
                 if (mysqlDataSource.isResolvable) mysqlDataSource.get()
                 else throw IllegalStateException("MySQL datasource is not available")
             }
 
-            DB_TYPE_IN_MEMORY -> {
+            LemlineConfigConstants.DB_TYPE_IN_MEMORY -> {
                 if (h2DataSource.isResolvable) h2DataSource.get()
                 else throw IllegalStateException("H2 datasource is not available")
             }
@@ -81,17 +80,17 @@ class DatabaseManager {
         log.debug { "-         H2 flyway resolvable: ${h2Flyway.isResolvable}" }
 
         when (dbType) {
-            DB_TYPE_POSTGRESQL -> {
+            LemlineConfigConstants.DB_TYPE_POSTGRESQL -> {
                 if (postgresqlFlyway.isResolvable) postgresqlFlyway.get()
                 else throw IllegalStateException("PostgreSQL flyway is not available.")
             }
 
-            DB_TYPE_MYSQL -> {
+            LemlineConfigConstants.DB_TYPE_MYSQL -> {
                 if (mysqlFlyway.isResolvable) mysqlFlyway.get()
                 else throw IllegalStateException("MySQL flyway is not available")
             }
 
-            DB_TYPE_IN_MEMORY -> {
+            LemlineConfigConstants.DB_TYPE_IN_MEMORY -> {
                 if (h2Flyway.isResolvable) h2Flyway.get()
                 else throw IllegalStateException("H2 flyway is not available")
             }

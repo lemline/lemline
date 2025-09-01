@@ -1,18 +1,43 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.runner.config.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.DB_MIGRATE_AT_START_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.INGESTION_TOPIC_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MSG_CONSUMER_CONCURRENCY_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.WORKFLOWS_TOPIC_DEFAULT
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithDefault
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Pattern
 import java.util.*
 
-const val PRODUCER_ENABLED = "lemline.messaging.producer.enabled"
-const val CONSUMER_ENABLED = "lemline.messaging.consumer.enabled"
 const val DATABASE_TYPE = "lemline.database.type"
 const val MESSAGING_TYPE = "lemline.messaging.type"
-const val MESSAGING_CONSUMER_CONCURRENCY = "lemline.messaging.consumer.concurrency"
 const val MIGRATE_AT_START = "lemline.database.migrate-at-start"
+
+const val WORKFLOWS_PRODUCER_ENABLED = "lemline.messaging.workflows.producer.enabled"
+const val WORKFLOWS_CONSUMER_ENABLED = "lemline.messaging.workflows.consumer.enabled"
+const val WORKFLOWS_CONSUMER_CONCURRENCY = "lemline.messaging.workflows.consumer.concurrency"
+const val INGESTION_PRODUCER_ENABLED = "lemline.messaging.ingestion.producer.enabled"
+const val INGESTION_CONSUMER_ENABLED = "lemline.messaging.ingestion.consumer.enabled"
+const val INGESTION_CONSUMER_CONCURRENCY = "lemline.messaging.ingestion.consumer.concurrency"
 
 /**
  * Type-safe configuration mapping for Lemline.
@@ -36,7 +61,7 @@ const val MIGRATE_AT_START = "lemline.database.migrate-at-start"
  *    - Converted automatically: lemline.database.type -> LEMLINE_DATABASE_TYPE
  *    - Case-insensitive matching
  *
- * @see LemlineConfigSourceFactory for configuration transformation
+ * @see LemlineConfigSource for configuration transformation
  * @see https://quarkus.io/guides/config-reference for Quarkus configuration details
  */
 @Suppress("unused")
@@ -54,23 +79,22 @@ interface LemlineConfiguration {
     interface DatabaseConfig {
 
         /**
-         * Database type. Must be one of: in-memory, postgresql, mysql
+         * Database type.
+         * If not provided, it will be set in [LemlineConfigSource]
          */
         @Pattern(regexp = "in-memory|postgresql|mysql")
         fun type(): String
 
         /**
          * Whether to run database migrations at startup
-         * Default: false
          */
-        @WithDefault("false")
+        @WithDefault(DB_MIGRATE_AT_START_DEFAULT)
         fun migrateAtStart(): Boolean
 
         /**
          * Whether to baseline existing database
-         * Default: false
          */
-        @WithDefault("false")
+        @WithDefault(DB_BASELINE_ON_MIGRATE_DEFAULT)
         fun baselineOnMigrate(): Boolean
 
         /**
@@ -86,32 +110,42 @@ interface LemlineConfiguration {
 
     /**
      * PostgresSQL-specific configuration.
-     * IMPORTANT: default values are not applied here, but in [LemlineConfigSourceFactory].
-     * Adding default values here would automatically create an entry in the configuration.
      */
     interface PostgreSQLConfig {
+        @WithDefault(POSTGRES_HOST_DEFAULT)
         fun host(): String
 
-        @Min(1)
+        @WithDefault(POSTGRES_PORT_DEFAULT)
         fun port(): Int
+
+        @WithDefault(POSTGRES_USERNAME_DEFAULT)
         fun username(): String
-        fun password(): String
-        fun name(): String
+
+        @WithDefault(POSTGRES_PASSWORD_DEFAULT)
+        fun password(): Optional<String>
+
+        @WithDefault(POSTGRES_NAME_DEFAULT)
+        fun name(): Optional<String>
     }
 
     /**
      * MySQL-specific configuration.
-     * IMPORTANT: default values are not applied here, but in [LemlineConfigSourceFactory].
-     * Adding default values here would automatically create an entry in the configuration.
      */
     interface MySQLConfig {
+        @WithDefault(MYSQL_HOST_DEFAULT)
         fun host(): String
 
-        @Min(1)
-        fun port(): Int
-        fun username(): String
-        fun password(): String
-        fun name(): String
+        @WithDefault(MYSQL_PORT_DEFAULT)
+        fun port(): Optional<Int>
+
+        @WithDefault(MYSQL_USERNAME_DEFAULT)
+        fun username(): Optional<String>
+
+        @WithDefault(MYSQL_PASSWORD_DEFAULT)
+        fun password(): Optional<String>
+
+        @WithDefault(MYSQL_NAME_DEFAULT)
+        fun name(): Optional<String>
     }
 
     /**
@@ -119,18 +153,37 @@ interface LemlineConfiguration {
      */
     interface MessagingConfig {
 
-        // Producer settings
-        fun producer(): ProducerConfig
-
-        // Consumer settings
-        fun consumer(): ConsumerConfig
-
+        /**
+         * Database type.
+         * If not provided, it will be set in [LemlineConfigSource]
+         */
         @Pattern(regexp = "in-memory|kafka|rabbitmq")
         fun type(): String
 
-        // Broker Specific settings
+        fun workflows(): Optional<WorkflowsConfig>
+
+
+        fun ingestion(): Optional<IngestionConfig>
+
+        /**
+         * Optional Kafka configuration
+         */
         fun kafka(): Optional<KafkaConfig>
+
+        /**
+         * Optional RabbitMQ configuration
+         */
         fun rabbitmq(): Optional<RabbitMQConfig>
+    }
+
+    interface WorkflowsConfig {
+        fun producer(): ProducerConfig
+        fun consumer(): ConsumerConfig
+    }
+
+    interface IngestionConfig {
+        fun producer(): ProducerConfig
+        fun consumer(): ConsumerConfig
     }
 
     interface ProducerConfig {
@@ -142,86 +195,105 @@ interface LemlineConfiguration {
         @WithDefault("false")
         fun enabled(): Boolean
 
-        @WithDefault("64")
+        @WithDefault(MSG_CONSUMER_CONCURRENCY_DEFAULT)
         fun concurrency(): Int
     }
 
     /**
      * Kafka-specific configuration.
-     * IMPORTANT: default values are not applied here, but in [LemlineConfigSourceFactory].
-     * Adding default values here would automatically create an entry in the configuration.
      */
     interface KafkaConfig {
+        @WithDefault(KAFKA_BROKERS_DEFAULT)
         fun brokers(): String
-        fun topic(): String
-        fun groupId(): String
 
-        @Pattern(regexp = "earliest|latest")
-        fun offsetReset(): String
-
-        // Optional settings
-        fun topicDlq(): Optional<String>
-        fun topicOut(): Optional<String>
+        // Optional
         fun securityProtocol(): Optional<String>
         fun saslMechanism(): Optional<String>
         fun saslUsername(): Optional<String>
         fun saslPassword(): Optional<String>
-//
-//        fun workflows(): Optional<KafkaTopicConfig>
-//        fun ingestion(): Optional<KafkaTopicConfig>
-//    }
-//
-//    interface KafkaTopicConfig {
-//        fun topic(): String
-//        fun consumer(): KafkaConsumerConfig
-//        fun producer(): KafkaProducerConfig
-//
-//        @TestOnly
-//        fun topicOut(): Optional<String>
-//    }
-//
-//    interface KafkaConsumerConfig {
-//        @WithDefault("false")
-//        fun enabled(): Boolean
-//
-//        @WithDefault("1")
-//        fun concurrency(): Int
-//
-//        @WithDefault("group-1")
-//        fun groupId(): String
-//
-//        @WithDefault("earliest")
-//        @Pattern(regexp = "earliest|latest")
-//        fun offsetReset(): String
-//
-//        @WithDefault("earliest")
-//        fun topicDlq(): String
-//    }
-//
-//    interface KafkaProducerConfig {
-//        @WithDefault("false")
-//        fun enabled(): Boolean
+
+        fun workflows(): KafkaWorkflowsConfig
+        fun ingestion(): KafkaIngestionConfig
+    }
+
+    interface KafkaWorkflowsConfig {
+        @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
+        fun topic(): String
+        fun consumer(): KafkaConsumerConfig
+        fun producer(): KafkaProducerConfig
+    }
+
+    interface KafkaIngestionConfig {
+        @WithDefault(INGESTION_TOPIC_DEFAULT)
+        fun topic(): String
+        fun consumer(): KafkaConsumerConfig
+        fun producer(): KafkaProducerConfig
+    }
+
+    interface KafkaConsumerConfig {
+        @WithDefault(MSG_CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Int
+
+        @WithDefault(KAFKA_GROUP_ID_DEFAULT)
+        fun groupId(): String
+
+        @Pattern(regexp = "latest|earliest")
+        @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
+        fun offsetReset(): String
+
+        fun topicDlq(): Optional<String>
+
+        fun topicOut(): Optional<String>
+    }
+
+    interface KafkaProducerConfig {
+        fun topicOut(): Optional<String>
     }
 
     /**
      * RabbitMQ-specific configuration.
-     * IMPORTANT: default values are not applied here, but in [LemlineConfigSourceFactory].
+     * IMPORTANT: default values are not applied here, but in [LemlineConfigSource].
      * Adding default values here would automatically create an entry in the configuration.
      */
     interface RabbitMQConfig {
-        fun hostname(): String
+        fun hostname(): Optional<String>
+        fun port(): Optional<Int>
+        fun username(): Optional<String>
+        fun password(): Optional<String>
+        fun sslEnabled(): Optional<Boolean>
+        fun virtualHost(): Optional<String>
 
-        @Min(1)
-        fun port(): Int
-        fun username(): String
-        fun password(): String
-        fun virtualHost(): String
+        fun workflows(): RabbitWorkflowsConfig
+        fun ingestion(): RabbitIngestionConfig
+    }
+
+    interface RabbitWorkflowsConfig {
+
+        @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
         fun queue(): String
+        fun consumer(): RabbitConsumerConfig
+        fun producer(): RabbitProducerConfig
+    }
 
+    interface RabbitIngestionConfig {
+        @WithDefault(RABBITMQ_VHOST_DEFAULT)
+        fun virtualHost(): Optional<String>
+
+        @WithDefault(INGESTION_TOPIC_DEFAULT)
+        fun queue(): String
+        fun consumer(): RabbitConsumerConfig
+        fun producer(): RabbitProducerConfig
+    }
+
+    interface RabbitConsumerConfig {
+        @WithDefault(MSG_CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Int
         fun queueDlq(): Optional<String>
+    }
+
+    interface RabbitProducerConfig {
         fun queueOut(): Optional<String>
         fun exchangeName(): Optional<String>
-        fun sslEnabled(): Optional<Boolean>
     }
 
     interface OutboxConfig {
@@ -347,10 +419,12 @@ interface LemlineConfiguration {
 
     /**
      * Metrics configuration
-     * default values are not applied here, but in [LemlineConfigSourceFactory].
      */
     interface MetricsConfig {
+        @WithDefault(METRICS_PORT_DEFAULT)
         fun port(): Int
+
+        @WithDefault(METRICS_PATH_DEFAULT)
         fun path(): String
     }
 }

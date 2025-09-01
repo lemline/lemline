@@ -2,8 +2,8 @@
 package com.lemline.runner.messaging
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
-import com.lemline.runner.instances.WORKFLOW_IN
-import com.lemline.runner.instances.WORKFLOW_OUT
+import com.lemline.runner.instances.WORKFLOWS_IN_CHANNEL
+import com.lemline.runner.instances.WORKFLOWS_OUT_CHANNEL
 import com.lemline.runner.messaging.bases.WorkflowConsumerTest
 import com.lemline.runner.tests.profiles.RabbitMQProfile
 import com.rabbitmq.client.Channel
@@ -43,10 +43,10 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
     @ConfigProperty(name = "rabbitmq-password")
     lateinit var rabbitmqPassword: String
 
-    @ConfigProperty(name = "mp.messaging.incoming.$WORKFLOW_IN.queue.name")
+    @ConfigProperty(name = "mp.messaging.incoming.$WORKFLOWS_IN_CHANNEL.queue.name")
     lateinit var queueIn: String
 
-    @ConfigProperty(name = "mp.messaging.outgoing.$WORKFLOW_OUT.queue.name")
+    @ConfigProperty(name = "mp.messaging.outgoing.$WORKFLOWS_OUT_CHANNEL.queue.name")
     lateinit var queueOut: String
 
     private lateinit var connection: Connection
@@ -73,14 +73,14 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         channel.queueDeclare(queueIn, true, false, false, null)
 
         // Explicitly declare the exchange that SmallRye will default to
-        channel.exchangeDeclare(WORKFLOW_OUT, "topic", true)
+        channel.exchangeDeclare(WORKFLOWS_OUT_CHANNEL, "topic", true)
 
         // Declare the outgoing queue (where this test consumes)
         channel.queueDeclare(queueOut, true, false, false, null)
 
         // Bind the outgoing queue to the exchange with an EMPTY routing key,
         // matching the default behavior observed in the logs.
-        channel.queueBind(queueOut, WORKFLOW_OUT, "") // routingKey = ""
+        channel.queueBind(queueOut, WORKFLOWS_OUT_CHANNEL, "") // routingKey = ""
 
         // Purge queues
         channel.queuePurge(queueIn)

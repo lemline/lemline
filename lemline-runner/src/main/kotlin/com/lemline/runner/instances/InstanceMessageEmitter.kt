@@ -7,12 +7,12 @@ import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.enterprise.context.ApplicationScoped
 import org.eclipse.microprofile.reactive.messaging.Channel
 
-internal const val WORKFLOW_OUT = "workflows-out"
+internal const val WORKFLOWS_OUT_CHANNEL = "workflows-out"
 
 @Startup
 @ApplicationScoped
 internal class InstanceMessageEmitter : MessageEmitter() {
 
-    @Channel(WORKFLOW_OUT)
+    @Channel(WORKFLOWS_OUT_CHANNEL)
     override lateinit var emitter: MutinyEmitter<String>
 }

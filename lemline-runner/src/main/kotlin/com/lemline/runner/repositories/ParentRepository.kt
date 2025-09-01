@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.PARENT_TABLE
 import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus

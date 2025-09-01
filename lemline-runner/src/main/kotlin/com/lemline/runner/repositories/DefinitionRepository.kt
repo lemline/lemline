@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.DEFINITION_TABLE
 import com.lemline.runner.models.DefinitionModel
 import jakarta.enterprise.context.ApplicationScoped

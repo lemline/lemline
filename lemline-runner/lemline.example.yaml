@@ -95,6 +95,7 @@ lemline:
   # --- Messaging Configuration ---
   # The messaging type is inferred from the block you configure below (e.g., `kafka` or `rabbitmq`).
   messaging:
+
     # --- Kafka Specific Settings (Uncomment and configure to use Kafka) ---
     kafka:
       brokers: ${LEMLINE_KAFKA_BROKERS:localhost:9092}

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
 import com.lemline.common.info
@@ -6,6 +7,7 @@ import com.lemline.runner.LemlineApplication
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
+import com.lemline.runner.config.LemlineConfigConstants.INGESTION_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
@@ -15,6 +17,7 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_DESERIALIZE
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MSG_CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
@@ -22,24 +25,54 @@ import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USER_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USER_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_QUEUE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOWS_TOPIC_DEFAULT
-import com.lemline.runner.instances.WORKFLOW_IN
-import com.lemline.runner.instances.WORKFLOW_OUT
+import com.lemline.runner.ingestion.INGESTION_IN_CHANNEL
+import com.lemline.runner.ingestion.INGESTION_OUT_CHANNEL
+import com.lemline.runner.instances.WORKFLOWS_IN_CHANNEL
+import com.lemline.runner.instances.WORKFLOWS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
+
+enum class TopicType(
+    val configKey: String,
+    val defaultTopicName: String,
+    val incomingChannel: String,
+    val outgoingChannel: String,
+    val consumerEnabled: String,
+    val producerEnabled: String,
+    val consumerConcurrency: String
+) {
+    WORKFLOWS(
+        "workflows",
+        WORKFLOWS_TOPIC_DEFAULT,
+        WORKFLOWS_IN_CHANNEL,
+        WORKFLOWS_OUT_CHANNEL,
+        WORKFLOWS_CONSUMER_ENABLED,
+        WORKFLOWS_PRODUCER_ENABLED,
+        WORKFLOWS_CONSUMER_CONCURRENCY
+    ),
+    INGESTION(
+        "ingestion",
+        INGESTION_TOPIC_DEFAULT,
+        INGESTION_IN_CHANNEL,
+        INGESTION_OUT_CHANNEL,
+        INGESTION_CONSUMER_ENABLED,
+        INGESTION_PRODUCER_ENABLED,
+        INGESTION_CONSUMER_CONCURRENCY
+    );
+}
 
 class LemlineConfigSource : PropertiesConfigSource(
     buildProperties(),
@@ -64,10 +97,10 @@ class LemlineConfigSource : PropertiesConfigSource(
             logger.info { "Lemline user properties:\n${lemlineProps.toPrint()}" }
 
             // System property overrides
-            lemlineProps[CONSUMER_ENABLED] =
-                System.getProperty(CONSUMER_ENABLED) ?: lemlineProps[CONSUMER_ENABLED] ?: "false"
-            lemlineProps[PRODUCER_ENABLED] =
-                System.getProperty(PRODUCER_ENABLED) ?: lemlineProps[PRODUCER_ENABLED] ?: "false"
+            lemlineProps[WORKFLOWS_CONSUMER_ENABLED] = System.getProperty(WORKFLOWS_CONSUMER_ENABLED) ?: "false"
+            lemlineProps[WORKFLOWS_PRODUCER_ENABLED] = System.getProperty(WORKFLOWS_PRODUCER_ENABLED) ?: "false"
+            lemlineProps[INGESTION_CONSUMER_ENABLED] = System.getProperty(INGESTION_CONSUMER_ENABLED) ?: "false"
+            lemlineProps[INGESTION_PRODUCER_ENABLED] = System.getProperty(INGESTION_PRODUCER_ENABLED) ?: "false"
 
             // Generate and merge transformed properties
             val generatedProps = mutableMapOf<String, String>()
@@ -109,21 +142,13 @@ class LemlineConfigSource : PropertiesConfigSource(
                 val host = props["$prefix.host"] ?: POSTGRES_HOST_DEFAULT
                 val port = props["$prefix.port"] ?: POSTGRES_PORT_DEFAULT
                 val name = props["$prefix.name"] ?: POSTGRES_NAME_DEFAULT
-                val username = props["$prefix.username"] ?: POSTGRES_USER_DEFAULT
-                val password = props["$prefix.password"] ?: POSTGRES_PASSWORD_DEFAULT
-
-                // apply defaults
-                "$prefix.host".let { if (props[it] == null) generated[it] = host }
-                "$prefix.port".let { if (props[it] == null) generated[it] = port }
-                "$prefix.name".let { if (props[it] == null) generated[it] = name }
-                "$prefix.username".let { if (props[it] == null) generated[it] = username }
-                "$prefix.password".let { if (props[it] == null) generated[it] = password }
 
                 // apply quarkus properties
                 if (type == DB_TYPE_POSTGRESQL) {
-                    generated["quarkus.datasource.postgresql.username"] = username
-                    generated["quarkus.datasource.postgresql.password"] = password
-                    generated["quarkus.datasource.postgresql.jdbc.url"] = "jdbc:postgresql://$host:$port/$name"
+                    val postgres = "quarkus.datasource.postgresql"
+                    generated["$postgres.username"] = props["$prefix.username"] ?: POSTGRES_USERNAME_DEFAULT
+                    generated["$postgres.password"] = props["$prefix.password"] ?: POSTGRES_PASSWORD_DEFAULT
+                    generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$name"
                 }
             }
 
@@ -132,21 +157,13 @@ class LemlineConfigSource : PropertiesConfigSource(
                 val host = props["$prefix.host"] ?: MYSQL_HOST_DEFAULT
                 val port = props["$prefix.port"] ?: MYSQL_PORT_DEFAULT
                 val name = props["$prefix.name"] ?: MYSQL_NAME_DEFAULT
-                val username = props["$prefix.username"] ?: MYSQL_USER_DEFAULT
-                val password = props["$prefix.password"] ?: MYSQL_PASSWORD_DEFAULT
-
-                // apply defaults
-                "$prefix.host".let { if (props[it] == null) generated[it] = host }
-                "$prefix.port".let { if (props[it] == null) generated[it] = port }
-                "$prefix.name".let { if (props[it] == null) generated[it] = name }
-                "$prefix.username".let { if (props[it] == null) generated[it] = username }
-                "$prefix.password".let { if (props[it] == null) generated[it] = password }
 
                 // apply quarkus properties
                 if (type == DB_TYPE_MYSQL) {
-                    generated["quarkus.datasource.mysql.username"] = username
-                    generated["quarkus.datasource.mysql.password"] = password
-                    generated["quarkus.datasource.mysql.jdbc.url"] = "jdbc:mysql://$host:$port/$name" +
+                    val mysql = "quarkus.datasource.mysql"
+                    generated["$mysql.username"] = props["$prefix.username"] ?: MYSQL_USERNAME_DEFAULT
+                    generated["$mysql.password"] = props["$prefix.password"] ?: MYSQL_PASSWORD_DEFAULT
+                    generated["$mysql.jdbc.url"] = "jdbc:mysql://$host:$port/$name" +
                         "?useSSL=false" +
                         "&allowPublicKeyRetrieval=true" +
                         "&sessionVariables=sql_mode='STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'" +
@@ -185,130 +202,122 @@ class LemlineConfigSource : PropertiesConfigSource(
             }
             generated[MESSAGING_TYPE] = type
 
-            val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
-            val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
-            generated["$outgoing.merge"] = "true"
-
-            val consumerEnabled = props[CONSUMER_ENABLED].toBoolean()
-            val producerEnabled = props[PRODUCER_ENABLED].toBoolean()
-
-            if (useKafka) {
-                val prefix = "lemline.messaging.kafka"
-                val brokers = props["$prefix.brokers"] ?: KAFKA_BROKERS_DEFAULT
-
-                val useWorkflows = props.keys.any { it.startsWith("$prefix.workflows") }
-                val useIngestion = props.keys.any { it.startsWith("$prefix.ingestion") }
-
-                if (useWorkflows) {
-
-                }
-
-                if (useIngestion) {
-
-                }
-
-                val topic = props["$prefix.topic"] ?: WORKFLOWS_TOPIC_DEFAULT
-                val groupId = props["$prefix.group-id"] ?: KAFKA_GROUP_ID_DEFAULT
-                val offsetReset = props["$prefix.offset-reset"] ?: KAFKA_OFFSET_RESET_DEFAULT
-                val topicDLQ = props["$prefix.topic-dlq"] ?: "$topic-dlq"
-                val topicOut = props["$prefix.topic-out"] ?: topic
-
-                // apply defaults
-                "$prefix.brokers".let { if (props[it] == null) generated[it] = brokers }
-                "$prefix.topic".let { if (props[it] == null) generated[it] = topic }
-                "$prefix.group-id".let { if (props[it] == null) generated[it] = groupId }
-                "$prefix.offset-reset".let { if (props[it] == null) generated[it] = offsetReset }
-                "$prefix.topic-dlq".let { if (props[it] == null) generated[it] = topicDLQ }
-
-                // apply smallrye messaging properties
-                if (type == MSG_TYPE_KAFKA) {
-                    generated["kafka.bootstrap.servers"] = brokers
-
-                    if (consumerEnabled) {
-                        generated["$incoming.connector"] = KAFKA_CONNECTOR
-                        generated["$incoming.topic"] = topic
-                        generated["$incoming.group.id"] = groupId
-                        generated["$incoming.auto.offset.reset"] = offsetReset
-                        generated["$incoming.failure-strategy"] = "dead-letter-queue"
-                        generated["$incoming.dead-letter-queue.topic"] = topicDLQ
-                        generated["$incoming.value.deserializer"] = KAFKA_STRING_DESERIALIZER
-                    }
-
-                    if (producerEnabled) {
-                        generated["$outgoing.connector"] = KAFKA_CONNECTOR
-                        generated["$outgoing.topic"] = topicOut
-                        generated["$outgoing.value.serializer"] = KAFKA_STRING_SERIALIZER
-                    }
-
-                    props["$prefix.security-protocol"]?.let { generated["kafka.security.protocol"] = it }
-                    props["$prefix.sasl-mechanism"]?.let { generated["kafka.sasl.mechanism"] = it }
-
-                    if (props.containsKey("$prefix.sasl-username") && props.containsKey("$prefix.sasl-password")) {
-                        generated["kafka.sasl.jaas.config"] =
-                            "org.apache.kafka.common.security.plain.PlainLoginModule required " +
-                                "username=\"${props["$prefix.sasl-username"]}\" " +
-                                "password=\"${props["$prefix.sasl-password"]}\";"
-                        if (!generated.containsKey("kafka.sasl.mechanism")) {
-                            generated["kafka.sasl.mechanism"] = "PLAIN"
-                        }
-                    }
-                }
-            }
-
-            if (useRabbit) {
-                val prefix = "lemline.messaging.rabbitmq"
-                val hostname = props["$prefix.hostname"] ?: RABBITMQ_HOST_DEFAULT
-                val port = props["$prefix.port"] ?: RABBITMQ_PORT_DEFAULT
-                val username = props["$prefix.username"] ?: RABBITMQ_USER_DEFAULT
-                val password = props["$prefix.password"] ?: RABBITMQ_PASSWORD_DEFAULT
-                val virtualHost = props["$prefix.virtual-host"] ?: RABBITMQ_VHOST_DEFAULT
-                val queue = props["$prefix.queue"] ?: RABBITMQ_QUEUE_DEFAULT
-                val queueDLQ = props["$prefix.queue-dlq"] ?: "$queue-dlq"
-                val queueOut = props["$prefix.queue-out"] ?: queue
-
-                // apply defaults
-                "$prefix.hostname".let { if (props[it] == null) generated[it] = hostname }
-                "$prefix.port".let { if (props[it] == null) generated[it] = port }
-                "$prefix.username".let { if (props[it] == null) generated[it] = username }
-                "$prefix.password".let { if (props[it] == null) generated[it] = password }
-                "$prefix.virtual-host".let { if (props[it] == null) generated[it] = virtualHost }
-                "$prefix.queue".let { if (props[it] == null) generated[it] = queue }
-
-                // apply smallrye messaging properties
-                if (type == MSG_TYPE_RABBITMQ) {
-                    generated["rabbitmq-host"] = hostname
-                    generated["rabbitmq-port"] = port
-                    generated["rabbitmq-username"] = username
-                    generated["rabbitmq-password"] = password
-                    generated["rabbitmq-virtual-host"] = virtualHost
-
-                    if (consumerEnabled) {
-                        generated["$incoming.connector"] = RABBITMQ_CONNECTOR
-                        generated["$incoming.queue.name"] = queue
-                        generated["$incoming.queue.durable"] = "true"
-                        generated["$incoming.auto-ack"] = "false"
-                        generated["$incoming.deserializer"] = RABBITMQ_STRING_SERIALIZER
-                        generated["$incoming.queue.arguments.x-dead-letter-exchange"] = "dlx"
-                        generated["$incoming.queue.arguments.x-dead-letter-routing-key"] = queueDLQ
-                    }
-
-                    if (producerEnabled) {
-                        generated["$outgoing.connector"] = RABBITMQ_CONNECTOR
-                        generated["$outgoing.queue.name"] = queueOut
-                        generated["$outgoing.serializer"] = RABBITMQ_STRING_SERIALIZER
-                    }
-
-                    props["$prefix.exchange-name"]?.let { generated["$outgoing.exchange.name"] = it }
-                    props["$prefix.ssl-enabled"]?.let { generated["rabbitmq-ssl"] = it }
-                }
-            }
-
-            if (type == MSG_TYPE_IN_MEMORY) {
-                generated["$incoming.connector"] = IN_MEMORY_CONNECTOR
-                generated["$outgoing.connector"] = IN_MEMORY_CONNECTOR
+            when (type) {
+                MSG_TYPE_KAFKA -> generated.configureKafka(props)
+                MSG_TYPE_RABBITMQ -> generated.configureRabbit(props)
+                MSG_TYPE_IN_MEMORY -> generated.configureInMemory()
+                else -> error("Unknown messaging type: $type")
             }
 
             return generated
+        }
+
+
+        private fun MutableMap<String, String>.configureKafka(props: Map<String, String>) {
+            val kafka = "lemline.messaging.kafka"
+            // With Default values
+            set("kafka.bootstrap.servers", props["$kafka.brokers"] ?: KAFKA_BROKERS_DEFAULT)
+            // Optional values
+            props["$kafka.security-protocol"]?.let { set("kafka.security.protocol", it) }
+            props["$kafka.sasl-mechanism"]?.let { set("kafka.sasl.mechanism", it) }
+
+            if (props.containsKey("$kafka.sasl-username") && props.containsKey("$kafka.sasl-password")) {
+                set(
+                    "kafka.sasl.jaas.config",
+                    "org.apache.kafka.common.security.plain.PlainLoginModule required " +
+                        "username=\"${props["$kafka.sasl-username"]}\" " +
+                        "password=\"${props["$kafka.sasl-password"]}\";"
+                )
+                if (!containsKey("kafka.sasl.mechanism")) set("kafka.sasl.mechanism", "PLAIN")
+            }
+
+            configureKafkaTopic(props, TopicType.WORKFLOWS)
+            configureKafkaTopic(props, TopicType.INGESTION)
+        }
+
+        private fun MutableMap<String, String>.configureKafkaTopic(
+            props: Map<String, String>,
+            type: TopicType
+        ) {
+            val config = "lemline.messaging.kafka.${type.configKey}"
+            val topic = props["$config.topic"] ?: type.defaultTopicName
+
+            if (props[type.consumerEnabled].toBoolean()) {
+                val consumer = "$config.consumer"
+                val incoming = "mp.messaging.incoming.${type.incomingChannel}"
+                set("$incoming.connector", KAFKA_CONNECTOR)
+                set("$incoming.topic", topic)
+                set("$incoming.group.id", props["$consumer.group-id"] ?: KAFKA_GROUP_ID_DEFAULT)
+                set("$incoming.auto.offset.reset", props["$consumer.offset-reset"] ?: KAFKA_OFFSET_RESET_DEFAULT)
+                set("$incoming.failure-strategy", "dead-letter-queue")
+                set("$incoming.dead-letter-queue.topic", props["$consumer.topic-dlq"] ?: "$topic-dlq")
+                set("$incoming.value.deserializer", KAFKA_STRING_DESERIALIZER)
+                // set the consumer concurrency
+                set(type.consumerConcurrency, props["$consumer.concurrency"] ?: MSG_CONSUMER_CONCURRENCY_DEFAULT)
+            }
+
+            if (props[type.producerEnabled].toBoolean()) {
+                val producer = "$config.producer"
+                val outgoing = "mp.messaging.outgoing.${type.outgoingChannel}"
+                set("$outgoing.connector", KAFKA_CONNECTOR)
+                set("$outgoing.topic", props["$producer.topic-out"] ?: topic)
+                set("$outgoing.value.serializer", KAFKA_STRING_SERIALIZER)
+            }
+        }
+
+        private fun MutableMap<String, String>.configureRabbit(props: Map<String, String>) {
+            val rabbit = "lemline.messaging.rabbitmq"
+            // Values with Default
+            set("rabbitmq-host", props["$rabbit.hostname"] ?: RABBITMQ_HOST_DEFAULT)
+            set("rabbitmq-port", props["$rabbit.port"] ?: RABBITMQ_PORT_DEFAULT)
+            set("rabbitmq-username", props["$rabbit.username"] ?: RABBITMQ_USER_DEFAULT)
+            set("rabbitmq-password", props["$rabbit.password"] ?: RABBITMQ_PASSWORD_DEFAULT)
+            set("rabbitmq-virtual-host", props["$rabbit.virtual-host"] ?: RABBITMQ_VHOST_DEFAULT)
+            // Optional values
+            props["$rabbit.ssl-enabled"]?.let { set("rabbitmq-ssl", it) }
+
+            configureRabbitQueue(props, TopicType.WORKFLOWS)
+            configureRabbitQueue(props, TopicType.INGESTION)
+        }
+
+        private fun MutableMap<String, String>.configureRabbitQueue(
+            props: Map<String, String>,
+            type: TopicType
+        ) {
+            val channel = "lemline.messaging.kafka.${type.configKey}"
+            val queue = props["$channel.queue"] ?: type.defaultTopicName
+
+            if (props[type.consumerEnabled].toBoolean()) {
+                val consumer = "$channel.consumer"
+                val incoming = "mp.messaging.incoming.${type.incomingChannel}"
+                val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue-dlq"
+                set("$incoming.connector", RABBITMQ_CONNECTOR)
+                set("$incoming.queue.name", queue)
+                set("$incoming.queue.durable", "true")
+                set("$incoming.auto-ack", "false")
+                set("$incoming.deserializer", RABBITMQ_STRING_SERIALIZER)
+                set("$incoming.queue.arguments.x-dead-letter-exchange", "dlx")
+                set("$incoming.queue.arguments.x-dead-letter-routing-key", queueDLQ)
+                // set the consumer concurrency
+                set(type.consumerConcurrency, props["$consumer.concurrency"] ?: MSG_CONSUMER_CONCURRENCY_DEFAULT)
+            }
+
+            if (props[type.producerEnabled].toBoolean()) {
+                val producer = "$channel.producer"
+                val outgoing = "mp.messaging.outgoing.${type.outgoingChannel}"
+                set("$outgoing.connector", RABBITMQ_CONNECTOR)
+                set("$outgoing.queue.name", props["$producer.queue-out"] ?: queue)
+                set("$outgoing.serializer", RABBITMQ_STRING_SERIALIZER)
+                props["$producer.exchange-name"]?.let { set("$outgoing.exchange.name", it) }
+            }
+        }
+
+        private fun MutableMap<String, String>.configureInMemory() {
+            set("mp.messaging.incoming.$WORKFLOWS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+            set("mp.messaging.outgoing.$WORKFLOWS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+
+            set("mp.messaging.incoming.$INGESTION_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+            set("mp.messaging.outgoing.$INGESTION_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
         }
 
         private fun generateMetricsProperties(props: Map<String, String>): Map<String, String> {
@@ -316,10 +325,6 @@ class LemlineConfigSource : PropertiesConfigSource(
             val prefix = "lemline.metrics"
             val port = props["$prefix.port"] ?: METRICS_PORT_DEFAULT
             val path = props["$prefix.path"] ?: METRICS_PATH_DEFAULT
-
-            // apply defaults
-            "$prefix.port".let { if (props[it] == null) generated[it] = port }
-            "$prefix.path".let { if (props[it] == null) generated[it] = path }
 
             // apply quarkus properties
             generated["quarkus.http.port"] = port

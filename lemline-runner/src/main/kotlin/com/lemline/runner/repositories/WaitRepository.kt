@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.WAIT_TABLE
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.outbox.OutboxRelay
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.ResultSet
@@ -22,7 +22,7 @@ import kotlin.time.ExperimentalTime
  *
  * @see OutboxRepository for base functionality and documentation
  * @see WaitOutboxModel for the message model
- * @see OutboxProcessor for the processing logic
+ * @see OutboxRelay for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime

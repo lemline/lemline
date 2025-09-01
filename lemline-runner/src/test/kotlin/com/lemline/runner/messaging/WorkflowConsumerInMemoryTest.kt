@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.runner.instances.WORKFLOW_IN
-import com.lemline.runner.instances.WORKFLOW_OUT
+import com.lemline.runner.instances.WORKFLOWS_IN_CHANNEL
+import com.lemline.runner.instances.WORKFLOWS_OUT_CHANNEL
 import com.lemline.runner.messaging.bases.WorkflowConsumerTest
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
@@ -40,8 +40,8 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      * 2. Initializes the channels for fresh testing
      */
     override fun setupMessaging() {
-        source = connector.source(WORKFLOW_IN)
-        sink = connector.sink(WORKFLOW_OUT)
+        source = connector.source(WORKFLOWS_IN_CHANNEL)
+        sink = connector.sink(WORKFLOWS_OUT_CHANNEL)
     }
 
     /**
