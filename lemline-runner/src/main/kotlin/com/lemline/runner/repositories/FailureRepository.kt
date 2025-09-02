@@ -44,13 +44,14 @@ const val FAILURE_TABLE = "lemline_failures"
  * - This class is marked with `@ExperimentalTime` to indicate its use of experimental Kotlin time-related APIs.
  * - The `FailureModel` class provides factory methods to create instances directly from exceptions.
  */
+@jakarta.enterprise.context.ApplicationScoped
 @ExperimentalTime
 class FailureRepository : WithInstanceRepository<FailureModel>() {
 
     @Inject
     override lateinit var databaseManager: DatabaseManager
     
-    override val tableName = DEFINITION_TABLE
+    override val tableName = FAILURE_TABLE
 
     companion object {
         internal const val MESSAGE_COLUMN = "message"
@@ -85,7 +86,7 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
         id = getUuid(rs, ID_COLUMN),
         instance = rs.getInstanceMessage(),
         reason = rs.getString(REASON_COLUMN),
-        message = rs.getString(REASON_COLUMN),
+        message = rs.getString(MESSAGE_COLUMN),
         errorClass = rs.getString(ERROR_CLASS_COLUMN),
         errorMessage = rs.getString(ERROR_MESSAGE_COLUMN),
         errorStackTrace = rs.getString(ERROR_STACKTRACE_COLUMN)
