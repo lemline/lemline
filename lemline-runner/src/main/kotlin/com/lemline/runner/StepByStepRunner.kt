@@ -3,6 +3,7 @@ package com.lemline.runner
 
 import com.lemline.common.debug
 import com.lemline.common.error
+import com.lemline.common.ids.IdGenerator
 import com.lemline.common.logger
 import com.lemline.core.activities.runs.getInputFor
 import com.lemline.core.instances.RunInstance
@@ -14,10 +15,11 @@ import com.lemline.runner.exceptions.RunWorkflowStartedException
 import com.lemline.runner.exceptions.TaskCompletedException
 import com.lemline.runner.exceptions.TaskRetriedException
 import com.lemline.runner.exceptions.WaitStartedException
+import com.lemline.runner.ingestion.IngestionMessageEmitter
+import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.PARENT_TABLE
 import com.lemline.runner.models.ParentOutboxModel
-import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.models.SCHEDULE_TABLE
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.repositories.ParentRepository
@@ -32,6 +34,7 @@ import jakarta.inject.Inject
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -46,6 +49,7 @@ internal class StepByStepRunner @Inject constructor(
     private val waitRepository: WaitRepository,
     private val parentRepository: ParentRepository,
     private val scheduleRepository: ScheduleRepository,
+    private val ingestionEmitter: IngestionMessageEmitter,
     private val stater: Starter
 ) {
     private val logger = logger()
@@ -65,6 +69,7 @@ internal class StepByStepRunner @Inject constructor(
         }
     }
 
+    @ExperimentalSerializationApi
     suspend fun run(processor: Processor): InstanceMessage? {
 
         processor.onTaskCompleted { onTaskCompleted(it) }
@@ -164,15 +169,17 @@ internal class StepByStepRunner @Inject constructor(
      * The workflow instance's processing is halted temporarily, and further processing is expected to resume
      * asynchronously through the RetryOutbox.
      */
+    @ExperimentalSerializationApi
     private suspend fun InstanceMessage.onRetry(tryInstance: TryInstance) {
         val delay = tryInstance.delay ?: error("No delay set in in $tryInstance")
 
-        val retryOutboxModel = RetryOutboxModel(
+        val retryMessage = RetryIngestionMessage(
+            id = IdGenerator.generateUUIDV7(),
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
         )
-        // Save the message to the retry table
-        retryRepository.insert(retryOutboxModel)
+        // Save the message to ingest into the retry table
+        ingestionEmitter.send(retryMessage.toJsonString())
     }
 
     /**

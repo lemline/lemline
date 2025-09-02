@@ -19,18 +19,21 @@ internal class InstanceMessageTest {
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {
         // Given
+        val workflowId = UUID.randomUUID()
+        val parentId = UUID.randomUUID()
+
         val instanceMessage = InstanceMessage.fromObjects(
-            workflowId = UUID.randomUUID(),
+            workflowId = workflowId,
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
-            workflowPosition = NodePosition.Companion.root,
-            workflowState = WorkflowState(mapOf(NodePosition.Companion.root to NodeState(rawInput = JsonPrimitive("")))),
-            parentId = UUID.randomUUID(),
+            workflowPosition = NodePosition.root,
+            workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            parentId = parentId
         )
 
         // When
         Assertions.assertEquals(
-            """{"i":"test-id","n":"test-workflow","v":"1.0.0","p":"","s":{"":{"inp":""}}}""",
+            """{"i":"$workflowId","n":"test-workflow","v":"1.0.0","p":"","s":{"":{"inp":""}},"w":"$parentId"}""",
             instanceMessage.payload,
         )
     }
@@ -42,8 +45,8 @@ internal class InstanceMessageTest {
             workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
-            workflowPosition = NodePosition.Companion.root,
-            workflowState = WorkflowState(mapOf(NodePosition.Companion.root to NodeState(rawInput = JsonPrimitive("")))),
+            workflowPosition = NodePosition.root,
+            workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
             parentId = UUID.randomUUID(),
         )
 
@@ -58,10 +61,10 @@ internal class InstanceMessageTest {
             workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
-            workflowPosition = NodePosition.Companion.root,
+            workflowPosition = NodePosition.root,
             workflowState = WorkflowState(
                 mapOf(
-                    NodePosition.Companion.root to NodeState(
+                    NodePosition.root to NodeState(
                         rawInput = JsonObject(mapOf("test" to JsonPrimitive("value"))),
                         startedAt = Clock.System.now(),
                     )
@@ -97,9 +100,9 @@ internal class InstanceMessageTest {
         // Then
         val expectedStates = WorkflowState(
             mapOf(
-                NodePosition.Companion.root to NodeState(
+                NodePosition.root to NodeState(
                     rawInput = input,
-                    startedAt = instanceMessage.workflowState.parsed[NodePosition.Companion.root]!!.startedAt,
+                    startedAt = instanceMessage.workflowState.parsed[NodePosition.root]!!.startedAt,
                 ),
             )
         )
@@ -107,6 +110,6 @@ internal class InstanceMessageTest {
         Assertions.assertEquals(name, instanceMessage.workflowName)
         Assertions.assertEquals(version, instanceMessage.workflowVersion)
         Assertions.assertEquals(expectedStates, instanceMessage.workflowState.parsed)
-        Assertions.assertEquals(NodePosition.Companion.root, instanceMessage.workflowPosition.parsed)
+        Assertions.assertEquals(NodePosition.root, instanceMessage.workflowPosition.parsed)
     }
 }

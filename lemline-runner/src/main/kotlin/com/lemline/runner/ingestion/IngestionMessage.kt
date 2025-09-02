@@ -11,7 +11,6 @@ import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
 
@@ -20,13 +19,10 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 @Serializable
 @JsonClassDiscriminator("t") // <- type discriminator for polymorphic serialization
 sealed interface IngestionMessage : WithId {
-    @SerialName("w")
     val instance: InstanceMessage?
 
-    @SerialName("s")
     var outBoxStatus: OutBoxStatus
 
-    @SerialName("f")
     var outboxScheduledFor: Instant?
 
     fun toJsonString(): String = LemlineJson.encodeToString(this)

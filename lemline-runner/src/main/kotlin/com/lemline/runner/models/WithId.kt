@@ -2,9 +2,7 @@
 package com.lemline.runner.models
 
 import java.util.*
-import kotlinx.serialization.SerialName
 
 interface WithId {
-    @SerialName("i")
     val id: UUID
 }

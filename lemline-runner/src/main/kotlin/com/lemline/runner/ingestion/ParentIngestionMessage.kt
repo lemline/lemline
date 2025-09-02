@@ -17,12 +17,16 @@ import kotlinx.serialization.Serializable
 @Serializable
 @SerialName("p") // <- type discriminator for polymorphic serialization
 data class ParentIngestionMessage(
+    @SerialName("i")
     override val id: @Contextual UUID,
 
+    @SerialName("w")
     override var instance: InstanceMessage,
 
+    @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
+    @SerialName("f")
     override var outboxScheduledFor: Instant?,
 ) : IngestionMessage {
 

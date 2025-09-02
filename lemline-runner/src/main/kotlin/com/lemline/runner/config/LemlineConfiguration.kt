@@ -63,7 +63,7 @@ const val INGESTION_CONSUMER_CONCURRENCY = "lemline.messaging.ingestion.consumer
  *    - Case-insensitive matching
  *
  * @see LemlineConfigSource for configuration transformation
- * @see https://quarkus.io/guides/config-reference for Quarkus configuration details
+ * @see [https://quarkus.io/guides/config-reference] for Quarkus configuration details
  */
 @Suppress("unused")
 @ConfigMapping(prefix = "lemline")

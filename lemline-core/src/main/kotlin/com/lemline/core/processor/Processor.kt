@@ -79,7 +79,7 @@ import kotlinx.serialization.json.JsonElement
 class Processor(
     val instance: WorkflowInstance,
     secrets: Map<String, JsonElement>,
-    var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.Companion.default,
+    var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
 ) {
     /**
      * Companion object for creating new instances of the workflow.
