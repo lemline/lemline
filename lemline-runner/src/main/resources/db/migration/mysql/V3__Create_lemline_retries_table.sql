@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS lemline_retries
 CREATE INDEX idx_lemline_retries_workflow_id
     ON lemline_retries (workflow_id);
 
+-- Create an index for efficient querying on parent_id
+CREATE INDEX idx_lemline_retries_parent_id
+    ON lemline_retries (parent_id);
+
 -- Create an index for efficient querying on status and delayed_until
 CREATE INDEX idx_lemline_retries_status_delayed_until
     ON lemline_retries (outbox_status, outbox_delayed_until);

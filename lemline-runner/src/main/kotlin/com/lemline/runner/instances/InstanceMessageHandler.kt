@@ -10,12 +10,13 @@ import com.lemline.common.withLoggingContext
 import com.lemline.core.definitions.Definitions
 import com.lemline.core.processor.Processor
 import com.lemline.runner.StepByStepRunner
+import com.lemline.runner.ingestion.IngestionMessageEmitter
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.MessageSubscriberMetrics.Companion.FailureReasons
-import com.lemline.runner.models.RETRY_TABLE
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.DefinitionRepository
+import com.lemline.runner.repositories.RETRY_TABLE
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.secrets.Secrets
 import io.serverlessworkflow.api.types.Workflow
@@ -38,7 +39,8 @@ import org.jetbrains.annotations.TestOnly
 @ExperimentalSerializationApi
 @ApplicationScoped
 internal class InstanceMessageHandler(
-    private val emitter: InstanceMessageEmitter,
+    private val instanceEmitter: InstanceMessageEmitter,
+    private val ingestionEmitter: IngestionMessageEmitter,
     private val definitionRepository: DefinitionRepository,
     private val retryRepository: RetryRepository,
     private val stepByStepRunner: StepByStepRunner,
@@ -203,7 +205,7 @@ internal class InstanceMessageHandler(
      */
     private suspend fun InstanceMessage.emit() = try {
         logger.debug { "Emitting next message: $this" }
-        emitter.send(this)
+        instanceEmitter.send(this)
     } catch (e: Exception) {
         logger.warn(e) { "Failed to emit next message. Message will be stored in the $RETRY_TABLE table instead to be re-emit later" }
         metrics.processingFailed(FailureReasons.MESSAGE_EMISSION_ERROR, workflowName, workflowVersion)

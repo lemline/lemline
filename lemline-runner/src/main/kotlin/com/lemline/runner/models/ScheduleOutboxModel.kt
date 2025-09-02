@@ -23,8 +23,6 @@ import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 import kotlinx.serialization.json.JsonElement
 
-const val SCHEDULE_TABLE = "lemline_schedules"
-
 @ExperimentalTime
 data class ScheduleOutboxModel(
     override val id: UUID = IdGenerator.generateUUIDV7(),

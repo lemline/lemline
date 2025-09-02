@@ -4,8 +4,6 @@ package com.lemline.runner.models
 import com.lemline.common.json.LemlineJson
 import io.serverlessworkflow.api.types.Workflow
 
-const val DEFINITION_TABLE = "lemline_definitions"
-
 data class DefinitionModel(
     val name: String,
 

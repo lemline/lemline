@@ -2,7 +2,7 @@
 CREATE TABLE lemline_schedules
 (
     id                   uuid PRIMARY KEY,
-    workflow_id          uuid           NOT NULL,
+    workflow_id          uuid UNIQUE    NOT NULL,
     workflow_name        VARCHAR(255)   NOT NULL,
     workflow_version     VARCHAR(255)   NOT NULL,
     workflow_position    TEXT           NOT NULL,
@@ -25,6 +25,10 @@ CREATE TABLE lemline_schedules
 CREATE INDEX IF NOT EXISTS idx_lemline_schedules_workflow_id
     ON lemline_schedules (workflow_id);
 
--- Add index for status for more efficient queries
+-- Create an index for efficient querying on parent_id
+CREATE INDEX IF NOT EXISTS idx_lemline_schedules_parent_id
+    ON lemline_schedules (parent_id);
+
+-- Create an index for efficient querying on status and delayed_until
 CREATE INDEX IF NOT EXISTS idx_lemline_schedules_status_delayed_until
     ON lemline_schedules (outbox_status, outbox_delayed_until);

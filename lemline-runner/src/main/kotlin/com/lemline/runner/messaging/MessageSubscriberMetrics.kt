@@ -172,27 +172,6 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
         }
     }
 
-    /**
-     * Determines a low-cardinality failure reason from an exception for use in metrics.
-     * This is crucial for creating actionable alerts and dashboards without overwhelming
-     * the metrics backend.
-     */
-    fun getFailureReason(e: Throwable): String = when (e) {
-        // Domain-specific errors from the workflow engine
-        is WorkflowException -> FailureReasons.WORKFLOW_ERROR_PREFIX + e.error.type.lowercase()
-
-        // --- Database & Persistence Errors ---
-        is SQLException -> FailureReasons.DATABASE_ERROR
-
-        // --- I/O and Network Errors ---
-        is IOException -> FailureReasons.IO_ERROR
-
-        // --- Application State Errors ---
-        is IllegalStateException -> FailureReasons.INVALID_STATE
-
-        // --- Fallback for any other uncategorized exception ---
-        else -> FailureReasons.PROCESSING_ERROR
-    }
 
     companion object {
         // Tag Keys
@@ -210,6 +189,28 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
             const val INVALID_STATE = "invalid_state"
             const val PROCESSING_ERROR = "processing_error"
             const val WORKFLOW_ERROR_PREFIX = "workflow_"
+        }
+
+        /**
+         * Determines a low-cardinality failure reason from an exception for use in metrics.
+         * This is crucial for creating actionable alerts and dashboards without overwhelming
+         * the metrics backend.
+         */
+        fun getFailureReason(e: Throwable): String = when (e) {
+            // Domain-specific errors from the workflow engine
+            is WorkflowException -> FailureReasons.WORKFLOW_ERROR_PREFIX + e.error.type.lowercase()
+
+            // --- Database & Persistence Errors ---
+            is SQLException -> FailureReasons.DATABASE_ERROR
+
+            // --- I/O and Network Errors ---
+            is IOException -> FailureReasons.IO_ERROR
+
+            // --- Application State Errors ---
+            is IllegalStateException -> FailureReasons.INVALID_STATE
+
+            // --- Fallback for any other uncategorized exception ---
+            else -> FailureReasons.PROCESSING_ERROR
         }
     }
 }

@@ -18,11 +18,11 @@ import com.lemline.runner.exceptions.WaitStartedException
 import com.lemline.runner.ingestion.IngestionMessageEmitter
 import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.models.PARENT_TABLE
 import com.lemline.runner.models.ParentOutboxModel
-import com.lemline.runner.models.SCHEDULE_TABLE
 import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.repositories.PARENT_TABLE
 import com.lemline.runner.repositories.ParentRepository
+import com.lemline.runner.repositories.SCHEDULE_TABLE
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.starters.Starter
@@ -155,7 +155,7 @@ internal class StepByStepRunner @Inject constructor(
                     // updates the scheduled execution instant from the after property.
                     schedule.scheduleAfterCompletion()
                     scheduleRepository.update(schedule)
-                    logger.debug { "Rescheduled workflow ${schedule.instance.workflowName} for ${schedule.outboxScheduledFor}" }
+                    logger.debug { "Rescheduled workflow ${schedule.workflowName} for ${schedule.outboxScheduledFor}" }
                 }
                     ?: logger.error { "CRITICAL - Unable to find workflow $workflowId ($workflowName) in $SCHEDULE_TABLE table. The workflow will not be restarted." }
             }

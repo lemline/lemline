@@ -27,12 +27,17 @@ class RabbitMQTestResource : QuarkusTestResourceLifecycleManager {
         rabbitmq.start()
 
         // Return the RabbitMQ connection configuration
-        return mapOf(
+        val properties = mapOf(
             "rabbitmq-host" to rabbitmq.host,
             "rabbitmq-port" to rabbitmq.getMappedPort(5672).toString(),
             "rabbitmq-username" to rabbitmq.adminUsername,
             "rabbitmq-password" to rabbitmq.adminPassword,
         )
+
+        // Set as system properties so that [LemlineConfigSource] can see them.
+        properties.forEach { (k, v) -> System.setProperty(k, v) }
+
+        return properties
     }
 
     override fun stop() {

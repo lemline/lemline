@@ -8,8 +8,6 @@ import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-const val RETRY_TABLE = "lemline_retries"
-
 @ExperimentalTime
 data class RetryOutboxModel(
     override val id: UUID = IdGenerator.generateUUIDV7(),

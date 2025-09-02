@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.models.PARENT_TABLE
 import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
@@ -9,6 +8,8 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
+
+const val PARENT_TABLE = "lemline_parents"
 
 /**
  * Repository for managing run messages in the outbox pattern.

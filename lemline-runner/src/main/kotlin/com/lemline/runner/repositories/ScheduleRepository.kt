@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.models.SCHEDULE_TABLE
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
+import java.util.*
 import kotlin.time.ExperimentalTime
+
+const val SCHEDULE_TABLE = "lemline_schedules"
 
 /**
  * Repository for managing wait messages in the outbox pattern.
@@ -57,7 +60,6 @@ class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
                 stmt.setString(idx, entity.scheduleZone)
             })
 
-    @ExperimentalTime
     override fun createModel(rs: ResultSet) = ScheduleOutboxModel(
         id = getUuid(rs, ID_COLUMN),
         instance = rs.getInstanceMessage(),
@@ -71,4 +73,7 @@ class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
         scheduleCron = rs.getString(SCHEDULE_CRON_COLUMN),
         scheduleZone = rs.getString(SCHEDULE_ZONE_COLUMN),
     )
+
+    suspend fun findByWorkflowId(workflowId: UUID, connection: Connection? = null): ScheduleOutboxModel? =
+        findWithWorkflowId(workflowId, connection).firstOrNull()
 }

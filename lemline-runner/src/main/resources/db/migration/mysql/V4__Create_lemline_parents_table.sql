@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS lemline_parents
 CREATE INDEX idx_lemline_parents_workflow_id
     ON lemline_parents (workflow_id);
 
+-- Create an index for efficient querying on parent_id
+CREATE INDEX idx_lemline_parents_parent_id
+    ON lemline_parents (parent_id);
+
 -- Create an index for efficient querying on status and delayed_until
 CREATE INDEX idx_lemline_parents_status_delayed_until
     ON lemline_parents (outbox_status, outbox_delayed_until);

@@ -8,8 +8,6 @@ import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-const val WAIT_TABLE = "lemline_waits"
-
 @ExperimentalTime
 data class WaitOutboxModel(
     override val id: UUID = IdGenerator.generateUUIDV7(),

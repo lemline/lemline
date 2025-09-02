@@ -99,11 +99,13 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             logger.info { "Lemline user properties:\n${lemlineProps.toPrint()}" }
 
-            // Those system properties are set in LemlineApplication
-            lemlineProps[WORKFLOWS_CONSUMER_ENABLED] = System.getProperty(WORKFLOWS_CONSUMER_ENABLED) ?: "false"
-            lemlineProps[WORKFLOWS_PRODUCER_ENABLED] = System.getProperty(WORKFLOWS_PRODUCER_ENABLED) ?: "false"
-            lemlineProps[INGESTION_CONSUMER_ENABLED] = System.getProperty(INGESTION_CONSUMER_ENABLED) ?: "false"
-            lemlineProps[INGESTION_PRODUCER_ENABLED] = System.getProperty(INGESTION_PRODUCER_ENABLED) ?: "false"
+            // Override with system properties, as they have higher priority,
+            // This includes properties defined in [LemlineApplication]
+            System.getProperties().forEach { (key, value) ->
+                if (key.toString().startsWith("lemline.")) {
+                    lemlineProps[key.toString()] = value.toString()
+                }
+            }
 
             // Generate and merge transformed properties
             val generatedProps = mutableMapOf<String, String>()
@@ -121,14 +123,9 @@ class LemlineConfigSource : PropertiesConfigSource(
 
         private fun generateDatabaseProperties(props: Map<String, String>): Map<String, String> {
             val generated = mutableMapOf<String, String>()
+
             val usePostgres = props.keys.any { it.startsWith("lemline.database.postgresql.") }
             val useMysql = props.keys.any { it.startsWith("lemline.database.mysql.") }
-
-            // if the type is explicitly set, validate we have a matching database configuration
-            when (props[DATABASE_TYPE]) {
-                DB_TYPE_POSTGRESQL -> require(usePostgres) { "Property 'postgresql' is not defined. Please specify it." }
-                DB_TYPE_MYSQL -> require(useMysql) { "Property 'mysql' is not defined. Please specify it." }
-            }
 
             val type = props[DATABASE_TYPE] ?: run {
                 when {
@@ -182,11 +179,6 @@ class LemlineConfigSource : PropertiesConfigSource(
             val generated = mutableMapOf<String, String>()
             val useKafka = props.keys.any { it.startsWith("lemline.messaging.kafka.") }
             val useRabbit = props.keys.any { it.startsWith("lemline.messaging.rabbitmq.") }
-
-            when (props[MESSAGING_TYPE]) {
-                MSG_TYPE_KAFKA -> require(useKafka) { "Property 'kafka' is not defined. Please specify it." }
-                DB_TYPE_MYSQL -> require(useRabbit) { "Property 'rabbitmq' is not defined. Please specify it." }
-            }
 
             val type = props[MESSAGING_TYPE] ?: run {
                 when {

@@ -21,6 +21,10 @@ CREATE TABLE IF NOT EXISTS lemline_waits
 CREATE INDEX idx_lemline_waits_workflow_id
     ON lemline_waits (workflow_id);
 
+-- Create an index for efficient querying on parent_id
+CREATE INDEX idx_lemline_waits_parent_id
+    ON lemline_waits (parent_id);
+
 -- Create an index for efficient querying on status and delayed_until
 CREATE INDEX idx_lemline_waits_status_delayed_until
     ON lemline_waits (outbox_status, outbox_delayed_until);

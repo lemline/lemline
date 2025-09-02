@@ -26,13 +26,17 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
         // Start Kafka
         kafka.start()
 
+        val servers = kafka.bootstrapServers ?: error("Failed to start Kafka container")
+
         // Return only the bootstrap servers configuration
-        return mapOf(
-            "kafka.bootstrap.servers" to (
-                kafka.bootstrapServers
-                    ?: throw RuntimeException("Failed to start Kafka container")
-                ),
+        val properties = mapOf(
+            "kafka.bootstrap.servers" to servers,
         )
+
+        // Set as system properties so that [LemlineConfigSource] can see them.
+        properties.forEach { (k, v) -> System.setProperty(k, v) }
+
+        return properties
     }
 
     override fun stop() {

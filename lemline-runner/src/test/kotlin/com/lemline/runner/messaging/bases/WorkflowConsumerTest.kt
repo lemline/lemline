@@ -23,6 +23,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -47,6 +48,7 @@ import org.junit.jupiter.api.Test
  * - Handling workflows that complete without further output.
  */
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal abstract class WorkflowConsumerTest {
     @Inject
     lateinit var retryRepository: RetryRepository
@@ -171,7 +173,7 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(instanceMessage.payload)
+        val future = sendMessageFuture(instanceMessage.toJsonString())
 
         // Then
         // Wait for the message to be processed
@@ -252,7 +254,7 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(instanceMessage.payload)
+        val future = sendMessageFuture(instanceMessage.toJsonString())
 
         // Wait for the message to be processed
         future.get(2, SECONDS)
@@ -292,7 +294,7 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(instanceMessage.payload)
+        val future = sendMessageFuture(instanceMessage.toJsonString())
 
         // Then
         // Wait for the message to be processed
@@ -339,7 +341,7 @@ internal abstract class WorkflowConsumerTest {
         )
 
         // When
-        val future = sendMessageFuture(instanceMessage.payload)
+        val future = sendMessageFuture(instanceMessage.toJsonString())
 
         // Then
         // Wait for the message to be processed
