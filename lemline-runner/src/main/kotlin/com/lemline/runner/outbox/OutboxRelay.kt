@@ -3,7 +3,7 @@ package com.lemline.runner.outbox
 
 import com.lemline.common.debug
 import com.lemline.common.error
-import com.lemline.common.warn
+import com.lemline.common.info
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.OutboxRepository
 import kotlin.time.Clock
@@ -84,30 +84,28 @@ internal class OutboxRelay<T : OutboxModel>(
 
                 if (toProcess > 0) {
                     totalToProcess += toProcess
-                    logger.debug { "Processing batch $batchNumber of $toProcess messages" }
-
-                    // Process each message in a separate coroutine for improved performance
-                    val processed = coroutineScope {
-                        messages.map {
-                            async { processOutboxEntity(it, maxAttempts, initialDelay) }
-                        }
-                    }.awaitAll().count { it }
-
-                    // once done, update the messages in the same transaction
+                    val processed = process(messages, maxAttempts, initialDelay)
                     repository.update(messages, connection)
-
                     totalProcessed += processed
-                    logger.debug { "Processed batch $batchNumber with $processed/$toProcess messages processed successfully" }
                 }
             }
         } while (toProcess >= batchSize)
 
-        logger.debug { "Processed all $batchNumber batches with $totalProcessed/$totalToProcess messages processed successfully" }
+        logBatches(totalProcessed, totalToProcess, batchNumber, "processed")
     } catch (e: Exception) {
         logger.error(e) { "💥Error during scheduled outbox processing" }
         // Don't throw the exception to prevent scheduler from stopping
         // The next scheduled run will try again
     }
+
+    /**
+     * Processes a list of entities concurrently on separate coroutines for improved performance.
+     */
+    private suspend fun process(entities: List<T>, maxAttempts: Int, initialDelay: Duration): Int = coroutineScope {
+        entities.map {
+            async { processOutboxEntity(it, maxAttempts, initialDelay) }
+        }
+    }.awaitAll().count { it }
 
     /**
      * Processes a given message with retry handling, exponential backoff, and status update.
@@ -123,7 +121,7 @@ internal class OutboxRelay<T : OutboxModel>(
         relay(outboxEntity)
         true // <- return true (success)
     } catch (e: Exception) {
-        logger.warn(e) { "Failed to process outbox entity for workflow ${outboxEntity.instance?.workflowId}" }
+        logger.info(e) { "Failed to process outbox entity for workflow ${outboxEntity.instance?.workflowId}" }
         outboxEntity.outBoxStatus = OutBoxStatus.PENDING
         outboxEntity.outboxLastError = e.stackTraceToString()
 
@@ -171,17 +169,13 @@ internal class OutboxRelay<T : OutboxModel>(
 
                 if (toDelete > 0) {
                     totalToDelete += toDelete
-                    logger.debug { "Deleting batch $batchNumber with $toDelete messages" }
                     val deleted = repository.delete(messages, connection)
                     totalDeleted += deleted
-                    logger.debug { "Deleted batch $batchNumber with $toDelete/$deleted messages successfully deleted" }
                 }
             }
         } while (toDelete >= batchSize)
 
-        logger.debug {
-            "Deleted all $batchNumber batches with $totalDeleted/$totalToDelete messages successfully deleted (older than $cutoffDate)"
-        }
+        logBatches(totalDeleted, totalToDelete, batchNumber, "deleted")
     } catch (e: Exception) {
         logger.error(e) { "💥 Error during scheduled outbox cleanup" }
         // Don't throw the exception to prevent scheduler from stopping
@@ -204,4 +198,18 @@ internal class OutboxRelay<T : OutboxModel>(
         // Ensure we never return less than .1 second (100ms)
         return (baseDelay + jitter).toLong().coerceAtLeast(100L).milliseconds
     }
+
+    private fun logBatches(success: Int, total: Int, batchNumber: Int, action: String) {
+        val failed = total - success
+        when (total) {
+            0 -> logger.debug { "No message found to process" }
+            else -> when {
+                failed == 0 -> logger.debug { "All ${total.messages()} $action successfully (over ${batchNumber.batches()})" }
+                else -> logger.debug { "${success.messages()} $action successfully and ${failed.messages()} failed (over ${batchNumber.batches()})" }
+            }
+        }
+    }
+
+    private fun Int.messages(): String = this.toString() + " message" + if (this == 1) "" else "s"
+    private fun Int.batches(): String = this.toString() + " batch" + if (this == 1) "" else "es"
 }

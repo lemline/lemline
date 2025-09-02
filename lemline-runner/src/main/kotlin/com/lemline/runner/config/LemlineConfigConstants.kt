@@ -23,7 +23,8 @@ object LemlineConfigConstants {
     const val MSG_TYPE_KAFKA = "kafka"
     const val MSG_TYPE_RABBITMQ = "rabbitmq"
 
-    const val MSG_CONSUMER_CONCURRENCY_DEFAULT = "64"
+    // Consumer concurrency
+    const val CONSUMER_CONCURRENCY_DEFAULT = "64"
 
     // Messaging connectors
     const val IN_MEMORY_CONNECTOR = "smallrye-in-memory"

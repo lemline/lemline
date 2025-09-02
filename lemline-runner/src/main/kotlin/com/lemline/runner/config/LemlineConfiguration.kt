@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_MIGRATE_AT_START_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.INGESTION_TOPIC_DEFAULT
@@ -9,7 +10,6 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MSG_CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
@@ -35,6 +35,7 @@ const val MIGRATE_AT_START = "lemline.database.migrate-at-start"
 const val WORKFLOWS_PRODUCER_ENABLED = "lemline.messaging.workflows.producer.enabled"
 const val WORKFLOWS_CONSUMER_ENABLED = "lemline.messaging.workflows.consumer.enabled"
 const val WORKFLOWS_CONSUMER_CONCURRENCY = "lemline.messaging.workflows.consumer.concurrency"
+
 const val INGESTION_PRODUCER_ENABLED = "lemline.messaging.ingestion.producer.enabled"
 const val INGESTION_CONSUMER_ENABLED = "lemline.messaging.ingestion.consumer.enabled"
 const val INGESTION_CONSUMER_CONCURRENCY = "lemline.messaging.ingestion.consumer.concurrency"
@@ -195,8 +196,8 @@ interface LemlineConfiguration {
         @WithDefault("false")
         fun enabled(): Boolean
 
-        @WithDefault(MSG_CONSUMER_CONCURRENCY_DEFAULT)
-        fun concurrency(): Int
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Long
     }
 
     /**
@@ -231,7 +232,7 @@ interface LemlineConfiguration {
     }
 
     interface KafkaConsumerConfig {
-        @WithDefault(MSG_CONSUMER_CONCURRENCY_DEFAULT)
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
         fun concurrency(): Int
 
         @WithDefault(KAFKA_GROUP_ID_DEFAULT)
@@ -286,7 +287,7 @@ interface LemlineConfiguration {
     }
 
     interface RabbitConsumerConfig {
-        @WithDefault(MSG_CONSUMER_CONCURRENCY_DEFAULT)
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
         fun concurrency(): Int
         fun queueDlq(): Optional<String>
     }
@@ -351,14 +352,12 @@ interface LemlineConfiguration {
     interface OutboxProcessingConfig {
         /**
          * Processing interval
-         * Default: 10 second
          */
         @WithDefault("10s")
         fun every(): String
 
         /**
          * Maximum number of messages to process in one batch
-         * Default: 1000
          */
         @WithDefault("1000")
         @Min(1)
@@ -366,7 +365,6 @@ interface LemlineConfiguration {
 
         /**
          * Initial delay before starting processing
-         * Default: 30 seconds
          */
         @WithDefault("30s")
         fun initialDelay(): String
@@ -392,14 +390,12 @@ interface LemlineConfiguration {
     interface OutboxCleanupConfig {
         /**
          * Cleanup interval
-         * Default: 1 hour
          */
         @WithDefault("1h")
         fun every(): String
 
         /**
          * Age of messages to clean up
-         * Default: 7 days
          */
         @WithDefault("7d")
         fun after(): String

@@ -27,7 +27,7 @@ import org.reactivestreams.Subscription
 @ExperimentalTime
 internal abstract class MessageSubscriber() : Subscriber<Message<String>> {
 
-    abstract val maxConcurrency: Int
+    abstract val maxConcurrency: Long
     abstract val enabled: Boolean
     abstract val publisher: Publisher<Message<String>>
     abstract val handler: MessageHandler
@@ -75,7 +75,7 @@ internal abstract class MessageSubscriber() : Subscriber<Message<String>> {
             return
         }
         subscription = s
-        subscription.request(maxConcurrency.toLong())
+        subscription.request(maxConcurrency)
     }
 
     override fun onNext(item: Message<String>) {

@@ -260,7 +260,6 @@ class Processor(
                 if (tryInstance == null) {
                     // the workflow is faulted
                     status = WorkflowStatus.FAULTED
-                    logError(e) { "Workflow execution faulted" }
                     onWorkflowFaulted()
                     throw e
                 }

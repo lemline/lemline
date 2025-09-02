@@ -4,9 +4,13 @@ package com.lemline.runner.config
 import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.runner.LemlineApplication
+import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
+import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.H2_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.INGESTION_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
@@ -17,7 +21,6 @@ import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_DESERIALIZE
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.MSG_CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
@@ -46,7 +49,7 @@ import com.lemline.runner.instances.WORKFLOWS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
 
 enum class TopicType(
-    val configKey: String,
+    val config: String,
     val defaultTopicName: String,
     val incomingChannel: String,
     val outgoingChannel: String,
@@ -96,7 +99,7 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             logger.info { "Lemline user properties:\n${lemlineProps.toPrint()}" }
 
-            // System property overrides
+            // Those system properties are set in LemlineApplication
             lemlineProps[WORKFLOWS_CONSUMER_ENABLED] = System.getProperty(WORKFLOWS_CONSUMER_ENABLED) ?: "false"
             lemlineProps[WORKFLOWS_PRODUCER_ENABLED] = System.getProperty(WORKFLOWS_PRODUCER_ENABLED) ?: "false"
             lemlineProps[INGESTION_CONSUMER_ENABLED] = System.getProperty(INGESTION_CONSUMER_ENABLED) ?: "false"
@@ -137,46 +140,39 @@ class LemlineConfigSource : PropertiesConfigSource(
             }
             generated[DATABASE_TYPE] = type
 
-            if (usePostgres) {
-                val prefix = "lemline.database.postgresql"
-                val host = props["$prefix.host"] ?: POSTGRES_HOST_DEFAULT
-                val port = props["$prefix.port"] ?: POSTGRES_PORT_DEFAULT
-                val name = props["$prefix.name"] ?: POSTGRES_NAME_DEFAULT
-
-                // apply quarkus properties
-                if (type == DB_TYPE_POSTGRESQL) {
+            when (type) {
+                DB_TYPE_POSTGRESQL -> {
+                    val db = "lemline.database.postgresql"
+                    val host = props["$db.host"] ?: POSTGRES_HOST_DEFAULT
+                    val port = props["$db.port"] ?: POSTGRES_PORT_DEFAULT
+                    val name = props["$db.name"] ?: POSTGRES_NAME_DEFAULT
                     val postgres = "quarkus.datasource.postgresql"
-                    generated["$postgres.username"] = props["$prefix.username"] ?: POSTGRES_USERNAME_DEFAULT
-                    generated["$postgres.password"] = props["$prefix.password"] ?: POSTGRES_PASSWORD_DEFAULT
+                    generated["$postgres.username"] = props["$db.username"] ?: POSTGRES_USERNAME_DEFAULT
+                    generated["$postgres.password"] = props["$db.password"] ?: POSTGRES_PASSWORD_DEFAULT
                     generated["$postgres.jdbc.url"] = "jdbc:postgresql://$host:$port/$name"
                 }
-            }
 
-            if (useMysql) {
-                val prefix = "lemline.database.mysql"
-                val host = props["$prefix.host"] ?: MYSQL_HOST_DEFAULT
-                val port = props["$prefix.port"] ?: MYSQL_PORT_DEFAULT
-                val name = props["$prefix.name"] ?: MYSQL_NAME_DEFAULT
-
-                // apply quarkus properties
-                if (type == DB_TYPE_MYSQL) {
+                DB_TYPE_MYSQL -> {
+                    val db = "lemline.database.mysql"
+                    val host = props["$db.host"] ?: MYSQL_HOST_DEFAULT
+                    val port = props["$db.port"] ?: MYSQL_PORT_DEFAULT
+                    val name = props["$db.name"] ?: MYSQL_NAME_DEFAULT
                     val mysql = "quarkus.datasource.mysql"
-                    generated["$mysql.username"] = props["$prefix.username"] ?: MYSQL_USERNAME_DEFAULT
-                    generated["$mysql.password"] = props["$prefix.password"] ?: MYSQL_PASSWORD_DEFAULT
+                    generated["$mysql.username"] = props["$db.username"] ?: MYSQL_USERNAME_DEFAULT
+                    generated["$mysql.password"] = props["$db.password"] ?: MYSQL_PASSWORD_DEFAULT
                     generated["$mysql.jdbc.url"] = "jdbc:mysql://$host:$port/$name" +
                         "?useSSL=false" +
                         "&allowPublicKeyRetrieval=true" +
                         "&sessionVariables=sql_mode='STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'" +
                         "&continueBatchOnError=false"
                 }
-            }
 
-            // apply quarkus properties
-            if (type == DB_TYPE_IN_MEMORY) {
-                generated["quarkus.datasource.username"] = LemlineConfigConstants.H2_USERNAME_DEFAULT
-                generated["quarkus.datasource.password"] = LemlineConfigConstants.H2_PASSWORD_DEFAULT
-                generated["quarkus.datasource.jdbc.url"] =
-                    "jdbc:h2:mem:${LemlineConfigConstants.H2_DB_NAME_DEFAULT};DB_CLOSE_DELAY=-1;MODE=PostgreSQL"
+                DB_TYPE_IN_MEMORY -> {
+                    val h2 = "quarkus.datasource" // <- default datasource
+                    generated["$h2.username"] = H2_USERNAME_DEFAULT
+                    generated["$h2.password"] = H2_PASSWORD_DEFAULT
+                    generated["$h2.jdbc.url"] = "jdbc:h2:mem:$H2_DB_NAME_DEFAULT;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"
+                }
             }
 
             return generated
@@ -239,7 +235,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             props: Map<String, String>,
             type: TopicType
         ) {
-            val config = "lemline.messaging.kafka.${type.configKey}"
+            val config = "lemline.messaging.kafka.${type.config}"
             val topic = props["$config.topic"] ?: type.defaultTopicName
 
             if (props[type.consumerEnabled].toBoolean()) {
@@ -253,7 +249,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                 set("$incoming.dead-letter-queue.topic", props["$consumer.topic-dlq"] ?: "$topic-dlq")
                 set("$incoming.value.deserializer", KAFKA_STRING_DESERIALIZER)
                 // set the consumer concurrency
-                set(type.consumerConcurrency, props["$consumer.concurrency"] ?: MSG_CONSUMER_CONCURRENCY_DEFAULT)
+                set(type.consumerConcurrency, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
             }
 
             if (props[type.producerEnabled].toBoolean()) {
@@ -284,22 +280,21 @@ class LemlineConfigSource : PropertiesConfigSource(
             props: Map<String, String>,
             type: TopicType
         ) {
-            val channel = "lemline.messaging.kafka.${type.configKey}"
+            val channel = "lemline.messaging.kafka.${type.config}"
             val queue = props["$channel.queue"] ?: type.defaultTopicName
 
             if (props[type.consumerEnabled].toBoolean()) {
                 val consumer = "$channel.consumer"
                 val incoming = "mp.messaging.incoming.${type.incomingChannel}"
-                val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue-dlq"
                 set("$incoming.connector", RABBITMQ_CONNECTOR)
                 set("$incoming.queue.name", queue)
                 set("$incoming.queue.durable", "true")
                 set("$incoming.auto-ack", "false")
                 set("$incoming.deserializer", RABBITMQ_STRING_SERIALIZER)
                 set("$incoming.queue.arguments.x-dead-letter-exchange", "dlx")
-                set("$incoming.queue.arguments.x-dead-letter-routing-key", queueDLQ)
+                set("$incoming.queue.arguments.x-dead-letter-routing-key", props["$consumer.queue-dlq"] ?: "$queue-dlq")
                 // set the consumer concurrency
-                set(type.consumerConcurrency, props["$consumer.concurrency"] ?: MSG_CONSUMER_CONCURRENCY_DEFAULT)
+                set(type.consumerConcurrency, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
             }
 
             if (props[type.producerEnabled].toBoolean()) {

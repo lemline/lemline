@@ -14,11 +14,11 @@ import org.reactivestreams.Publisher
 
 internal const val WORKFLOWS_IN_CHANNEL = "workflows-in"
 
-@OptIn(ExperimentalTime::class)
+@ExperimentalTime
 @Startup
 @ApplicationScoped
 internal class InstanceMessageSubscriber(
-    @param:ConfigProperty(name = WORKFLOWS_CONSUMER_CONCURRENCY) override val maxConcurrency: Int,
+    @param:ConfigProperty(name = WORKFLOWS_CONSUMER_CONCURRENCY) override val maxConcurrency: Long,
     @param:ConfigProperty(name = WORKFLOWS_CONSUMER_ENABLED) override val enabled: Boolean,
     @param:Channel(WORKFLOWS_IN_CHANNEL) override val publisher: Publisher<Message<String>>,
     override val handler: InstanceMessageHandler,
