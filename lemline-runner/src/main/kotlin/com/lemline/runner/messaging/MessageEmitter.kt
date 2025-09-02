@@ -12,18 +12,18 @@ import java.time.ZoneId
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.eclipse.microprofile.reactive.messaging.Message
 
-internal abstract class MessageEmitter {
+internal abstract class MessageEmitter<T : JsonSerializable> {
 
     protected abstract val emitter: MutinyEmitter<String>
 
     @ConfigProperty(name = MESSAGING_TYPE)
     private lateinit var messagingType: String
 
-    suspend fun send(payload: String) {
-        emit(payload, getMetaData())
+    suspend fun send(msg: T) {
+        emit(msg.toJsonString(), getMetaData())
     }
 
-    suspend fun emit(payload: String, metadata: Any): Void? =
+    private suspend fun emit(payload: String, metadata: Any): Void? =
         emitter.sendMessage(Message.of(payload).addMetadata(metadata)).awaitSuspending()
 
     private fun getMetaData(): Any =

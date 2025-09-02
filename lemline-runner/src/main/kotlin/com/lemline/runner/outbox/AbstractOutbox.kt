@@ -63,7 +63,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     private val outboxCleaning = AtomicBoolean(false)
 
     open suspend fun process(entity: T) {
-        entity.instance?.payload?.let { emitter.send(it) }
+        entity.instance?.let { emitter.send(it) }
     }
 
     @PostConstruct

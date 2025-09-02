@@ -24,6 +24,7 @@ import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
@@ -34,6 +35,7 @@ import org.jetbrains.annotations.TestOnly
  * the entire lifecycle of a message.
  */
 @ExperimentalTime
+@ExperimentalSerializationApi
 @ApplicationScoped
 internal class InstanceMessageHandler(
     private val emitter: InstanceMessageEmitter,
@@ -80,7 +82,7 @@ internal class InstanceMessageHandler(
                         message.ack(workflowName, workflowVersion)
                         // For testing: complete the future
 
-                        processingMessages.remove(message.payload)?.complete(nextMessage?.payload)
+                        processingMessages.remove(message.payload)?.complete(nextMessage?.toJsonString())
                     }
                     metrics.processingCompleted(workflowName, workflowVersion)
                 }
@@ -200,8 +202,8 @@ internal class InstanceMessageHandler(
      * The method ensures that no unhandled exceptions are propagated.
      */
     private suspend fun InstanceMessage.emit() = try {
-        logger.debug { "Emitting next message: $payload" }
-        emitter.send(payload)
+        logger.debug { "Emitting next message: $this" }
+        emitter.send(this)
     } catch (e: Exception) {
         logger.warn(e) { "Failed to emit next message. Message will be stored in the $RETRY_TABLE table instead to be re-emit later" }
         metrics.processingFailed(FailureReasons.MESSAGE_EMISSION_ERROR, workflowName, workflowVersion)

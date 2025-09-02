@@ -34,7 +34,7 @@ internal class InstanceMessageTest {
         // When
         Assertions.assertEquals(
             """{"i":"$workflowId","n":"test-workflow","v":"1.0.0","p":"","s":{"":{"inp":""}},"w":"$parentId"}""",
-            instanceMessage.payload,
+            instanceMessage.toJsonString(),
         )
     }
 
@@ -51,7 +51,7 @@ internal class InstanceMessageTest {
         )
 
         // When
-        Assertions.assertEquals(instanceMessage, InstanceMessage.fromJsonString(instanceMessage.payload))
+        Assertions.assertEquals(instanceMessage, InstanceMessage.fromJsonString(instanceMessage.toJsonString()))
     }
 
     @Test

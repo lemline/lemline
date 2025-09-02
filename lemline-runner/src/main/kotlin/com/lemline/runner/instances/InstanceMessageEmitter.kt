@@ -5,13 +5,15 @@ import com.lemline.runner.messaging.MessageEmitter
 import io.quarkus.runtime.Startup
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.enterprise.context.ApplicationScoped
+import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Channel
 
 internal const val WORKFLOWS_OUT_CHANNEL = "workflows-out"
 
+@ExperimentalTime
 @Startup
 @ApplicationScoped
-internal class InstanceMessageEmitter : MessageEmitter() {
+internal class InstanceMessageEmitter : MessageEmitter<InstanceMessage>() {
 
     @Channel(WORKFLOWS_OUT_CHANNEL)
     override lateinit var emitter: MutinyEmitter<String>

@@ -7,6 +7,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.WorkflowState
+import com.lemline.runner.messaging.JsonSerializable
 import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.Contextual
@@ -51,7 +52,7 @@ data class InstanceMessage(
      * Indicates the id of the parent model describing the workflow waiting for this workflow completion, if any.
      */
     @SerialName("w") @Contextual val parentId: UUID? = null,
-) : WorkflowInstance {
+) : WorkflowInstance, JsonSerializable {
 
     override val initialState by lazy { workflowState.parsed }
     override val initialPosition by lazy { workflowPosition.parsed }
@@ -62,7 +63,7 @@ data class InstanceMessage(
     @Transient
     lateinit var message: Message<String>
 
-    val payload: String by lazy { LemlineJson.encodeToString(this) }
+    override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
     fun updateWith(workflowState: WorkflowState, workflowPosition: NodePosition): InstanceMessage = copy(
         workflowPosition = LazyParsedField(workflowPosition, NodePosition.Companion.serializer()),
@@ -112,8 +113,8 @@ data class InstanceMessage(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
-            workflowPosition = NodePosition.Companion.root,
-            workflowState = WorkflowState.Companion.newInstance(workflowInput),
+            workflowPosition = NodePosition.root,
+            workflowState = WorkflowState.newInstance(workflowInput),
             parentId = parentId,
         )
 

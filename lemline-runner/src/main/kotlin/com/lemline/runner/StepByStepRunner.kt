@@ -23,7 +23,6 @@ import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.models.SCHEDULE_TABLE
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.repositories.ParentRepository
-import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.starters.Starter
@@ -41,11 +40,11 @@ import kotlinx.serialization.json.JsonElement
  * WorkflowConsumer is responsible for consuming workflow messages from the incoming channel,
  * processing them, and sending the results to the outgoing channel.
  */
-@OptIn(ExperimentalTime::class)
+@ExperimentalTime
+@ExperimentalSerializationApi
 @Startup
 @ApplicationScoped
 internal class StepByStepRunner @Inject constructor(
-    private val retryRepository: RetryRepository,
     private val waitRepository: WaitRepository,
     private val parentRepository: ParentRepository,
     private val scheduleRepository: ScheduleRepository,
@@ -69,7 +68,6 @@ internal class StepByStepRunner @Inject constructor(
         }
     }
 
-    @ExperimentalSerializationApi
     suspend fun run(processor: Processor): InstanceMessage? {
 
         processor.onTaskCompleted { onTaskCompleted(it) }
@@ -169,7 +167,6 @@ internal class StepByStepRunner @Inject constructor(
      * The workflow instance's processing is halted temporarily, and further processing is expected to resume
      * asynchronously through the RetryOutbox.
      */
-    @ExperimentalSerializationApi
     private suspend fun InstanceMessage.onRetry(tryInstance: TryInstance) {
         val delay = tryInstance.delay ?: error("No delay set in in $tryInstance")
 
@@ -179,7 +176,7 @@ internal class StepByStepRunner @Inject constructor(
             outboxScheduledFor = Clock.System.now().plus(delay),
         )
         // Save the message to ingest into the retry table
-        ingestionEmitter.send(retryMessage.toJsonString())
+        ingestionEmitter.send(retryMessage)
     }
 
     /**

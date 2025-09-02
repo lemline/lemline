@@ -136,12 +136,12 @@ internal class IngestionMessageTest {
         // Expect compact keys with class discriminator t
         // ParentIngestionMessage has serial name "p"
         assertEquals(
-            "{\"t\":\"p\",\"i\":\"$id\",\"w\":${instance.payload},\"f\":null}",
+            "{\"t\":\"p\",\"i\":\"$id\",\"w\":${instance.toJsonString()},\"f\":null}",
             msgParent.toJsonString(),
         )
         // WaitIngestionMessage has serial name "w"
         assertEquals(
-            "{\"t\":\"w\",\"i\":\"$id\",\"w\":${instance.payload},\"f\":null}",
+            "{\"t\":\"w\",\"i\":\"$id\",\"w\":${instance.toJsonString()},\"f\":null}",
             msgWait.toJsonString(),
         )
         // RetryIngestionMessage has serial name "r"
@@ -151,7 +151,7 @@ internal class IngestionMessageTest {
         )
         // ScheduleIngestionMessage has serial name "s"
         assertEquals(
-            "{\"t\":\"s\",\"i\":\"$id\",\"w\":${instance.payload},\"f\":null,\"sa\":\"PT1S\",\"se\":null,\"sc\":null,\"sz\":null}",
+            "{\"t\":\"s\",\"i\":\"$id\",\"w\":${instance.toJsonString()},\"f\":null,\"sa\":\"PT1S\",\"se\":null,\"sc\":null,\"sz\":null}",
             msgSchedule.toJsonString(),
         )
     }

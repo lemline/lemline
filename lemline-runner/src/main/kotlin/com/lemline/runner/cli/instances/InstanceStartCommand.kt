@@ -75,7 +75,7 @@ class InstanceStartCommand : Runnable {
             ::cliError
         )
         instanceMessage?.let {
-            emitter.send(it.payload)
+            emitter.send(it)
             cliPrint {
                 "Instance ${it.workflowId} started successfully (name: $workflowName, version: ${it.workflowVersion}, input: $workflowInput)"
             }
