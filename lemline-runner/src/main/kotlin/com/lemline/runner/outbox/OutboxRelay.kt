@@ -4,7 +4,9 @@ package com.lemline.runner.outbox
 import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
+import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
+import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -34,14 +36,15 @@ import org.slf4j.Logger
  * - Detailed logging and error tracking
  *
  * @param logger Logger instance for tracking operations
- * @param repository Repository for accessing the outbox table
+ * @param outboxRepository Repository for accessing the outbox table
  * @param relay Function that processes individual messages
  * @param T Type of the message entity (must implement OutboxModel interface)
  */
 @ExperimentalTime
 internal class OutboxRelay<T : OutboxModel>(
     private val logger: Logger,
-    private val repository: OutboxRepository<T>,
+    private val outboxRepository: OutboxRepository<T>,
+    private val failureRepository: FailureRepository,
     private val relay: suspend (T) -> Unit,
 ) {
     /**
@@ -77,16 +80,23 @@ internal class OutboxRelay<T : OutboxModel>(
             batchNumber++
             var toProcess = 0
             // Find and process messages in the same transaction
-            repository.withTransaction { connection ->
+            outboxRepository.withTransaction { connection ->
                 // Find and lock messages ready to process
-                val messages = repository.findEntitiesToProcess(maxAttempts, batchSize, connection)
+                val messages = outboxRepository.findEntitiesToProcess(maxAttempts, batchSize, connection)
                 toProcess = messages.size
 
                 if (toProcess > 0) {
                     totalToProcess += toProcess
                     val processed = process(messages, maxAttempts, initialDelay)
-                    repository.update(messages, connection)
+                    outboxRepository.update(messages, connection)
                     totalProcessed += processed
+
+                    // Insert new failures into the FAILURE_TABLE within the same transaction
+                    // This can be undone by retrying the outbox
+                    val failures = messages
+                        .filter { it.outBoxStatus == OutBoxStatus.FAILED }
+                        .map { FailureModel.from(it) }
+                    failureRepository.insert(failures, connection)
                 }
             }
         } while (toProcess >= batchSize)
@@ -101,7 +111,11 @@ internal class OutboxRelay<T : OutboxModel>(
     /**
      * Processes a list of entities concurrently on separate coroutines for improved performance.
      */
-    private suspend fun process(entities: List<T>, maxAttempts: Int, initialDelay: Duration): Int = coroutineScope {
+    private suspend fun process(
+        entities: List<T>,
+        maxAttempts: Int,
+        initialDelay: Duration
+    ): Int = coroutineScope {
         entities.map {
             async { processOutboxEntity(it, maxAttempts, initialDelay) }
         }
@@ -122,13 +136,15 @@ internal class OutboxRelay<T : OutboxModel>(
         true // <- return true (success)
     } catch (e: Exception) {
         logger.info(e) { "Failed to process outbox entity for workflow ${outboxEntity.instance?.workflowId}" }
-        outboxEntity.outBoxStatus = OutBoxStatus.PENDING
-        outboxEntity.outboxLastError = e.stackTraceToString()
+        outboxEntity.outboxErrorClass = e::class.qualifiedName
+        outboxEntity.outboxErrorMessage = e.message
+        outboxEntity.outboxErrorStackTrace = e.stackTraceToString()
 
         if (outboxEntity.outboxAttemptCount >= maxAttempts) {
             outboxEntity.outBoxStatus = OutBoxStatus.FAILED
             logger.error { "Message ${outboxEntity.instance?.workflowId} has reached maximum retry attempts" }
         } else {
+            outboxEntity.outBoxStatus = OutBoxStatus.PENDING
             val nextDelay = calculateNextAttemptDelay(outboxEntity.outboxAttemptCount, initialDelay)
             outboxEntity.outboxDelayedUntil = Clock.System.now() + nextDelay
             logger.debug { "Message ${outboxEntity.instance?.workflowId} will be retried in ${nextDelay}ms (attempt ${outboxEntity.outboxAttemptCount})" }
@@ -163,13 +179,13 @@ internal class OutboxRelay<T : OutboxModel>(
             batchNumber++
             var toDelete = 0
             // Find and delete messages in the same transaction
-            repository.withTransaction { connection ->
-                val messages = repository.findEntitiesToDelete(cutoffDate, batchSize, connection)
+            outboxRepository.withTransaction { connection ->
+                val messages = outboxRepository.findEntitiesToDelete(cutoffDate, batchSize, connection)
                 toDelete = messages.size
 
                 if (toDelete > 0) {
                     totalToDelete += toDelete
-                    val deleted = repository.delete(messages, connection)
+                    val deleted = outboxRepository.delete(messages, connection)
                     totalDeleted += deleted
                 }
             }

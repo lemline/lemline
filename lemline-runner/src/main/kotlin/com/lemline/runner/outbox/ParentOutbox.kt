@@ -4,6 +4,7 @@ package com.lemline.runner.outbox
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.models.ParentOutboxModel
+import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ParentRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
@@ -25,13 +26,16 @@ import kotlin.time.ExperimentalTime
 internal class ParentOutbox : AbstractOutbox<ParentOutboxModel>() {
 
     @Inject
-    override lateinit var emitter: InstanceMessageEmitter
+    override lateinit var instanceEmitter: InstanceMessageEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
 
     @Inject
-    override lateinit var repository: ParentRepository
+    override lateinit var failureRepository: FailureRepository
+
+    @Inject
+    override lateinit var outboxRepository: ParentRepository
 
     // Is this outbox enabled?
     override val enabled by lazy {

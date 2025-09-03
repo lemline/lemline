@@ -50,11 +50,11 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
 
     @Inject
     override lateinit var databaseManager: DatabaseManager
-    
+
     override val tableName = FAILURE_TABLE
 
     companion object {
-        internal const val MESSAGE_COLUMN = "message"
+        internal const val PAYLOAD_COLUMN = "payload"
         internal const val REASON_COLUMN = "reason"
 
         internal const val ERROR_CLASS_COLUMN = "error_class"
@@ -64,8 +64,8 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
 
     override val prepareStatementMap: Map<String, (PreparedStatement, FailureModel, Int) -> Unit> by lazy {
         super.prepareStatementMap + mapOf(
-            MESSAGE_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
-                stmt.setString(idx, entity.message)
+            PAYLOAD_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
+                stmt.setString(idx, entity.payload)
             },
             REASON_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
                 stmt.setString(idx, entity.reason)
@@ -86,7 +86,7 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
         id = getUuid(rs, ID_COLUMN),
         instance = rs.getInstanceMessage(),
         reason = rs.getString(REASON_COLUMN),
-        message = rs.getString(MESSAGE_COLUMN),
+        payload = rs.getString(PAYLOAD_COLUMN),
         errorClass = rs.getString(ERROR_CLASS_COLUMN),
         errorMessage = rs.getString(ERROR_MESSAGE_COLUMN),
         errorStackTrace = rs.getString(ERROR_STACKTRACE_COLUMN)

@@ -1,24 +1,26 @@
--- Use the table name from com.lemline.runner.models.ScheduleModel
+-- Use the table name from com.lemline.runner.repositories.SCHEDULE_TABLE
 CREATE TABLE lemline_schedules
 (
-    id                   BINARY(16) PRIMARY KEY,
-    workflow_id          BINARY(16) UNIQUE NOT NULL,
-    workflow_name        VARCHAR(255)      NOT NULL,
-    workflow_version     VARCHAR(255)      NOT NULL,
-    workflow_position    TEXT              NOT NULL,
-    workflow_state       MEDIUMTEXT        NOT NULL,
-    parent_id            BINARY(16),
-    outbox_status        VARCHAR(50)       NOT NULL,
-    outbox_scheduled_for TIMESTAMP(6),
-    outbox_delayed_until TIMESTAMP(6),
-    outbox_attempt_count INTEGER           NOT NULL DEFAULT 0,
-    outbox_last_error    MEDIUMTEXT,
-    schedule_after       VARCHAR(255),
-    schedule_cron        VARCHAR(255),
-    schedule_every       VARCHAR(255),
-    schedule_zone        VARCHAR(64),
-    created_at           TIMESTAMP(6)      NOT NULL,
-    updated_at           TIMESTAMP(6)
+    id                      BINARY(16) PRIMARY KEY,
+    workflow_id             BINARY(16) UNIQUE NOT NULL,
+    workflow_name           VARCHAR(255)      NOT NULL,
+    workflow_version        VARCHAR(255)      NOT NULL,
+    workflow_position       TEXT              NOT NULL,
+    workflow_state          MEDIUMTEXT        NOT NULL,
+    parent_id               BINARY(16),
+    schedule_after          VARCHAR(255),
+    schedule_cron           VARCHAR(255),
+    schedule_every          VARCHAR(255),
+    schedule_zone           VARCHAR(64),
+    outbox_status           VARCHAR(50)       NOT NULL,
+    outbox_scheduled_for    TIMESTAMP(6),
+    outbox_delayed_until    TIMESTAMP(6),
+    outbox_attempt_count    INTEGER           NOT NULL DEFAULT 0,
+    outbox_error_class      TEXT,
+    outbox_error_message    TEXT,
+    outbox_error_stacktrace MEDIUMTEXT,
+    created_at              TIMESTAMP(6)      NOT NULL,
+    updated_at              TIMESTAMP(6)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4;
 

@@ -17,26 +17,22 @@ import kotlinx.serialization.Serializable
 @Serializable
 @SerialName("r") // <- type discriminator for polymorphic serialization
 data class RetryIngestionMessage(
-    @SerialName("i")
+    @SerialName("id")
     override val id: @Contextual UUID,
 
-    @SerialName("w")
-    override val instance: InstanceMessage?,
+    @SerialName("i")
+    override val instance: InstanceMessage,
 
     @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
     @SerialName("f")
-    override var outboxScheduledFor: Instant?,
-
-    @SerialName("m")
-    val message: String? = null,
-) : IngestionMessage {
+    override var outboxScheduledFor: Instant?
+) : OutboxIngestionMessage, IngestionMessage {
     fun toModel() = RetryOutboxModel(
         id = id,
         instance = instance,
         outBoxStatus = outBoxStatus,
         outboxScheduledFor = outboxScheduledFor,
-        message = message
     )
 }

@@ -18,6 +18,7 @@ internal abstract class WaitRepositoryTest : OutboxRepositoryTest<WaitOutboxMode
     override lateinit var repository: WaitRepository
 
     override fun createRandomEntity() = WaitOutboxModel(
+        id = UUID.randomUUID(),
         instance = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = randomString,

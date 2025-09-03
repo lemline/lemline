@@ -7,10 +7,8 @@ import com.lemline.core.nodes.NodePosition
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.messaging.JsonSerializable
 import com.lemline.runner.models.WithId
-import com.lemline.runner.outbox.OutBoxStatus
 import java.util.*
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
@@ -21,10 +19,6 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 @JsonClassDiscriminator("t") // <- type discriminator for polymorphic serialization
 sealed interface IngestionMessage : WithId, JsonSerializable {
     val instance: InstanceMessage?
-
-    var outBoxStatus: OutBoxStatus
-
-    var outboxScheduledFor: Instant?
 
     override fun toJsonString(): String = LemlineJson.encodeToString(this)
 

@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.core.errors.WorkflowException
+import com.lemline.runner.failures.FailureReasons.getFailureReason
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
 import io.micrometer.core.instrument.MeterRegistry
-import java.io.IOException
-import java.sql.SQLException
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.ExperimentalTime
 import kotlin.time.TimeSource.Monotonic.markNow
@@ -178,39 +176,5 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
         private const val TAG_REASON = "reason"
         private const val TAG_WORKFLOW_NAME = "workflow_name"
         private const val TAG_WORKFLOW_VERSION = "workflow_version"
-
-        // Tag Values for 'reason'
-        object FailureReasons {
-            const val DEFINITION_NOT_FOUND = "definition_not_found"
-            const val SECRETS_RETRIEVAL_FAILED = "secrets_retrieval_failed"
-            const val MESSAGE_EMISSION_ERROR = "message_emission_error"
-            const val DATABASE_ERROR = "database_error"
-            const val IO_ERROR = "io_error"
-            const val INVALID_STATE = "invalid_state"
-            const val PROCESSING_ERROR = "processing_error"
-            const val WORKFLOW_ERROR_PREFIX = "workflow_"
-        }
-
-        /**
-         * Determines a low-cardinality failure reason from an exception for use in metrics.
-         * This is crucial for creating actionable alerts and dashboards without overwhelming
-         * the metrics backend.
-         */
-        fun getFailureReason(e: Throwable): String = when (e) {
-            // Domain-specific errors from the workflow engine
-            is WorkflowException -> FailureReasons.WORKFLOW_ERROR_PREFIX + e.error.type.lowercase()
-
-            // --- Database & Persistence Errors ---
-            is SQLException -> FailureReasons.DATABASE_ERROR
-
-            // --- I/O and Network Errors ---
-            is IOException -> FailureReasons.IO_ERROR
-
-            // --- Application State Errors ---
-            is IllegalStateException -> FailureReasons.INVALID_STATE
-
-            // --- Fallback for any other uncategorized exception ---
-            else -> FailureReasons.PROCESSING_ERROR
-        }
     }
 }

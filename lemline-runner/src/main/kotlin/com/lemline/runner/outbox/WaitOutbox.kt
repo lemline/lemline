@@ -4,6 +4,7 @@ package com.lemline.runner.outbox
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.WaitRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
@@ -23,13 +24,16 @@ import kotlin.time.ExperimentalTime
 internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
 
     @Inject
-    override lateinit var emitter: InstanceMessageEmitter
+    override lateinit var instanceEmitter: InstanceMessageEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
 
     @Inject
-    override lateinit var repository: WaitRepository
+    override lateinit var failureRepository: FailureRepository
+    
+    @Inject
+    override lateinit var outboxRepository: WaitRepository
 
     // Is this outbox enabled?
     override val enabled by lazy {

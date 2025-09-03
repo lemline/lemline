@@ -63,15 +63,17 @@ class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
     override fun createModel(rs: ResultSet) = ScheduleOutboxModel(
         id = getUuid(rs, ID_COLUMN),
         instance = rs.getInstanceMessage(),
-        outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
-        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
-        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
-        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
-        outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
         scheduleAfter = rs.getString(SCHEDULE_AFTER_COLUMN),
         scheduleEvery = rs.getString(SCHEDULE_EVERY_COLUMN),
         scheduleCron = rs.getString(SCHEDULE_CRON_COLUMN),
         scheduleZone = rs.getString(SCHEDULE_ZONE_COLUMN),
+        outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
+        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
+        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
+        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
+        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN),
+        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN),
+        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN),
     )
 
     suspend fun findByWorkflowId(workflowId: UUID, connection: Connection? = null): ScheduleOutboxModel? =

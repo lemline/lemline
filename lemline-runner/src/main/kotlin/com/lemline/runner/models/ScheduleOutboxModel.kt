@@ -25,7 +25,7 @@ import kotlinx.serialization.json.JsonElement
 
 @ExperimentalTime
 data class ScheduleOutboxModel(
-    override val id: UUID = IdGenerator.generateUUIDV7(),
+    override val id: UUID,
 
     override var instance: InstanceMessage,
 
@@ -37,8 +37,12 @@ data class ScheduleOutboxModel(
 
     override var outboxAttemptCount: Int = 0,
 
-    override var outboxLastError: String? = null,
+    override var outboxErrorClass: String? = null,
 
+    override var outboxErrorMessage: String? = null,
+
+    override var outboxErrorStackTrace: String? = null,
+    
     val scheduleAfter: String?,
 
     val scheduleEvery: String?,

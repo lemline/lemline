@@ -41,6 +41,8 @@ internal class ParentRepository : OutboxRepository<ParentOutboxModel>() {
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
         outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
         outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
-        outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
+        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN),
+        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN),
+        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN),
     )
 }

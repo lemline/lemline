@@ -4,6 +4,7 @@ package com.lemline.runner.outbox
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
+import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository
 import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
@@ -26,14 +27,18 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
     @Inject // Inject the specific repository
     lateinit var waitRepository: WaitRepository
 
+    @Inject // Inject the failure repository
+    override lateinit var failureRepository: FailureRepository
+    
     // Implement the abstract repository property
-    override val testRepository: OutboxRepository<WaitOutboxModel> by lazy { waitRepository }
+    override val outboxRepository: OutboxRepository<WaitOutboxModel> by lazy { waitRepository }
 
     // Implement the abstract KClass property
     override val modelClass: KClass<WaitOutboxModel> = WaitOutboxModel::class
 
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = WaitOutboxModel(
+        id = UUID.randomUUID(),
         instance = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = Random.nextBytes(10).toString(),

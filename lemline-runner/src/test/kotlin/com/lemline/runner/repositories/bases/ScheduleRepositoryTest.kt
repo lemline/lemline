@@ -18,6 +18,7 @@ internal abstract class ScheduleRepositoryTest : OutboxRepositoryTest<ScheduleOu
     override lateinit var repository: ScheduleRepository
 
     override fun createRandomEntity() = ScheduleOutboxModel(
+        id = UUID.randomUUID(),
         instance = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = randomString,

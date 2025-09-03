@@ -19,6 +19,7 @@ internal abstract class RetryRepositoryTest : OutboxRepositoryTest<RetryOutboxMo
     override lateinit var repository: RetryRepository
 
     override fun createRandomEntity() = RetryOutboxModel(
+        id = UUID.randomUUID(),
         instance = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = randomString,

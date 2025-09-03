@@ -1,4 +1,4 @@
--- Use the table name from com.lemline.runner.models.FailureModel
+-- Use the table name from com.lemline.runner.repositories.FAILURES_TABLE
 CREATE TABLE IF NOT EXISTS lemline_failures
 (
     id                BINARY(16) PRIMARY KEY,
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS lemline_failures
     workflow_position TEXT         NOT NULL,
     workflow_state    MEDIUMTEXT   NOT NULL,
     parent_id         BINARY(16),
-    message           MEDIUMTEXT,
+    payload           MEDIUMTEXT,
     reason            VARCHAR(255) NOT NULL,
     error_class       TEXT         NOT NULL,
     error_message     TEXT,

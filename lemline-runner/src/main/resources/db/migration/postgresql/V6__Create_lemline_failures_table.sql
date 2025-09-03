@@ -1,4 +1,4 @@
--- Use the table name from com.lemline.runner.models.FailureModel
+-- Use the table name from com.lemline.runner.repositories.FAILURES_TABLE
 CREATE TABLE IF NOT EXISTS lemline_failures
 (
     id                UUID PRIMARY KEY,
@@ -8,11 +8,11 @@ CREATE TABLE IF NOT EXISTS lemline_failures
     workflow_position TEXT           NOT NULL,
     workflow_state    TEXT           NOT NULL,
     parent_id         UUID,
-    message           TEXT,
+    payload           TEXT,
     reason            VARCHAR(255)   NOT NULL,
-    error_class       TEXT           NOT NULL,
+    error_class       TEXT,
     error_message     TEXT,
-    error_stacktrace  TEXT           NOT NULL,
+    error_stacktrace  TEXT,
     created_at        TIMESTAMPTZ(6) NOT NULL,
     updated_at        TIMESTAMPTZ(6)
 );

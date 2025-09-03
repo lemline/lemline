@@ -4,6 +4,7 @@ package com.lemline.runner.outbox
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
+import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
@@ -23,17 +24,21 @@ import kotlin.time.ExperimentalTime
 @ExperimentalTime
 internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>() {
 
-    @Inject // Inject the specific repository
+    @Inject // Inject the retry repository
     lateinit var retryRepository: RetryRepository
 
+    @Inject // Inject the failure repository
+    override lateinit var failureRepository: FailureRepository
+
     // Implement the abstract repository property
-    override val testRepository: OutboxRepository<RetryOutboxModel> by lazy { retryRepository }
+    override val outboxRepository: OutboxRepository<RetryOutboxModel> by lazy { retryRepository }
 
     // Implement the abstract KClass property
     override val modelClass: KClass<RetryOutboxModel> = RetryOutboxModel::class
 
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = RetryOutboxModel(
+        id = UUID.randomUUID(),
         instance = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = Random.nextBytes(10).toString(),
@@ -42,7 +47,6 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>(
             workflowState = "Test Retry Message: $payload",
             parentId = null,
         ),
-        message = null,
         outboxScheduledFor = null,
     )
 }

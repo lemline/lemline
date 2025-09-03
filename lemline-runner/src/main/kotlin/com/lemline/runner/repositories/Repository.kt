@@ -303,7 +303,7 @@ abstract class Repository<T> {
      * @return The result of executing the provided block with a `Connection`.
      * @throws java.sql.SQLException If an error occurs while acquiring or using the connection from the datasource.
      */
-    protected suspend fun <R> withConnection(connection: Connection?, block: (Connection) -> R): R =
+    protected suspend fun <R> withConnection(connection: Connection?, block: suspend (Connection) -> R): R =
         withContext(Dispatchers.IO) {
             when (connection) {
                 null -> databaseManager.datasource.connection.use { block(it) }

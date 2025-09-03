@@ -4,13 +4,14 @@ package com.lemline.runner.ingestion
 import com.lemline.common.LogContext
 import com.lemline.common.debug
 import com.lemline.common.error
+import com.lemline.common.ids.IdGenerator
 import com.lemline.common.logger
 import com.lemline.common.warn
 import com.lemline.common.withLoggingContext
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.models.RetryOutboxModel
-import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.models.FailureModel
+import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.ScheduleRepository
@@ -18,7 +19,6 @@ import com.lemline.runner.repositories.WaitRepository
 import jakarta.enterprise.context.ApplicationScoped
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Message
@@ -37,6 +37,7 @@ internal class IngestionMessageHandler(
     private val retryRepository: RetryRepository,
     private val scheduleRepository: ScheduleRepository,
     private val waitRepository: WaitRepository,
+    private val failureRepository: FailureRepository,
     private val metrics: IngestionMessageSubscriberMetrics,
 ) : MessageHandler {
 
@@ -69,6 +70,8 @@ internal class IngestionMessageHandler(
                             is RetryIngestionMessage -> ingestionMessage.save()
                             is ScheduleIngestionMessage -> ingestionMessage.save()
                             is WaitIngestionMessage -> ingestionMessage.save()
+                            is FailureIngestionMessage -> ingestionMessage.save()
+                            else -> error("Unknown ingestion message type: ${ingestionMessage::class.qualifiedName}")
                         }
                     }
                     metrics.processingCompleted(workflowName ?: UNKNOWN, workflowVersion ?: UNKNOWN)
@@ -115,53 +118,23 @@ internal class IngestionMessageHandler(
         waitRepository.insert(toModel())
     }
 
+    private suspend fun FailureIngestionMessage.save() {
+        failureRepository.insert(toModel())
+    }
+
     private suspend fun Message<String>.deserializationFailed(cause: Exception) = try {
-        val retryOutboxModel = RetryOutboxModel(
-            instance = null,
-            message = payload,
-            outboxLastError = cause.stackTraceToString(),
-            outboxScheduledFor = Clock.System.now(),
-            outBoxStatus = OutBoxStatus.FAILED,
+        val failure = FailureModel.from(
+            id = IdGenerator.generateUUIDV7(),
+            payload = payload,
+            reason = FailureReasons.DESERIALISATION_ERROR,
+            error = cause
         )
-        retryRepository.insert(retryOutboxModel)
+        failureRepository.insert(failure)
         // as the responsibility of the message is transferred to the database, we acknowledge the message
         ack(UNKNOWN, UNKNOWN)
     } catch (e: Exception) {
         logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: ${this.payload}" }
         nack(e, UNKNOWN, UNKNOWN)
-    }
-
-    private suspend fun InstanceMessage.saveAsFailed(cause: Exception?) = try {
-        val retryOutboxModel = RetryOutboxModel(
-            instance = this,
-            message = null,
-            outboxLastError = cause?.stackTraceToString(),
-            outboxScheduledFor = Clock.System.now(),
-            outBoxStatus = OutBoxStatus.FAILED,
-        )
-        retryRepository.insert(retryOutboxModel)
-        // as the responsibility of the message is transferred to the database, we acknowledge the message
-        message.ack(workflowName, workflowVersion)
-    } catch (e: Exception) {
-        logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: $this" }
-        message.nack(e, workflowName, workflowVersion)
-    }
-
-    private suspend fun InstanceMessage.saveForRetry(cause: Exception) = try {
-        // save the next message for re-emission
-        val retryOutboxModel = RetryOutboxModel(
-            instance = this,
-            outboxLastError = cause.stackTraceToString(),
-            outboxScheduledFor = Clock.System.now(), // <- TODO check first date
-            outBoxStatus = OutBoxStatus.PENDING,
-            message = null,
-        )
-        retryRepository.insert(retryOutboxModel)
-        // as the responsibility of the message is transferred to the database, we acknowledge the message
-        message.ack(workflowName, workflowVersion)
-    } catch (e: Exception) {
-        logger.error(e) { "Failed to insert next message for retry, neg-acknowledging the initial message: ${message.payload}" }
-        message.nack(e, workflowName, workflowVersion)
     }
 
     /**

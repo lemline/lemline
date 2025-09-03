@@ -116,9 +116,11 @@ abstract class WithIdRepository<T : WithId> : Repository<T>() {
     }
 
     /**
-     * Retrieves an entity by its ID.
+     * Finds an entity by its unique identifier.
      *
-     * @return The entity with the specified ID, or null if not found.
+     * @param id The unique identifier of the entity to find.
+     * @param connection An optional database connection to use. If null, a new connection is acquired.
+     * @return The entity corresponding to the provided identifier, or null if no entity is found.
      */
     suspend fun findById(id: UUID, connection: Connection? = null): T? = withConnection(connection) { conn ->
         conn.prepareStatement(findByIdSql).use { stmt ->
@@ -130,4 +132,20 @@ abstract class WithIdRepository<T : WithId> : Repository<T>() {
     }
 
     private val findByIdSql by lazy { "SELECT * FROM $tableName WHERE $ID_COLUMN = ? LIMIT 1" }
+
+    /**
+     * Deletes an entity by its unique ID.
+     *
+     * @param id The unique identifier of the entity to delete.
+     * @param connection An optional database connection to use. If null, a new connection is acquired.
+     * @return The number of rows affected by the delete operation.
+     */
+    suspend fun deleteById(id: UUID, connection: Connection? = null): Int = withConnection(connection) { conn ->
+        conn.prepareStatement(deleteByIdSql).use { stmt ->
+            setUuid(stmt, 1, id)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val deleteByIdSql: String by lazy { "DELETE FROM $tableName WHERE $ID_COLUMN = ?" }
 }

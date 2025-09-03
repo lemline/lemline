@@ -6,6 +6,7 @@ import com.lemline.common.logger
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.models.OutboxModel
+import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
@@ -42,8 +43,9 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     protected abstract val enabled: Boolean
 
 
-    protected abstract val repository: OutboxRepository<T>
-    protected abstract val emitter: InstanceMessageEmitter
+    protected abstract val failureRepository: FailureRepository
+    protected abstract val outboxRepository: OutboxRepository<T>
+    protected abstract val instanceEmitter: InstanceMessageEmitter
 
     protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig
     protected abstract val cleanupConf: LemlineConfiguration.OutboxCleanupConfig
@@ -51,7 +53,8 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     private val outboxRelay by lazy {
         OutboxRelay(
             logger = logger,
-            repository = repository,
+            failureRepository = failureRepository,
+            outboxRepository = outboxRepository,
             relay = ::process,
         )
     }
@@ -63,7 +66,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     private val outboxCleaning = AtomicBoolean(false)
 
     open suspend fun process(entity: T) {
-        entity.instance?.let { emitter.send(it) }
+        entity.instance?.let { instanceEmitter.send(it) }
     }
 
     @PostConstruct

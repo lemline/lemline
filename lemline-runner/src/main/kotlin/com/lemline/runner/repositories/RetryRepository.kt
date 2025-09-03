@@ -5,7 +5,6 @@ import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.sql.PreparedStatement
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
 
@@ -29,21 +28,16 @@ const val RETRY_TABLE = "lemline_retries"
 @ExperimentalTime
 class RetryRepository : OutboxRepository<RetryOutboxModel>() {
 
-    companion object {
-        internal const val MESSAGE_COLUMN = "message"
-    }
-
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = RETRY_TABLE
 
-    // add the message colum
-    override val prepareStatementMap: Map<String, (PreparedStatement, RetryOutboxModel, Int) -> Unit> =
-        super.prepareStatementMap + (
-            MESSAGE_COLUMN to { stmt: PreparedStatement, entity: RetryOutboxModel, idx: Int ->
-                stmt.setString(idx, entity.message)
-            })
+    companion object {
+        internal const val ERROR_CLASS_COLUMN = "error_class"
+        internal const val ERROR_MESSAGE_COLUMN = "error_message"
+        internal const val ERROR_STACKTRACE_COLUMN = "error_stacktrace"
+    }
 
     @ExperimentalTime
     override fun createModel(rs: ResultSet) = RetryOutboxModel(
@@ -53,7 +47,8 @@ class RetryRepository : OutboxRepository<RetryOutboxModel>() {
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
         outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
         outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
-        outboxLastError = rs.getString(OUTBOX_LAST_ERROR_COLUMN),
-        message = rs.getString(MESSAGE_COLUMN),
+        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN),
+        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN),
+        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN),
     )
 }

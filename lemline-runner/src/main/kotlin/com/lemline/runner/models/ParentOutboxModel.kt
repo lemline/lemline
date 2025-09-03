@@ -2,7 +2,6 @@
 package com.lemline.runner.models
 
 import com.lemline.common.flexible.LazyParsedField
-import com.lemline.common.ids.IdGenerator
 import com.lemline.core.workflows.WorkflowState
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
@@ -14,7 +13,7 @@ import kotlinx.serialization.json.JsonElement
 
 @ExperimentalTime
 data class ParentOutboxModel(
-    override val id: UUID = IdGenerator.generateUUIDV7(),
+    override val id: UUID,
 
     override var instance: InstanceMessage,
 
@@ -26,7 +25,11 @@ data class ParentOutboxModel(
 
     override var outboxAttemptCount: Int = 0,
 
-    override var outboxLastError: String? = null,
+    override var outboxErrorClass: String? = null,
+
+    override var outboxErrorMessage: String? = null,
+
+    override var outboxErrorStackTrace: String? = null,
 ) : OutboxModel {
 
     /**

@@ -4,25 +4,24 @@ package com.lemline.runner.instances
 import com.lemline.common.LogContext
 import com.lemline.common.debug
 import com.lemline.common.error
+import com.lemline.common.ids.IdGenerator
 import com.lemline.common.logger
 import com.lemline.common.warn
 import com.lemline.common.withLoggingContext
 import com.lemline.core.definitions.Definitions
 import com.lemline.core.processor.Processor
 import com.lemline.runner.StepByStepRunner
+import com.lemline.runner.failures.FailureReasons
+import com.lemline.runner.ingestion.FailureIngestionMessage
 import com.lemline.runner.ingestion.IngestionMessageEmitter
+import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.messaging.MessageSubscriberMetrics.Companion.FailureReasons
-import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.RETRY_TABLE
-import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.secrets.Secrets
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -42,11 +41,16 @@ internal class InstanceMessageHandler(
     private val instanceEmitter: InstanceMessageEmitter,
     private val ingestionEmitter: IngestionMessageEmitter,
     private val definitionRepository: DefinitionRepository,
-    private val retryRepository: RetryRepository,
     private val stepByStepRunner: StepByStepRunner,
     private val metrics: InstanceMessageSubscriberMetrics,
 ) : MessageHandler {
     val logger = logger()
+
+    @TestOnly
+    internal var onComplete = { _: Message<String>, _: String? -> }
+
+    @TestOnly
+    internal var onFailure = { _: Message<String>, _: Throwable? -> }
 
     /**
      * Handles the entire lifecycle of an incoming reactive message. This includes deserialization,
@@ -82,21 +86,17 @@ internal class InstanceMessageHandler(
                         nextMessage?.emit()
                         // --- Acknowledgment (Success Path) ---
                         message.ack(workflowName, workflowVersion)
-                        // For testing: complete the future
-
-                        processingMessages.remove(message.payload)?.complete(nextMessage?.toJsonString())
+                        // For testing
+                        onComplete(message, nextMessage?.toJsonString())
                     }
                     metrics.processingCompleted(workflowName, workflowVersion)
                 }
             }
         } catch (e: ProcessingException) {
-            onProcessingFailure(instanceMessage, e)
-            // For testing: complete the future
-            processingMessages.remove(message.payload)?.completeExceptionally(e.cause)
+            // For testing
+            onFailure(message, e.cause)
         }
     }
-
-    var onProcessingFailure = { _: InstanceMessage, _: Exception -> }
 
     /**
      * Deserializes the message payload. Returns the Message object on success, or null on failure.
@@ -214,14 +214,13 @@ internal class InstanceMessageHandler(
     }
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) = try {
-        val retryOutboxModel = RetryOutboxModel(
-            instance = null,
-            message = payload,
-            outboxLastError = cause.stackTraceToString(),
-            outboxScheduledFor = Clock.System.now(),
-            outBoxStatus = OutBoxStatus.FAILED,
+        val failure = FailureIngestionMessage.from(
+            id = IdGenerator.generateUUIDV7(),
+            payload = payload,
+            error = cause,
+            reason = FailureReasons.DESERIALISATION_ERROR
         )
-        retryRepository.insert(retryOutboxModel)
+        ingestionEmitter.send(failure)
         // as the responsibility of the message is transferred to the database, we acknowledge the message
         ack(UNKNOWN, UNKNOWN)
     } catch (e: Exception) {
@@ -235,15 +234,13 @@ internal class InstanceMessageHandler(
             .saveAsFailed(cause)
     }
 
-    private suspend fun InstanceMessage.saveAsFailed(cause: Exception?) = try {
-        val retryOutboxModel = RetryOutboxModel(
+    private suspend fun InstanceMessage.saveAsFailed(cause: Exception) = try {
+        val failure = FailureIngestionMessage.from(
+            id = IdGenerator.generateUUIDV7(),
             instance = this,
-            message = null,
-            outboxLastError = cause?.stackTraceToString(),
-            outboxScheduledFor = Clock.System.now(),
-            outBoxStatus = OutBoxStatus.FAILED,
+            error = cause,
         )
-        retryRepository.insert(retryOutboxModel)
+        ingestionEmitter.send(failure)
         // as the responsibility of the message is transferred to the database, we acknowledge the message
         message.ack(workflowName, workflowVersion)
     } catch (e: Exception) {
@@ -253,14 +250,13 @@ internal class InstanceMessageHandler(
 
     private suspend fun InstanceMessage.saveForRetry(cause: Exception) = try {
         // save the next message for re-emission
-        val retryOutboxModel = RetryOutboxModel(
+        val retry = RetryIngestionMessage(
+            id = IdGenerator.generateUUIDV7(),
             instance = this,
-            outboxLastError = cause.stackTraceToString(),
             outboxScheduledFor = Clock.System.now(), // <- TODO check first date
             outBoxStatus = OutBoxStatus.PENDING,
-            message = null,
         )
-        retryRepository.insert(retryOutboxModel)
+        ingestionEmitter.send(retry)
         // as the responsibility of the message is transferred to the database, we acknowledge the message
         message.ack(workflowName, workflowVersion)
     } catch (e: Exception) {
@@ -308,12 +304,12 @@ internal class InstanceMessageHandler(
     }
 
     // For testing purposes
-    private val processingMessages = ConcurrentHashMap<String, CompletableFuture<String?>>()
+    //private val processingMessages = ConcurrentHashMap<String, CompletableFuture<String?>>()
 
     // For testing purposes
-    @TestOnly
-    internal fun waitForProcessing(msg: String): CompletableFuture<String?> =
-        processingMessages.computeIfAbsent(msg) { CompletableFuture() }
+//    @TestOnly
+//    internal fun waitForProcessing(msg: String): CompletableFuture<String?> =
+//        processingMessages.computeIfAbsent(msg) { CompletableFuture() }
 
     internal class ProcessingException(cause: Throwable) : RuntimeException(cause)
 

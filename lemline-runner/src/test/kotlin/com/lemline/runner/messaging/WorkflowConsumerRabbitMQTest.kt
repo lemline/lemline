@@ -17,6 +17,7 @@ import io.quarkus.test.junit.TestProfile
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
 
@@ -29,6 +30,7 @@ import org.junit.jupiter.api.Tag
 @Tag("integration")
 @EnabledOnlyIfDockerAvailable
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 
     @ConfigProperty(name = "rabbitmq-host")

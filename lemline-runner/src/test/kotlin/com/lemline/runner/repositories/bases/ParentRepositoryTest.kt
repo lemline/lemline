@@ -19,6 +19,7 @@ internal abstract class ParentRepositoryTest : OutboxRepositoryTest<ParentOutbox
     override lateinit var repository: ParentRepository
 
     override fun createRandomEntity() = ParentOutboxModel(
+        id = UUID.randomUUID(),
         instance = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = randomString,

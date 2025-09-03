@@ -61,10 +61,17 @@ interface OutboxModel : WithInstance {
     var outboxAttemptCount: Int
 
     /**
-     * Last error message encountered during processing.
-     * This field stores the error message from the most recent failed attempt.
-     * It helps with debugging and monitoring message processing issues.
-     * Null if no errors have occurred yet.
+     * Class of the last exception that occurred during processing of this message.
      */
-    var outboxLastError: String?
+    var outboxErrorClass: String?
+
+    /**
+     * Message of the last exception that occurred during processing of this message.
+     */
+    var outboxErrorMessage: String?
+
+    /**
+     * Stacktrace of the last exception that occurred during processing of this message.
+     */
+    var outboxErrorStackTrace: String?
 }

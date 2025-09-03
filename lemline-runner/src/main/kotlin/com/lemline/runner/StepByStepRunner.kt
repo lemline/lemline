@@ -17,9 +17,9 @@ import com.lemline.runner.exceptions.TaskRetriedException
 import com.lemline.runner.exceptions.WaitStartedException
 import com.lemline.runner.ingestion.IngestionMessageEmitter
 import com.lemline.runner.ingestion.RetryIngestionMessage
+import com.lemline.runner.ingestion.WaitIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.ParentOutboxModel
-import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.repositories.PARENT_TABLE
 import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.SCHEDULE_TABLE
@@ -116,6 +116,7 @@ internal class StepByStepRunner @Inject constructor(
         // insert the parent workflow without delayedUntil
         // TODO make id idempotent
         val parent = ParentOutboxModel(
+            id = IdGenerator.generateUUIDV7(),
             instance = this,
             outboxScheduledFor = null,
         )
@@ -186,12 +187,13 @@ internal class StepByStepRunner @Inject constructor(
      * asynchronously through the WaitOutbox.
      */
     private suspend fun InstanceMessage.onWait(delay: Duration) {
-        val waitOutboxModel = WaitOutboxModel(
+        val waitMessage = WaitIngestionMessage(
+            id = IdGenerator.generateUUIDV7(),
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
         )
         // Save the message to the wait table
-        waitRepository.insert(waitOutboxModel)
+        ingestionEmitter.send(waitMessage)
     }
 
     private val Processor.updatedInstanceMessage

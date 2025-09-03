@@ -17,10 +17,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 @SerialName("s") // <- type discriminator for polymorphic serialization
 data class ScheduleIngestionMessage(
-    @SerialName("i")
+    @SerialName("id")
     override val id: @Contextual UUID,
 
-    @SerialName("w")
+    @SerialName("i")
     override var instance: InstanceMessage,
 
     @SerialName("s")
@@ -30,17 +30,17 @@ data class ScheduleIngestionMessage(
     override var outboxScheduledFor: Instant?,
 
     @SerialName("sa")
-    val scheduleAfter: String?,
+    val scheduleAfter: String? = null,
 
     @SerialName("se")
-    val scheduleEvery: String?,
+    val scheduleEvery: String? = null,
 
     @SerialName("sc")
-    val scheduleCron: String?,
+    val scheduleCron: String? = null,
 
     @SerialName("sz")
-    val scheduleZone: String?,
-) : IngestionMessage {
+    val scheduleZone: String? = null,
+) : OutboxIngestionMessage, IngestionMessage {
     fun toModel() = ScheduleOutboxModel(
         id = id,
         instance = instance,

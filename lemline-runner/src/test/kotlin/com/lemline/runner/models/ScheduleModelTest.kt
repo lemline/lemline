@@ -21,6 +21,7 @@ class ScheduleModelTest {
         outboxScheduledFor: Instant? = null,
         scheduleZone: String? = null
     ) = ScheduleOutboxModel(
+        id = UUID.randomUUID(),
         instance = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowVersion = "1.0",

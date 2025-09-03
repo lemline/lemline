@@ -5,9 +5,11 @@ import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
 import com.lemline.core.workflows.WorkflowState
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.outbox.OutBoxStatus
 import java.util.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -81,10 +83,9 @@ internal class IngestionMessageTest {
     fun `should be JSON serializable and deserializable for Retry message`() {
         val original: IngestionMessage = RetryIngestionMessage(
             id = UUID.randomUUID(),
-            instance = null,
+            instance = sampleInstance(),
             outBoxStatus = com.lemline.runner.outbox.OutBoxStatus.PENDING,
             outboxScheduledFor = null,
-            message = "oops",
         )
         val json = original.toJsonString()
         val deserialized = IngestionMessage.fromJsonString(json)
@@ -93,66 +94,82 @@ internal class IngestionMessageTest {
 
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {
-        val id = UUID.fromString("00000000-0000-0000-0000-000000000001")
+        val id = UUID.randomUUID()
+
+        val scheduledFor = Instant.parse("2023-01-01T00:00:00Z")
+
         val instance = InstanceMessage.fromObjects(
-            workflowId = UUID.fromString("00000000-0000-0000-0000-000000000002"),
+            workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
             workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
-            parentId = UUID.fromString("00000000-0000-0000-0000-000000000003"),
+            parentId = UUID.randomUUID(),
         )
 
-        val msgParent: IngestionMessage = ParentIngestionMessage(
+        val msgParent = ParentIngestionMessage(
             id = id,
             instance = instance,
-            outBoxStatus = com.lemline.runner.outbox.OutBoxStatus.PENDING,
-            outboxScheduledFor = null,
+            outBoxStatus = OutBoxStatus.FAILED,
+            outboxScheduledFor = scheduledFor,
         )
-        val msgWait: IngestionMessage = WaitIngestionMessage(
+        val msgWait = WaitIngestionMessage(
             id = id,
             instance = instance,
-            outBoxStatus = com.lemline.runner.outbox.OutBoxStatus.PENDING,
-            outboxScheduledFor = null,
+            outBoxStatus = OutBoxStatus.FAILED,
+            outboxScheduledFor = scheduledFor,
         )
-        val msgRetry: IngestionMessage = RetryIngestionMessage(
-            id = id,
-            instance = null,
-            outBoxStatus = com.lemline.runner.outbox.OutBoxStatus.PENDING,
-            outboxScheduledFor = null,
-            message = "m",
-        )
-        val msgSchedule: IngestionMessage = ScheduleIngestionMessage(
+        val msgRetry = RetryIngestionMessage(
             id = id,
             instance = instance,
-            outBoxStatus = com.lemline.runner.outbox.OutBoxStatus.PENDING,
-            outboxScheduledFor = null,
-            scheduleAfter = "PT1S",
-            scheduleEvery = null,
-            scheduleCron = null,
-            scheduleZone = null,
+            outBoxStatus = OutBoxStatus.FAILED,
+            outboxScheduledFor = scheduledFor,
+        )
+        val msgSchedule = ScheduleIngestionMessage(
+            id = id,
+            instance = instance,
+            outBoxStatus = OutBoxStatus.FAILED,
+            outboxScheduledFor = scheduledFor,
+            scheduleAfter = "after",
+            scheduleEvery = "every",
+            scheduleCron = "cron",
+            scheduleZone = "zone",
+        )
+        val msgFailure = FailureIngestionMessage(
+            id = id,
+            instance = instance,
+            payload = "payload",
+            reason = "reason",
+            errorClass = "errorClass",
+            errorMessage = "errorMessage",
+            errorStackTrace = "errorStackTrace",
         )
 
         // Expect compact keys with class discriminator t
-        // ParentIngestionMessage has serial name "p"
+        // ParentIngestionMessage has a serial name "p"
         assertEquals(
-            "{\"t\":\"p\",\"i\":\"$id\",\"w\":${instance.toJsonString()},\"f\":null}",
+            """{"t":"p","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"2023-01-01T00:00:00Z"}""",
             msgParent.toJsonString(),
         )
-        // WaitIngestionMessage has serial name "w"
+        // WaitIngestionMessage has a serial name "w"
         assertEquals(
-            "{\"t\":\"w\",\"i\":\"$id\",\"w\":${instance.toJsonString()},\"f\":null}",
+            """{"t":"w","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"2023-01-01T00:00:00Z"}""",
             msgWait.toJsonString(),
         )
-        // RetryIngestionMessage has serial name "r"
+        // RetryIngestionMessage has a serial name "r"
         assertEquals(
-            "{\"t\":\"r\",\"i\":\"$id\",\"w\":null,\"f\":null,\"m\":\"m\"}",
+            """{"t":"r","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"2023-01-01T00:00:00Z"}""",
             msgRetry.toJsonString(),
         )
-        // ScheduleIngestionMessage has serial name "s"
+        // ScheduleIngestionMessage has a serial name "s"
         assertEquals(
-            "{\"t\":\"s\",\"i\":\"$id\",\"w\":${instance.toJsonString()},\"f\":null,\"sa\":\"PT1S\",\"se\":null,\"sc\":null,\"sz\":null}",
+            """{"t":"s","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"2023-01-01T00:00:00Z","sa":"after","se":"every","sc":"cron","sz":"zone"}""",
             msgSchedule.toJsonString(),
+        )
+        // FailureIngestionMessage has a serial name "f"
+        assertEquals(
+            """{"t":"f","id":"$id","i":${instance.toJsonString()},"p":"payload","r":"reason","ec":"errorClass","em":"errorMessage","es":"errorStackTrace"}""",
+            msgFailure.toJsonString(),
         )
     }
 }

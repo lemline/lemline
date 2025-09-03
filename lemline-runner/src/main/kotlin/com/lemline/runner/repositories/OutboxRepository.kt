@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
+import com.lemline.runner.outbox.OutBoxStatus.FAILED
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
+import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.Timestamp
+import java.util.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -30,12 +34,17 @@ import kotlin.time.toJavaInstant
 @ExperimentalTime
 abstract class OutboxRepository<T : OutboxModel> : WithInstanceRepository<T>() {
 
+    @Inject
+    lateinit var failureRepository: FailureRepository
+
     companion object {
         internal const val OUTBOX_STATUS_COLUMN = "outbox_status"
         internal const val OUTBOX_SCHEDULED_FOR_COLUMN = "outbox_scheduled_for"
         internal const val OUTBOX_DELAYED_UNTIL_COLUMN = "outbox_delayed_until"
         internal const val OUTBOX_ATTEMPT_COUNT_COLUMN = "outbox_attempt_count"
-        internal const val OUTBOX_LAST_ERROR_COLUMN = "outbox_last_error"
+        internal const val OUTBOX_ERROR_CLASS_COLUMN = "outbox_error_class"
+        internal const val OUTBOX_ERROR_MESSAGE_COLUMN = "outbox_error_message"
+        internal const val OUTBOX_ERROR_STACKTRACE_COLUMN = "outbox_error_stacktrace"
     }
 
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
@@ -52,11 +61,30 @@ abstract class OutboxRepository<T : OutboxModel> : WithInstanceRepository<T>() {
             OUTBOX_ATTEMPT_COUNT_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 stmt.setInt(idx, entity.outboxAttemptCount)
             },
-            OUTBOX_LAST_ERROR_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.outboxLastError)
+            OUTBOX_ERROR_CLASS_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setString(idx, entity.outboxErrorClass)
+            },
+            OUTBOX_ERROR_MESSAGE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setString(idx, entity.outboxErrorMessage)
+            },
+            OUTBOX_ERROR_STACKTRACE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
+                stmt.setString(idx, entity.outboxErrorStackTrace)
             }
         )
     }
+
+    suspend fun retryById(id: UUID, connection: Connection? = null): Int = withConnection(connection) { conn ->
+        findById(id, conn)?.let { entity ->
+            // if the outbox was failed, delete the failure entry
+            if (entity.outBoxStatus == FAILED) {
+                failureRepository.deleteById(FailureModel.from(entity).id, conn)
+            }
+            entity.outBoxStatus = PENDING
+            update(entity, conn)
+        } ?: 0
+    }
+
+    private val findByIdSql by lazy { "SELECT * FROM $tableName WHERE $ID_COLUMN = ? LIMIT 1" }
 
     /**
      * Finds and locks messages that are ready to be processed.

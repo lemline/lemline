@@ -17,10 +17,10 @@ import kotlinx.serialization.Serializable
 @Serializable
 @SerialName("w") // <- type discriminator for polymorphic serialization
 data class WaitIngestionMessage(
-    @SerialName("i")
+    @SerialName("id")
     override val id: @Contextual UUID,
 
-    @SerialName("w")
+    @SerialName("i")
     override var instance: InstanceMessage,
 
     @SerialName("s")
@@ -28,7 +28,7 @@ data class WaitIngestionMessage(
 
     @SerialName("f")
     override var outboxScheduledFor: Instant?,
-) : IngestionMessage {
+) : OutboxIngestionMessage, IngestionMessage {
     fun toModel() = WaitOutboxModel(
         id = id,
         instance = instance,

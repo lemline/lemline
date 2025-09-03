@@ -44,9 +44,10 @@ internal abstract class FailureRepositoryTest {
     fun `should insert and retrieve a failure with all fields`() = runTest {
         val ex = IllegalStateException("boom")
         val model = FailureModel.from(
+            id = UUID.randomUUID(),
             instance = sampleInstance(),
             error = ex,
-        ).copy(message = "custom message")
+        )
 
         repository.insert(model) shouldBe 1
 
@@ -64,24 +65,24 @@ internal abstract class FailureRepositoryTest {
         val instance1 = sampleInstance()
         val instance2 = sampleInstance()
 
-        val f1 = FailureModel.from(instance1, RuntimeException("e1")).copy(message = "m1")
-        val f2 = FailureModel.from(instance1, RuntimeException("e2")).copy(message = "m2")
-        val f3 = FailureModel.from(instance2, RuntimeException("e3")).copy(message = "m3")
+        val f1 = FailureModel.from(UUID.randomUUID(), instance1, RuntimeException("e1")).copy(payload = "m1")
+        val f2 = FailureModel.from(UUID.randomUUID(), instance1, RuntimeException("e2")).copy(payload = "m2")
+        val f3 = FailureModel.from(UUID.randomUUID(), instance2, RuntimeException("e3")).copy(payload = "m3")
 
         repository.insert(listOf(f1, f2, f3))
 
         val found1 = repository.findWithWorkflowId(instance1.workflowId)
-        found1.map { it.message }.toSet() shouldBe setOf("m1", "m2")
+        found1.map { it.payload }.toSet() shouldBe setOf("m1", "m2")
 
         val found2 = repository.findWithWorkflowId(instance2.workflowId)
-        found2.map { it.message }.toSet() shouldBe setOf("m3")
+        found2.map { it.payload }.toSet() shouldBe setOf("m3")
     }
 
     @Test
     fun `count and deleteAll should work`() = runTest {
         val instance = sampleInstance()
         val failures = List(3) { idx ->
-            FailureModel.from(instance, RuntimeException("err-$idx")).copy(message = "m$idx")
+            FailureModel.from(UUID.randomUUID(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
         }
         repository.insert(failures)
         repository.count() shouldBe 3
