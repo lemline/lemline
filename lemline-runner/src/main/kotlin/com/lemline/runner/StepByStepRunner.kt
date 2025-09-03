@@ -6,6 +6,7 @@ import com.lemline.common.error
 import com.lemline.common.ids.IdGenerator
 import com.lemline.common.logger
 import com.lemline.core.activities.runs.getInputFor
+import com.lemline.core.errors.WorkflowException
 import com.lemline.core.instances.RunInstance
 import com.lemline.core.instances.TryInstance
 import com.lemline.core.instances.WaitInstance
@@ -16,15 +17,14 @@ import com.lemline.runner.exceptions.TaskCompletedException
 import com.lemline.runner.exceptions.TaskRetriedException
 import com.lemline.runner.exceptions.WaitStartedException
 import com.lemline.runner.ingestion.IngestionMessageEmitter
+import com.lemline.runner.ingestion.ParentIngestionMessage
 import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.ingestion.WaitIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.repositories.PARENT_TABLE
 import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.SCHEDULE_TABLE
 import com.lemline.runner.repositories.ScheduleRepository
-import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.starters.Starter
 import io.quarkus.runtime.Startup
 import io.serverlessworkflow.api.types.RunWorkflow
@@ -45,7 +45,6 @@ import kotlinx.serialization.json.JsonElement
 @Startup
 @ApplicationScoped
 internal class StepByStepRunner @Inject constructor(
-    private val waitRepository: WaitRepository,
     private val parentRepository: ParentRepository,
     private val scheduleRepository: ScheduleRepository,
     private val ingestionEmitter: IngestionMessageEmitter,
@@ -72,7 +71,7 @@ internal class StepByStepRunner @Inject constructor(
 
         processor.onTaskCompleted { onTaskCompleted(it) }
         processor.onTaskStarted { onTaskStarted(it) }
-        processor.onTaskRetried { throw TaskRetriedException() }
+        processor.onTaskRetried { t: TryInstance, e: WorkflowException -> throw TaskRetriedException(t, e) }
 
         val nextMessage = try {
             processor.run()
@@ -85,10 +84,10 @@ internal class StepByStepRunner @Inject constructor(
             logger.debug { "Task completed (${processor.position})" }
             // next message
             processor.updatedInstanceMessage
-        } catch (_: TaskRetriedException) {
+        } catch (e: TaskRetriedException) {
             logger.debug { "Scheduling retry of task (${processor.position})" }
             // Store the message to the retry repository
-            processor.updatedInstanceMessage.onRetry(processor.current as TryInstance)
+            processor.updatedInstanceMessage.onRetry(e.tryInstance, e.cause)
             null
         } catch (e: WaitStartedException) {
             logger.debug { "Starting wait task (${processor.position})" }
@@ -115,12 +114,12 @@ internal class StepByStepRunner @Inject constructor(
     ): InstanceMessage? {
         // insert the parent workflow without delayedUntil
         // TODO make id idempotent
-        val parent = ParentOutboxModel(
-            id = IdGenerator.generateUUIDV7(),
+        val parent = ParentIngestionMessage(
+            id = IdGenerator.generateV7(),
             instance = this,
             outboxScheduledFor = null,
         )
-        parentRepository.insert(parent)
+        ingestionEmitter.send(parent)
 
         return stater.start(
             workflowName = runWorkflow.workflow.name,
@@ -168,13 +167,14 @@ internal class StepByStepRunner @Inject constructor(
      * The workflow instance's processing is halted temporarily, and further processing is expected to resume
      * asynchronously through the RetryOutbox.
      */
-    private suspend fun InstanceMessage.onRetry(tryInstance: TryInstance) {
+    private suspend fun InstanceMessage.onRetry(tryInstance: TryInstance, e: WorkflowException) {
         val delay = tryInstance.delay ?: error("No delay set in in $tryInstance")
 
-        val retryMessage = RetryIngestionMessage(
-            id = IdGenerator.generateUUIDV7(),
+        val retryMessage = RetryIngestionMessage.from(
+            id = IdGenerator.generateV7(),
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
+            error = e
         )
         // Save the message to ingest into the retry table
         ingestionEmitter.send(retryMessage)
@@ -188,7 +188,7 @@ internal class StepByStepRunner @Inject constructor(
      */
     private suspend fun InstanceMessage.onWait(delay: Duration) {
         val waitMessage = WaitIngestionMessage(
-            id = IdGenerator.generateUUIDV7(),
+            id = IdGenerator.generateV7(),
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
         )

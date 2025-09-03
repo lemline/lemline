@@ -48,5 +48,8 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>(
             parentId = null,
         ),
         outboxScheduledFor = null,
+        errorClass = "test-error-class",
+        errorMessage = "test-error-message",
+        errorStackTrace = "test-error-stacktrace",
     )
 }

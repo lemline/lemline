@@ -27,19 +27,19 @@ object FailureReasons {
      */
     fun getFailureReason(e: Throwable): String = when (e) {
         // Domain-specific errors from the workflow engine
-        is WorkflowException -> FailureReasons.WORKFLOW_ERROR_PREFIX + e.error.type.lowercase()
+        is WorkflowException -> WORKFLOW_ERROR_PREFIX + e.error.type.lowercase()
 
         // --- Database & Persistence Errors ---
-        is SQLException -> FailureReasons.DATABASE_ERROR
+        is SQLException -> DATABASE_ERROR
 
         // --- I/O and Network Errors ---
-        is IOException -> FailureReasons.IO_ERROR
+        is IOException -> IO_ERROR
 
         // --- Application State Errors ---
-        is IllegalStateException -> FailureReasons.ILLEGAL_STATE
+        is IllegalStateException -> ILLEGAL_STATE
 
         // --- Fallback for any other uncategorized exception ---
-        else -> FailureReasons.PROCESSING_ERROR
+        else -> PROCESSING_ERROR
     }
 }
 

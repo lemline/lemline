@@ -16,7 +16,7 @@ object IdGenerator {
      * Uses UuidCreator to create a time-ordered UUID which provides both uniqueness
      * and chronological ordering.
      */
-    fun generateUUIDV7(): UUID = UuidCreator.getTimeOrderedEpochFast()
+    fun generateV7(): UUID = UuidCreator.getTimeOrderedEpochFast()
 
     /**
      * Derive a new UUIDv7 deterministically from an existing UUIDv7.

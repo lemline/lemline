@@ -10,9 +10,9 @@ CREATE TABLE IF NOT EXISTS lemline_failures
     parent_id         UUID,
     payload           TEXT,
     reason            VARCHAR(255)   NOT NULL,
-    error_class       TEXT,
+    error_class       TEXT           NOT NULL,
     error_message     TEXT,
-    error_stacktrace  TEXT,
+    error_stacktrace  TEXT           NOT NULL,
     created_at        TIMESTAMPTZ(6) NOT NULL,
     updated_at        TIMESTAMPTZ(6)
 );

@@ -742,6 +742,34 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     }
 
     @Test
+    fun `deleteById should remove an existing message`() = runTest {
+        // Given
+        val message = insertRandomEntity()
+
+        // When
+        val deletedCount = repository.deleteById(message.id)
+
+        // Then
+        deletedCount shouldBe 1
+        repository.findById(message.id) shouldBe null
+    }
+
+    @Test
+    fun `deleteById should return 0 if message does not exist`() = runTest {
+        // Given
+        val existingMessage = createRandomEntity()
+        repository.insert(existingMessage)
+        val randomId = createRandomEntity().id
+
+        // When
+        val deletedCount = repository.deleteById(randomId)
+
+        // Then
+        deletedCount shouldBe 0
+        repository.findById(existingMessage.id) shouldNotBe null
+    }
+
+    @Test
     fun `batch delete should remove multiple existing messages`() = runTest {
         // Given
         val messagesToDelete = List(5) { createRandomEntity() }

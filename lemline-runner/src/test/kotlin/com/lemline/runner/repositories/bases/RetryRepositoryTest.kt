@@ -29,6 +29,9 @@ internal abstract class RetryRepositoryTest : OutboxRepositoryTest<RetryOutboxMo
             parentId = null,
         ),
         outboxScheduledFor = randomInstant,
+        errorClass = randomString,
+        errorMessage = randomString,
+        errorStackTrace = randomString,
     )
 
     override fun changeDelayedUntil(model: RetryOutboxModel) = model.copy(outboxDelayedUntil = randomInstant)

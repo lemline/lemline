@@ -5,6 +5,7 @@ import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.PreparedStatement
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
 
@@ -39,6 +40,19 @@ class RetryRepository : OutboxRepository<RetryOutboxModel>() {
         internal const val ERROR_STACKTRACE_COLUMN = "error_stacktrace"
     }
 
+    // add the error
+    override val prepareStatementMap: Map<String, (PreparedStatement, RetryOutboxModel, Int) -> Unit> =
+        super.prepareStatementMap + (
+            ERROR_CLASS_COLUMN to { stmt: PreparedStatement, entity: RetryOutboxModel, idx: Int ->
+                stmt.setString(idx, entity.errorClass)
+            }) + (
+            ERROR_MESSAGE_COLUMN to { stmt: PreparedStatement, entity: RetryOutboxModel, idx: Int ->
+                stmt.setString(idx, entity.errorMessage)
+            }) + (
+            ERROR_STACKTRACE_COLUMN to { stmt: PreparedStatement, entity: RetryOutboxModel, idx: Int ->
+                stmt.setString(idx, entity.errorStackTrace)
+            })
+
     @ExperimentalTime
     override fun createModel(rs: ResultSet) = RetryOutboxModel(
         id = getUuid(rs, ID_COLUMN),
@@ -50,5 +64,8 @@ class RetryRepository : OutboxRepository<RetryOutboxModel>() {
         outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN),
         outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN),
         outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN),
+        errorClass = rs.getString(ERROR_CLASS_COLUMN),
+        errorMessage = rs.getString(ERROR_MESSAGE_COLUMN),
+        errorStackTrace = rs.getString(ERROR_STACKTRACE_COLUMN)
     )
 }

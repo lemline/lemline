@@ -26,4 +26,10 @@ data class RetryOutboxModel(
     override var outboxErrorMessage: String? = null,
 
     override var outboxErrorStackTrace: String? = null,
+
+    val errorClass: String,
+
+    val errorMessage: String?,
+
+    val errorStackTrace: String,
 ) : OutboxModel

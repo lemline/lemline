@@ -104,7 +104,7 @@ data class InstanceMessage(
         )
 
         fun forNewWorkflow(
-            workflowId: UUID = IdGenerator.generateUUIDV7(),
+            workflowId: UUID = IdGenerator.generateV7(),
             workflowName: String,
             workflowVersion: String,
             workflowInput: JsonElement,

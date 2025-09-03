@@ -7,12 +7,8 @@ import com.cronutils.model.definition.CronDefinitionBuilder
 import com.cronutils.model.time.ExecutionTime
 import com.cronutils.parser.CronParser
 import com.lemline.common.ids.IdGenerator
-import com.lemline.core.nodes.NodePosition
-import com.lemline.core.utils.toDuration
-import com.lemline.core.workflows.WorkflowState
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
-import io.serverlessworkflow.api.types.Schedule
 import java.time.ZoneId
 import java.util.*
 import kotlin.time.Clock
@@ -21,7 +17,6 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
-import kotlinx.serialization.json.JsonElement
 
 @ExperimentalTime
 data class ScheduleOutboxModel(
@@ -42,7 +37,7 @@ data class ScheduleOutboxModel(
     override var outboxErrorMessage: String? = null,
 
     override var outboxErrorStackTrace: String? = null,
-    
+
     val scheduleAfter: String?,
 
     val scheduleEvery: String?,
@@ -84,7 +79,7 @@ data class ScheduleOutboxModel(
         }
         // set a new id for the next workflow instance
         instance = instance.copy(
-            workflowId = IdGenerator.generateUUIDV7(), // <- TODO Manage idempotency by providing a deterministic workflow id
+            workflowId = IdGenerator.generateV7(), // <- TODO Manage idempotency by providing a deterministic workflow id
         )
     }
 
@@ -100,53 +95,11 @@ data class ScheduleOutboxModel(
 
     companion object {
         private val cronParser by lazy { CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX)) }
-
-        fun create(
-            workflowId: UUID,
-            workflowName: String,
-            workflowVersion: String,
-            workflowInput: JsonElement,
-            schedule: Schedule,
-            zoneId: ZoneId?
-        ): ScheduleOutboxModel {
-            val scheduleEvery = schedule.every?.toDuration()?.toString()
-            val scheduleAfter = schedule.after?.toDuration()?.toString()
-            val scheduleCron = schedule.cron
-
-            val now = Clock.System.now()
-
-            val scheduledFor = when {
-                scheduleAfter != null -> null
-                scheduleCron != null -> cronParser.parse(scheduleCron)!!.getNextCronExecutionInstant(now, zoneId)
-                scheduleEvery != null -> now + Duration.parse(scheduleEvery)
-                else -> error("Invalid schedule model")
-            }
-
-            val scheduleOutboxModel = ScheduleOutboxModel(
-                id = workflowId,
-                instance = InstanceMessage.fromObjects(
-                    workflowId = workflowId,
-                    workflowName = workflowName,
-                    workflowVersion = workflowVersion,
-                    workflowPosition = NodePosition.root,
-                    workflowState = WorkflowState.newInstance(workflowInput),
-                    parentId = null,
-                ),
-                scheduleEvery = scheduleEvery,
-                scheduleAfter = scheduleAfter,
-                scheduleCron = scheduleCron,
-                scheduleZone = zoneId?.id,
-
-                outboxScheduledFor = scheduledFor
-            )
-
-            return scheduleOutboxModel
-        }
     }
 }
 
 @ExperimentalTime
-private fun Cron.getNextCronExecutionInstant(now: Instant, zoneId: ZoneId?): Instant? = ExecutionTime.forCron(this)
+internal fun Cron.getNextCronExecutionInstant(now: Instant, zoneId: ZoneId?): Instant? = ExecutionTime.forCron(this)
     .nextExecution(now.toJavaInstant().atZone(zoneId ?: ZoneId.of("UTC")))
     .map { it.toInstant().toKotlinInstant() }
     .orElse(null)

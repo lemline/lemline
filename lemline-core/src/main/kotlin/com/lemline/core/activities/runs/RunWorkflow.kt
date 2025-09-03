@@ -32,7 +32,7 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
     val subProcessor: Processor = Processor.createNew(
         name = subWorkflowName,
         version = subWorkflowVersion,
-        id = IdGenerator.generateUUIDV7(),
+        id = IdGenerator.generateV7(),
         rawInput = childWorkflowInput,
         secrets = rootInstance.secrets,
         activityRunnerProvider = processor.activityRunnerProvider,

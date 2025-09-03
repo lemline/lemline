@@ -242,7 +242,7 @@ class Processor(
      * - If a retryable error occurs, it internally handles the delay and continues execution.
      *
      * @return The final result of the workflow as a [JsonElement].
-     * @throws com.lemline.core.errors.WorkflowException If a non-retryable error occurs during workflow execution.
+     * @throws [com.lemline.core.errors.WorkflowException] If a non-retryable error occurs during workflow execution.
      */
     suspend fun run(): JsonElement {
         status = WorkflowStatus.RUNNING
@@ -276,7 +276,7 @@ class Processor(
                     // reinit childIndex, as we are going to retry
                     tryInstance.childIndex = -1
                     // Update node position after setting retry
-                    onTaskRetried(current!!)
+                    onTaskRetried(current as TryInstance, e)
                     // Suspend execution for the duration of the delay.
                     delay(tryInstance.delay!!)
                     // Continue the loop to re-execute the TryInstance's children.
@@ -473,7 +473,7 @@ class Processor(
      *
      * @param handler A lambda function to execute when a task is retried.
      */
-    fun onTaskRetried(handler: (t: NodeInstance<*>) -> Unit) {
+    fun onTaskRetried(handler: (t: TryInstance, e: WorkflowException) -> Unit) {
         onTaskRetried = handler
     }
 
@@ -484,7 +484,7 @@ class Processor(
     private var onTaskStarted = { t: NodeInstance<*> -> }
     private var onTaskCompleted = { t: NodeInstance<*> -> }
     private var onTaskFaulted = { t: NodeInstance<*> -> }
-    private var onTaskRetried = { t: NodeInstance<*> -> }
+    private var onTaskRetried = { t: TryInstance, e: WorkflowException -> }
 
     /**
      * Logs debug messages with workflow context.

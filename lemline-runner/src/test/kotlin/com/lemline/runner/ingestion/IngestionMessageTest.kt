@@ -41,7 +41,7 @@ internal class IngestionMessageTest {
         val original: IngestionMessage = ParentIngestionMessage(
             id = UUID.randomUUID(),
             instance = sampleInstance(),
-            outBoxStatus = com.lemline.runner.outbox.OutBoxStatus.PENDING,
+            outBoxStatus = OutBoxStatus.PENDING,
             outboxScheduledFor = Clock.System.now(),
         )
         val json = original.toJsonString()
@@ -54,7 +54,7 @@ internal class IngestionMessageTest {
         val original: IngestionMessage = WaitIngestionMessage(
             id = UUID.randomUUID(),
             instance = sampleInstance(),
-            outBoxStatus = com.lemline.runner.outbox.OutBoxStatus.PENDING,
+            outBoxStatus = OutBoxStatus.PENDING,
             outboxScheduledFor = Clock.System.now(),
         )
         val json = original.toJsonString()
@@ -67,7 +67,7 @@ internal class IngestionMessageTest {
         val original: IngestionMessage = ScheduleIngestionMessage(
             id = UUID.randomUUID(),
             instance = sampleInstance(),
-            outBoxStatus = com.lemline.runner.outbox.OutBoxStatus.PENDING,
+            outBoxStatus = OutBoxStatus.PENDING,
             outboxScheduledFor = null,
             scheduleAfter = "PT10S",
             scheduleEvery = "a",
@@ -84,8 +84,27 @@ internal class IngestionMessageTest {
         val original: IngestionMessage = RetryIngestionMessage(
             id = UUID.randomUUID(),
             instance = sampleInstance(),
-            outBoxStatus = com.lemline.runner.outbox.OutBoxStatus.PENDING,
+            outBoxStatus = OutBoxStatus.FAILED,
             outboxScheduledFor = null,
+            errorClass = "a",
+            errorMessage = "b",
+            errorStackTrace = "c",
+        )
+        val json = original.toJsonString()
+        val deserialized = IngestionMessage.fromJsonString(json)
+        assertEquals(original, deserialized)
+    }
+
+    @Test
+    fun `should be JSON serializable and deserializable for Failure message`() {
+        val original: IngestionMessage = FailureIngestionMessage(
+            id = UUID.randomUUID(),
+            instance = sampleInstance(),
+            payload = "p",
+            reason = "r",
+            errorClass = "a",
+            errorMessage = "b",
+            errorStackTrace = "c",
         )
         val json = original.toJsonString()
         val deserialized = IngestionMessage.fromJsonString(json)
@@ -124,6 +143,9 @@ internal class IngestionMessageTest {
             instance = instance,
             outBoxStatus = OutBoxStatus.FAILED,
             outboxScheduledFor = scheduledFor,
+            errorClass = "errorClass",
+            errorMessage = "errorMessage",
+            errorStackTrace = "errorStackTrace",
         )
         val msgSchedule = ScheduleIngestionMessage(
             id = id,
@@ -158,7 +180,7 @@ internal class IngestionMessageTest {
         )
         // RetryIngestionMessage has a serial name "r"
         assertEquals(
-            """{"t":"r","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"2023-01-01T00:00:00Z"}""",
+            """{"t":"r","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"2023-01-01T00:00:00Z","ec":"errorClass","em":"errorMessage","es":"errorStackTrace"}""",
             msgRetry.toJsonString(),
         )
         // ScheduleIngestionMessage has a serial name "s"

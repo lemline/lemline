@@ -5,25 +5,27 @@ import com.github.zafarkhaja.semver.Version
 import com.lemline.common.ids.IdGenerator
 import com.lemline.core.definitions.Definitions
 import com.lemline.core.schemas.SchemaValidator
+import com.lemline.runner.ingestion.IngestionMessageEmitter
+import com.lemline.runner.ingestion.ScheduleIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.repositories.DefinitionRepository
-import com.lemline.runner.repositories.ScheduleRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.ZoneId
 import java.util.*
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
 @ExperimentalTime
+@ExperimentalSerializationApi
 @ApplicationScoped
 class Starter {
     @Inject
     private lateinit var definitionRepository: DefinitionRepository
 
     @Inject
-    private lateinit var scheduleRepository: ScheduleRepository
+    private lateinit var ingestionMessageEmitter: IngestionMessageEmitter
 
     suspend fun start(
         workflowName: String,
@@ -56,7 +58,7 @@ class Starter {
         }
 
         // create the message
-        val workflowId = IdGenerator.generateUUIDV7() // <- TODO create idempotent id
+        val workflowId = IdGenerator.generateV7() // <- TODO create idempotent id
 
         val instanceMessage = InstanceMessage.forNewWorkflow(
             workflowId = workflowId,
@@ -72,7 +74,7 @@ class Starter {
                 null -> instanceMessage
 
                 else -> {
-                    val scheduleOutboxModel = ScheduleOutboxModel.create(
+                    val scheduleOutboxModel = ScheduleIngestionMessage.from(
                         workflowId = instanceMessage.workflowId,
                         workflowName = workflowName,
                         workflowVersion = workflowVersion,
@@ -80,7 +82,8 @@ class Starter {
                         schedule = workflow.schedule,
                         zoneId = zoneId
                     )
-                    scheduleRepository.insert(scheduleOutboxModel)
+                    ingestionMessageEmitter.send(scheduleOutboxModel)
+
                     // start the message right away for scheduleAfter and scheduleEvery
                     if (scheduleOutboxModel.scheduleCron != null) {
                         onDebug {
@@ -97,6 +100,7 @@ class Starter {
         }
     }
 
+    // TODO (get from cache first)
     private suspend fun getDefinition(name: String, version: String?, onError: (() -> String) -> Nothing): String =
         version?.let { version ->
             // by name and version

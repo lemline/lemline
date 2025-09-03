@@ -16,7 +16,6 @@ import com.lemline.runner.ingestion.FailureIngestionMessage
 import com.lemline.runner.ingestion.IngestionMessageEmitter
 import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.RETRY_TABLE
 import com.lemline.runner.secrets.Secrets
@@ -215,7 +214,7 @@ internal class InstanceMessageHandler(
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) = try {
         val failure = FailureIngestionMessage.from(
-            id = IdGenerator.generateUUIDV7(),
+            id = IdGenerator.generateV7(),
             payload = payload,
             error = cause,
             reason = FailureReasons.DESERIALISATION_ERROR
@@ -236,7 +235,7 @@ internal class InstanceMessageHandler(
 
     private suspend fun InstanceMessage.saveAsFailed(cause: Exception) = try {
         val failure = FailureIngestionMessage.from(
-            id = IdGenerator.generateUUIDV7(),
+            id = IdGenerator.generateV7(),
             instance = this,
             error = cause,
         )
@@ -250,11 +249,11 @@ internal class InstanceMessageHandler(
 
     private suspend fun InstanceMessage.saveForRetry(cause: Exception) = try {
         // save the next message for re-emission
-        val retry = RetryIngestionMessage(
-            id = IdGenerator.generateUUIDV7(),
+        val retry = RetryIngestionMessage.from(
+            id = IdGenerator.generateV7(),
             instance = this,
             outboxScheduledFor = Clock.System.now(), // <- TODO check first date
-            outBoxStatus = OutBoxStatus.PENDING,
+            error = cause
         )
         ingestionEmitter.send(retry)
         // as the responsibility of the message is transferred to the database, we acknowledge the message

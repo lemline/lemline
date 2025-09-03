@@ -31,6 +31,7 @@ import kotlin.time.toJavaInstant
  *
  * @param T The type of entity managed by this repository, extending OutboxModel.
  */
+@Suppress("unused")
 @ExperimentalTime
 abstract class OutboxRepository<T : OutboxModel> : WithInstanceRepository<T>() {
 
@@ -83,8 +84,6 @@ abstract class OutboxRepository<T : OutboxModel> : WithInstanceRepository<T>() {
             update(entity, conn)
         } ?: 0
     }
-
-    private val findByIdSql by lazy { "SELECT * FROM $tableName WHERE $ID_COLUMN = ? LIMIT 1" }
 
     /**
      * Finds and locks messages that are ready to be processed.

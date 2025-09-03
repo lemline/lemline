@@ -17,12 +17,9 @@ import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.repositories.WaitRepository
 import jakarta.enterprise.context.ApplicationScoped
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Message
-import org.jetbrains.annotations.TestOnly
 
 /**
  * MessageHandler is responsible for consuming workflow messages from the incoming channel,
@@ -71,15 +68,13 @@ internal class IngestionMessageHandler(
                             is ScheduleIngestionMessage -> ingestionMessage.save()
                             is WaitIngestionMessage -> ingestionMessage.save()
                             is FailureIngestionMessage -> ingestionMessage.save()
-                            else -> error("Unknown ingestion message type: ${ingestionMessage::class.qualifiedName}")
                         }
                     }
                     metrics.processingCompleted(workflowName ?: UNKNOWN, workflowVersion ?: UNKNOWN)
                 }
             }
-        } catch (e: ProcessingException) {
-            // For testing: complete the future
-            processingMessages.remove(message.payload)?.completeExceptionally(e.cause)
+        } catch (_: ProcessingException) {
+            // Nothing to do
         }
     }
 
@@ -124,7 +119,7 @@ internal class IngestionMessageHandler(
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) = try {
         val failure = FailureModel.from(
-            id = IdGenerator.generateUUIDV7(),
+            id = IdGenerator.generateV7(),
             payload = payload,
             reason = FailureReasons.DESERIALISATION_ERROR,
             error = cause
@@ -175,14 +170,6 @@ internal class IngestionMessageHandler(
             metrics.nackFailed(workflowName, workflowVersion)
         }
     }
-
-    // For testing purposes
-    private val processingMessages = ConcurrentHashMap<String, CompletableFuture<String?>>()
-
-    // For testing purposes
-    @TestOnly
-    internal fun waitForProcessing(msg: String): CompletableFuture<String?> =
-        processingMessages.computeIfAbsent(msg) { CompletableFuture() }
 
     internal class ProcessingException(cause: Throwable) : RuntimeException(cause)
 

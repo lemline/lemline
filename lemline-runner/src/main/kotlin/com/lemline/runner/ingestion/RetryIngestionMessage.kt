@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.ingestion
 
+import com.lemline.core.errors.WorkflowException
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
@@ -27,12 +28,49 @@ data class RetryIngestionMessage(
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
     @SerialName("f")
-    override var outboxScheduledFor: Instant?
+    override var outboxScheduledFor: Instant?,
+
+    @SerialName("ec")
+    val errorClass: String,
+
+    @SerialName("em")
+    val errorMessage: String?,
+
+    @SerialName("es")
+    val errorStackTrace: String,
 ) : OutboxIngestionMessage, IngestionMessage {
     fun toModel() = RetryOutboxModel(
         id = id,
         instance = instance,
         outBoxStatus = outBoxStatus,
         outboxScheduledFor = outboxScheduledFor,
+        errorClass = errorClass,
+        errorMessage = errorMessage,
+        errorStackTrace = errorStackTrace,
     )
+
+    companion object {
+        fun from(
+            id: UUID,
+            instance: InstanceMessage,
+            outboxScheduledFor: Instant,
+            error: Throwable,
+        ) = RetryIngestionMessage(
+            id = id,
+            instance = instance,
+            errorClass = when (error) {
+                is WorkflowException -> error.error.type
+                else -> error::class.qualifiedName!!
+            },
+            errorMessage = when (error) {
+                is WorkflowException -> error.error.title
+                else -> error.message
+            },
+            errorStackTrace = when (error) {
+                is WorkflowException -> error.error.toJsonPrettyString()
+                else -> error.stackTraceToString()
+            },
+            outboxScheduledFor = outboxScheduledFor,
+        )
+    }
 }
