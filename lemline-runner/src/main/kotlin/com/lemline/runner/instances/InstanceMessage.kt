@@ -6,82 +6,77 @@ import com.lemline.common.ids.IdGenerator
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.NodeStates
+import com.lemline.core.workflows.WorkflowId
 import com.lemline.core.workflows.WorkflowInstance
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.messaging.JsonSerializable
+import com.lemline.runner.models.IDV7
 import java.util.*
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 import org.eclipse.microprofile.reactive.messaging.Message
 
-/**
- * Represents a message containing information about a workflow execution.
- *
- * @property workflowName The name of the workflow.
- * @property workflowVersion The version of the workflow.
- * @property nodeStates A map of the internal initial states (per position).
- * @property workflowPosition The current active initial position
- */
 @ExperimentalTime
 @Serializable
 data class InstanceMessage(
     /**
-     * The ID of the workflow.
+     * Description of the workflow instance
      */
-    @SerialName("i") @Contextual override val workflowId: UUID,
-    /**
-     * The name of the workflow.
-     */
-    @SerialName("n") override val workflowName: String,
-    /**
-     * The version of the workflow.
-     */
-    @SerialName("v") override val workflowVersion: String,
-    /**
-     * The current active initial position
-     */
-    @SerialName("p") val workflowPosition: LazyParsedField<NodePosition>,
-    /**
-     * A map of the internal initial states (per position)
-     */
-    @SerialName("s") val nodeStates: LazyParsedField<NodeStates>,
-    /**
-     * Indicates the id of the parent model describing the workflow waiting for this workflow completion, if any.
-     */
-    @SerialName("w") @Contextual val parentId: UUID? = null,
-) : WorkflowInstance, JsonSerializable {
+    @SerialName("i") val workflowInstance: WorkflowInstance,
 
-    override val currentState by lazy { nodeStates.parsed }
-
-    override val currentPosition by lazy { workflowPosition.parsed }
+    /**
+     * Parent's model ID waiting for this instance completion, if any.
+     */
+    @SerialName("p") val parentId: IDV7? = null,
+) : JsonSerializable {
 
     @Transient
     lateinit var message: Message<String>
 
+    @Transient
+    val workflowId = workflowInstance.workflowId
+
+    @Transient
+    val workflowName = workflowInstance.workflowName
+
+    @Transient
+    val workflowVersion = workflowInstance.workflowVersion
+
+    @Transient
+    val currentPosition = workflowInstance.currentPosition
+
+    @Transient
+    val currentStates = workflowInstance.currentStates
+
     override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
-    fun updateWith(nodeStates: NodeStates, workflowPosition: NodePosition): InstanceMessage = copy(
-        workflowPosition = LazyParsedField(workflowPosition, NodePosition.Companion.serializer()),
-        nodeStates = LazyParsedField(nodeStates, NodeStates.Companion.serializer()),
+    fun updateWith(
+        currentPosition: NodePosition,
+        currentStates: NodeStates
+    ): InstanceMessage = copy(
+        workflowInstance = workflowInstance.copy(currentPosition = currentPosition, currentStates = currentStates),
     ).also { it.message = message }
 
     companion object {
         fun fromObjects(
-            workflowId: UUID,
-            workflowName: String,
-            workflowVersion: String,
-            workflowPosition: NodePosition,
-            nodeStates: NodeStates,
-            parentId: UUID?,
+            workflowId: WorkflowId,
+            workflowName: WorkflowName,
+            workflowVersion: WorkflowVersion,
+            currentPosition: NodePosition,
+            currentStates: NodeStates,
+            parentId: IDV7?,
         ) = InstanceMessage(
-            workflowId = workflowId,
-            workflowName = workflowName,
-            workflowVersion = workflowVersion,
-            workflowPosition = LazyParsedField(workflowPosition, NodePosition.Companion.serializer()),
-            nodeStates = LazyParsedField(nodeStates, NodeStates.Companion.serializer()),
+            workflowInstance = WorkflowInstance(
+                workflowId = workflowId,
+                workflowName = workflowName,
+                workflowVersion = workflowVersion,
+                currentPosition = currentPosition,
+                currentStates = currentStates,
+            ),
             parentId = parentId,
         )
 
@@ -91,7 +86,7 @@ data class InstanceMessage(
             workflowVersion: String,
             workflowPosition: String,
             workflowState: String,
-            parentId: UUID?,
+            parentId: IDV7?,
         ) = InstanceMessage(
             workflowId = workflowId,
             workflowName = workflowName,
@@ -106,13 +101,13 @@ data class InstanceMessage(
             workflowName: String,
             workflowVersion: String,
             workflowInput: JsonElement,
-            parentId: UUID? = null,
+            parentId: IDV7? = null,
         ) = fromObjects(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
-            workflowPosition = NodePosition.root,
-            nodeStates = NodeStates.newInstance(workflowInput),
+            currentPosition = NodePosition.root,
+            currentStates = NodeStates.newInstance(workflowInput),
             parentId = parentId,
         )
 

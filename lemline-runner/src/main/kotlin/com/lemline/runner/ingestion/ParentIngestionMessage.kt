@@ -21,7 +21,7 @@ data class ParentIngestionMessage(
     override val id: @Contextual UUID,
 
     @SerialName("i")
-    override var instance: InstanceMessage,
+    override var instanceMessage: InstanceMessage,
 
     @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
@@ -32,7 +32,7 @@ data class ParentIngestionMessage(
 
     fun toModel() = ParentOutboxModel(
         id = id,
-        instance = instance,
+        instanceMessage = instanceMessage,
         outBoxStatus = outBoxStatus,
         outboxScheduledFor = outboxScheduledFor
     )

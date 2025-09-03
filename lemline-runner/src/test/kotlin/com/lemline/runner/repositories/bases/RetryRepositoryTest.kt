@@ -20,7 +20,7 @@ internal abstract class RetryRepositoryTest : OutboxRepositoryTest<RetryOutboxMo
 
     override fun createRandomEntity() = RetryOutboxModel(
         id = UUID.randomUUID(),
-        instance = InstanceMessage.fromStrings(
+        instanceMessage = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = randomString,
             workflowVersion = randomString,

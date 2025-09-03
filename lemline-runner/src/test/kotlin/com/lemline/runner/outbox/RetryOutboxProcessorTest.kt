@@ -39,7 +39,7 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>(
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = RetryOutboxModel(
         id = UUID.randomUUID(),
-        instance = InstanceMessage.fromStrings(
+        instanceMessage = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = Random.nextBytes(10).toString(),
             workflowVersion = Random.nextBytes(10).toString(),

@@ -6,11 +6,10 @@ import com.cronutils.model.CronType
 import com.cronutils.model.definition.CronDefinitionBuilder
 import com.cronutils.model.time.ExecutionTime
 import com.cronutils.parser.CronParser
-import com.lemline.common.ids.IdGenerator
+import com.lemline.core.workflows.WorkflowId
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import java.time.ZoneId
-import java.util.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
@@ -20,9 +19,9 @@ import kotlin.time.toKotlinInstant
 
 @ExperimentalTime
 data class ScheduleOutboxModel(
-    override val id: UUID,
+    override val id: IDV7,
 
-    override var instance: InstanceMessage,
+    override var instanceMessage: InstanceMessage,
 
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
@@ -78,8 +77,9 @@ data class ScheduleOutboxModel(
             else -> OutBoxStatus.PENDING
         }
         // set a new id for the next workflow instance
-        instance = instance.copy(
-            workflowId = IdGenerator.generateV7(), // <- TODO Manage idempotency by providing a deterministic workflow id
+        instanceMessage = instanceMessage.copy(
+            workflowInstance = instanceMessage.workflowInstance.copy(workflowId = WorkflowId.new()),
+            // <- TODO Manage idempotency by providing a deterministic workflow id
         )
     }
 

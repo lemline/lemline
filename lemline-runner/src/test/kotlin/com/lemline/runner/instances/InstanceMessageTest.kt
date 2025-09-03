@@ -26,8 +26,8 @@ internal class InstanceMessageTest {
             workflowId = workflowId,
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
-            workflowPosition = NodePosition.root,
-            nodeStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            currentPosition = NodePosition.root,
+            currentStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
             parentId = parentId
         )
 
@@ -45,8 +45,8 @@ internal class InstanceMessageTest {
             workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
-            workflowPosition = NodePosition.root,
-            nodeStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            currentPosition = NodePosition.root,
+            currentStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
             parentId = UUID.randomUUID(),
         )
 
@@ -61,8 +61,8 @@ internal class InstanceMessageTest {
             workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
-            workflowPosition = NodePosition.root,
-            nodeStates = NodeStates(
+            currentPosition = NodePosition.root,
+            currentStates = NodeStates(
                 mapOf(
                     NodePosition.root to NodeState(
                         rawInput = JsonObject(mapOf("test" to JsonPrimitive("value"))),

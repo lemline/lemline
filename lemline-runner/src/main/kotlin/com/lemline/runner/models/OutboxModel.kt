@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.lemline.core.nodes.NodePosition
+import com.lemline.core.workflows.NodeStates
+import com.lemline.core.workflows.WorkflowId
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
@@ -23,7 +28,7 @@ import kotlin.time.Instant
 @ExperimentalTime
 interface OutboxModel : WithInstance {
 
-    override val instance: InstanceMessage?
+    override val instanceMessage: InstanceMessage
 
     /**
      * Current status of the message in the outbox. Possible values:
@@ -74,4 +79,30 @@ interface OutboxModel : WithInstance {
      * Stacktrace of the last exception that occurred during processing of this message.
      */
     var outboxErrorStackTrace: String?
+
+    /**
+     * The ID of the workflow.
+     */
+    override val workflowId: WorkflowId get() = super.workflowId!!
+
+    /**
+     * The name of the workflow.
+     */
+    override val workflowName: WorkflowName? get() = super.workflowName!!
+
+    /**
+     * The version of the workflow.
+     */
+    override val workflowVersion: WorkflowVersion get() = super.workflowVersion!!
+
+    /**
+     * The current active initial position
+     */
+    override val currentPosition: NodePosition get() = super.currentPosition!!
+
+    /**
+     * A map of the internal initial states (per position)
+     */
+    override val currentStates: NodeStates get() = super.currentStates!!
+
 }

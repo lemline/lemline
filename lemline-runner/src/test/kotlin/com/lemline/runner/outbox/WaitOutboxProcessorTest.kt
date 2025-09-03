@@ -29,7 +29,7 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
 
     @Inject // Inject the failure repository
     override lateinit var failureRepository: FailureRepository
-    
+
     // Implement the abstract repository property
     override val outboxRepository: OutboxRepository<WaitOutboxModel> by lazy { waitRepository }
 
@@ -39,7 +39,7 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = WaitOutboxModel(
         id = UUID.randomUUID(),
-        instance = InstanceMessage.fromStrings(
+        instanceMessage = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = Random.nextBytes(10).toString(),
             workflowVersion = Random.nextBytes(10).toString(),

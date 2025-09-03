@@ -19,7 +19,7 @@ internal abstract class WaitRepositoryTest : OutboxRepositoryTest<WaitOutboxMode
 
     override fun createRandomEntity() = WaitOutboxModel(
         id = UUID.randomUUID(),
-        instance = InstanceMessage.fromStrings(
+        instanceMessage = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = randomString,
             workflowVersion = randomString,

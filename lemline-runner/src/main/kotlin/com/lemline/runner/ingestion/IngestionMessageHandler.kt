@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.ingestion
 
-import com.lemline.common.LogContext
 import com.lemline.common.debug
 import com.lemline.common.error
-import com.lemline.common.ids.IdGenerator
 import com.lemline.common.logger
-import com.lemline.common.withLoggingContext
+import com.lemline.core.logger.withWorkflowContext
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN
+import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_NAME
+import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_VERSION
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.RetryRepository
@@ -37,7 +37,7 @@ internal class IngestionMessageHandler(
     private val waitRepository: WaitRepository,
     private val failureRepository: FailureRepository,
     override val metrics: IngestionMessageSubscriberMetrics,
-) : MessageHandler {
+) : MessageHandler<IngestionMessage> {
 
     override val logger = logger()
 
@@ -60,13 +60,8 @@ internal class IngestionMessageHandler(
 
         try {
             with(ingestionMessage) {
-                metrics.recordProcessingDuration(workflowName ?: UNKNOWN, workflowVersion ?: UNKNOWN) {
-                    withLoggingContext(
-                        LogContext.WORKFLOW_ID to workflowId.toString(),
-                        LogContext.WORKFLOW_NAME to workflowName,
-                        LogContext.WORKFLOW_VERSION to workflowVersion,
-                        LogContext.NODE_POSITION to (workflowPosition?.serialized ?: UNKNOWN),
-                    ) {
+                metrics.recordProcessingDuration(workflowName, workflowVersion) {
+                    withWorkflowContext(workflowId, workflowName, workflowVersion, currentPosition) {
                         when (ingestionMessage) {
                             is ParentIngestionMessage -> ingestionMessage.save()
                             is RetryIngestionMessage -> ingestionMessage.save()
@@ -75,15 +70,15 @@ internal class IngestionMessageHandler(
                             is FailureIngestionMessage -> ingestionMessage.save()
                         }
                         // --- Acknowledgment (Success Path) ---
-                        message.ack(workflowName ?: UNKNOWN, workflowVersion ?: UNKNOWN)
+                        message.ack(workflowName, workflowVersion)
                     }
-                    metrics.processingCompleted(workflowName ?: UNKNOWN, workflowVersion ?: UNKNOWN)
+                    metrics.processingCompleted(workflowName, workflowVersion)
                 }
             }
             logger.debug { "Processed: ${message.toLogString()}" }
         } catch (e: Exception) {
             // --- NegAcknowledgment (Failure Path) ---
-            message.nack(e, ingestionMessage.workflowName ?: UNKNOWN, ingestionMessage.workflowVersion ?: UNKNOWN)
+            message.nack(e, ingestionMessage.workflowName, ingestionMessage.workflowVersion)
             logger.error(e) { "Error during processing of message: ${message.toLogString()}" }
 
             throw e
@@ -95,11 +90,11 @@ internal class IngestionMessageHandler(
      * Handles its own metrics, logging, and persistence of failed messages.
      */
 
-    private suspend fun Message<String>.deserialize(): IngestionMessage? = try {
+    override suspend fun Message<String>.deserialize(): IngestionMessage = try {
         metrics.recordDeserializationDuration {
             IngestionMessage.fromJsonString(payload)
         }.also {
-            metrics.deserializationCompleted(it.workflowName ?: UNKNOWN, it.workflowVersion ?: UNKNOWN)
+            metrics.deserializationCompleted(it.workflowName, it.workflowVersion)
         }
     } catch (e: Exception) {
         logger.error(e) { "Failed to deserialize message: ${toLogString()}" }
@@ -131,16 +126,16 @@ internal class IngestionMessageHandler(
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) = try {
         val failure = FailureModel.from(
-            id = IdGenerator.generateV7(),
+            id = IDV7.new(),
             payload = payload,
             reason = FailureReasons.DESERIALISATION_ERROR,
             error = cause
         )
         failureRepository.insert(failure)
         // as the responsibility of the message is transferred to the database, we acknowledge the message
-        ack(UNKNOWN, UNKNOWN)
+        ack(UNKNOWN_NAME, UNKNOWN_VERSION)
     } catch (e: Exception) {
         logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: ${toLogString()}" }
-        nack(e, UNKNOWN, UNKNOWN)
+        nack(e, UNKNOWN_NAME, UNKNOWN_VERSION)
     }
 }

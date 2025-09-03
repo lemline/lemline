@@ -19,7 +19,7 @@ internal abstract class ScheduleRepositoryTest : OutboxRepositoryTest<ScheduleOu
 
     override fun createRandomEntity() = ScheduleOutboxModel(
         id = UUID.randomUUID(),
-        instance = InstanceMessage.fromStrings(
+        instanceMessage = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = randomString,
             workflowVersion = randomString,

@@ -24,8 +24,8 @@ internal class IngestionMessageTest {
         workflowId = UUID.randomUUID(),
         workflowName = "test-workflow",
         workflowVersion = "1.0.0",
-        workflowPosition = NodePosition.root,
-        nodeStates = NodeStates(
+        currentPosition = NodePosition.root,
+        currentStates = NodeStates(
             mapOf(
                 NodePosition.root to NodeState(
                     rawInput = JsonObject(mapOf("k" to JsonPrimitive("v"))),
@@ -40,7 +40,7 @@ internal class IngestionMessageTest {
     fun `should be JSON serializable and deserializable for Parent message`() {
         val original: IngestionMessage = ParentIngestionMessage(
             id = UUID.randomUUID(),
-            instance = sampleInstance(),
+            instanceMessage = sampleInstance(),
             outBoxStatus = OutBoxStatus.PENDING,
             outboxScheduledFor = Clock.System.now(),
         )
@@ -53,7 +53,7 @@ internal class IngestionMessageTest {
     fun `should be JSON serializable and deserializable for Wait message`() {
         val original: IngestionMessage = WaitIngestionMessage(
             id = UUID.randomUUID(),
-            instance = sampleInstance(),
+            instanceMessage = sampleInstance(),
             outBoxStatus = OutBoxStatus.PENDING,
             outboxScheduledFor = Clock.System.now(),
         )
@@ -66,7 +66,7 @@ internal class IngestionMessageTest {
     fun `should be JSON serializable and deserializable for Schedule message`() {
         val original: IngestionMessage = ScheduleIngestionMessage(
             id = UUID.randomUUID(),
-            instance = sampleInstance(),
+            instanceMessage = sampleInstance(),
             outBoxStatus = OutBoxStatus.PENDING,
             outboxScheduledFor = null,
             scheduleAfter = "PT10S",
@@ -83,7 +83,7 @@ internal class IngestionMessageTest {
     fun `should be JSON serializable and deserializable for Retry message`() {
         val original: IngestionMessage = RetryIngestionMessage(
             id = UUID.randomUUID(),
-            instance = sampleInstance(),
+            instanceMessage = sampleInstance(),
             outBoxStatus = OutBoxStatus.FAILED,
             outboxScheduledFor = null,
             errorClass = "a",
@@ -99,7 +99,7 @@ internal class IngestionMessageTest {
     fun `should be JSON serializable and deserializable for Failure message`() {
         val original: IngestionMessage = FailureIngestionMessage(
             id = UUID.randomUUID(),
-            instance = sampleInstance(),
+            instanceMessage = sampleInstance(),
             payload = "p",
             reason = "r",
             errorClass = "a",
@@ -121,26 +121,26 @@ internal class IngestionMessageTest {
             workflowId = UUID.randomUUID(),
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
-            workflowPosition = NodePosition.root,
-            nodeStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            currentPosition = NodePosition.root,
+            currentStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
             parentId = UUID.randomUUID(),
         )
 
         val msgParent = ParentIngestionMessage(
             id = id,
-            instance = instance,
+            instanceMessage = instance,
             outBoxStatus = OutBoxStatus.FAILED,
             outboxScheduledFor = scheduledFor,
         )
         val msgWait = WaitIngestionMessage(
             id = id,
-            instance = instance,
+            instanceMessage = instance,
             outBoxStatus = OutBoxStatus.FAILED,
             outboxScheduledFor = scheduledFor,
         )
         val msgRetry = RetryIngestionMessage(
             id = id,
-            instance = instance,
+            instanceMessage = instance,
             outBoxStatus = OutBoxStatus.FAILED,
             outboxScheduledFor = scheduledFor,
             errorClass = "errorClass",
@@ -149,7 +149,7 @@ internal class IngestionMessageTest {
         )
         val msgSchedule = ScheduleIngestionMessage(
             id = id,
-            instance = instance,
+            instanceMessage = instance,
             outBoxStatus = OutBoxStatus.FAILED,
             outboxScheduledFor = scheduledFor,
             scheduleAfter = "after",
@@ -159,7 +159,7 @@ internal class IngestionMessageTest {
         )
         val msgFailure = FailureIngestionMessage(
             id = id,
-            instance = instance,
+            instanceMessage = instance,
             payload = "payload",
             reason = "reason",
             errorClass = "errorClass",

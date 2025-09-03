@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.ingestion
 
-import com.lemline.common.ids.IdGenerator
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.FailureModel
-import java.util.*
+import com.lemline.runner.models.IDV7
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -18,10 +16,10 @@ import kotlinx.serialization.Serializable
 @SerialName("f") // <- type discriminator for polymorphic serialization
 data class FailureIngestionMessage(
     @SerialName("id")
-    override val id: @Contextual UUID,
+    override val id: IDV7,
 
     @SerialName("i")
-    override val instance: InstanceMessage?,
+    override val instanceMessage: InstanceMessage?,
 
     @SerialName("p")
     val payload: String?,
@@ -41,7 +39,7 @@ data class FailureIngestionMessage(
     ) : IngestionMessage {
     fun toModel() = FailureModel(
         id = id,
-        instance = instance,
+        instanceMessage = instanceMessage,
         payload = payload,
         reason = reason,
         errorClass = errorClass,
@@ -51,13 +49,13 @@ data class FailureIngestionMessage(
 
     companion object {
         fun from(
-            id: UUID,
+            id: IDV7,
             instance: InstanceMessage,
             error: Throwable,
             reason: String = getFailureReason(error)
         ) = FailureIngestionMessage(
-            id = IdGenerator.deriveUuidV7FromV7(id),
-            instance = instance,
+            id = IDV7.from(id),
+            instanceMessage = instance,
             payload = null,
             reason = reason,
             errorClass = error::class.qualifiedName!!,
@@ -66,13 +64,13 @@ data class FailureIngestionMessage(
         )
 
         fun from(
-            id: UUID,
+            id: IDV7,
             payload: String,
             error: Throwable,
             reason: String = getFailureReason(error)
         ) = FailureIngestionMessage(
-            id = IdGenerator.deriveUuidV7FromV7(id),
-            instance = null,
+            id = IDV7.from(id),
+            instanceMessage = null,
             payload = payload,
             reason = reason,
             errorClass = error::class.qualifiedName!!,

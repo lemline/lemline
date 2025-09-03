@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.core.workflows.WorkflowId
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.WithInstance
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -54,22 +56,22 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
         super.prepareStatementMap + mapOf(
             WORKFLOW_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setUuid(stmt, idx, entity.instance?.workflowId)
+                setUuid(stmt, idx, entity.workflowId?.value)
             },
             WORKFLOW_NAME_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.instance?.workflowName)
+                stmt.setString(idx, entity.workflowName?.toString())
             },
             WORKFLOW_VERSION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.instance?.workflowVersion)
+                stmt.setString(idx, entity.workflowVersion?.toString())
             },
             WORKFLOW_POSITION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.instance?.workflowPosition?.serialized)
+                stmt.setString(idx, entity.currentPosition?.toString())
             },
             WORKFLOW_STATE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.instance?.nodeStates?.serialized)
+                stmt.setString(idx, entity.currentStates?.toJsonString())
             },
             PARENT_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setUuid(stmt, idx, entity.instance?.parentId)
+                setUuid(stmt, idx, entity.parentId?.value)
             }
         )
     }
@@ -82,7 +84,7 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
             workflowVersion = getString(WORKFLOW_VERSION_COLUMN),
             workflowPosition = getString(WORKFLOW_POSITION_COLUMN),
             workflowState = getString(WORKFLOW_STATE_COLUMN),
-            parentId = getUuid(this, PARENT_ID_COLUMN),
+            parentId = IDV7(getUuid(this, PARENT_ID_COLUMN)),
         )
     }
 
@@ -91,10 +93,10 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
      *
      * @return The entity with the specified WorkflowId, or null if not found.
      */
-    suspend fun findWithWorkflowId(workflowId: UUID, connection: Connection? = null): List<T> =
+    suspend fun findWithWorkflowId(workflowId: WorkflowId, connection: Connection? = null): List<T> =
         withConnection(connection) { conn ->
             conn.prepareStatement(findWithWorkflowIdSql).use { stmt ->
-                setUuid(stmt, 1, workflowId)
+                setUuid(stmt, 1, workflowId.value)
                 stmt.executeQuery().use { it.toModels() }
             }
         }

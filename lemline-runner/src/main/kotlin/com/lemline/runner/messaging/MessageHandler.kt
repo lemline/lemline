@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.common.LogContext
 import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.warn
-import com.lemline.common.withLoggingContext
-import com.lemline.runner.models.WorkflowIdentification
+import com.lemline.core.logger.withWorkflowContext
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
+import com.lemline.runner.models.WithInstance
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
 import kotlin.time.ExperimentalTime
@@ -16,7 +17,7 @@ import org.eclipse.microprofile.reactive.messaging.Message as ReactiveMessage
 import org.slf4j.Logger
 
 @ExperimentalTime
-internal interface MessageHandler<T : WorkflowIdentification> {
+internal interface MessageHandler<T : WithInstance> {
 
     suspend fun Message<String>.deserialize(): T
 
@@ -41,13 +42,8 @@ internal interface MessageHandler<T : WorkflowIdentification> {
             logger.debug { "Deserialized: ${message.toLogString()}" }
 
             with(msg) {
-                withLoggingContext(
-                    LogContext.WORKFLOW_ID to id,
-                    LogContext.WORKFLOW_NAME to name,
-                    LogContext.WORKFLOW_VERSION to version,
-                    LogContext.NODE_POSITION to position,
-                ) {
-                    metrics.recordProcessingDuration(name, version) {
+                withWorkflowContext(workflowId, workflowName, workflowVersion, currentPosition) {
+                    metrics.recordProcessingDuration(workflowName, version) {
                         // --- Processing ---
                         val next = msg.handle()
                         // --- Emit next message if any ---
@@ -75,7 +71,7 @@ internal interface MessageHandler<T : WorkflowIdentification> {
      * @param workflowName The name of the workflow associated with the message.
      * @param workflowVersion The version of the workflow associated with the message.
      */
-    suspend fun ReactiveMessage<*>.ack(workflowName: String, workflowVersion: String) {
+    suspend fun ReactiveMessage<*>.ack(workflowName: WorkflowName?, workflowVersion: WorkflowVersion?) {
         try {
             logger.debug { "Acknowledging message ${toLogString()}" }
             ackSuspending()
@@ -96,7 +92,11 @@ internal interface MessageHandler<T : WorkflowIdentification> {
      * @param workflowName The name of the workflow associated with the message.
      * @param workflowVersion The version of the workflow associated with the message.
      */
-    suspend fun ReactiveMessage<*>.nack(reason: Exception, workflowName: String, workflowVersion: String) {
+    suspend fun ReactiveMessage<*>.nack(
+        reason: Exception,
+        workflowName: WorkflowName?,
+        workflowVersion: WorkflowVersion?
+    ) {
         try {
             nackSuspending(reason)
             logger.warn(reason) { "CRITICAL - Negatively Acknowledged message: ${toLogString()}" }
@@ -110,6 +110,8 @@ internal interface MessageHandler<T : WorkflowIdentification> {
 
     companion object {
         const val UNKNOWN = "unknown"
+        val UNKNOWN_NAME = WorkflowName(UNKNOWN)
+        val UNKNOWN_VERSION = WorkflowVersion(UNKNOWN)
     }
 }
 

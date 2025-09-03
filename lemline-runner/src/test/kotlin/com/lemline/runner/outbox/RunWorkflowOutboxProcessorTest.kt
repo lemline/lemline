@@ -39,7 +39,7 @@ internal class RunWorkflowOutboxProcessorTest : OutboxProcessorTest<ParentOutbox
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = ParentOutboxModel(
         id = UUID.randomUUID(),
-        instance = InstanceMessage.fromStrings(
+        instanceMessage = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowName = Random.nextBytes(10).toString(),
             workflowVersion = Random.nextBytes(10).toString(),

@@ -4,6 +4,7 @@ package com.lemline.runner.repositories
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.models.WithId
 import java.nio.ByteBuffer
@@ -110,7 +111,7 @@ abstract class WithIdRepository<T : WithId> : Repository<T>() {
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
         mapOf(
             ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setUuid(stmt, idx, entity.id)
+                setUuid(stmt, idx, entity.id.value)
             },
         )
     }
@@ -122,9 +123,9 @@ abstract class WithIdRepository<T : WithId> : Repository<T>() {
      * @param connection An optional database connection to use. If null, a new connection is acquired.
      * @return The entity corresponding to the provided identifier, or null if no entity is found.
      */
-    suspend fun findById(id: UUID, connection: Connection? = null): T? = withConnection(connection) { conn ->
+    suspend fun findById(id: IDV7, connection: Connection? = null): T? = withConnection(connection) { conn ->
         conn.prepareStatement(findByIdSql).use { stmt ->
-            setUuid(stmt, 1, id)
+            setUuid(stmt, 1, id.value)
             stmt.executeQuery().use { rs ->
                 if (rs.next()) createModel(rs) else null
             }

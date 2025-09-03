@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
 import kotlin.time.Clock
@@ -23,4 +24,6 @@ value class NodeStates(private val state: Map<NodePosition, NodeState>) {
                 ),
             )
     }
+
+    fun toJsonString() = LemlineJson.encodeToString(state)
 }

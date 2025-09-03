@@ -9,7 +9,7 @@ import kotlinx.serialization.Serializable
 
 @JvmInline
 @Serializable
-value class WorkflowId private constructor(private val value: @Contextual UUID) {
+value class WorkflowId(val value: @Contextual UUID) {
     override fun toString(): String = value.toString()
 
     companion object {

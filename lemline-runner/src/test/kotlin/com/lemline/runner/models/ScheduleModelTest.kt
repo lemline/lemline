@@ -22,7 +22,7 @@ class ScheduleModelTest {
         scheduleZone: String? = null
     ) = ScheduleOutboxModel(
         id = UUID.randomUUID(),
-        instance = InstanceMessage.fromStrings(
+        instanceMessage = InstanceMessage.fromStrings(
             workflowId = UUID.randomUUID(),
             workflowVersion = "1.0",
             workflowName = "test-workflow",

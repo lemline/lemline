@@ -3,12 +3,11 @@ package com.lemline.runner.ingestion
 
 import com.lemline.core.errors.WorkflowException
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
-import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -19,10 +18,10 @@ import kotlinx.serialization.Serializable
 @SerialName("r") // <- type discriminator for polymorphic serialization
 data class RetryIngestionMessage(
     @SerialName("id")
-    override val id: @Contextual UUID,
+    override val id: IDV7,
 
     @SerialName("i")
-    override val instance: InstanceMessage,
+    override val instanceMessage: InstanceMessage,
 
     @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
@@ -41,7 +40,7 @@ data class RetryIngestionMessage(
 ) : OutboxIngestionMessage, IngestionMessage {
     fun toModel() = RetryOutboxModel(
         id = id,
-        instance = instance,
+        instanceMessage = instanceMessage,
         outBoxStatus = outBoxStatus,
         outboxScheduledFor = outboxScheduledFor,
         errorClass = errorClass,
@@ -51,13 +50,13 @@ data class RetryIngestionMessage(
 
     companion object {
         fun from(
-            id: UUID,
+            id: IDV7,
             instance: InstanceMessage,
             outboxScheduledFor: Instant,
             error: Throwable,
         ) = RetryIngestionMessage(
             id = id,
-            instance = instance,
+            instanceMessage = instance,
             errorClass = when (error) {
                 is WorkflowException -> error.error.type
                 else -> error::class.qualifiedName!!

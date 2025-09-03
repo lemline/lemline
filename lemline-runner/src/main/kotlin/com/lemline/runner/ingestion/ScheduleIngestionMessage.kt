@@ -7,6 +7,9 @@ import com.cronutils.parser.CronParser
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.utils.toDuration
 import com.lemline.core.workflows.NodeStates
+import com.lemline.core.workflows.WorkflowId
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.models.getNextCronExecutionInstant
@@ -33,7 +36,7 @@ data class ScheduleIngestionMessage(
     override val id: @Contextual UUID,
 
     @SerialName("i")
-    override var instance: InstanceMessage,
+    override var instanceMessage: InstanceMessage,
 
     @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
@@ -55,7 +58,7 @@ data class ScheduleIngestionMessage(
 ) : OutboxIngestionMessage, IngestionMessage {
     fun toModel() = ScheduleOutboxModel(
         id = id,
-        instance = instance,
+        instanceMessage = instanceMessage,
         outBoxStatus = outBoxStatus,
         outboxScheduledFor = outboxScheduledFor,
         scheduleAfter = scheduleAfter,
@@ -68,9 +71,9 @@ data class ScheduleIngestionMessage(
         private val cronParser by lazy { CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX)) }
 
         fun from(
-            workflowId: UUID,
-            workflowName: String,
-            workflowVersion: String,
+            workflowId: WorkflowId,
+            workflowName: WorkflowName,
+            workflowVersion: WorkflowVersion,
             workflowInput: JsonElement,
             schedule: Schedule,
             zoneId: ZoneId?
@@ -90,12 +93,12 @@ data class ScheduleIngestionMessage(
 
             val scheduleIngestionMessage = ScheduleIngestionMessage(
                 id = workflowId,
-                instance = InstanceMessage.fromObjects(
+                instanceMessage = InstanceMessage.fromObjects(
                     workflowId = workflowId,
                     workflowName = workflowName,
                     workflowVersion = workflowVersion,
-                    workflowPosition = NodePosition.root,
-                    nodeStates = NodeStates.newInstance(workflowInput),
+                    currentPosition = NodePosition.root,
+                    currentStates = NodeStates.newInstance(workflowInput),
                     parentId = null,
                 ),
                 scheduleEvery = scheduleEvery,

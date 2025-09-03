@@ -148,7 +148,7 @@ internal class InstanceMessageHandler(
     private suspend fun InstanceMessage.getWorkflowProcessor(
         secrets: Map<String, JsonElement>
     ): Processor = try {
-        Processor(workflowInstance = this, secrets = secrets)
+        Processor(workflowInstance = workflowInstance, secrets = secrets)
     } catch (e: Exception) {
         throw DelegatedException {
             logger.error(e) { "Failed to convert the message to a workflow processor. Storing it in the $RETRY_TABLE table for manual inspection." }
@@ -213,7 +213,7 @@ internal class InstanceMessageHandler(
 
     private suspend fun Processor.runFailed(cause: Exception) {
         (workflowInstance as InstanceMessage)
-            .updateWith(state, position!!)
+            .updateWith(position!!, state)
             .saveAsFailed(cause)
     }
 

@@ -21,7 +21,7 @@ data class WaitIngestionMessage(
     override val id: @Contextual UUID,
 
     @SerialName("i")
-    override var instance: InstanceMessage,
+    override var instanceMessage: InstanceMessage,
 
     @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
@@ -31,7 +31,7 @@ data class WaitIngestionMessage(
 ) : OutboxIngestionMessage, IngestionMessage {
     fun toModel() = WaitOutboxModel(
         id = id,
-        instance = instance,
+        instanceMessage = instanceMessage,
         outBoxStatus = outBoxStatus,
         outboxScheduledFor = outboxScheduledFor
     )

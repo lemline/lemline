@@ -21,6 +21,7 @@ import com.lemline.runner.ingestion.ParentIngestionMessage
 import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.ingestion.WaitIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.repositories.PARENT_TABLE
 import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.SCHEDULE_TABLE
@@ -116,7 +117,7 @@ internal class StepByStepRunner @Inject constructor(
         // TODO make id idempotent
         val parent = ParentIngestionMessage(
             id = IdGenerator.generateV7(),
-            instance = this,
+            instanceMessage = this,
             outboxScheduledFor = null,
         )
         ingestionEmitter.send(parent)
@@ -144,7 +145,7 @@ internal class StepByStepRunner @Inject constructor(
                     // updates the parent with the output at the current position
                     parent.completeWith(output)
                     parentRepository.update(parent)
-                    logger.debug { "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId ($workflowName), set up to restart at position ${parent.workflowPosition} with output $output" }
+                    logger.debug { "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId ($workflowName), set up to restart at position ${parent.currentPosition} with output $output" }
                 }
                     ?: logger.error { "CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted." }
             }
@@ -171,7 +172,7 @@ internal class StepByStepRunner @Inject constructor(
         val delay = tryInstance.delay ?: error("No delay set in in $tryInstance")
 
         val retryMessage = RetryIngestionMessage.from(
-            id = IdGenerator.generateV7(),
+            id = IDV7.new(),
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
             error = e
@@ -189,7 +190,7 @@ internal class StepByStepRunner @Inject constructor(
     private suspend fun InstanceMessage.onWait(delay: Duration) {
         val waitMessage = WaitIngestionMessage(
             id = IdGenerator.generateV7(),
-            instance = this,
+            instanceMessage = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
         )
         // Save the message to the wait table
@@ -197,5 +198,5 @@ internal class StepByStepRunner @Inject constructor(
     }
 
     private val Processor.updatedInstanceMessage
-        get() = (workflowInstance as InstanceMessage).updateWith(state, position!!)
+        get() = (workflowInstance as InstanceMessage).updateWith(position!!, state)
 }

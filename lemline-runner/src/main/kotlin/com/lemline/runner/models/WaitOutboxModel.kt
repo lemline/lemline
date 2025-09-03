@@ -3,15 +3,14 @@ package com.lemline.runner.models
 
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
-import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
 @ExperimentalTime
 data class WaitOutboxModel(
-    override val id: UUID,
+    override val id: IDV7,
 
-    override val instance: InstanceMessage,
+    override val instanceMessage: InstanceMessage,
 
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
