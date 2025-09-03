@@ -20,5 +20,5 @@ data class WorkflowDescriptor(
     val id: String,
     val definition: JsonObject,
     val input: JsonElement,
-    val startedAt: JsonObject,
+    private val startedAt: JsonObject,
 )

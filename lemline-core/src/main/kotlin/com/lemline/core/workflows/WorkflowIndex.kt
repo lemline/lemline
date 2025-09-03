@@ -6,7 +6,7 @@ import io.serverlessworkflow.api.types.Workflow
 /**
  * Pair representing the index of a workflow consisting of its name and version.
  */
-typealias WorkflowIndex = Pair<String, String>
+typealias WorkflowIndex = Pair<WorkflowName, WorkflowVersion>
 
 val Workflow.index: WorkflowIndex
-    get() = document.name to document.version
+    get() = WorkflowName(document.name) to WorkflowVersion(document.version)

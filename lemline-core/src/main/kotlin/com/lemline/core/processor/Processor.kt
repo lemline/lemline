@@ -7,7 +7,6 @@ import com.lemline.common.info
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger
 import com.lemline.common.warn
-import com.lemline.common.withWorkflowContext
 import com.lemline.core.RuntimeDescriptor
 import com.lemline.core.activities.ActivityRunnerProvider
 import com.lemline.core.definitions.Definitions
@@ -29,6 +28,7 @@ import com.lemline.core.instances.SetInstance
 import com.lemline.core.instances.SwitchInstance
 import com.lemline.core.instances.TryInstance
 import com.lemline.core.instances.WaitInstance
+import com.lemline.core.logger.withWorkflowContext
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.nodes.NodePosition
@@ -36,9 +36,11 @@ import com.lemline.core.nodes.NodeState
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.nodes.isGoingDown
 import com.lemline.core.nodes.isGoingUp
+import com.lemline.core.workflows.NodeStates
+import com.lemline.core.workflows.WorkflowId
 import com.lemline.core.workflows.WorkflowInstance
-import com.lemline.core.workflows.WorkflowInstanceImpl
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import io.serverlessworkflow.api.types.CallAsyncAPI
 import io.serverlessworkflow.api.types.CallGRPC
 import io.serverlessworkflow.api.types.CallHTTP
@@ -57,7 +59,6 @@ import io.serverlessworkflow.api.types.WaitTask
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.WorkflowStatus
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import java.util.*
 import java.util.concurrent.CompletableFuture
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -71,13 +72,13 @@ import kotlinx.serialization.json.JsonElement
 /**
  * Represents an instance of a workflow, including its state, position, secrets, and execution logic.
  *
- * @property instance The workflow instance.
+ * @property workflowInstance The workflow instance.
  * @property secrets A map of secrets used in the workflow.
  */
 @ExperimentalTime
 @Suppress("unused")
 class Processor(
-    val instance: WorkflowInstance,
+    val workflowInstance: WorkflowInstance,
     secrets: Map<String, JsonElement>,
     var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
 ) {
@@ -102,19 +103,19 @@ class Processor(
         @JvmStatic
         @JvmOverloads
         fun createNew(
-            name: String,
-            version: String,
-            id: UUID,
+            name: WorkflowName,
+            version: WorkflowVersion,
+            id: WorkflowId,
             rawInput: JsonElement,
             secrets: Map<String, JsonElement> = emptyMap(),
             activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
         ) = Processor(
-            instance = WorkflowInstanceImpl(
-                id = id,
-                name = name,
-                version = version,
-                initialState = WorkflowState.newInstance(rawInput),
-                initialPosition = NodePosition.root,
+            workflowInstance = WorkflowInstance(
+                workflowId = id,
+                workflowName = name,
+                workflowVersion = version,
+                currentStates = NodeStates.newInstance(rawInput),
+                currentPosition = NodePosition.root,
             ),
             secrets = secrets,
             activityRunnerProvider = activityRunnerProvider
@@ -147,10 +148,10 @@ class Processor(
     val workflow: Workflow
 
     init {
-        workflow = Definitions.getOrNull(instance.name, instance.version)
-            ?: error("workflow ${instance.name} (version ${instance.version}) not found")
+        workflow = Definitions.getOrNull(workflowInstance.workflowName, workflowInstance.workflowVersion)
+            ?: error("workflow ${workflowInstance.workflowName} (version ${workflowInstance.workflowVersion}) not found")
         // get root state from instance
-        val rootState = instance.initialState[NodePosition.root]
+        val rootState = workflowInstance.currentStates[NodePosition.root]
             ?: error("no initial state provided for the root node")
         // get startedAt and rawInput from root state
         val errorStr by lazy { "provided in the root node of the initial state" }
@@ -160,12 +161,12 @@ class Processor(
             ?: error("no raw input $errorStr")
         // create the root instance
         val rootNode = Definitions.getRootNode(workflow)
-        rootInstance = (rootNode.createInstance(instance.initialState, null) as RootInstance)
+        rootInstance = (rootNode.createInstance(workflowInstance.currentStates, null) as RootInstance)
         rootInstance.processor = this
         rootInstance.secrets = secrets
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
-            id = instance.id.toString(),
+            id = workflowInstance.workflowId.toString(),
             definition = LemlineJson.encodeToElement(workflow),
             input = rawInput,
             startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant())),
@@ -182,8 +183,8 @@ class Processor(
     /**
      * The current node instance in the workflow execution.
      */
-    var current: NodeInstance<*>? = nodeInstances[instance.initialPosition]
-        ?: error("node not found at initial position ${instance.initialPosition}")
+    var current: NodeInstance<*>? = nodeInstances[workflowInstance.currentPosition]
+        ?: error("node not found at initial position ${workflowInstance.currentPosition}")
 
     /**
      * Retrieves the current position in the workflow.
@@ -196,7 +197,7 @@ class Processor(
      *
      * @return A map of node positions to their corresponding node states.
      */
-    val state: WorkflowState
+    val state: NodeStates
         get() {
             val mapOfStates = mutableMapOf<NodePosition, NodeState>()
             fun collectStates(nodeInstance: NodeInstance<*>) {
@@ -206,7 +207,7 @@ class Processor(
                 nodeInstance.children.forEach { collectStates(it) }
             }
             collectStates(rootInstance)
-            return WorkflowState(mapOfStates)
+            return NodeStates(mapOfStates)
         }
 
     /**
@@ -385,7 +386,7 @@ class Processor(
      */
     @Suppress("UNCHECKED_CAST")
     private fun Node<*>.createInstance(
-        initialState: WorkflowState,
+        initialState: NodeStates,
         parent: NodeInstance<*>?,
     ): NodeInstance<*> = when (task) {
         is RootTask -> RootInstance(this as Node<RootTask>)
@@ -493,10 +494,10 @@ class Processor(
      * @param message Lambda providing the log message.
      */
     private fun logDebug(e: Throwable? = null, message: () -> String) = withWorkflowContext(
-        workflowId = instance.id.toString(),
-        workflowName = instance.name,
-        workflowVersion = instance.version,
-        nodePosition = position.toString(),
+        workflowId = workflowInstance.workflowId,
+        workflowName = workflowInstance.workflowName,
+        workflowVersion = workflowInstance.workflowVersion,
+        currentPosition = position,
     ) {
         logger.debug(e, message)
     }
@@ -508,10 +509,10 @@ class Processor(
      * @param message Lambda providing the log message.
      */
     private fun logInfo(e: Throwable? = null, message: () -> String) = withWorkflowContext(
-        workflowId = instance.id.toString(),
-        workflowName = instance.name,
-        workflowVersion = instance.version,
-        nodePosition = position.toString(),
+        workflowId = workflowInstance.workflowId,
+        workflowName = workflowInstance.workflowName,
+        workflowVersion = workflowInstance.workflowVersion,
+        currentPosition = position,
     ) {
         logger.info(e, message)
     }
@@ -523,10 +524,10 @@ class Processor(
      * @param message Lambda providing the log message.
      */
     private fun logWarn(e: Throwable? = null, message: () -> String) = withWorkflowContext(
-        workflowId = instance.id.toString(),
-        workflowName = instance.name,
-        workflowVersion = instance.version,
-        nodePosition = position.toString(),
+        workflowId = workflowInstance.workflowId,
+        workflowName = workflowInstance.workflowName,
+        workflowVersion = workflowInstance.workflowVersion,
+        currentPosition = position,
     ) {
         logger.warn(e, message)
     }
@@ -539,10 +540,10 @@ class Processor(
      */
     private fun logError(e: Throwable? = null, message: () -> String) {
         withWorkflowContext(
-            workflowId = instance.id.toString(),
-            workflowName = instance.name,
-            workflowVersion = instance.version,
-            nodePosition = position.toString(),
+            workflowId = workflowInstance.workflowId,
+            workflowName = workflowInstance.workflowName,
+            workflowVersion = workflowInstance.workflowVersion,
+            currentPosition = position,
         ) {
             logger.error(e, message)
         }
@@ -563,5 +564,5 @@ class Processor(
      * @throws IllegalStateException Always thrown with the provided message.
      */
     private fun error(message: Any): Nothing =
-        throw IllegalStateException("Workflow ${instance.name} (version ${instance.version})): $message")
+        throw IllegalStateException("Workflow ${workflowInstance.workflowName} (version ${workflowInstance.workflowVersion})): $message")
 }

@@ -2,7 +2,7 @@
 package com.lemline.runner.models
 
 import com.lemline.common.flexible.LazyParsedField
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.workflows.NodeStates
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import java.util.*
@@ -38,8 +38,8 @@ data class ParentOutboxModel(
      */
     fun completeWith(output: JsonElement) {
         // set the workflow output at the rawOutput at the current position of the workflow
-        val state = workflowState.apply { this[workflowPosition]!!.rawOutput = output }
-        instance = instance.copy(workflowState = LazyParsedField(state, WorkflowState.serializer()))
+        val state = nodeStates.apply { this[workflowPosition]!!.rawOutput = output }
+        instance = instance.copy(nodeStates = LazyParsedField(state, NodeStates.serializer()))
         // Set delayedUntil to restart parent workflow via the ParentOutbox
         val now = Clock.System.now()
         outboxScheduledFor = now

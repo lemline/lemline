@@ -447,9 +447,7 @@ class CallHttpTest {
         }
 
         // Run the workflow
-        shouldThrow<TaskCompletedException> {
-            instance.run()
-        }
+        shouldThrow<TaskCompletedException> { instance.run() }
 
         // Verify there was no Error
         instance.status shouldBe WorkflowStatus.RUNNING

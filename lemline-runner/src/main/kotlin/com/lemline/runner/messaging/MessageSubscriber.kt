@@ -5,6 +5,7 @@ import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.logger
 import com.lemline.common.warn
+import com.lemline.runner.models.WorkflowIdentification
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import java.util.concurrent.atomic.AtomicBoolean
@@ -25,12 +26,12 @@ import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 
 @ExperimentalTime
-internal abstract class MessageSubscriber() : Subscriber<Message<String>> {
+internal abstract class MessageSubscriber<T : WorkflowIdentification>() : Subscriber<Message<String>> {
 
     abstract val maxConcurrency: Long
     abstract val enabled: Boolean
     abstract val publisher: Publisher<Message<String>>
-    abstract val handler: MessageHandler
+    abstract val handler: MessageHandler<T>
     abstract val metrics: MessageSubscriberMetrics
 
     val logger = logger()

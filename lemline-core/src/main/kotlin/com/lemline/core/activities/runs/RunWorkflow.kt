@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.runs
 
-import com.lemline.common.ids.IdGenerator
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.instances.RunInstance
 import com.lemline.core.processor.Processor
+import com.lemline.core.workflows.WorkflowId
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import io.serverlessworkflow.api.types.RunWorkflow
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.launch
@@ -15,8 +17,8 @@ import kotlinx.serialization.json.JsonElement
 internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElement {
     logDebug { "Executing run workflow command: ${node.name}" }
 
-    val subWorkflowName = runWorkflow.workflow.name
-    val subWorkflowVersion = runWorkflow.workflow.version
+    val subWorkflowName = WorkflowName(runWorkflow.workflow.name)
+    val subWorkflowVersion = WorkflowVersion(runWorkflow.workflow.version)
 
     logDebug { "Sub-workflow name: $subWorkflowName, version: $subWorkflowVersion" }
 
@@ -32,7 +34,7 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
     val subProcessor: Processor = Processor.createNew(
         name = subWorkflowName,
         version = subWorkflowVersion,
-        id = IdGenerator.generateV7(),
+        id = WorkflowId.new(),
         rawInput = childWorkflowInput,
         secrets = rootInstance.secrets,
         activityRunnerProvider = processor.activityRunnerProvider,
@@ -45,25 +47,25 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
                 subProcessor.run()
             } catch (e: Exception) {
                 // It's important to log errors from async workflows.
-                logError(e) { "Asynchronous sub-workflow ${subProcessor.instance.id} failed." }
+                logError(e) { "Asynchronous sub-workflow ${subProcessor.workflowInstance.workflowId} failed." }
             }
         }
-        logInfo { "Launched sub-workflow ${subProcessor.instance.id} asynchronously." }
+        logInfo { "Launched sub-workflow ${subProcessor.workflowInstance.workflowId} asynchronously." }
         // As per DSL, output for await: false is the transformed input
         return transformedInput
     }
 
     // For awaiting execution, run the sub-workflow and handle its result or exception.
-    logInfo { "Starting sub-workflow instance ${subProcessor.instance.id} and awaiting completion." }
+    logInfo { "Starting sub-workflow instance ${subProcessor.workflowInstance.workflowId} and awaiting completion." }
 
     try {
         // The run() method now returns the result directly on success.
         val subWorkflowResult = subProcessor.run()
-        logInfo { "Sub-workflow ${subProcessor.instance.id} finished successfully." }
+        logInfo { "Sub-workflow ${subProcessor.workflowInstance.workflowId} finished successfully." }
         return subWorkflowResult
     } catch (e: WorkflowException) {
         // If run() throws an exception, the sub-workflow has faulted.
-        logError(e) { "Sub-workflow ${subProcessor.instance.id} faulted." }
+        logError(e) { "Sub-workflow ${subProcessor.workflowInstance.workflowId} faulted." }
         // Propagate the error to the parent workflow.
         raiseError(
             WorkflowErrorType.RUNTIME,

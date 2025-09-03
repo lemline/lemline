@@ -136,7 +136,7 @@ internal class StepByStepRunner @Inject constructor(
      * Handles the completion of the workflow instance.
      */
     private suspend fun Processor.onWorkflowCompleted(output: JsonElement, isScheduledAfter: Boolean) =
-        with(instance as InstanceMessage) {
+        with(workflowInstance as InstanceMessage) {
             // Case of child workflow completion
             parentId?.let { parentId ->
                 // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
@@ -197,5 +197,5 @@ internal class StepByStepRunner @Inject constructor(
     }
 
     private val Processor.updatedInstanceMessage
-        get() = (instance as InstanceMessage).updateWith(state, position!!)
+        get() = (workflowInstance as InstanceMessage).updateWith(state, position!!)
 }

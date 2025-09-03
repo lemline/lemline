@@ -1,22 +1,71 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
+import com.lemline.common.LogContext
 import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.info
 import com.lemline.common.warn
+import com.lemline.common.withLoggingContext
+import com.lemline.runner.models.WorkflowIdentification
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
 import kotlin.time.ExperimentalTime
+import org.eclipse.microprofile.reactive.messaging.Message
 import org.eclipse.microprofile.reactive.messaging.Message as ReactiveMessage
+import org.slf4j.Logger
 
 @ExperimentalTime
-internal interface MessageHandler {
-    suspend fun handleMessage(message: ReactiveMessage<String>)
+internal interface MessageHandler<T : WorkflowIdentification> {
 
-    val logger: org.slf4j.Logger
+    suspend fun Message<String>.deserialize(): T
+
+    suspend fun T.handle(): T?
+
+    suspend fun T.emit()
+
+    val logger: Logger
 
     val metrics: MessageSubscriberMetrics
+
+    val onComplete: (Message<String>, String?) -> Unit
+
+    val onFailure: (Message<String>, Throwable?) -> Unit
+
+    suspend fun handleMessage(message: Message<String>) {
+        try {
+            logger.debug { "Received: ${message.toLogString()}" }
+
+            // --- Deserialization ---
+            val msg = message.deserialize()
+            logger.debug { "Deserialized: ${message.toLogString()}" }
+
+            with(msg) {
+                withLoggingContext(
+                    LogContext.WORKFLOW_ID to id,
+                    LogContext.WORKFLOW_NAME to name,
+                    LogContext.WORKFLOW_VERSION to version,
+                    LogContext.NODE_POSITION to position,
+                ) {
+                    metrics.recordProcessingDuration(name, version) {
+                        // --- Processing ---
+                        val next = msg.handle()
+                        // --- Emit next message if any ---
+                        next?.emit()
+                        // --- Acknowledgment (Success Path) ---
+                        message.ack(name, version)
+                        logger.debug { "Processed: ${message.toLogString()}" }
+                        // For testing
+                        onComplete(message, next?.toJsonString())
+                    }
+                    metrics.processingCompleted(name, version)
+                }
+            }
+        } catch (e: DelegatedException) {
+            // For testing
+            onFailure(message, e)
+        }
+    }
 
     /**
      * Acknowledges a reactive message to indicate successful processing.
@@ -59,8 +108,10 @@ internal interface MessageHandler {
         }
     }
 
-
     companion object {
         const val UNKNOWN = "unknown"
     }
 }
+
+class DelegatedException(block: suspend () -> Unit) : RuntimeException()
+

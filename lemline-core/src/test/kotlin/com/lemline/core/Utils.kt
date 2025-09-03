@@ -4,10 +4,12 @@ package com.lemline.core
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.definitions.Definitions
 import com.lemline.core.processor.Processor
+import com.lemline.core.workflows.WorkflowId
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
-import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -33,7 +35,7 @@ internal fun getWorkflowProcessor(
     input: JsonElement,
     name: String = "workflow-${doYaml.hashCode()}",
     version: String = "0.1.0",
-    id: UUID = UUID.randomUUID(),
+    id: WorkflowId = WorkflowId.new(),
 ): Processor {
     val document =
         """document:
@@ -46,8 +48,8 @@ internal fun getWorkflowProcessor(
     Definitions.parseAndPut(workflowYaml)
 
     return Processor.createNew(
-        name = name,
-        version = version,
+        name = WorkflowName(name),
+        version = WorkflowVersion(version),
         id = id,
         rawInput = input,
     )

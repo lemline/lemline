@@ -6,6 +6,8 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.workflows.WorkflowIndex
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.core.workflows.index
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader
@@ -73,7 +75,7 @@ object Definitions {
      * @throws IllegalStateException if the workflow is not found.
      */
     @JvmStatic
-    fun getOrNull(name: String, version: String): Workflow? = workflowCache[name to version]
+    fun getOrNull(name: WorkflowName, version: WorkflowVersion): Workflow? = workflowCache[name to version]
 
     /**
      * Retrieves the root node of the given workflow.

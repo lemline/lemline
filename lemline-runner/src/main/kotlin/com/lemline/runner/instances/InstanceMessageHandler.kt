@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.instances
 
-import com.lemline.common.LogContext
 import com.lemline.common.debug
 import com.lemline.common.error
 import com.lemline.common.ids.IdGenerator
 import com.lemline.common.logger
 import com.lemline.common.warn
-import com.lemline.common.withLoggingContext
 import com.lemline.core.definitions.Definitions
 import com.lemline.core.processor.Processor
 import com.lemline.runner.StepByStepRunner
@@ -15,8 +13,8 @@ import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.ingestion.FailureIngestionMessage
 import com.lemline.runner.ingestion.IngestionMessageEmitter
 import com.lemline.runner.ingestion.RetryIngestionMessage
+import com.lemline.runner.messaging.DelegatedException
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.RETRY_TABLE
@@ -44,14 +42,14 @@ internal class InstanceMessageHandler(
     private val definitionRepository: DefinitionRepository,
     private val stepByStepRunner: StepByStepRunner,
     override val metrics: InstanceMessageSubscriberMetrics,
-) : MessageHandler {
+) : MessageHandler<InstanceMessage> {
     override val logger = logger()
 
     @TestOnly
-    internal var onComplete = { _: Message<String>, _: String? -> }
+    override var onComplete = { _: Message<String>, _: String? -> }
 
     @TestOnly
-    internal var onFailure = { _: Message<String>, _: Throwable? -> }
+    override var onFailure = { _: Message<String>, _: Throwable? -> }
 
     /**
      * Handles the entire lifecycle of an incoming reactive message. This includes deserialization,
@@ -60,65 +58,37 @@ internal class InstanceMessageHandler(
      * This function is designed to be resilient and will not throw exceptions, instead handling
      * failures by logging, recording metrics, and saving messages for retry or inspection.
      *
-     * @param message The raw reactive message from the messaging system.
      */
-    override suspend fun handleMessage(message: Message<String>) {
-        logger.debug { "Received: ${message.toLogString()}" }
+    override suspend fun InstanceMessage.handle(): InstanceMessage? {
+        // --- Get Workflow Definition ---
+        val workflow = findWorkflowDefinition()
+        // --- Get secrets for this workflow ---
+        val secrets = findSecrets(workflow)
+        // --- Get an instance of this workflow ---
+        val workflowInstance = getWorkflowProcessor(secrets)
+        // --- Run this instance ---
+        return run(workflowInstance)
 
-        // --- Deserialization ---
-        val instanceMessage = message.deserialize() ?: return
-        logger.debug { "Deserialized: ${message.toLogString()}" }
-
-        try {
-            with(instanceMessage) {
-                metrics.recordProcessingDuration(workflowName, workflowVersion) {
-                    withLoggingContext(
-                        LogContext.WORKFLOW_ID to workflowId.toString(),
-                        LogContext.WORKFLOW_NAME to workflowName,
-                        LogContext.WORKFLOW_VERSION to workflowVersion,
-                        LogContext.NODE_POSITION to workflowPosition.serialized,
-                    ) {
-                        // --- Get Workflow Definition ---
-                        val workflow = findWorkflowDefinition()
-                        // --- Get secrets for this workflow ---
-                        val secrets = findSecrets(workflow)
-                        // --- Get an instance of this workflow ---
-                        val workflowInstance = getWorkflowProcessor(secrets)
-                        // --- Run this instance ---
-                        val nextMessage = run(workflowInstance)
-                        // --- Emit next message if any ---
-                        nextMessage?.emit()
-                        // --- Acknowledgment (Success Path) ---
-                        message.ack(workflowName, workflowVersion)
-                        logger.debug { "Processed: ${message.toLogString()}" }
-                        // For testing
-                        onComplete(message, nextMessage?.toJsonString())
-                    }
-                    metrics.processingCompleted(workflowName, workflowVersion)
-                }
-            }
-        } catch (e: ProcessingException) {
-            // For testing
-            onFailure(message, e.cause)
-        }
     }
 
     /**
      * Deserializes the message payload. Returns the Message object on success, or null on failure.
      * Handles its own metrics, logging, and persistence of failed messages.
      */
-    private suspend fun Message<String>.deserialize(): InstanceMessage? = try {
+    @Throws(DelegatedException::class)
+    override suspend fun Message<String>.deserialize(): InstanceMessage = try {
         metrics.recordDeserializationDuration {
             InstanceMessage.fromMessage(this)
         }.also {
             metrics.deserializationCompleted(it.workflowName, it.workflowVersion)
         }
     } catch (e: Exception) {
-        logger.error(e) { "Failed to deserialize message: ${toLogString()}" }
-        metrics.deserializationFailed(e)
-        // Deserialization failure is fatal for this message. Save and ACK.
-        deserializationFailed(e)
-        null
+        throw DelegatedException {
+            logger.error(e) { "Failed to deserialize message: ${toLogString()}" }
+            metrics.deserializationFailed(e)
+            // Deserialization failure is fatal for this message. Save and ACK.
+            deserializationFailed(e)
+        }
     }
 
     /**
@@ -129,6 +99,7 @@ internal class InstanceMessageHandler(
      * If the workflow is still not found,
      * metrics are updated to reflect the failure, and the message is saved for manual inspection.
      */
+    @Throws(DelegatedException::class)
     private suspend fun InstanceMessage.findWorkflowDefinition(): Workflow = try {
         // Try to get from cache first, then from repository if not found
         Definitions.getOrNull(workflowName, workflowVersion)
@@ -136,16 +107,16 @@ internal class InstanceMessageHandler(
                 ?.definition
                 ?.let { Definitions.parseAndPut(it) }
     } catch (e: Exception) {
-        logger.error(e) { "Error during workflow definition retrieval" }
-        metrics.processingFailed(e, workflowName, workflowVersion)
-        saveForRetry(e)
-        throw ProcessingException(e)
-    } ?: run {
+        throw DelegatedException {
+            logger.error(e) { "Error during workflow definition retrieval" }
+            metrics.processingFailed(e, workflowName, workflowVersion)
+            saveForRetry(e)
+        }
+    } ?: throw DelegatedException {
         // If `workflow` is null
         metrics.processingFailed(FailureReasons.DEFINITION_NOT_FOUND, workflowName, workflowVersion)
         val cause = IllegalStateException("Workflow ${workflowName}:${workflowVersion} not found")
         saveAsFailed(cause)
-        throw ProcessingException(cause)
     }
 
     /**
@@ -154,15 +125,17 @@ internal class InstanceMessageHandler(
      * If an error occurs while getting the secrets, the error is logged,
      * metrics are updated to reflect the failure, and the message is saved for manual inspection.
      */
+    @Throws(DelegatedException::class)
     private suspend fun InstanceMessage.findSecrets(
         workflow: Workflow,
     ): Map<String, JsonElement> = try {
         Secrets.getForWorkflow(workflow)
     } catch (e: Exception) {
-        logger.error(e) { "Unable to retrieve needed secret. Storing the message in the $RETRY_TABLE table for manual inspection." }
-        metrics.processingFailed(FailureReasons.SECRETS_RETRIEVAL_FAILED, workflowName, workflowVersion)
-        saveAsFailed(e)
-        throw ProcessingException(e)
+        throw DelegatedException {
+            logger.error(e) { "Unable to retrieve needed secret. Storing the message in the $RETRY_TABLE table for manual inspection." }
+            metrics.processingFailed(FailureReasons.SECRETS_RETRIEVAL_FAILED, workflowName, workflowVersion)
+            saveAsFailed(e)
+        }
     }
 
     /**
@@ -171,15 +144,17 @@ internal class InstanceMessageHandler(
      * If an error occurs while constructing the instance, the error is logged,
      * metrics are updated to reflect the failure, and the message is saved for manual inspection.
      */
+    @Throws(DelegatedException::class)
     private suspend fun InstanceMessage.getWorkflowProcessor(
         secrets: Map<String, JsonElement>
     ): Processor = try {
-        Processor(instance = this, secrets = secrets)
+        Processor(workflowInstance = this, secrets = secrets)
     } catch (e: Exception) {
-        logger.error(e) { "Failed to convert the message to a workflow processor. Storing it in the $RETRY_TABLE table for manual inspection." }
-        metrics.processingFailed(e, workflowName, workflowVersion)
-        saveAsFailed(e)
-        throw ProcessingException(e)
+        throw DelegatedException {
+            logger.error(e) { "Failed to convert the message to a workflow processor. Storing it in the $RETRY_TABLE table for manual inspection." }
+            metrics.processingFailed(e, workflowName, workflowVersion)
+            saveAsFailed(e)
+        }
     }
 
     /**
@@ -189,14 +164,21 @@ internal class InstanceMessageHandler(
      * If execution fails, it logs the failure, updates processing metrics, and stores the message
      * in the retry table for manual inspection.
      */
+    @Throws(DelegatedException::class)
+
     private suspend fun run(processor: Processor): InstanceMessage? {
         return try {
             with(stepByStepRunner) { run(processor) }
         } catch (e: Exception) {
-            logger.error(e) { "Failed to run instance. Storing current state in the $RETRY_TABLE table for manual inspection." }
-            metrics.processingFailed(e, processor.instance.name, processor.instance.version)
-            processor.runFailed(e)
-            throw ProcessingException(e)
+            throw DelegatedException {
+                logger.error(e) { "Failed to run instance. Storing current state in the $RETRY_TABLE table for manual inspection." }
+                metrics.processingFailed(
+                    e,
+                    processor.workflowInstance.workflowName,
+                    processor.workflowInstance.workflowVersion
+                )
+                processor.runFailed(e)
+            }
         }
     }
 
@@ -208,17 +190,18 @@ internal class InstanceMessageHandler(
      * and the message is stored in the retry table for reprocessing.
      * The method ensures that no unhandled exceptions are propagated.
      */
-    private suspend fun InstanceMessage.emit() = try {
+    override suspend fun InstanceMessage.emit() = try {
         logger.debug { "Emitting next message: $this" }
         instanceEmitter.send(this)
     } catch (e: Exception) {
-        logger.warn(e) { "Failed to emit next message. Message will be stored in the $RETRY_TABLE table instead to be re-emit later" }
-        metrics.processingFailed(FailureReasons.MESSAGE_EMISSION_ERROR, workflowName, workflowVersion)
-        saveForRetry(e)
-        throw ProcessingException(e)
+        throw DelegatedException {
+            logger.warn(e) { "Failed to emit next message. Message will be stored in the $RETRY_TABLE table instead to be re-emit later" }
+            metrics.processingFailed(FailureReasons.MESSAGE_EMISSION_ERROR, workflowName, workflowVersion)
+            saveForRetry(e)
+        }
     }
 
-    private suspend fun Message<String>.deserializationFailed(cause: Exception) = try {
+    private suspend fun Message<String>.deserializationFailed(cause: Exception) {
         val failure = FailureIngestionMessage.from(
             id = IdGenerator.generateV7(),
             payload = payload,
@@ -226,35 +209,24 @@ internal class InstanceMessageHandler(
             reason = FailureReasons.DESERIALISATION_ERROR
         )
         ingestionEmitter.send(failure)
-        // as the responsibility of the message is transferred to the database, we acknowledge the message
-        ack(UNKNOWN, UNKNOWN)
-    } catch (e: Exception) {
-        logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: ${toLogString()}" }
-        nack(e, UNKNOWN, UNKNOWN)
     }
 
     private suspend fun Processor.runFailed(cause: Exception) {
-        (instance as InstanceMessage)
+        (workflowInstance as InstanceMessage)
             .updateWith(state, position!!)
             .saveAsFailed(cause)
     }
 
-    private suspend fun InstanceMessage.saveAsFailed(cause: Exception) = try {
+    private suspend fun InstanceMessage.saveAsFailed(cause: Exception) {
         val failure = FailureIngestionMessage.from(
             id = IdGenerator.generateV7(),
             instance = this,
             error = cause,
         )
         ingestionEmitter.send(failure)
-        // as the responsibility of the message is transferred to the database, we acknowledge the message
-        message.ack(workflowName, workflowVersion)
-    } catch (e: Exception) {
-        logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: $this" }
-        message.nack(e, workflowName, workflowVersion)
     }
 
-    private suspend fun InstanceMessage.saveForRetry(cause: Exception) = try {
-        // save the next message for re-emission
+    private suspend fun InstanceMessage.saveForRetry(cause: Exception) {
         val retry = RetryIngestionMessage.from(
             id = IdGenerator.generateV7(),
             instance = this,
@@ -262,21 +234,7 @@ internal class InstanceMessageHandler(
             error = cause
         )
         ingestionEmitter.send(retry)
-        // as the responsibility of the message is transferred to the database, we acknowledge the message
-        message.ack(workflowName, workflowVersion)
-    } catch (e: Exception) {
-        logger.error(e) { "Failed to insert next message for retry, neg-acknowledging the initial message: ${message.toLogString()}" }
-        message.nack(e, workflowName, workflowVersion)
     }
 
-    // For testing purposes
-    //private val processingMessages = ConcurrentHashMap<String, CompletableFuture<String?>>()
-
-    // For testing purposes
-//    @TestOnly
-//    internal fun waitForProcessing(msg: String): CompletableFuture<String?> =
-//        processingMessages.computeIfAbsent(msg) { CompletableFuture() }
-
     internal class ProcessingException(cause: Throwable) : RuntimeException(cause)
-    internal class DelegatedException(cause: Throwable, block: () -> Unit) : RuntimeException(cause)
 }

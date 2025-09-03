@@ -5,8 +5,8 @@ import com.lemline.common.flexible.LazyParsedField
 import com.lemline.common.ids.IdGenerator
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
+import com.lemline.core.workflows.NodeStates
 import com.lemline.core.workflows.WorkflowInstance
-import com.lemline.core.workflows.WorkflowState
 import com.lemline.runner.messaging.JsonSerializable
 import java.util.*
 import kotlin.time.ExperimentalTime
@@ -22,7 +22,7 @@ import org.eclipse.microprofile.reactive.messaging.Message
  *
  * @property workflowName The name of the workflow.
  * @property workflowVersion The version of the workflow.
- * @property workflowState A map of the internal initial states (per position).
+ * @property nodeStates A map of the internal initial states (per position).
  * @property workflowPosition The current active initial position
  */
 @ExperimentalTime
@@ -31,15 +31,15 @@ data class InstanceMessage(
     /**
      * The ID of the workflow.
      */
-    @SerialName("i") @Contextual val workflowId: UUID,
+    @SerialName("i") @Contextual override val workflowId: UUID,
     /**
      * The name of the workflow.
      */
-    @SerialName("n") val workflowName: String,
+    @SerialName("n") override val workflowName: String,
     /**
      * The version of the workflow.
      */
-    @SerialName("v") val workflowVersion: String,
+    @SerialName("v") override val workflowVersion: String,
     /**
      * The current active initial position
      */
@@ -47,27 +47,25 @@ data class InstanceMessage(
     /**
      * A map of the internal initial states (per position)
      */
-    @SerialName("s") val workflowState: LazyParsedField<WorkflowState>,
+    @SerialName("s") val nodeStates: LazyParsedField<NodeStates>,
     /**
      * Indicates the id of the parent model describing the workflow waiting for this workflow completion, if any.
      */
     @SerialName("w") @Contextual val parentId: UUID? = null,
 ) : WorkflowInstance, JsonSerializable {
 
-    override val initialState by lazy { workflowState.parsed }
-    override val initialPosition by lazy { workflowPosition.parsed }
-    override val id by lazy { workflowId }
-    override val name by lazy { workflowName }
-    override val version by lazy { workflowVersion }
+    override val currentState by lazy { nodeStates.parsed }
+
+    override val currentPosition by lazy { workflowPosition.parsed }
 
     @Transient
     lateinit var message: Message<String>
 
     override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
-    fun updateWith(workflowState: WorkflowState, workflowPosition: NodePosition): InstanceMessage = copy(
+    fun updateWith(nodeStates: NodeStates, workflowPosition: NodePosition): InstanceMessage = copy(
         workflowPosition = LazyParsedField(workflowPosition, NodePosition.Companion.serializer()),
-        workflowState = LazyParsedField(workflowState, WorkflowState.Companion.serializer()),
+        nodeStates = LazyParsedField(nodeStates, NodeStates.Companion.serializer()),
     ).also { it.message = message }
 
     companion object {
@@ -76,14 +74,14 @@ data class InstanceMessage(
             workflowName: String,
             workflowVersion: String,
             workflowPosition: NodePosition,
-            workflowState: WorkflowState,
+            nodeStates: NodeStates,
             parentId: UUID?,
         ) = InstanceMessage(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
             workflowPosition = LazyParsedField(workflowPosition, NodePosition.Companion.serializer()),
-            workflowState = LazyParsedField(workflowState, WorkflowState.Companion.serializer()),
+            nodeStates = LazyParsedField(nodeStates, NodeStates.Companion.serializer()),
             parentId = parentId,
         )
 
@@ -99,7 +97,7 @@ data class InstanceMessage(
             workflowName = workflowName,
             workflowVersion = workflowVersion,
             workflowPosition = LazyParsedField(workflowPosition, NodePosition.Companion.serializer()),
-            workflowState = LazyParsedField(workflowState, WorkflowState.Companion.serializer()),
+            nodeStates = LazyParsedField(workflowState, NodeStates.Companion.serializer()),
             parentId = parentId,
         )
 
@@ -114,7 +112,7 @@ data class InstanceMessage(
             workflowName = workflowName,
             workflowVersion = workflowVersion,
             workflowPosition = NodePosition.root,
-            workflowState = WorkflowState.newInstance(workflowInput),
+            nodeStates = NodeStates.newInstance(workflowInput),
             parentId = parentId,
         )
 

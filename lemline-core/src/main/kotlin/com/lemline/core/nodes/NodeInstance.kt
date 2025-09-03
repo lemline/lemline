@@ -10,7 +10,6 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonElement
 import com.lemline.common.logger
 import com.lemline.common.warn
-import com.lemline.common.withWorkflowContext
 import com.lemline.core.errors.WorkflowError
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
@@ -23,8 +22,12 @@ import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.instances.RootInstance
 import com.lemline.core.instances.TryInstance
+import com.lemline.core.logger.withWorkflowContext
 import com.lemline.core.processor.Processor
 import com.lemline.core.schemas.SchemaValidator
+import com.lemline.core.workflows.WorkflowId
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
@@ -53,10 +56,10 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     private val logger = logger()
 
     private fun <T> withWorkflowContext(block: () -> T) = withWorkflowContext(
-        workflowId = rootInstance.workflowDescriptor.id,
-        workflowName = rootInstance.node.task.document.name,
-        workflowVersion = rootInstance.node.task.document.version,
-        nodePosition = node.position.toString(),
+        workflowId = WorkflowId.from(rootInstance.workflowDescriptor),
+        workflowName = WorkflowName(rootInstance.node.task.document.name),
+        workflowVersion = WorkflowVersion(rootInstance.node.task.document.version),
+        currentPosition = node.position,
         block = block,
     )
 

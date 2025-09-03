@@ -66,7 +66,7 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
                 stmt.setString(idx, entity.instance?.workflowPosition?.serialized)
             },
             WORKFLOW_STATE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.instance?.workflowState?.serialized)
+                stmt.setString(idx, entity.instance?.nodeStates?.serialized)
             },
             PARENT_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 setUuid(stmt, idx, entity.instance?.parentId)

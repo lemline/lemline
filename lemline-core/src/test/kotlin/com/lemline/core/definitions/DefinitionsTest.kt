@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.workflows
+package com.lemline.core.definitions
 
-import com.lemline.core.definitions.Definitions
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.utils.name
+import com.lemline.core.utils.version
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
+import com.lemline.core.workflows.index
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -21,7 +25,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
 
-class WorkflowsTest {
+class DefinitionsTest {
 
     private val sampleYamlWorkflow = """
         document:
@@ -125,7 +129,7 @@ class WorkflowsTest {
         workflow.shouldBeInstanceOf<Workflow>()
 
         // Verify the workflow is in the cache
-        val cachedWorkflow = Definitions.getOrNull(workflow.document.name, workflow.document.version)
+        val cachedWorkflow = Definitions.getOrNull(workflow.name, workflow.version)
         cachedWorkflow shouldNotBe null
         cachedWorkflow?.document?.name shouldBe workflow.document.name
 
@@ -160,7 +164,7 @@ class WorkflowsTest {
     @Test
     fun `getOrNull should return null for non-existent workflow`() {
         // When
-        val result = Definitions.getOrNull("non-existent", "1.0.0")
+        val result = Definitions.getOrNull(WorkflowName("non-existent"), WorkflowVersion("1.0.0"))
 
         // Then
         result shouldBe null
@@ -172,7 +176,7 @@ class WorkflowsTest {
         val workflow = Definitions.parseAndPut(sampleYamlWorkflow)
 
         // When
-        val result = Definitions.getOrNull(workflow.document.name, workflow.document.version)
+        val result = Definitions.getOrNull(workflow.name, workflow.version)
 
         // Then
         result shouldBe workflow
@@ -215,8 +219,8 @@ class WorkflowsTest {
     fun `workflow index should work correctly`() {
         // Given
         val workflow = Definitions.parseAndPut(sampleYamlWorkflow)
-        val workflowName = workflow.document.name
-        val workflowVersion = workflow.document.version
+        val workflowName = workflow.name
+        val workflowVersion = workflow.version
 
         // When
         val index = workflow.index
@@ -288,15 +292,15 @@ class WorkflowsTest {
 
         // Verify all workflows were cached correctly
         results.forEachIndexed { i, workflow ->
-            val name = workflow.document.name
-            val version = workflow.document.version
+            val name = workflow.name
+            val version = workflow.version
             val cachedWorkflow = Definitions.getOrNull(name, version)
 
             // Should be in cache
             cachedWorkflow shouldBe workflow
 
             // Name should match the expected pattern
-            name shouldBe "test-workflow-${i + 1}"
+            name.toString() shouldBe "test-workflow-${i + 1}"
         }
     }
 

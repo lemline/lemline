@@ -187,7 +187,7 @@ class TryCatchTest {
         """
         val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
-        instance.onTaskRetried {
+        instance.onTaskRetried { _, _ ->
             throw TaskRetriedException()
         }
 
@@ -236,7 +236,7 @@ class TryCatchTest {
         """
         val instance = getWorkflowProcessor(workflowYaml, JsonObject(mapOf()))
 
-        instance.onTaskRetried {
+        instance.onTaskRetried { _, _ ->
             throw TaskRetriedException()
         }
 

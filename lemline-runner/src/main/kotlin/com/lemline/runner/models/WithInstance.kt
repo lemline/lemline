@@ -2,7 +2,7 @@
 package com.lemline.runner.models
 
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.workflows.NodeStates
 import com.lemline.runner.instances.InstanceMessage
 import java.util.*
 import kotlin.time.ExperimentalTime
@@ -34,5 +34,5 @@ interface WithInstance : WithId {
     /**
      * A map of the internal initial states (per position)
      */
-    val workflowState: WorkflowState get() = instance!!.workflowState.parsed
+    val nodeStates: NodeStates get() = instance!!.nodeStates.parsed
 }

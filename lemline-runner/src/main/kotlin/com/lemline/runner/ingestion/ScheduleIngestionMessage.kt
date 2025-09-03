@@ -6,7 +6,7 @@ import com.cronutils.model.definition.CronDefinitionBuilder
 import com.cronutils.parser.CronParser
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.utils.toDuration
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.workflows.NodeStates
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.models.getNextCronExecutionInstant
@@ -95,7 +95,7 @@ data class ScheduleIngestionMessage(
                     workflowName = workflowName,
                     workflowVersion = workflowVersion,
                     workflowPosition = NodePosition.root,
-                    workflowState = WorkflowState.newInstance(workflowInput),
+                    nodeStates = NodeStates.newInstance(workflowInput),
                     parentId = null,
                 ),
                 scheduleEvery = scheduleEvery,

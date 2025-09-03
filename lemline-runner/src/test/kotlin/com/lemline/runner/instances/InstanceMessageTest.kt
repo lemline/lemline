@@ -4,7 +4,7 @@ package com.lemline.runner.instances
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.workflows.NodeStates
 import java.util.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -27,7 +27,7 @@ internal class InstanceMessageTest {
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
-            workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            nodeStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
             parentId = parentId
         )
 
@@ -46,7 +46,7 @@ internal class InstanceMessageTest {
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
-            workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            nodeStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
             parentId = UUID.randomUUID(),
         )
 
@@ -62,7 +62,7 @@ internal class InstanceMessageTest {
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
-            workflowState = WorkflowState(
+            nodeStates = NodeStates(
                 mapOf(
                     NodePosition.root to NodeState(
                         rawInput = JsonObject(mapOf("test" to JsonPrimitive("value"))),
@@ -98,18 +98,18 @@ internal class InstanceMessageTest {
         val instanceMessage = InstanceMessage.forNewWorkflow(id, name, version, input)
 
         // Then
-        val expectedStates = WorkflowState(
+        val expectedStates = NodeStates(
             mapOf(
                 NodePosition.root to NodeState(
                     rawInput = input,
-                    startedAt = instanceMessage.workflowState.parsed[NodePosition.root]!!.startedAt,
+                    startedAt = instanceMessage.nodeStates.parsed[NodePosition.root]!!.startedAt,
                 ),
             )
         )
 
         Assertions.assertEquals(name, instanceMessage.workflowName)
         Assertions.assertEquals(version, instanceMessage.workflowVersion)
-        Assertions.assertEquals(expectedStates, instanceMessage.workflowState.parsed)
+        Assertions.assertEquals(expectedStates, instanceMessage.nodeStates.parsed)
         Assertions.assertEquals(NodePosition.root, instanceMessage.workflowPosition.parsed)
     }
 }

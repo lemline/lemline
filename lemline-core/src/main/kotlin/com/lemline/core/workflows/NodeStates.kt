@@ -11,13 +11,13 @@ import kotlinx.serialization.json.JsonElement
 @ExperimentalTime
 @Serializable
 @JvmInline
-value class WorkflowState(private val state: Map<NodePosition, NodeState>) {
+value class NodeStates(private val state: Map<NodePosition, NodeState>) {
 
     operator fun get(key: NodePosition): NodeState? = state[key]
 
     companion object {
         fun newInstance(rawInput: JsonElement) =
-            WorkflowState(
+            NodeStates(
                 mapOf(
                     NodePosition.root to NodeState(rawInput = rawInput, startedAt = Clock.System.now()),
                 ),

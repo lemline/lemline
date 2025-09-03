@@ -150,7 +150,7 @@ class InstanceStartCommandTest {
                 put("number", 123)
             }
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
         }
 
         @Test
@@ -169,7 +169,7 @@ class InstanceStartCommandTest {
                 })
             }
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
         }
 
         @Test
@@ -186,7 +186,7 @@ class InstanceStartCommandTest {
                 put("'number'", 123)
             }
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
         }
 
         @Test
@@ -203,7 +203,7 @@ class InstanceStartCommandTest {
                 put("number", 123)
             }
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
         }
     }
 
@@ -224,7 +224,7 @@ class InstanceStartCommandTest {
                 add(JsonPrimitive("four"))
             }
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
         }
 
         @Test
@@ -245,7 +245,7 @@ class InstanceStartCommandTest {
                 })
             }
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe expectedJson
         }
     }
 
@@ -259,7 +259,7 @@ class InstanceStartCommandTest {
             // When & Then
             val sentMessage = executeCommandAndVerify(workflowName, workflowVersion, "--input", inputJsonString)
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive("just a string")
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive("just a string")
         }
 
         @Test
@@ -270,7 +270,7 @@ class InstanceStartCommandTest {
             // When & Then
             val sentMessage = executeCommandAndVerify(workflowName, workflowVersion, "--input", inputJsonString)
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive(42)
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive(42)
         }
 
         @Test
@@ -281,7 +281,7 @@ class InstanceStartCommandTest {
             // When & Then
             val sentMessage = executeCommandAndVerify(workflowName, workflowVersion, "--input", inputJsonString)
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive("'42'")
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive("'42'")
         }
 
         @Test
@@ -292,7 +292,7 @@ class InstanceStartCommandTest {
             // When & Then
             val sentMessage = executeCommandAndVerify(workflowName, workflowVersion, "--input", inputJsonString)
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive("42")
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive("42")
         }
 
         @Test
@@ -303,7 +303,7 @@ class InstanceStartCommandTest {
             // When & Then
             val sentMessage = executeCommandAndVerify(workflowName, workflowVersion, "--input", inputJsonString)
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive(true)
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive(true)
         }
 
         @Test
@@ -314,7 +314,7 @@ class InstanceStartCommandTest {
             // When & Then
             val sentMessage = executeCommandAndVerify(workflowName, workflowVersion, "--input", inputJsonString)
 
-            sentMessage.workflowState.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive("true")
+            sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput shouldBe JsonPrimitive("true")
         }
     }
 
@@ -324,7 +324,7 @@ class InstanceStartCommandTest {
         val sentMessage = executeCommandAndVerify(workflowName, workflowVersion)
 
         // Get the raw input as a JsonElement
-        val rawInput = sentMessage.workflowState.parsed[NodePosition.root]?.rawInput
+        val rawInput = sentMessage.nodeStates.parsed[NodePosition.root]?.rawInput
 
         // When no input is provided, the command should use an empty JSON object
         rawInput shouldBe JsonObject(emptyMap())

@@ -3,7 +3,7 @@ package com.lemline.runner.ingestion
 
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.workflows.NodeStates
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import java.util.*
@@ -25,7 +25,7 @@ internal class IngestionMessageTest {
         workflowName = "test-workflow",
         workflowVersion = "1.0.0",
         workflowPosition = NodePosition.root,
-        workflowState = WorkflowState(
+        nodeStates = NodeStates(
             mapOf(
                 NodePosition.root to NodeState(
                     rawInput = JsonObject(mapOf("k" to JsonPrimitive("v"))),
@@ -122,7 +122,7 @@ internal class IngestionMessageTest {
             workflowName = "test-workflow",
             workflowVersion = "1.0.0",
             workflowPosition = NodePosition.root,
-            workflowState = WorkflowState(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+            nodeStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
             parentId = UUID.randomUUID(),
         )
 
