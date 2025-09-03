@@ -2,11 +2,11 @@
 CREATE TABLE IF NOT EXISTS lemline_failures
 (
     id                BINARY(16) PRIMARY KEY,
-    workflow_id       BINARY(16)   NOT NULL,
-    workflow_name     VARCHAR(255) NOT NULL,
-    workflow_version  VARCHAR(255) NOT NULL,
-    workflow_position TEXT         NOT NULL,
-    workflow_state    MEDIUMTEXT   NOT NULL,
+    workflow_id       BINARY(16),
+    workflow_name     VARCHAR(255),
+    workflow_version  VARCHAR(255),
+    workflow_position TEXT,
+    workflow_state    MEDIUMTEXT,
     parent_id         BINARY(16),
     payload           MEDIUMTEXT,
     reason            VARCHAR(255) NOT NULL,

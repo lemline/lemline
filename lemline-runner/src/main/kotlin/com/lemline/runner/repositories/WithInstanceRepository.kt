@@ -74,14 +74,17 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
         )
     }
 
-    protected fun ResultSet.getInstanceMessage() = InstanceMessage.fromStrings(
-        workflowId = getUuid(this, WORKFLOW_ID_COLUMN),
-        workflowName = getString(WORKFLOW_NAME_COLUMN),
-        workflowVersion = getString(WORKFLOW_VERSION_COLUMN),
-        workflowPosition = getString(WORKFLOW_POSITION_COLUMN),
-        workflowState = getString(WORKFLOW_STATE_COLUMN),
-        parentId = getUuid(this, PARENT_ID_COLUMN),
-    )
+    protected fun ResultSet.getInstanceMessage() = when (val id = getUuid(this, WORKFLOW_ID_COLUMN)) {
+        null -> null
+        else -> InstanceMessage.fromStrings(
+            workflowId = id,
+            workflowName = getString(WORKFLOW_NAME_COLUMN),
+            workflowVersion = getString(WORKFLOW_VERSION_COLUMN),
+            workflowPosition = getString(WORKFLOW_POSITION_COLUMN),
+            workflowState = getString(WORKFLOW_STATE_COLUMN),
+            parentId = getUuid(this, PARENT_ID_COLUMN),
+        )
+    }
 
     /**
      * Retrieves an entity by its WorkflowId.

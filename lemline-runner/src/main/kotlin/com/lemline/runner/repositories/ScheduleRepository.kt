@@ -62,7 +62,7 @@ class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
 
     override fun createModel(rs: ResultSet) = ScheduleOutboxModel(
         id = getUuid(rs, ID_COLUMN),
-        instance = rs.getInstanceMessage(),
+        instance = rs.getInstanceMessage()!!,
         scheduleAfter = rs.getString(SCHEDULE_AFTER_COLUMN),
         scheduleEvery = rs.getString(SCHEDULE_EVERY_COLUMN),
         scheduleCron = rs.getString(SCHEDULE_CRON_COLUMN),

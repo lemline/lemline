@@ -16,6 +16,8 @@ import com.lemline.runner.ingestion.FailureIngestionMessage
 import com.lemline.runner.ingestion.IngestionMessageEmitter
 import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.messaging.MessageHandler
+import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN
+import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.RETRY_TABLE
 import com.lemline.runner.secrets.Secrets
@@ -41,9 +43,9 @@ internal class InstanceMessageHandler(
     private val ingestionEmitter: IngestionMessageEmitter,
     private val definitionRepository: DefinitionRepository,
     private val stepByStepRunner: StepByStepRunner,
-    private val metrics: InstanceMessageSubscriberMetrics,
+    override val metrics: InstanceMessageSubscriberMetrics,
 ) : MessageHandler {
-    val logger = logger()
+    override val logger = logger()
 
     @TestOnly
     internal var onComplete = { _: Message<String>, _: String? -> }
@@ -61,8 +63,11 @@ internal class InstanceMessageHandler(
      * @param message The raw reactive message from the messaging system.
      */
     override suspend fun handleMessage(message: Message<String>) {
+        logger.debug { "Received: ${message.toLogString()}" }
+
         // --- Deserialization ---
         val instanceMessage = message.deserialize() ?: return
+        logger.debug { "Deserialized: ${message.toLogString()}" }
 
         try {
             with(instanceMessage) {
@@ -85,6 +90,7 @@ internal class InstanceMessageHandler(
                         nextMessage?.emit()
                         // --- Acknowledgment (Success Path) ---
                         message.ack(workflowName, workflowVersion)
+                        logger.debug { "Processed: ${message.toLogString()}" }
                         // For testing
                         onComplete(message, nextMessage?.toJsonString())
                     }
@@ -108,7 +114,7 @@ internal class InstanceMessageHandler(
             metrics.deserializationCompleted(it.workflowName, it.workflowVersion)
         }
     } catch (e: Exception) {
-        logger.error(e) { "Failed to deserialize message: $payload" }
+        logger.error(e) { "Failed to deserialize message: ${toLogString()}" }
         metrics.deserializationFailed(e)
         // Deserialization failure is fatal for this message. Save and ACK.
         deserializationFailed(e)
@@ -223,7 +229,7 @@ internal class InstanceMessageHandler(
         // as the responsibility of the message is transferred to the database, we acknowledge the message
         ack(UNKNOWN, UNKNOWN)
     } catch (e: Exception) {
-        logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: ${this.payload}" }
+        logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: ${toLogString()}" }
         nack(e, UNKNOWN, UNKNOWN)
     }
 
@@ -259,47 +265,8 @@ internal class InstanceMessageHandler(
         // as the responsibility of the message is transferred to the database, we acknowledge the message
         message.ack(workflowName, workflowVersion)
     } catch (e: Exception) {
-        logger.error(e) { "Failed to insert next message for retry, neg-acknowledging the initial message: ${message.payload}" }
+        logger.error(e) { "Failed to insert next message for retry, neg-acknowledging the initial message: ${message.toLogString()}" }
         message.nack(e, workflowName, workflowVersion)
-    }
-
-    /**
-     * Acknowledges a reactive message to indicate successful processing.
-     * If the acknowledgment fails, logs the error and increments the failure metrics counter.
-     *
-     * @param this The reactive message being acknowledged.
-     * @param workflowName The name of the workflow associated with the message.
-     * @param workflowVersion The version of the workflow associated with the message.
-     */
-    private fun Message<*>.ack(workflowName: String, workflowVersion: String) {
-        try {
-            logger.debug { "ACKing message: $payload" }
-            ack()
-            metrics.ackCompleted(workflowName, workflowVersion)
-        } catch (e: Exception) {
-            logger.error(e) { "CRITICAL: Failed to ACK message. Duplicate processing may occur: $payload" }
-            metrics.ackFailed(workflowName, workflowVersion)
-        }
-    }
-
-    /**
-     * Handles the negative acknowledgment (NACK) for a reactive message, including logging,
-     * metrics increment, and exception handling if the NACK operation fails.
-     *
-     * @param this The reactive message to be negatively acknowledged.
-     * @param reason The exception that triggered the negative acknowledgment.
-     * @param workflowName The name of the workflow associated with the message.
-     * @param workflowVersion The version of the workflow associated with the message.
-     */
-    private fun Message<*>.nack(reason: Exception, workflowName: String, workflowVersion: String) {
-        try {
-            logger.debug { "NACKing message: $payload" }
-            nack(reason)
-            metrics.nackCompleted(workflowName, workflowVersion)
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to NACK message. This message should be represented by brokers: $payload" }
-            metrics.nackFailed(workflowName, workflowVersion)
-        }
     }
 
     // For testing purposes
@@ -311,8 +278,5 @@ internal class InstanceMessageHandler(
 //        processingMessages.computeIfAbsent(msg) { CompletableFuture() }
 
     internal class ProcessingException(cause: Throwable) : RuntimeException(cause)
-
-    companion object {
-        private const val UNKNOWN = "unknown"
-    }
+    internal class DelegatedException(cause: Throwable, block: () -> Unit) : RuntimeException(cause)
 }

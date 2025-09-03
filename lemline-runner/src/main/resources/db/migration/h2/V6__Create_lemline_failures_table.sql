@@ -2,11 +2,11 @@
 CREATE TABLE IF NOT EXISTS lemline_failures
 (
     id                UUID PRIMARY KEY,
-    workflow_id       UUID                     NOT NULL,
-    workflow_name     VARCHAR(255)             NOT NULL,
-    workflow_version  VARCHAR(255)             NOT NULL,
-    workflow_position CLOB                     NOT NULL,
-    workflow_state    CLOB                     NOT NULL,
+    workflow_id       UUID,
+    workflow_name     VARCHAR(255),
+    workflow_version  VARCHAR(255),
+    workflow_position CLOB,
+    workflow_state    CLOB,
     parent_id         UUID,
     payload           CLOB,
     reason            VARCHAR(255)             NOT NULL,

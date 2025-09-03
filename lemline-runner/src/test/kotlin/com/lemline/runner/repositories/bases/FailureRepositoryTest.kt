@@ -63,6 +63,26 @@ internal abstract class FailureRepositoryTest {
     }
 
     @Test
+    fun `should insert and retrieve a failure with only payload`() = runTest {
+        val ex = IllegalStateException("boom")
+        val model = FailureModel.from(
+            id = IdGenerator.generateV7(),
+            payload = "payload",
+            error = ex,
+        )
+
+        repository.insert(model) shouldBe 1
+
+        // listAll should return the same model
+        val all = repository.listAll()
+        all shouldHaveSize 1
+        val retrieved = all.first()
+
+        // basic id and instance mapping
+        retrieved shouldBe model
+    }
+
+    @Test
     fun `should find failures by workflow id`() = runTest {
         val instance1 = sampleInstance()
         val instance2 = sampleInstance()

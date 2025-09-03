@@ -35,9 +35,20 @@ internal abstract class MessageSubscriber() : Subscriber<Message<String>> {
 
     val logger = logger()
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, throwable ->
-        logger.error(throwable) { "Unhandled coroutine exception in consumer" }
-    })
+    private val scope: CoroutineScope =
+        CoroutineScope(
+            Dispatchers.IO +
+                SupervisorJob() +
+                CoroutineExceptionHandler { _, throwable ->
+                    if (throwable is Exception && isConnectionError(throwable)) {
+                        logger.error(throwable) { "Critical connection error in consumer - triggering shutdown" }
+                        // Trigger a shutdown of the subscriber
+                        CoroutineScope(Dispatchers.Default).launch { onShutdown() }
+                    } else {
+                        logger.error(throwable) { "Unhandled coroutine exception in consumer" }
+                    }
+                })
+
 
     @PostConstruct
     fun init() {
@@ -79,31 +90,19 @@ internal abstract class MessageSubscriber() : Subscriber<Message<String>> {
     }
 
     override fun onNext(item: Message<String>) {
-        // Record metric as soon as the message is received from the stream.
-        metrics.received()
-
-        // Check if we are already shutting down before launching a new coroutine.
         if (isShutdown.get()) {
-            // The scope is shutting down. We cannot process this message.
-            // By not acknowledging or unacknowledging it, we rely on the broker's standard redelivery mechanism.
             logger.warn { "Received message after subscriber shutdown. It will be redelivered by the broker. Message: $item" }
-            return
-        }
+        } else {
+            scope.launch {
+                metrics.received()
+                metrics.incrementActive()
 
-        // Delegate the message processing to a coroutine.
-        scope.launch {
-            metrics.incrementActive()
-            try {
-                // Delegate the entire message lifecycle to the handler.
-                // The handler is responsible for processing, ack/nack, and its own error handling.
-                handler.handleMessage(item)
-            } catch (e: Exception) {
-                // This is a safety net. The handler should not throw exceptions.
-                // If it does, it indicates a bug in the handler's own try/catch logic.
-                logger.error(e) { "CRITICAL: Unhandled exception from message handler. The message's state is now unknown and it may be redelivered or lost. Message: ${item.payload}" }
-            } finally {
-                metrics.decrementActive()
-                requestNext()
+                try {
+                    handler.handleMessage(item)
+                } finally {
+                    metrics.decrementActive()
+                    requestNext()
+                }
             }
         }
     }
@@ -164,4 +163,28 @@ internal abstract class MessageSubscriber() : Subscriber<Message<String>> {
         }.join()
     }
 
+}
+
+private fun isConnectionError(e: Exception): Boolean = when (e) {
+    is java.io.IOException,
+    is java.util.concurrent.TimeoutException -> true
+
+    // Kafka specific exceptions
+    is org.apache.kafka.common.errors.NetworkException,
+    is org.apache.kafka.common.errors.DisconnectException,
+    is org.apache.kafka.common.errors.TimeoutException -> true
+
+    // RabbitMQ specific exceptions
+    is com.rabbitmq.client.ShutdownSignalException -> true
+
+    else -> {
+        // Recursive check for the cause
+        val cause = e.cause
+        when {
+            cause == null -> false
+            cause === e -> false  // Avoid infinite loop
+            cause is Exception -> isConnectionError(cause)
+            else -> false
+        }
+    }
 }

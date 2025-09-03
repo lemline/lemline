@@ -36,7 +36,7 @@ internal class WaitRepository : OutboxRepository<WaitOutboxModel>() {
     @ExperimentalTime
     override fun createModel(rs: ResultSet) = WaitOutboxModel(
         id = getUuid(rs, ID_COLUMN),
-        instance = rs.getInstanceMessage(),
+        instance = rs.getInstanceMessage()!!,
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
         outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
