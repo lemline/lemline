@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonElement
 data class ParentOutboxModel(
     override val id: IDV7,
 
-    override var instanceMessage: InstanceMessage,
+    override val instanceMessage: InstanceMessage,
 
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
@@ -27,19 +27,16 @@ data class ParentOutboxModel(
     override var outboxErrorMessage: String? = null,
 
     override var outboxErrorStackTrace: String? = null,
-) : OutboxModel {
+) : OutboxModel(instanceMessage) {
 
     /**
      * Completes the instance's state by setting the output at the current position.
      * Set also outboxScheduledFor as now to restart this workflow.
      */
     fun completeWith(output: JsonElement) {
-        // set the workflow output at the rawOutput at the current position of the workflow
-        val updatedStates =
-            instanceMessage.workflowInstance.currentStates.apply { this[currentPosition!!]!!.rawOutput = output }
-        instanceMessage =
-            instanceMessage.copy(workflowInstance = instanceMessage.workflowInstance.copy(currentStates = updatedStates))
-        // Set delayedUntil to restart parent workflow via the ParentOutbox
+        // Update the workflow state with the output
+        instanceMessage.workflowState.setCurrentTaskOutput(output)
+        // Set  to restart parent workflow via the ParentOutbox
         val now = Clock.System.now()
         outboxScheduledFor = now
         outboxDelayedUntil = now

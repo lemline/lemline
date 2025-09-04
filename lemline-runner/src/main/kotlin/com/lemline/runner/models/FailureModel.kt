@@ -4,6 +4,7 @@ package com.lemline.runner.models
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.LemlineMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
 
@@ -16,7 +17,7 @@ data class FailureModel(
     val errorClass: String,
     val errorMessage: String?,
     val errorStackTrace: String,
-) : WithInstance {
+) : LemlineMessage {
     companion object {
         fun from(
             id: IDV7,

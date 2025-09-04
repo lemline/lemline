@@ -1,12 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.core.nodes.NodePosition
-import com.lemline.core.workflows.NodeStates
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.LemlineMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
 import kotlin.time.ExperimentalTime
@@ -26,83 +22,60 @@ import kotlin.time.Instant
  * @see OutboxRelay for the processing logic
  */
 @ExperimentalTime
-interface OutboxModel : WithInstance {
+abstract class OutboxModel(open val instanceMessage: InstanceMessage) : LemlineMessage by instanceMessage {
 
-    override val instanceMessage: InstanceMessage
+    /**
+     * Unique identifier
+     */
+    abstract val id: IDV7
 
     /**
      * Current status of the message in the outbox. Possible values:
      * - PENDING: Message is ready to be processed
-     * - SENT: Message has been successfully processed
-     * - FAILED: Message has failed to be processed after maximum retry attempts
+     * - SENT: Relay has successfully processed this message, and it is safe to delete it from the outbox table
+     * - FAILED: Relay has failed to process this message after maximum retry attempts
      *
      * Messages with FAILED status are not processed, neither deleted, and must be manually handled
      *
      * @see OutBoxStatus for possible status values
      */
-    var outBoxStatus: OutBoxStatus
+    abstract var outBoxStatus: OutBoxStatus
 
     /**
-     * The specific timestamp indicating when a message or task is scheduled for processing or execution.
-     * If null, the message or task is not yet scheduled or has no specific scheduled time.
+     * The specific timestamp indicating when a message or task is scheduled for processing or execution by the outbox relay.
+     * If null, the message or task is not yet scheduled.
      */
-    var outboxScheduledFor: Instant?
+    abstract var outboxScheduledFor: Instant?
 
     /**
-     * Timestamp indicating when the message should be processed next.
-     * Used for implementing retry delays with exponential backoff.
+     * Timestamp indicating when the message should be processed next by the outbox relay.
+     * Used for retry by the outbox relay with exponential backoff.
      *
      * @see OutboxRelay for delay calculation
      */
-    var outboxDelayedUntil: Instant?
+    abstract var outboxDelayedUntil: Instant?
 
     /**
-     * Number of processing attempts made for this message.
-     * This counter is incremented each time processing fails.
+     * Number of processing attempts made for this message by the outbox relay.
+     * This counter is incremented each time the relay fails.
      * When it reaches the maximum configured attempts, the message is marked as FAILED.
      *
      * @see OutboxRelay.process for retry logic
      */
-    var outboxAttemptCount: Int
+    abstract var outboxAttemptCount: Int
 
     /**
-     * Class of the last exception that occurred during processing of this message.
+     * Class of the last exception that occurred during processing of this message by the outbox relay.
      */
-    var outboxErrorClass: String?
+    abstract var outboxErrorClass: String?
 
     /**
-     * Message of the last exception that occurred during processing of this message.
+     * Message of the last exception that occurred during processing of this message by the outbox relay.
      */
-    var outboxErrorMessage: String?
+    abstract var outboxErrorMessage: String?
 
     /**
-     * Stacktrace of the last exception that occurred during processing of this message.
+     * Stacktrace of the last exception that occurred during processing of this message by the outbox relay.
      */
-    var outboxErrorStackTrace: String?
-
-    /**
-     * The ID of the workflow.
-     */
-    override val workflowId: WorkflowId get() = super.workflowId!!
-
-    /**
-     * The name of the workflow.
-     */
-    override val workflowName: WorkflowName? get() = super.workflowName!!
-
-    /**
-     * The version of the workflow.
-     */
-    override val workflowVersion: WorkflowVersion get() = super.workflowVersion!!
-
-    /**
-     * The current active initial position
-     */
-    override val currentPosition: NodePosition get() = super.currentPosition!!
-
-    /**
-     * A map of the internal initial states (per position)
-     */
-    override val currentStates: NodeStates get() = super.currentStates!!
-
+    abstract var outboxErrorStackTrace: String?
 }

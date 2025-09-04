@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.models.DefinitionModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -59,11 +61,11 @@ class DefinitionRepository : Repository<DefinitionModel>() {
      * @param connection An optional database connection. If null, a new connection will be created.
      * @return A list of `WorkflowModel` instances matching the given name.
      */
-    suspend fun listByName(name: String, connection: Connection? = null): List<DefinitionModel> =
+    suspend fun listByName(name: WorkflowName, connection: Connection? = null): List<DefinitionModel> =
         withConnection(connection) {
             it.prepareStatement(listByNameSql).use { stmt ->
                 stmt.apply {
-                    setString(1, name)
+                    setString(1, name.toString())
                 }
                 stmt.executeQuery().use { rs ->
                     buildList {
@@ -85,12 +87,16 @@ class DefinitionRepository : Repository<DefinitionModel>() {
      * @param version The version of the workflow
      * @return The workflow model if found, null otherwise
      */
-    suspend fun findByNameAndVersion(name: String, version: String, connection: Connection? = null): DefinitionModel? =
+    suspend fun findByNameAndVersion(
+        name: WorkflowName,
+        version: WorkflowVersion,
+        connection: Connection? = null
+    ): DefinitionModel? =
         withConnection(connection) {
             it.prepareStatement(findByNameAndVersionSql).use { stmt ->
                 stmt.apply {
-                    setString(1, name)
-                    setString(2, version)
+                    setString(1, name.toString())
+                    setString(2, version.toString())
                 }
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) createModel(rs) else null

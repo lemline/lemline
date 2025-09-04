@@ -25,4 +25,4 @@ internal class InstanceMessageSubscriber(
     @param:Channel(WORKFLOWS_IN_CHANNEL) override val publisher: Publisher<Message<String>>,
     override val handler: InstanceMessageHandler,
     override val metrics: InstanceMessageSubscriberMetrics,
-) : MessageSubscriber()
+) : MessageSubscriber<InstanceMessage>()

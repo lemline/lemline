@@ -6,6 +6,7 @@ import com.lemline.common.error
 import com.lemline.common.logger
 import com.lemline.core.logger.withWorkflowContext
 import com.lemline.runner.failures.FailureReasons
+import com.lemline.runner.messaging.DelegatedException
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_NAME
 import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_VERSION
@@ -50,32 +51,16 @@ internal class IngestionMessageHandler(
      *
      * @param message The raw reactive message from the messaging system.
      */
-    override suspend fun handleMessage(message: Message<String>) {
-        logger.debug { "Received: ${message.toLogString()}" }
+    override suspend fun IngestionMessage.handle(): IngestionMessage? {
 
-        // --- Deserialization ---
-        val ingestionMessage = message.deserialize() ?: return
-
-        logger.debug { "Deserialized: ${message.toLogString()}" }
-
-        try {
-            with(ingestionMessage) {
-                metrics.recordProcessingDuration(workflowName, workflowVersion) {
-                    withWorkflowContext(workflowId, workflowName, workflowVersion, currentPosition) {
-                        when (ingestionMessage) {
-                            is ParentIngestionMessage -> ingestionMessage.save()
-                            is RetryIngestionMessage -> ingestionMessage.save()
-                            is ScheduleIngestionMessage -> ingestionMessage.save()
-                            is WaitIngestionMessage -> ingestionMessage.save()
-                            is FailureIngestionMessage -> ingestionMessage.save()
+                        when (this) {
+                            is ParentIngestionMessage -> save()
+                            is RetryIngestionMessage -> save()
+                            is ScheduleIngestionMessage -> save()
+                            is WaitIngestionMessage -> save()
+                            is FailureIngestionMessage -> save()
                         }
-                        // --- Acknowledgment (Success Path) ---
-                        message.ack(workflowName, workflowVersion)
-                    }
-                    metrics.processingCompleted(workflowName, workflowVersion)
-                }
-            }
-            logger.debug { "Processed: ${message.toLogString()}" }
+                       
         } catch (e: Exception) {
             // --- NegAcknowledgment (Failure Path) ---
             message.nack(e, ingestionMessage.workflowName, ingestionMessage.workflowVersion)
@@ -97,11 +82,12 @@ internal class IngestionMessageHandler(
             metrics.deserializationCompleted(it.workflowName, it.workflowVersion)
         }
     } catch (e: Exception) {
-        logger.error(e) { "Failed to deserialize message: ${toLogString()}" }
-        metrics.deserializationFailed(e)
-        // Deserialization failure is fatal for this message. Save and ACK.
-        deserializationFailed(e)
-        null
+        throw DelegatedException {
+            logger.error(e) { "Failed to deserialize message: ${toLogString()}" }
+            metrics.deserializationFailed(e)
+            // Deserialization failure is fatal for this message. Save and ACK.
+            deserializationFailed(e)
+        }
     }
 
     private suspend fun ParentIngestionMessage.save() {
@@ -132,10 +118,5 @@ internal class IngestionMessageHandler(
             error = cause
         )
         failureRepository.insert(failure)
-        // as the responsibility of the message is transferred to the database, we acknowledge the message
-        ack(UNKNOWN_NAME, UNKNOWN_VERSION)
-    } catch (e: Exception) {
-        logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: ${toLogString()}" }
-        nack(e, UNKNOWN_NAME, UNKNOWN_VERSION)
     }
 }

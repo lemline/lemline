@@ -3,8 +3,8 @@ package com.lemline.runner.repositories
 
 import com.lemline.core.workflows.WorkflowId
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.LemlineMessage
 import com.lemline.runner.models.IDV7
-import com.lemline.runner.models.WithInstance
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -42,7 +42,7 @@ import kotlin.time.ExperimentalTime
  */
 @Suppress("unused")
 @ExperimentalTime
-abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() {
+abstract class WithInstanceRepository<T : LemlineMessage> : WithIdRepository<T>() {
 
     companion object {
         internal const val WORKFLOW_ID_COLUMN = "workflow_id"
@@ -56,19 +56,19 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
         super.prepareStatementMap + mapOf(
             WORKFLOW_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setUuid(stmt, idx, entity.workflowId?.value)
+                setUuid(stmt, idx, entity.workflowState?.workflowId?.value)
             },
             WORKFLOW_NAME_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.workflowName?.toString())
+                stmt.setString(idx, entity.workflowState?.workflowName?.toString())
             },
             WORKFLOW_VERSION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.workflowVersion?.toString())
+                stmt.setString(idx, entity.workflowState?.workflowVersion?.toString())
             },
             WORKFLOW_POSITION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.currentPosition?.toString())
+                stmt.setString(idx, entity.workflowState?.currentPosition?.toString())
             },
             WORKFLOW_STATE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.currentStates?.toJsonString())
+                stmt.setString(idx, entity.workflowState?.currentStates?.toJsonString())
             },
             PARENT_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 setUuid(stmt, idx, entity.parentId?.value)

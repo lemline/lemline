@@ -8,7 +8,6 @@ import com.lemline.common.warn
 import com.lemline.core.logger.withWorkflowContext
 import com.lemline.core.workflows.WorkflowName
 import com.lemline.core.workflows.WorkflowVersion
-import com.lemline.runner.models.WithInstance
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
 import kotlin.time.ExperimentalTime
@@ -17,7 +16,7 @@ import org.eclipse.microprofile.reactive.messaging.Message as ReactiveMessage
 import org.slf4j.Logger
 
 @ExperimentalTime
-internal interface MessageHandler<T : WithInstance> {
+internal interface MessageHandler<T : LemlineMessage> {
 
     suspend fun Message<String>.deserialize(): T
 
@@ -41,22 +40,26 @@ internal interface MessageHandler<T : WithInstance> {
             val msg = message.deserialize()
             logger.debug { "Deserialized: ${message.toLogString()}" }
 
-            with(msg) {
-                withWorkflowContext(workflowId, workflowName, workflowVersion, currentPosition) {
-                    metrics.recordProcessingDuration(workflowName, version) {
-                        // --- Processing ---
-                        val next = msg.handle()
-                        // --- Emit next message if any ---
-                        next?.emit()
-                        // --- Acknowledgment (Success Path) ---
-                        message.ack(name, version)
-                        logger.debug { "Processed: ${message.toLogString()}" }
-                        // For testing
-                        onComplete(message, next?.toJsonString())
-                    }
-                    metrics.processingCompleted(name, version)
+            val workflowId = msg.workflowState?.workflowId
+            val workflowName = msg.workflowState?.workflowName
+            val workflowVersion = msg.workflowState?.workflowVersion
+            val currentPosition = msg.workflowState?.currentPosition
+
+            withWorkflowContext(workflowId, workflowName, workflowVersion, currentPosition) {
+                metrics.recordProcessingDuration(workflowName, workflowVersion) {
+                    // --- Processing ---
+                    val next = msg.handle()
+                    // --- Emit next message if any ---
+                    next?.emit()
+                    // --- Acknowledgment (Success Path) ---
+                    message.ack(workflowName, workflowVersion)
+                    logger.debug { "Processed: ${message.toLogString()}" }
+                    // For testing
+                    onComplete(message, next?.toJsonString())
                 }
+                metrics.processingCompleted(workflowName, workflowVersion)
             }
+
         } catch (e: DelegatedException) {
             // For testing
             onFailure(message, e)

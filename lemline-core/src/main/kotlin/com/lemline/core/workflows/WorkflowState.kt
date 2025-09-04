@@ -5,10 +5,11 @@ import com.lemline.core.nodes.NodePosition
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 @Serializable
 @ExperimentalTime
-data class WorkflowInstance(
+data class WorkflowState(
     /**
      * The ID of the workflow.
      */
@@ -28,9 +29,15 @@ data class WorkflowInstance(
      * The current position
      */
     @SerialName("p") val currentPosition: NodePosition,
-    
+
     /**
      * A map of the current states (per position)
      */
     @SerialName("s") val currentStates: NodeStates,
-)
+) {
+    fun setCurrentTaskOutput(output: JsonElement) {
+        currentStates[currentPosition]!!.rawOutput = output
+    }
+
+    fun duplicate(newId: WorkflowId): WorkflowState = copy(workflowId = newId)
+}

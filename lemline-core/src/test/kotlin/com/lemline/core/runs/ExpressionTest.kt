@@ -127,7 +127,7 @@ class ExpressionTest {
         workflowProcessor.run()
 
         val expected = WorkflowDescriptor(
-            id = workflowProcessor.workflowInstance.workflowId.toString(),
+            id = workflowProcessor.workflowState.workflowId.toString(),
             definition = JsonObject(mapOf()),
             input = JsonPrimitive(0),
             startedAt = JsonObject(mapOf()),

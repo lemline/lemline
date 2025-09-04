@@ -3,7 +3,6 @@ package com.lemline.runner.instances
 
 import com.lemline.common.debug
 import com.lemline.common.error
-import com.lemline.common.ids.IdGenerator
 import com.lemline.common.logger
 import com.lemline.common.warn
 import com.lemline.core.definitions.Definitions
@@ -16,6 +15,7 @@ import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.messaging.DelegatedException
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.toLogString
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.RETRY_TABLE
 import com.lemline.runner.secrets.Secrets
@@ -68,7 +68,6 @@ internal class InstanceMessageHandler(
         val workflowInstance = getWorkflowProcessor(secrets)
         // --- Run this instance ---
         return run(workflowInstance)
-
     }
 
     /**
@@ -113,7 +112,6 @@ internal class InstanceMessageHandler(
             saveForRetry(e)
         }
     } ?: throw DelegatedException {
-        // If `workflow` is null
         metrics.processingFailed(FailureReasons.DEFINITION_NOT_FOUND, workflowName, workflowVersion)
         val cause = IllegalStateException("Workflow ${workflowName}:${workflowVersion} not found")
         saveAsFailed(cause)
@@ -148,7 +146,7 @@ internal class InstanceMessageHandler(
     private suspend fun InstanceMessage.getWorkflowProcessor(
         secrets: Map<String, JsonElement>
     ): Processor = try {
-        Processor(workflowInstance = workflowInstance, secrets = secrets)
+        Processor(workflowState = workflowState, secrets = secrets)
     } catch (e: Exception) {
         throw DelegatedException {
             logger.error(e) { "Failed to convert the message to a workflow processor. Storing it in the $RETRY_TABLE table for manual inspection." }
@@ -165,7 +163,6 @@ internal class InstanceMessageHandler(
      * in the retry table for manual inspection.
      */
     @Throws(DelegatedException::class)
-
     private suspend fun run(processor: Processor): InstanceMessage? {
         return try {
             with(stepByStepRunner) { run(processor) }
@@ -174,8 +171,8 @@ internal class InstanceMessageHandler(
                 logger.error(e) { "Failed to run instance. Storing current state in the $RETRY_TABLE table for manual inspection." }
                 metrics.processingFailed(
                     e,
-                    processor.workflowInstance.workflowName,
-                    processor.workflowInstance.workflowVersion
+                    processor.workflowState.workflowName,
+                    processor.workflowState.workflowVersion
                 )
                 processor.runFailed(e)
             }
@@ -203,7 +200,7 @@ internal class InstanceMessageHandler(
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) {
         val failure = FailureIngestionMessage.from(
-            id = IdGenerator.generateV7(),
+            id = IDV7.from(this),
             payload = payload,
             error = cause,
             reason = FailureReasons.DESERIALISATION_ERROR
@@ -212,14 +209,14 @@ internal class InstanceMessageHandler(
     }
 
     private suspend fun Processor.runFailed(cause: Exception) {
-        (workflowInstance as InstanceMessage)
+        (workflowState as InstanceMessage)
             .updateWith(position!!, state)
             .saveAsFailed(cause)
     }
 
     private suspend fun InstanceMessage.saveAsFailed(cause: Exception) {
         val failure = FailureIngestionMessage.from(
-            id = IdGenerator.generateV7(),
+            id = IDV7.from(this.message),
             instance = this,
             error = cause,
         )
@@ -228,13 +225,11 @@ internal class InstanceMessageHandler(
 
     private suspend fun InstanceMessage.saveForRetry(cause: Exception) {
         val retry = RetryIngestionMessage.from(
-            id = IdGenerator.generateV7(),
+            id = IDV7.from(this.message),
             instance = this,
             outboxScheduledFor = Clock.System.now(), // <- TODO check first date
             error = cause
         )
         ingestionEmitter.send(retry)
     }
-
-    internal class ProcessingException(cause: Throwable) : RuntimeException(cause)
 }

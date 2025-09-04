@@ -45,7 +45,7 @@ data class ScheduleOutboxModel(
 
     val scheduleZone: String?,
 
-    ) : OutboxModel {
+    ) : OutboxModel(instanceMessage) {
 
     val after: Duration? by lazy { scheduleAfter?.let { Duration.parse(it) } }
 
@@ -61,7 +61,7 @@ data class ScheduleOutboxModel(
      *
      * This is called by [com.lemline.runner.outbox.ScheduleOutbox], before sending the related message
      */
-    internal fun updateBeforeProcessing() {
+    internal fun prepareNextScheduled(newId: WorkflowId) {
         // Reset the attempt counter
         outboxAttemptCount = 0
         // Calculate the next scheduled execution time
@@ -78,8 +78,7 @@ data class ScheduleOutboxModel(
         }
         // set a new id for the next workflow instance
         instanceMessage = instanceMessage.copy(
-            workflowInstance = instanceMessage.workflowInstance.copy(workflowId = WorkflowId.new()),
-            // <- TODO Manage idempotency by providing a deterministic workflow id
+            workflowState = instanceMessage.workflowState.duplicate(newId),
         )
     }
 

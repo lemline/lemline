@@ -7,10 +7,10 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.NodeStates
 import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowState
 import com.lemline.core.workflows.WorkflowVersion
-import com.lemline.runner.messaging.JsonSerializable
+import com.lemline.runner.messaging.LemlineMessage
 import com.lemline.runner.models.IDV7
 import java.util.*
 import kotlin.time.ExperimentalTime
@@ -23,34 +23,26 @@ import org.eclipse.microprofile.reactive.messaging.Message
 @ExperimentalTime
 @Serializable
 data class InstanceMessage(
+
     /**
      * Description of the workflow instance
      */
-    @SerialName("i") val workflowInstance: WorkflowInstance,
+    @SerialName("i") override val workflowState: WorkflowState,
 
     /**
      * Parent's model ID waiting for this instance completion, if any.
      */
-    @SerialName("p") val parentId: IDV7? = null,
-) : JsonSerializable {
+    @SerialName("p") override val parentId: IDV7? = null
+) : LemlineMessage {
 
     @Transient
     lateinit var message: Message<String>
 
     @Transient
-    val workflowId = workflowInstance.workflowId
+    val workflowName = workflowState.workflowName
 
     @Transient
-    val workflowName = workflowInstance.workflowName
-
-    @Transient
-    val workflowVersion = workflowInstance.workflowVersion
-
-    @Transient
-    val currentPosition = workflowInstance.currentPosition
-
-    @Transient
-    val currentStates = workflowInstance.currentStates
+    val workflowVersion = workflowState.workflowVersion
 
     override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
@@ -58,7 +50,7 @@ data class InstanceMessage(
         currentPosition: NodePosition,
         currentStates: NodeStates
     ): InstanceMessage = copy(
-        workflowInstance = workflowInstance.copy(currentPosition = currentPosition, currentStates = currentStates),
+        workflowState = workflowState.copy(currentPosition = currentPosition, currentStates = currentStates),
     ).also { it.message = message }
 
     companion object {
@@ -70,7 +62,7 @@ data class InstanceMessage(
             currentStates: NodeStates,
             parentId: IDV7?,
         ) = InstanceMessage(
-            workflowInstance = WorkflowInstance(
+            workflowState = WorkflowState(
                 workflowId = workflowId,
                 workflowName = workflowName,
                 workflowVersion = workflowVersion,

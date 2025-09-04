@@ -47,25 +47,25 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
                 subProcessor.run()
             } catch (e: Exception) {
                 // It's important to log errors from async workflows.
-                logError(e) { "Asynchronous sub-workflow ${subProcessor.workflowInstance.workflowId} failed." }
+                logError(e) { "Asynchronous sub-workflow ${subProcessor.workflowState.workflowId} failed." }
             }
         }
-        logInfo { "Launched sub-workflow ${subProcessor.workflowInstance.workflowId} asynchronously." }
+        logInfo { "Launched sub-workflow ${subProcessor.workflowState.workflowId} asynchronously." }
         // As per DSL, output for await: false is the transformed input
         return transformedInput
     }
 
     // For awaiting execution, run the sub-workflow and handle its result or exception.
-    logInfo { "Starting sub-workflow instance ${subProcessor.workflowInstance.workflowId} and awaiting completion." }
+    logInfo { "Starting sub-workflow instance ${subProcessor.workflowState.workflowId} and awaiting completion." }
 
     try {
         // The run() method now returns the result directly on success.
         val subWorkflowResult = subProcessor.run()
-        logInfo { "Sub-workflow ${subProcessor.workflowInstance.workflowId} finished successfully." }
+        logInfo { "Sub-workflow ${subProcessor.workflowState.workflowId} finished successfully." }
         return subWorkflowResult
     } catch (e: WorkflowException) {
         // If run() throws an exception, the sub-workflow has faulted.
-        logError(e) { "Sub-workflow ${subProcessor.workflowInstance.workflowId} faulted." }
+        logError(e) { "Sub-workflow ${subProcessor.workflowState.workflowId} faulted." }
         // Propagate the error to the parent workflow.
         raiseError(
             WorkflowErrorType.RUNTIME,

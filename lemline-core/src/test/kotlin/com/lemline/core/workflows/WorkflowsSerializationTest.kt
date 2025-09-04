@@ -59,7 +59,7 @@ class WorkflowsSerializationTest {
     @OptIn(ExperimentalTime::class)
     @Test
     fun `Instance serializes and deserializes`() {
-        val workflowInstance = WorkflowInstance(
+        val workflowState = WorkflowState(
             workflowId = WorkflowId.new(),
             workflowName = WorkflowName("orders"),
             workflowVersion = WorkflowVersion("v1"),
@@ -67,12 +67,12 @@ class WorkflowsSerializationTest {
             currentStates = NodeStates.newInstance(JsonPrimitive("hello"))
         )
 
-        val encoded = LemlineJson.encodeToString(workflowInstance)
-        val decoded = LemlineJson.decodeFromString<WorkflowInstance>(encoded)
-        assertEquals(workflowInstance.workflowName, decoded.workflowName)
-        assertEquals(workflowInstance.workflowVersion, decoded.workflowVersion)
-        assertEquals(workflowInstance.workflowId, decoded.workflowId)
-        assertEquals(workflowInstance.currentPosition, decoded.currentPosition)
+        val encoded = LemlineJson.encodeToString(workflowState)
+        val decoded = LemlineJson.decodeFromString<WorkflowState>(encoded)
+        assertEquals(workflowState.workflowName, decoded.workflowName)
+        assertEquals(workflowState.workflowVersion, decoded.workflowVersion)
+        assertEquals(workflowState.workflowId, decoded.workflowId)
+        assertEquals(workflowState.currentPosition, decoded.currentPosition)
         assertNotNull(decoded.currentStates[NodePosition.root])
     }
 }

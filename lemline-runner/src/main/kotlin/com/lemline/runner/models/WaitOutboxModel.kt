@@ -26,4 +26,4 @@ data class WaitOutboxModel(
 
     override var outboxErrorStackTrace: String? = null,
 
-    ) : OutboxModel
+    ) : OutboxModel(instanceMessage)

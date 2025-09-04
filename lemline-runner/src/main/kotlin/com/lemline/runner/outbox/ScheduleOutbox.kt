@@ -35,7 +35,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
 
     @Inject
     override lateinit var failureRepository: FailureRepository
-    
+
     @Inject
     override lateinit var outboxRepository: ScheduleRepository
 
@@ -54,7 +54,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
 
     override suspend fun process(entity: ScheduleOutboxModel) {
         // update the schedule model with the next instant to be processed
-        entity.updateBeforeProcessing()
+        entity.prepareNextScheduled()
         // start a new instance of the workflow (with new workflowId)
         super.process(entity)
     }

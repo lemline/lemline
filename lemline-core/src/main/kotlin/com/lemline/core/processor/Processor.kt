@@ -38,8 +38,8 @@ import com.lemline.core.nodes.isGoingDown
 import com.lemline.core.nodes.isGoingUp
 import com.lemline.core.workflows.NodeStates
 import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowInstance
 import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowState
 import com.lemline.core.workflows.WorkflowVersion
 import io.serverlessworkflow.api.types.CallAsyncAPI
 import io.serverlessworkflow.api.types.CallGRPC
@@ -72,13 +72,13 @@ import kotlinx.serialization.json.JsonElement
 /**
  * Represents an instance of a workflow, including its state, position, secrets, and execution logic.
  *
- * @property workflowInstance The workflow instance.
+ * @property workflowState The workflow instance.
  * @property secrets A map of secrets used in the workflow.
  */
 @ExperimentalTime
 @Suppress("unused")
 class Processor(
-    val workflowInstance: WorkflowInstance,
+    val workflowState: WorkflowState,
     secrets: Map<String, JsonElement>,
     var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
 ) {
@@ -110,7 +110,7 @@ class Processor(
             secrets: Map<String, JsonElement> = emptyMap(),
             activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
         ) = Processor(
-            workflowInstance = WorkflowInstance(
+            workflowState = WorkflowState(
                 workflowId = id,
                 workflowName = name,
                 workflowVersion = version,
@@ -148,10 +148,10 @@ class Processor(
     val workflow: Workflow
 
     init {
-        workflow = Definitions.getOrNull(workflowInstance.workflowName, workflowInstance.workflowVersion)
-            ?: error("workflow ${workflowInstance.workflowName} (version ${workflowInstance.workflowVersion}) not found")
+        workflow = Definitions.getOrNull(workflowState.workflowName, workflowState.workflowVersion)
+            ?: error("workflow ${workflowState.workflowName} (version ${workflowState.workflowVersion}) not found")
         // get root state from instance
-        val rootState = workflowInstance.currentStates[NodePosition.root]
+        val rootState = workflowState.currentStates[NodePosition.root]
             ?: error("no initial state provided for the root node")
         // get startedAt and rawInput from root state
         val errorStr by lazy { "provided in the root node of the initial state" }
@@ -161,12 +161,12 @@ class Processor(
             ?: error("no raw input $errorStr")
         // create the root instance
         val rootNode = Definitions.getRootNode(workflow)
-        rootInstance = (rootNode.createInstance(workflowInstance.currentStates, null) as RootInstance)
+        rootInstance = (rootNode.createInstance(workflowState.currentStates, null) as RootInstance)
         rootInstance.processor = this
         rootInstance.secrets = secrets
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
-            id = workflowInstance.workflowId.toString(),
+            id = workflowState.workflowId.toString(),
             definition = LemlineJson.encodeToElement(workflow),
             input = rawInput,
             startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant())),
@@ -183,8 +183,8 @@ class Processor(
     /**
      * The current node instance in the workflow execution.
      */
-    var current: NodeInstance<*>? = nodeInstances[workflowInstance.currentPosition]
-        ?: error("node not found at initial position ${workflowInstance.currentPosition}")
+    var current: NodeInstance<*>? = nodeInstances[workflowState.currentPosition]
+        ?: error("node not found at initial position ${workflowState.currentPosition}")
 
     /**
      * Retrieves the current position in the workflow.
@@ -494,9 +494,9 @@ class Processor(
      * @param message Lambda providing the log message.
      */
     private fun logDebug(e: Throwable? = null, message: () -> String) = withWorkflowContext(
-        workflowId = workflowInstance.workflowId,
-        workflowName = workflowInstance.workflowName,
-        workflowVersion = workflowInstance.workflowVersion,
+        workflowId = workflowState.workflowId,
+        workflowName = workflowState.workflowName,
+        workflowVersion = workflowState.workflowVersion,
         currentPosition = position,
     ) {
         logger.debug(e, message)
@@ -509,9 +509,9 @@ class Processor(
      * @param message Lambda providing the log message.
      */
     private fun logInfo(e: Throwable? = null, message: () -> String) = withWorkflowContext(
-        workflowId = workflowInstance.workflowId,
-        workflowName = workflowInstance.workflowName,
-        workflowVersion = workflowInstance.workflowVersion,
+        workflowId = workflowState.workflowId,
+        workflowName = workflowState.workflowName,
+        workflowVersion = workflowState.workflowVersion,
         currentPosition = position,
     ) {
         logger.info(e, message)
@@ -524,9 +524,9 @@ class Processor(
      * @param message Lambda providing the log message.
      */
     private fun logWarn(e: Throwable? = null, message: () -> String) = withWorkflowContext(
-        workflowId = workflowInstance.workflowId,
-        workflowName = workflowInstance.workflowName,
-        workflowVersion = workflowInstance.workflowVersion,
+        workflowId = workflowState.workflowId,
+        workflowName = workflowState.workflowName,
+        workflowVersion = workflowState.workflowVersion,
         currentPosition = position,
     ) {
         logger.warn(e, message)
@@ -540,9 +540,9 @@ class Processor(
      */
     private fun logError(e: Throwable? = null, message: () -> String) {
         withWorkflowContext(
-            workflowId = workflowInstance.workflowId,
-            workflowName = workflowInstance.workflowName,
-            workflowVersion = workflowInstance.workflowVersion,
+            workflowId = workflowState.workflowId,
+            workflowName = workflowState.workflowName,
+            workflowVersion = workflowState.workflowVersion,
             currentPosition = position,
         ) {
             logger.error(e, message)
@@ -564,5 +564,5 @@ class Processor(
      * @throws IllegalStateException Always thrown with the provided message.
      */
     private fun error(message: Any): Nothing =
-        throw IllegalStateException("Workflow ${workflowInstance.workflowName} (version ${workflowInstance.workflowVersion})): $message")
+        throw IllegalStateException("Workflow ${workflowState.workflowName} (version ${workflowState.workflowVersion})): $message")
 }
