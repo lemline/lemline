@@ -32,6 +32,9 @@ tasks.test {
 dependencies {
     implementation(project(":lemline-common"))
 
+    // Add kotlinx-coroutines-slf4j for MDC context support in coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.7.3")
+
     // Apply the kotlinx bundle of dependencies from the version catalog (`gradle/libs.versions.toml`).
     implementation(libs.bundles.kotlinxEcosystem)
 
