@@ -63,6 +63,6 @@ object JQExpression : ExpressionEvaluator {
      * Converts an object JSON to a JQScope
      */
     private fun ObjectNode.toJQScope() = JQScope.newEmptyScope().apply {
-        fields().forEach { field -> setValue(field.key, field.value) }
+        properties().forEach { field -> setValue(field.key, field.value) }
     }
 }

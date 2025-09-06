@@ -36,7 +36,7 @@ internal class ParentRepository : OutboxRepository<ParentOutboxModel>() {
     override val tableName = PARENT_TABLE
 
     override fun createModel(rs: ResultSet) = ParentOutboxModel(
-        id = IDV7(getUuid(rs, ID_COLUMN)),
+        id = IDV7(getUuid(rs, ID_COLUMN)!!),
         instanceMessage = rs.getInstanceMessage()!!,
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),

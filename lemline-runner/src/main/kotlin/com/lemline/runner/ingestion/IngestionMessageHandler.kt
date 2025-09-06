@@ -74,7 +74,9 @@ internal class IngestionMessageHandler(
             }
         } catch (e: Exception) {
             logger.error(e) { "Error when saving message: $this" }
-            throw CompensationException(getFailureReason(e)) { TODO() }
+            throw CompensationException(getFailureReason(e)) {
+                TODO()
+            }
         }
         return null
     }

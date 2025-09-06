@@ -7,17 +7,23 @@ import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository
+import io.quarkus.runtime.ShutdownEvent
 import jakarta.annotation.PostConstruct
-import jakarta.annotation.PreDestroy
+import jakarta.enterprise.event.Observes
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 
 /**
  * AbstractOutbox provides base functionality for outbox pattern implementations.
@@ -40,13 +46,14 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
     protected abstract val enabled: Boolean
 
-
     protected abstract val failureRepository: FailureRepository
     protected abstract val outboxRepository: OutboxRepository<T>
     protected abstract val instanceEmitter: InstanceMessageEmitter
 
     protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig
     protected abstract val cleanupConf: LemlineConfiguration.OutboxCleanupConfig
+
+    private val gracePeriod = 5000L
 
     private val outboxRelay by lazy {
         OutboxRelay(
@@ -62,6 +69,8 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
     private val outboxCleaningExecutor = Executors.newSingleThreadScheduledExecutor()
     private val outboxCleaning = AtomicBoolean(false)
+
+    private val isShuttingDown = AtomicBoolean(false)
 
     open suspend fun process(entity: T) {
         instanceEmitter.send(entity.instanceMessage)
@@ -95,16 +104,47 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         logger.info { "⏱️ Outbox cleaning scheduled every ${cleanupPeriodSeconds}s" }
     }
 
-    @PreDestroy
-    private fun shutdown() {
+    // Quarkus will wait for the completion of performGracefulShutdown() before shutting down
+    fun onQuarkusShutdown(@Observes event: ShutdownEvent) {
+        logger.info { "🛑 ShutdownEvent received - initiating graceful shutdown" }
+        performGracefulShutdown(gracePeriod)
+    }
+
+    private fun performGracefulShutdown(timeoutMs: Long) {
+        if (!isShuttingDown.compareAndSet(false, true)) {
+            logger.info { "🛑 Shutdown already in progress - ignoring" }
+            return
+        }
+
         logger.info { "🛑 Shutting down outbox..." }
 
-        // Cancel coroutines
-        scope.cancel()
-
-        // Shutdown executors
+        // Shutdown executors first (prevents new coroutine launches)
         shutdownExecutor(outboxProcessingExecutor, "processing")
         shutdownExecutor(outboxCleaningExecutor, "cleaning")
+
+        // Wait for active coroutines to complete (non-blocking)
+        gracefulWaitForCompletion(timeoutMs)
+    }
+
+    private fun gracefulWaitForCompletion(timeoutMs: Long) {
+        // Use a separate thread to avoid blocking @PreDestroy
+        try {
+            runBlocking {
+                withTimeout(timeoutMs) {
+                    // Wait for all child coroutines to complete
+                    scope.coroutineContext.job.children.forEach { it.join() }
+                }
+                logger.info { "✅ All scheduled tasks processed, completing shutdown" }
+            }
+        } catch (_: TimeoutCancellationException) {
+            logger.warn { "⚠️ Graceful shutdown timed out with tasks still being processed" }
+        } catch (e: Exception) {
+            logger.error(e) { "💥 Error during graceful shutdown" }
+        } finally {
+            // Always cancel remaining coroutines
+            scope.cancel()
+            logger.info { "🏁 Outbox scope cancelled" }
+        }
     }
 
     /**
@@ -112,6 +152,11 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      * This method uses an `AtomicBoolean` to prevent overlapping executions.
      */
     private suspend fun outbox() {
+        if (isShuttingDown.get()) {
+            logger.debug { "⏹️ Skipping outbox processing: shutdown in progress" }
+            return
+        }
+
         if (!outboxProcessing.compareAndSet(false, true)) {
             logger.warn { "⏭ Skipping scheduled outbox processing: previous execution still running" }
             return
@@ -135,6 +180,12 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      * This method uses an `AtomicBoolean` to prevent overlapping executions.
      */
     private suspend fun cleanup() {
+        if (isShuttingDown.get()) {
+            logger.debug { "⏹️ Skipping outbox cleaning: shutdown in progress" }
+            return
+        }
+
+
         if (!outboxCleaning.compareAndSet(false, true)) {
             logger.warn { "⏭ Skipping scheduled outbox cleaning: previous execution still running" }
             return
@@ -159,10 +210,12 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      * this fails, it forces the termination of all tasks. It also accounts for interrupted exceptions,
      * ensuring the current thread's interrupt status is reasserted.
      */
-    private fun shutdownExecutor(executor: java.util.concurrent.ScheduledExecutorService, name: String) {
-        executor.shutdown() // stop accepting new tasks
+    private fun shutdownExecutor(executor: ScheduledExecutorService, name: String) {
         try {
-            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+            //Stop accepting new scheduled tasks
+            executor.shutdown()
+
+            if (!executor.awaitTermination(gracePeriod, TimeUnit.MILLISECONDS)) {
                 logger.warn { "⚠️ Forcing shutdown of outbox $name executor" }
                 executor.shutdownNow()
             } else {

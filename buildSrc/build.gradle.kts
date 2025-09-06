@@ -4,7 +4,7 @@ plugins {
     // and are applied in the project's `build.gradle.kts` files as required.
     `kotlin-dsl`
 
-    kotlin("jvm") version libs.versions.kotlin.get()
+    kotlin("jvm") version "2.0.21" // ← Use Gradle 8.13's embedded Kotlin version
 }
 
 val javaVersion = libs.versions.java.get().toInt()

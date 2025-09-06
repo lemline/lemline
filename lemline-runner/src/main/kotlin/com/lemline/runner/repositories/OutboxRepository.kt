@@ -102,7 +102,7 @@ abstract class OutboxRepository<T : OutboxModel> : WithInstanceRepository<T>() {
                     setInt(3, limit)
                 }
 
-                stmt.executeQuery().use { it.toModels() }
+                stmt.executeQuery().use { rs -> rs.toModels() }
             }
         }
 
@@ -134,7 +134,7 @@ abstract class OutboxRepository<T : OutboxModel> : WithInstanceRepository<T>() {
                     setInt(2, limit)
                 }
 
-                stmt.executeQuery().use { it.toModels() }
+                stmt.executeQuery().use { rs -> rs.toModels() }
             }
         }
 

@@ -126,9 +126,9 @@ fun <T> withThreadLoggingContext(
     additional: Map<String, String?> = emptyMap(),
     block: () -> T
 ): T = withThreadMDC(
-    WORKFLOW_ID to (workflowId?.toString() ?: "unknown"),
-    WORKFLOW_NAME to (workflowName?.toString() ?: "unknown"),
-    WORKFLOW_VERSION to (workflowVersion?.toString() ?: "unknown"),
+    WORKFLOW_ID to (workflowId?.toString() ?: ""),
+    WORKFLOW_NAME to (workflowName?.toString() ?: ""),
+    WORKFLOW_VERSION to (workflowVersion?.toString() ?: ""),
     *additional.entries.map { it.key to it.value }.toTypedArray(),
     block = block
 )
@@ -150,9 +150,9 @@ suspend inline fun <T> withSuspendLoggingContext(
     crossinline block: suspend () -> T
 ): T {
     val element = WorkflowLoggingContext(
-        workflowId = workflowId?.toString() ?: "unknow",
-        workflowName = workflowName?.toString() ?: "unknow",
-        workflowVersion = workflowVersion?.toString() ?: "unknow",
+        workflowId = workflowId?.toString() ?: "",
+        workflowName = workflowName?.toString() ?: "",
+        workflowVersion = workflowVersion?.toString() ?: "",
         additionalContext = additional
     )
     return withContext(element) { block() }

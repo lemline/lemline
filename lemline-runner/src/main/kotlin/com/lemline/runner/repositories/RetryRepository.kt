@@ -58,9 +58,8 @@ class RetryRepository : OutboxRepository<RetryOutboxModel>() {
                 stmt.setString(idx, entity.errorStackTrace)
             })
 
-    @ExperimentalTime
     override fun createModel(rs: ResultSet) = RetryOutboxModel(
-        id = IDV7(getUuid(rs, ID_COLUMN)),
+        id = IDV7(getUuid(rs, ID_COLUMN)!!),
         instanceMessage = rs.getInstanceMessage()!!,
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),

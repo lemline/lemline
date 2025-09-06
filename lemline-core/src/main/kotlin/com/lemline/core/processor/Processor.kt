@@ -271,7 +271,7 @@ class Processor(
 
                 // retry if the TryInstance has a delay configured
                 if (tryInstance.delay != null) {
-                    logger.info { "Retry with delay: ${tryInstance.delay}" }
+                    logger.info { "on $workflowId - Retry with delay: ${tryInstance.delay}" }
                     // reinit childIndex, as we are going to retry
                     tryInstance.childIndex = -1
                     // Update node position after setting retry

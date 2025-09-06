@@ -84,7 +84,7 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
     }
 
     override fun createModel(rs: ResultSet) = FailureModel(
-        id = IDV7(getUuid(rs, ID_COLUMN)),
+        id = IDV7(getUuid(rs, ID_COLUMN)!!),
         instanceMessage = rs.getInstanceMessage(),
         payload = rs.getString(PAYLOAD_COLUMN),
         errorReason = rs.getString(ERROR_REASON_COLUMN),

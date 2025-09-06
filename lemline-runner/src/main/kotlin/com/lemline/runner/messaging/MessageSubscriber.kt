@@ -2,8 +2,9 @@
 package com.lemline.runner.messaging
 
 import com.lemline.core.logger.logger
+import io.quarkus.runtime.ShutdownEvent
 import jakarta.annotation.PostConstruct
-import jakarta.annotation.PreDestroy
+import jakarta.enterprise.event.Observes
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -34,11 +35,13 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
 
     val logger = logger()
 
+    private val gracePeriod = 5000L
+
     private val scope: CoroutineScope =
         CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, e ->
             logger.warn(e) { "Error processing message, will attempt to recover." }
             // restart the subscription on another coroutine
-            reSubscribe()
+            //reSubscribe()
         })
 
 
@@ -52,9 +55,10 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
         }
     }
 
-    @PreDestroy
-    fun shutdown() {
-        onShutdown()
+    // Quarkus will wait for the completion of performGracefulShutdown() before shutting down
+    fun onQuarkusShutdown(@Observes event: ShutdownEvent) {
+        logger.info { "🛑 ShutdownEvent received - initiating graceful shutdown" }
+        performGracefulShutdown(gracePeriod)
     }
 
     private lateinit var subscription: Subscription
@@ -71,7 +75,7 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
         }
         cancelSubscription()
         // wait for active messages to complete
-        gracePeriod(timeoutMs)
+        gracefulWaitForCompletion(timeoutMs)
         // restart the subscription
         subscribe()
     }
@@ -114,25 +118,32 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
 
     override fun onError(t: Throwable) {
         logger.error(t) { "Error on subscription" }
-        reSubscribe()
+        //reSubscribe()
     }
 
     override fun onComplete() {
         logger.info { "Subscription completed" }
-        onShutdown()
+        //onShutdown()
     }
 
-    internal fun onShutdown(timeoutMs: Long = 5000) {
+    private fun performGracefulShutdown(timeoutMs: Long) {
         if (!isShutdown.compareAndSet(false, true)) {
-            logger.warn { "onShutdown called more than once - ignoring" }
+            logger.warn { "Graceful shutdown already initiated" }
             return
         }
 
+        logger.info { "🛑 Starting graceful shutdown with messaging channels open" }
+
+        // Stop receiving messages
         cancelSubscription()
-        // wait for active messages to complete
-        gracePeriod(timeoutMs)
-        // shutdown the scope
+
+        // Wait for active messages to complete
+        gracefulWaitForCompletion(timeoutMs)
+
+        // Shutdown du scope
         scope.cancel()
+
+        logger.info { "🏁 scope cancelled" }
     }
 
     private fun requestNext() {
@@ -156,25 +167,27 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
         }
     }
 
-    private fun gracePeriod(timeoutMs: Long) {
-        // Launch a coroutine to handle the shutdown
-        runBlocking {
-            try {
-                withTimeout(timeoutMs) {
-                    // Wait for coroutines currently processing messages
-                    scope.coroutineContext.job.children.forEach { it.join() }
+    private fun gracefulWaitForCompletion(timeoutMs: Long) = runBlocking {
+        try {
+            withTimeout(timeoutMs) {
+                logger.info { "⏳ Waiting for ${metrics.getActiveCount()} active messages to complete" }
 
-                    // check also metrics
-                    while (metrics.getActiveCount() > 0) {
-                        delay(50)
-                    }
+                // Wait for coroutines currently processing messages
+                scope.coroutineContext.job.children.forEach { it.join() }
+
+                // check also metrics
+                while (metrics.getActiveCount() > 0) {
+                    delay(10)
                 }
-                logger.info { "✅ All messages processed, completing shutdown" }
-            } catch (_: TimeoutCancellationException) {
-                logger.warn { "⚠️ Graceful shutdown timed out with ${metrics.getActiveCount()} messages still active" }
-                // Force cancel the remaining jobs
-                scope.coroutineContext.job.cancelChildren()
             }
+            logger.info { "✅ All messages processed gracefully" }
+        } catch (_: TimeoutCancellationException) {
+            val remainingCount = metrics.getActiveCount()
+            logger.warn { "⚠️ Graceful shutdown timed out with $remainingCount messages still active" }
+            scope.coroutineContext.job.cancelChildren()
+        } catch (e: Exception) {
+            logger.error(e) { "💥 Error during graceful shutdown" }
         }
     }
 }
+

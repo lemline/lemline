@@ -79,15 +79,14 @@ abstract class WithIdRepository<T : WithId> : Repository<T>() {
         }
     }
 
-    protected val getUuid by lazy {
+    protected val getUuid: (ResultSet, String) -> UUID? by lazy {
         when (databaseManager.dbType) {
             DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> { rs: ResultSet, columnName: String ->
                 rs.getObject(columnName, UUID::class.java)
             }
 
             DB_TYPE_MYSQL -> { rs: ResultSet, columnName: String ->
-                val bytes = rs.getBytes(columnName)
-                bytes?.toUUID()
+                rs.getBytes(columnName)?.toUUID()
             }
 
             else -> error("Unsupported database type '${databaseManager.dbType}'")

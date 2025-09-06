@@ -91,7 +91,7 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
                 currentPosition = NodePosition.fromJsonString(getString(WORKFLOW_POSITION_COLUMN)),
                 currentStates = NodeStates.fromJsonString(getString(WORKFLOW_STATE_COLUMN)),
             ),
-            parentId = IDV7(getUuid(this, PARENT_ID_COLUMN)),
+            parentId = getUuid(this, PARENT_ID_COLUMN)?.let { IDV7(it) },
         )
     }
 

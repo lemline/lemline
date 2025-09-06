@@ -35,6 +35,7 @@ import picocli.CommandLine.ParseResult
  * This class is responsible for starting the Quarkus application and processing CLI commands.
  */
 @QuarkusMain
+@ExperimentalSerializationApi
 class LemlineApplication : QuarkusApplication {
 
     @Inject
@@ -241,6 +242,7 @@ private fun CommandLine.setup() = this
         executionExceptionHandler = CustomExceptionHandler()
     }
 
+@ExperimentalSerializationApi
 private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
     val path = filePath.normalize()
     val fileExists = Files.exists(path)
