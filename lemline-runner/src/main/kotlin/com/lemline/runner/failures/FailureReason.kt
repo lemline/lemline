@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.failures
 
 import com.lemline.core.errors.WorkflowException
@@ -43,4 +44,3 @@ object FailureReasons {
         else -> PROCESSING_ERROR
     }
 }
-

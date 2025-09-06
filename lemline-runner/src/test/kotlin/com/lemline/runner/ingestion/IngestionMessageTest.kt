@@ -158,7 +158,7 @@ internal class IngestionMessageTest {
         )
 
         // Then
-        
+
         // ParentIngestionMessage has a serial name "p"
         assertEquals(
             """{"t":"p","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"$scheduledFor"}""",

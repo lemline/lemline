@@ -38,39 +38,39 @@ internal interface MessageHandler<T : WorkflowMessage> {
             logger.debug { "Received: ${message.toLogString()}" }
             metrics.recordDeserializationDuration {
                 try {
-                    message.deserialize()
+                    message.deserialize().also {
+                        // deserialisation succeeded
+                        logger.debug { "Deserialized ${message.toLogString()}: $it" }
+                        workflowId = it.workflowId
+                        workflowName = it.workflowName
+                        workflowVersion = it.workflowVersion
+                        metrics.deserializationCompleted(workflowName, workflowVersion)
+                    }
                 } catch (e: Exception) {
                     metrics.deserializationFailed(e)
                     throw e
-                }.also {
-                    // deserialisation succeeded
-                    logger.debug { "Deserialized ${message.toLogString()}: $it" }
-                    workflowId = it.workflowId
-                    workflowName = it.workflowName
-                    workflowVersion = it.workflowVersion
-                    metrics.deserializationCompleted(workflowName, workflowVersion)
                 }
             }
-        } ?: return // <- deserialization() failed
+        }.getOrElse { return } // <- tryWithCompensation handles (neg)acknowledgment if the block fails
 
         // --- Processing ---
         message.tryWithCompensation(workflowId, workflowName, workflowVersion) {
             // Process et get next message
             next = metrics.recordProcessingDuration(workflowName, workflowVersion) {
                 try {
-                    msg.handle()
+                    msg.handle().also {
+                        logger.debug { "Processed: ${message.toLogString()}" }
+                        metrics.processingCompleted(workflowName, workflowVersion)
+                    }
                 } catch (e: Exception) {
                     val reason = if (e is CompensationException) e.reason else getFailureReason(e)
                     metrics.processingFailed(reason, workflowName, workflowVersion)
                     throw e
-                }.also {
-                    logger.debug { "Processed: ${message.toLogString()}" }
-                    metrics.processingCompleted(workflowName, workflowVersion)
                 }
             }
             // Serialize and emit the next message if any
             next?.emit()
-        } ?: return // <- handle() failed
+        }.getOrElse { return } // <- tryWithCompensation handles (neg)acknowledgment if the block fails
 
         // Success Path
         message.acknowledgeWithRetry(workflowName, workflowVersion)
@@ -91,9 +91,9 @@ internal interface MessageHandler<T : WorkflowMessage> {
         workflowName: WorkflowName? = null,
         workflowVersion: WorkflowVersion? = null,
         block: suspend () -> T
-    ): T? = withSuspendLoggingContext(workflowId, workflowName, workflowVersion) {
+    ): Result<T> = withSuspendLoggingContext(workflowId, workflowName, workflowVersion) {
         try {
-            block()
+            Result.success(block())
         } catch (compensation: CompensationException) {
             try {
                 compensation.run()
@@ -103,12 +103,12 @@ internal interface MessageHandler<T : WorkflowMessage> {
                 negAcknowledgeWithRetry(e, workflowName, workflowVersion)
                 onFailureTest(this, e)
             }
-            null
+            Result.failure(compensation)
         } catch (e: Exception) {
             // Failure path
             negAcknowledgeWithRetry(e, workflowName, workflowVersion)
             onFailureTest(this, e)
-            null
+            Result.failure(e)
         }
     }
 
@@ -159,4 +159,3 @@ internal interface MessageHandler<T : WorkflowMessage> {
 }
 
 class CompensationException(val reason: String, val run: suspend () -> Unit) : RuntimeException()
-

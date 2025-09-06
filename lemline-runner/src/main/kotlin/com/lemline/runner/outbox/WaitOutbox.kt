@@ -31,7 +31,7 @@ internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
 
     @Inject
     override lateinit var failureRepository: FailureRepository
-    
+
     @Inject
     override lateinit var outboxRepository: WaitRepository
 

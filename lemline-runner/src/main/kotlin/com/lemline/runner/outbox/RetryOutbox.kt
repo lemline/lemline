@@ -35,7 +35,7 @@ internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
 
     @Inject
     override lateinit var failureRepository: FailureRepository
-    
+
     @Inject
     override lateinit var outboxRepository: RetryRepository
 

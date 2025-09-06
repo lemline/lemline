@@ -39,9 +39,11 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
 
     private val scope: CoroutineScope =
         CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, e ->
-            logger.warn(e) { "Error processing message, will attempt to recover." }
-            // restart the subscription on another coroutine
-            //reSubscribe()
+            if (!isShutdown.get()) {
+                logger.warn(e) { "Error processing message, will attempt to recover." }
+                // restart the subscription on another coroutine
+                reSubscribe()
+            }
         })
 
 
@@ -58,7 +60,7 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
     // Quarkus will wait for the completion of performGracefulShutdown() before shutting down
     fun onQuarkusShutdown(@Observes event: ShutdownEvent) {
         logger.info { "🛑 ShutdownEvent received - initiating graceful shutdown" }
-        performGracefulShutdown(gracePeriod)
+        performGracefulShutdown()
     }
 
     private lateinit var subscription: Subscription
@@ -68,14 +70,16 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
     private var isSubscribed = AtomicBoolean(false)
     private var isShutdown = AtomicBoolean(false)
 
-    internal fun reSubscribe(timeoutMs: Long = 5000) {
+    internal fun reSubscribe() {
         if (!isResubscribing.compareAndSet(false, true)) {
-            logger.warn { "reSubscribe called more than once - ignoring" }
+            logger.warn { "reSubscribe already ongoing - ignoring" }
             return
         }
-        cancelSubscription()
-        // wait for active messages to complete
-        gracefulWaitForCompletion(timeoutMs)
+        if (isSubscribed.get()) {
+            cancelSubscription()
+            // wait for active messages to complete
+            gracefulWaitForCompletion()
+        }
         // restart the subscription
         subscribe()
     }
@@ -100,7 +104,7 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
 
     override fun onNext(item: Message<String>) {
         if (isShutdown.get()) {
-            logger.warn { "Received message after subscriber shutdown. It will be redelivered by the broker. Message: $item" }
+            logger.warn { "Received message after subscriber shutdown. It will be redelivered by the broker. Message: ${item.toLogString()}" }
             return
         }
 
@@ -117,8 +121,10 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
     }
 
     override fun onError(t: Throwable) {
-        logger.error(t) { "Error on subscription" }
-        //reSubscribe()
+        if (!isShutdown.get()) {
+            logger.error(t) { "Error on subscription" }
+            reSubscribe()
+        }
     }
 
     override fun onComplete() {
@@ -126,7 +132,7 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
         //onShutdown()
     }
 
-    private fun performGracefulShutdown(timeoutMs: Long) {
+    private fun performGracefulShutdown() {
         if (!isShutdown.compareAndSet(false, true)) {
             logger.warn { "Graceful shutdown already initiated" }
             return
@@ -138,11 +144,10 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
         cancelSubscription()
 
         // Wait for active messages to complete
-        gracefulWaitForCompletion(timeoutMs)
+        gracefulWaitForCompletion()
 
         // Shutdown du scope
         scope.cancel()
-
         logger.info { "🏁 scope cancelled" }
     }
 
@@ -167,9 +172,9 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
         }
     }
 
-    private fun gracefulWaitForCompletion(timeoutMs: Long) = runBlocking {
+    private fun gracefulWaitForCompletion() = runBlocking {
         try {
-            withTimeout(timeoutMs) {
+            withTimeout(gracePeriod) {
                 logger.info { "⏳ Waiting for ${metrics.getActiveCount()} active messages to complete" }
 
                 // Wait for coroutines currently processing messages
@@ -190,4 +195,3 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
         }
     }
 }
-

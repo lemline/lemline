@@ -46,6 +46,7 @@ import com.lemline.runner.ingestion.INGESTION_OUT_CHANNEL
 import com.lemline.runner.instances.WORKFLOWS_IN_CHANNEL
 import com.lemline.runner.instances.WORKFLOWS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
+import kotlinx.serialization.ExperimentalSerializationApi
 
 enum class TopicType(
     val type: String,
@@ -76,6 +77,7 @@ enum class TopicType(
     );
 }
 
+@ExperimentalSerializationApi
 class LemlineConfigSource : PropertiesConfigSource(
     buildProperties(),
     LemlineConfigConstants.CONFIG_SOURCE_NAME,

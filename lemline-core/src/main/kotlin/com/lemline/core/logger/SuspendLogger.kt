@@ -63,4 +63,3 @@ class SuspendLogger(klass: Class<*>) : CanSuspendLog {
         if (isErrorEnabled) error(message(), e)
     }
 }
-
