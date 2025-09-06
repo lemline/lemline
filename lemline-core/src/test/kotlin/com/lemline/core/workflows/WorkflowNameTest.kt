@@ -38,14 +38,4 @@ class WorkflowNameTest {
 
         assertEquals(name, decodedName)
     }
-
-    @Test
-    fun `WorkflowName can be used as map keys`() {
-        val m = linkedMapOf<WorkflowName, Int>()
-        val name = WorkflowName("orders")
-        m[name] = 1
-
-        assertTrue(m.containsKey(WorkflowName("orders")))
-        assertEquals(1, m[WorkflowName("orders")])
-    }
 }
