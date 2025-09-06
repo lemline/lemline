@@ -8,7 +8,7 @@ import kotlin.time.Instant
 
 @ExperimentalTime
 interface OutboxIngestionMessage : WithId {
-    var outBoxStatus: OutBoxStatus
+    val outBoxStatus: OutBoxStatus
 
-    var outboxScheduledFor: Instant?
+    val outboxScheduledFor: Instant?
 }

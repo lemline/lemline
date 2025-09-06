@@ -24,10 +24,10 @@ data class RetryIngestionMessage(
     override val instanceMessage: InstanceMessage,
 
     @SerialName("s")
-    override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
+    override val outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
     @SerialName("f")
-    override var outboxScheduledFor: Instant?,
+    override val outboxScheduledFor: Instant?,
 
     @SerialName("er")
     val errorReason: String,

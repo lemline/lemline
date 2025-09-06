@@ -20,13 +20,13 @@ data class ParentIngestionMessage(
     override val id: IDV7,
 
     @SerialName("i")
-    override var instanceMessage: InstanceMessage,
+    override val instanceMessage: InstanceMessage,
 
     @SerialName("s")
-    override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
+    override val outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
     @SerialName("f")
-    override var outboxScheduledFor: Instant?,
+    override val outboxScheduledFor: Instant?,
 ) : OutboxIngestionMessage, IngestionMessage {
 
     fun toModel() = ParentOutboxModel(
