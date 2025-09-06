@@ -16,12 +16,13 @@ import org.reactivestreams.Publisher
 internal const val INGESTION_IN_CHANNEL = "ingestion-in"
 
 @ExperimentalTime
+@ExperimentalSerializationApi
 @Startup
 @ApplicationScoped
-internal class IngestionMessageSubscriber @OptIn(ExperimentalSerializationApi::class) constructor(
+internal class IngestionMessageSubscriber(
     @param:ConfigProperty(name = INGESTION_CONSUMER_CONCURRENCY) override val maxConcurrency: Long,
     @param:ConfigProperty(name = INGESTION_CONSUMER_ENABLED) override val enabled: Boolean,
     @param:Channel(INGESTION_IN_CHANNEL) override val publisher: Publisher<Message<String>>,
     override val handler: IngestionMessageHandler,
     override val metrics: IngestionMessageSubscriberMetrics,
-) : MessageSubscriber()
+) : MessageSubscriber<IngestionMessage>()

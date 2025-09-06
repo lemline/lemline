@@ -2,6 +2,8 @@
 package com.lemline.runner.cli.instances
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.starters.Starter
@@ -64,12 +66,12 @@ class InstanceStartCommand : Runnable {
 
     override fun run(): Unit = runBlocking {
         if (name.isNullOrBlank()) cliError { "Workflow name must be provided" }
-        val workflowName = name!!
+        val workflowName = WorkflowName(name!!)
         val workflowInput = getInput(input)
 
         val instanceMessage = stater.start(
             workflowName = workflowName,
-            optionalVersion = version,
+            optionalVersion = version?.let { WorkflowVersion(it) },
             workflowInput = workflowInput,
             parentId = null,
             zoneId = getZoneId(),

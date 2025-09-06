@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS lemline_failures
     workflow_state    MEDIUMTEXT,
     parent_id         BINARY(16),
     payload           MEDIUMTEXT,
-    reason            VARCHAR(255) NOT NULL,
+    error_reason      VARCHAR(255) NOT NULL,
     error_class       TEXT         NOT NULL,
     error_message     TEXT,
     error_stacktrace  MEDIUMTEXT   NOT NULL,

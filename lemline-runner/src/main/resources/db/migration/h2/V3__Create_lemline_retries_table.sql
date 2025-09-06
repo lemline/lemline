@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS lemline_retries
     workflow_position       CLOB                     NOT NULL,
     workflow_state          CLOB                     NOT NULL,
     parent_id               UUID,
+    error_reason            VARCHAR(255)             NOT NULL,
     error_class             CLOB                     NOT NULL,
     error_message           CLOB,
     error_stacktrace        CLOB                     NOT NULL,

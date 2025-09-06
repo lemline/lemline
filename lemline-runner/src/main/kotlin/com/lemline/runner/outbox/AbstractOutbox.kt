@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.common.error
-import com.lemline.common.logger
+import com.lemline.core.logger.logger
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.models.OutboxModel
@@ -19,7 +18,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import org.slf4j.Logger
 
 /**
  * AbstractOutbox provides base functionality for outbox pattern implementations.
@@ -36,7 +34,7 @@ import org.slf4j.Logger
  */
 @ExperimentalTime
 internal abstract class AbstractOutbox<T : OutboxModel>() {
-    protected val logger: Logger by lazy { logger() }
+    protected val logger by lazy { logger() }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
@@ -66,13 +64,13 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     private val outboxCleaning = AtomicBoolean(false)
 
     open suspend fun process(entity: T) {
-        entity.instanceMessage?.let { instanceEmitter.send(it) }
+        instanceEmitter.send(entity.instanceMessage)
     }
 
     @PostConstruct
     fun init() {
         if (!enabled) {
-            logger.debug("🚫 Outbox disabled by config")
+            logger.debug { "🚫 Outbox disabled by config" }
             return
         }
 
@@ -84,7 +82,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
             outboxPeriodSeconds,
             TimeUnit.SECONDS
         )
-        logger.info("⏱️ Outbox processing scheduled every ${outboxPeriodSeconds}s")
+        logger.info { "⏱️ Outbox processing scheduled every ${outboxPeriodSeconds}s" }
 
         // Schedule cleanup
         val cleanupPeriodSeconds = cleanupConf.every.inWholeSeconds
@@ -94,12 +92,12 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
             cleanupPeriodSeconds,
             TimeUnit.SECONDS
         )
-        logger.info("⏱️ Outbox cleaning scheduled every ${cleanupPeriodSeconds}s")
+        logger.info { "⏱️ Outbox cleaning scheduled every ${cleanupPeriodSeconds}s" }
     }
 
     @PreDestroy
     private fun shutdown() {
-        logger.info("🛑 Shutting down outbox...")
+        logger.info { "🛑 Shutting down outbox..." }
 
         // Cancel coroutines
         scope.cancel()
@@ -115,7 +113,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      */
     private suspend fun outbox() {
         if (!outboxProcessing.compareAndSet(false, true)) {
-            logger.warn("⏭ Skipping scheduled outbox processing: previous execution still running")
+            logger.warn { "⏭ Skipping scheduled outbox processing: previous execution still running" }
             return
         }
 
@@ -138,7 +136,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      */
     private suspend fun cleanup() {
         if (!outboxCleaning.compareAndSet(false, true)) {
-            logger.warn("⏭ Skipping scheduled outbox cleaning: previous execution still running")
+            logger.warn { "⏭ Skipping scheduled outbox cleaning: previous execution still running" }
             return
         }
 
@@ -165,14 +163,14 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         executor.shutdown() // stop accepting new tasks
         try {
             if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                logger.warn("⚠️ Forcing shutdown of outbox $name executor")
+                logger.warn { "⚠️ Forcing shutdown of outbox $name executor" }
                 executor.shutdownNow()
             } else {
-                logger.info("✅ Outbox $name executor stopped gracefully")
+                logger.info { "✅ Outbox $name executor stopped gracefully" }
             }
         } catch (_: InterruptedException) {
             // The current thread was interrupted while waiting
-            logger.error("💥 Interrupted while shutting down outbox $name executor")
+            logger.error { "💥 Interrupted while shutting down outbox $name executor" }
             executor.shutdownNow()
             Thread.currentThread().interrupt() // <- reassert the interrupt status
         }

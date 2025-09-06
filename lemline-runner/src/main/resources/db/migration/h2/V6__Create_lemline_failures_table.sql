@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS lemline_failures
     workflow_state    CLOB,
     parent_id         UUID,
     payload           CLOB,
-    reason            VARCHAR(255)             NOT NULL,
+    error_reason      VARCHAR(255)             NOT NULL,
     error_class       CLOB                     NOT NULL,
     error_message     CLOB,
     error_stacktrace  CLOB                     NOT NULL,

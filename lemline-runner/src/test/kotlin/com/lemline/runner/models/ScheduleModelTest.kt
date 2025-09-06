@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.core.workflows.WorkflowId
+import com.lemline.runner.instances.InstanceMessageTest.Companion.sampleInstance
 import com.lemline.runner.outbox.OutBoxStatus
-import java.util.*
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertNull
@@ -21,15 +21,8 @@ class ScheduleModelTest {
         outboxScheduledFor: Instant? = null,
         scheduleZone: String? = null
     ) = ScheduleOutboxModel(
-        id = UUID.randomUUID(),
-        instanceMessage = InstanceMessage.fromStrings(
-            workflowId = UUID.randomUUID(),
-            workflowVersion = "1.0",
-            workflowName = "test-workflow",
-            workflowPosition = "start",
-            workflowState = "{}",
-            parentId = null
-        ),
+        id = IDV7.new(),
+        instanceMessage = sampleInstance(),
         outBoxStatus = OutBoxStatus.PENDING,
         outboxScheduledFor = outboxScheduledFor,
         scheduleCron = scheduleCron,
@@ -42,7 +35,7 @@ class ScheduleModelTest {
     fun `should return next execution instant for valid cron`() {
         // cron for every minute
         val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = Instant.parse("2023-01-01T00:00:00Z"))
-        model.prepareNextScheduled()
+        model.prepareNextScheduled(WorkflowId.new())
         // The next execution should be exactly one minute after the outboxScheduledFor time
         val expected = Instant.parse("2023-01-01T00:01:00Z")
         assertEquals(expected, model.outboxScheduledFor)
@@ -51,13 +44,13 @@ class ScheduleModelTest {
     @Test
     fun `should fail when badly defined`() {
         val model = createModel()
-        assertFails { model.prepareNextScheduled() }
+        assertFails { model.prepareNextScheduled(WorkflowId.new()) }
     }
 
     @Test
     fun `should return null when outboxScheduledFor is null`() {
         val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = null)
-        model.prepareNextScheduled()
+        model.prepareNextScheduled(WorkflowId.new())
         assertNull(model.outboxScheduledFor)
     }
 
@@ -68,7 +61,7 @@ class ScheduleModelTest {
             scheduleCron = "0 0 1 1 *", // At 00:00 on day-of-month 1 and on month 1
             outboxScheduledFor = Instant.parse("2023-01-01T01:00:00Z") // after the cron time
         )
-        model.prepareNextScheduled()
+        model.prepareNextScheduled(WorkflowId.new())
         // The next execution should be the next year
         val expected = Instant.parse("2024-01-01T00:00:00Z")
         assertEquals(expected, model.outboxScheduledFor)
@@ -81,7 +74,7 @@ class ScheduleModelTest {
             outboxScheduledFor = Instant.parse("2023-01-01T08:00:00Z"),
             scheduleZone = "America/New_York"
         )
-        model.prepareNextScheduled()
+        model.prepareNextScheduled(WorkflowId.new())
 
         // 9 AM in New York on Jan 1st is 14:00 UTC
         val expected = Instant.parse("2023-01-01T14:00:00Z")

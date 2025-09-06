@@ -99,9 +99,6 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
             TAG_WORKFLOW_VERSION, (workflowVersion ?: UNKNOWN_VERSION).toString()
         ).increment()
 
-    fun processingFailed(e: Exception, workflowName: WorkflowName?, workflowVersion: WorkflowVersion?) =
-        processingFailed(getFailureReason(e), workflowName, workflowVersion)
-
     /**
      * Increments the counter for successfully acknowledged messages.
      */

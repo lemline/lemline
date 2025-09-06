@@ -36,7 +36,7 @@ data class ParentOutboxModel(
     fun completeWith(output: JsonElement) {
         // Update the workflow state with the output
         instanceMessage.workflowState.setCurrentTaskOutput(output)
-        // Set  to restart parent workflow via the ParentOutbox
+        // Set to restart parent workflow via the ParentOutbox
         val now = Clock.System.now()
         outboxScheduledFor = now
         outboxDelayedUntil = now

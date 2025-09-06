@@ -2,6 +2,7 @@
 package com.lemline.runner.repositories
 
 import com.lemline.runner.models.FailureModel
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus.FAILED
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
@@ -10,7 +11,6 @@ import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.Timestamp
-import java.util.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -74,7 +74,7 @@ abstract class OutboxRepository<T : OutboxModel> : WithInstanceRepository<T>() {
         )
     }
 
-    suspend fun retryById(id: UUID, connection: Connection? = null): Int = withConnection(connection) { conn ->
+    suspend fun retryById(id: IDV7, connection: Connection? = null): Int = withConnection(connection) { conn ->
         findById(id, conn)?.let { entity ->
             // if the outbox was failed, delete the failure entry
             if (entity.outBoxStatus == FAILED) {

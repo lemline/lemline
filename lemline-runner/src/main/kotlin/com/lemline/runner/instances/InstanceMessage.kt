@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.instances
 
-import com.lemline.common.flexible.LazyParsedField
-import com.lemline.common.ids.IdGenerator
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.nodes.NodePosition
-import com.lemline.core.workflows.NodeStates
+import com.lemline.core.processor.Processor
 import com.lemline.core.workflows.WorkflowId
 import com.lemline.core.workflows.WorkflowName
 import com.lemline.core.workflows.WorkflowState
 import com.lemline.core.workflows.WorkflowVersion
-import com.lemline.runner.messaging.LemlineMessage
+import com.lemline.runner.messaging.WorkflowMessage
 import com.lemline.runner.models.IDV7
-import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -23,83 +19,56 @@ import org.eclipse.microprofile.reactive.messaging.Message
 @ExperimentalTime
 @Serializable
 data class InstanceMessage(
-
     /**
      * Description of the workflow instance
      */
-    @SerialName("i") override val workflowState: WorkflowState,
+    @SerialName("s") val workflowState: WorkflowState,
 
     /**
      * Parent's model ID waiting for this instance completion, if any.
      */
-    @SerialName("p") override val parentId: IDV7? = null
-) : LemlineMessage {
+    @SerialName("p") val parentId: IDV7? = null
+) : WorkflowMessage {
 
     @Transient
     lateinit var message: Message<String>
 
     @Transient
-    val workflowName = workflowState.workflowName
+    override val workflowName = workflowState.workflowName
 
     @Transient
-    val workflowVersion = workflowState.workflowVersion
+    override val workflowVersion = workflowState.workflowVersion
+
+    @Transient
+    override val workflowId = workflowState.workflowId
 
     override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
-    fun updateWith(
-        currentPosition: NodePosition,
-        currentStates: NodeStates
-    ): InstanceMessage = copy(
-        workflowState = workflowState.copy(currentPosition = currentPosition, currentStates = currentStates),
+    /**
+     * Updates the workflow state with the given processor's current position and states.
+     */
+    fun updateFrom(processor: Processor): InstanceMessage = copy(
+        workflowState = workflowState.copy(
+            currentPosition = processor.position!!,
+            currentStates = processor.state,
+        )
     ).also { it.message = message }
 
     companion object {
-        fun fromObjects(
+
+        fun new(
             workflowId: WorkflowId,
             workflowName: WorkflowName,
             workflowVersion: WorkflowVersion,
-            currentPosition: NodePosition,
-            currentStates: NodeStates,
-            parentId: IDV7?,
+            workflowInput: JsonElement,
+            parentId: IDV7? = null,
         ) = InstanceMessage(
-            workflowState = WorkflowState(
+            workflowState = WorkflowState.new(
                 workflowId = workflowId,
                 workflowName = workflowName,
                 workflowVersion = workflowVersion,
-                currentPosition = currentPosition,
-                currentStates = currentStates,
+                input = workflowInput,
             ),
-            parentId = parentId,
-        )
-
-        fun fromStrings(
-            workflowId: UUID,
-            workflowName: String,
-            workflowVersion: String,
-            workflowPosition: String,
-            workflowState: String,
-            parentId: IDV7?,
-        ) = InstanceMessage(
-            workflowId = workflowId,
-            workflowName = workflowName,
-            workflowVersion = workflowVersion,
-            workflowPosition = LazyParsedField(workflowPosition, NodePosition.Companion.serializer()),
-            nodeStates = LazyParsedField(workflowState, NodeStates.Companion.serializer()),
-            parentId = parentId,
-        )
-
-        fun forNewWorkflow(
-            workflowId: UUID = IdGenerator.generateV7(),
-            workflowName: String,
-            workflowVersion: String,
-            workflowInput: JsonElement,
-            parentId: IDV7? = null,
-        ) = fromObjects(
-            workflowId = workflowId,
-            workflowName = workflowName,
-            workflowVersion = workflowVersion,
-            currentPosition = NodePosition.root,
-            currentStates = NodeStates.newInstance(workflowInput),
             parentId = parentId,
         )
 

@@ -141,9 +141,9 @@ abstract class WithIdRepository<T : WithId> : Repository<T>() {
      * @param connection An optional database connection to use. If null, a new connection is acquired.
      * @return The number of rows affected by the delete operation.
      */
-    suspend fun deleteById(id: UUID, connection: Connection? = null): Int = withConnection(connection) { conn ->
+    suspend fun deleteById(id: IDV7, connection: Connection? = null): Int = withConnection(connection) { conn ->
         conn.prepareStatement(deleteByIdSql).use { stmt ->
-            setUuid(stmt, 1, id)
+            setUuid(stmt, 1, id.value)
             stmt.executeUpdate()
         }
     }

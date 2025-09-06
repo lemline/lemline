@@ -1,12 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processor
 
-import com.lemline.common.debug
-import com.lemline.common.error
-import com.lemline.common.info
 import com.lemline.common.json.LemlineJson
-import com.lemline.common.logger
-import com.lemline.common.warn
 import com.lemline.core.RuntimeDescriptor
 import com.lemline.core.activities.ActivityRunnerProvider
 import com.lemline.core.definitions.Definitions
@@ -28,7 +23,7 @@ import com.lemline.core.instances.SetInstance
 import com.lemline.core.instances.SwitchInstance
 import com.lemline.core.instances.TryInstance
 import com.lemline.core.instances.WaitInstance
-import com.lemline.core.logger.withWorkflowContext
+import com.lemline.core.logger.logger
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.nodes.NodePosition
@@ -86,6 +81,8 @@ class Processor(
     val workflowName = workflowState.workflowName
     val workflowVersion = workflowState.workflowVersion
 
+    val logger = logger()
+
     /**
      * Companion object for creating new instances of the workflow.
      */
@@ -118,7 +115,7 @@ class Processor(
                 workflowId = id,
                 workflowName = name,
                 workflowVersion = version,
-                currentStates = NodeStates.newInstance(rawInput),
+                currentStates = NodeStates.new(rawInput),
                 currentPosition = NodePosition.root,
             ),
             secrets = secrets,
@@ -127,9 +124,6 @@ class Processor(
 
         internal val scope = CoroutineScope(Dispatchers.IO)
     }
-
-    private val logger = logger()
-
 
     /**
      * The root instance of the workflow, representing the entry point for execution.
@@ -153,7 +147,7 @@ class Processor(
 
     init {
         workflow = Definitions.getOrNull(workflowName, workflowVersion)
-            ?: error("workflow $workflowName (version $workflowVersion) not found")
+            ?: error("workflow definition not found")
         // get root state from instance
         val rootState = workflowState.currentStates[NodePosition.root]
             ?: error("no initial state provided for the root node")
@@ -230,7 +224,7 @@ class Processor(
      * This method is provided for convenience for Java users or in testing scenarios.
      *
      * @return The final result of the workflow as a [JsonElement].
-     * @throws com.lemline.core.errors.WorkflowException If a non-retryable error occurs during execution.
+     * @throws WorkflowException If a non-retryable error occurs during execution.
      */
     fun runBlocking(): JsonElement = kotlinx.coroutines.runBlocking(scope.coroutineContext) {
         run()
@@ -247,7 +241,7 @@ class Processor(
      * - If a retryable error occurs, it internally handles the delay and continues execution.
      *
      * @return The final result of the workflow as a [JsonElement].
-     * @throws [com.lemline.core.errors.WorkflowException] If a non-retryable error occurs during workflow execution.
+     * @throws [WorkflowException] If a non-retryable error occurs during workflow execution.
      */
     suspend fun run(): JsonElement {
         status = WorkflowStatus.RUNNING
@@ -269,7 +263,7 @@ class Processor(
                     throw e
                 }
 
-                logInfo { "Caught workflow exception: ${e.error}" }
+                logger.info { "Caught workflow exception: ${e.error}" }
                 // reset the state of current nodes up to the tryInstance
                 current?.resetUpTo(tryInstance)
                 // returning to the TryInstance
@@ -277,7 +271,7 @@ class Processor(
 
                 // retry if the TryInstance has a delay configured
                 if (tryInstance.delay != null) {
-                    logInfo { "Retry with delay: ${tryInstance.delay}" }
+                    logger.info { "Retry with delay: ${tryInstance.delay}" }
                     // reinit childIndex, as we are going to retry
                     tryInstance.childIndex = -1
                     // Update node position after setting retry
@@ -299,7 +293,7 @@ class Processor(
         // If the loop completes, the workflow has finished successfully.
         status = WorkflowStatus.COMPLETED
         onWorkflowCompleted()
-        logDebug { "Workflow status: $status, current position: $position" }
+        logger.info { "Workflow status: $status, current position: $position" }
 
         // Return the final transformed output of the root node.
         return rootInstance.transformedOutput
@@ -492,80 +486,17 @@ class Processor(
     private var onTaskRetried = { t: TryInstance, e: WorkflowException -> }
 
     /**
-     * Logs debug messages with workflow context.
-     *
-     * @param e Optional throwable to include in the log.
-     * @param message Lambda providing the log message.
-     */
-    private fun logDebug(e: Throwable? = null, message: () -> String) {
-        val block: () -> Unit = { logger.debug(e, message) }
-        return withWorkflowContext(
-            workflowId = workflowId,
-            workflowName = workflowName,
-            workflowVersion = workflowVersion,
-            currentPosition = position,
-            block = block,
-        )
-    }
-
-    /**
-     * Logs informational messages with workflow context.
-     *
-     * @param e Optional throwable to include in the log.
-     * @param message Lambda providing the log message.
-     */
-    private fun logInfo(e: Throwable? = null, message: () -> String) {
-        val block: () -> Unit = { logger.info(e, message) }
-        return withWorkflowContext(
-            workflowId = workflowId,
-            workflowName = workflowName,
-            workflowVersion = workflowVersion,
-            currentPosition = position,
-            block = block,
-        )
-    }
-
-    /**
-     * Logs warning messages with workflow context.
-     *
-     * @param e Optional throwable to include in the log.
-     * @param message Lambda providing the log message.
-     */
-    private fun logWarn(e: Throwable? = null, message: () -> String) {
-        val block: () -> Unit = { logger.warn(e, message) }
-        return withWorkflowContext(
-            workflowId = workflowId,
-            workflowName = workflowName,
-            workflowVersion = workflowVersion,
-            currentPosition = position,
-            block = block,
-        )
-    }
-
-    /**
-     * Logs error messages with workflow context.
-     *
-     * @param e Optional throwable to include in the log.
-     * @param message Lambda providing the log message.
-     */
-    private fun logError(e: Throwable? = null, message: () -> String) {
-        val block: () -> Unit = { logger.error(e, message) }
-        return withWorkflowContext(
-            workflowId = workflowId,
-            workflowName = workflowName,
-            workflowVersion = workflowVersion,
-            currentPosition = position,
-            block = block,
-        )
-    }
-
-    /**
      * Retrieves the final output of the workflow.
      */
     fun getOutput(): JsonElement = when (status) {
         WorkflowStatus.COMPLETED -> rootInstance.transformedOutput
         else -> error("Workflow is not completed yet")
     }
+
+    /**
+     * Indicates whether the workflow is scheduled to be restart after a delay.
+     */
+    val isScheduledAfter get() = workflow.schedule?.after != null
 
     /**
      * Throws an error with a formatted message.

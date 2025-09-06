@@ -1,23 +1,33 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.lemline.common.json.LemlineJson
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.messaging.LemlineMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.Transient
 
 @ExperimentalTime
 data class FailureModel(
     override val id: IDV7,
-    override var instanceMessage: InstanceMessage?,
+    var instanceMessage: InstanceMessage?,
     val payload: String?,
-    val reason: String,
+    val errorReason: String,
     val errorClass: String,
     val errorMessage: String?,
     val errorStackTrace: String,
-) : LemlineMessage {
+) : WithInstance {
+
+    @Transient
+    override val workflowState get() = instanceMessage?.workflowState
+
+    @Transient
+    override val parentId get() = instanceMessage?.parentId
+
+    override fun toJsonString() = LemlineJson.encodeToString(this)
+
     companion object {
         fun from(
             id: IDV7,
@@ -28,7 +38,7 @@ data class FailureModel(
             id = id,
             instanceMessage = instance,
             payload = null,
-            reason = reason,
+            errorReason = reason,
             errorClass = error::class.qualifiedName!!,
             errorMessage = error.message,
             errorStackTrace = error.stackTraceToString()
@@ -43,7 +53,7 @@ data class FailureModel(
             id = id,
             instanceMessage = null,
             payload = payload,
-            reason = reason,
+            errorReason = reason,
             errorClass = error::class.qualifiedName!!,
             errorMessage = error.message,
             errorStackTrace = error.stackTraceToString()
@@ -56,7 +66,7 @@ data class FailureModel(
                 id = IDV7.from(outbox.id),
                 instanceMessage = outbox.instanceMessage,
                 payload = null,
-                reason = FailureReasons.OUTBOX_ERROR,
+                errorReason = FailureReasons.OUTBOX_ERROR,
                 errorClass = outbox.outboxErrorClass!!,
                 errorMessage = outbox.outboxErrorMessage,
                 errorStackTrace = outbox.outboxErrorStackTrace!!

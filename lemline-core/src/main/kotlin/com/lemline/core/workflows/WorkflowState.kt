@@ -35,9 +35,33 @@ data class WorkflowState(
      */
     @SerialName("s") val currentStates: NodeStates,
 ) {
+    /**
+     * Sets the output of the current task.
+     */
     fun setCurrentTaskOutput(output: JsonElement) {
         currentStates[currentPosition]!!.rawOutput = output
     }
 
+    /**
+     * Creates a new instance of the workflow state with a new ID.
+     */
     fun duplicate(newId: WorkflowId): WorkflowState = copy(workflowId = newId)
+
+    companion object {
+        /**
+         * Creates a new object describing a new instance
+         */
+        fun new(
+            workflowId: WorkflowId,
+            workflowName: WorkflowName,
+            workflowVersion: WorkflowVersion,
+            input: JsonElement,
+        ) = WorkflowState(
+            workflowId = workflowId,
+            workflowName = workflowName,
+            workflowVersion = workflowVersion,
+            currentPosition = NodePosition.root,
+            currentStates = NodeStates.new(input)
+        )
+    }
 }

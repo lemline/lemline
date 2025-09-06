@@ -4,24 +4,21 @@ package com.lemline.runner.ingestion
 import com.cronutils.model.CronType
 import com.cronutils.model.definition.CronDefinitionBuilder
 import com.cronutils.parser.CronParser
-import com.lemline.core.nodes.NodePosition
 import com.lemline.core.utils.toDuration
-import com.lemline.core.workflows.NodeStates
 import com.lemline.core.workflows.WorkflowId
 import com.lemline.core.workflows.WorkflowName
 import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.models.getNextCronExecutionInstant
 import com.lemline.runner.outbox.OutBoxStatus
 import io.serverlessworkflow.api.types.Schedule
 import java.time.ZoneId
-import java.util.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -33,7 +30,7 @@ import kotlinx.serialization.json.JsonElement
 @SerialName("s") // <- type discriminator for polymorphic serialization
 data class ScheduleIngestionMessage(
     @SerialName("id")
-    override val id: @Contextual UUID,
+    override val id: IDV7,
 
     @SerialName("i")
     override var instanceMessage: InstanceMessage,
@@ -92,13 +89,12 @@ data class ScheduleIngestionMessage(
             }
 
             val scheduleIngestionMessage = ScheduleIngestionMessage(
-                id = workflowId,
-                instanceMessage = InstanceMessage.fromObjects(
+                id = IDV7.new(),
+                instanceMessage = InstanceMessage.new(
                     workflowId = workflowId,
                     workflowName = workflowName,
                     workflowVersion = workflowVersion,
-                    currentPosition = NodePosition.root,
-                    currentStates = NodeStates.newInstance(workflowInput),
+                    workflowInput = workflowInput,
                     parentId = null,
                 ),
                 scheduleEvery = scheduleEvery,

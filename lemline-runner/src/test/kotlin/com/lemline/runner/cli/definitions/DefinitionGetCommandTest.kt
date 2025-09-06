@@ -3,6 +3,8 @@ package com.lemline.runner.cli.definitions
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.core.definitions.Definitions as Workflows
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.DefinitionModel
@@ -32,8 +34,8 @@ class DefinitionGetCommandTest {
     private lateinit var selector: InteractiveWorkflowSelector
     private lateinit var objectMapper: ObjectMapper
 
-    private lateinit var workflowName: String
-    private lateinit var workflowVersion: String
+    private var workflowName = WorkflowName("testWorkflow")
+    private var workflowVersion = WorkflowVersion("1.0.0")
     private lateinit var workflowDefinition: DefinitionModel
     private lateinit var cmd: CommandLine
     private lateinit var outStream: ByteArrayOutputStream
@@ -55,8 +57,8 @@ class DefinitionGetCommandTest {
         injectField(command, "objectMapper", objectMapper)
         injectField(command, "mixin", GlobalMixin())
 
-        workflowName = "testWorkflow"
-        workflowVersion = "1.0.0"
+        workflowName = WorkflowName("testWorkflow")
+        workflowVersion = WorkflowVersion("1.0.0")
         workflowDefinition = DefinitionModel(
             name = workflowName,
             version = workflowVersion,
@@ -100,7 +102,7 @@ class DefinitionGetCommandTest {
         @Test
         fun `should fetch and display workflow when name and version are provided`() {
             // When
-            val exitCode = cmd.execute(workflowName, workflowVersion)
+            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString())
 
             // Then
             exitCode shouldBe 0
@@ -111,12 +113,12 @@ class DefinitionGetCommandTest {
         @Test
         fun `should display error when workflow not found`() {
             // Given
-            val nonExistentName = "nonExistentWorkflow"
-            val nonExistentVersion = "9.9.9"
+            val nonExistentName = WorkflowName("nonExistentWorkflow")
+            val nonExistentVersion = WorkflowVersion("9.9.9")
             coEvery { definitionRepository.findByNameAndVersion(nonExistentName, nonExistentVersion) } returns null
 
             // When
-            val exitCode = cmd.execute(nonExistentName, nonExistentVersion)
+            val exitCode = cmd.execute(nonExistentName.toString(), nonExistentVersion.toString())
 
             // Then
             exitCode shouldBe 0 // Command doesn't throw, just prints error
@@ -141,7 +143,7 @@ class DefinitionGetCommandTest {
             } returns jsonOutput
 
             // When
-            val exitCode = cmd.execute(workflowName, workflowVersion, "--format", "JSON")
+            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--format", "JSON")
 
             // Then
             exitCode shouldBe 0
@@ -160,7 +162,7 @@ class DefinitionGetCommandTest {
             coEvery { selector.prepareSelection(filterName = workflowName) } returns selectionList
 
             // When
-            val exitCode = cmd.execute(workflowName)
+            val exitCode = cmd.execute(workflowName.toString())
 
             // Then
             exitCode shouldBe 0

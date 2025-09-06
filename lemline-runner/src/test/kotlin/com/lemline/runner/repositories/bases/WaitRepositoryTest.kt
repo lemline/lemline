@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.instances.InstanceMessageTest.Companion.sampleInstance
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.repositories.WaitRepository
 import jakarta.inject.Inject
-import java.util.*
 import kotlin.time.ExperimentalTime
 
 /**
@@ -18,15 +18,8 @@ internal abstract class WaitRepositoryTest : OutboxRepositoryTest<WaitOutboxMode
     override lateinit var repository: WaitRepository
 
     override fun createRandomEntity() = WaitOutboxModel(
-        id = UUID.randomUUID(),
-        instanceMessage = InstanceMessage.fromStrings(
-            workflowId = UUID.randomUUID(),
-            workflowName = randomString,
-            workflowVersion = randomString,
-            workflowPosition = randomString,
-            workflowState = randomString,
-            parentId = null,
-        ),
+        id = IDV7.new(),
+        instanceMessage = sampleInstance(),
         outboxScheduledFor = randomInstant,
     )
 

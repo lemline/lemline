@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.common.ids.IdGenerator
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.instances.InstanceMessageTest.Companion.sampleInstance
 import com.lemline.runner.models.FailureModel
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.repositories.FailureRepository
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import jakarta.inject.Inject
-import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
@@ -33,20 +32,11 @@ internal abstract class FailureRepositoryTest {
         repository.deleteAll()
     }
 
-    private fun sampleInstance(): InstanceMessage = InstanceMessage.fromStrings(
-        workflowId = UUID.randomUUID(),
-        workflowName = "wf-name",
-        workflowVersion = "1.0.0",
-        workflowPosition = "pos",
-        workflowState = "state",
-        parentId = null,
-    )
-
     @Test
     fun `should insert and retrieve a failure with all fields`() = runTest {
         val ex = IllegalStateException("boom")
         val model = FailureModel.from(
-            id = IdGenerator.generateV7(),
+            id = IDV7.new(),
             instance = sampleInstance(),
             error = ex,
         )
@@ -66,7 +56,7 @@ internal abstract class FailureRepositoryTest {
     fun `should insert and retrieve a failure with only payload`() = runTest {
         val ex = IllegalStateException("boom")
         val model = FailureModel.from(
-            id = IdGenerator.generateV7(),
+            id = IDV7.new(),
             payload = "payload",
             error = ex,
         )
@@ -87,9 +77,9 @@ internal abstract class FailureRepositoryTest {
         val instance1 = sampleInstance()
         val instance2 = sampleInstance()
 
-        val f1 = FailureModel.from(IdGenerator.generateV7(), instance1, RuntimeException("e1")).copy(payload = "m1")
-        val f2 = FailureModel.from(IdGenerator.generateV7(), instance1, RuntimeException("e2")).copy(payload = "m2")
-        val f3 = FailureModel.from(IdGenerator.generateV7(), instance2, RuntimeException("e3")).copy(payload = "m3")
+        val f1 = FailureModel.from(IDV7.new(), instance1, RuntimeException("e1")).copy(payload = "m1")
+        val f2 = FailureModel.from(IDV7.new(), instance1, RuntimeException("e2")).copy(payload = "m2")
+        val f3 = FailureModel.from(IDV7.new(), instance2, RuntimeException("e3")).copy(payload = "m3")
 
         repository.insert(listOf(f1, f2, f3))
 
@@ -104,7 +94,7 @@ internal abstract class FailureRepositoryTest {
     fun `count and deleteAll should work`() = runTest {
         val instance = sampleInstance()
         val failures = List(3) { idx ->
-            FailureModel.from(IdGenerator.generateV7(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
+            FailureModel.from(IDV7.new(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
         }
         repository.insert(failures)
         repository.count() shouldBe 3
@@ -117,7 +107,7 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `deleteById should remove an existing failure`() = runTest {
         // Given
-        val failure = FailureModel.from(IdGenerator.generateV7(), sampleInstance(), RuntimeException("boom"))
+        val failure = FailureModel.from(IDV7.new(), sampleInstance(), RuntimeException("boom"))
         repository.insert(failure)
 
         // When
@@ -131,9 +121,9 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `deleteById should return 0 if failure does not exist`() = runTest {
         // Given
-        val failure = FailureModel.from(IdGenerator.generateV7(), sampleInstance(), RuntimeException("boom"))
+        val failure = FailureModel.from(IDV7.new(), sampleInstance(), RuntimeException("boom"))
         repository.insert(failure)
-        val randomId = UUID.randomUUID()
+        val randomId = IDV7.new()
 
         // When
         val deletedCount = repository.deleteById(randomId)

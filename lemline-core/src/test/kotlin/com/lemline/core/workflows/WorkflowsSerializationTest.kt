@@ -64,7 +64,7 @@ class WorkflowsSerializationTest {
             workflowName = WorkflowName("orders"),
             workflowVersion = WorkflowVersion("v1"),
             currentPosition = NodePosition.root,
-            currentStates = NodeStates.newInstance(JsonPrimitive("hello"))
+            currentStates = NodeStates.new(JsonPrimitive("hello"))
         )
 
         val encoded = LemlineJson.encodeToString(workflowState)

@@ -1,11 +1,11 @@
-package com.lemline.runner.messaging
+package com.lemline.runner.models
 
 import com.lemline.core.workflows.WorkflowState
-import com.lemline.runner.models.IDV7
+import com.lemline.runner.messaging.JsonSerializable
 import kotlin.time.ExperimentalTime
 
 @ExperimentalTime
-interface LemlineMessage : JsonSerializable {
+interface WithInstance : WithId, JsonSerializable {
 
     val workflowState: WorkflowState?
 

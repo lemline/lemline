@@ -1,8 +1,6 @@
 package com.lemline.runner.messaging
 
-import com.lemline.common.error
-import com.lemline.common.logger
-import com.lemline.common.warn
+import com.lemline.core.logger.logger
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
 import io.smallrye.reactive.messaging.kafka.api.IncomingKafkaRecordMetadata
@@ -16,6 +14,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.random.Random
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeout
 import org.apache.kafka.common.errors.RetriableException
@@ -78,67 +77,59 @@ object AckNackPolicy {
     val livenessDownOnFatal = AtomicBoolean(false)
 
     /**
-     * A function that attempts to acknowledge a message with retries in case of failure.
-     * The function will make several attempts to acknowledge the message within the provided
-     * retry constraints, such as the maximum number of attempts, the total time budget, and
-     * the timeout for an individual attempt.
+     * Acknowledges a message with retry logic, ensuring retries with exponential backoff if the acknowledgment fails.
+     * The method implements local retries to keep acknowledgment and processing within the defined time and attempt limits.
      *
-     * @param msg The message to be acknowledged. Must be an instance of a reactive messaging Message.
-     * @param maxAttempts The maximum number of retry attempts to perform. Defaults to 6.
-     * @param totalBudgetMs The total time budget (in milliseconds) allowed for all retry attempts. Defaults to 60,000 ms.
-     * @param singleAttemptTimeoutMs The timeout duration (in milliseconds) for a single acknowledgment attempt. Defaults to 10,000 ms.
-     * @return True if the message was successfully acknowledged within the retry constraints, otherwise false.
+     * @param maxAttempts The maximum number of retry attempts for acknowledgment. Defaults to 6.
+     * @param totalBudgetMs The total allowable time budget for acknowledgment retries, in milliseconds. Defaults to 60,000 ms.
+     * @param singleAttemptTimeoutMs The timeout for a single acknowledgment attempt, in milliseconds. Defaults to 10,000 ms.
      */
-    suspend fun ackWithRetry(
-        msg: Message<*>,
+    suspend fun Message<*>.ackWithRetry(
         maxAttempts: Int = 6,
-        totalBudgetMs: Long = 60_000, // Keep local retry+processing under throttled.unprocessed-record-max-age.ms
-        singleAttemptTimeoutMs: Long = 10_000
-    ): Boolean = retry("ACK", maxAttempts, totalBudgetMs) {
+        totalBudgetMs: Long = 6_000, // Keep local retry+processing under throttled.unprocessed-record-max-age.ms
+        singleAttemptTimeoutMs: Long = 1_000
+    ) = retry("ACK", maxAttempts, totalBudgetMs) {
         withTimeout(singleAttemptTimeoutMs) {
-            msg.ackSuspending()
+            ackSuspending()
         }
     }
 
     /**
-     * Handles a negative acknowledgment (NACK) of a reactive message with retry logic.
-     * The method retries the NACK operation up to a specified number of attempts within
-     * a time budget, using a timeout for each individual attempt.
+     * Attempts to negatively acknowledge a message multiple times with retry logic.
+     * This method supports configurable retry attempts, a total time budget for retries,
+     * and a timeout for each individual attempt. The negative acknowledgment is performed
+     * asynchronously, with detailed handling for failed attempts.
      *
-     * @param msg The reactive message to be negatively acknowledged.
-     * @param cause The throwable that triggered the negative acknowledgment.
-     * @param maxAttempts The maximum number of retry attempts for the NACK operation. Default is 6.
-     * @param totalBudgetMs The total time budget in milliseconds across all retry attempts. Default is 60,000ms.
-     * @param singleAttemptTimeoutMs The timeout in milliseconds for each individual retry attempt. Default is 10,000ms.
-     * @return True if the NACK operation succeeds within the constraints, false otherwise.
+     * @param cause The exception or error that caused the message to be negatively acknowledged.
+     * @param maxAttempts The maximum number of retry attempts. Default is 6.
+     * @param totalBudgetMs The total time budget in milliseconds for all retry attempts combined. Default is 60,000 ms.
+     * @param singleAttemptTimeoutMs The timeout in milliseconds for each individual retry attempt. Default is 10,000 ms.
      */
-    suspend fun nackWithRetry(
-        msg: Message<*>,
+    suspend fun Message<*>.nackWithRetry(
         cause: Throwable,
         maxAttempts: Int = 6,
-        totalBudgetMs: Long = 60_000,
-        singleAttemptTimeoutMs: Long = 10_000
-    ): Boolean = retry("NACK", maxAttempts, totalBudgetMs) {
+        totalBudgetMs: Long = 6_000,
+        singleAttemptTimeoutMs: Long = 1_000
+    ) = retry("NACK", maxAttempts, totalBudgetMs) {
         withTimeout(singleAttemptTimeoutMs) {
-            msg.nackSuspending(cause)
+            nackSuspending(cause)
         }
     }
 
     /**
      * Writes a message and its associated metadata to a local quarantine file for later inspection.
      *
-     * @param msg The message to be quarantined, including its metadata and payload.
+     * @param this The message to be quarantined, including its metadata and payload.
      * @param cause The throwable that caused the message to be quarantined.
      * @param path Optional file path to the quarantine file. Defaults to "/var/lib/lemline/quarantine.jsonl".
      * @return True if the message was successfully written to the quarantine file, false otherwise.
      */
-    fun quarantineLocally(
-        msg: Message<*>,
+    fun Message<*>.quarantineLocally(
         cause: Throwable,
         path: String = "/var/lib/lemline/quarantine.jsonl"
     ): Boolean = try {
-        val kafkaMd = msg.getMetadata(IncomingKafkaRecordMetadata::class.java).orElse(null)
-        val rabbitMd = msg.getMetadata(IncomingRabbitMQMetadata::class.java).orElse(null)
+        val kafkaMd = getMetadata(IncomingKafkaRecordMetadata::class.java).orElse(null)
+        val rabbitMd = getMetadata(IncomingRabbitMQMetadata::class.java).orElse(null)
         val json = buildString {
             append('{')
             append("\"ts\":\"").append(Instant.now()).append('\"')
@@ -156,38 +147,36 @@ object AckNackPolicy {
             }
             append(",\"error\":\"").append(rootCause(cause)?.javaClass?.name).append('\"')
             append(",\"errorMessage\":\"").append((rootCause(cause)?.message ?: "").replace("\"", "\\\"")).append('\"')
-            append(",\"payload\":").append(msg.payload.toString().replace("\"", "\\\""))
+            append(",\"payload\":").append(payload.toString().replace("\"", "\\\""))
             append('}').append('\n')
         }
         Files.createDirectories(Paths.get(path).parent)
         Files.writeString(
             Paths.get(path), json, StandardOpenOption.CREATE, StandardOpenOption.APPEND
         )
-        logger.warn(cause) { "Message ${msg.toLogString()} quarantined to $path" }
+        logger.warn(cause) { "Message ${toLogString()} quarantined to $path" }
         true
     } catch (t: Exception) {
-        logger.error(t) { "Failed to write message ${msg.toLogString()} to quarantine file $path" }
+        logger.error(t) { "Failed to write message ${toLogString()} to quarantine file $path" }
         false
     }
 
     /**
-     * Retries the execution of a block of code with a configurable maximum number of attempts and
-     * a time budget, using an exponential backoff strategy between attempts. The method ensures
-     * that the retry process stops on reaching the maximum attempts, exceeding the time budget,
-     * or encountering a non-retriable exception.
+     * Retries the execution of a given suspending block of code until it succeeds, the maximum number of attempts
+     * is reached, or the total time budget in milliseconds is exceeded. The retry logic includes handling exceptions
+     * and applying an exponential backoff mechanism to space out subsequent attempts.
      *
-     * @param label A descriptive label used in logging to identify the operation being retried.
-     * @param maxAttempts The maximum number of retry attempts allowed. Once reached, the method stops retrying.
-     * @param totalBudgetMs The total time budget in milliseconds within which all retries must be performed. Once exceeded, the method stops retrying.
-     * @param block A suspending lambda expression that contains the code to be executed and potentially retried upon failure.
-     * @return True if the operation completes successfully within the retry constraints, false otherwise.
+     * @param label A descriptive label for the retry operation, used in logging to track the operation being attempted.
+     * @param maxAttempts The maximum number of retry attempts allowed before giving up.
+     * @param totalBudgetMs The total allowable time budget for retries, in milliseconds, after which retries will stop.
+     * @param block The suspending block of code to execute and retry upon failure.
      */
     private suspend fun retry(
         label: String,
         maxAttempts: Int,
         totalBudgetMs: Long,
         block: suspend () -> Unit
-    ): Boolean {
+    ) {
         var attempt = 0
         val start = System.nanoTime()
         while (true) {
@@ -195,7 +184,7 @@ object AckNackPolicy {
                 if (attempt > 0) readinessDownDuringRetries.set(true)
                 block()
                 readinessDownDuringRetries.set(false)
-                return true
+                return
             } catch (e: Exception) {
                 attempt++
                 val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
@@ -203,7 +192,7 @@ object AckNackPolicy {
                 if (!retriable || attempt >= maxAttempts || elapsedMs >= totalBudgetMs) {
                     logger.error(e) { "$label failed after $attempt attempts (${elapsedMs}ms)" }
                     livenessDownOnFatal.set(true)
-                    return false
+                    throw e
                 }
                 sleepBackoff(attempt)
             }
@@ -218,9 +207,9 @@ object AckNackPolicy {
      */
     private fun isRetriable(t: Throwable): Boolean {
         val c = rootCause(t)
-        return c is RetriableException ||
-            c is java.net.SocketTimeoutException ||
-            c is java.nio.channels.ClosedChannelException
+        return c is TimeoutCancellationException || // <- coroutine timeout exception
+            c is RetriableException || // <- kafka exception
+            c is java.io.IOException // <- IO exception (e.g. connection reset)
     }
 
     private fun rootCause(t: Throwable?): Throwable? {

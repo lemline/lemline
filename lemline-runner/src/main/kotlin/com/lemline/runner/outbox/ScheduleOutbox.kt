@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
+import com.lemline.core.workflows.WorkflowId
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.models.ScheduleOutboxModel
@@ -54,7 +55,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
 
     override suspend fun process(entity: ScheduleOutboxModel) {
         // update the schedule model with the next instant to be processed
-        entity.prepareNextScheduled()
+        entity.prepareNextScheduled(WorkflowId.new())
         // start a new instance of the workflow (with new workflowId)
         super.process(entity)
     }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.definitions
 
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.DefinitionModel
@@ -31,8 +33,8 @@ class DefinitionDeleteCommandTest {
     private lateinit var originalErr: PrintStream
     private lateinit var originalIn: java.io.InputStream
 
-    private lateinit var workflowName: String
-    private lateinit var workflowVersion: String
+    private var workflowName = WorkflowName("testWorkflow")
+    private var workflowVersion = WorkflowVersion("1.0.0")
     private lateinit var workflowDefinition: DefinitionModel
     private lateinit var workflowDefinition2: DefinitionModel
 
@@ -48,8 +50,8 @@ class DefinitionDeleteCommandTest {
         injectField(command, "selector", selector)
         injectField(command, "mixin", GlobalMixin())
 
-        workflowName = "testWorkflow"
-        workflowVersion = "1.0.0"
+        workflowName = WorkflowName("testWorkflow")
+        workflowVersion = WorkflowVersion("1.0.0")
         workflowDefinition = DefinitionModel(
             name = workflowName,
             version = workflowVersion,
@@ -67,7 +69,7 @@ class DefinitionDeleteCommandTest {
 
         workflowDefinition2 = DefinitionModel(
             name = workflowName,
-            version = "2.0.0",
+            version = WorkflowVersion("2.0.0"),
             definition = """
                 document:
                   dsl: 1.0.0
@@ -118,7 +120,7 @@ class DefinitionDeleteCommandTest {
             coEvery { definitionRepository.delete(workflowDefinition) } returns 1
 
             // When
-            val exitCode = cmd.execute(workflowName, workflowVersion, "--force")
+            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--force")
 
             // Then
             exitCode shouldBe 0
@@ -135,7 +137,7 @@ class DefinitionDeleteCommandTest {
             coEvery { definitionRepository.delete(workflowVersions) } returns 2
 
             // When
-            val exitCode = cmd.execute(workflowName, "--force")
+            val exitCode = cmd.execute(workflowName.toString(), "--force")
 
             // Then
             exitCode shouldBe 0
@@ -180,12 +182,12 @@ class DefinitionDeleteCommandTest {
         @Test
         fun `should handle workflow not found when deleting specific version with force flag`() {
             // Given
-            val nonExistentName = "nonExistentWorkflow"
-            val nonExistentVersion = "9.9.9"
+            val nonExistentName = WorkflowName("nonExistentWorkflow")
+            val nonExistentVersion = WorkflowVersion("9.9.9")
             coEvery { definitionRepository.findByNameAndVersion(nonExistentName, nonExistentVersion) } returns null
 
             // When
-            val exitCode = cmd.execute(nonExistentName, nonExistentVersion, "--force")
+            val exitCode = cmd.execute(nonExistentName.toString(), nonExistentVersion.toString(), "--force")
 
             // Then
             exitCode shouldBe 0
@@ -205,7 +207,7 @@ class DefinitionDeleteCommandTest {
             } returns workflowDefinition
 
             // When - force flag will bypass the confirmation
-            val exitCode = cmd.execute(workflowName, workflowVersion, "--force")
+            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--force")
 
             // Then
             exitCode shouldBe 0

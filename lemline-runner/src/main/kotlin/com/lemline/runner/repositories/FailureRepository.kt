@@ -56,8 +56,7 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
 
     companion object {
         internal const val PAYLOAD_COLUMN = "payload"
-        internal const val REASON_COLUMN = "reason"
-
+        internal const val ERROR_REASON_COLUMN = "error_reason"
         internal const val ERROR_CLASS_COLUMN = "error_class"
         internal const val ERROR_MESSAGE_COLUMN = "error_message"
         internal const val ERROR_STACKTRACE_COLUMN = "error_stacktrace"
@@ -68,8 +67,8 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
             PAYLOAD_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
                 stmt.setString(idx, entity.payload)
             },
-            REASON_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
-                stmt.setString(idx, entity.reason)
+            ERROR_REASON_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
+                stmt.setString(idx, entity.errorReason)
             },
             ERROR_CLASS_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
                 stmt.setString(idx, entity.errorClass)
@@ -86,8 +85,8 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
     override fun createModel(rs: ResultSet) = FailureModel(
         id = IDV7(getUuid(rs, ID_COLUMN)),
         instanceMessage = rs.getInstanceMessage(),
-        reason = rs.getString(REASON_COLUMN),
         payload = rs.getString(PAYLOAD_COLUMN),
+        errorReason = rs.getString(ERROR_REASON_COLUMN),
         errorClass = rs.getString(ERROR_CLASS_COLUMN),
         errorMessage = rs.getString(ERROR_MESSAGE_COLUMN),
         errorStackTrace = rs.getString(ERROR_STACKTRACE_COLUMN)

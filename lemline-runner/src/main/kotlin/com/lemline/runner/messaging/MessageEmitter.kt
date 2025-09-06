@@ -19,6 +19,10 @@ internal abstract class MessageEmitter<T : JsonSerializable> {
     @ConfigProperty(name = MESSAGING_TYPE)
     private lateinit var messagingType: String
 
+    suspend fun send(payload: String) {
+        emit(payload, getMetaData())
+    }
+
     suspend fun send(msg: T) {
         emit(msg.toJsonString(), getMetaData())
     }

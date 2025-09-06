@@ -5,10 +5,13 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
 import com.lemline.core.workflows.NodeStates
-import java.util.*
-import kotlin.time.Clock
+import com.lemline.core.workflows.WorkflowId
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.workflows.WorkflowVersion
+import com.lemline.runner.models.IDV7
+import kotlin.random.Random
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -16,24 +19,34 @@ import org.junit.jupiter.api.Test
 @ExperimentalTime
 internal class InstanceMessageTest {
 
+    companion object {
+        fun sampleInstance(): InstanceMessage {
+            return InstanceMessage(
+                workflowState = WorkflowState(
+                    workflowId = WorkflowId.new(),
+                    workflowName = WorkflowName("test-workflow"),
+                    workflowVersion = WorkflowVersion(Random.nextBytes(10).toString()),
+                    currentPosition = NodePosition.root,
+                    currentStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
+                ),
+                parentId = IDV7.new()
+            )
+        }
+    }
+
+
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {
         // Given
-        val workflowId = UUID.randomUUID()
-        val parentId = UUID.randomUUID()
-
-        val instanceMessage = InstanceMessage.fromObjects(
-            workflowId = workflowId,
-            workflowName = "test-workflow",
-            workflowVersion = "1.0.0",
-            currentPosition = NodePosition.root,
-            currentStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
-            parentId = parentId
-        )
+        val instanceMessage = sampleInstance()
+        val workflowId = instanceMessage.workflowId
+        val parentId = instanceMessage.parentId
+        val workflowName = instanceMessage.workflowName
+        val workflowVersion = instanceMessage.workflowVersion
 
         // When
         Assertions.assertEquals(
-            """{"i":"$workflowId","n":"test-workflow","v":"1.0.0","p":"","s":{"":{"inp":""}},"w":"$parentId"}""",
+            """{"i":"$workflowId","n":"$workflowName","v":"$workflowVersion","p":"","s":{"":{"inp":""}},"w":"$parentId"}""",
             instanceMessage.toJsonString(),
         )
     }
@@ -41,75 +54,13 @@ internal class InstanceMessageTest {
     @Test
     fun `should be JSON serializable and deserializable`() {
         // Given
-        val instanceMessage = InstanceMessage.fromObjects(
-            workflowId = UUID.randomUUID(),
-            workflowName = "test-workflow",
-            workflowVersion = "1.0.0",
-            currentPosition = NodePosition.root,
-            currentStates = NodeStates(mapOf(NodePosition.root to NodeState(rawInput = JsonPrimitive("")))),
-            parentId = UUID.randomUUID(),
-        )
-
-        // When
-        Assertions.assertEquals(instanceMessage, InstanceMessage.fromJsonString(instanceMessage.toJsonString()))
-    }
-
-    @Test
-    fun `should serialize and deserialize MessageBody`() {
-        // Given
-        val original = InstanceMessage.fromObjects(
-            workflowId = UUID.randomUUID(),
-            workflowName = "test-workflow",
-            workflowVersion = "1.0.0",
-            currentPosition = NodePosition.root,
-            currentStates = NodeStates(
-                mapOf(
-                    NodePosition.root to NodeState(
-                        rawInput = JsonObject(mapOf("test" to JsonPrimitive("value"))),
-                        startedAt = Clock.System.now(),
-                    )
-                ),
-            ),
-            parentId = UUID.randomUUID(),
-        )
+        val original = sampleInstance()
 
         // When
         val json = LemlineJson.encodeToString(original)
-        val deserialized = LemlineJson.decodeFromString<InstanceMessage>(json)
-
-        // Then
-        Assertions.assertEquals(original, deserialized)
-    }
-
-    @Test
-    fun `should create new instance with correct initial state`() {
-        // Given
-        val id = UUID.randomUUID()
-        val name = "test-workflow"
-        val version = "1.0.0"
-        val input = JsonObject(
-            mapOf(
-                "key1" to JsonPrimitive("value1"),
-                "key2" to JsonPrimitive("value2"),
-            ),
-        )
+        val deserialized = InstanceMessage.fromJsonString(json)
 
         // When
-        val instanceMessage = InstanceMessage.forNewWorkflow(id, name, version, input)
-
-        // Then
-        val expectedStates = NodeStates(
-            mapOf(
-                NodePosition.root to NodeState(
-                    rawInput = input,
-                    startedAt = instanceMessage.nodeStates.parsed[NodePosition.root]!!.startedAt,
-                ),
-            )
-        )
-
-        Assertions.assertEquals(name, instanceMessage.workflowName)
-        Assertions.assertEquals(version, instanceMessage.workflowVersion)
-        Assertions.assertEquals(expectedStates, instanceMessage.nodeStates.parsed)
-        Assertions.assertEquals(NodePosition.root, instanceMessage.workflowPosition.parsed)
+        Assertions.assertEquals(original, deserialized)
     }
 }

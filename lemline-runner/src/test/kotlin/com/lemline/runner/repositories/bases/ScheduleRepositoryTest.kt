@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.instances.InstanceMessageTest.Companion.sampleInstance
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.repositories.ScheduleRepository
 import jakarta.inject.Inject
-import java.util.*
 import kotlin.time.ExperimentalTime
 
 /**
@@ -18,15 +18,8 @@ internal abstract class ScheduleRepositoryTest : OutboxRepositoryTest<ScheduleOu
     override lateinit var repository: ScheduleRepository
 
     override fun createRandomEntity() = ScheduleOutboxModel(
-        id = UUID.randomUUID(),
-        instanceMessage = InstanceMessage.fromStrings(
-            workflowId = UUID.randomUUID(),
-            workflowName = randomString,
-            workflowVersion = randomString,
-            workflowPosition = randomString,
-            workflowState = randomString,
-            parentId = null,
-        ),
+        id = IDV7.new(),
+        instanceMessage = sampleInstance(),
         scheduleAfter = randomNullableString,
         scheduleCron = randomNullableString,
         scheduleEvery = randomNullableString,

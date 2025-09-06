@@ -17,12 +17,17 @@ value class NodeStates(private val state: Map<NodePosition, NodeState>) {
     operator fun get(key: NodePosition): NodeState? = state[key]
 
     companion object {
-        fun newInstance(rawInput: JsonElement) =
+        /**
+         * Creates a new object describing the initial states of the nodes.
+         */
+        fun new(rawInput: JsonElement) =
             NodeStates(
                 mapOf(
                     NodePosition.root to NodeState(rawInput = rawInput, startedAt = Clock.System.now()),
                 ),
             )
+
+        fun fromJsonString(jsonString: String) = LemlineJson.decodeFromString<NodeStates>(jsonString)
     }
 
     fun toJsonString() = LemlineJson.encodeToString(state)

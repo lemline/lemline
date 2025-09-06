@@ -2,17 +2,19 @@
 package com.lemline.runner.starters
 
 import com.github.zafarkhaja.semver.Version
-import com.lemline.common.ids.IdGenerator
 import com.lemline.core.definitions.Definitions
 import com.lemline.core.schemas.SchemaValidator
+import com.lemline.core.workflows.WorkflowId
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.ingestion.IngestionMessageEmitter
 import com.lemline.runner.ingestion.ScheduleIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.repositories.DefinitionRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.ZoneId
-import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
@@ -28,10 +30,10 @@ class Starter {
     private lateinit var ingestionMessageEmitter: IngestionMessageEmitter
 
     suspend fun start(
-        workflowName: String,
-        optionalVersion: String?,
+        workflowName: WorkflowName,
+        optionalVersion: WorkflowVersion?,
         workflowInput: JsonElement,
-        parentId: UUID?,
+        parentId: IDV7?,
         zoneId: ZoneId?,
         onDebug: (() -> String) -> Unit,
         onError: (() -> String) -> Nothing,
@@ -46,7 +48,7 @@ class Starter {
             onError { "Invalid workflow definition: ${e.message}" }
         }
 
-        val workflowVersion = workflow.document.version
+        val workflowVersion = WorkflowVersion(workflow.document.version)
 
         // Validate input against schema if any
         workflow.input?.schema?.let { schema ->
@@ -58,9 +60,9 @@ class Starter {
         }
 
         // create the message
-        val workflowId = IdGenerator.generateV7() // <- TODO create idempotent id
+        val workflowId = WorkflowId.new() // <- TODO create idempotent id
 
-        val instanceMessage = InstanceMessage.forNewWorkflow(
+        val instanceMessage = InstanceMessage.new(
             workflowId = workflowId,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
@@ -101,19 +103,25 @@ class Starter {
     }
 
     // TODO (get from cache first)
-    private suspend fun getDefinition(name: String, version: String?, onError: (() -> String) -> Nothing): String =
-        version?.let { version ->
-            // by name and version
-            definitionRepository.findByNameAndVersion(name, version)?.definition
-                ?: onError { "Workflow with name '$name' and version '$version' not found" }
-        } ?: run {
-            // by name only, get the last version
-            val workflows = definitionRepository.listByName(name)
-            if (workflows.isEmpty()) onError { "No workflows found with name '$name'" }
+    private suspend fun getDefinition(
+        workflowName: WorkflowName,
+        workflowVersion: WorkflowVersion?,
+        onError: (() -> String) -> Nothing
+    ): String = workflowVersion?.let { version ->
+        // by name and version
+        definitionRepository.findByNameAndVersion(workflowName, version)
+            ?.definition
+            ?: onError { "Workflow with name '$workflowName' and version '$version' not found" }
+    } ?: run {
+        // by name only, get the last version
+        val workflows = definitionRepository.listByName(workflowName)
+        if (workflows.isEmpty()) onError { "No workflows found with name '$workflowName'" }
 
-            workflows.maxWithOrNull { w1, w2 ->
-                runCatching { Version.parse(w1.version).compareTo(Version.parse(w2.version)) }
-                    .getOrDefault(w1.version.compareTo(w2.version))
-            }?.definition ?: onError { "Failed to determine latest version for workflow '$name'" }
-        }
+        workflows.maxWithOrNull { w1, w2 ->
+            val v1 = w1.version.toString()
+            val v2 = w2.version.toString()
+            runCatching { Version.parse(v1).compareTo(Version.parse(v2)) }
+                .getOrDefault(v1.compareTo(v2))
+        }?.definition ?: onError { "Failed to determine latest version for workflow '$workflowName'" }
+    }
 }

@@ -12,6 +12,7 @@ object FailureReasons {
     const val SERIALISATION_ERROR = "serialisation_error"
     const val DEFINITION_NOT_FOUND = "definition_not_found"
     const val SECRETS_RETRIEVAL_FAILED = "secrets_retrieval_failed"
+    const val WORKFLOW_INITIALIZATION_ERROR = "workflow_initialization_error"
     const val MESSAGE_EMISSION_ERROR = "message_emission_error"
     const val DATABASE_ERROR = "database_error"
     const val IO_ERROR = "io_error"

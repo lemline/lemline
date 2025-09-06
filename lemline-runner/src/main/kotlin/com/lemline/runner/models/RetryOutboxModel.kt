@@ -27,6 +27,11 @@ data class RetryOutboxModel(
     override var outboxErrorStackTrace: String? = null,
 
     /**
+     * Reason for this retry
+     */
+    val errorReason: String,
+
+    /**
      * Error class of the exception that triggered this retry
      */
     val errorClass: String,

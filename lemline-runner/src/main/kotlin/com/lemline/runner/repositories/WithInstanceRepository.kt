@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.core.nodes.NodePosition
+import com.lemline.core.workflows.NodeStates
 import com.lemline.core.workflows.WorkflowId
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.messaging.LemlineMessage
 import com.lemline.runner.models.IDV7
+import com.lemline.runner.models.WithInstance
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -42,7 +47,7 @@ import kotlin.time.ExperimentalTime
  */
 @Suppress("unused")
 @ExperimentalTime
-abstract class WithInstanceRepository<T : LemlineMessage> : WithIdRepository<T>() {
+abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() {
 
     companion object {
         internal const val WORKFLOW_ID_COLUMN = "workflow_id"
@@ -76,14 +81,16 @@ abstract class WithInstanceRepository<T : LemlineMessage> : WithIdRepository<T>(
         )
     }
 
-    protected fun ResultSet.getInstanceMessage() = when (val id = getUuid(this, WORKFLOW_ID_COLUMN)) {
+    protected fun ResultSet.getInstanceMessage(): InstanceMessage? = when (val id = getUuid(this, WORKFLOW_ID_COLUMN)) {
         null -> null
-        else -> InstanceMessage.fromStrings(
-            workflowId = id,
-            workflowName = getString(WORKFLOW_NAME_COLUMN),
-            workflowVersion = getString(WORKFLOW_VERSION_COLUMN),
-            workflowPosition = getString(WORKFLOW_POSITION_COLUMN),
-            workflowState = getString(WORKFLOW_STATE_COLUMN),
+        else -> InstanceMessage(
+            workflowState = WorkflowState(
+                workflowId = WorkflowId(id),
+                workflowName = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
+                workflowVersion = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
+                currentPosition = NodePosition.fromJsonString(getString(WORKFLOW_POSITION_COLUMN)),
+                currentStates = NodeStates.fromJsonString(getString(WORKFLOW_STATE_COLUMN)),
+            ),
             parentId = IDV7(getUuid(this, PARENT_ID_COLUMN)),
         )
     }

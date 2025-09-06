@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.common.error
-import com.lemline.common.info
-import com.lemline.common.logger
-import com.lemline.common.warn
+import com.lemline.core.logger.logger
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
 import java.util.concurrent.atomic.AtomicBoolean
@@ -15,9 +12,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.future.future
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.reactivestreams.Publisher
@@ -25,7 +24,7 @@ import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 
 @ExperimentalTime
-internal abstract class MessageSubscriber<T : LemlineMessage>() : Subscriber<Message<String>> {
+internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Message<String>> {
 
     abstract val maxConcurrency: Long
     abstract val enabled: Boolean
@@ -36,18 +35,11 @@ internal abstract class MessageSubscriber<T : LemlineMessage>() : Subscriber<Mes
     val logger = logger()
 
     private val scope: CoroutineScope =
-        CoroutineScope(
-            Dispatchers.IO +
-                SupervisorJob() +
-                CoroutineExceptionHandler { _, throwable ->
-                    if (throwable is Exception && isConnectionError(throwable)) {
-                        logger.error(throwable) { "Critical connection error in consumer - triggering shutdown" }
-                        // Trigger a shutdown of the subscriber
-                        CoroutineScope(Dispatchers.Default).launch { onShutdown() }
-                    } else {
-                        logger.error(throwable) { "Unhandled coroutine exception in consumer" }
-                    }
-                })
+        CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, e ->
+            logger.warn(e) { "Error processing message, will attempt to recover." }
+            // restart the subscription on another coroutine
+            reSubscribe()
+        })
 
 
     @PostConstruct
@@ -68,9 +60,21 @@ internal abstract class MessageSubscriber<T : LemlineMessage>() : Subscriber<Mes
     private lateinit var subscription: Subscription
 
     // Add state tracking
+    private var isResubscribing = AtomicBoolean(false)
     private var isSubscribed = AtomicBoolean(false)
     private var isShutdown = AtomicBoolean(false)
 
+    internal fun reSubscribe(timeoutMs: Long = 5000) {
+        if (!isResubscribing.compareAndSet(false, true)) {
+            logger.warn { "reSubscribe called more than once - ignoring" }
+            return
+        }
+        cancelSubscription()
+        // wait for active messages to complete
+        gracePeriod(timeoutMs)
+        // restart the subscription
+        subscribe()
+    }
 
     internal fun subscribe() {
         if (!isSubscribed.compareAndSet(false, true)) {
@@ -87,29 +91,30 @@ internal abstract class MessageSubscriber<T : LemlineMessage>() : Subscriber<Mes
         }
         subscription = s
         subscription.request(maxConcurrency)
+        isResubscribing.set(false)
     }
 
     override fun onNext(item: Message<String>) {
         if (isShutdown.get()) {
             logger.warn { "Received message after subscriber shutdown. It will be redelivered by the broker. Message: $item" }
-        } else {
-            scope.launch {
-                metrics.received()
-                metrics.incrementActive()
+            return
+        }
 
-                try {
-                    handler.handleMessage(item)
-                } finally {
-                    metrics.decrementActive()
-                    requestNext()
-                }
+        scope.launch {
+            metrics.received()
+            metrics.incrementActive()
+            try {
+                handler.handleMessage(item)
+            } finally {
+                metrics.decrementActive()
             }
+            requestNext()
         }
     }
 
     override fun onError(t: Throwable) {
         logger.error(t) { "Error on subscription" }
-        onShutdown()
+        reSubscribe()
     }
 
     override fun onComplete() {
@@ -118,10 +123,16 @@ internal abstract class MessageSubscriber<T : LemlineMessage>() : Subscriber<Mes
     }
 
     internal fun onShutdown(timeoutMs: Long = 5000) {
-        if (!isShutdown.compareAndSet(false, true)) return
+        if (!isShutdown.compareAndSet(false, true)) {
+            logger.warn { "onShutdown called more than once - ignoring" }
+            return
+        }
+
         cancelSubscription()
         // wait for active messages to complete
         gracePeriod(timeoutMs)
+        // shutdown the scope
+        scope.cancel()
     }
 
     private fun requestNext() {
@@ -138,6 +149,7 @@ internal abstract class MessageSubscriber<T : LemlineMessage>() : Subscriber<Mes
             try {
                 logger.info { "🔻 Shutting down consumer" }
                 subscription.cancel()
+                isSubscribed.set(false)
             } catch (e: Exception) {
                 logger.error(e) { "Error canceling subscription" }
             }
@@ -146,45 +158,23 @@ internal abstract class MessageSubscriber<T : LemlineMessage>() : Subscriber<Mes
 
     private fun gracePeriod(timeoutMs: Long) {
         // Launch a coroutine to handle the shutdown
-        CoroutineScope(Dispatchers.Default).future {
+        runBlocking {
             try {
-                // Wait for active messages to complete (with timeout)
                 withTimeout(timeoutMs) {
+                    // Wait for coroutines currently processing messages
+                    scope.coroutineContext.job.children.forEach { it.join() }
+
+                    // check also metrics
                     while (metrics.getActiveCount() > 0) {
-                        delay(100)
+                        delay(50)
                     }
                 }
                 logger.info { "✅ All messages processed, completing shutdown" }
             } catch (_: TimeoutCancellationException) {
                 logger.warn { "⚠️ Graceful shutdown timed out with ${metrics.getActiveCount()} messages still active" }
-            } finally {
-                scope.cancel()
+                // Force cancel the remaining jobs
+                scope.coroutineContext.job.cancelChildren()
             }
-        }.join()
-    }
-
-}
-
-private fun isConnectionError(e: Exception): Boolean = when (e) {
-    is java.io.IOException,
-    is java.util.concurrent.TimeoutException -> true
-
-    // Kafka specific exceptions
-    is org.apache.kafka.common.errors.NetworkException,
-    is org.apache.kafka.common.errors.DisconnectException,
-    is org.apache.kafka.common.errors.TimeoutException -> true
-
-    // RabbitMQ specific exceptions
-    is com.rabbitmq.client.ShutdownSignalException -> true
-
-    else -> {
-        // Recursive check for the cause
-        val cause = e.cause
-        when {
-            cause == null -> false
-            cause === e -> false  // Avoid infinite loop
-            cause is Exception -> isConnectionError(cause)
-            else -> false
         }
     }
 }

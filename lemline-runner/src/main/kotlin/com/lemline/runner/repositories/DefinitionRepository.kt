@@ -31,10 +31,10 @@ class DefinitionRepository : Repository<DefinitionModel>() {
             stmt.setString(idx, entity.definition)
         },
         WORKFLOW_NAME_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
-            stmt.setString(idx, entity.name)
+            stmt.setString(idx, entity.name.toString())
         },
         WORKFLOW_VERSION_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
-            stmt.setString(idx, entity.version)
+            stmt.setString(idx, entity.version.toString())
         }
     )
 
@@ -48,8 +48,8 @@ class DefinitionRepository : Repository<DefinitionModel>() {
      * @return A new workflow model instance populated with data from the ResultSet
      */
     override fun createModel(rs: ResultSet): DefinitionModel = DefinitionModel(
-        name = rs.getString(WORKFLOW_NAME_COLUMN),
-        version = rs.getString(WORKFLOW_VERSION_COLUMN),
+        name = WorkflowName(rs.getString(WORKFLOW_NAME_COLUMN)),
+        version = WorkflowVersion(rs.getString(WORKFLOW_VERSION_COLUMN)),
         definition = rs.getString(WORKFLOW_DEFINITION_COLUMN)
     )
 

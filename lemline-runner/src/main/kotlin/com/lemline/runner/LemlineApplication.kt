@@ -23,6 +23,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import kotlin.system.exitProcess
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.jboss.logging.Logger
 import org.jboss.logging.Logger.Level
 import picocli.CommandLine
@@ -69,6 +70,7 @@ class LemlineApplication : QuarkusApplication {
          *
          * @param args Command line arguments.
          */
+        @OptIn(ExperimentalSerializationApi::class)
         @JvmStatic
         fun main(args: Array<String>) {
             try {

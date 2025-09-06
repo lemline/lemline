@@ -16,7 +16,7 @@ import kotlinx.serialization.Serializable
 @SerialName("f") // <- type discriminator for polymorphic serialization
 data class FailureIngestionMessage(
     @SerialName("id")
-    override val id: IDV7,
+    val id: IDV7,
 
     @SerialName("i")
     override val instanceMessage: InstanceMessage?,
@@ -25,7 +25,7 @@ data class FailureIngestionMessage(
     val payload: String?,
 
     @SerialName("r")
-    val reason: String,
+    val errorReason: String,
 
     @SerialName("ec")
     val errorClass: String,
@@ -41,7 +41,7 @@ data class FailureIngestionMessage(
         id = id,
         instanceMessage = instanceMessage,
         payload = payload,
-        reason = reason,
+        errorReason = errorReason,
         errorClass = errorClass,
         errorMessage = errorMessage,
         errorStackTrace = errorStackTrace,
@@ -57,7 +57,7 @@ data class FailureIngestionMessage(
             id = IDV7.from(id),
             instanceMessage = instance,
             payload = null,
-            reason = reason,
+            errorReason = reason,
             errorClass = error::class.qualifiedName!!,
             errorMessage = error.message,
             errorStackTrace = error.stackTraceToString()
@@ -72,7 +72,7 @@ data class FailureIngestionMessage(
             id = IDV7.from(id),
             instanceMessage = null,
             payload = payload,
-            reason = reason,
+            errorReason = reason,
             errorClass = error::class.qualifiedName!!,
             errorMessage = error.message,
             errorStackTrace = error.stackTraceToString()

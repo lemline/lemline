@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox.bases
 
+import com.lemline.core.logger.logger
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus.FAILED
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
@@ -30,7 +31,6 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.slf4j.LoggerFactory
 
 
 @ExperimentalTime
@@ -63,7 +63,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     private val mockedProcessor = mockk<suspend (T) -> Unit>()
     private val outboxRelay: OutboxRelay<T> by lazy {
         OutboxRelay(
-            logger = LoggerFactory.getLogger(this::class.java),
+            logger = logger(),
             failureRepository = failureRepository,
             outboxRepository = outboxRepository,
             relay = mockedProcessor,

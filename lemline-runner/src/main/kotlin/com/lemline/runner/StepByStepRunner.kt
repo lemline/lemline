@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner
 
-import com.lemline.common.debug
-import com.lemline.common.error
-import com.lemline.common.ids.IdGenerator
-import com.lemline.common.logger
 import com.lemline.core.activities.runs.getInputFor
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.instances.RunInstance
 import com.lemline.core.instances.TryInstance
 import com.lemline.core.instances.WaitInstance
+import com.lemline.core.logger.logger
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.processor.Processor
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.exceptions.RunWorkflowStartedException
 import com.lemline.runner.exceptions.TaskCompletedException
 import com.lemline.runner.exceptions.TaskRetriedException
 import com.lemline.runner.exceptions.WaitStartedException
+import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.ingestion.IngestionMessageEmitter
 import com.lemline.runner.ingestion.ParentIngestionMessage
 import com.lemline.runner.ingestion.RetryIngestionMessage
@@ -51,13 +51,13 @@ internal class StepByStepRunner @Inject constructor(
     private val ingestionEmitter: IngestionMessageEmitter,
     private val stater: Starter
 ) {
-    private val logger = logger()
+    val logger = logger()
 
-    private val onTaskCompleted = { task: NodeInstance<*> ->
+    private val taskCompletedHandler = { task: NodeInstance<*> ->
         if (task.node.isActivity()) throw TaskCompletedException()
     }
 
-    private val onTaskStarted = { task: NodeInstance<*> ->
+    private val taskStartedHandler = { task: NodeInstance<*> ->
         when (task) {
             is WaitInstance -> if (task.delay.isPositive()) throw WaitStartedException(task.delay)
             is RunInstance -> if (task.node.task.run.get() is RunWorkflow) throw RunWorkflowStartedException(
@@ -68,40 +68,41 @@ internal class StepByStepRunner @Inject constructor(
         }
     }
 
-    suspend fun run(processor: Processor): InstanceMessage? {
+    private val taskRetriedHandler = { t: TryInstance, e: WorkflowException ->
+        throw TaskRetriedException(t, e)
+    }
 
-        processor.onTaskCompleted { onTaskCompleted(it) }
-        processor.onTaskStarted { onTaskStarted(it) }
-        processor.onTaskRetried { t: TryInstance, e: WorkflowException -> throw TaskRetriedException(t, e) }
+    suspend fun InstanceMessage.run(processor: Processor): InstanceMessage? {
+
+        processor.onTaskCompleted(taskCompletedHandler)
+        processor.onTaskStarted(taskStartedHandler)
+        processor.onTaskRetried(taskRetriedHandler)
 
         val nextMessage = try {
             processor.run()
-            processor.onWorkflowCompleted(
-                processor.getOutput(),
-                processor.workflow.schedule?.after != null
-            )
+            updateFrom(processor).onWorkflowCompleted(processor.getOutput(), processor.isScheduledAfter)
             null
         } catch (_: TaskCompletedException) {
             logger.debug { "Task completed (${processor.position})" }
             // next message
-            processor.updatedInstanceMessage
+            updateFrom(processor)
         } catch (e: TaskRetriedException) {
             logger.debug { "Scheduling retry of task (${processor.position})" }
             // Store the message to the retry repository
-            processor.updatedInstanceMessage.onRetry(e.tryInstance, e.cause)
+            updateFrom(processor).onRetry(e.tryInstance, e.cause)
             null
         } catch (e: WaitStartedException) {
             logger.debug { "Starting wait task (${processor.position})" }
             // Store the message to the wait repository
-            processor.updatedInstanceMessage.onWait(e.delay)
+            updateFrom(processor).onWait(e.delay)
             null
         } catch (e: RunWorkflowStartedException) {
             logger.debug { "Starting child workflow (${processor.position})" }
             // Store the message to the run workflow repository
-            processor.updatedInstanceMessage.onRunWorkflow(e.runWorkflow, processor.current as RunInstance)
+            updateFrom(processor).onRunWorkflow(e.runWorkflow, processor.current as RunInstance)
         }
 
-        return nextMessage?.also { it.message = processor.updatedInstanceMessage.message }
+        return nextMessage
     }
 
     /**
@@ -116,15 +117,15 @@ internal class StepByStepRunner @Inject constructor(
         // insert the parent workflow without delayedUntil
         // TODO make id idempotent
         val parent = ParentIngestionMessage(
-            id = IdGenerator.generateV7(),
+            id = IDV7.new(),
             instanceMessage = this,
             outboxScheduledFor = null,
         )
         ingestionEmitter.send(parent)
 
         return stater.start(
-            workflowName = runWorkflow.workflow.name,
-            optionalVersion = runWorkflow.workflow.version,
+            workflowName = WorkflowName(runWorkflow.workflow.name),
+            optionalVersion = WorkflowVersion(runWorkflow.workflow.version),
             workflowInput = runWorkflow.getInputFor(runInstance),
             parentId = parent.id,
             zoneId = null,
@@ -136,31 +137,30 @@ internal class StepByStepRunner @Inject constructor(
     /**
      * Handles the completion of the workflow instance.
      */
-    private suspend fun Processor.onWorkflowCompleted(output: JsonElement, isScheduledAfter: Boolean) =
-        with(workflowState as InstanceMessage) {
-            // Case of child workflow completion
-            parentId?.let { parentId ->
-                // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
-                parentRepository.findById(parentId)?.let { parent ->
-                    // updates the parent with the output at the current position
-                    parent.completeWith(output)
-                    parentRepository.update(parent)
-                    logger.debug { "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId ($workflowName), set up to restart at position ${parent.currentPosition} with output $output" }
-                }
-                    ?: logger.error { "CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted." }
+    private suspend fun InstanceMessage.onWorkflowCompleted(output: JsonElement, isScheduledAfter: Boolean) {
+        // Case of child workflow completion
+        parentId?.let { parentId ->
+            // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
+            parentRepository.findById(parentId)?.let { parent ->
+                // updates the parent with the output at the current position
+                parent.completeWith(output)
+                parentRepository.update(parent)
+                logger.debug { "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId ($workflowName), set up to restart at position ${parent.workflowState.currentPosition} with output $output" }
             }
-
-            // Case of workflow completion with scheduled after
-            if (isScheduledAfter) {
-                scheduleRepository.findByWorkflowId(workflowId)?.let { schedule ->
-                    // updates the scheduled execution instant from the after property.
-                    schedule.scheduleAfterCompletion()
-                    scheduleRepository.update(schedule)
-                    logger.debug { "Rescheduled workflow ${schedule.workflowName} for ${schedule.outboxScheduledFor}" }
-                }
-                    ?: logger.error { "CRITICAL - Unable to find workflow $workflowId ($workflowName) in $SCHEDULE_TABLE table. The workflow will not be restarted." }
-            }
+                ?: error { "CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted." }
         }
+
+        // Case of workflow completion with scheduled after
+        if (isScheduledAfter) {
+            scheduleRepository.findByWorkflowId(workflowId)?.let { schedule ->
+                // updates the scheduled execution instant from the after property.
+                schedule.scheduleAfterCompletion()
+                scheduleRepository.update(schedule)
+                logger.debug { "Rescheduled workflow ${schedule.workflowName} for ${schedule.outboxScheduledFor}" }
+            }
+                ?: error { "CRITICAL - Unable to find workflow $workflowId ($workflowName) in $SCHEDULE_TABLE table. The workflow will not be restarted." }
+        }
+    }
 
     /**
      * Handles the retry mechanism for the workflow instance by saving a RetryModel message to the retry repository
@@ -175,9 +175,10 @@ internal class StepByStepRunner @Inject constructor(
             id = IDV7.new(),
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
-            error = e
+            error = e,
+            reason = getFailureReason(e)
         )
-        // Save the message to ingest into the retry table
+        // Send the message to ingest into the retry table
         ingestionEmitter.send(retryMessage)
     }
 
@@ -189,14 +190,11 @@ internal class StepByStepRunner @Inject constructor(
      */
     private suspend fun InstanceMessage.onWait(delay: Duration) {
         val waitMessage = WaitIngestionMessage(
-            id = IdGenerator.generateV7(),
+            id = IDV7.new(),
             instanceMessage = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
         )
-        // Save the message to the wait table
+        // Send the message to ingest into the wait table
         ingestionEmitter.send(waitMessage)
     }
-
-    private val Processor.updatedInstanceMessage
-        get() = (workflowState as InstanceMessage).updateWith(position!!, state)
 }

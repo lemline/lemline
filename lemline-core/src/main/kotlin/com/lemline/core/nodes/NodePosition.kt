@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
+import com.lemline.common.json.LemlineJson
 import kotlinx.serialization.Serializable
 
 /**
@@ -74,5 +75,8 @@ data class NodePosition(private val path: List<String> = listOf()) {
 
     companion object {
         val root = PositionPointer.root.toPosition()
+
+        fun fromJsonString(jsonString: String) = LemlineJson.decodeFromString<NodePosition>(jsonString)
+
     }
 }

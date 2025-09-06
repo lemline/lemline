@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
-import com.lemline.common.info
-import com.lemline.common.logger
+import com.lemline.core.logger.logger
 import com.lemline.runner.LemlineApplication
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
@@ -49,7 +48,7 @@ import com.lemline.runner.instances.WORKFLOWS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
 
 enum class TopicType(
-    val config: String,
+    val type: String,
     val defaultTopicName: String,
     val incomingChannel: String,
     val outgoingChannel: String,
@@ -225,31 +224,33 @@ class LemlineConfigSource : PropertiesConfigSource(
 
         private fun MutableMap<String, String>.configureKafkaTopic(
             props: Map<String, String>,
-            type: TopicType
+            topicType: TopicType
         ) {
-            val config = "lemline.messaging.kafka.${type.config}"
-            val topic = props["$config.topic"] ?: type.defaultTopicName
+            val type = "lemline.messaging.kafka.${topicType.type}"
+            val topic = props["$type.topic"] ?: topicType.defaultTopicName
 
-            if (props[type.consumerEnabled].toBoolean()) {
-                val consumer = "$config.consumer"
-                val incoming = "mp.messaging.incoming.${type.incomingChannel}"
+            if (props[topicType.consumerEnabled].toBoolean()) {
+                val consumer = "$type.consumer"
+                val incoming = "mp.messaging.incoming.${topicType.incomingChannel}"
+                val topicDLQ = props["$consumer.topic-dlq"] ?: "$topic.dlq"
                 set("$incoming.connector", KAFKA_CONNECTOR)
                 set("$incoming.topic", topic)
                 set("$incoming.group.id", props["$consumer.group-id"] ?: KAFKA_GROUP_ID_DEFAULT)
                 set("$incoming.auto.offset.reset", props["$consumer.offset-reset"] ?: KAFKA_OFFSET_RESET_DEFAULT)
-                set("$incoming.failure-strategy", "dead-letter-queue")
-                set("$incoming.dead-letter-queue.topic", props["$consumer.topic-dlq"] ?: "$topic-dlq")
                 set("$incoming.value.deserializer", KAFKA_STRING_DESERIALIZER)
+                set("$incoming.failure-strategy", "dead-letter-queue")
+                set("$incoming.dead-letter-queue.topic", topicDLQ)
                 // set the consumer concurrency
-                set(type.consumerConcurrency, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
+                set(topicType.consumerConcurrency, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
             }
 
-            if (props[type.producerEnabled].toBoolean()) {
-                val producer = "$config.producer"
-                val outgoing = "mp.messaging.outgoing.${type.outgoingChannel}"
+            if (props[topicType.producerEnabled].toBoolean()) {
+                val producer = "$type.producer"
+                val outgoing = "mp.messaging.outgoing.${topicType.outgoingChannel}"
                 set("$outgoing.connector", KAFKA_CONNECTOR)
                 set("$outgoing.topic", props["$producer.topic-out"] ?: topic)
                 set("$outgoing.value.serializer", KAFKA_STRING_SERIALIZER)
+                set("$outgoing.acks", "all")
             }
         }
 
@@ -270,31 +271,38 @@ class LemlineConfigSource : PropertiesConfigSource(
 
         private fun MutableMap<String, String>.configureRabbitQueue(
             props: Map<String, String>,
-            type: TopicType
+            topicType: TopicType
         ) {
-            val channel = "lemline.messaging.kafka.${type.config}"
-            val queue = props["$channel.queue"] ?: type.defaultTopicName
+            val type = "lemline.messaging.rabbitmq.${topicType.type}"
+            val queue = props["$type.queue"] ?: topicType.defaultTopicName
 
-            if (props[type.consumerEnabled].toBoolean()) {
-                val consumer = "$channel.consumer"
-                val incoming = "mp.messaging.incoming.${type.incomingChannel}"
+            if (props[topicType.consumerEnabled].toBoolean()) {
+                val consumer = "$type.consumer"
+                val incoming = "mp.messaging.incoming.${topicType.incomingChannel}"
+                val queueDLQ = props["$consumer.queue-dlq"] ?: "$queue.dlq"
                 set("$incoming.connector", RABBITMQ_CONNECTOR)
                 set("$incoming.queue.name", queue)
                 set("$incoming.queue.durable", "true")
                 set("$incoming.auto-ack", "false")
                 set("$incoming.deserializer", RABBITMQ_STRING_SERIALIZER)
-                set("$incoming.queue.arguments.x-dead-letter-exchange", "dlx")
-                set("$incoming.queue.arguments.x-dead-letter-routing-key", props["$consumer.queue-dlq"] ?: "$queue-dlq")
+                set("$incoming.failure-strategy", "reject") // do not retry
+                set("$incoming.auto-bind-dlq", "true")
+                set("$incoming.dlx.declare", "true")
+                set("$incoming.dead-letter-queue-name", queueDLQ)
+                set("$incoming.dead-letter-exchange", "${topicType.incomingChannel}.dlx")
+                set("$incoming.dead-letter-exchange-type", "direct")
+                set("$incoming.dead-letter-routing-key", queueDLQ)
                 // set the consumer concurrency
-                set(type.consumerConcurrency, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
+                set(topicType.consumerConcurrency, props["$consumer.concurrency"] ?: CONSUMER_CONCURRENCY_DEFAULT)
             }
 
-            if (props[type.producerEnabled].toBoolean()) {
-                val producer = "$channel.producer"
-                val outgoing = "mp.messaging.outgoing.${type.outgoingChannel}"
+            if (props[topicType.producerEnabled].toBoolean()) {
+                val producer = "$type.producer"
+                val outgoing = "mp.messaging.outgoing.${topicType.outgoingChannel}"
                 set("$outgoing.connector", RABBITMQ_CONNECTOR)
                 set("$outgoing.queue.name", props["$producer.queue-out"] ?: queue)
                 set("$outgoing.serializer", RABBITMQ_STRING_SERIALIZER)
+                set("$outgoing.delivery-mode", "persistent")
                 props["$producer.exchange-name"]?.let { set("$outgoing.exchange.name", it) }
             }
         }

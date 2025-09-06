@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.instances.InstanceMessageTest.Companion.sampleInstance
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.repositories.RetryRepository
 import jakarta.inject.Inject
-import java.util.*
 import kotlin.time.ExperimentalTime
 
 
@@ -19,16 +19,10 @@ internal abstract class RetryRepositoryTest : OutboxRepositoryTest<RetryOutboxMo
     override lateinit var repository: RetryRepository
 
     override fun createRandomEntity() = RetryOutboxModel(
-        id = UUID.randomUUID(),
-        instanceMessage = InstanceMessage.fromStrings(
-            workflowId = UUID.randomUUID(),
-            workflowName = randomString,
-            workflowVersion = randomString,
-            workflowPosition = randomString,
-            workflowState = randomString,
-            parentId = null,
-        ),
+        id = IDV7.new(),
+        instanceMessage = sampleInstance(),
         outboxScheduledFor = randomInstant,
+        errorReason = randomString,
         errorClass = randomString,
         errorMessage = randomString,
         errorStackTrace = randomString,

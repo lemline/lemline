@@ -2,19 +2,21 @@
 package com.lemline.runner.models
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import io.serverlessworkflow.api.types.Workflow
 
 data class DefinitionModel(
-    val name: String,
+    val name: WorkflowName,
 
-    val version: String,
+    val version: WorkflowVersion,
 
     val definition: String
 ) {
     companion object {
         fun from(workflow: Workflow) = DefinitionModel(
-            name = workflow.document.name,
-            version = workflow.document.version,
+            name = WorkflowName(workflow.document.name),
+            version = WorkflowVersion(workflow.document.version),
             definition = LemlineJson.yamlMapper.writeValueAsString(workflow)
         )
     }

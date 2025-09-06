@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
@@ -35,7 +36,7 @@ internal class WaitRepository : OutboxRepository<WaitOutboxModel>() {
 
     @ExperimentalTime
     override fun createModel(rs: ResultSet) = WaitOutboxModel(
-        id = getUuid(rs, ID_COLUMN),
+        id = IDV7(getUuid(rs, ID_COLUMN)),
         instanceMessage = rs.getInstanceMessage()!!,
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),

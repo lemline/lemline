@@ -3,13 +3,8 @@
 
 package com.lemline.core.nodes
 
-import com.lemline.common.debug
-import com.lemline.common.error
-import com.lemline.common.info
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonElement
-import com.lemline.common.logger
-import com.lemline.common.warn
 import com.lemline.core.errors.WorkflowError
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
@@ -22,12 +17,9 @@ import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.instances.RootInstance
 import com.lemline.core.instances.TryInstance
-import com.lemline.core.logger.withWorkflowContext
+import com.lemline.core.logger.logger
 import com.lemline.core.processor.Processor
 import com.lemline.core.schemas.SchemaValidator
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
@@ -53,39 +45,8 @@ import kotlinx.serialization.json.booleanOrNull
  */
 @ExperimentalTime
 abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val parent: NodeInstance<*>?) {
-    private val logger = logger()
 
-    private fun <T> withWorkflowContext(block: () -> T) = withWorkflowContext(
-        workflowId = WorkflowId.from(rootInstance.workflowDescriptor),
-        workflowName = WorkflowName(rootInstance.node.task.document.name),
-        workflowVersion = WorkflowVersion(rootInstance.node.task.document.version),
-        currentPosition = node.position,
-        block = block,
-    )
-
-    /**
-     * Local debug function that sets the workflow context each time it's called
-     */
-    internal fun logDebug(e: Throwable? = null, message: () -> String) =
-        withWorkflowContext { logger.debug(e, message) }
-
-    /**
-     * Local info function that sets the workflow context each time it's called
-     */
-    internal fun logInfo(e: Throwable? = null, message: () -> String) =
-        withWorkflowContext { logger.info(e, message) }
-
-    /**
-     * Local warn function that sets the workflow context each time it's called
-     */
-    internal fun logWarn(e: Throwable? = null, message: () -> String) =
-        withWorkflowContext { logger.warn(e, message) }
-
-    /**
-     * Local error function that sets the workflow context each time it's called
-     */
-    internal fun logError(e: Throwable? = null, message: () -> String) =
-        withWorkflowContext { logger.error(e, message) }
+    val logger = logger()
 
     /**
      * Node internal initialStates
@@ -283,21 +244,21 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     }
 
     private fun logEntering() {
-        logDebug { "Entering node ${node.name} (${node.task::class.simpleName})" }
-        logDebug { "      rawInput         = $rawInput" }
-        logDebug { "      scope            = $scope" }
-        logDebug { "      transformedInput = $transformedInput" }
+        logger.debug { "Entering node ${node.name} (${node.task::class.simpleName})" }
+        logger.debug { "      rawInput         = $rawInput" }
+        logger.debug { "      scope            = $scope" }
+        logger.debug { "      transformedInput = $transformedInput" }
     }
 
     private fun logLeaving() {
-        logDebug { "Leaving node ${node.name} (${node.task::class.simpleName})" }
-        logDebug { "      rawOutput         = $rawOutput" }
-        logDebug { "      scope             = $scope" }
-        logDebug { "      transformedOutput = $transformedOutput" }
+        logger.debug { "Leaving node ${node.name} (${node.task::class.simpleName})" }
+        logger.debug { "      rawOutput         = $rawOutput" }
+        logger.debug { "      scope             = $scope" }
+        logger.debug { "      transformedOutput = $transformedOutput" }
     }
 
     private fun logSkipping() {
-        logDebug { "Skipping node ${node.name} (${node.task::class.simpleName})" }
+        logger.debug { "Skipping node ${node.name} (${node.task::class.simpleName})" }
     }
 
     internal fun skippingUpTo(next: NodeInstance<*>) {

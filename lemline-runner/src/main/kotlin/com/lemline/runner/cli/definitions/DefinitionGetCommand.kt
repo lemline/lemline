@@ -3,6 +3,8 @@ package com.lemline.runner.cli.definitions
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.core.definitions.Definitions
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.DefinitionModel
@@ -59,14 +61,18 @@ class DefinitionGetCommand : Runnable {
     )
     var format: OutputFormat = OutputFormat.YAML
 
+    val workflowName by lazy { name?.let { WorkflowName(it) } }
+
+    val workflowVersion by lazy { version?.let { WorkflowVersion(it) } }
+
     override fun run() = runBlocking {
 
         try {
-            if (name != null && version != null) {
+            if (workflowName != null && workflowVersion != null) {
                 // Direct fetch: Both name and version provided - runs once and exits
-                val selectedWorkflow = definitionRepository.findByNameAndVersion(name!!, version!!)
+                val selectedWorkflow = definitionRepository.findByNameAndVersion(workflowName!!, workflowVersion!!)
                 if (selectedWorkflow == null) {
-                    System.err.println("ERROR: Workflow '$name' version '$version' not found.")
+                    System.err.println("ERROR: Workflow '$workflowName' version '$workflowVersion' not found.")
                     return@runBlocking // Exit if direct fetch fails
                 }
                 displayWorkflowDefinition(selectedWorkflow)
@@ -74,7 +80,7 @@ class DefinitionGetCommand : Runnable {
                 // --- Interactive selection mode ---
 
                 // Prepare selection (displays the list if needed)
-                val selectionList = selector.prepareSelection(filterName = name)
+                val selectionList = selector.prepareSelection(filterName = workflowName)
                     ?: return@runBlocking // Exit if nothing found
 
                 // Handle a single result directly
@@ -91,7 +97,7 @@ class DefinitionGetCommand : Runnable {
                     when {
                         input.isNullOrEmpty() -> {
                             // Blank input: Redisplay the list and re-prompt
-                            selector.prepareSelection(filterName = name) ?: break
+                            selector.prepareSelection(filterName = workflowName) ?: break
                             continue
                         }
 

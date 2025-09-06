@@ -2,12 +2,11 @@
 package com.lemline.runner.ingestion
 
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
-import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -18,7 +17,7 @@ import kotlinx.serialization.Serializable
 @SerialName("p") // <- type discriminator for polymorphic serialization
 data class ParentIngestionMessage(
     @SerialName("id")
-    override val id: @Contextual UUID,
+    override val id: IDV7,
 
     @SerialName("i")
     override var instanceMessage: InstanceMessage,

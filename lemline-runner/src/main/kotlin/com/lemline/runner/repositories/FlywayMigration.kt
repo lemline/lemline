@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.common.logger
+import com.lemline.core.logger.logger
 import com.lemline.runner.config.DATABASE_TYPE
 import com.lemline.runner.config.LemlineConfigConstants
 import com.lemline.runner.config.MIGRATE_AT_START
@@ -39,7 +39,7 @@ class FlywayMigration(
         if (profile == "test" || db == LemlineConfigConstants.DB_TYPE_IN_MEMORY || migrateAtStart) {
             // migrate custom Flyway
             databaseManager.flyway.migrate()
-            log.info("Flyway migrations applied successfully on ${databaseManager.dbType} database.")
+            log.info { "Flyway migrations applied successfully on ${databaseManager.dbType} database." }
         }
     }
 }

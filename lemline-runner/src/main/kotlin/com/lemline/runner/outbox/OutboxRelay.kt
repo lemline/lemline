@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.common.debug
-import com.lemline.common.error
-import com.lemline.common.info
+import com.lemline.core.logger.Logger
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.FailureRepository
@@ -16,7 +14,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import org.jetbrains.annotations.VisibleForTesting
-import org.slf4j.Logger
 
 /**
  * OutboxProcessor is a generic processor for handling outbox pattern operations.
@@ -135,19 +132,19 @@ internal class OutboxRelay<T : OutboxModel>(
         relay(outboxEntity)
         true // <- return true (success)
     } catch (e: Exception) {
-        logger.info(e) { "Failed to process outbox entity for workflow ${outboxEntity.instanceMessage?.workflowId}" }
+        logger.info(e) { "Failed to process outbox entity for workflow ${outboxEntity.instanceMessage.workflowId}" }
         outboxEntity.outboxErrorClass = e::class.qualifiedName
         outboxEntity.outboxErrorMessage = e.message
         outboxEntity.outboxErrorStackTrace = e.stackTraceToString()
 
         if (outboxEntity.outboxAttemptCount >= maxAttempts) {
             outboxEntity.outBoxStatus = OutBoxStatus.FAILED
-            logger.error { "Message ${outboxEntity.instanceMessage?.workflowId} has reached maximum retry attempts" }
+            logger.error { "Message ${outboxEntity.instanceMessage.workflowId} has reached maximum retry attempts" }
         } else {
             outboxEntity.outBoxStatus = OutBoxStatus.PENDING
             val nextDelay = calculateNextAttemptDelay(outboxEntity.outboxAttemptCount, initialDelay)
             outboxEntity.outboxDelayedUntil = Clock.System.now() + nextDelay
-            logger.debug { "Message ${outboxEntity.instanceMessage?.workflowId} will be retried in ${nextDelay}ms (attempt ${outboxEntity.outboxAttemptCount})" }
+            logger.debug { "Message ${outboxEntity.instanceMessage.workflowId} will be retried in ${nextDelay}ms (attempt ${outboxEntity.outboxAttemptCount})" }
         }
         false // <- return false (failure)
     }

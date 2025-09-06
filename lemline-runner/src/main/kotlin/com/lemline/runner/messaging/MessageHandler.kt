@@ -1,22 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.common.debug
-import com.lemline.common.error
-import com.lemline.common.info
-import com.lemline.common.warn
-import com.lemline.core.logger.withWorkflowContext
+import com.lemline.core.logger.Logger
+import com.lemline.core.logger.withSuspendLoggingContext
+import com.lemline.core.workflows.WorkflowId
 import com.lemline.core.workflows.WorkflowName
 import com.lemline.core.workflows.WorkflowVersion
-import io.quarkus.smallrye.reactivemessaging.ackSuspending
-import io.quarkus.smallrye.reactivemessaging.nackSuspending
+import com.lemline.runner.failures.FailureReasons.getFailureReason
 import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
-import org.eclipse.microprofile.reactive.messaging.Message as ReactiveMessage
-import org.slf4j.Logger
 
 @ExperimentalTime
-internal interface MessageHandler<T : LemlineMessage> {
+internal interface MessageHandler<T : WorkflowMessage> {
 
     suspend fun Message<String>.deserialize(): T
 
@@ -28,95 +23,140 @@ internal interface MessageHandler<T : LemlineMessage> {
 
     val metrics: MessageSubscriberMetrics
 
-    val onComplete: (Message<String>, String?) -> Unit
+    val onCompleteTest: (Message<String>, T?) -> Unit
 
-    val onFailure: (Message<String>, Throwable?) -> Unit
+    val onFailureTest: (Message<String>, Throwable?) -> Unit
 
     suspend fun handleMessage(message: Message<String>) {
-        try {
+        var next: T?
+        var workflowId: WorkflowId? = null
+        var workflowName: WorkflowName? = null
+        var workflowVersion: WorkflowVersion? = null
+
+        // --- Deserialization ---
+        val msg: T = message.tryWithCompensation {
             logger.debug { "Received: ${message.toLogString()}" }
-
-            // --- Deserialization ---
-            val msg = message.deserialize()
-            logger.debug { "Deserialized: ${message.toLogString()}" }
-
-            val workflowId = msg.workflowState?.workflowId
-            val workflowName = msg.workflowState?.workflowName
-            val workflowVersion = msg.workflowState?.workflowVersion
-            val currentPosition = msg.workflowState?.currentPosition
-
-            withWorkflowContext(workflowId, workflowName, workflowVersion, currentPosition) {
-                metrics.recordProcessingDuration(workflowName, workflowVersion) {
-                    // --- Processing ---
-                    val next = msg.handle()
-                    // --- Emit next message if any ---
-                    next?.emit()
-                    // --- Acknowledgment (Success Path) ---
-                    message.ack(workflowName, workflowVersion)
-                    logger.debug { "Processed: ${message.toLogString()}" }
-                    // For testing
-                    onComplete(message, next?.toJsonString())
+            metrics.recordDeserializationDuration {
+                try {
+                    message.deserialize()
+                } catch (e: Exception) {
+                    metrics.deserializationFailed(e)
+                    throw e
+                }.also {
+                    // deserialisation succeeded
+                    logger.debug { "Deserialized ${message.toLogString()}: $it" }
+                    workflowId = it.workflowId
+                    workflowName = it.workflowName
+                    workflowVersion = it.workflowVersion
+                    metrics.deserializationCompleted(workflowName, workflowVersion)
                 }
-                metrics.processingCompleted(workflowName, workflowVersion)
             }
+        } ?: return // <- deserialization() failed
 
-        } catch (e: DelegatedException) {
-            // For testing
-            onFailure(message, e)
-        }
+        // --- Processing ---
+        message.tryWithCompensation(workflowId, workflowName, workflowVersion) {
+            // Process et get next message
+            next = metrics.recordProcessingDuration(workflowName, workflowVersion) {
+                try {
+                    msg.handle()
+                } catch (e: Exception) {
+                    val reason = if (e is CompensationException) e.reason else getFailureReason(e)
+                    metrics.processingFailed(reason, workflowName, workflowVersion)
+                    throw e
+                }.also {
+                    logger.debug { "Processed: ${message.toLogString()}" }
+                    metrics.processingCompleted(workflowName, workflowVersion)
+                }
+            }
+            // Serialize and emit the next message if any
+            next?.emit()
+        } ?: return // <- handle() failed
+
+        // Success Path
+        message.acknowledgeWithRetry(workflowName, workflowVersion)
     }
 
     /**
-     * Acknowledges a reactive message to indicate successful processing.
-     * If the acknowledgment fails, logs the error and increments the failure metrics counter.
+     * Attempts to execute a suspending block within a log context.
+     * If failing,
+     * - the compensation actions of the CompensationException are executed, and the message is acknowledged.
+     * - if failing again, the message is negatively acknowledged.
      *
-     * @param this The reactive message being acknowledged.
-     * @param workflowName The name of the workflow associated with the message.
-     * @param workflowVersion The version of the workflow associated with the message.
+     * @return The result of the block if successful, else null
+     *
+     * @throws Exception If an error occurs during (negative) acknowledgment
      */
-    suspend fun ReactiveMessage<*>.ack(workflowName: WorkflowName?, workflowVersion: WorkflowVersion?) {
+    suspend fun <T> Message<String>.tryWithCompensation(
+        workflowId: WorkflowId? = null,
+        workflowName: WorkflowName? = null,
+        workflowVersion: WorkflowVersion? = null,
+        block: suspend () -> T
+    ): T? = withSuspendLoggingContext(workflowId, workflowName, workflowVersion) {
         try {
-            logger.debug { "Acknowledging message ${toLogString()}" }
-            ackSuspending()
-            metrics.ackCompleted(workflowName, workflowVersion)
+            block()
+        } catch (compensation: CompensationException) {
+            try {
+                compensation.run()
+                acknowledgeWithRetry(workflowName, workflowVersion)
+            } catch (e: Exception) {
+                // Failure path
+                negAcknowledgeWithRetry(e, workflowName, workflowVersion)
+                onFailureTest(this, e)
+            }
+            null
         } catch (e: Exception) {
-            logger.info(e) { "Failed to acknowledge message. Trying now to NegAck it: ${toLogString()}" }
-            metrics.ackFailed(workflowName, workflowVersion)
-            nack(e, workflowName, workflowVersion)
+            // Failure path
+            negAcknowledgeWithRetry(e, workflowName, workflowVersion)
+            onFailureTest(this, e)
+            null
         }
     }
 
     /**
-     * Handles the negative acknowledgment (NACK) for a reactive message, including logging,
-     * metrics increment, and exception handling if the NACK operation fails.
+     * Acknowledges the current message with retry logic.
      *
-     * @param this The reactive message to be negatively acknowledged.
-     * @param reason The exception that triggered the negative acknowledgment.
-     * @param workflowName The name of the workflow associated with the message.
-     * @param workflowVersion The version of the workflow associated with the message.
+     * If the acknowledgment fails, an exception is thrown to trigger a broker reconnection
      */
-    suspend fun ReactiveMessage<*>.nack(
-        reason: Exception,
+    suspend fun Message<String>.acknowledgeWithRetry(
         workflowName: WorkflowName?,
         workflowVersion: WorkflowVersion?
-    ) {
-        try {
-            nackSuspending(reason)
-            logger.warn(reason) { "CRITICAL - Negatively Acknowledged message: ${toLogString()}" }
-            metrics.nackCompleted(workflowName, workflowVersion)
-        } catch (e: Exception) {
-            logger.error(e) { "CRITICAL - Failed to NACK message. This message should be represented by brokers: ${toLogString()}" }
-            metrics.nackFailed(workflowName, workflowVersion)
-            throw e
-        }
+    ) = try {
+        with(AckNackPolicy) { ackWithRetry() }
+        logger.debug { "Message ACKed: ${toLogString()}" }
+        metrics.ackCompleted(workflowName, workflowVersion)
+    } catch (e: Exception) {
+        logger.error(e) { "Failed to ACK message: ${toLogString()}" }
+        metrics.ackFailed(workflowName, workflowVersion)
+        throw e
+    }
+
+    /**
+     * Handles the process of negatively acknowledging a message with retry logic.
+     * If the retry attempts fail, the message is quarantined locally, and an acknowledgment
+     * is attempted to ensure the message is processed within the defined constraints.
+     *
+     * If quarantining locally or the acknowledgment fails, an exception is thrown to trigger a broker reconnection
+     */
+    suspend fun Message<String>.negAcknowledgeWithRetry(
+        e: Exception,
+        workflowName: WorkflowName?,
+        workflowVersion: WorkflowVersion?
+    ) = try {
+        with(AckNackPolicy) { nackWithRetry(e) }
+        logger.warn(e) { "Message NACKed: ${toLogString()} - should be sent to the DLQ by brokers" }
+        metrics.nackCompleted(workflowName, workflowVersion)
+    } catch (e: Exception) {
+        logger.error(e) { "Failed to NACK message: ${toLogString()}" }
+        metrics.nackFailed(workflowName, workflowVersion)
+        throw e
     }
 
     companion object {
-        const val UNKNOWN = "unknown"
+        private const val UNKNOWN = ""
         val UNKNOWN_NAME = WorkflowName(UNKNOWN)
         val UNKNOWN_VERSION = WorkflowVersion(UNKNOWN)
     }
 }
 
-class DelegatedException(block: suspend () -> Unit) : RuntimeException()
+class CompensationException(val reason: String, val run: suspend () -> Unit) : RuntimeException()
 

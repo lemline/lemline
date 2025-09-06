@@ -63,6 +63,10 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
 
+    // Logging
+//    implementation("net.logstash.logback:logstash-logback-encoder:8.1")
+//    implementation("ch.qos.logback:logback-classic:1.5.18")
+
     // ─────────────────────────────────────────────────────────────────────────
     // Libraries below are needed for Native Compilation - DO NOT TOUCh except you know what you are doing
     // ─────────────────────────────────────────────────────────────────────────

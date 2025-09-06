@@ -2,6 +2,9 @@
 package com.lemline.runner.messaging.bases
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.core.workflows.WorkflowId
+import com.lemline.core.workflows.WorkflowName
+import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.instances.InstanceMessageHandler
 import com.lemline.runner.models.DefinitionModel
@@ -12,7 +15,6 @@ import com.lemline.runner.repositories.WaitRepository
 import io.kotest.assertions.throwables.shouldThrowAny
 import io.kotest.matchers.shouldBe
 import jakarta.inject.Inject
-import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
@@ -64,7 +66,7 @@ internal abstract class WorkflowConsumerTest {
     @Inject
     lateinit var instanceMessageHandler: InstanceMessageHandler
 
-    val processingMessages = ConcurrentHashMap<String, CompletableFuture<String?>>()
+    val processingMessages = ConcurrentHashMap<String, CompletableFuture<InstanceMessage?>>()
 
     @BeforeEach
     fun setup() = runTest {
@@ -75,18 +77,18 @@ internal abstract class WorkflowConsumerTest {
 
         processingMessages.clear()
 
-        instanceMessageHandler.onFailure = { msg: Message<String>, e: Throwable? ->
+        instanceMessageHandler.onFailureTest = { msg: Message<String>, e: Throwable? ->
             processingMessages.remove(msg.payload)?.completeExceptionally(e)
         }
 
-        instanceMessageHandler.onComplete = { msg: Message<String>, o: String? ->
+        instanceMessageHandler.onCompleteTest = { msg: Message<String>, o: InstanceMessage? ->
             processingMessages.remove(msg.payload)?.complete(o)
         }
 
         // Create test workflow definition
         val definitionModel = DefinitionModel(
-            name = "test-workflow",
-            version = "1.0.0",
+            name = WorkflowName("test-workflow"),
+            version = WorkflowVersion("1.0.0"),
             definition = """
             document:
                 dsl: '1.0.0'
@@ -156,7 +158,7 @@ internal abstract class WorkflowConsumerTest {
     protected abstract fun receiveMessage(timeout: Long, unit: TimeUnit): String?
 
 
-    private fun sendMessageFuture(messageJson: String): CompletableFuture<String?> {
+    private fun sendMessageFuture(messageJson: String): CompletableFuture<InstanceMessage?> {
         // Send the message to the input topic
         sendMessage(messageJson)
 
@@ -181,10 +183,10 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage.forNewWorkflow(
-            workflowId = UUID.randomUUID(),
-            workflowName = "test-workflow",
-            workflowVersion = "1.0.0",
+        val instanceMessage = InstanceMessage.new(
+            workflowId = WorkflowId.new(),
+            workflowName = WorkflowName("test-workflow"),
+            workflowVersion = WorkflowVersion("1.0.0"),
             workflowInput = JsonPrimitive("task"),
         )
 
@@ -262,10 +264,10 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should store instance with retry in retry repository`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage.forNewWorkflow(
-            workflowId = UUID.randomUUID(),
-            workflowName = "test-workflow",
-            workflowVersion = "1.0.0",
+        val instanceMessage = InstanceMessage.new(
+            workflowId = WorkflowId.new(),
+            workflowName = WorkflowName("test-workflow"),
+            workflowVersion = WorkflowVersion("1.0.0"),
             workflowInput = JsonPrimitive("retry"),
         )
 
@@ -302,10 +304,10 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should store waiting instance in wait repository`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage.forNewWorkflow(
-            UUID.randomUUID(),
-            "test-workflow",
-            "1.0.0",
+        val instanceMessage = InstanceMessage.new(
+            WorkflowId.new(),
+            WorkflowName("test-workflow"),
+            WorkflowVersion("1.0.0"),
             JsonPrimitive("wait"),
         )
 
@@ -349,10 +351,10 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should handle completed workflow without sending message`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage.forNewWorkflow(
-            UUID.randomUUID(),
-            "test-workflow",
-            "1.0.0",
+        val instanceMessage = InstanceMessage.new(
+            WorkflowId.new(),
+            WorkflowName("test-workflow"),
+            WorkflowVersion("1.0.0"),
             JsonPrimitive("completed"),
         )
 

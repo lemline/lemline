@@ -1,0 +1,13 @@
+package com.lemline.core.logger
+
+interface CanLog {
+    fun trace(e: Throwable? = null, message: () -> String)
+
+    fun debug(e: Throwable? = null, message: () -> String)
+
+    fun info(e: Throwable? = null, message: () -> String)
+
+    fun warn(e: Throwable? = null, message: () -> String)
+
+    fun error(e: Throwable? = null, message: () -> String)
+}

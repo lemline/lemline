@@ -1,15 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.ingestion
 
-import com.lemline.common.debug
-import com.lemline.common.error
-import com.lemline.common.logger
-import com.lemline.core.logger.withWorkflowContext
-import com.lemline.runner.failures.FailureReasons
-import com.lemline.runner.messaging.DelegatedException
+import com.lemline.core.logger.logger
+import com.lemline.runner.failures.FailureReasons.DESERIALISATION_ERROR
+import com.lemline.runner.failures.FailureReasons.getFailureReason
+import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_NAME
-import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_VERSION
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.IDV7
@@ -22,6 +18,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Message
+import org.jetbrains.annotations.TestOnly
 
 /**
  * MessageHandler is responsible for consuming workflow messages from the incoming channel,
@@ -40,54 +37,46 @@ internal class IngestionMessageHandler(
     override val metrics: IngestionMessageSubscriberMetrics,
 ) : MessageHandler<IngestionMessage> {
 
-    override val logger = logger()
+    override var logger = logger()
+
+    @TestOnly
+    override var onCompleteTest = { _: Message<String>, _: IngestionMessage? -> }
+
+    @TestOnly
+    override var onFailureTest = { _: Message<String>, _: Throwable? -> }
 
     /**
-     * Handles the entire lifecycle of an incoming reactive message. This includes deserialization,
-     * processing, emission of the next step, and finally acknowledgment (ack/nack).
+     * Deserializes the message payload. Returns the IngestionMessage
      *
-     * This function is designed to be resilient and will not throw exceptions, instead handling
-     * failures by logging, recording metrics, and saving messages for retry or inspection.
-     *
-     * @param message The raw reactive message from the messaging system.
+     * This function is designed to throw only DelegatedException with additional actions
      */
-    override suspend fun IngestionMessage.handle(): IngestionMessage? {
-
-                        when (this) {
-                            is ParentIngestionMessage -> save()
-                            is RetryIngestionMessage -> save()
-                            is ScheduleIngestionMessage -> save()
-                            is WaitIngestionMessage -> save()
-                            is FailureIngestionMessage -> save()
-                        }
-                       
-        } catch (e: Exception) {
-            // --- NegAcknowledgment (Failure Path) ---
-            message.nack(e, ingestionMessage.workflowName, ingestionMessage.workflowVersion)
-            logger.error(e) { "Error during processing of message: ${message.toLogString()}" }
-
-            throw e
-        }
+    override suspend fun Message<String>.deserialize(): IngestionMessage = try {
+        IngestionMessage.fromJsonString(payload)
+    } catch (e: Exception) {
+        logger.info { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
+        throw CompensationException(DESERIALISATION_ERROR) { deserializationFailed(e) }
     }
 
     /**
-     * Deserializes the message payload. Returns the Message object on success, or null on failure.
-     * Handles its own metrics, logging, and persistence of failed messages.
+     * Handles the lifecycle of an incoming ingestion message.
+     *
+     * This function is designed to throw only DelegatedException with additional actions
      */
-
-    override suspend fun Message<String>.deserialize(): IngestionMessage = try {
-        metrics.recordDeserializationDuration {
-            IngestionMessage.fromJsonString(payload)
-        }.also {
-            metrics.deserializationCompleted(it.workflowName, it.workflowVersion)
+    @Throws(CompensationException::class)
+    override suspend fun IngestionMessage.handle(): IngestionMessage? {
+        try {
+            when (this) {
+                is ParentIngestionMessage -> save()
+                is RetryIngestionMessage -> save()
+                is ScheduleIngestionMessage -> save()
+                is WaitIngestionMessage -> save()
+                is FailureIngestionMessage -> save()
+            }
+        } catch (e: Exception) {
+            logger.error(e) { "Error when saving message: $this" }
+            throw CompensationException(getFailureReason(e)) { TODO() }
         }
-    } catch (e: Exception) {
-        throw DelegatedException {
-            logger.error(e) { "Failed to deserialize message: ${toLogString()}" }
-            metrics.deserializationFailed(e)
-            // Deserialization failure is fatal for this message. Save and ACK.
-            deserializationFailed(e)
-        }
+        return null
     }
 
     private suspend fun ParentIngestionMessage.save() {
@@ -110,13 +99,17 @@ internal class IngestionMessageHandler(
         failureRepository.insert(toModel())
     }
 
-    private suspend fun Message<String>.deserializationFailed(cause: Exception) = try {
+    private suspend fun Message<String>.deserializationFailed(cause: Exception) {
         val failure = FailureModel.from(
             id = IDV7.new(),
             payload = payload,
-            reason = FailureReasons.DESERIALISATION_ERROR,
+            reason = DESERIALISATION_ERROR,
             error = cause
         )
         failureRepository.insert(failure)
+    }
+
+    override suspend fun IngestionMessage.emit() {
+        error("This method should not be called")
     }
 }

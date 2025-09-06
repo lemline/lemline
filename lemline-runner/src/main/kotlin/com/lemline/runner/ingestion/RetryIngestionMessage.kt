@@ -29,6 +29,9 @@ data class RetryIngestionMessage(
     @SerialName("f")
     override var outboxScheduledFor: Instant?,
 
+    @SerialName("er")
+    val errorReason: String,
+
     @SerialName("ec")
     val errorClass: String,
 
@@ -43,6 +46,7 @@ data class RetryIngestionMessage(
         instanceMessage = instanceMessage,
         outBoxStatus = outBoxStatus,
         outboxScheduledFor = outboxScheduledFor,
+        errorReason = errorReason,
         errorClass = errorClass,
         errorMessage = errorMessage,
         errorStackTrace = errorStackTrace,
@@ -54,9 +58,11 @@ data class RetryIngestionMessage(
             instance: InstanceMessage,
             outboxScheduledFor: Instant,
             error: Throwable,
+            reason: String
         ) = RetryIngestionMessage(
             id = id,
             instanceMessage = instance,
+            errorReason = reason,
             errorClass = when (error) {
                 is WorkflowException -> error.error.type
                 else -> error::class.qualifiedName!!

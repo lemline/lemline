@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.runs
 
-import com.lemline.common.debug
-import com.lemline.common.logger
-import com.lemline.common.warn
+import com.lemline.core.logger.logger
 
 internal object NodeChecker {
-    private val log = logger()
+    private val logger = logger()
 
     val exec: String? by lazy {
         getNodeExecAndCheckVersion()
@@ -43,14 +41,14 @@ internal object NodeChecker {
         val versionPattern = Regex("v(\\d+)\\.(\\d+)\\.(\\d+)")
         val match = versionPattern.matchEntire(version)
         when (match) {
-            null -> log.warn { "Node.js version '$version' does not match expected format. Cannot verify ES2024 compatibility." }
+            null -> logger.warn { "Node.js version '$version' does not match expected format. Cannot verify ES2024 compatibility." }
 
             else -> {
-                log.debug { "Detected Node.js version: '$version'" }
+                logger.debug { "Detected Node.js version: '$version'" }
                 val (major, _, _) = match.destructured
                 val majorInt = major.toIntOrNull() ?: 0
                 // ES2024 compatibility: Node.js >= 22.0.0
-                if (majorInt < 22) log.warn { "Node.js version $version detected. ES2024 features require Node.js >= 22.0.0. Some scripts may not run as expected." }
+                if (majorInt < 22) logger.warn { "Node.js version $version detected. ES2024 features require Node.js >= 22.0.0. Some scripts may not run as expected." }
             }
         }
         return foundExec
