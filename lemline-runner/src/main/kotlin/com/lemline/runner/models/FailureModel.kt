@@ -66,7 +66,7 @@ data class FailureModel(
                 id = IDV7.from(outbox.id),
                 instanceMessage = outbox.instanceMessage,
                 payload = null,
-                errorReason = FailureReasons.OUTBOX_ERROR,
+                errorReason = FailureReasons.OUTBOX_FAILURE,
                 errorClass = outbox.outboxErrorClass!!,
                 errorMessage = outbox.outboxErrorMessage,
                 errorStackTrace = outbox.outboxErrorStackTrace!!

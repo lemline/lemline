@@ -2,7 +2,7 @@
 package com.lemline.runner.ingestion
 
 import com.lemline.core.logger.logger
-import com.lemline.runner.failures.FailureReasons.DESERIALISATION_ERROR
+import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.MessageHandler
@@ -54,7 +54,7 @@ internal class IngestionMessageHandler(
         IngestionMessage.fromJsonString(payload)
     } catch (e: Exception) {
         logger.info { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
-        throw CompensationException(DESERIALISATION_ERROR) { deserializationFailed(e) }
+        throw CompensationException(DESERIALIZATION_FAILURE) { deserializationFailed(e) }
     }
 
     /**
@@ -105,7 +105,7 @@ internal class IngestionMessageHandler(
         val failure = FailureModel.from(
             id = IDV7.random(),
             payload = payload,
-            reason = DESERIALISATION_ERROR,
+            reason = DESERIALIZATION_FAILURE,
             error = cause
         )
         failureRepository.insert(failure)

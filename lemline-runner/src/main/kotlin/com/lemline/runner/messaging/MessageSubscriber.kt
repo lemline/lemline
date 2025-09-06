@@ -39,7 +39,7 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
 
     private val scope: CoroutineScope =
         CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, e ->
-            if (!isShutdown.get()) {
+            if (!isShutdown.get() && (e is Exception)) {
                 logger.warn(e) { "Error processing message, will attempt to recover." }
                 // restart the subscription on another coroutine
                 reSubscribe()
@@ -134,11 +134,11 @@ internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Me
 
     private fun performGracefulShutdown() {
         if (!isShutdown.compareAndSet(false, true)) {
-            logger.warn { "Graceful shutdown already initiated" }
+            logger.warn { "🛑 Graceful shutdown already initiated - ignoring" }
             return
         }
 
-        logger.info { "🛑 Starting graceful shutdown with messaging channels open" }
+        logger.info { "🛑 Starting graceful shutdown" }
 
         // Stop receiving messages
         cancelSubscription()

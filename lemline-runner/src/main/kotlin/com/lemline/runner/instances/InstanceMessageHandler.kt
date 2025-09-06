@@ -5,12 +5,12 @@ import com.lemline.core.definitions.Definitions
 import com.lemline.core.logger.logger
 import com.lemline.core.processor.Processor
 import com.lemline.runner.StepByStepRunner
-import com.lemline.runner.failures.FailureReasons.DEFINITION_NOT_FOUND
-import com.lemline.runner.failures.FailureReasons.DESERIALISATION_ERROR
-import com.lemline.runner.failures.FailureReasons.MESSAGE_EMISSION_ERROR
-import com.lemline.runner.failures.FailureReasons.SECRETS_RETRIEVAL_FAILED
-import com.lemline.runner.failures.FailureReasons.SERIALISATION_ERROR
-import com.lemline.runner.failures.FailureReasons.WORKFLOW_INITIALIZATION_ERROR
+import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
+import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
+import com.lemline.runner.failures.FailureReasons.MESSAGE_EMISSION_FAILURE
+import com.lemline.runner.failures.FailureReasons.SECRETS_RETRIEVAL_FAILURE
+import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
+import com.lemline.runner.failures.FailureReasons.WORKFLOW_INIT_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.ingestion.FailureIngestionMessage
 import com.lemline.runner.ingestion.IngestionMessageEmitter
@@ -20,6 +20,7 @@ import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.IDV7
 import com.lemline.runner.repositories.DefinitionRepository
+import com.lemline.runner.repositories.FAILURE_TABLE
 import com.lemline.runner.repositories.RETRY_TABLE
 import com.lemline.runner.secrets.Secrets
 import io.serverlessworkflow.api.types.Workflow
@@ -63,7 +64,7 @@ internal class InstanceMessageHandler(
         InstanceMessage.fromMessage(this)
     } catch (e: Exception) {
         logger.info { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
-        throw CompensationException(DESERIALISATION_ERROR) { deserializationFailed(e) }
+        throw CompensationException(DESERIALIZATION_FAILURE) { deserializationFailed(e) }
     }
 
     /**
@@ -102,7 +103,7 @@ internal class InstanceMessageHandler(
     } ?: run {
         val errorMsg = "Workflow ${workflowName}:${workflowVersion} not found."
         logger.error { "$errorMsg Storing the message in the $RETRY_TABLE table for manual inspection." }
-        emitAsFailed(IllegalStateException(errorMsg), DEFINITION_NOT_FOUND)
+        emitAsFailed(IllegalStateException(errorMsg), DEFINITION_MISSING)
     }
 
     /**
@@ -115,7 +116,7 @@ internal class InstanceMessageHandler(
         Secrets.getForWorkflow(workflow)
     } catch (e: Exception) {
         logger.error(e) { "Unable to retrieve needed secret. Storing the message in the $RETRY_TABLE table for manual inspection." }
-        emitAsFailed(e, SECRETS_RETRIEVAL_FAILED)
+        emitAsFailed(e, SECRETS_RETRIEVAL_FAILURE)
     }
 
     /**
@@ -130,7 +131,7 @@ internal class InstanceMessageHandler(
         Processor(workflowState = workflowState, secrets = secrets)
     } catch (e: Exception) {
         logger.error(e) { "Failed to init workflow processor. Storing it in the $RETRY_TABLE table for manual inspection." }
-        emitAsFailed(e, WORKFLOW_INITIALIZATION_ERROR)
+        emitAsFailed(e, WORKFLOW_INIT_FAILURE)
     }
 
     /**
@@ -144,7 +145,7 @@ internal class InstanceMessageHandler(
         return try {
             with(stepByStepRunner) { run(processor) }
         } catch (e: Exception) {
-            logger.error(e) { "Failed to run instance. Storing current state in the $RETRY_TABLE table for manual inspection." }
+            logger.error(e) { "Failed to run instance. Storing current state in the $FAILURE_TABLE table for manual inspection." }
             updateFrom(processor).emitAsFailed(e, getFailureReason(e))
         }
     }
@@ -163,14 +164,14 @@ internal class InstanceMessageHandler(
             this.toJsonString()
         } catch (e: Exception) {
             logger.error(e) { "Failed to serialize new message. Message will be stored in the $RETRY_TABLE table as failed" }
-            emitAsFailed(e, SERIALISATION_ERROR)
+            emitAsFailed(e, SERIALIZATION_FAILURE)
         }
         // Emit the message
         try {
             instanceEmitter.send(payload)
         } catch (e: Exception) {
             logger.warn(e) { "Failed to emit next message. Message will be stored in the $RETRY_TABLE table instead to be re-emit later" }
-            emitToRetry(e, MESSAGE_EMISSION_ERROR)
+            emitToRetry(e, MESSAGE_EMISSION_FAILURE)
         }
     }
 
@@ -179,7 +180,7 @@ internal class InstanceMessageHandler(
             id = IDV7.random(),
             payload = payload,
             error = cause,
-            reason = DESERIALISATION_ERROR
+            reason = DESERIALIZATION_FAILURE
         )
         ingestionEmitter.send(failure)
     }
