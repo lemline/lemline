@@ -74,12 +74,12 @@ abstract class OutboxModel(open val instanceMessage: InstanceMessage) : WithInst
      */
     abstract var outboxErrorStackTrace: String?
 
-    override val workflowState = instanceMessage.workflowState
-    override val parentId = instanceMessage.parentId
+    override val workflowState get() = instanceMessage.workflowState
+    override val parentId get() = instanceMessage.parentId
 
-    val workflowId = workflowState.workflowId
-    val workflowName = workflowState.workflowName
-    val workflowVersion = workflowState.workflowVersion
+    val workflowId get() = workflowState.workflowId
+    val workflowName get() = workflowState.workflowName
+    val workflowVersion get() = workflowState.workflowVersion
 
     override fun toJsonString() = LemlineJson.encodeToString(this)
 }
