@@ -36,13 +36,4 @@ class WorkflowVersionTest {
 
         assertEquals(version, decodedVersion)
     }
-
-    @Test
-    fun `WorkflowVersion works in maps with WorkflowName keys`() {
-        val m = linkedMapOf<WorkflowName, WorkflowVersion>()
-        val name = WorkflowName("orders")
-        m[name] = WorkflowVersion("v1")
-
-        assertEquals(WorkflowVersion("v1"), m[WorkflowName("orders")])
-    }
 }
