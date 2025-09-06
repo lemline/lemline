@@ -14,9 +14,9 @@ value class IDV7(val value: @Contextual UUID) {
     init {
         require(value.version() == 7) { "Invalid UUID version" }
     }
-    
+
     companion object {
-        fun new(): IDV7 = IDV7(IdGenerator.generateV7())
+        fun random(): IDV7 = IDV7(IdGenerator.generateV7())
 
         fun from(id: IDV7): IDV7 = IDV7(IdGenerator.deriveUuidV7FromV7(id.value))
 

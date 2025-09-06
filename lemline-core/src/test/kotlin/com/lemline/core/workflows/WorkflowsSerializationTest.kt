@@ -33,7 +33,7 @@ class WorkflowsSerializationTest {
 
     @Test
     fun `WorkflowId serializes and deserializes`() {
-        val id = WorkflowId.new()
+        val id = WorkflowId.random()
         val encoded = LemlineJson.encodeToString(id)
         assertEquals(encoded, "\"$id\"")
         val decoded = LemlineJson.decodeFromString<WorkflowId>(encoded)
@@ -60,7 +60,7 @@ class WorkflowsSerializationTest {
     @Test
     fun `Instance serializes and deserializes`() {
         val workflowState = WorkflowState(
-            workflowId = WorkflowId.new(),
+            workflowId = WorkflowId.random(),
             workflowName = WorkflowName("orders"),
             workflowVersion = WorkflowVersion("v1"),
             currentPosition = NodePosition.root,

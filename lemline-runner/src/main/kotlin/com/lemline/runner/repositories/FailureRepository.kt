@@ -3,6 +3,7 @@ package com.lemline.runner.repositories
 
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.IDV7
+import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -45,7 +46,7 @@ const val FAILURE_TABLE = "lemline_failures"
  * - This class is marked with `@ExperimentalTime` to indicate its use of experimental Kotlin time-related APIs.
  * - The `FailureModel` class provides factory methods to create instances directly from exceptions.
  */
-@jakarta.enterprise.context.ApplicationScoped
+@ApplicationScoped
 @ExperimentalTime
 class FailureRepository : WithInstanceRepository<FailureModel>() {
 

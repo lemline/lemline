@@ -101,7 +101,7 @@ internal class IngestionMessageHandler(
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) {
         val failure = FailureModel.from(
-            id = IDV7.new(),
+            id = IDV7.random(),
             payload = payload,
             reason = DESERIALISATION_ERROR,
             error = cause

@@ -176,7 +176,7 @@ internal class InstanceMessageHandler(
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) {
         val failure = FailureIngestionMessage.from(
-            id = IDV7.new(),
+            id = IDV7.random(),
             payload = payload,
             error = cause,
             reason = DESERIALISATION_ERROR
@@ -194,7 +194,7 @@ internal class InstanceMessageHandler(
 
     private suspend fun InstanceMessage.saveAsFailed(error: Exception, reason: String) {
         val failure = FailureIngestionMessage.from(
-            id = IDV7.new(),
+            id = IDV7.random(),
             instance = this,
             error = error,
             reason = reason,
@@ -204,7 +204,7 @@ internal class InstanceMessageHandler(
 
     private suspend fun InstanceMessage.saveForRetry(cause: Exception, reason: String) {
         val retry = RetryIngestionMessage.from(
-            id = IDV7.new(),
+            id = IDV7.random(),
             instance = this,
             outboxScheduledFor = Clock.System.now(), // <- TODO check first date
             error = cause,

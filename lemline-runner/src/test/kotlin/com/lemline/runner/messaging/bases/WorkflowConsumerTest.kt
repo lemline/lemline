@@ -184,7 +184,7 @@ internal abstract class WorkflowConsumerTest {
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.new(
-            workflowId = WorkflowId.new(),
+            workflowId = WorkflowId.random(),
             workflowName = WorkflowName("test-workflow"),
             workflowVersion = WorkflowVersion("1.0.0"),
             workflowInput = JsonPrimitive("task"),
@@ -265,7 +265,7 @@ internal abstract class WorkflowConsumerTest {
     fun `should store instance with retry in retry repository`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.new(
-            workflowId = WorkflowId.new(),
+            workflowId = WorkflowId.random(),
             workflowName = WorkflowName("test-workflow"),
             workflowVersion = WorkflowVersion("1.0.0"),
             workflowInput = JsonPrimitive("retry"),
@@ -305,7 +305,7 @@ internal abstract class WorkflowConsumerTest {
     fun `should store waiting instance in wait repository`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.new(
-            WorkflowId.new(),
+            WorkflowId.random(),
             WorkflowName("test-workflow"),
             WorkflowVersion("1.0.0"),
             JsonPrimitive("wait"),
@@ -352,7 +352,7 @@ internal abstract class WorkflowConsumerTest {
     fun `should handle completed workflow without sending message`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.new(
-            WorkflowId.new(),
+            WorkflowId.random(),
             WorkflowName("test-workflow"),
             WorkflowVersion("1.0.0"),
             JsonPrimitive("completed"),

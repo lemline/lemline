@@ -60,7 +60,7 @@ class Starter {
         }
 
         // create the message
-        val workflowId = WorkflowId.new() // <- TODO create idempotent id
+        val workflowId = WorkflowId.random() // <- TODO create idempotent id
 
         val instanceMessage = InstanceMessage.new(
             workflowId = workflowId,

@@ -854,13 +854,4 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         repository.insert(entity)
         return entity
     }
-
-    val randomInstant: Instant
-        get() = Clock.System.now() + Random.nextInt(-1000, 1000).days
-
-    val randomString: String
-        get() = Random.nextBytes(32).toString()
-
-    val randomNullableString: String?
-        get() = if (Random.nextBoolean()) null else randomString
 }

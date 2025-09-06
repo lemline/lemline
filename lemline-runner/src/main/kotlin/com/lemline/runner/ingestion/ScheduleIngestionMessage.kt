@@ -89,7 +89,7 @@ data class ScheduleIngestionMessage(
             }
 
             val scheduleIngestionMessage = ScheduleIngestionMessage(
-                id = IDV7.new(),
+                id = IDV7.random(),
                 instanceMessage = InstanceMessage.new(
                     workflowId = workflowId,
                     workflowName = workflowName,

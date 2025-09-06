@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
@@ -46,6 +47,8 @@ data class WorkflowState(
      * Creates a new instance of the workflow state with a new ID.
      */
     fun duplicate(newId: WorkflowId): WorkflowState = copy(workflowId = newId)
+
+    fun toJsonString(): String = LemlineJson.encodeToString(this)
 
     companion object {
         /**

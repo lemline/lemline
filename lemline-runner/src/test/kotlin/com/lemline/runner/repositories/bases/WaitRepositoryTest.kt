@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.runner.instances.InstanceMessageTest.Companion.sampleInstance
+import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.random.random
 import com.lemline.runner.repositories.WaitRepository
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 
 /**
  * Abstract base class for wait repository tests.
@@ -18,10 +20,10 @@ internal abstract class WaitRepositoryTest : OutboxRepositoryTest<WaitOutboxMode
     override lateinit var repository: WaitRepository
 
     override fun createRandomEntity() = WaitOutboxModel(
-        id = IDV7.new(),
-        instanceMessage = sampleInstance(),
-        outboxScheduledFor = randomInstant,
+        id = IDV7.random(),
+        instanceMessage = InstanceMessage.random(),
+        outboxScheduledFor = Instant.random(),
     )
 
-    override fun changeDelayedUntil(model: WaitOutboxModel) = model.copy(outboxDelayedUntil = randomInstant)
+    override fun changeDelayedUntil(model: WaitOutboxModel) = model.copy(outboxDelayedUntil = Instant.random())
 }

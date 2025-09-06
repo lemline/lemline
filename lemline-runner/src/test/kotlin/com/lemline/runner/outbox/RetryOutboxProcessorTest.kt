@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.runner.instances.InstanceMessageTest.Companion.sampleInstance
+import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
+import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository
 import com.lemline.runner.repositories.RetryRepository
@@ -37,8 +38,8 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>(
 
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = RetryOutboxModel(
-        id = IDV7.new(),
-        instanceMessage = sampleInstance(),
+        id = IDV7.random(),
+        instanceMessage = InstanceMessage.random(),
         outboxScheduledFor = null,
         errorReason = "test-error-reason",
         errorClass = "test-error-class",

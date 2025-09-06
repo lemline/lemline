@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.runner.instances.InstanceMessageTest.Companion.sampleInstance
+import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
+import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository
 import com.lemline.runner.repositories.ParentRepository
@@ -37,8 +38,8 @@ internal class RunWorkflowOutboxProcessorTest : OutboxProcessorTest<ParentOutbox
 
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = ParentOutboxModel(
-        id = IDV7.new(),
-        instanceMessage = sampleInstance(),
+        id = IDV7.random(),
+        instanceMessage = InstanceMessage.random(),
         outboxScheduledFor = null
     )
 }

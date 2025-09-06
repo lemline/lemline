@@ -117,7 +117,7 @@ internal class StepByStepRunner @Inject constructor(
         // insert the parent workflow without delayedUntil
         // TODO make id idempotent
         val parent = ParentIngestionMessage(
-            id = IDV7.new(),
+            id = IDV7.random(),
             instanceMessage = this,
             outboxScheduledFor = null,
         )
@@ -172,7 +172,7 @@ internal class StepByStepRunner @Inject constructor(
         val delay = tryInstance.delay ?: error("No delay set in in $tryInstance")
 
         val retryMessage = RetryIngestionMessage.from(
-            id = IDV7.new(),
+            id = IDV7.random(),
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
             error = e,
@@ -190,7 +190,7 @@ internal class StepByStepRunner @Inject constructor(
      */
     private suspend fun InstanceMessage.onWait(delay: Duration) {
         val waitMessage = WaitIngestionMessage(
-            id = IDV7.new(),
+            id = IDV7.random(),
             instanceMessage = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
         )

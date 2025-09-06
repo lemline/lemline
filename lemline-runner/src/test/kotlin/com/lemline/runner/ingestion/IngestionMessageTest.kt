@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.ingestion
 
-import com.lemline.runner.instances.InstanceMessageTest.Companion.sampleInstance
+import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.IDV7
 import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.random.nullableRandom
+import com.lemline.runner.random.random
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -17,88 +19,102 @@ internal class IngestionMessageTest {
 
     @Test
     fun `should be JSON serializable and deserializable for Parent message`() {
+        // Given
         val original: IngestionMessage = ParentIngestionMessage(
-            id = IDV7.new(),
-            instanceMessage = sampleInstance(),
+            id = IDV7.random(),
+            instanceMessage = InstanceMessage.random(),
             outBoxStatus = OutBoxStatus.PENDING,
             outboxScheduledFor = Clock.System.now(),
         )
-        val json = original.toJsonString()
-        val deserialized = IngestionMessage.fromJsonString(json)
+        // When
+        val serialized = original.toJsonString()
+        val deserialized = IngestionMessage.fromJsonString(serialized)
+        // Then
         assertEquals(original, deserialized)
     }
 
     @Test
     fun `should be JSON serializable and deserializable for Wait message`() {
+        // Given
         val original: IngestionMessage = WaitIngestionMessage(
-            id = IDV7.new(),
-            instanceMessage = sampleInstance(),
+            id = IDV7.random(),
+            instanceMessage = InstanceMessage.random(),
             outBoxStatus = OutBoxStatus.PENDING,
-            outboxScheduledFor = Clock.System.now(),
+            outboxScheduledFor = Instant.nullableRandom(),
         )
-        val json = original.toJsonString()
-        val deserialized = IngestionMessage.fromJsonString(json)
+        // When
+        val serialized = original.toJsonString()
+        val deserialized = IngestionMessage.fromJsonString(serialized)
+        // Then
         assertEquals(original, deserialized)
     }
 
     @Test
     fun `should be JSON serializable and deserializable for Schedule message`() {
+        // Given
         val original: IngestionMessage = ScheduleIngestionMessage(
-            id = IDV7.new(),
-            instanceMessage = sampleInstance(),
+            id = IDV7.random(),
+            instanceMessage = InstanceMessage.random(),
             outBoxStatus = OutBoxStatus.PENDING,
-            outboxScheduledFor = null,
-            scheduleAfter = "PT10S",
-            scheduleEvery = "a",
-            scheduleCron = "b",
-            scheduleZone = "c",
+            outboxScheduledFor = Instant.nullableRandom(),
+            scheduleAfter = String.nullableRandom(),
+            scheduleEvery = String.nullableRandom(),
+            scheduleCron = String.nullableRandom(),
+            scheduleZone = String.nullableRandom(),
         )
-        val json = original.toJsonString()
-        val deserialized = IngestionMessage.fromJsonString(json)
+        // When
+        val serialized = original.toJsonString()
+        val deserialized = IngestionMessage.fromJsonString(serialized)
+        // Then
         assertEquals(original, deserialized)
     }
 
     @Test
     fun `should be JSON serializable and deserializable for Retry message`() {
+        // Given
         val original: IngestionMessage = RetryIngestionMessage(
-            id = IDV7.new(),
-            instanceMessage = sampleInstance(),
+            id = IDV7.random(),
+            instanceMessage = InstanceMessage.random(),
             outBoxStatus = OutBoxStatus.FAILED,
-            outboxScheduledFor = null,
-            errorReason = "r",
-            errorClass = "a",
-            errorMessage = "b",
-            errorStackTrace = "c",
+            outboxScheduledFor = Instant.nullableRandom(),
+            errorReason = String.random(),
+            errorClass = String.random(),
+            errorMessage = String.nullableRandom(),
+            errorStackTrace = String.random(),
         )
-        val json = original.toJsonString()
-        val deserialized = IngestionMessage.fromJsonString(json)
+        // When
+        val serialized = original.toJsonString()
+        val deserialized = IngestionMessage.fromJsonString(serialized)
+        // Then
         assertEquals(original, deserialized)
     }
 
     @Test
     fun `should be JSON serializable and deserializable for Failure message`() {
+        // Given
         val original: IngestionMessage = FailureIngestionMessage(
-            id = IDV7.new(),
-            instanceMessage = sampleInstance(),
-            payload = "p",
-            errorReason = "r",
-            errorClass = "a",
-            errorMessage = "b",
-            errorStackTrace = "c",
+            id = IDV7.random(),
+            instanceMessage = InstanceMessage.random(),
+            payload = String.nullableRandom(),
+            errorReason = String.random(),
+            errorClass = String.random(),
+            errorMessage = String.nullableRandom(),
+            errorStackTrace = String.random(),
         )
-        val json = original.toJsonString()
-        val deserialized = IngestionMessage.fromJsonString(json)
+        // When
+        val serialized = original.toJsonString()
+        val deserialized = IngestionMessage.fromJsonString(serialized)
+        // Then
         assertEquals(original, deserialized)
     }
 
     @Test
     fun `serialized keys maintain their values for messages backward compatibility`() {
-        val id = IDV7.new()
-
-        val scheduledFor = Instant.parse("2023-01-01T00:00:00Z")
-
-        val instance = sampleInstance()
-
+        // Given
+        val id = IDV7.random()
+        val scheduledFor = Instant.random()
+        val instance = InstanceMessage.random()
+        // When
         val msgParent = ParentIngestionMessage(
             id = id,
             instanceMessage = instance,
@@ -135,36 +151,37 @@ internal class IngestionMessageTest {
             id = id,
             instanceMessage = instance,
             payload = "payload",
-            errorReason = "reason",
+            errorReason = "errorReason",
             errorClass = "errorClass",
             errorMessage = "errorMessage",
             errorStackTrace = "errorStackTrace",
         )
 
-        // Expect compact keys with class discriminator t
+        // Then
+        
         // ParentIngestionMessage has a serial name "p"
         assertEquals(
-            """{"t":"p","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"2023-01-01T00:00:00Z"}""",
+            """{"t":"p","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"$scheduledFor"}""",
             msgParent.toJsonString(),
         )
         // WaitIngestionMessage has a serial name "w"
         assertEquals(
-            """{"t":"w","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"2023-01-01T00:00:00Z"}""",
+            """{"t":"w","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"$scheduledFor"}""",
             msgWait.toJsonString(),
         )
         // RetryIngestionMessage has a serial name "r"
         assertEquals(
-            """{"t":"r","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"2023-01-01T00:00:00Z","ec":"errorClass","em":"errorMessage","es":"errorStackTrace"}""",
+            """{"t":"r","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"$scheduledFor","er":"errorReason","ec":"errorClass","em":"errorMessage","es":"errorStackTrace"}""",
             msgRetry.toJsonString(),
         )
         // ScheduleIngestionMessage has a serial name "s"
         assertEquals(
-            """{"t":"s","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"2023-01-01T00:00:00Z","sa":"after","se":"every","sc":"cron","sz":"zone"}""",
+            """{"t":"s","id":"$id","i":${instance.toJsonString()},"s":"FAILED","f":"$scheduledFor","sa":"after","se":"every","sc":"cron","sz":"zone"}""",
             msgSchedule.toJsonString(),
         )
         // FailureIngestionMessage has a serial name "f"
         assertEquals(
-            """{"t":"f","id":"$id","i":${instance.toJsonString()},"p":"payload","r":"reason","ec":"errorClass","em":"errorMessage","es":"errorStackTrace"}""",
+            """{"t":"f","id":"$id","i":${instance.toJsonString()},"p":"payload","er":"errorReason","ec":"errorClass","em":"errorMessage","es":"errorStackTrace"}""",
             msgFailure.toJsonString(),
         )
     }

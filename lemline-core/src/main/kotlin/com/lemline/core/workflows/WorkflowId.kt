@@ -13,7 +13,7 @@ value class WorkflowId(val value: @Contextual UUID) {
     override fun toString(): String = value.toString()
 
     companion object {
-        fun new(): WorkflowId = WorkflowId(IdGenerator.generateV7())
+        fun random(): WorkflowId = WorkflowId(IdGenerator.generateV7())
 
         fun from(descriptor: WorkflowDescriptor): WorkflowId = WorkflowId(UUID.fromString(descriptor.id))
     }

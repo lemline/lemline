@@ -35,7 +35,7 @@ internal fun getWorkflowProcessor(
     input: JsonElement,
     name: String = "workflow-${doYaml.hashCode()}",
     version: String = "0.1.0",
-    id: WorkflowId = WorkflowId.new(),
+    id: WorkflowId = WorkflowId.random(),
 ): Processor {
     val document =
         """document:

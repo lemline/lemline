@@ -24,7 +24,7 @@ data class FailureIngestionMessage(
     @SerialName("p")
     val payload: String?,
 
-    @SerialName("r")
+    @SerialName("er")
     val errorReason: String,
 
     @SerialName("ec")

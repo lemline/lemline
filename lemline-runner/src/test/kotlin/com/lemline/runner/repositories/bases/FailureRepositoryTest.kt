@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.runner.instances.InstanceMessageTest.Companion.sampleInstance
+import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.IDV7
+import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -36,8 +37,8 @@ internal abstract class FailureRepositoryTest {
     fun `should insert and retrieve a failure with all fields`() = runTest {
         val ex = IllegalStateException("boom")
         val model = FailureModel.from(
-            id = IDV7.new(),
-            instance = sampleInstance(),
+            id = IDV7.random(),
+            instance = InstanceMessage.random(),
             error = ex,
         )
 
@@ -56,7 +57,7 @@ internal abstract class FailureRepositoryTest {
     fun `should insert and retrieve a failure with only payload`() = runTest {
         val ex = IllegalStateException("boom")
         val model = FailureModel.from(
-            id = IDV7.new(),
+            id = IDV7.random(),
             payload = "payload",
             error = ex,
         )
@@ -74,12 +75,12 @@ internal abstract class FailureRepositoryTest {
 
     @Test
     fun `should find failures by workflow id`() = runTest {
-        val instance1 = sampleInstance()
-        val instance2 = sampleInstance()
+        val instance1 = InstanceMessage.random()
+        val instance2 = InstanceMessage.random()
 
-        val f1 = FailureModel.from(IDV7.new(), instance1, RuntimeException("e1")).copy(payload = "m1")
-        val f2 = FailureModel.from(IDV7.new(), instance1, RuntimeException("e2")).copy(payload = "m2")
-        val f3 = FailureModel.from(IDV7.new(), instance2, RuntimeException("e3")).copy(payload = "m3")
+        val f1 = FailureModel.from(IDV7.random(), instance1, RuntimeException("e1")).copy(payload = "m1")
+        val f2 = FailureModel.from(IDV7.random(), instance1, RuntimeException("e2")).copy(payload = "m2")
+        val f3 = FailureModel.from(IDV7.random(), instance2, RuntimeException("e3")).copy(payload = "m3")
 
         repository.insert(listOf(f1, f2, f3))
 
@@ -92,9 +93,9 @@ internal abstract class FailureRepositoryTest {
 
     @Test
     fun `count and deleteAll should work`() = runTest {
-        val instance = sampleInstance()
+        val instance = InstanceMessage.random()
         val failures = List(3) { idx ->
-            FailureModel.from(IDV7.new(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
+            FailureModel.from(IDV7.random(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
         }
         repository.insert(failures)
         repository.count() shouldBe 3
@@ -107,7 +108,7 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `deleteById should remove an existing failure`() = runTest {
         // Given
-        val failure = FailureModel.from(IDV7.new(), sampleInstance(), RuntimeException("boom"))
+        val failure = FailureModel.from(IDV7.random(), InstanceMessage.random(), RuntimeException("boom"))
         repository.insert(failure)
 
         // When
@@ -121,9 +122,9 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `deleteById should return 0 if failure does not exist`() = runTest {
         // Given
-        val failure = FailureModel.from(IDV7.new(), sampleInstance(), RuntimeException("boom"))
+        val failure = FailureModel.from(IDV7.random(), InstanceMessage.random(), RuntimeException("boom"))
         repository.insert(failure)
-        val randomId = IDV7.new()
+        val randomId = IDV7.random()
 
         // When
         val deletedCount = repository.deleteById(randomId)

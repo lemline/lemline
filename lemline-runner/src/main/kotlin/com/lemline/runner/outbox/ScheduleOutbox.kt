@@ -55,7 +55,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
 
     override suspend fun process(entity: ScheduleOutboxModel) {
         // update the schedule model with the next instant to be processed
-        entity.prepareNextScheduled(WorkflowId.new())
+        entity.prepareNextScheduled(WorkflowId.random())
         // start a new instance of the workflow (with new workflowId)
         super.process(entity)
     }
