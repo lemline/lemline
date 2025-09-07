@@ -29,9 +29,9 @@ class MessageMetaData {
         addMetaDataFunction(this, metaData)
     }
 
-    fun Message<*>.getMetaData() {
-        getMetaDataFunction(this)
-    }
+    val Message<*>.messageId get() = getMetaData().messageId
+
+    fun Message<*>.getMetaData() = getMetaDataFunction(this)
 
     private val getMetaDataFunction by lazy {
         when (messagingType) {

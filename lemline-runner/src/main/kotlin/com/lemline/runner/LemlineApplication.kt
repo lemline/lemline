@@ -71,7 +71,6 @@ class LemlineApplication : QuarkusApplication {
          *
          * @param args Command line arguments.
          */
-        @OptIn(ExperimentalSerializationApi::class)
         @JvmStatic
         fun main(args: Array<String>) {
             try {

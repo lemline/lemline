@@ -208,9 +208,19 @@ object AckNackPolicy {
      */
     private fun isRetriable(t: Throwable): Boolean {
         val c = rootCause(t)
+        // We check class names for RabbitMQ exceptions as we cannot add imports here.
+        val isRabbitMqTransient = when (c?.javaClass?.name) {
+            "com.rabbitmq.client.ShutdownSignalException",
+            "com.rabbitmq.client.AlreadyClosedException" -> true
+
+            else -> false
+        }
+        val isSqlTransient = c?.javaClass?.name?.startsWith("java.sql.SQLTransient") == true
+
         return c is TimeoutCancellationException || // <- coroutine timeout exception
             c is RetriableException || // <- kafka exception
-            c is java.io.IOException // <- IO exception (e.g. connection reset)
+            c is java.io.IOException || // <- IO exception (e.g. connection reset)
+            isRabbitMqTransient || isSqlTransient
     }
 
     private fun rootCause(t: Throwable?): Throwable? {

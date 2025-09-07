@@ -100,12 +100,14 @@ internal interface MessageHandler<T : WithWorkflowInfo> {
                 acknowledgeWithRetry(workflowName, workflowVersion)
             } catch (e: Exception) {
                 // Failure path
+                logger.error(e) { "Failed to execute compensation for ${toLogString()}" }
                 negAcknowledgeWithRetry(e, workflowName, workflowVersion)
                 onFailureTest(this, e)
             }
             Result.failure(compensation)
         } catch (e: Exception) {
             // Failure path
+            logger.error(e) { "Failed to process ${toLogString()}" }
             negAcknowledgeWithRetry(e, workflowName, workflowVersion)
             onFailureTest(this, e)
             Result.failure(e)
@@ -143,7 +145,7 @@ internal interface MessageHandler<T : WithWorkflowInfo> {
         workflowVersion: WorkflowVersion?
     ) = try {
         with(AckNackPolicy) { nackWithRetry(e) }
-        logger.warn(e) { "Message NACKed: ${toLogString()} - should be sent to the DLQ by brokers" }
+        logger.info(e) { "Message NACKed: ${toLogString()} - should be sent to the DLQ by brokers" }
         metrics.nackCompleted(workflowName, workflowVersion)
     } catch (e: Exception) {
         logger.error(e) { "Failed to NACK message: ${toLogString()}" }
