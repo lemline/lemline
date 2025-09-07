@@ -2,6 +2,7 @@
 package com.lemline.runner.models
 
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.JsonSerializable
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
 import kotlin.time.ExperimentalTime
@@ -23,7 +24,7 @@ import kotlinx.serialization.Serializable
  */
 @ExperimentalTime
 @Serializable
-abstract class OutboxModel() : WithInstance {
+abstract class OutboxModel() : WithInstance, JsonSerializable {
 
     abstract val instanceMessage: InstanceMessage
 

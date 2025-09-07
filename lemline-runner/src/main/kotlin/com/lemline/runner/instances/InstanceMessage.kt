@@ -8,6 +8,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.processor.Processor
 import com.lemline.core.workflows.WorkflowState
+import com.lemline.runner.messaging.JsonSerializable
 import com.lemline.runner.messaging.WithWorkflowInfo
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
@@ -28,7 +29,7 @@ data class InstanceMessage(
      * Parent's model ID waiting for this instance completion, if any.
      */
     @SerialName("p") val parentId: IDV7? = null
-) : WithWorkflowInfo {
+) : WithWorkflowInfo, JsonSerializable {
 
     @Transient
     lateinit var message: Message<String>
