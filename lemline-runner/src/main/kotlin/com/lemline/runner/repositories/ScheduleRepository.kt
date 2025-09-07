@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.runner.models.IDV7
+import com.lemline.common.values.WorkflowId
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
@@ -62,7 +61,7 @@ class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
             })
 
     override fun createModel(rs: ResultSet) = ScheduleOutboxModel(
-        id = IDV7(getUuid(rs, ID_COLUMN)!!),
+        id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage()!!,
         scheduleAfter = rs.getString(SCHEDULE_AFTER_COLUMN),
         scheduleEvery = rs.getString(SCHEDULE_EVERY_COLUMN),
@@ -70,12 +69,13 @@ class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
         scheduleZone = rs.getString(SCHEDULE_ZONE_COLUMN),
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
-        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
-        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
-        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN),
-        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN),
-        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN),
-    )
+    ).apply {
+        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN)
+        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN)
+        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN)
+        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN)
+        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN)
+    }
 
     suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection? = null): ScheduleOutboxModel? =
         findWithWorkflowId(workflowId, connection).firstOrNull()

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.models.DefinitionModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject

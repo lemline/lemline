@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox.bases
 
-import com.lemline.core.logger.logger
+import com.lemline.common.logger.logger
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.OutBoxStatus.FAILED
 import com.lemline.runner.outbox.OutBoxStatus.PENDING

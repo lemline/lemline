@@ -2,7 +2,7 @@
 package com.lemline.runner.cli.common
 
 import com.github.zafarkhaja.semver.Version
-import com.lemline.core.workflows.WorkflowName
+import com.lemline.common.values.WorkflowName
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable

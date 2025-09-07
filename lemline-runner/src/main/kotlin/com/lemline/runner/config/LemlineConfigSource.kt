@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
-import com.lemline.core.logger.logger
+import com.lemline.common.logger.logger
 import com.lemline.runner.LemlineApplication
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY

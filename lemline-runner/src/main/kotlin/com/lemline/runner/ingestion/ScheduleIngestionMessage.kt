@@ -4,12 +4,12 @@ package com.lemline.runner.ingestion
 import com.cronutils.model.CronType
 import com.cronutils.model.definition.CronDefinitionBuilder
 import com.cronutils.parser.CronParser
+import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.utils.toDuration
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.models.getNextCronExecutionInstant
 import com.lemline.runner.outbox.OutBoxStatus

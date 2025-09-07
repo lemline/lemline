@@ -2,13 +2,13 @@
 package com.lemline.runner.instances
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.processor.Processor
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
 import com.lemline.core.workflows.WorkflowState
-import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.messaging.WorkflowMessage
-import com.lemline.runner.models.IDV7
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

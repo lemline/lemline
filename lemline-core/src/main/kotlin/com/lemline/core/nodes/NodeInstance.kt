@@ -5,6 +5,7 @@ package com.lemline.core.nodes
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonElement
+import com.lemline.common.logger.logger
 import com.lemline.core.errors.WorkflowError
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
@@ -17,7 +18,6 @@ import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.instances.RootInstance
 import com.lemline.core.instances.TryInstance
-import com.lemline.core.logger.logger
 import com.lemline.core.processor.Processor
 import com.lemline.core.schemas.SchemaValidator
 import io.serverlessworkflow.api.types.ExportAs

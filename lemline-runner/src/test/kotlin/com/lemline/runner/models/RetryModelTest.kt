@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.lemline.common.random.random
+import com.lemline.common.values.IDV7
 import com.lemline.core.workflows.WorkflowState
 import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
@@ -66,7 +68,8 @@ class RetryModelTest {
         )
 
         val serialized = original.toJsonString()
-        val deserialized = com.lemline.runner.ingestion.IngestionMessage.fromJsonString(serialized) as RetryIngestionMessage
+        val deserialized =
+            com.lemline.runner.ingestion.IngestionMessage.fromJsonString(serialized) as RetryIngestionMessage
         assertEquals(original, deserialized)
 
         // and toModel should still be safe

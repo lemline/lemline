@@ -2,6 +2,9 @@
 package com.lemline.core.workflows
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName

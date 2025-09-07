@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.common.values.IDV7
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
-import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.models.WithId
-import java.nio.ByteBuffer
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
@@ -59,19 +58,19 @@ abstract class WithIdRepository<T : WithId> : Repository<T>() {
         internal const val ID_COLUMN = "id"
     }
 
-    protected val setUuid by lazy {
+    protected val setIDV7 by lazy {
         when (databaseManager.dbType) {
-            DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> { stmt: PreparedStatement, parameterIndex: Int, uuid: UUID? ->
-                when (uuid) {
+            DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> { stmt: PreparedStatement, parameterIndex: Int, id: IDV7? ->
+                when (id) {
                     null -> stmt.setNull(parameterIndex, Types.OTHER)
-                    else -> stmt.setObject(parameterIndex, uuid)
+                    else -> stmt.setObject(parameterIndex, id.value)
                 }
             }
 
-            DB_TYPE_MYSQL -> { stmt: PreparedStatement, parameterIndex: Int, uuid: UUID? ->
-                when (uuid) {
+            DB_TYPE_MYSQL -> { stmt: PreparedStatement, parameterIndex: Int, id: IDV7? ->
+                when (id) {
                     null -> stmt.setNull(parameterIndex, Types.BINARY)
-                    else -> stmt.setBytes(parameterIndex, uuid.toBytes())
+                    else -> stmt.setBytes(parameterIndex, id.toBytes())
                 }
             }
 
@@ -79,39 +78,25 @@ abstract class WithIdRepository<T : WithId> : Repository<T>() {
         }
     }
 
-    protected val getUuid: (ResultSet, String) -> UUID? by lazy {
+    protected val getIDV7: (ResultSet, String) -> IDV7? by lazy {
         when (databaseManager.dbType) {
             DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> { rs: ResultSet, columnName: String ->
-                rs.getObject(columnName, UUID::class.java)
+                rs.getObject(columnName, UUID::class.java)?.let { IDV7(it) }
             }
 
             DB_TYPE_MYSQL -> { rs: ResultSet, columnName: String ->
-                rs.getBytes(columnName)?.toUUID()
+                rs.getBytes(columnName)?.let { IDV7.from(it) }
             }
 
             else -> error("Unsupported database type '${databaseManager.dbType}'")
         }
     }
-
-    private fun ByteArray.toUUID(): UUID {
-        require(this.size == 16) { "ByteArray must be exactly 16 bytes for UUID conversion, but was ${this.size}" }
-        val bb = ByteBuffer.wrap(this)
-        val mostSignificantBits = bb.long
-        val leastSignificantBits = bb.long
-        return UUID(mostSignificantBits, leastSignificantBits)
-    }
-
-    private fun UUID.toBytes(): ByteArray =
-        ByteBuffer.allocate(16).putLong(mostSignificantBits).putLong(leastSignificantBits).array()
-
 
     override val keyColumns: List<String> = listOf(ID_COLUMN)
 
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
         mapOf(
-            ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setUuid(stmt, idx, entity.id.value)
-            },
+            ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int -> setIDV7(stmt, idx, entity.id) },
         )
     }
 
@@ -124,7 +109,7 @@ abstract class WithIdRepository<T : WithId> : Repository<T>() {
      */
     suspend fun findById(id: IDV7, connection: Connection? = null): T? = withConnection(connection) { conn ->
         conn.prepareStatement(findByIdSql).use { stmt ->
-            setUuid(stmt, 1, id.value)
+            setIDV7(stmt, 1, id)
             stmt.executeQuery().use { rs ->
                 if (rs.next()) createModel(rs) else null
             }
@@ -142,7 +127,7 @@ abstract class WithIdRepository<T : WithId> : Repository<T>() {
      */
     suspend fun deleteById(id: IDV7, connection: Connection? = null): Int = withConnection(connection) { conn ->
         conn.prepareStatement(deleteByIdSql).use { stmt ->
-            setUuid(stmt, 1, id.value)
+            setIDV7(stmt, 1, id)
             stmt.executeUpdate()
         }
     }

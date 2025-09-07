@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 @file:Suppress("unused")
 
-package com.lemline.core.logger
+package com.lemline.common.logger
 
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.ThreadContextElement

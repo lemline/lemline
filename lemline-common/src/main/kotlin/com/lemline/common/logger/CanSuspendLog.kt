@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.logger
+package com.lemline.common.logger
 
 interface CanSuspendLog {
     suspend fun trace(e: Throwable? = null, message: suspend () -> String)

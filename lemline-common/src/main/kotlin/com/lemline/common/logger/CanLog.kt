@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.logger
+package com.lemline.common.logger
 
 interface CanLog {
     fun trace(e: Throwable? = null, message: () -> String)

@@ -2,11 +2,11 @@
 package com.lemline.core
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.Definitions
 import com.lemline.core.processor.Processor
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow

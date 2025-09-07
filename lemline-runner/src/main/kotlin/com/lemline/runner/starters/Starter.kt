@@ -2,15 +2,15 @@
 package com.lemline.runner.starters
 
 import com.github.zafarkhaja.semver.Version
+import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.Definitions
 import com.lemline.core.schemas.SchemaValidator
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.ingestion.IngestionMessageEmitter
 import com.lemline.runner.ingestion.ScheduleIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.models.IDV7
 import com.lemline.runner.repositories.DefinitionRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject

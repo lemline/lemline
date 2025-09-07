@@ -7,6 +7,8 @@ plugins {
     kotlin("plugin.allopen") version libs.versions.kotlin.get()
     kotlin("plugin.jpa") version libs.versions.kotlin.get()
     alias(libs.plugins.quarkus)
+
+    id("java-test-fixtures")
 }
 
 group = "com.lemline"
@@ -109,6 +111,13 @@ dependencies {
     testImplementation("org.testcontainers:mysql")
     testImplementation("org.testcontainers:kafka")
     testImplementation("org.testcontainers:rabbitmq")
+
+    // Tests Fixtures
+    testFixturesImplementation(kotlin("test"))
+    testFixturesImplementation(enforcedPlatform(libs.kotest.bom))
+    testFixturesImplementation(libs.bundles.kotlinxEcosystem)
+    testFixturesImplementation(testFixtures(project(":lemline-common")))
+    testFixturesImplementation(testFixtures(project(":lemline-core")))
 }
 
 // ────────────────────────────────────────────────────────────────────────────

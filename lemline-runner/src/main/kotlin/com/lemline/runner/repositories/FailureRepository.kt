@@ -2,7 +2,6 @@
 package com.lemline.runner.repositories
 
 import com.lemline.runner.models.FailureModel
-import com.lemline.runner.models.IDV7
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.PreparedStatement
@@ -84,7 +83,7 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
     }
 
     override fun createModel(rs: ResultSet) = FailureModel(
-        id = IDV7(getUuid(rs, ID_COLUMN)!!),
+        id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage(),
         payload = rs.getString(PAYLOAD_COLUMN),
         errorReason = rs.getString(ERROR_REASON_COLUMN),

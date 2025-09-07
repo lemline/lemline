@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.runs
 
-import com.lemline.core.logger.logger
+import com.lemline.common.logger.logger
 
 internal object PythonChecker {
     private val log = logger()

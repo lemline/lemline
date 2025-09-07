@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.core.logger.Logger
-import com.lemline.core.logger.withSuspendLoggingContext
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
+import com.lemline.common.logger.Logger
+import com.lemline.common.logger.withSuspendLoggingContext
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message

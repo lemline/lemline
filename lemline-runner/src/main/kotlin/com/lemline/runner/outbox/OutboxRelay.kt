@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.core.logger.Logger
+import com.lemline.common.logger.Logger
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.FailureRepository

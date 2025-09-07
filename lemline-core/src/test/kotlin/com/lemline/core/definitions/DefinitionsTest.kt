@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.definitions
 
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.utils.name
 import com.lemline.core.utils.version
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.core.workflows.index
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe

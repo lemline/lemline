@@ -19,12 +19,11 @@ internal object NodePositionSerializer : KSerializer<NodePosition> {
 
     override fun serialize(encoder: Encoder, value: NodePosition) {
         // Use the jsonPointer's string representation for serialization
-        encoder.encodeString(value.positionPointer.toString())
+        encoder.encodeString(value.toString())
     }
 
     override fun deserialize(decoder: Decoder): NodePosition {
         // Read the string, create a JsonPointer, then convert to NodePosition
-        val jsonPointerString = decoder.decodeString()
-        return PositionPointer(jsonPointerString).toPosition()
+        return NodePosition.from(decoder.decodeString())
     }
 }

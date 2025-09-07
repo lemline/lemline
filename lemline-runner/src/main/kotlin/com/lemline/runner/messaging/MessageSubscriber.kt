@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.core.logger.logger
+import com.lemline.common.logger.logger
 import io.quarkus.runtime.ShutdownEvent
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.event.Observes

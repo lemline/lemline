@@ -2,8 +2,8 @@
 package com.lemline.runner.cli.instances
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.starters.Starter

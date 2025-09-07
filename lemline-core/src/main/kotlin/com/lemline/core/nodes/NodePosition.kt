@@ -76,6 +76,8 @@ data class NodePosition(private val path: List<String> = listOf()) {
     companion object {
         val root = PositionPointer.root.toPosition()
 
+        fun from(path: String) = PositionPointer(path).toPosition()
+
         fun fromJsonString(jsonString: String): NodePosition = LemlineJson.decodeFromString(jsonString)
 
     }

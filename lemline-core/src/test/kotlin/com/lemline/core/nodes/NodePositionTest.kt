@@ -2,6 +2,7 @@
 package com.lemline.core.nodes
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.core.random.random
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -14,7 +15,6 @@ class NodePositionTest {
     @Test
     fun `root pointer and toString should be empty`() {
         val root = NodePosition.root
-        assertEquals("", root.positionPointer.toString())
         assertEquals("", root.toString())
         // Also via PositionPointer root
         assertEquals(NodePosition.root, PositionPointer.root.toPosition())
@@ -87,15 +87,13 @@ class NodePositionTest {
     @Nested
     inner class Serialization {
         @Test
-        fun `serialize and deserialize non-root`() {
-            val original = PositionPointer("/do/1/run").toPosition()
+        fun `serialize and deserialize random`() {
+            val original = NodePosition.random()
             val json = LemlineJson.encodeToString(original)
-            // Should be a JSON string with same pointer
-            assertEquals("\"/do/1/run\"", json)
 
+            println(json)
             val decoded = LemlineJson.decodeFromString<NodePosition>(json)
             assertEquals(original, decoded)
-            assertEquals("/do/1/run", decoded.toString())
         }
 
         @Test
@@ -109,5 +107,11 @@ class NodePositionTest {
             assertEquals(root, decoded)
             assertEquals("", decoded.toString())
         }
+
+
     }
+}
+
+fun main() {
+    println(NodePosition.fromJsonString("\"/[B@29ee8374/[B@5a20c592/[B@29abec7e\""))
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.logger
+package com.lemline.common.logger
 
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory

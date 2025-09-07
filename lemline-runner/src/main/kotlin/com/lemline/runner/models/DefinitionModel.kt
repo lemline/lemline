@@ -2,8 +2,8 @@
 package com.lemline.runner.models
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import io.serverlessworkflow.api.types.Workflow
 
 data class DefinitionModel(

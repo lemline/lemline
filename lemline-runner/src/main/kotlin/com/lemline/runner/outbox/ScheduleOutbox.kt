@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.core.workflows.WorkflowId
+import com.lemline.common.values.WorkflowId
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.instances.InstanceMessageEmitter
 import com.lemline.runner.models.ScheduleOutboxModel

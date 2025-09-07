@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlinx.serialization.Serializable
 
 /**
  * Base class for outbox pattern message models.
@@ -22,7 +22,10 @@ import kotlin.time.Instant
  * @see OutboxRelay for the processing logic
  */
 @ExperimentalTime
-abstract class OutboxModel(open val instanceMessage: InstanceMessage) : WithInstance {
+@Serializable
+abstract class OutboxModel() : WithInstance {
+
+    abstract val instanceMessage: InstanceMessage
 
     /**
      * Current status of the message in the outbox. Possible values:
@@ -80,6 +83,4 @@ abstract class OutboxModel(open val instanceMessage: InstanceMessage) : WithInst
     val workflowId get() = workflowState.workflowId
     val workflowName get() = workflowState.workflowName
     val workflowVersion get() = workflowState.workflowVersion
-
-    override fun toJsonString() = LemlineJson.encodeToString(this)
 }

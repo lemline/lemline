@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.runs
 
-import com.lemline.core.logger.logger
+import com.lemline.common.logger.logger
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.nio.file.Files

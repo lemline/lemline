@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.instances
 
+import com.lemline.common.logger.logger
+import com.lemline.common.values.IDV7
 import com.lemline.core.definitions.Definitions
-import com.lemline.core.logger.logger
 import com.lemline.core.processor.Processor
 import com.lemline.runner.StepByStepRunner
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
@@ -18,7 +19,6 @@ import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.toLogString
-import com.lemline.runner.models.IDV7
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.FAILURE_TABLE
 import com.lemline.runner.repositories.RETRY_TABLE

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities.runs
 
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.instances.RunInstance
 import com.lemline.core.processor.Processor
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
 import io.serverlessworkflow.api.types.RunWorkflow
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.launch

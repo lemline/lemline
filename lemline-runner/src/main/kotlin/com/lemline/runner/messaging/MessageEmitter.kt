@@ -1,55 +1,35 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.runner.config.LemlineConfigConstants
-import com.lemline.runner.config.MESSAGING_TYPE
+import com.lemline.common.values.IDV7
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
-import io.smallrye.reactive.messaging.kafka.api.OutgoingKafkaRecordMetadata
-import io.smallrye.reactive.messaging.rabbitmq.OutgoingRabbitMQMetadata
-import java.time.Instant
-import java.time.ZoneId
-import org.eclipse.microprofile.config.inject.ConfigProperty
+import jakarta.inject.Inject
 import org.eclipse.microprofile.reactive.messaging.Message
 
 internal abstract class MessageEmitter<T : JsonSerializable> {
 
     protected abstract val emitter: MutinyEmitter<String>
 
-    @ConfigProperty(name = MESSAGING_TYPE)
-    private lateinit var messagingType: String
+    @Inject
+    private lateinit var messageMetaData: MessageMetaData
 
     suspend fun send(payload: String) {
-        emit(payload, getMetaData())
+        val md = MetaData(messageId = IDV7.random())
+        emit(payload, md)
     }
 
     suspend fun send(msg: T) {
-        emit(msg.toJsonString(), getMetaData())
+        val md = MetaData(messageId = IDV7.random())
+        emit(msg.toJsonString(), md)
     }
 
-    private suspend fun emit(payload: String, metadata: Any): Void? =
-        emitter.sendMessage(Message.of(payload).addMetadata(metadata)).awaitSuspending()
+    private suspend fun emit(payload: String, metadata: MetaData) {
+        val msg = Message.of(payload)
+        with(messageMetaData) { msg.addMetaData(metadata) }
 
-    private fun getMetaData(): Any =
-        when (messagingType) {
-            LemlineConfigConstants.MSG_TYPE_KAFKA -> getKafkaMetaData()
-            LemlineConfigConstants.MSG_TYPE_RABBITMQ -> getRabbitMQMeta()
-            LemlineConfigConstants.MSG_TYPE_IN_MEMORY -> getInMemoryMeta()
-            else -> error("Unknown messaging type: $messagingType")
-        }
+        emitter.sendMessage(msg).awaitSuspending()
+    }
 
-    private fun getKafkaMetaData() = OutgoingKafkaRecordMetadata.builder<String>()
-        .build()
-
-    private fun getRabbitMQMeta() = OutgoingRabbitMQMetadata.Builder()
-        .withMessageId("order-${System.nanoTime()}")
-        .withTimestamp(Instant.now().atZone(ZoneId.of("UTC")))
-        .withHeader("Idempotency-Key", "abc-123")
-        .build()
-
-    private fun getInMemoryMeta() = InMemoryMetaData(
-        id = "order-${System.nanoTime()}",
-        timestamp = Instant.now()
-    )
 
 }

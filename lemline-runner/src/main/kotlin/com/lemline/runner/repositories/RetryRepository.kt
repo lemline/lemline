@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
@@ -59,18 +58,19 @@ class RetryRepository : OutboxRepository<RetryOutboxModel>() {
             })
 
     override fun createModel(rs: ResultSet) = RetryOutboxModel(
-        id = IDV7(getUuid(rs, ID_COLUMN)!!),
+        id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage()!!,
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
-        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
-        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
-        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN),
-        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN),
-        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN),
         errorReason = rs.getString(ERROR_REASON_COLUMN),
         errorClass = rs.getString(ERROR_CLASS_COLUMN),
         errorMessage = rs.getString(ERROR_MESSAGE_COLUMN),
         errorStackTrace = rs.getString(ERROR_STACKTRACE_COLUMN)
-    )
+    ).apply {
+        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN)
+        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN)
+        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN)
+        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN)
+        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN)
+    }
 }

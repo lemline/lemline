@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.NodeStates
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
 import com.lemline.core.workflows.WorkflowState
-import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.WithInstance
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
-import java.util.*
 import kotlin.time.ExperimentalTime
 
 /**
@@ -61,7 +60,7 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
         super.prepareStatementMap + mapOf(
             WORKFLOW_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setUuid(stmt, idx, entity.workflowState?.workflowId?.value)
+                setIDV7(stmt, idx, entity.workflowState?.workflowId?.value)
             },
             WORKFLOW_NAME_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 stmt.setString(idx, entity.workflowState?.workflowName?.toString())
@@ -76,22 +75,22 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
                 stmt.setString(idx, entity.workflowState?.currentStates?.toJsonString())
             },
             PARENT_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setUuid(stmt, idx, entity.parentId?.value)
+                setIDV7(stmt, idx, entity.parentId)
             }
         )
     }
 
-    protected fun ResultSet.getInstanceMessage(): InstanceMessage? = when (val id = getUuid(this, WORKFLOW_ID_COLUMN)) {
+    protected fun ResultSet.getInstanceMessage(): InstanceMessage? = when (val id = getIDV7(this, WORKFLOW_ID_COLUMN)) {
         null -> null
         else -> InstanceMessage(
             workflowState = WorkflowState(
                 workflowId = WorkflowId(id),
                 workflowName = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
                 workflowVersion = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
-                currentPosition = NodePosition.fromJsonString(getString(WORKFLOW_POSITION_COLUMN)),
+                currentPosition = NodePosition.from(getString(WORKFLOW_POSITION_COLUMN)),
                 currentStates = NodeStates.fromJsonString(getString(WORKFLOW_STATE_COLUMN)),
             ),
-            parentId = getUuid(this, PARENT_ID_COLUMN)?.let { IDV7(it) },
+            parentId = getIDV7(this, PARENT_ID_COLUMN),
         )
     }
 
@@ -103,7 +102,7 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
     suspend fun findWithWorkflowId(workflowId: WorkflowId, connection: Connection? = null): List<T> =
         withConnection(connection) { conn ->
             conn.prepareStatement(findWithWorkflowIdSql).use { stmt ->
-                setUuid(stmt, 1, workflowId.value)
+                setIDV7(stmt, 1, workflowId.value)
                 stmt.executeQuery().use { it.toModels() }
             }
         }
@@ -114,12 +113,12 @@ abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() 
     /**
      * Retrieves an entity by its ParenId.
      *
-     * @return The entity with the specified WorkflowId, or null if not found.
+     * @return The entity with the specified parentId, or null if not found.
      */
-    suspend fun findWithParentId(workflowId: UUID, connection: Connection? = null): List<T> =
+    suspend fun findWithParentId(parentId: IDV7, connection: Connection? = null): List<T> =
         withConnection(connection) { conn ->
             conn.prepareStatement(findWithParentIdSql).use { stmt ->
-                setUuid(stmt, 1, workflowId)
+                setIDV7(stmt, 1, parentId)
                 stmt.executeQuery().use { it.toModels() }
             }
         }

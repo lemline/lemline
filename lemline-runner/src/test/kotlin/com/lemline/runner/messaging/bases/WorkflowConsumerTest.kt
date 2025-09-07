@@ -2,9 +2,9 @@
 package com.lemline.runner.messaging.bases
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.workflows.WorkflowId
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.instances.InstanceMessageHandler
 import com.lemline.runner.models.DefinitionModel

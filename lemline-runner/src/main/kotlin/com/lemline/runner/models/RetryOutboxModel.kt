@@ -1,48 +1,82 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.IDV7
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 @ExperimentalTime
+@Serializable
 data class RetryOutboxModel(
+    @SerialName("id")
     override val id: IDV7,
 
+    @SerialName("i")
     override val instanceMessage: InstanceMessage,
 
+    @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
 
+    @SerialName("f")
     override var outboxScheduledFor: Instant?,
-
-    override var outboxDelayedUntil: Instant? = outboxScheduledFor,
-
-    override var outboxAttemptCount: Int = 0,
-
-    override var outboxErrorClass: String? = null,
-
-    override var outboxErrorMessage: String? = null,
-
-    override var outboxErrorStackTrace: String? = null,
 
     /**
      * Reason for this retry
      */
+    @SerialName("er")
     val errorReason: String,
 
     /**
      * Error class of the exception that triggered this retry
      */
+    @SerialName("ec")
     val errorClass: String,
 
     /**
      * Error message of the exception that triggered this retry
      */
+    @SerialName("em")
     val errorMessage: String?,
 
     /**
      * Stacktrace of the exception that triggered this retry
      */
-    val errorStackTrace: String,
-) : OutboxModel(instanceMessage)
+    @SerialName("es")
+    val errorStackTrace: String
+
+) : OutboxModel() {
+
+    init {
+        require(outboxScheduledFor != null) { "outboxScheduledFor cannot be null" }
+    }
+
+    @Transient
+    override var outboxDelayedUntil: Instant? = outboxScheduledFor
+        set(until) {
+            require(until != null) { "outboxDelayedUntil cannot be null" }
+            field = until
+        }
+
+    @Transient
+    override var outboxAttemptCount: Int = 0
+
+    @Transient
+    override var outboxErrorClass: String? = null
+
+    @Transient
+    override var outboxErrorMessage: String? = null
+
+    @Transient
+    override var outboxErrorStackTrace: String? = null
+
+    override fun toJsonString() = LemlineJson.encodeToString(this)
+
+    // Needed by tests
+    companion object {}
+}

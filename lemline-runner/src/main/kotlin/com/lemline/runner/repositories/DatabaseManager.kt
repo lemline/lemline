@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.core.logger.logger
+import com.lemline.common.logger.logger
 import com.lemline.runner.config.DATABASE_TYPE
 import com.lemline.runner.config.LemlineConfigConstants
 import io.agroal.api.AgroalDataSource

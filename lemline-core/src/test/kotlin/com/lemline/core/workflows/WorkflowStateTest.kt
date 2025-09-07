@@ -2,6 +2,9 @@
 package com.lemline.core.workflows
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
 import kotlin.test.Test
@@ -65,7 +68,10 @@ class WorkflowStateTest {
         assertEquals(original.currentPosition, dup.currentPosition)
         // NodeStates is a value class around a Map -> content equality should hold
         assertNotNull(dup.currentStates[NodePosition.root])
-        assertEquals(original.currentStates[NodePosition.root]?.rawInput, dup.currentStates[NodePosition.root]?.rawInput)
+        assertEquals(
+            original.currentStates[NodePosition.root]?.rawInput,
+            dup.currentStates[NodePosition.root]?.rawInput
+        )
     }
 
     @Test

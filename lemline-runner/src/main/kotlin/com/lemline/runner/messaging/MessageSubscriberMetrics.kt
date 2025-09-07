@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_NAME
 import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_VERSION

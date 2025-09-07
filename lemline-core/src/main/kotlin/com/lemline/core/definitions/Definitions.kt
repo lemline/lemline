@@ -2,12 +2,12 @@
 package com.lemline.core.definitions
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.workflows.WorkflowIndex
-import com.lemline.core.workflows.WorkflowName
-import com.lemline.core.workflows.WorkflowVersion
 import com.lemline.core.workflows.index
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader

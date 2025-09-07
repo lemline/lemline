@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.ingestion
 
+import com.lemline.common.values.IDV7
 import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.models.IDV7
 import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
