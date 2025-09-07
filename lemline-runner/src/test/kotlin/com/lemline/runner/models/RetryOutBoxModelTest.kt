@@ -1,16 +1,21 @@
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.runner.models
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.runner.messaging.JsonSerializable
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import org.junit.jupiter.api.Assertions
 
-internal fun nullable(value: Any?): String = if (value == null) "null" else """"$value""""
+internal fun nullable(value: JsonSerializable?): String = value?.toJsonString() ?: "null"
+internal fun nullable(value: String?): String = value?.let { "\"$value\"" } ?: "null"
+internal fun nullable(value: Instant?): String = value?.let { "\"$value\"" } ?: "null"
 
-@ExperimentalTime
 class RetryOutBoxModelTest {
 
 

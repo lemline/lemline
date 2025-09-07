@@ -2,9 +2,7 @@
 package com.lemline.runner.ingestion
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.workflows.WorkflowState
-import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.messaging.WorkflowMessage
+import com.lemline.runner.models.WithInstance
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
@@ -14,20 +12,10 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 @ExperimentalTime
 @Serializable
 @JsonClassDiscriminator("t") // <- type discriminator for polymorphic serialization
-sealed interface IngestionMessage : WorkflowMessage {
-    val instanceMessage: InstanceMessage?
-
-    val workflowState: WorkflowState? get() = instanceMessage?.workflowState
-
-    override fun toJsonString(): String = LemlineJson.encodeToString(this)
+sealed interface IngestionMessage : WithInstance {
+    val model: WithInstance
 
     companion object {
-        fun fromJsonString(str: String): IngestionMessage = LemlineJson.decodeFromString(str)
+        fun fromJsonString(json: String): IngestionMessage = LemlineJson.decodeFromString(json)
     }
-
-    override val workflowId get() = instanceMessage?.workflowId
-
-    override val workflowName get() = instanceMessage?.workflowName
-
-    override val workflowVersion get() = instanceMessage?.workflowVersion
 }

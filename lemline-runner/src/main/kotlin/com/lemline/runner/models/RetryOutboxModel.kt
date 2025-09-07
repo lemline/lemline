@@ -3,6 +3,7 @@ package com.lemline.runner.models
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
+import com.lemline.core.errors.WorkflowException
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
@@ -77,6 +78,30 @@ data class RetryOutboxModel(
 
     override fun toJsonString() = LemlineJson.encodeToString(this)
 
-    // Needed by tests
-    companion object {}
+    companion object {
+        fun from(
+            id: IDV7,
+            instance: InstanceMessage,
+            outboxScheduledFor: Instant,
+            error: Throwable,
+            reason: String
+        ) = RetryOutboxModel(
+            id = id,
+            instanceMessage = instance,
+            errorReason = reason,
+            errorClass = when (error) {
+                is WorkflowException -> error.error.type
+                else -> error::class.qualifiedName!!
+            },
+            errorMessage = when (error) {
+                is WorkflowException -> error.error.title
+                else -> error.message
+            },
+            errorStackTrace = when (error) {
+                is WorkflowException -> error.error.toJsonPrettyString()
+                else -> error.stackTraceToString()
+            },
+            outboxScheduledFor = outboxScheduledFor,
+        )
+    }
 }

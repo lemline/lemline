@@ -82,23 +82,23 @@ internal class IngestionMessageHandler(
     }
 
     private suspend fun ParentIngestionMessage.save() {
-        parentRepository.insert(toModel())
+        parentRepository.insert(model)
     }
 
     private suspend fun RetryIngestionMessage.save() {
-        retryRepository.insert(toModel())
+        retryRepository.insert(model)
     }
 
     private suspend fun ScheduleIngestionMessage.save() {
-        scheduleRepository.insert(toModel())
+        scheduleRepository.insert(model)
     }
 
     private suspend fun WaitIngestionMessage.save() {
-        waitRepository.insert(toModel())
+        waitRepository.insert(model)
     }
 
     private suspend fun FailureIngestionMessage.save() {
-        failureRepository.insert(toModel())
+        failureRepository.insert(model)
     }
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) {

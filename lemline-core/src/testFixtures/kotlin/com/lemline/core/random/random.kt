@@ -29,13 +29,18 @@ fun NodeState.Companion.random() = NodeState(
     forIndex = Random.nextInt(),
 )
 
-fun WorkflowState.Companion.random(): WorkflowState {
-    val randomPos = NodePosition.random()
-    return WorkflowState(
-        workflowId = WorkflowId.random(),
-        workflowName = WorkflowName.random(),
-        workflowVersion = WorkflowVersion.random(),
-        currentPosition = randomPos,
-        currentStates = NodeStates(mapOf(randomPos to NodeState.random())),
+fun NodeStates.Companion.random() = NodeStates(
+    mapOf(
+        NodePosition.random() to NodeState.random(),
+        NodePosition.random() to NodeState.random(),
+        NodePosition.random() to NodeState.random(),
     )
-}
+)
+
+fun WorkflowState.Companion.random(): WorkflowState = WorkflowState(
+    workflowId = WorkflowId.random(),
+    workflowName = WorkflowName.random(),
+    workflowVersion = WorkflowVersion.random(),
+    currentPosition = NodePosition.random(),
+    currentStates = NodeStates.random(),
+)

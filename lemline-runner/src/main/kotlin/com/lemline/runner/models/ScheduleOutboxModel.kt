@@ -9,8 +9,12 @@ import com.cronutils.parser.CronParser
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.utils.toDuration
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
+import io.serverlessworkflow.api.types.Schedule
 import java.time.ZoneId
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -21,6 +25,7 @@ import kotlin.time.toKotlinInstant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.json.JsonElement
 
 @ExperimentalTime
 @Serializable
@@ -114,6 +119,47 @@ data class ScheduleOutboxModel(
 
     companion object {
         private val cronParser by lazy { CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX)) }
+
+        fun from(
+            workflowId: WorkflowId,
+            workflowName: WorkflowName,
+            workflowVersion: WorkflowVersion,
+            workflowInput: JsonElement,
+            schedule: Schedule,
+            zoneId: ZoneId?
+        ): ScheduleOutboxModel {
+            val scheduleEvery = schedule.every?.toDuration()?.toString()
+            val scheduleAfter = schedule.after?.toDuration()?.toString()
+            val scheduleCron = schedule.cron
+
+            val now = Clock.System.now()
+
+            val scheduledFor = when {
+                scheduleAfter != null -> null
+                scheduleCron != null -> cronParser.parse(scheduleCron)!!.getNextCronExecutionInstant(now, zoneId)
+                scheduleEvery != null -> now + Duration.parse(scheduleEvery)
+                else -> error("Invalid schedule model")
+            }
+
+            val scheduleIngestionMessage = ScheduleOutboxModel(
+                id = IDV7.random(),
+                instanceMessage = InstanceMessage.new(
+                    workflowId = workflowId,
+                    workflowName = workflowName,
+                    workflowVersion = workflowVersion,
+                    workflowInput = workflowInput,
+                    parentId = null,
+                ),
+                scheduleEvery = scheduleEvery,
+                scheduleAfter = scheduleAfter,
+                scheduleCron = scheduleCron,
+                scheduleZone = zoneId?.id,
+
+                outboxScheduledFor = scheduledFor
+            )
+
+            return scheduleIngestionMessage
+        }
     }
 }
 

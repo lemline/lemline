@@ -79,8 +79,4 @@ abstract class OutboxModel() : WithInstance {
 
     override val workflowState get() = instanceMessage.workflowState
     override val parentId get() = instanceMessage.parentId
-
-    val workflowId get() = workflowState.workflowId
-    val workflowName get() = workflowState.workflowName
-    val workflowVersion get() = workflowState.workflowVersion
 }

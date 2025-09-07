@@ -15,6 +15,7 @@ import com.lemline.core.random.random
 import com.lemline.core.workflows.NodeStates
 import com.lemline.core.workflows.WorkflowState
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.models.RetryOutboxModel
@@ -44,6 +45,21 @@ fun WorkflowState.Companion.random(): WorkflowState {
 fun InstanceMessage.Companion.random() = InstanceMessage(
     workflowState = WorkflowState.random(),
     parentId = IDV7.random()
+)
+
+fun InstanceMessage.Companion.nullableRandom() = when (Random.nextBoolean()) {
+    true -> random()
+    false -> null
+}
+
+fun FailureModel.Companion.random() = FailureModel(
+    id = IDV7.random(),
+    instanceMessage = InstanceMessage.nullableRandom(),
+    payload = String.nullableRandom(),
+    errorReason = String.random(),
+    errorClass = String.random(),
+    errorMessage = String.nullableRandom(),
+    errorStackTrace = String.random(),
 )
 
 fun OutboxModel.randomize(nullableDelayed: Boolean = false) = apply {

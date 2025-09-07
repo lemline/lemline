@@ -22,6 +22,9 @@ import com.lemline.runner.ingestion.ParentIngestionMessage
 import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.ingestion.WaitIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.ParentOutboxModel
+import com.lemline.runner.models.RetryOutboxModel
+import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.repositories.PARENT_TABLE
 import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.SCHEDULE_TABLE
@@ -116,12 +119,12 @@ internal class StepByStepRunner @Inject constructor(
     ): InstanceMessage? {
         // insert the parent workflow without delayedUntil
         // TODO make id idempotent
-        val parent = ParentIngestionMessage(
+        val parent = ParentOutboxModel(
             id = IDV7.random(),
             instanceMessage = this,
             outboxScheduledFor = null,
         )
-        ingestionEmitter.send(parent)
+        ingestionEmitter.send(ParentIngestionMessage(parent))
 
         return stater.start(
             workflowName = WorkflowName(runWorkflow.workflow.name),
@@ -171,7 +174,7 @@ internal class StepByStepRunner @Inject constructor(
     private suspend fun InstanceMessage.onRetry(tryInstance: TryInstance, e: WorkflowException) {
         val delay = tryInstance.delay ?: error("No delay set in in $tryInstance")
 
-        val retryMessage = RetryIngestionMessage.from(
+        val retryMessage = RetryOutboxModel.from(
             id = IDV7.random(),
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
@@ -179,7 +182,7 @@ internal class StepByStepRunner @Inject constructor(
             reason = getFailureReason(e)
         )
         // Send the message to ingest into the retry table
-        ingestionEmitter.send(retryMessage)
+        ingestionEmitter.send(RetryIngestionMessage(retryMessage))
     }
 
     /**
@@ -189,12 +192,12 @@ internal class StepByStepRunner @Inject constructor(
      * asynchronously through the WaitOutbox.
      */
     private suspend fun InstanceMessage.onWait(delay: Duration) {
-        val waitMessage = WaitIngestionMessage(
+        val waitMessage = WaitOutboxModel(
             id = IDV7.random(),
             instanceMessage = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
         )
         // Send the message to ingest into the wait table
-        ingestionEmitter.send(waitMessage)
+        ingestionEmitter.send(WaitIngestionMessage(waitMessage))
     }
 }

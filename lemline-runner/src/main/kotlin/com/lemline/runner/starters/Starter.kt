@@ -11,6 +11,7 @@ import com.lemline.core.schemas.SchemaValidator
 import com.lemline.runner.ingestion.IngestionMessageEmitter
 import com.lemline.runner.ingestion.ScheduleIngestionMessage
 import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.repositories.DefinitionRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -76,7 +77,7 @@ class Starter {
                 null -> instanceMessage
 
                 else -> {
-                    val scheduleOutboxModel = ScheduleIngestionMessage.from(
+                    val scheduleOutboxModel = ScheduleOutboxModel.from(
                         workflowId = instanceMessage.workflowId,
                         workflowName = workflowName,
                         workflowVersion = workflowVersion,
@@ -84,7 +85,7 @@ class Starter {
                         schedule = workflow.schedule,
                         zoneId = zoneId
                     )
-                    ingestionMessageEmitter.send(scheduleOutboxModel)
+                    ingestionMessageEmitter.send(ScheduleIngestionMessage(scheduleOutboxModel))
 
                     // start the message right away for scheduleAfter and scheduleEvery
                     if (scheduleOutboxModel.scheduleCron != null) {

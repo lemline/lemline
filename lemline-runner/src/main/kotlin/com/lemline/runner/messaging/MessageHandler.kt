@@ -11,7 +11,7 @@ import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
 
 @ExperimentalTime
-internal interface MessageHandler<T : WorkflowMessage> {
+internal interface MessageHandler<T : WithWorkflowInfo> {
 
     suspend fun Message<String>.deserialize(): T
 

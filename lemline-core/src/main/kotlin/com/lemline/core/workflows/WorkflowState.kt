@@ -69,5 +69,7 @@ data class WorkflowState(
             currentPosition = NodePosition.root,
             currentStates = NodeStates.new(input)
         )
+
+        fun fromJsonString(json: String): WorkflowState = LemlineJson.decodeFromString(json)
     }
 }

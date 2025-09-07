@@ -25,7 +25,7 @@ import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 
 @ExperimentalTime
-internal abstract class MessageSubscriber<T : WorkflowMessage>() : Subscriber<Message<String>> {
+internal abstract class MessageSubscriber<T : WithWorkflowInfo>() : Subscriber<Message<String>> {
 
     abstract val maxConcurrency: Long
     abstract val enabled: Boolean

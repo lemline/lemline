@@ -19,6 +19,8 @@ import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.toLogString
+import com.lemline.runner.models.FailureModel
+import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.FAILURE_TABLE
 import com.lemline.runner.repositories.RETRY_TABLE
@@ -176,13 +178,13 @@ internal class InstanceMessageHandler(
     }
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) {
-        val failure = FailureIngestionMessage.from(
+        val failure = FailureModel.from(
             id = IDV7.random(),
             payload = payload,
             error = cause,
             reason = DESERIALIZATION_FAILURE
         )
-        ingestionEmitter.send(failure)
+        ingestionEmitter.send(FailureIngestionMessage(failure))
     }
 
     private suspend fun InstanceMessage.emitToRetry(cause: Exception, reason: String): Nothing {
@@ -194,23 +196,23 @@ internal class InstanceMessageHandler(
     }
 
     private suspend fun InstanceMessage.saveAsFailed(error: Exception, reason: String) {
-        val failure = FailureIngestionMessage.from(
+        val failure = FailureModel.from(
             id = IDV7.random(),
             instance = this,
             error = error,
             reason = reason,
         )
-        ingestionEmitter.send(failure)
+        ingestionEmitter.send(FailureIngestionMessage(failure))
     }
 
     private suspend fun InstanceMessage.saveForRetry(cause: Exception, reason: String) {
-        val retry = RetryIngestionMessage.from(
+        val retry = RetryOutboxModel.from(
             id = IDV7.random(),
             instance = this,
             outboxScheduledFor = Clock.System.now(), // <- TODO check first date
             error = cause,
             reason = reason,
         )
-        ingestionEmitter.send(retry)
+        ingestionEmitter.send(RetryIngestionMessage(retry))
     }
 }

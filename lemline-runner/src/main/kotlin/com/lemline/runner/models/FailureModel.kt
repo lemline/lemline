@@ -8,23 +8,36 @@ import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.Transient
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 @ExperimentalTime
+@Serializable
 data class FailureModel(
+    @SerialName("id")
     override val id: IDV7,
+
+    @SerialName("i")
     var instanceMessage: InstanceMessage?,
+
+    @SerialName("p")
     val payload: String?,
+
+    @SerialName("er")
     val errorReason: String,
+
+    @SerialName("ec")
     val errorClass: String,
+
+    @SerialName("em")
     val errorMessage: String?,
+
+    @SerialName("es")
     val errorStackTrace: String,
 ) : WithInstance {
 
-    @Transient
     override val workflowState get() = instanceMessage?.workflowState
 
-    @Transient
     override val parentId get() = instanceMessage?.parentId
 
     override fun toJsonString() = LemlineJson.encodeToString(this)

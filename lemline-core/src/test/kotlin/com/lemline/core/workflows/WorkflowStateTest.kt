@@ -7,6 +7,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
+import com.lemline.core.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -19,6 +20,16 @@ import kotlinx.serialization.json.JsonPrimitive
 
 @OptIn(ExperimentalTime::class)
 class WorkflowStateTest {
+
+    @Test
+    fun `WorkflowState serializes and deserializes`() {
+        val workflowState = WorkflowState.random()
+
+        val encoded = workflowState.toJsonString()
+        val decoded = WorkflowState.fromJsonString(encoded)
+
+        assertEquals(workflowState, decoded)
+    }
 
     @Test
     fun `new() should initialize root position and initial node state`() {
@@ -72,27 +83,6 @@ class WorkflowStateTest {
             original.currentStates[NodePosition.root]?.rawInput,
             dup.currentStates[NodePosition.root]?.rawInput
         )
-    }
-
-    @Test
-    fun `toJsonString() should match LemlineJson encoding and round-trip`() {
-        val ws = WorkflowState.new(
-            workflowId = WorkflowId.random(),
-            workflowName = WorkflowName("orders"),
-            workflowVersion = WorkflowVersion("v1"),
-            input = JsonPrimitive("hello"),
-        )
-
-        val encodedByMethod = ws.toJsonString()
-        val encodedByJson = LemlineJson.encodeToString(ws)
-        assertEquals(encodedByJson, encodedByMethod)
-
-        val decoded = LemlineJson.decodeFromString<WorkflowState>(encodedByMethod)
-        assertEquals(ws.workflowId, decoded.workflowId)
-        assertEquals(ws.workflowName, decoded.workflowName)
-        assertEquals(ws.workflowVersion, decoded.workflowVersion)
-        assertEquals(ws.currentPosition, decoded.currentPosition)
-        assertNotNull(decoded.currentStates[NodePosition.root])
     }
 
     @Test
