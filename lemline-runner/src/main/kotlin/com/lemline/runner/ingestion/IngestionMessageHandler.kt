@@ -9,13 +9,19 @@ import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
+import com.lemline.runner.repositories.FAILURE_TABLE
 import com.lemline.runner.repositories.FailureRepository
+import com.lemline.runner.repositories.PARENT_TABLE
 import com.lemline.runner.repositories.ParentRepository
+import com.lemline.runner.repositories.RETRY_TABLE
 import com.lemline.runner.repositories.RetryRepository
+import com.lemline.runner.repositories.SCHEDULE_TABLE
 import com.lemline.runner.repositories.ScheduleRepository
+import com.lemline.runner.repositories.WAIT_TABLE
 import com.lemline.runner.repositories.WaitRepository
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
@@ -38,6 +44,10 @@ internal class IngestionMessageHandler(
 ) : MessageHandler<IngestionMessage> {
 
     override var logger = logger()
+
+    val maxAttempts: Int = 6
+    val totalBudgetMs: Long = 50_000
+    val singleAttemptTimeoutMs: Long = 10_000
 
     @TestOnly
     override var onCompleteTest = { _: Message<String>, _: IngestionMessage? -> }
@@ -82,23 +92,63 @@ internal class IngestionMessageHandler(
     }
 
     private suspend fun ParentIngestionMessage.save() {
-        parentRepository.insert(model)
+        retry(
+            label = "Saving in $PARENT_TABLE table",
+            maxAttempts = maxAttempts,
+            totalBudgetMs = totalBudgetMs,
+        ) {
+            withTimeout(singleAttemptTimeoutMs) {
+                parentRepository.insert(model)
+            }
+        }
     }
 
     private suspend fun RetryIngestionMessage.save() {
-        retryRepository.insert(model)
+        retry(
+            label = "Saving in $RETRY_TABLE table",
+            maxAttempts = maxAttempts,
+            totalBudgetMs = totalBudgetMs,
+        ) {
+            withTimeout(singleAttemptTimeoutMs) {
+                retryRepository.insert(model)
+            }
+        }
     }
 
     private suspend fun ScheduleIngestionMessage.save() {
-        scheduleRepository.insert(model)
+        retry(
+            label = "Saving in $SCHEDULE_TABLE table",
+            maxAttempts = maxAttempts,
+            totalBudgetMs = totalBudgetMs,
+        ) {
+            withTimeout(singleAttemptTimeoutMs) {
+                scheduleRepository.insert(model)
+            }
+        }
     }
 
     private suspend fun WaitIngestionMessage.save() {
-        waitRepository.insert(model)
+        retry(
+            label = "Saving in $WAIT_TABLE table",
+            maxAttempts = maxAttempts,
+            totalBudgetMs = totalBudgetMs,
+        ) {
+            withTimeout(singleAttemptTimeoutMs) {
+                waitRepository.insert(model)
+            }
+        }
     }
 
     private suspend fun FailureIngestionMessage.save() {
-        failureRepository.insert(model)
+        retry(
+            label = "Saving in $FAILURE_TABLE table",
+            maxAttempts = maxAttempts,
+            totalBudgetMs = totalBudgetMs,
+        ) {
+            withTimeout(singleAttemptTimeoutMs) {
+                failureRepository.insert(model)
+            }
+        }
     }
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) {
