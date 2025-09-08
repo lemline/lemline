@@ -3,7 +3,7 @@ package com.lemline.runner.cli.definitions
 
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.definitions.Definitions as Workflows
+import com.lemline.core.definitions.DefinitionCache as Workflows
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository

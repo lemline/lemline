@@ -2,7 +2,7 @@
 package com.lemline.runner.repositories.bases
 
 import com.lemline.common.values.IDV7
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository

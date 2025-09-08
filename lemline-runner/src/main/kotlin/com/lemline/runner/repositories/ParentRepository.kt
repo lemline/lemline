@@ -8,6 +8,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 const val PARENT_TABLE = "lemline_parents"
 
@@ -27,6 +28,7 @@ const val PARENT_TABLE = "lemline_parents"
  */
 @ApplicationScoped
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal class ParentRepository : OutboxRepository<ParentOutboxModel>() {
 
     @Inject

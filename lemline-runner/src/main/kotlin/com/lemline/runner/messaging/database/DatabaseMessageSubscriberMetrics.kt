@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.ingestion
+package com.lemline.runner.messaging.database
 
 import com.lemline.runner.messaging.MessageSubscriberMetrics
 import io.micrometer.core.instrument.MeterRegistry
@@ -12,8 +12,8 @@ import kotlin.time.ExperimentalTime
  */
 @Singleton
 @ExperimentalTime
-internal class IngestionMessageSubscriberMetrics @Inject constructor(
+internal class DatabaseMessageSubscriberMetrics @Inject constructor(
     registry: MeterRegistry
 ) : MessageSubscriberMetrics(registry) {
-    override val METRIC_PREFIX = "lemline.ingestion"
+    override val METRIC_PREFIX = "lemline.messaging.database"
 }

@@ -12,7 +12,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.utils.toDuration
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import io.serverlessworkflow.api.types.Schedule
 import java.time.ZoneId
@@ -22,13 +22,16 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 
+@ExperimentalSerializationApi
 @ExperimentalTime
 @Serializable
+@SerialName("s") // <- type discriminator for polymorphic serialization
 data class ScheduleOutboxModel(
     @SerialName("id")
     override val id: IDV7,
@@ -141,7 +144,7 @@ data class ScheduleOutboxModel(
                 else -> error("Invalid schedule model")
             }
 
-            val scheduleIngestionMessage = ScheduleOutboxModel(
+            return ScheduleOutboxModel(
                 id = IDV7.random(),
                 instanceMessage = InstanceMessage.new(
                     workflowId = workflowId,
@@ -157,8 +160,6 @@ data class ScheduleOutboxModel(
 
                 outboxScheduledFor = scheduledFor
             )
-
-            return scheduleIngestionMessage
         }
     }
 }

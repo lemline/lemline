@@ -7,6 +7,7 @@ import jakarta.inject.Inject
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 const val FAILURE_TABLE = "lemline_failures"
 
@@ -47,6 +48,7 @@ const val FAILURE_TABLE = "lemline_failures"
  */
 @ApplicationScoped
 @ExperimentalTime
+@ExperimentalSerializationApi
 class FailureRepository : WithInstanceRepository<FailureModel>() {
 
     @Inject

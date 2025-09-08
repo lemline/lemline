@@ -1,21 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.ingestion
+package com.lemline.runner.messaging.instances
 
 import com.lemline.runner.messaging.MessageEmitter
 import io.quarkus.runtime.Startup
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.ExperimentalTime
-import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Channel
 
-internal const val INGESTION_OUT_CHANNEL = "ingestion-out"
+internal const val WORKFLOWS_OUT_CHANNEL = "workflows-out"
 
-@ExperimentalSerializationApi
 @ExperimentalTime
 @Startup
 @ApplicationScoped
-internal class IngestionMessageEmitter : MessageEmitter<IngestionMessage>() {
-    @Channel(INGESTION_OUT_CHANNEL)
+internal class InstanceMessageEmitter : MessageEmitter<InstanceMessage>() {
+
+    @Channel(WORKFLOWS_OUT_CHANNEL)
     override lateinit var emitter: MutinyEmitter<String>
 }

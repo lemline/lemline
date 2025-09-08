@@ -4,7 +4,7 @@ package com.lemline.runner.cli.definitions
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.definitions.Definitions
+import com.lemline.core.definitions.DefinitionCache
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.models.DefinitionModel
@@ -136,7 +136,7 @@ class DefinitionGetCommand : Runnable {
     private fun displayWorkflowDefinition(definitionModel: DefinitionModel) = when (format) {
         // Re-parse the stored definition to ensure it's valid before serializing
         OutputFormat.JSON -> try {
-            val workflow = Definitions.parse(definitionModel.definition)
+            val workflow = DefinitionCache.parse(definitionModel.definition)
             val workflowJson = objectMapper
                 .writerWithDefaultPrettyPrinter()
                 .writeValueAsString(workflow)

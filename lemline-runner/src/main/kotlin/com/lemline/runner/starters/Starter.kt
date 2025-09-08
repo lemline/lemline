@@ -1,18 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.starters
 
-import com.github.zafarkhaja.semver.Version
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.definitions.Definitions
 import com.lemline.core.schemas.SchemaValidator
-import com.lemline.runner.ingestion.IngestionMessageEmitter
-import com.lemline.runner.ingestion.ScheduleIngestionMessage
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.definitions.Definitions
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.ScheduleOutboxModel
-import com.lemline.runner.repositories.DefinitionRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.ZoneId
@@ -24,30 +20,31 @@ import kotlinx.serialization.json.JsonElement
 @ExperimentalSerializationApi
 @ApplicationScoped
 class Starter {
-    @Inject
-    private lateinit var definitionRepository: DefinitionRepository
 
     @Inject
-    private lateinit var ingestionMessageEmitter: IngestionMessageEmitter
+    private lateinit var definitions: Definitions
 
-    suspend fun start(
+    /**
+     * Returns a pair of [InstanceMessage] and [ScheduleOutboxModel]
+     *
+     * Depending on the schedule of the workflow, different messages are needed:
+     *      - no schedule -> a single instanceMessage
+     *      - schedule after or every -> an instanceMessage and a scheduleOutboxModel
+     *      - schedule cron -> a single scheduleOutboxModel
+     *      For the two last cases, we sent an IngestionMessage (first database ingestion, then only after starting the instance)
+     */
+    suspend fun getStartingMessages(
+        workflowId: WorkflowId,
         workflowName: WorkflowName,
         optionalVersion: WorkflowVersion?,
         workflowInput: JsonElement,
         parentId: IDV7?,
         zoneId: ZoneId?,
-        onDebug: (() -> String) -> Unit,
         onError: (() -> String) -> Nothing,
-    ): InstanceMessage? {
+    ): Pair<InstanceMessage?, ScheduleOutboxModel?> {
         // Retrieve the workflow definition from the repository
-        val definition = getDefinition(workflowName, optionalVersion, onError)
-
-        // Parse workflow definition into a Workflow object
-        val workflow = try {
-            Definitions.parse(definition)
-        } catch (e: Exception) {
-            onError { "Invalid workflow definition: ${e.message}" }
-        }
+        val workflow = definitions.get(workflowName, optionalVersion)
+            ?: onError { "Workflow $workflowName (version=${optionalVersion ?: "latest"}) not found." }
 
         val workflowVersion = WorkflowVersion(workflow.document.version)
 
@@ -56,73 +53,36 @@ class Starter {
             try {
                 SchemaValidator.validate(workflowInput, schema)
             } catch (e: Exception) {
-                onError { "Input validation failed against workflow schema: ${e.message}" }
+                onError { "Input validation failed against workflow schema: ${e.message}." }
             }
         }
 
-        // create the message
-        val workflowId = WorkflowId.random() // <- TODO create idempotent id
+        // create the instance message, if not scheduled by a cron
+        val instanceMessage = when (workflow.schedule?.cron.isNullOrBlank()) {
+            true -> InstanceMessage.new(
+                workflowId = workflowId,
+                workflowName = workflowName,
+                workflowVersion = workflowVersion,
+                workflowInput = workflowInput,
+                parentId = parentId,
+            )
 
-        val instanceMessage = InstanceMessage.new(
-            workflowId = workflowId,
-            workflowName = workflowName,
-            workflowVersion = workflowVersion,
-            workflowInput = workflowInput,
-            parentId = parentId,
-        )
-
-        // start workflow
-        return try {
-            when (workflow.schedule) {
-                null -> instanceMessage
-
-                else -> {
-                    val scheduleOutboxModel = ScheduleOutboxModel.from(
-                        workflowId = instanceMessage.workflowId,
-                        workflowName = workflowName,
-                        workflowVersion = workflowVersion,
-                        workflowInput = workflowInput,
-                        schedule = workflow.schedule,
-                        zoneId = zoneId
-                    )
-                    ingestionMessageEmitter.send(ScheduleIngestionMessage(scheduleOutboxModel))
-
-                    // start the message right away for scheduleAfter and scheduleEvery
-                    if (scheduleOutboxModel.scheduleCron != null) {
-                        onDebug {
-                            "Instance $workflowId scheduled successfully " +
-                                "(name: $workflowName, version: $workflowVersion, input: $workflowInput, " +
-                                "cron: ${workflow.schedule.cron}, zone: ${zoneId ?: ZoneId.of("UTC")}"
-                        }
-                        null
-                    } else instanceMessage
-                }
-            }
-        } catch (e: Exception) {
-            onError { "Failed to start workflow instance: ${e.message}" }
+            false -> null
         }
-    }
 
-    // TODO (get from cache first)
-    private suspend fun getDefinition(
-        workflowName: WorkflowName,
-        workflowVersion: WorkflowVersion?,
-        onError: (() -> String) -> Nothing
-    ): String = workflowVersion?.let { version ->
-        // by name and version
-        definitionRepository.findByNameAndVersion(workflowName, version)
-            ?.definition
-            ?: onError { "Workflow with name '$workflowName' and version '$version' not found" }
-    } ?: run {
-        // by name only, get the last version
-        val workflows = definitionRepository.listByName(workflowName)
-        if (workflows.isEmpty()) onError { "No workflows found with name '$workflowName'" }
+        // create the scheduleMessage if a schedule is present
+        val scheduleOutboxModel = when (workflow.schedule) {
+            null -> null
+            else -> ScheduleOutboxModel.from(
+                workflowId = workflowId,
+                workflowName = workflowName,
+                workflowVersion = workflowVersion,
+                workflowInput = workflowInput,
+                schedule = workflow.schedule,
+                zoneId = zoneId
+            )
+        }
 
-        workflows.maxWithOrNull { w1, w2 ->
-            val v1 = w1.version.toString()
-            val v2 = w2.version.toString()
-            runCatching { Version.parse(v1).compareTo(Version.parse(v2)) }
-                .getOrDefault(v1.compareTo(v2))
-        }?.definition ?: onError { "Failed to determine latest version for workflow '$workflowName'" }
+        return instanceMessage to scheduleOutboxModel
     }
 }

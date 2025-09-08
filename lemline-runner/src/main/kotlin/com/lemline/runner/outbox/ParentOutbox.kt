@@ -2,7 +2,7 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.instances.InstanceMessageEmitter
+import com.lemline.runner.messaging.instances.InstanceMessageEmitter
 import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ParentRepository
@@ -11,6 +11,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * `RunWorkflowOutbox` specializes `AbstractOutbox` to implement the outbox pattern for child workflow execution events.
@@ -23,6 +24,7 @@ import kotlin.time.ExperimentalTime
 @Startup
 @ApplicationScoped
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal class ParentOutbox : AbstractOutbox<ParentOutboxModel>() {
 
     @Inject

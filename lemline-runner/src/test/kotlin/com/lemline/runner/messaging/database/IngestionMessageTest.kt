@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.ingestion
+package com.lemline.runner.messaging.database
 
+import com.lemline.runner.messaging.database.envelopes.FailureEnvelope
+import com.lemline.runner.messaging.database.envelopes.ModelEnvelope
+import com.lemline.runner.messaging.database.envelopes.ParentOutboxEnvelope
+import com.lemline.runner.messaging.database.envelopes.RetryOutboxEnvelope
+import com.lemline.runner.messaging.database.envelopes.ScheduleOutboxEnvelope
+import com.lemline.runner.messaging.database.envelopes.WaitOutboxEnvelope
 import com.lemline.runner.random.random
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -14,12 +20,12 @@ internal class IngestionMessageTest {
     @Test
     fun `should be JSON serializable and deserializable for Parent message`() {
         // Given
-        val original: IngestionMessage = ParentIngestionMessage.random()
+        val original: ModelEnvelope = ParentOutboxEnvelope.random()
         // When
         val serialized = original.toJsonString()
 
         println(serialized)
-        val deserialized = IngestionMessage.fromJsonString(serialized)
+        val deserialized = ModelEnvelope.fromJsonString(serialized)
         // Then
         assertEquals(original, deserialized)
     }
@@ -27,10 +33,10 @@ internal class IngestionMessageTest {
     @Test
     fun `should be JSON serializable and deserializable for Wait message`() {
         // Given
-        val original: IngestionMessage = WaitIngestionMessage.random()
+        val original: ModelEnvelope = WaitOutboxEnvelope.random()
         // When
         val serialized = original.toJsonString()
-        val deserialized = IngestionMessage.fromJsonString(serialized)
+        val deserialized = ModelEnvelope.fromJsonString(serialized)
         // Then
         assertEquals(original, deserialized)
     }
@@ -38,10 +44,10 @@ internal class IngestionMessageTest {
     @Test
     fun `should be JSON serializable and deserializable for Schedule message`() {
         // Given
-        val original: IngestionMessage = ScheduleIngestionMessage.random()
+        val original: ModelEnvelope = ScheduleOutboxEnvelope.random()
         // When
         val serialized = original.toJsonString()
-        val deserialized = IngestionMessage.fromJsonString(serialized)
+        val deserialized = ModelEnvelope.fromJsonString(serialized)
         // Then
         assertEquals(original, deserialized)
     }
@@ -49,10 +55,10 @@ internal class IngestionMessageTest {
     @Test
     fun `should be JSON serializable and deserializable for Retry message`() {
         // Given
-        val original: IngestionMessage = RetryIngestionMessage.random()
+        val original: ModelEnvelope = RetryOutboxEnvelope.random()
         // When
         val serialized = original.toJsonString()
-        val deserialized = IngestionMessage.fromJsonString(serialized)
+        val deserialized = ModelEnvelope.fromJsonString(serialized)
         // Then
         assertEquals(original, deserialized)
     }
@@ -60,10 +66,10 @@ internal class IngestionMessageTest {
     @Test
     fun `should be JSON serializable and deserializable for Failure message`() {
         // Given
-        val original: IngestionMessage = FailureIngestionMessage.random()
+        val original: ModelEnvelope = FailureEnvelope.random()
         // When
         val serialized = original.toJsonString()
-        val deserialized = IngestionMessage.fromJsonString(serialized)
+        val deserialized = ModelEnvelope.fromJsonString(serialized)
         // Then
         assertEquals(original, deserialized)
     }
@@ -73,15 +79,15 @@ internal class IngestionMessageTest {
         // Given
 
         // When
-        val msgParent = ParentIngestionMessage.random()
+        val msgParent = ParentOutboxEnvelope.random()
 
-        val msgWait = WaitIngestionMessage.random()
+        val msgWait = WaitOutboxEnvelope.random()
 
-        val msgRetry = RetryIngestionMessage.random()
+        val msgRetry = RetryOutboxEnvelope.random()
 
-        val msgSchedule = ScheduleIngestionMessage.random()
+        val msgSchedule = ScheduleOutboxEnvelope.random()
 
-        val msgFailure = FailureIngestionMessage.random()
+        val msgFailure = FailureEnvelope.random()
 
         // Then
 

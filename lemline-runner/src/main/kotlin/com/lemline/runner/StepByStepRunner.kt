@@ -3,6 +3,7 @@ package com.lemline.runner
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.activities.runs.getInputFor
@@ -17,18 +18,13 @@ import com.lemline.runner.exceptions.TaskCompletedException
 import com.lemline.runner.exceptions.TaskRetriedException
 import com.lemline.runner.exceptions.WaitStartedException
 import com.lemline.runner.failures.FailureReasons.getFailureReason
-import com.lemline.runner.ingestion.IngestionMessageEmitter
-import com.lemline.runner.ingestion.ParentIngestionMessage
-import com.lemline.runner.ingestion.RetryIngestionMessage
-import com.lemline.runner.ingestion.WaitIngestionMessage
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.database.CompletedMessage
+import com.lemline.runner.messaging.database.DatabaseMessageEmitter
+import com.lemline.runner.messaging.database.IngestionMessage
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.models.WaitOutboxModel
-import com.lemline.runner.repositories.PARENT_TABLE
-import com.lemline.runner.repositories.ParentRepository
-import com.lemline.runner.repositories.SCHEDULE_TABLE
-import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.starters.Starter
 import io.quarkus.runtime.Startup
 import io.serverlessworkflow.api.types.RunWorkflow
@@ -49,9 +45,7 @@ import kotlinx.serialization.json.JsonElement
 @Startup
 @ApplicationScoped
 internal class StepByStepRunner @Inject constructor(
-    private val parentRepository: ParentRepository,
-    private val scheduleRepository: ScheduleRepository,
-    private val ingestionEmitter: IngestionMessageEmitter,
+    private val databaseEmitter: DatabaseMessageEmitter,
     private val stater: Starter
 ) {
     val logger = logger()
@@ -124,45 +118,41 @@ internal class StepByStepRunner @Inject constructor(
             instanceMessage = this,
             outboxScheduledFor = null,
         )
-        ingestionEmitter.send(ParentIngestionMessage(parent))
 
-        return stater.start(
+        val (instanceMessage, scheduleOutboxModel) = stater.getStartingMessages(
+            workflowId = WorkflowId.random(),
             workflowName = WorkflowName(runWorkflow.workflow.name),
             optionalVersion = WorkflowVersion(runWorkflow.workflow.version),
             workflowInput = runWorkflow.getInputFor(runInstance),
-            parentId = parent.id,
-            zoneId = null,
-            onDebug = { fn -> logger.debug { fn() } },
-            onError = { fn -> error(fn()) },
+            parentId = null,
+            zoneId = null
+        ) { fn -> error(fn()) }
+
+        // As we already have a ParentOutboxModel, we always send an IngestionMessage
+        // The instance will be started only after the parent (and possible schedule) ingestion
+        val ingestionMessage = IngestionMessage(
+            instanceModels = listOfNotNull(parent, scheduleOutboxModel),
+            instanceMessages = listOfNotNull(instanceMessage)
         )
+
+        databaseEmitter.send(ingestionMessage)
+
+        return null
     }
 
     /**
      * Handles the completion of the workflow instance.
      */
     private suspend fun InstanceMessage.onWorkflowCompleted(output: JsonElement, isScheduledAfter: Boolean) {
-        // Case of child workflow completion
-        parentId?.let { parentId ->
-            // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
-            parentRepository.findById(parentId)?.let { parent ->
-                // updates the parent with the output at the current position
-                parent.completeWith(output)
-                parentRepository.update(parent)
-                logger.debug { "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId ($workflowName), set up to restart at position ${parent.workflowState.currentPosition} with output $output" }
-            }
-                ?: error { "CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted." }
-        }
-
-        // Case of workflow completion with scheduled after
-        if (isScheduledAfter) {
-            scheduleRepository.findByWorkflowId(workflowId)?.let { schedule ->
-                // updates the scheduled execution instant from the after property.
-                schedule.scheduleAfterCompletion()
-                scheduleRepository.update(schedule)
-                logger.debug { "Rescheduled workflow ${schedule.workflowName} for ${schedule.outboxScheduledFor}" }
-            }
-                ?: error { "CRITICAL - Unable to find workflow $workflowId ($workflowName) in $SCHEDULE_TABLE table. The workflow will not be restarted." }
-        }
+        val completedMessage = CompletedMessage(
+            workflowId = workflowId,
+            workflowName = workflowName,
+            workflowVersion = workflowVersion,
+            parentId = parentId,
+            output = if (parentId != null) output else null,
+            isScheduledAfter = isScheduledAfter
+        )
+        databaseEmitter.send(completedMessage)
     }
 
     /**
@@ -182,7 +172,7 @@ internal class StepByStepRunner @Inject constructor(
             reason = getFailureReason(e)
         )
         // Send the message to ingest into the retry table
-        ingestionEmitter.send(RetryIngestionMessage(retryMessage))
+        databaseEmitter.send(IngestionMessage(retryMessage))
     }
 
     /**
@@ -198,6 +188,6 @@ internal class StepByStepRunner @Inject constructor(
             outboxScheduledFor = Clock.System.now().plus(delay),
         )
         // Send the message to ingest into the wait table
-        ingestionEmitter.send(WaitIngestionMessage(waitMessage))
+        databaseEmitter.send(IngestionMessage(waitMessage))
     }
 }

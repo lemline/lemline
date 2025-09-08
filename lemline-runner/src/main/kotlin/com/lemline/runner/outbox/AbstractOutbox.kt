@@ -3,7 +3,7 @@ package com.lemline.runner.outbox
 
 import com.lemline.common.logger.logger
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.instances.InstanceMessageEmitter
+import com.lemline.runner.messaging.instances.InstanceMessageEmitter
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository
@@ -24,6 +24,7 @@ import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * AbstractOutbox provides base functionality for outbox pattern implementations.
@@ -39,6 +40,7 @@ import kotlinx.coroutines.withTimeout
  * @see OutboxRelay for the core message processing logic
  */
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal abstract class AbstractOutbox<T : OutboxModel>() {
     protected val logger by lazy { logger() }
 

@@ -11,6 +11,7 @@ import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 const val SCHEDULE_TABLE = "lemline_schedules"
 
@@ -30,6 +31,7 @@ const val SCHEDULE_TABLE = "lemline_schedules"
  */
 @ApplicationScoped
 @ExperimentalTime
+@ExperimentalSerializationApi
 class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
 
     companion object {

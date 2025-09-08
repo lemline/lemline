@@ -8,7 +8,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.RuntimeDescriptor
 import com.lemline.core.activities.ActivityRunnerProvider
-import com.lemline.core.definitions.Definitions
+import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.instances.CallAsyncApiInstance
@@ -146,7 +146,7 @@ class Processor(
     val workflow: Workflow
 
     init {
-        workflow = Definitions.getOrNull(workflowName, workflowVersion)
+        workflow = DefinitionCache.getOrNull(workflowName, workflowVersion)
             ?: error("workflow definition not found")
         // get root state from instance
         val rootState = workflowState.currentStates[NodePosition.root]
@@ -158,7 +158,7 @@ class Processor(
         val rawInput = rootState.rawInput
             ?: error("no raw input $errorStr")
         // create the root instance
-        val rootNode = Definitions.getRootNode(workflow)
+        val rootNode = DefinitionCache.getRootNode(workflow)
         rootInstance = (rootNode.createInstance(workflowState.currentStates, null) as RootInstance)
         rootInstance.processor = this
         rootInstance.secrets = secrets

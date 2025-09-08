@@ -8,6 +8,7 @@ import jakarta.inject.Inject
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 const val RETRY_TABLE = "lemline_retries"
 
@@ -27,6 +28,7 @@ const val RETRY_TABLE = "lemline_retries"
  */
 @ApplicationScoped
 @ExperimentalTime
+@ExperimentalSerializationApi
 class RetryRepository : OutboxRepository<RetryOutboxModel>() {
 
     @Inject

@@ -3,7 +3,7 @@ package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.random.random
 import kotlin.test.assertEquals
@@ -11,9 +11,11 @@ import kotlin.test.assertFails
 import kotlin.test.assertNull
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.Test
 
 @ExperimentalTime
+@ExperimentalSerializationApi
 class ScheduleModelTest {
 
     private fun createModel(

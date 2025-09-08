@@ -5,9 +5,11 @@ import com.lemline.runner.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.Assertions
 
 @ExperimentalTime
+@ExperimentalSerializationApi
 class FailureModelTest {
 
     @Test

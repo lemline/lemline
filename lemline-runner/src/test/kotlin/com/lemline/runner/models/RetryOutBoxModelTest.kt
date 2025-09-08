@@ -10,12 +10,14 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.Assertions
 
 internal fun nullable(value: JsonSerializable?): String = value?.toJsonString() ?: "null"
 internal fun nullable(value: String?): String = value?.let { "\"$value\"" } ?: "null"
 internal fun nullable(value: Instant?): String = value?.let { "\"$value\"" } ?: "null"
 
+@ExperimentalSerializationApi
 class RetryOutBoxModelTest {
 
 

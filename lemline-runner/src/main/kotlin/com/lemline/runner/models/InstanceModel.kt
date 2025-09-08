@@ -3,11 +3,14 @@ package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
 import com.lemline.core.workflows.WorkflowState
-import com.lemline.runner.messaging.WithWorkflowInfo
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonClassDiscriminator
 
+@ExperimentalSerializationApi
 @ExperimentalTime
-interface WithInstance : WithId, WithWorkflowInfo {
+@JsonClassDiscriminator("t") // <- type discriminator for polymorphic serialization
+sealed interface InstanceModel : WithId, WithInstanceInfo {
 
     val workflowState: WorkflowState?
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.instances
+package com.lemline.runner.messaging.instances
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
@@ -9,7 +9,7 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.processor.Processor
 import com.lemline.core.workflows.WorkflowState
 import com.lemline.runner.messaging.JsonSerializable
-import com.lemline.runner.messaging.WithWorkflowInfo
+import com.lemline.runner.models.WithInstanceInfo
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -29,7 +29,7 @@ data class InstanceMessage(
      * Parent's model ID waiting for this instance completion, if any.
      */
     @SerialName("p") val parentId: IDV7? = null
-) : WithWorkflowInfo, JsonSerializable {
+) : WithInstanceInfo, JsonSerializable {
 
     @Transient
     lateinit var message: Message<String>

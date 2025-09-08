@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.instances
+package com.lemline.runner.messaging.instances
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
-import com.lemline.core.definitions.Definitions
+import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.processor.Processor
 import com.lemline.runner.StepByStepRunner
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
@@ -13,11 +13,10 @@ import com.lemline.runner.failures.FailureReasons.SECRETS_RETRIEVAL_FAILURE
 import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.WORKFLOW_INIT_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
-import com.lemline.runner.ingestion.FailureIngestionMessage
-import com.lemline.runner.ingestion.IngestionMessageEmitter
-import com.lemline.runner.ingestion.RetryIngestionMessage
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.MessageHandler
+import com.lemline.runner.messaging.database.DatabaseMessageEmitter
+import com.lemline.runner.messaging.database.IngestionMessage
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.RetryOutboxModel
@@ -44,7 +43,7 @@ import org.jetbrains.annotations.TestOnly
 @ApplicationScoped
 internal class InstanceMessageHandler(
     private val instanceEmitter: InstanceMessageEmitter,
-    private val ingestionEmitter: IngestionMessageEmitter,
+    private val ingestionEmitter: DatabaseMessageEmitter,
     private val definitionRepository: DefinitionRepository,
     private val stepByStepRunner: StepByStepRunner,
     override val metrics: InstanceMessageSubscriberMetrics,
@@ -95,10 +94,10 @@ internal class InstanceMessageHandler(
      */
     private suspend fun InstanceMessage.findWorkflowDefinition(): Workflow = try {
         // Try to get from cache first, then from repository if not found
-        Definitions.getOrNull(workflowName, workflowVersion)
+        DefinitionCache.getOrNull(workflowName, workflowVersion)
             ?: definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
                 ?.definition
-                ?.let { Definitions.parseAndPut(it) }
+                ?.let { DefinitionCache.parseAndPut(it) }
     } catch (e: Exception) {
         logger.error(e) { "Error during workflow definition retrieval." }
         emitToRetry(e, getFailureReason(e))
@@ -184,7 +183,7 @@ internal class InstanceMessageHandler(
             error = cause,
             reason = DESERIALIZATION_FAILURE
         )
-        ingestionEmitter.send(FailureIngestionMessage(failure))
+        ingestionEmitter.send(IngestionMessage(failure))
     }
 
     private suspend fun InstanceMessage.emitToRetry(cause: Exception, reason: String): Nothing {
@@ -202,7 +201,7 @@ internal class InstanceMessageHandler(
             error = error,
             reason = reason,
         )
-        ingestionEmitter.send(FailureIngestionMessage(failure))
+        ingestionEmitter.send(IngestionMessage(failure))
     }
 
     private suspend fun InstanceMessage.saveForRetry(cause: Exception, reason: String) {
@@ -213,6 +212,6 @@ internal class InstanceMessageHandler(
             error = cause,
             reason = reason,
         )
-        ingestionEmitter.send(RetryIngestionMessage(retry))
+        ingestionEmitter.send(IngestionMessage(retry))
     }
 }

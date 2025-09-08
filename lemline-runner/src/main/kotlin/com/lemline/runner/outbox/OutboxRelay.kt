@@ -13,6 +13,7 @@ import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.jetbrains.annotations.VisibleForTesting
 
 /**
@@ -38,6 +39,7 @@ import org.jetbrains.annotations.VisibleForTesting
  * @param T Type of the message entity (must implement OutboxModel interface)
  */
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal class OutboxRelay<T : OutboxModel>(
     private val logger: Logger,
     private val outboxRepository: OutboxRepository<T>,

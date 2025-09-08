@@ -2,10 +2,13 @@
 package com.lemline.runner.cli.instances
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
-import com.lemline.runner.instances.InstanceMessageEmitter
+import com.lemline.runner.messaging.database.DatabaseMessageEmitter
+import com.lemline.runner.messaging.database.IngestionMessage
+import com.lemline.runner.messaging.instances.InstanceMessageEmitter
 import com.lemline.runner.starters.Starter
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
@@ -36,7 +39,10 @@ class InstanceStartCommand : Runnable {
     lateinit var stater: Starter
 
     @Inject
-    private lateinit var emitter: InstanceMessageEmitter
+    private lateinit var instanceEmitter: InstanceMessageEmitter
+
+    @Inject
+    private lateinit var databaseEmitter: DatabaseMessageEmitter
 
     @Parameters(
         index = "0",
@@ -69,22 +75,38 @@ class InstanceStartCommand : Runnable {
         val workflowName = WorkflowName(name!!)
         val workflowInput = getInput(input)
 
-        val instanceMessage = stater.start(
+        val workflowId = WorkflowId.random()
+
+        // Depending on the schedule of the workflow, different messages are needed:
+        // - no schedule -> a single instanceMessage
+        // - schedule after or every -> an instanceMessage and a scheduleOutboxModel
+        // - schedule cron -> a single scheduleOutboxModel
+        // For the two last cases, we sent an IngestionMessage (first database ingestion, then only after starting the instance)
+        val (instanceMessage, scheduleOutboxModel) = stater.getStartingMessages(
+            workflowId = workflowId,
             workflowName = workflowName,
             optionalVersion = version?.let { WorkflowVersion(it) },
             workflowInput = workflowInput,
             parentId = null,
             zoneId = getZoneId(),
-            ::cliPrint,
             ::cliError
         )
-        instanceMessage?.let {
-            emitter.send(it)
-            cliPrint {
-                "Instance ${it.workflowId} started successfully (name: $workflowName, version: ${it.workflowVersion}, input: $workflowInput)"
-            }
+
+        val workflowVersion = instanceMessage?.workflowVersion ?: scheduleOutboxModel?.workflowVersion
+
+        when (scheduleOutboxModel) {
+            null -> instanceEmitter.send(instanceMessage!!)
+            else -> databaseEmitter.send(
+                IngestionMessage(
+                    instanceModels = mutableListOf(scheduleOutboxModel),
+                    instanceMessages = listOfNotNull(instanceMessage)
+                )
+            )
         }
 
+        cliPrint {
+            "Instance $workflowId started successfully (name: $workflowName, version: $workflowVersion, input: $workflowInput)"
+        }
     }
 
     // Parse the input string as JSON

@@ -2,6 +2,7 @@
 package com.lemline.runner.messaging
 
 import com.lemline.common.logger.logger
+import com.lemline.runner.models.WithInstanceInfo
 import io.quarkus.runtime.ShutdownEvent
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.event.Observes
@@ -25,7 +26,7 @@ import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 
 @ExperimentalTime
-internal abstract class MessageSubscriber<T : WithWorkflowInfo>() : Subscriber<Message<String>> {
+internal abstract class MessageSubscriber<T : WithInstanceInfo>() : Subscriber<Message<String>> {
 
     abstract val maxConcurrency: Long
     abstract val enabled: Boolean

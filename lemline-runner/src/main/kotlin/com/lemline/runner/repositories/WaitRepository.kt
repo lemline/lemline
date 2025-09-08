@@ -8,6 +8,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 const val WAIT_TABLE = "lemline_waits"
 
@@ -26,6 +27,7 @@ const val WAIT_TABLE = "lemline_waits"
  * @see OutboxRelay for the processing logic
  */
 @ApplicationScoped
+@ExperimentalSerializationApi
 @ExperimentalTime
 internal class WaitRepository : OutboxRepository<WaitOutboxModel>() {
     @Inject

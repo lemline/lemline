@@ -14,7 +14,7 @@ import io.serverlessworkflow.api.WorkflowReader
 import io.serverlessworkflow.api.types.Workflow
 import java.util.concurrent.ConcurrentHashMap
 
-object Definitions {
+object DefinitionCache {
 
     private val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
     private val rootNodesCache = ConcurrentHashMap<WorkflowIndex, Node<RootTask>>()

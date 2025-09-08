@@ -5,15 +5,18 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
-import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.messaging.JsonSerializable
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+@ExperimentalSerializationApi
 @ExperimentalTime
 @Serializable
+@SerialName("f") // <- type discriminator for polymorphic serialization
 data class FailureModel(
     @SerialName("id")
     override val id: IDV7,
@@ -35,7 +38,7 @@ data class FailureModel(
 
     @SerialName("es")
     val errorStackTrace: String,
-) : WithInstance, JsonSerializable {
+) : InstanceModel, JsonSerializable {
 
     override val workflowState get() = instanceMessage?.workflowState
 

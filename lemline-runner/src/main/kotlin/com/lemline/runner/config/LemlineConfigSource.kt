@@ -41,10 +41,10 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZ
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOWS_TOPIC_DEFAULT
-import com.lemline.runner.ingestion.INGESTION_IN_CHANNEL
-import com.lemline.runner.ingestion.INGESTION_OUT_CHANNEL
-import com.lemline.runner.instances.WORKFLOWS_IN_CHANNEL
-import com.lemline.runner.instances.WORKFLOWS_OUT_CHANNEL
+import com.lemline.runner.messaging.database.INGESTION_IN_CHANNEL
+import com.lemline.runner.messaging.database.INGESTION_OUT_CHANNEL
+import com.lemline.runner.messaging.instances.WORKFLOWS_IN_CHANNEL
+import com.lemline.runner.messaging.instances.WORKFLOWS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
 import kotlinx.serialization.ExperimentalSerializationApi
 

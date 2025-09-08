@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.ingestion
+package com.lemline.runner.messaging.database
 
 import com.lemline.runner.config.INGESTION_CONSUMER_CONCURRENCY
 import com.lemline.runner.config.INGESTION_CONSUMER_ENABLED
@@ -19,10 +19,10 @@ internal const val INGESTION_IN_CHANNEL = "ingestion-in"
 @ExperimentalSerializationApi
 @Startup
 @ApplicationScoped
-internal class IngestionMessageSubscriber(
+internal class DatabaseMessageSubscriber(
     @param:ConfigProperty(name = INGESTION_CONSUMER_CONCURRENCY) override val maxConcurrency: Long,
     @param:ConfigProperty(name = INGESTION_CONSUMER_ENABLED) override val enabled: Boolean,
     @param:Channel(INGESTION_IN_CHANNEL) override val publisher: Publisher<Message<String>>,
-    override val handler: IngestionMessageHandler,
-    override val metrics: IngestionMessageSubscriberMetrics,
-) : MessageSubscriber<IngestionMessage>()
+    override val handler: DatabaseMessageHandler,
+    override val metrics: DatabaseMessageSubscriberMetrics,
+) : MessageSubscriber<DatabaseMessage>()

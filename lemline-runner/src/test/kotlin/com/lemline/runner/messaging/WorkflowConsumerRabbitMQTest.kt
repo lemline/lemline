@@ -2,9 +2,9 @@
 package com.lemline.runner.messaging
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
-import com.lemline.runner.instances.WORKFLOWS_IN_CHANNEL
-import com.lemline.runner.instances.WORKFLOWS_OUT_CHANNEL
 import com.lemline.runner.messaging.bases.WorkflowConsumerTest
+import com.lemline.runner.messaging.instances.WORKFLOWS_IN_CHANNEL
+import com.lemline.runner.messaging.instances.WORKFLOWS_OUT_CHANNEL
 import com.lemline.runner.tests.profiles.RabbitMQProfile
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection

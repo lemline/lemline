@@ -72,12 +72,12 @@ class DefinitionsTest {
      */
     private fun clearWorkflowCaches() {
         // Use reflection to access and clear the cache maps
-        val workflowCacheField: Field = Definitions::class.java.getDeclaredField("workflowCache")
+        val workflowCacheField: Field = DefinitionCache::class.java.getDeclaredField("workflowCache")
         workflowCacheField.isAccessible = true
         val workflowCache = workflowCacheField.get(null)
         workflowCache.javaClass.getMethod("clear").invoke(workflowCache)
 
-        val rootNodesCacheField: Field = Definitions::class.java.getDeclaredField("rootNodesCache")
+        val rootNodesCacheField: Field = DefinitionCache::class.java.getDeclaredField("rootNodesCache")
         rootNodesCacheField.isAccessible = true
         val rootNodesCache = rootNodesCacheField.get(null)
         rootNodesCache.javaClass.getMethod("clear").invoke(rootNodesCache)
@@ -86,7 +86,7 @@ class DefinitionsTest {
     @Test
     fun `parse should successfully parse a YAML workflow definition`() {
         // When
-        val workflow = Definitions.parse(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parse(sampleYamlWorkflow)
 
         // Then
         workflow.shouldBeInstanceOf<Workflow>()
@@ -97,7 +97,7 @@ class DefinitionsTest {
     @Test
     fun `parse should successfully parse a JSON workflow definition`() {
         // When
-        val workflow = Definitions.parse(sampleJsonWorkflow)
+        val workflow = DefinitionCache.parse(sampleJsonWorkflow)
 
         // Then
         workflow.shouldBeInstanceOf<Workflow>()
@@ -116,25 +116,25 @@ class DefinitionsTest {
 
         // Then
         assertThrows<Exception> {
-            Definitions.parse(invalidWorkflow)
+            DefinitionCache.parse(invalidWorkflow)
         }
     }
 
     @Test
     fun `parseAndPut should cache the workflow and its root node`() {
         // When
-        val workflow = Definitions.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
 
         // Then
         workflow.shouldBeInstanceOf<Workflow>()
 
         // Verify the workflow is in the cache
-        val cachedWorkflow = Definitions.getOrNull(workflow.name, workflow.version)
+        val cachedWorkflow = DefinitionCache.getOrNull(workflow.name, workflow.version)
         cachedWorkflow shouldNotBe null
         cachedWorkflow?.document?.name shouldBe workflow.document.name
 
         // Verify the root node is created and cached
-        val rootNode = Definitions.getRootNode(workflow)
+        val rootNode = DefinitionCache.getRootNode(workflow)
         rootNode.shouldBeInstanceOf<Node<RootTask>>()
         rootNode.task.shouldBeInstanceOf<RootTask>()
     }
@@ -157,14 +157,14 @@ class DefinitionsTest {
 
         // Then
         assertThrows<Exception> {
-            Definitions.parseAndPut(invalidWorkflow)
+            DefinitionCache.parseAndPut(invalidWorkflow)
         }
     }
 
     @Test
     fun `getOrNull should return null for non-existent workflow`() {
         // When
-        val result = Definitions.getOrNull(WorkflowName("non-existent"), WorkflowVersion("1.0.0"))
+        val result = DefinitionCache.getOrNull(WorkflowName("non-existent"), WorkflowVersion("1.0.0"))
 
         // Then
         result shouldBe null
@@ -173,10 +173,10 @@ class DefinitionsTest {
     @Test
     fun `getOrNull should return cached workflow`() {
         // Given
-        val workflow = Definitions.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
 
         // When
-        val result = Definitions.getOrNull(workflow.name, workflow.version)
+        val result = DefinitionCache.getOrNull(workflow.name, workflow.version)
 
         // Then
         result shouldBe workflow
@@ -188,7 +188,7 @@ class DefinitionsTest {
         val workflow = validation().read(sampleYamlWorkflow, WorkflowFormat.YAML)
 
         // When
-        val rootNode = Definitions.getRootNode(workflow)
+        val rootNode = DefinitionCache.getRootNode(workflow)
 
         // Then
         rootNode.shouldBeInstanceOf<Node<RootTask>>()
@@ -196,17 +196,17 @@ class DefinitionsTest {
         rootNode.parent shouldBe null
 
         // Call again to verify caching
-        val cachedRootNode = Definitions.getRootNode(workflow)
+        val cachedRootNode = DefinitionCache.getRootNode(workflow)
         cachedRootNode shouldBe rootNode
     }
 
     @Test
     fun `getRootNode creates a root node with the correct structure`() {
         // Given - a simple workflow
-        val workflow = Definitions.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
 
         // When
-        val rootNode = Definitions.getRootNode(workflow)
+        val rootNode = DefinitionCache.getRootNode(workflow)
 
         // Then - just verify the structure is correct
         rootNode.shouldBeInstanceOf<Node<RootTask>>()
@@ -218,7 +218,7 @@ class DefinitionsTest {
     @Test
     fun `workflow index should work correctly`() {
         // Given
-        val workflow = Definitions.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
         val workflowName = workflow.name
         val workflowVersion = workflow.version
 
@@ -230,7 +230,7 @@ class DefinitionsTest {
         index.second shouldBe workflowVersion
 
         // Verify the index is used correctly for caching
-        val cachedWorkflow = Definitions.getOrNull(workflowName, workflowVersion)
+        val cachedWorkflow = DefinitionCache.getOrNull(workflowName, workflowVersion)
         cachedWorkflow shouldBe workflow
     }
 
@@ -244,7 +244,7 @@ class DefinitionsTest {
 
         // When parsing - it should fall back to JSON parsing
         val workflow = assertDoesNotThrow {
-            Definitions.parse(badYamlGoodJson)
+            DefinitionCache.parse(badYamlGoodJson)
         }
 
         // Then
@@ -261,7 +261,7 @@ class DefinitionsTest {
 
         // Then both YAML and JSON parsing should fail
         assertThrows<Exception> {
-            Definitions.parse(invalidDefinition)
+            DefinitionCache.parse(invalidDefinition)
         }
     }
 
@@ -286,7 +286,7 @@ class DefinitionsTest {
         // Process workflows concurrently
         val results = workflows.map { yaml ->
             async(Dispatchers.Default) {
-                Definitions.parseAndPut(yaml)
+                DefinitionCache.parseAndPut(yaml)
             }
         }.awaitAll()
 
@@ -294,7 +294,7 @@ class DefinitionsTest {
         results.forEachIndexed { i, workflow ->
             val name = workflow.name
             val version = workflow.version
-            val cachedWorkflow = Definitions.getOrNull(name, version)
+            val cachedWorkflow = DefinitionCache.getOrNull(name, version)
 
             // Should be in cache
             cachedWorkflow shouldBe workflow
@@ -307,12 +307,12 @@ class DefinitionsTest {
     @Test
     fun `concurrent access to root node cache should work correctly`() = runBlocking {
         // Create a workflow to test with
-        val workflow = Definitions.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
 
         // Access the root node concurrently from multiple coroutines
         val results = (1..10).map {
             async(Dispatchers.Default) {
-                Definitions.getRootNode(workflow)
+                DefinitionCache.getRootNode(workflow)
             }
         }.awaitAll()
 
@@ -349,7 +349,7 @@ class DefinitionsTest {
 
         // When
         val workflow = assertDoesNotThrow {
-            Definitions.parse(complexWorkflow)
+            DefinitionCache.parse(complexWorkflow)
         }
 
         // Then

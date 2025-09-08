@@ -9,6 +9,7 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.healthcheck.FatalAckLiveness.livenessDownOnFatal
 import com.lemline.runner.healthcheck.RetryReadiness.readinessDownDuringRetries
+import com.lemline.runner.models.WithInstanceInfo
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
 import java.util.concurrent.CompletionException
@@ -23,7 +24,7 @@ import org.apache.kafka.common.errors.RetriableException
 import org.eclipse.microprofile.reactive.messaging.Message
 
 @ExperimentalTime
-internal interface MessageHandler<T : WithWorkflowInfo> {
+internal interface MessageHandler<T : WithInstanceInfo> {
 
     suspend fun Message<String>.deserialize(): T
 
@@ -160,12 +161,11 @@ internal interface MessageHandler<T : WithWorkflowInfo> {
         label = "ACK",
         maxAttempts = maxAttempts,
         totalBudgetMs = totalBudgetMs,
+        singleAttemptTimeoutMs = singleAttemptTimeoutMs,
         onRetryStart = { readinessDownDuringRetries.set(true) },
         onFatalFailure = { _, _, _ -> livenessDownOnFatal.set(true) }
     ) {
-        withTimeout(singleAttemptTimeoutMs) {
-            ackSuspending()
-        }
+        ackSuspending()
     }
 
     /**
@@ -209,12 +209,11 @@ internal interface MessageHandler<T : WithWorkflowInfo> {
         label = "NACK",
         maxAttempts = maxAttempts,
         totalBudgetMs = totalBudgetMs,
+        singleAttemptTimeoutMs = singleAttemptTimeoutMs,
         onRetryStart = { readinessDownDuringRetries.set(true) },
         onFatalFailure = { _, _, _ -> livenessDownOnFatal.set(true) }
     ) {
-        withTimeout(singleAttemptTimeoutMs) {
-            nackSuspending(cause)
-        }
+        nackSuspending(cause)
     }
 
     /**
@@ -236,6 +235,7 @@ internal interface MessageHandler<T : WithWorkflowInfo> {
         label: String,
         maxAttempts: Int = 6,
         totalBudgetMs: Long = 30_000,
+        singleAttemptTimeoutMs: Long = 15_000,
         onRetryStart: (() -> Unit)? = null,
         onFatalFailure: ((Exception, Int, Long) -> Unit)? = null,
         block: suspend () -> Unit
@@ -245,7 +245,9 @@ internal interface MessageHandler<T : WithWorkflowInfo> {
         while (true) {
             try {
                 if (attempt > 0) onRetryStart?.invoke()
-                block()
+                withTimeout(singleAttemptTimeoutMs) {
+                    block()
+                }
                 return
             } catch (e: Exception) {
                 attempt++

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.runner.instances.InstanceMessage
 import com.lemline.runner.messaging.JsonSerializable
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Base class for outbox pattern message models.
@@ -22,9 +22,9 @@ import kotlinx.serialization.Serializable
  *
  * @see OutboxRelay for the processing logic
  */
+@ExperimentalSerializationApi
 @ExperimentalTime
-@Serializable
-abstract class OutboxModel() : WithInstance, JsonSerializable {
+sealed class OutboxModel() : InstanceModel, JsonSerializable {
 
     abstract val instanceMessage: InstanceMessage
 
@@ -79,5 +79,6 @@ abstract class OutboxModel() : WithInstance, JsonSerializable {
     abstract var outboxErrorStackTrace: String?
 
     override val workflowState get() = instanceMessage.workflowState
+
     override val parentId get() = instanceMessage.parentId
 }

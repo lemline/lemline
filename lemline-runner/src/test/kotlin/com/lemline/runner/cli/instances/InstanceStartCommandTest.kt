@@ -5,7 +5,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.repositories.DefinitionRepository

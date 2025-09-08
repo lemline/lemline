@@ -15,6 +15,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Abstract repository for managing entities that follow the outbox pattern.
@@ -33,6 +34,7 @@ import kotlin.time.toJavaInstant
  */
 @Suppress("unused")
 @ExperimentalTime
+@ExperimentalSerializationApi
 abstract class OutboxRepository<T : OutboxModel> : WithInstanceRepository<T>() {
 
     @Inject

@@ -8,12 +8,13 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.NodeStates
 import com.lemline.core.workflows.WorkflowState
-import com.lemline.runner.instances.InstanceMessage
-import com.lemline.runner.models.WithInstance
+import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.models.InstanceModel
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Abstract repository class for managing entities that include workflow instance details.
@@ -44,9 +45,10 @@ import kotlin.time.ExperimentalTime
  *
  * This class is marked with `@ExperimentalTime` to indicate that it makes use of experimental Kotlin time-related APIs.
  */
+@ExperimentalSerializationApi
 @Suppress("unused")
 @ExperimentalTime
-abstract class WithInstanceRepository<T : WithInstance> : WithIdRepository<T>() {
+abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>() {
 
     companion object {
         internal const val WORKFLOW_ID_COLUMN = "workflow_id"

@@ -3,7 +3,7 @@ package com.lemline.runner.outbox
 
 import com.lemline.common.values.WorkflowId
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.instances.InstanceMessageEmitter
+import com.lemline.runner.messaging.instances.InstanceMessageEmitter
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ScheduleRepository
@@ -12,6 +12,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * `ScheduleOutbox` specializes `AbstractOutbox` to implement the outbox pattern for scheduled workflow executions.
@@ -26,6 +27,7 @@ import kotlin.time.ExperimentalTime
 @Startup
 @ApplicationScoped
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
 
     @Inject
@@ -53,6 +55,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
     // Cleanup configuration
     override val cleanupConf by lazy { lemlineConfig.outbox().schedule().cleanup() }
 
+    // process entity with status == PENDING and outboxDelayedUntil < now
     override suspend fun process(entity: ScheduleOutboxModel) {
         // update the schedule model with the next instant to be processed
         entity.prepareNextScheduled(WorkflowId.random())

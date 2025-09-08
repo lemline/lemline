@@ -14,12 +14,7 @@ import com.lemline.core.nodes.NodeState
 import com.lemline.core.random.random
 import com.lemline.core.workflows.NodeStates
 import com.lemline.core.workflows.WorkflowState
-import com.lemline.runner.ingestion.FailureIngestionMessage
-import com.lemline.runner.ingestion.ParentIngestionMessage
-import com.lemline.runner.ingestion.RetryIngestionMessage
-import com.lemline.runner.ingestion.ScheduleIngestionMessage
-import com.lemline.runner.ingestion.WaitIngestionMessage
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.models.ParentOutboxModel
@@ -111,18 +106,4 @@ fun WaitOutboxModel.Companion.random() = WaitOutboxModel(
     outboxScheduledFor = Instant.random(), // <- Not nullable
 ).also { it.randomize() }
 
-fun ParentIngestionMessage.Companion.random() =
-    ParentIngestionMessage(ParentOutboxModel.random())
-
-fun ScheduleIngestionMessage.Companion.random() =
-    ScheduleIngestionMessage(ScheduleOutboxModel.random())
-
-fun WaitIngestionMessage.Companion.random() =
-    WaitIngestionMessage(WaitOutboxModel.random())
-
-fun RetryIngestionMessage.Companion.random() =
-    RetryIngestionMessage(RetryOutboxModel.random())
-
-fun FailureIngestionMessage.Companion.random() =
-    FailureIngestionMessage(FailureModel.random())
 

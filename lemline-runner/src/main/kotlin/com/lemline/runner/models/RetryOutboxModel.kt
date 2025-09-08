@@ -4,16 +4,19 @@ package com.lemline.runner.models
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.core.errors.WorkflowException
-import com.lemline.runner.instances.InstanceMessage
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 
+@ExperimentalSerializationApi
 @ExperimentalTime
 @Serializable
+@SerialName("r") // <- type discriminator for polymorphic serialization
 data class RetryOutboxModel(
     @SerialName("id")
     override val id: IDV7,
