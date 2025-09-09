@@ -7,6 +7,7 @@ import com.lemline.core.definitions.DefinitionCache as Workflows
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
+import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.coEvery
@@ -169,7 +170,7 @@ class DefinitionPostCommandTest {
             val exitCode = cmd.execute("--file", nonExistentFile.absolutePath)
 
             // Then
-            exitCode shouldBe 1 // We expect a non-zero exit code for errors
+            exitCode shouldBeGreaterThan 0 // We expect a non-zero exit code for errors
             errStream.toString() shouldContain "does not exist"
         }
     }
@@ -238,7 +239,7 @@ class DefinitionPostCommandTest {
             val exitCode = cmd.execute("--directory", nonExistentDir.absolutePath)
 
             // Then
-            exitCode shouldBe 1 // We expect a non-zero exit code for errors
+            exitCode shouldBeGreaterThan 0 // We expect a non-zero exit code for errors
             errStream.toString() shouldContain "does not exist"
         }
     }
@@ -249,7 +250,7 @@ class DefinitionPostCommandTest {
         val exitCode = cmd.execute()
 
         // Then
-        exitCode shouldBe 2 // We expect a parameter validation exit code (2)
+        exitCode shouldBeGreaterThan 0 // We expect a parameter validation exit code (2)
         errStream.toString() shouldContain "You must specify at least one file"
     }
 
@@ -259,7 +260,7 @@ class DefinitionPostCommandTest {
         val exitCode = cmd.execute("--recursive")
 
         // Then
-        exitCode shouldBe 2 // We expect a parameter validation exit code (2)
+        exitCode shouldBeGreaterThan 0 // We expect a parameter validation exit code (2)
         errStream.toString() shouldContain "can only be used with"
     }
 

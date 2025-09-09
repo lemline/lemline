@@ -49,13 +49,7 @@ class Starter {
         val workflowVersion = WorkflowVersion(workflow.document.version)
 
         // Validate input against schema if any
-        workflow.input?.schema?.let { schema ->
-            try {
-                SchemaValidator.validate(workflowInput, schema)
-            } catch (e: Exception) {
-                onError { "Input validation failed against workflow schema: ${e.message}." }
-            }
-        }
+        validateInput(workflowInput, workflow, onError)
 
         // create the instance message, if not scheduled by a cron
         val instanceMessage = when (workflow.schedule?.cron.isNullOrBlank()) {
@@ -84,5 +78,49 @@ class Starter {
         }
 
         return instanceMessage to scheduleOutboxModel
+    }
+
+    suspend fun validate(
+        workflowName: WorkflowName,
+        optionalVersion: WorkflowVersion?,
+        workflowInput: JsonElement,
+        onError: (() -> String) -> Nothing,
+    ) {
+        val workflow = definitions.get(workflowName, optionalVersion)
+            ?: onError { "Workflow $workflowName (version=${optionalVersion ?: "latest"}) not found." }
+        validateInput(workflowInput, workflow, onError)
+    }
+
+    private fun validateInput(
+        workflowInput: JsonElement,
+        workflow: io.serverlessworkflow.api.types.Workflow,
+        onError: (() -> String) -> Nothing,
+    ) {
+        workflow.input?.schema?.let { schema ->
+            // quick required-fields check to improve error reporting and ensure early failure
+            runCatching {
+                val inline = schema.schemaInline?.document
+                val required = (inline as? Map<*, *>)?.get("required")
+                val requiredList: List<String> = when (required) {
+                    is Collection<*> -> required.filterIsInstance<String>()
+                    else -> emptyList()
+                }
+                if (requiredList.isNotEmpty()) {
+                    val inputKeys = workflowInput
+                        .let { it as? kotlinx.serialization.json.JsonObject }
+                        ?.keys ?: emptySet()
+                    val missing = requiredList.filterNot { it in inputKeys }
+                    if (missing.isNotEmpty()) {
+                        onError { "Input validation failed against workflow schema: missing required field(s) ${missing.joinToString(", ") { "'" + it + "'" }}" }
+                    }
+                }
+            }
+
+            try {
+                SchemaValidator.validate(workflowInput, schema)
+            } catch (e: Exception) {
+                onError { "Input validation failed against workflow schema: ${e.message}." }
+            }
+        }
     }
 }

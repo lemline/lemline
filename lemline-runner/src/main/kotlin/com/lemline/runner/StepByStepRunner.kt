@@ -144,15 +144,17 @@ internal class StepByStepRunner @Inject constructor(
      * Handles the completion of the workflow instance.
      */
     private suspend fun InstanceMessage.onWorkflowCompleted(output: JsonElement, isScheduledAfter: Boolean) {
-        val completedMessage = CompletedMessage(
-            workflowId = workflowId,
-            workflowName = workflowName,
-            workflowVersion = workflowVersion,
-            parentId = parentId,
-            output = if (parentId != null) output else null,
-            isScheduledAfter = isScheduledAfter
-        )
-        databaseEmitter.send(completedMessage)
+        if (parentId != null || isScheduledAfter) {
+            val completedMessage = CompletedMessage(
+                workflowId = workflowId,
+                workflowName = workflowName,
+                workflowVersion = workflowVersion,
+                parentId = parentId,
+                output = if (parentId != null) output else null,
+                isScheduledAfter = isScheduledAfter
+            )
+            databaseEmitter.send(completedMessage)
+        }
     }
 
     /**

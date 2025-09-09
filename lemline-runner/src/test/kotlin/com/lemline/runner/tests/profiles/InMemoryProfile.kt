@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
+import com.lemline.runner.config.DATABASE_CONSUMER_ENABLED
+import com.lemline.runner.config.DATABASE_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_TYPE
-import com.lemline.runner.config.INGESTION_CONSUMER_ENABLED
-import com.lemline.runner.config.INGESTION_PRODUCER_ENABLED
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import com.lemline.runner.config.MESSAGING_TYPE
@@ -30,8 +30,8 @@ class InMemoryProfile : QuarkusTestProfile {
             MESSAGING_TYPE to MSG_TYPE_IN_MEMORY,
             WORKFLOWS_CONSUMER_ENABLED to "true",
             WORKFLOWS_PRODUCER_ENABLED to "true",
-            INGESTION_CONSUMER_ENABLED to "true",
-            INGESTION_PRODUCER_ENABLED to "true"
+            DATABASE_CONSUMER_ENABLED to "true",
+            DATABASE_PRODUCER_ENABLED to "true"
         )
     }
 

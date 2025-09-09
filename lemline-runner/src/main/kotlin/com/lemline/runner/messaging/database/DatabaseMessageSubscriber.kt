@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.database
 
+import com.lemline.runner.config.DATABASE_CONSUMER_ENABLED
 import com.lemline.runner.config.INGESTION_CONSUMER_CONCURRENCY
-import com.lemline.runner.config.INGESTION_CONSUMER_ENABLED
 import com.lemline.runner.messaging.MessageSubscriber
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
@@ -13,7 +13,7 @@ import org.eclipse.microprofile.reactive.messaging.Channel
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.reactivestreams.Publisher
 
-internal const val INGESTION_IN_CHANNEL = "ingestion-in"
+internal const val DATABASE_IN_CHANNEL = "ingestion-in"
 
 @ExperimentalTime
 @ExperimentalSerializationApi
@@ -21,8 +21,8 @@ internal const val INGESTION_IN_CHANNEL = "ingestion-in"
 @ApplicationScoped
 internal class DatabaseMessageSubscriber(
     @param:ConfigProperty(name = INGESTION_CONSUMER_CONCURRENCY) override val maxConcurrency: Long,
-    @param:ConfigProperty(name = INGESTION_CONSUMER_ENABLED) override val enabled: Boolean,
-    @param:Channel(INGESTION_IN_CHANNEL) override val publisher: Publisher<Message<String>>,
+    @param:ConfigProperty(name = DATABASE_CONSUMER_ENABLED) override val enabled: Boolean,
+    @param:Channel(DATABASE_IN_CHANNEL) override val publisher: Publisher<Message<String>>,
     override val handler: DatabaseMessageHandler,
     override val metrics: DatabaseMessageSubscriberMetrics,
 ) : MessageSubscriber<DatabaseMessage>()

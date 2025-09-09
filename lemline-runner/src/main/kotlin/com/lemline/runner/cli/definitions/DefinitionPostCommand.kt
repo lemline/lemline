@@ -59,7 +59,7 @@ class DefinitionPostCommand : Runnable {
         // Validate that the recursive option is used with directories
         if (recursive && directories.isEmpty()) {
             throw CommandLine.ParameterException(
-                CommandLine(this),
+                CommandLine(this@DefinitionPostCommand),
                 "The --recursive option can only be used with the --directory option."
             )
         }
@@ -67,7 +67,7 @@ class DefinitionPostCommand : Runnable {
         // Ensure that at least one source is provided
         if (files.isEmpty() && directories.isEmpty()) {
             throw CommandLine.ParameterException(
-                CommandLine(this),
+                CommandLine(this@DefinitionPostCommand),
                 "You must specify at least one file (-f) or directory (-d)"
             )
         }
@@ -86,13 +86,13 @@ class DefinitionPostCommand : Runnable {
     private suspend fun processSingleFile(file: File) {
         if (!file.exists()) {
             throw CommandLine.ParameterException(
-                CommandLine(this),
+                CommandLine(this@DefinitionPostCommand),
                 "The specified file does not exist: ${file.absolutePath}"
             )
         }
         if (!file.isFile) {
             throw CommandLine.ParameterException(
-                CommandLine(this),
+                CommandLine(this@DefinitionPostCommand),
                 "The specified path is not a regular file: ${file.absolutePath}"
             )
         }
@@ -102,13 +102,13 @@ class DefinitionPostCommand : Runnable {
     internal suspend fun processDirectory(directory: File) {
         if (!directory.exists()) {
             throw CommandLine.ParameterException(
-                CommandLine(this),
+                CommandLine(this@DefinitionPostCommand),
                 "The specified directory does not exist: ${directory.absolutePath}"
             )
         }
         if (!directory.isDirectory) {
             throw CommandLine.ParameterException(
-                CommandLine(this),
+                CommandLine(this@DefinitionPostCommand),
                 "The specified path is not a directory: ${directory.absolutePath}"
             )
         }

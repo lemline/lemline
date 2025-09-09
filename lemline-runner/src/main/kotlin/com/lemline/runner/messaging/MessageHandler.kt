@@ -41,7 +41,7 @@ internal interface MessageHandler<T : WithInstanceInfo> {
     val onFailureTest: (Message<String>, Throwable?) -> Unit
 
     suspend fun handleMessage(message: Message<String>) {
-        var next: T?
+        var next: T? = null
         var workflowId: WorkflowId? = null
         var workflowName: WorkflowName? = null
         var workflowVersion: WorkflowVersion? = null
@@ -86,6 +86,7 @@ internal interface MessageHandler<T : WithInstanceInfo> {
             next?.emit()
         }.getOrElse { return } // <- tryWithCompensation handles (neg)acknowledgment if the block fails
 
+        onCompleteTest(message, next)
         // Success Path
         message.acknowledgeWithRetry(workflowName, workflowVersion)
     }
@@ -100,18 +101,19 @@ internal interface MessageHandler<T : WithInstanceInfo> {
      *
      * @throws Exception If an error occurs during (negative) acknowledgment
      */
-    suspend fun <T> Message<String>.tryWithCompensation(
+    suspend fun <S> Message<String>.tryWithCompensation(
         workflowId: WorkflowId? = null,
         workflowName: WorkflowName? = null,
         workflowVersion: WorkflowVersion? = null,
-        block: suspend () -> T
-    ): Result<T> = withSuspendLoggingContext(workflowId, workflowName, workflowVersion) {
+        block: suspend () -> S
+    ): Result<S> = withSuspendLoggingContext(workflowId, workflowName, workflowVersion) {
         try {
             Result.success(block())
         } catch (compensation: CompensationException) {
             try {
                 compensation.run()
                 acknowledgeWithRetry(workflowName, workflowVersion)
+                onFailureTest(this, compensation)
             } catch (e: Exception) {
                 // Failure path
                 logger.error(e) { "Failed to execute compensation for ${toLogString()}" }

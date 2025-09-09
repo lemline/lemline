@@ -14,6 +14,7 @@ import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
 import kotlin.reflect.KClass
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -42,7 +43,7 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>(
     override fun createTestModel(payload: String) = RetryOutboxModel(
         id = IDV7.random(),
         instanceMessage = InstanceMessage.random(),
-        outboxScheduledFor = null,
+        outboxScheduledFor = Clock.System.now(),
         errorReason = "test-error-reason",
         errorClass = "test-error-class",
         errorMessage = "test-error-message",

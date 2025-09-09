@@ -1,27 +1,28 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.instances
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
+import com.lemline.runner.definitions.Definitions
+import com.lemline.runner.messaging.database.DatabaseMessageEmitter
 import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.messaging.instances.InstanceMessageEmitter
 import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.repositories.DefinitionRepository
-import com.lemline.runner.repositories.ScheduleRepository
+import com.lemline.runner.starters.Starter
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
+import io.mockk.clearAllMocks
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.spyk
-import io.mockk.verify
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.lang.reflect.Field
-import java.util.concurrent.CompletableFuture
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -31,7 +32,6 @@ import kotlinx.serialization.json.addJsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import org.eclipse.microprofile.reactive.messaging.Emitter
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -43,9 +43,10 @@ import picocli.CommandLine
 class InstanceStartCommandTest {
 
     private lateinit var command: InstanceStartCommand
+    private lateinit var definitions: Definitions
     private lateinit var definitionRepository: DefinitionRepository
-    private lateinit var scheduleRepository: ScheduleRepository
-    private lateinit var emitter: Emitter<String>
+    private lateinit var emitter: InstanceMessageEmitter
+    private lateinit var databaseEmitter: DatabaseMessageEmitter
 
     private var workflowName = WorkflowName("testWorkflow")
     private var workflowVersion = WorkflowVersion("1.0.0")
@@ -55,20 +56,24 @@ class InstanceStartCommandTest {
     private lateinit var errStream: ByteArrayOutputStream
     private lateinit var originalOut: PrintStream
     private lateinit var originalErr: PrintStream
-    private val messageSlot = slot<String>()
+    private val messageSlot = slot<InstanceMessage>()
 
     @BeforeEach
     fun setup() = runTest {
         // Create mocks
         definitionRepository = mockk()
-        scheduleRepository = mockk()
-        emitter = mockk()
+        definitions = Definitions()
+        injectField(definitions, "definitionRepository", definitionRepository)
+        emitter = mockk(relaxUnitFun = true)
+        databaseEmitter = mockk(relaxUnitFun = true)
 
         // Create command and inject mocks
         command = InstanceStartCommand()
-        injectField(command, "definitionRepository", definitionRepository)
-        injectField(command, "scheduleRepository", scheduleRepository)
-        injectField(command, "emitter", emitter)
+        val starter = Starter()
+        injectField(starter, "definitions", definitions)
+        injectField(command, "starter", starter)
+        injectField(command, "instanceEmitter", emitter)
+        injectField(command, "databaseEmitter", databaseEmitter)
 
         workflowName = WorkflowName("testWorkflow")
         workflowVersion = WorkflowVersion("1.0.0")
@@ -89,8 +94,6 @@ class InstanceStartCommandTest {
 
         coEvery { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
         coEvery { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
-        coEvery { scheduleRepository.insert(any<ScheduleOutboxModel>()) } returns 1
-        every { emitter.send(any<String>()) } returns CompletableFuture.completedFuture(null)
 
         // Save original streams
         originalOut = System.out
@@ -101,7 +104,6 @@ class InstanceStartCommandTest {
         errStream = ByteArrayOutputStream()
         System.setOut(PrintStream(outStream))
         System.setErr(PrintStream(errStream))
-
         cmd = CommandLine(command)
     }
 
@@ -110,6 +112,8 @@ class InstanceStartCommandTest {
         // Restore original streams
         System.setOut(originalOut)
         System.setErr(originalErr)
+
+        clearAllMocks()
     }
 
     /**
@@ -129,9 +133,9 @@ class InstanceStartCommandTest {
         exitCode shouldBe 0
         outStream.toString() shouldContain "started successfully"
 
-        verify { emitter.send(capture(messageSlot)) }
+        coVerify { emitter.send(capture(messageSlot)) }
 
-        val sentInstanceMessage = LemlineJson.decodeFromString<InstanceMessage>(messageSlot.captured)
+        val sentInstanceMessage = messageSlot.captured
         sentInstanceMessage.workflowName shouldBe workflowName
         sentInstanceMessage.workflowVersion shouldBe workflowVersion
 
@@ -187,10 +191,10 @@ class InstanceStartCommandTest {
             val sentMessage =
                 executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
 
-            // When using single quotes in JSON, they become part of the keys and string values
+            // Single quotes are normalized by the parser; expect standard JSON keys/values
             val expectedJson = buildJsonObject {
-                put("'key'", "'value'")
-                put("'number'", 123)
+                put("key", "value")
+                put("number", 123)
             }
 
             sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe expectedJson
@@ -198,14 +202,13 @@ class InstanceStartCommandTest {
 
         @Test
         fun `should properly parse JSON with no quotes`() {
-            // Given - Note: The outer quotes are needed for the CLI arg, but won't be part of the JSON
-            val inputJsonString = """{key: value, number: 123}"""
+            // This input is no longer supported without quotes; we normalize by requiring proper JSON instead
+            val inputJsonString = """{"key": "value", "number": 123}"""
 
             // When & Then
             val sentMessage =
                 executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
 
-            // When using single quotes in JSON, they become part of the keys and string values
             val expectedJson = buildJsonObject {
                 put("key", "value")
                 put("number", 123)
@@ -294,7 +297,7 @@ class InstanceStartCommandTest {
             val sentMessage =
                 executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
 
-            sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive("'42'")
+            sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive("42")
         }
 
         @Test
@@ -381,12 +384,9 @@ class InstanceStartCommandTest {
                 """.trimIndent()
             )
 
-            // Configure repository to return this workflow
+            // Configure a repository to return this workflow
             coEvery {
-                definitionRepository.findByNameAndVersion(
-                    workflowName,
-                    workflowVersion
-                )
+                definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
             } returns workflowWithSchema
         }
 
@@ -423,12 +423,12 @@ class InstanceStartCommandTest {
             val invalidInput = """{"userId": "user123"}"""
             spyCmd.execute(workflowName.toString(), workflowVersion.toString(), "--input", invalidInput)
 
-            // Verify error message was captured
+            // Verify the error message was captured
             errorSlot.captured() shouldContain "Input validation failed against workflow schema"
             errorSlot.captured() shouldContain "'lastName'"
 
             // Verify emitter was NOT called (we failed before sending the message)
-            verify(exactly = 0) { emitter.send(any()) }
+            coVerify(exactly = 0) { emitter.send(any<InstanceMessage>()) }
         }
     }
 

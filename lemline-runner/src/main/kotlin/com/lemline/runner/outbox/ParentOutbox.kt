@@ -45,7 +45,7 @@ internal class ParentOutbox : AbstractOutbox<ParentOutboxModel>() {
             ?: lemlineConfig.outbox().enabled().getOrNull()
             ?: lemlineConfig.messaging().workflows().getOrNull()?.consumer()?.enabled() ?: false
     }
-    
+
     /**
      * Messages in this table are not sent by an outbox process
      *  but during the processing of [com.lemline.runner.messaging.database.CompletedMessage]

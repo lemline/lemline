@@ -22,7 +22,7 @@ sealed interface InstanceModel : WithId, WithInstanceInfo, JsonSerializable {
      * The ID of the parent's model, if any.
      */
     val parentId: IDV7?
-    
+
     override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
     override val workflowId get() = workflowState?.workflowId

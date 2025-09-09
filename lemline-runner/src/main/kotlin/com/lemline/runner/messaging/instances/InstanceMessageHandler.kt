@@ -15,6 +15,7 @@ import com.lemline.runner.failures.FailureReasons.WORKFLOW_INIT_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.MessageHandler
+import com.lemline.runner.messaging.database.DATABASE_OUT_CHANNEL
 import com.lemline.runner.messaging.database.DatabaseMessageEmitter
 import com.lemline.runner.messaging.database.IngestionMessage
 import com.lemline.runner.messaging.toLogString
@@ -43,7 +44,7 @@ import org.jetbrains.annotations.TestOnly
 @ApplicationScoped
 internal class InstanceMessageHandler(
     private val instanceEmitter: InstanceMessageEmitter,
-    private val ingestionEmitter: DatabaseMessageEmitter,
+    private val databaseEmitter: DatabaseMessageEmitter,
     private val definitionRepository: DefinitionRepository,
     private val stepByStepRunner: StepByStepRunner,
     override val metrics: InstanceMessageSubscriberMetrics,
@@ -176,13 +177,16 @@ internal class InstanceMessageHandler(
     }
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) {
-        val failure = FailureModel.from(
-            id = IDV7.random(),
-            payload = payload,
-            error = cause,
-            reason = DESERIALIZATION_FAILURE
+        val failure = IngestionMessage(
+            FailureModel.from(
+                id = IDV7.random(),
+                payload = payload,
+                error = cause,
+                reason = DESERIALIZATION_FAILURE
+            )
         )
-        ingestionEmitter.send(IngestionMessage(failure))
+        databaseEmitter.send(failure)
+        logger.debug { "Message sent to $DATABASE_OUT_CHANNEL channel: $failure" }
     }
 
     private suspend fun InstanceMessage.emitToRetry(cause: Exception, reason: String): Nothing {
@@ -200,7 +204,7 @@ internal class InstanceMessageHandler(
             error = error,
             reason = reason,
         )
-        ingestionEmitter.send(IngestionMessage(failure))
+        databaseEmitter.send(IngestionMessage(failure))
     }
 
     private suspend fun InstanceMessage.saveForRetry(cause: Exception, reason: String) {
@@ -211,6 +215,6 @@ internal class InstanceMessageHandler(
             error = cause,
             reason = reason,
         )
-        ingestionEmitter.send(IngestionMessage(retry))
+        databaseEmitter.send(IngestionMessage(retry))
     }
 }

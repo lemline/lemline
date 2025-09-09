@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.runner.messaging.bases.WorkflowConsumerTest
+import com.lemline.runner.messaging.base.WorkflowConsumerTest
+import com.lemline.runner.messaging.database.DATABASE_IN_CHANNEL
+import com.lemline.runner.messaging.database.DATABASE_OUT_CHANNEL
 import com.lemline.runner.messaging.instances.WORKFLOWS_IN_CHANNEL
 import com.lemline.runner.messaging.instances.WORKFLOWS_OUT_CHANNEL
 import com.lemline.runner.tests.profiles.InMemoryProfile
@@ -31,8 +33,11 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
     @Any
     private lateinit var connector: InMemoryConnector
 
-    private lateinit var source: InMemorySource<String>
-    private lateinit var sink: InMemorySink<String>
+    private lateinit var instanceSource: InMemorySource<String>
+    private lateinit var instanceSink: InMemorySink<String>
+
+    private lateinit var databaseSource: InMemorySource<String>
+    private lateinit var databaseSink: InMemorySink<String>
 
     /**
      * Sets up the in-memory messaging infrastructure.
@@ -42,15 +47,20 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      * 2. Initializes the channels for fresh testing
      */
     override fun setupMessaging() {
-        source = connector.source(WORKFLOWS_IN_CHANNEL)
-        sink = connector.sink(WORKFLOWS_OUT_CHANNEL)
+        instanceSource = connector.source(WORKFLOWS_IN_CHANNEL)
+        instanceSink = connector.sink(WORKFLOWS_OUT_CHANNEL)
+
+
+        databaseSource = connector.source(DATABASE_IN_CHANNEL)
+        databaseSink = connector.sink(DATABASE_OUT_CHANNEL)
     }
 
     /**
      * Cleans up the in-memory messaging infrastructure.
      */
     override fun cleanupMessaging() {
-        // No cleanup needed for in-memory channels
+        if (::instanceSink.isInitialized) instanceSink.clear()
+        if (::databaseSink.isInitialized) databaseSink.clear()
     }
 
     /**
@@ -58,21 +68,35 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      *
      * @param message The message to send
      */
-    override fun sendMessage(message: String) {
-        source.send(message)
+    override fun sendInstanceMessage(message: String) {
+        instanceSource.send(message)
     }
 
     /**
-     * Receives a message from the workflow consumer.
+     * Receives a message from the instance consumer.
      *
      * @param timeout The maximum time to wait for a message
      * @param unit The time unit of the timeout
      * @return The received message, or null if no message was received within the timeout
      */
-    override fun receiveMessage(timeout: Long, unit: TimeUnit): String? {
+    override fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? {
         // Wait for the message to be processed
-        Thread.sleep(5)
+        Thread.sleep(10)
         // Get the first message from the sink
-        return sink.received().firstOrNull()?.payload
+        return instanceSink.received().firstOrNull()?.payload
+    }
+
+    /**
+     * Receives a message from the database consumer.
+     *
+     * @param timeout The maximum time to wait for a message
+     * @param unit The time unit of the timeout
+     * @return The received message, or null if no message was received within the timeout
+     */
+    override fun receiveDatabaseMessage(timeout: Long, unit: TimeUnit): String? {
+        // Wait for the message to be processed
+        Thread.sleep(10)
+        // Get the first message from the sink
+        return databaseSink.received().firstOrNull()?.payload
     }
 }

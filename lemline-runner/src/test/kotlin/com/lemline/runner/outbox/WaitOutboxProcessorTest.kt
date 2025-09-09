@@ -14,6 +14,7 @@ import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
 import kotlin.reflect.KClass
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -42,6 +43,6 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
     override fun createTestModel(payload: String) = WaitOutboxModel(
         id = IDV7.random(),
         instanceMessage = InstanceMessage.random(),
-        outboxScheduledFor = null,
+        outboxScheduledFor = Clock.System.now(),
     )
 }

@@ -6,8 +6,9 @@ import com.lemline.runner.config.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_D
 import com.lemline.runner.config.LemlineConfigConstants.DB_MIGRATE_AT_START_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.INGESTION_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
@@ -36,9 +37,9 @@ const val WORKFLOWS_PRODUCER_ENABLED = "lemline.messaging.workflows.producer.ena
 const val WORKFLOWS_CONSUMER_ENABLED = "lemline.messaging.workflows.consumer.enabled"
 const val WORKFLOWS_CONSUMER_CONCURRENCY = "lemline.messaging.workflows.consumer.concurrency"
 
-const val INGESTION_PRODUCER_ENABLED = "lemline.messaging.ingestion.producer.enabled"
-const val INGESTION_CONSUMER_ENABLED = "lemline.messaging.ingestion.consumer.enabled"
-const val INGESTION_CONSUMER_CONCURRENCY = "lemline.messaging.ingestion.consumer.concurrency"
+const val DATABASE_PRODUCER_ENABLED = "lemline.messaging.database.producer.enabled"
+const val DATABASE_CONSUMER_ENABLED = "lemline.messaging.database.consumer.enabled"
+const val INGESTION_CONSUMER_CONCURRENCY = "lemline.messaging.database.consumer.concurrency"
 
 /**
  * Type-safe configuration mapping for Lemline.
@@ -161,10 +162,10 @@ interface LemlineConfiguration {
         @Pattern(regexp = "in-memory|kafka|rabbitmq")
         fun type(): String
 
-        fun workflows(): Optional<WorkflowsConfig>
+        fun workflows(): Optional<ChannelConfig>
 
 
-        fun ingestion(): Optional<IngestionConfig>
+        fun database(): Optional<ChannelConfig>
 
         /**
          * Optional Kafka configuration
@@ -177,12 +178,7 @@ interface LemlineConfiguration {
         fun rabbitmq(): Optional<RabbitMQConfig>
     }
 
-    interface WorkflowsConfig {
-        fun producer(): ProducerConfig
-        fun consumer(): ConsumerConfig
-    }
-
-    interface IngestionConfig {
+    interface ChannelConfig {
         fun producer(): ProducerConfig
         fun consumer(): ConsumerConfig
     }
@@ -214,28 +210,44 @@ interface LemlineConfiguration {
         fun saslPassword(): Optional<String>
 
         fun workflows(): KafkaWorkflowsConfig
-        fun ingestion(): KafkaIngestionConfig
+        fun database(): KafkaIngestionConfig
     }
 
     interface KafkaWorkflowsConfig {
         @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
         fun topic(): String
-        fun consumer(): KafkaConsumerConfig
+        fun consumer(): KafkaConsumerWorkflowsConfig
         fun producer(): KafkaProducerConfig
     }
 
     interface KafkaIngestionConfig {
         @WithDefault(INGESTION_TOPIC_DEFAULT)
         fun topic(): String
-        fun consumer(): KafkaConsumerConfig
+        fun consumer(): KafkaConsumerDatabaseConfig
         fun producer(): KafkaProducerConfig
     }
 
-    interface KafkaConsumerConfig {
+    interface KafkaConsumerWorkflowsConfig {
         @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
         fun concurrency(): Int
 
-        @WithDefault(KAFKA_GROUP_ID_DEFAULT)
+        @WithDefault(KAFKA_WORKFLOWS_GROUP_ID_DEFAULT)
+        fun groupId(): String
+
+        @Pattern(regexp = "latest|earliest")
+        @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
+        fun offsetReset(): String
+
+        fun topicDlq(): Optional<String>
+
+        fun topicOut(): Optional<String>
+    }
+
+    interface KafkaConsumerDatabaseConfig {
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Int
+
+        @WithDefault(KAFKA_DATABASE_GROUP_ID_DEFAULT)
         fun groupId(): String
 
         @Pattern(regexp = "latest|earliest")
@@ -265,10 +277,12 @@ interface LemlineConfiguration {
         fun virtualHost(): Optional<String>
 
         fun workflows(): RabbitWorkflowsConfig
-        fun ingestion(): RabbitIngestionConfig
+        fun database(): RabbitIngestionConfig
     }
 
     interface RabbitWorkflowsConfig {
+        @WithDefault(RABBITMQ_VHOST_DEFAULT)
+        fun virtualHost(): Optional<String>
 
         @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
         fun queue(): String

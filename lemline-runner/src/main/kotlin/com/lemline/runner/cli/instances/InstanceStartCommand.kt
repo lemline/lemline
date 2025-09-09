@@ -36,7 +36,7 @@ class InstanceStartCommand : Runnable {
     lateinit var mixin: GlobalMixin
 
     @Inject
-    lateinit var stater: Starter
+    lateinit var starter: Starter
 
     @Inject
     private lateinit var instanceEmitter: InstanceMessageEmitter
@@ -82,7 +82,7 @@ class InstanceStartCommand : Runnable {
         // - schedule after or every -> an instanceMessage and a scheduleOutboxModel
         // - schedule cron -> a single scheduleOutboxModel
         // For the two last cases, we sent an IngestionMessage (first database ingestion, then only after starting the instance)
-        val (instanceMessage, scheduleOutboxModel) = stater.getStartingMessages(
+        val (instanceMessage, scheduleOutboxModel) = starter.getStartingMessages(
             workflowId = workflowId,
             workflowName = workflowName,
             optionalVersion = version?.let { WorkflowVersion(it) },
@@ -112,7 +112,9 @@ class InstanceStartCommand : Runnable {
     // Parse the input string as JSON
     private fun getInput(input: String?): JsonElement = input?.let {
         try {
-            LemlineJson.json.parseToJsonElement(it)
+            // Use Jackson first to support single quotes, unquoted field names, and comments, then normalize to JSON
+            val normalized = LemlineJson.jacksonMapper.readTree(it).toString()
+            LemlineJson.json.parseToJsonElement(normalized)
         } catch (e: Exception) {
             cliError { "Invalid JSON input: ${e.message}" }
         }

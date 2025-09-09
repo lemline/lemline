@@ -9,8 +9,8 @@ import com.lemline.runner.cli.CustomParameterHandler
 import com.lemline.runner.cli.MainCommand
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
-import com.lemline.runner.config.INGESTION_CONSUMER_ENABLED
-import com.lemline.runner.config.INGESTION_PRODUCER_ENABLED
+import com.lemline.runner.config.DATABASE_CONSUMER_ENABLED
+import com.lemline.runner.config.DATABASE_PRODUCER_ENABLED
 import com.lemline.runner.config.WORKFLOWS_CONSUMER_ENABLED
 import com.lemline.runner.config.WORKFLOWS_PRODUCER_ENABLED
 import io.quarkus.picocli.runtime.annotations.TopCommand
@@ -100,9 +100,9 @@ class LemlineApplication : QuarkusApplication {
 
                 if (helpOrVersion) {
                     disableMetricsEndpoint()
-                    System.setProperty(INGESTION_CONSUMER_ENABLED, "false")
+                    System.setProperty(DATABASE_CONSUMER_ENABLED, "false")
                     System.setProperty(WORKFLOWS_CONSUMER_ENABLED, "false")
-                    System.setProperty(INGESTION_PRODUCER_ENABLED, "false")
+                    System.setProperty(DATABASE_PRODUCER_ENABLED, "false")
                     System.setProperty(WORKFLOWS_PRODUCER_ENABLED, "false")
                 } else {
                     // The listen command, if any
@@ -110,15 +110,15 @@ class LemlineApplication : QuarkusApplication {
 
                     if (listen == null) {
                         disableMetricsEndpoint()
-                        System.setProperty(INGESTION_CONSUMER_ENABLED, "false")
+                        System.setProperty(DATABASE_CONSUMER_ENABLED, "false")
                         System.setProperty(WORKFLOWS_CONSUMER_ENABLED, "false")
-                        System.setProperty(INGESTION_PRODUCER_ENABLED, "false")
+                        System.setProperty(DATABASE_PRODUCER_ENABLED, "false")
                         System.setProperty(WORKFLOWS_PRODUCER_ENABLED, "false")
                     } else {
                         listen.port?.let { setMetricsEndpointPort(it) }
-                        System.setProperty(INGESTION_CONSUMER_ENABLED, "true")
+                        System.setProperty(DATABASE_CONSUMER_ENABLED, "true")
                         System.setProperty(WORKFLOWS_CONSUMER_ENABLED, "true")
-                        System.setProperty(INGESTION_PRODUCER_ENABLED, "true")
+                        System.setProperty(DATABASE_PRODUCER_ENABLED, "true")
                         System.setProperty(WORKFLOWS_PRODUCER_ENABLED, "true")
                     }
 
@@ -126,7 +126,7 @@ class LemlineApplication : QuarkusApplication {
                     val start = parseResults.command<InstanceStartCommand>()
                     if (start != null) {
                         System.setProperty(WORKFLOWS_PRODUCER_ENABLED, "true")
-                        System.setProperty(INGESTION_PRODUCER_ENABLED, "true")
+                        System.setProperty(DATABASE_PRODUCER_ENABLED, "true")
                     }
                 }
             } catch (ex: Exception) {

@@ -55,10 +55,11 @@ object LemlineConfigConstants {
 
     // Kafka
     const val KAFKA_BROKERS_DEFAULT = "localhost:9092"
-    const val KAFKA_GROUP_ID_DEFAULT = "lemline"
     const val KAFKA_OFFSET_RESET_DEFAULT = "earliest"
     const val KAFKA_STRING_SERIALIZER = "org.apache.kafka.common.serialization.StringSerializer"
     const val KAFKA_STRING_DESERIALIZER = "org.apache.kafka.common.serialization.StringDeserializer"
+    const val KAFKA_WORKFLOWS_GROUP_ID_DEFAULT = "lemline-group"
+    const val KAFKA_DATABASE_GROUP_ID_DEFAULT = "lemline-group"
 
     // RabbitMQ
     const val RABBITMQ_HOST_DEFAULT = "localhost"

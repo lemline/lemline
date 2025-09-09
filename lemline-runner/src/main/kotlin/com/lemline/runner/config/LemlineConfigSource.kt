@@ -14,10 +14,11 @@ import com.lemline.runner.config.LemlineConfigConstants.INGESTION_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_DESERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
@@ -41,8 +42,8 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZ
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.WORKFLOWS_TOPIC_DEFAULT
-import com.lemline.runner.messaging.database.INGESTION_IN_CHANNEL
-import com.lemline.runner.messaging.database.INGESTION_OUT_CHANNEL
+import com.lemline.runner.messaging.database.DATABASE_IN_CHANNEL
+import com.lemline.runner.messaging.database.DATABASE_OUT_CHANNEL
 import com.lemline.runner.messaging.instances.WORKFLOWS_IN_CHANNEL
 import com.lemline.runner.messaging.instances.WORKFLOWS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
@@ -55,7 +56,8 @@ enum class TopicType(
     val outgoingChannel: String,
     val consumerEnabled: String,
     val producerEnabled: String,
-    val consumerConcurrency: String
+    val consumerConcurrency: String,
+    val consumerGroupDefault: String,
 ) {
     WORKFLOWS(
         "workflows",
@@ -64,16 +66,18 @@ enum class TopicType(
         WORKFLOWS_OUT_CHANNEL,
         WORKFLOWS_CONSUMER_ENABLED,
         WORKFLOWS_PRODUCER_ENABLED,
-        WORKFLOWS_CONSUMER_CONCURRENCY
+        WORKFLOWS_CONSUMER_CONCURRENCY,
+        KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
     ),
-    INGESTION(
+    DATABASE(
         "ingestion",
         INGESTION_TOPIC_DEFAULT,
-        INGESTION_IN_CHANNEL,
-        INGESTION_OUT_CHANNEL,
-        INGESTION_CONSUMER_ENABLED,
-        INGESTION_PRODUCER_ENABLED,
-        INGESTION_CONSUMER_CONCURRENCY
+        DATABASE_IN_CHANNEL,
+        DATABASE_OUT_CHANNEL,
+        DATABASE_CONSUMER_ENABLED,
+        DATABASE_PRODUCER_ENABLED,
+        INGESTION_CONSUMER_CONCURRENCY,
+        KAFKA_DATABASE_GROUP_ID_DEFAULT
     );
 }
 
@@ -221,7 +225,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             }
 
             configureKafkaTopic(props, TopicType.WORKFLOWS)
-            configureKafkaTopic(props, TopicType.INGESTION)
+            configureKafkaTopic(props, TopicType.DATABASE)
         }
 
         private fun MutableMap<String, String>.configureKafkaTopic(
@@ -237,7 +241,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                 val topicDLQ = props["$consumer.topic-dlq"] ?: "$topic.dlq"
                 set("$incoming.connector", KAFKA_CONNECTOR)
                 set("$incoming.topic", topic)
-                set("$incoming.group.id", props["$consumer.group-id"] ?: KAFKA_GROUP_ID_DEFAULT)
+                set("$incoming.group.id", props["$consumer.group-id"] ?: topicType.consumerGroupDefault)
                 set("$incoming.auto.offset.reset", props["$consumer.offset-reset"] ?: KAFKA_OFFSET_RESET_DEFAULT)
                 set("$incoming.value.deserializer", KAFKA_STRING_DESERIALIZER)
                 set("$incoming.failure-strategy", "dead-letter-queue")
@@ -268,7 +272,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             props["$rabbit.ssl-enabled"]?.let { set("rabbitmq-ssl", it) }
 
             configureRabbitQueue(props, TopicType.WORKFLOWS)
-            configureRabbitQueue(props, TopicType.INGESTION)
+            configureRabbitQueue(props, TopicType.DATABASE)
         }
 
         private fun MutableMap<String, String>.configureRabbitQueue(
@@ -313,8 +317,8 @@ class LemlineConfigSource : PropertiesConfigSource(
             set("mp.messaging.incoming.$WORKFLOWS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
             set("mp.messaging.outgoing.$WORKFLOWS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
 
-            set("mp.messaging.incoming.$INGESTION_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
-            set("mp.messaging.outgoing.$INGESTION_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+            set("mp.messaging.incoming.$DATABASE_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+            set("mp.messaging.outgoing.$DATABASE_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
         }
 
         private fun generateMetricsProperties(props: Map<String, String>): Map<String, String> {

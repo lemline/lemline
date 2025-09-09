@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
+import com.lemline.runner.config.DATABASE_CONSUMER_ENABLED
+import com.lemline.runner.config.DATABASE_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_TYPE
-import com.lemline.runner.config.INGESTION_CONSUMER_ENABLED
-import com.lemline.runner.config.INGESTION_PRODUCER_ENABLED
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
 import com.lemline.runner.config.MESSAGING_TYPE
@@ -37,8 +37,15 @@ class KafkaProfile : QuarkusTestProfile {
             MESSAGING_TYPE to MSG_TYPE_KAFKA,
             WORKFLOWS_CONSUMER_ENABLED to "true",
             WORKFLOWS_PRODUCER_ENABLED to "true",
-            INGESTION_CONSUMER_ENABLED to "true",
-            INGESTION_PRODUCER_ENABLED to "true"
+            DATABASE_CONSUMER_ENABLED to "true",
+            DATABASE_PRODUCER_ENABLED to "true",
+
+            "mp.messaging.incoming.workflows-in.topic" to "lemline-workflows-in",
+            "mp.messaging.outgoing.workflows-out.topic" to "lemline-workflows-out",
+            "mp.messaging.incoming.ingestion-in.topic" to "lemline-ingestion-in",
+            "mp.messaging.outgoing.ingestion-out.topic" to "lemline-ingestion-out",
+
+            "smallrye.messaging.kafka.topic.creation.enable" to "true"
         )
     }
 

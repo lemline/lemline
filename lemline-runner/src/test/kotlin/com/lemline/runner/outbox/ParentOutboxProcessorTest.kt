@@ -14,6 +14,7 @@ import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
 import kotlin.reflect.KClass
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -24,7 +25,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @TestProfile(InMemoryProfile::class)
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class RunWorkflowOutboxProcessorTest : OutboxProcessorTest<ParentOutboxModel>() {
+internal class ParentOutboxProcessorTest : OutboxProcessorTest<ParentOutboxModel>() {
 
     @Inject // Inject the specific repository
     lateinit var parentRepository: ParentRepository
@@ -42,6 +43,6 @@ internal class RunWorkflowOutboxProcessorTest : OutboxProcessorTest<ParentOutbox
     override fun createTestModel(payload: String) = ParentOutboxModel(
         id = IDV7.random(),
         instanceMessage = InstanceMessage.random(),
-        outboxScheduledFor = null
+        outboxScheduledFor = Clock.System.now()
     )
 }
