@@ -293,7 +293,7 @@ class Processor(
         // If the loop completes, the workflow has finished successfully.
         status = WorkflowStatus.COMPLETED
         onWorkflowCompleted()
-        logger.info { "Workflow status: $status, current position: $position" }
+        logger.debug { "Workflow status: $status, output: ${getOutput()}" }
 
         // Return the final transformed output of the root node.
         return rootInstance.transformedOutput

@@ -139,8 +139,7 @@ internal class InstanceMessageHandler(
      * Executes a workflow instance constructed from the provided message, state, and secrets.
      *
      * This method attempts to run the workflow instance step by step using the `stepByStepRunner`.
-     * If execution fails, it logs the failure,  and stores the message
-     * in the retry table for manual inspection.
+     * If execution fails, it logs the failure and stores the message in the retry table for manual inspection.
      */
     private suspend fun InstanceMessage.run(processor: Processor): InstanceMessage? {
         return try {

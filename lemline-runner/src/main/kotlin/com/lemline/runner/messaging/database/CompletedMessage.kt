@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.database
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
@@ -27,10 +26,7 @@ data class CompletedMessage(
     val output: JsonElement?,
     val isScheduledAfter: Boolean
 ) : DatabaseMessage {
-
     init {
         require((parentId == null) == (output == null)) { "Output must be defined if parentId is not null" }
     }
-
-    override fun toJsonString(): String = LemlineJson.encodeToString(this)
 }

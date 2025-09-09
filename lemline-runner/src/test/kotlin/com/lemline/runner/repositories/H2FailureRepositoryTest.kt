@@ -5,6 +5,8 @@ import com.lemline.runner.repositories.bases.FailureRepositoryTest
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
+import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.TestInstance
 
 /**
@@ -13,5 +15,6 @@ import org.junit.jupiter.api.TestInstance
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
-@kotlin.time.ExperimentalTime
+@ExperimentalTime
+@ExperimentalSerializationApi
 internal class H2FailureRepositoryTest : FailureRepositoryTest()

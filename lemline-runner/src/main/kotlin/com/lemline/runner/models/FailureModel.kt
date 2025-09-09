@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
@@ -43,8 +42,6 @@ data class FailureModel(
     override val workflowState get() = instanceMessage?.workflowState
 
     override val parentId get() = instanceMessage?.parentId
-
-    override fun toJsonString() = LemlineJson.encodeToString(this)
 
     companion object {
         fun from(

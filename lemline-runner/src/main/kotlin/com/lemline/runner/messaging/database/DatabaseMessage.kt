@@ -11,6 +11,9 @@ import kotlinx.serialization.json.JsonClassDiscriminator
 @Serializable
 @JsonClassDiscriminator("t") // <- type discriminator for polymorphic serialization
 sealed interface DatabaseMessage : WithInstanceInfo, JsonSerializable {
+
+    override fun toJsonString(): String = LemlineJson.encodeToString(this)
+
     companion object {
         fun fromJsonString(json: String): DatabaseMessage = LemlineJson.decodeFromString(json)
     }

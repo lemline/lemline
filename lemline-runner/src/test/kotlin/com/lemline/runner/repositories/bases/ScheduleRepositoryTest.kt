@@ -8,11 +8,13 @@ import com.lemline.runner.repositories.ScheduleRepository
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Abstract base class for wait repository tests.
  */
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal abstract class ScheduleRepositoryTest : OutboxRepositoryTest<ScheduleOutboxModel>() {
 
     @Inject

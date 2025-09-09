@@ -12,6 +12,7 @@ import io.kotest.matchers.shouldNotBe
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test
  * extend this class and provide the proper Quarkus test profile.
  */
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal abstract class FailureRepositoryTest {
 
     @Inject

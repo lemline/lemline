@@ -15,6 +15,7 @@ import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
 import kotlin.reflect.KClass
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Runs the OutboxProcessorTest suite for RetryModel
@@ -22,6 +23,7 @@ import kotlin.time.ExperimentalTime
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal class RunWorkflowOutboxProcessorTest : OutboxProcessorTest<ParentOutboxModel>() {
 
     @Inject // Inject the specific repository

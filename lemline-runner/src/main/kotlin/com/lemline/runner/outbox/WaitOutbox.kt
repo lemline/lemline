@@ -11,6 +11,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * `WaitOutbox` specializes `AbstractOutbox` to implement the outbox pattern for wait tasks in workflows.
@@ -21,6 +22,7 @@ import kotlin.time.ExperimentalTime
 @Startup
 @ApplicationScoped
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
 
     @Inject

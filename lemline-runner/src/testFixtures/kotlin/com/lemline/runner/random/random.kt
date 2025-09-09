@@ -14,6 +14,7 @@ import com.lemline.core.nodes.NodeState
 import com.lemline.core.random.random
 import com.lemline.core.workflows.NodeStates
 import com.lemline.core.workflows.WorkflowState
+import com.lemline.runner.messaging.database.CompletedMessage
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
@@ -26,6 +27,7 @@ import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonElement
 
 fun OutBoxStatus.Companion.random() = Random.nextInt(OutBoxStatus.entries.size).let {
     OutBoxStatus.entries[it]
@@ -107,3 +109,15 @@ fun WaitOutboxModel.Companion.random() = WaitOutboxModel(
 ).also { it.randomize() }
 
 
+fun CompletedMessage.Companion.random(): CompletedMessage {
+    val parentId = IDV7.nullableRandom()
+
+    return CompletedMessage(
+        workflowId = WorkflowId.random(),
+        workflowName = WorkflowName.random(),
+        workflowVersion = WorkflowVersion.random(),
+        parentId = parentId,
+        output = if (parentId == null) null else JsonElement.random(),
+        isScheduledAfter = Random.nextBoolean(),
+    )
+}

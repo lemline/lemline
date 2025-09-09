@@ -52,7 +52,7 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     protected abstract val outboxRepository: OutboxRepository<T>
     protected abstract val instanceEmitter: InstanceMessageEmitter
 
-    protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig
+    protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig?
     protected abstract val cleanupConf: LemlineConfiguration.OutboxCleanupConfig
 
     private val gracePeriod = 5000L
@@ -86,14 +86,15 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
         }
 
         // Schedule outbox processing
-        val outboxPeriodSeconds = outboxConf.every.inWholeSeconds
-        outboxProcessingExecutor.scheduleAtFixedRate(
-            { scope.launch { outbox() } },
-            0,
-            outboxPeriodSeconds,
-            TimeUnit.SECONDS
-        )
-        logger.info { "⏱️ Outbox processing scheduled every ${outboxPeriodSeconds}s" }
+        outboxConf?.every?.inWholeSeconds?.let { period ->
+            outboxProcessingExecutor.scheduleAtFixedRate(
+                { scope.launch { outbox() } },
+                0,
+                period,
+                TimeUnit.SECONDS
+            )
+            logger.info { "⏱️ Outbox processing scheduled every ${period}s" }
+        }
 
         // Schedule cleanup
         val cleanupPeriodSeconds = cleanupConf.every.inWholeSeconds
@@ -166,9 +167,9 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
         try {
             outboxRelay.process(
-                batchSize = outboxConf.batchSize,
-                maxAttempts = outboxConf.maxAttempts,
-                initialDelay = outboxConf.initialDelay,
+                batchSize = outboxConf!!.batchSize,
+                maxAttempts = outboxConf!!.maxAttempts,
+                initialDelay = outboxConf!!.initialDelay,
             )
         } catch (e: Exception) {
             logger.error(e) { "💥 Error during outbox processing" }

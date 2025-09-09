@@ -3,6 +3,7 @@
 package com.lemline.runner.models
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.IDV7
 import com.lemline.runner.messaging.JsonSerializable
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.random.random
@@ -11,11 +12,14 @@ import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonElement
 import org.junit.jupiter.api.Assertions
 
 internal fun nullable(value: JsonSerializable?): String = value?.toJsonString() ?: "null"
 internal fun nullable(value: String?): String = value?.let { "\"$value\"" } ?: "null"
 internal fun nullable(value: Instant?): String = value?.let { "\"$value\"" } ?: "null"
+internal fun nullable(value: IDV7?): String = value?.let { "\"$value\"" } ?: "null"
+internal fun nullable(value: JsonElement?): String = value?.toString() ?: "null"
 
 @ExperimentalSerializationApi
 class RetryOutBoxModelTest {

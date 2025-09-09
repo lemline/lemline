@@ -4,6 +4,7 @@
 
 package com.lemline.common.random
 
+import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import kotlin.random.Random
@@ -36,3 +37,9 @@ fun Int.Companion.nullableRandom() = when (Random.nextBoolean()) {
 fun WorkflowName.Companion.random() = WorkflowName(String.random())
 
 fun WorkflowVersion.Companion.random() = WorkflowVersion(String.random())
+
+fun IDV7.Companion.nullableRandom() = when (Random.nextBoolean()) {
+    true -> random()
+    false -> null
+}
+

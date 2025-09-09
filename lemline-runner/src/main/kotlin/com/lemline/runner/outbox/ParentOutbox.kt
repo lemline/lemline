@@ -45,10 +45,13 @@ internal class ParentOutbox : AbstractOutbox<ParentOutboxModel>() {
             ?: lemlineConfig.outbox().enabled().getOrNull()
             ?: lemlineConfig.messaging().workflows().getOrNull()?.consumer()?.enabled() ?: false
     }
-
-    // Outbox processing configuration
-    override val outboxConf by lazy { lemlineConfig.outbox().runWorkflow().outbox() }
+    
+    /**
+     * Messages in this table are not sent by an outbox process
+     *  but during the processing of [com.lemline.runner.messaging.database.CompletedMessage]
+     */
+    override val outboxConf = null
 
     // Cleanup configuration
-    override val cleanupConf by lazy { lemlineConfig.outbox().runWorkflow().cleanup() }
+    override val cleanupConf by lazy { lemlineConfig.outbox().parent().cleanup() }
 }

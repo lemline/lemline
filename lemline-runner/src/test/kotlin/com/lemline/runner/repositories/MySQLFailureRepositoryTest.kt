@@ -6,6 +6,8 @@ import com.lemline.runner.repositories.bases.FailureRepositoryTest
 import com.lemline.runner.tests.profiles.MySQLProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
+import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.TestInstance
 
 /**
@@ -15,5 +17,6 @@ import org.junit.jupiter.api.TestInstance
 @TestProfile(MySQLProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @EnabledOnlyIfDockerAvailable
-@kotlin.time.ExperimentalTime
+@ExperimentalTime
+@ExperimentalSerializationApi
 internal class MySQLFailureRepositoryTest : FailureRepositoryTest()

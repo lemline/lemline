@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.core.errors.WorkflowException
 import com.lemline.runner.messaging.instances.InstanceMessage
@@ -78,8 +77,6 @@ data class RetryOutboxModel(
 
     @Transient
     override var outboxErrorStackTrace: String? = null
-
-    override fun toJsonString() = LemlineJson.encodeToString(this)
 
     companion object {
         fun from(

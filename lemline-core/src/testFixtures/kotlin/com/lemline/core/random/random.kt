@@ -14,8 +14,41 @@ import com.lemline.core.workflows.WorkflowState
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+
+fun JsonElement.Companion.random(): JsonElement {
+    return when (Random.nextInt(6)) {
+        0 -> JsonNull
+        1 -> JsonPrimitive(Random.nextBoolean())
+        2 -> JsonPrimitive(Random.nextInt())
+        3 -> JsonPrimitive(Random.nextDouble())
+        4 -> JsonPrimitive(String.random())
+        else -> when (Random.nextBoolean()) {
+            true -> buildJsonArray {
+                repeat(Random.nextInt(1, 4)) {
+                    add(JsonElement.random())
+                }
+            }
+
+            false -> buildJsonObject {
+                repeat(Random.nextInt(1, 4)) {
+                    put(String.random(), JsonElement.random())
+                }
+            }
+        }
+    }
+}
+
+fun JsonElement.Companion.nullableRandom() = when (Random.nextBoolean()) {
+    true -> random()
+    false -> null
+}
+
 
 fun NodePosition.Companion.random() = NodePosition(listOf(String.random(), String.random(), String.random()))
 

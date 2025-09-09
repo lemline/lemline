@@ -77,7 +77,7 @@ internal class StepByStepRunner @Inject constructor(
 
         val nextMessage = try {
             processor.run()
-            updateFrom(processor).onWorkflowCompleted(processor.getOutput(), processor.isScheduledAfter)
+            onWorkflowCompleted(processor.getOutput(), processor.isScheduledAfter)
             null
         } catch (_: TaskCompletedException) {
             logger.debug { "Task completed (${processor.position})" }
@@ -113,7 +113,7 @@ internal class StepByStepRunner @Inject constructor(
     ): InstanceMessage? {
         // insert the parent workflow without delayedUntil
         // TODO make id idempotent
-        val parent = ParentOutboxModel(
+        val parentOutboxModel = ParentOutboxModel(
             id = IDV7.random(),
             instanceMessage = this,
             outboxScheduledFor = null,
@@ -124,14 +124,14 @@ internal class StepByStepRunner @Inject constructor(
             workflowName = WorkflowName(runWorkflow.workflow.name),
             optionalVersion = WorkflowVersion(runWorkflow.workflow.version),
             workflowInput = runWorkflow.getInputFor(runInstance),
-            parentId = null,
+            parentId = parentOutboxModel.id,
             zoneId = null
         ) { fn -> error(fn()) }
 
         // As we already have a ParentOutboxModel, we always send an IngestionMessage
         // The instance will be started only after the parent (and possible schedule) ingestion
         val ingestionMessage = IngestionMessage(
-            instanceModels = listOfNotNull(parent, scheduleOutboxModel),
+            instanceModels = listOfNotNull(parentOutboxModel, scheduleOutboxModel),
             instanceMessages = listOfNotNull(instanceMessage)
         )
 

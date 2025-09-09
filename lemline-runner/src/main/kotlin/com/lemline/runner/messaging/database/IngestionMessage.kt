@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.database
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.InstanceModel
 import kotlin.time.ExperimentalTime
@@ -35,6 +34,4 @@ data class IngestionMessage(
     override val workflowId = instanceModels.first().workflowId
     override val workflowName = instanceModels.first().workflowName
     override val workflowVersion = instanceModels.first().workflowVersion
-
-    override fun toJsonString(): String = LemlineJson.encodeToString(this)
 }

@@ -76,16 +76,14 @@ internal class DatabaseMessageHandler(
     @Throws(CompensationException::class)
     override suspend fun DatabaseMessage.handle(): DatabaseMessage? {
         retry(
-            label = "${this::class.simpleName} handling",
+            label = "${this::class.simpleName}",
             maxAttempts = maxAttempts,
             totalBudgetMs = totalBudgetMs,
             singleAttemptTimeoutMs = singleAttemptTimeoutMs
         ) {
-            failureRepository.withTransaction {
-                when (this) {
-                    is IngestionMessage -> this.handle()
-                    is CompletedMessage -> this.handle()
-                }
+            when (this) {
+                is IngestionMessage -> this.handle()
+                is CompletedMessage -> this.handle()
             }
         }
         return null
@@ -98,10 +96,13 @@ internal class DatabaseMessageHandler(
             parentRepository.findById(parentId)?.let { parent ->
                 // updates the parent with the output at the current position
                 parent.completeWith(output!!)
+                // restarting the parent workflow
+                instanceEmitter.send(parent.instanceMessage)
+                // set parent status as SENT (allowing table cleaning by the outbox)
                 parentRepository.update(parent)
                 logger.debug { "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId ($workflowName), set up to restart at position ${parent.workflowState.currentPosition} with output $output" }
             }
-                ?: error { "CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted." }
+                ?: error("CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted.")
         }
 
         // Case of workflow completion with scheduled after
@@ -112,24 +113,26 @@ internal class DatabaseMessageHandler(
                 scheduleRepository.update(schedule)
                 logger.debug { "Scheduled workflow ${schedule.workflowName} for ${schedule.outboxScheduledFor}" }
             }
-                ?: error { "CRITICAL - Unable to find workflow $workflowId ($workflowName) in $SCHEDULE_TABLE table. The workflow will not be restarted." }
+                ?: error("CRITICAL - Unable to find workflow $workflowId ($workflowName) in $SCHEDULE_TABLE table. The workflow will not be restarted.")
         }
     }
 
     private suspend fun IngestionMessage.handle() {
-        // First save to database
-        instanceModels.forEach { model ->
-            when (model) {
-                is ParentOutboxModel -> parentRepository.insert(model)
-                is RetryOutboxModel -> retryRepository.insert(model)
-                is ScheduleOutboxModel -> scheduleRepository.insert(model)
-                is WaitOutboxModel -> waitRepository.insert(model)
-                is FailureModel -> failureRepository.insert(model)
+        failureRepository.withTransaction { conn ->
+            // First save to the database
+            instanceModels.forEach { model ->
+                when (model) {
+                    is ParentOutboxModel -> parentRepository.insert(model, conn)
+                    is RetryOutboxModel -> retryRepository.insert(model, conn)
+                    is ScheduleOutboxModel -> scheduleRepository.insert(model, conn)
+                    is WaitOutboxModel -> waitRepository.insert(model, conn)
+                    is FailureModel -> failureRepository.insert(model, conn)
+                }
             }
-        }
-        // Then send to brokers
-        instanceMessages.forEach { broker ->
-            instanceEmitter.send(broker)
+            // Then send instanceMessages to brokers
+            instanceMessages.forEach { broker ->
+                instanceEmitter.send(broker)
+            }
         }
     }
 

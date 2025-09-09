@@ -6,7 +6,6 @@ import com.cronutils.model.CronType
 import com.cronutils.model.definition.CronDefinitionBuilder
 import com.cronutils.model.time.ExecutionTime
 import com.cronutils.parser.CronParser
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
@@ -117,8 +116,6 @@ data class ScheduleOutboxModel(
         outboxDelayedUntil = Clock.System.now() + after!!
         outboxScheduledFor = outboxDelayedUntil
     }
-
-    override fun toJsonString() = LemlineJson.encodeToString(this)
 
     companion object {
         private val cronParser by lazy { CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX)) }

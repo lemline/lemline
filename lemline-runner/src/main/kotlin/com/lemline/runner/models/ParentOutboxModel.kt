@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
@@ -54,13 +53,10 @@ data class ParentOutboxModel(
     fun completeWith(output: JsonElement) {
         // Update the workflow state with the output
         instanceMessage.workflowState.setCurrentTaskOutput(output)
-        // Set to restart the parent workflow via the ParentOutbox
-        val now = Clock.System.now()
-        outboxScheduledFor = now
-        outboxDelayedUntil = now
+        // Update the status and scheduled time as we are restarting this workflow
+        outBoxStatus = OutBoxStatus.SENT
+        outboxScheduledFor = Clock.System.now()
     }
-
-    override fun toJsonString() = LemlineJson.encodeToString(this)
 
     // Needed by tests
     companion object

@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.instances
+package com.lemline.runner.messaging.instances
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.random.random
 import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.Assertions

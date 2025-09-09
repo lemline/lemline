@@ -299,49 +299,26 @@ interface LemlineConfiguration {
 
     interface OutboxConfig {
         fun enabled(): Optional<Boolean>
-        fun wait(): WaitOutboxConfig
-        fun retry(): RetryOutboxConfig
-        fun runWorkflow(): RunWorkflowOutboxConfig
-        fun schedule(): ScheduleOutboxConfig
+        fun wait(): ProcessOutboxConfig
+        fun retry(): ProcessOutboxConfig
+        fun schedule(): ProcessOutboxConfig
+        fun parent(): CleanupOutboxConfig
     }
 
     /**
-     * Wait service configuration.
-     * Controls the behavior of the wait message processing.
+     * Process and cleanup configuration.
      */
-    interface WaitOutboxConfig {
+    interface ProcessOutboxConfig {
         fun enabled(): Optional<Boolean>
         fun outbox(): OutboxProcessingConfig
         fun cleanup(): OutboxCleanupConfig
     }
 
     /**
-     * Retry service configuration.
-     * Controls the behavior of the retry message processing.
+     * Only cleanup configuration.
      */
-    interface RetryOutboxConfig {
+    interface CleanupOutboxConfig {
         fun enabled(): Optional<Boolean>
-        fun outbox(): OutboxProcessingConfig
-        fun cleanup(): OutboxCleanupConfig
-    }
-
-    /**
-     * Run Workflow service configuration.
-     * Controls the behavior of the run workflow message processing.
-     */
-    interface RunWorkflowOutboxConfig {
-        fun enabled(): Optional<Boolean>
-        fun outbox(): OutboxProcessingConfig
-        fun cleanup(): OutboxCleanupConfig
-    }
-
-    /**
-     * Schedule service configuration.
-     * Controls the behavior of the schedule message processing.
-     */
-    interface ScheduleOutboxConfig {
-        fun enabled(): Optional<Boolean>
-        fun outbox(): OutboxProcessingConfig
         fun cleanup(): OutboxCleanupConfig
     }
 

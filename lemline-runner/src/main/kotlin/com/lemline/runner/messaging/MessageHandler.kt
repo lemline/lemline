@@ -53,7 +53,6 @@ internal interface MessageHandler<T : WithInstanceInfo> {
                 try {
                     message.deserialize().also {
                         // deserialisation succeeded
-                        logger.debug { "Deserialized ${message.toLogString()}: $it" }
                         workflowId = it.workflowId
                         workflowName = it.workflowName
                         workflowVersion = it.workflowVersion
@@ -68,6 +67,8 @@ internal interface MessageHandler<T : WithInstanceInfo> {
 
         // --- Processing ---
         message.tryWithCompensation(workflowId, workflowName, workflowVersion) {
+            // We log here to get context
+            logger.debug { "Deserialized ${message.toLogString()}: $msg" }
             // Process et get next message
             next = metrics.recordProcessingDuration(workflowName, workflowVersion) {
                 try {
@@ -181,7 +182,7 @@ internal interface MessageHandler<T : WithInstanceInfo> {
         workflowVersion: WorkflowVersion?
     ) = try {
         nackWithRetry(e)
-        logger.info(e) { "Message NACKed: ${toLogString()} - should be sent to the DLQ by brokers" }
+        logger.info { "Message NACKed: ${toLogString()} - should be sent to the DLQ by brokers" }
         metrics.nackCompleted(workflowName, workflowVersion)
     } catch (e: Exception) {
         logger.error(e) { "Failed to NACK message: ${toLogString()}" }
@@ -258,6 +259,7 @@ internal interface MessageHandler<T : WithInstanceInfo> {
                     onFatalFailure?.invoke(e, attempt, elapsedMs)
                     throw e
                 }
+                logger.debug(e) { "$label failed at $attempt attempt (${elapsedMs}ms) - retrying" }
                 sleepBackoff(attempt)
             }
         }

@@ -25,6 +25,7 @@ import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -42,6 +43,7 @@ import org.junit.jupiter.api.Test
  * @param T The type of OutboxModel being tested
  */
 @ExperimentalTime
+@ExperimentalSerializationApi
 internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
     /** The repository implementation being tested */
