@@ -232,7 +232,7 @@ class LemlineApplication : QuarkusApplication {
     }
 }
 
-private fun CommandLine.setup() = this
+internal fun CommandLine.setup() = this
     .setUsageHelpAutoWidth(true)
     .setCaseInsensitiveEnumValuesAllowed(true)
     .setUnmatchedArgumentsAllowed(false)

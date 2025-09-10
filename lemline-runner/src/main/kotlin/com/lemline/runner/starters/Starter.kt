@@ -40,11 +40,11 @@ class Starter {
         workflowInput: JsonElement,
         parentId: IDV7?,
         zoneId: ZoneId?,
-        onError: (() -> String) -> Nothing,
+        onError: (String) -> Nothing,
     ): Pair<InstanceMessage?, ScheduleOutboxModel?> {
         // Retrieve the workflow definition from the repository
         val workflow = definitions.get(workflowName, optionalVersion)
-            ?: onError { "Workflow $workflowName (version=${optionalVersion ?: "latest"}) not found." }
+            ?: onError("Workflow $workflowName (version=${optionalVersion ?: "latest"}) not found.")
 
         val workflowVersion = WorkflowVersion(workflow.document.version)
 
@@ -83,13 +83,13 @@ class Starter {
     private fun validateInput(
         workflowInput: JsonElement,
         workflow: io.serverlessworkflow.api.types.Workflow,
-        onError: (() -> String) -> Nothing,
+        onError: (String) -> Nothing,
     ) {
         workflow.input?.schema?.let { schema ->
             try {
                 SchemaValidator.validate(workflowInput, schema)
             } catch (e: Exception) {
-                onError { "Input validation failed against workflow schema: ${e.message}." }
+                onError("Input validation failed against workflow schema: ${e.message}.")
             }
         }
     }

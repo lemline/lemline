@@ -6,7 +6,7 @@ import picocli.CommandLine
 
 class CustomExceptionHandler : CommandLine.IExecutionExceptionHandler {
     override fun handleExecutionException(
-        ex: java.lang.Exception,
+        ex: Exception,
         cmd: CommandLine,
         parseResult: CommandLine.ParseResult?
     ): Int {

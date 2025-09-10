@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
+import com.lemline.runner.cli.exceptions.CliException
 import com.lemline.runner.messaging.database.DatabaseMessageEmitter
 import com.lemline.runner.messaging.database.IngestionMessage
 import com.lemline.runner.messaging.instances.InstanceMessageEmitter
@@ -13,7 +14,6 @@ import com.lemline.runner.starters.Starter
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import java.time.ZoneId
-import kotlin.system.exitProcess
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -71,7 +71,7 @@ class InstanceStartCommand : Runnable {
     var zone: String? = null
 
     override fun run(): Unit = runBlocking {
-        if (name.isNullOrBlank()) cliError { "Workflow name must be provided" }
+        if (name.isNullOrBlank()) cliError("Workflow name must be provided")
         val workflowName = WorkflowName(name!!)
         val workflowInput = getInput(input)
 
@@ -89,8 +89,7 @@ class InstanceStartCommand : Runnable {
             workflowInput = workflowInput,
             parentId = null,
             zoneId = getZoneId(),
-            ::cliError
-        )
+        ) { cliError(it) }
 
         val workflowVersion = instanceMessage?.workflowVersion ?: scheduleOutboxModel?.workflowVersion
 
@@ -104,9 +103,7 @@ class InstanceStartCommand : Runnable {
             )
         }
 
-        cliPrint {
-            "Instance $workflowId started successfully (name: $workflowName, version: $workflowVersion, input: $workflowInput)"
-        }
+        cliPrint("Instance $workflowId started successfully (name: $workflowName, version: $workflowVersion, input: $workflowInput)")
     }
 
     // Parse the input string as JSON
@@ -116,7 +113,7 @@ class InstanceStartCommand : Runnable {
             val normalized = LemlineJson.jacksonMapper.readTree(it).toString()
             LemlineJson.json.parseToJsonElement(normalized)
         } catch (e: Exception) {
-            cliError { "Invalid JSON input: ${e.message}" }
+            cliError("Invalid JSON input: ${e.message}")
         }
     } ?: LemlineJson.jsonObject
 
@@ -124,16 +121,13 @@ class InstanceStartCommand : Runnable {
         try {
             ZoneId.of(it)
         } catch (_: Exception) {
-            cliError { "Invalid timezone ID: '$it'" }
+            cliError("Invalid timezone ID: '$it'")
         }
     }
 
-    internal fun cliPrint(msg: () -> String) {
-        println(msg())
+    internal fun cliPrint(msg: String) {
+        println(msg)
     }
 
-    internal fun cliError(msg: () -> String): Nothing {
-        System.err.println(msg())
-        exitProcess(1)
-    }
+    internal fun cliError(msg: String): Nothing = throw CliException(msg)
 }

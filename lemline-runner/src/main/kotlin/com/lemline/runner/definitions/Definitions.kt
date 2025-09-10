@@ -21,8 +21,20 @@ class Definitions() {
     @Inject
     private lateinit var definitionRepository: DefinitionRepository
 
-    suspend fun get(workflowName: WorkflowName): Workflow? {
-        // by name only, get the last version from repository
+    suspend fun get(workflowName: WorkflowName, workflowVersion: WorkflowVersion? = null): Workflow? {
+
+        if (workflowVersion == null) return get(workflowName)
+
+        return DefinitionCache.getOrNull(workflowName, workflowVersion)
+            ?: definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
+                ?.parseAndPut()
+    }
+
+    // parse the workflow definition and put it to the cache
+    private fun DefinitionModel.parseAndPut(): Workflow = DefinitionCache.parseAndPut(definition)
+
+    private suspend fun get(workflowName: WorkflowName): Workflow? {
+        // by name only, get the last version from the repository
         val workflows = definitionRepository.listByName(workflowName)
         if (workflows.isEmpty()) return null
 
@@ -36,19 +48,4 @@ class Definitions() {
             }.getOrDefault(v1.compareTo(v2))
         }.parseAndPut()
     }
-
-    /**
-     *
-     */
-    suspend fun get(workflowName: WorkflowName, workflowVersion: WorkflowVersion? = null): Workflow? {
-
-        if (workflowVersion == null) return get(workflowName)
-
-        return DefinitionCache.getOrNull(workflowName, workflowVersion)
-            ?: definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
-                ?.parseAndPut()
-    }
-
-    // parse the workflow definition and put it to the cache
-    private fun DefinitionModel.parseAndPut(): Workflow = DefinitionCache.parseAndPut(definition)
 }

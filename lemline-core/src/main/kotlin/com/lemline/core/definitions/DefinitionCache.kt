@@ -13,6 +13,7 @@ import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader
 import io.serverlessworkflow.api.types.Workflow
 import java.util.concurrent.ConcurrentHashMap
+import org.jetbrains.annotations.TestOnly
 
 object DefinitionCache {
 
@@ -95,5 +96,11 @@ object DefinitionCache {
             name = "workflow",
             parent = null,
         )
+    }
+
+    @TestOnly
+    fun clear() {
+        workflowCache.clear()
+        rootNodesCache.clear()
     }
 }

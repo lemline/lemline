@@ -126,7 +126,7 @@ internal class StepByStepRunner @Inject constructor(
             workflowInput = runWorkflow.getInputFor(runInstance),
             parentId = parentOutboxModel.id,
             zoneId = null
-        ) { fn -> error(fn()) }
+        ) { error(it) }
 
         // As we already have a ParentOutboxModel, we always send an IngestionMessage
         // The instance will be started only after the parent (and possible schedule) ingestion
