@@ -12,7 +12,22 @@ plugins {
 }
 
 group = "com.lemline"
-version = "0.2.0-SNAPSHOT"
+val baseVersion = "0.2.0"
+
+// Determine the version dynamically: use Git tag if present (CI), otherwise nightly suffix for main branch builds
+val envRef = System.getenv("GITHUB_REF") ?: ""
+val envRefName = System.getenv("GITHUB_REF_NAME") ?: ""
+val runId = System.getenv("GITHUB_RUN_ID") ?: ""
+val isTagBuild = envRef.startsWith("refs/tags/") || envRefName.matches(Regex("^v?\\d+\\.\\d+\\.\\d+.*$"))
+version = if (isTagBuild) {
+    // Use the tag name without leading 'v' if present
+    (envRefName.ifBlank { envRef.removePrefix("refs/tags/") }).removePrefix("v")
+} else if (!runId.isBlank()) {
+    // Default for main/nightly or any non-tagged build
+    "$baseVersion-nightly-$runId"
+} else {
+    "$baseVersion-snapshot"
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // 2) Exclude unwanted HTTP clients
