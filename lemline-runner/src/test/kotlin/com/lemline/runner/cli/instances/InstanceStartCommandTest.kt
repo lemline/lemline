@@ -349,17 +349,12 @@ class InstanceStartCommandTest {
         rawInput shouldBe JsonObject(emptyMap())
     }
 
-    @Nested
-    inner class SchemaValidationTests {
-        private lateinit var workflowWithSchema: DefinitionModel
-
-        @BeforeEach
-        fun setupSchemaTest() = runTest {
-            // Create a workflow with schema validation
-            workflowWithSchema = DefinitionModel(
-                name = workflowName,
-                version = workflowVersion,
-                definition = """
+    fun setupSchemaTest() {
+        // Create a workflow with schema validation
+        val workflowWithSchema = DefinitionModel(
+            name = workflowName,
+            version = workflowVersion,
+            definition = """
                     document:
                       dsl: 1.0.0
                       namespace: test
@@ -382,64 +377,66 @@ class InstanceStartCommandTest {
                       - wait30Seconds:
                           wait: PT30S
                 """.trimIndent()
-            )
+        )
 
-            // Configure a repository to return this workflow
-            coEvery {
-                definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
-            } returns workflowWithSchema
-        }
+        // Configure a repository to return this workflow
+        coEvery {
+            definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
+        } returns workflowWithSchema
+    }
 
-        @Test
-        fun `should validate input against schema when schema exists`() {
-            // Execute command with valid input matching the schema
-            val validInput = """{"userId": "user123", "lastName": "john", "lastName": "doe"}"""
-            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--input", validInput)
+    @Test
+    fun `should validate input against schema when schema exists`() {
+        setupSchemaTest()
+        // Execute command with valid input matching the schema
+        val validInput = """{"userId": "user123", "lastName": "john", "lastName": "doe"}"""
+        val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--input", validInput)
 
-            // Verify command was successful
-            exitCode shouldBe 0
-        }
+        // Verify command was successful
+        exitCode shouldBe 0
+    }
 
-        @Test
-        fun `should validate input against schema when schema exists (only required)`() {
-            // Execute command with valid input matching the schema
-            val validInput = """{"userId": "user123", "lastName": "doe"}"""
-            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--input", validInput)
+    @Test
+    fun `should validate input against schema when schema exists (only required)`() {
+        setupSchemaTest()
+        // Execute command with valid input matching the schema
+        val validInput = """{"userId": "user123", "lastName": "doe"}"""
+        val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--input", validInput)
 
-            // Verify command was successful
-            exitCode shouldBe 0
-        }
+        // Verify command was successful
+        exitCode shouldBe 0
+    }
 
-        @Test
-        fun `should fail when input validation fails`() {
-            // Create an error slot to capture error messages
-            val errorSlot = slot<() -> String>()
+    @Test
+    fun `should fail when input validation fails`() {
+        setupSchemaTest()
+        // Create an error slot to capture error messages
+        val errorSlot = slot<() -> String>()
 
-            // Create a spy of the command that intercepts calls to error()
-            val spyCommand = spyk(command) {
-                every { cliError(capture(errorSlot)) } answers {
-                    throw RuntimeException("Error: ${errorSlot.captured}")
-                }
+        // Create a spy of the command that intercepts calls to error()
+        val spyCommand = spyk(command) {
+            every { cliError(capture(errorSlot)) } answers {
+                throw RuntimeException("Error: ${errorSlot.captured}")
             }
-
-            // Create a new CommandLine with the spy
-            val spyCmd = CommandLine(spyCommand)
-
-            // Reset streams
-            outStream.reset()
-            errStream.reset()
-
-            // Execute command with invalid input (missing required lastName field)
-            val invalidInput = """{"userId": "user123"}"""
-            spyCmd.execute(workflowName.toString(), workflowVersion.toString(), "--input", invalidInput)
-
-            // Verify the error message was captured
-            errorSlot.captured() shouldContain "Input validation failed against workflow schema"
-            errorSlot.captured() shouldContain "'lastName'"
-
-            // Verify emitter was NOT called (we failed before sending the message)
-            coVerify(exactly = 0) { emitter.send(any<InstanceMessage>()) }
         }
+
+        // Create a new CommandLine with the spy
+        val spyCmd = CommandLine(spyCommand)
+
+        // Reset streams
+        outStream.reset()
+        errStream.reset()
+
+        // Execute command with invalid input (missing required lastName field)
+        val invalidInput = """{"userId": "user123"}"""
+        spyCmd.execute(workflowName.toString(), workflowVersion.toString(), "--input", invalidInput)
+
+        // Verify the error message was captured
+        errorSlot.captured() shouldContain "Input validation failed against workflow schema"
+        errorSlot.captured() shouldContain "'lastName'"
+
+        // Verify emitter was NOT called (we failed before sending the message)
+        coVerify(exactly = 0) { emitter.send(any<InstanceMessage>()) }
     }
 
     // Helper method to inject dependencies using reflection

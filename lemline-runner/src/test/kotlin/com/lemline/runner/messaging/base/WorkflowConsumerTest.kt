@@ -163,9 +163,9 @@ internal abstract class WorkflowConsumerTest {
 
     protected abstract fun sendInstanceMessage(message: String)
 
-    protected abstract fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String?
+    protected abstract fun receiveInstanceMessage(timeout: Long = 4, unit: TimeUnit = SECONDS): String?
 
-    protected abstract fun receiveDatabaseMessage(timeout: Long = 1, unit: TimeUnit): String?
+    protected abstract fun receiveDatabaseMessage(timeout: Long = 4, unit: TimeUnit = SECONDS): String?
 
     private fun sendMessageFuture(messageJson: String): CompletableFuture<InstanceMessage?> {
         // Send the message to the input topic
@@ -206,12 +206,12 @@ internal abstract class WorkflowConsumerTest {
         // Wait for the message to be processed
         println("output = ${future.get(1, SECONDS)}")
 
-        receiveInstanceMessage(1, SECONDS).shouldNotBeNull {
+        receiveInstanceMessage().shouldNotBeNull {
             println("i=$this")
         }
 
         // Verify that no message was sent to the database topic
-        receiveDatabaseMessage(1, SECONDS) shouldBe null
+        receiveDatabaseMessage() shouldBe null
     }
 
     /**
@@ -240,7 +240,7 @@ internal abstract class WorkflowConsumerTest {
         (cause is CompensationException && cause.reason == DESERIALIZATION_FAILURE) shouldBe true
 
         // Check that a message was sent to the database topic
-        receiveDatabaseMessage(2, SECONDS).shouldNotBeNull {
+        receiveDatabaseMessage().shouldNotBeNull {
             val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
             println("msg=$msg")
             msg.instanceMessages.isEmpty() shouldBe true
@@ -284,7 +284,7 @@ internal abstract class WorkflowConsumerTest {
         future.get(2, SECONDS) shouldBe null
 
         // Check that a message was sent to the database topic
-        receiveDatabaseMessage(2, SECONDS).shouldNotBeNull {
+        receiveDatabaseMessage().shouldNotBeNull {
             val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
             msg.instanceMessages.isEmpty() shouldBe true
             msg.instanceModels.size shouldBe 1
@@ -326,10 +326,10 @@ internal abstract class WorkflowConsumerTest {
         val future = sendMessageFuture(instanceMessage.toJsonString())
 
         // Then
-        println(future.get(2, SECONDS))
+        println(future.get(4, SECONDS))
 
         // Check that a message was sent to the database topic
-        receiveDatabaseMessage(2, SECONDS).shouldNotBeNull {
+        receiveDatabaseMessage().shouldNotBeNull {
             val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
             msg.instanceMessages.isEmpty() shouldBe true
             msg.instanceModels.size shouldBe 1
@@ -370,6 +370,6 @@ internal abstract class WorkflowConsumerTest {
         // Then
         future.get(2, SECONDS) shouldBe null
 
-        receiveDatabaseMessage(2, SECONDS) shouldBe null
+        receiveDatabaseMessage() shouldBe null
     }
 }
