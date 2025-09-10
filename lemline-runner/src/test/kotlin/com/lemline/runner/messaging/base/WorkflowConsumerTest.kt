@@ -163,9 +163,9 @@ internal abstract class WorkflowConsumerTest {
 
     protected abstract fun sendInstanceMessage(message: String)
 
-    protected abstract fun receiveInstanceMessage(timeout: Long = 4, unit: TimeUnit = SECONDS): String?
+    protected abstract fun receiveInstanceMessage(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
 
-    protected abstract fun receiveDatabaseMessage(timeout: Long = 4, unit: TimeUnit = SECONDS): String?
+    protected abstract fun receiveDatabaseMessage(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
 
     private fun sendMessageFuture(messageJson: String): CompletableFuture<InstanceMessage?> {
         // Send the message to the input topic
@@ -236,7 +236,7 @@ internal abstract class WorkflowConsumerTest {
         val future = sendMessageFuture(invalidMessage)
 
         // Then
-        val cause = shouldThrow<ExecutionException> { future.get(2, SECONDS) }.cause
+        val cause = shouldThrow<ExecutionException> { future.get(1, SECONDS) }.cause
         (cause is CompensationException && cause.reason == DESERIALIZATION_FAILURE) shouldBe true
 
         // Check that a message was sent to the database topic
@@ -281,7 +281,7 @@ internal abstract class WorkflowConsumerTest {
         val future = sendMessageFuture(instanceMessage.toJsonString())
 
         // Then
-        future.get(2, SECONDS) shouldBe null
+        future.get(1, SECONDS) shouldBe null
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
@@ -326,7 +326,7 @@ internal abstract class WorkflowConsumerTest {
         val future = sendMessageFuture(instanceMessage.toJsonString())
 
         // Then
-        println(future.get(4, SECONDS))
+        println(future.get(2, SECONDS))
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
@@ -368,7 +368,7 @@ internal abstract class WorkflowConsumerTest {
         val future = sendMessageFuture(instanceMessage.toJsonString())
 
         // Then
-        future.get(2, SECONDS) shouldBe null
+        future.get(1, SECONDS) shouldBe null
 
         receiveDatabaseMessage() shouldBe null
     }

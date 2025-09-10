@@ -21,7 +21,7 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
             .withNetworkAliases("kafka")
             .withKraft()
             .withCreateContainerCmdModifier { cmd -> cmd.withHostName("kafka") }
-            .waitingFor(Wait.forListeningPort())
+            .waitingFor(Wait.forLogMessage(".*\\[KafkaRaftServer nodeId=.*\\] Kafka Server started.*", 1))
 
         // Start Kafka
         kafka.start()
@@ -29,9 +29,7 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
         val servers = kafka.bootstrapServers ?: error("Failed to start Kafka container")
 
         // Return only the bootstrap servers configuration
-        val properties = mapOf(
-            "kafka.bootstrap.servers" to servers,
-        )
+        val properties = mapOf("kafka.bootstrap.servers" to servers)
 
         // Set as system properties so that [LemlineConfigSource] can see them.
         properties.forEach { (k, v) -> System.setProperty(k, v) }
