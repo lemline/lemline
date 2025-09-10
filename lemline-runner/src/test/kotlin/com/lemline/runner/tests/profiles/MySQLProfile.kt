@@ -27,9 +27,8 @@ class MySQLProfile : QuarkusTestProfile {
         return mapOf(
             // Database configuration
             DATABASE_TYPE to DB_TYPE_MYSQL,
-
             // Messaging configuration
-            MESSAGING_TYPE to MSG_TYPE_IN_MEMORY
+            MESSAGING_TYPE to MSG_TYPE_IN_MEMORY,
         )
     }
 

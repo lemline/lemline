@@ -393,6 +393,16 @@ class InstanceStartCommandTest {
         @Test
         fun `should validate input against schema when schema exists`() {
             // Execute command with valid input matching the schema
+            val validInput = """{"userId": "user123", "lastName": "john", "lastName": "doe"}"""
+            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--input", validInput)
+
+            // Verify command was successful
+            exitCode shouldBe 0
+        }
+
+        @Test
+        fun `should validate input against schema when schema exists (only required)`() {
+            // Execute command with valid input matching the schema
             val validInput = """{"userId": "user123", "lastName": "doe"}"""
             val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--input", validInput)
 
