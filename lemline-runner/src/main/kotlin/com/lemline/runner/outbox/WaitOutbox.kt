@@ -2,59 +2,51 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.WORKFLOW_OUT
-import com.lemline.runner.models.WaitModel
+import com.lemline.runner.messaging.instances.InstanceMessageEmitter
+import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.WaitRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
-import org.eclipse.microprofile.reactive.messaging.Channel
-import org.eclipse.microprofile.reactive.messaging.Emitter
+import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
- * WaitOutbox is responsible for processing and managing wait messages in the system.
- * It extends AbstractOutbox to leverage the common outbox pattern implementation.
+ * `WaitOutbox` specializes `AbstractOutbox` to implement the outbox pattern for wait tasks in workflows.
  *
- * This class specifically handles wait messages with configuration optimized for
- * the wait use case, including
- * - Processing batch size
- * - Maximum retry attempts
- * - Initial delay between retries
- * - Cleanup retention period
- *
- * @see AbstractOutbox for the base implementation
- * @see OutboxProcessor for the core message processing logic
+ * It manages the restart of workflow instances after a wait task.
+ * Integration occurs via the `WorkflowInstance.onWait` method in [com.lemline.runner.StepByStepRunner].
  */
 @Startup
 @ApplicationScoped
-internal class WaitOutbox : AbstractOutbox<WaitModel>() {
+@ExperimentalTime
+@ExperimentalSerializationApi
+internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
 
-    @Channel(WORKFLOW_OUT)
-    override lateinit var emitter: Emitter<String>
+    @Inject
+    override lateinit var instanceEmitter: InstanceMessageEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
 
     @Inject
-    override lateinit var repository: WaitRepository
+    override lateinit var failureRepository: FailureRepository
 
+    @Inject
+    override lateinit var outboxRepository: WaitRepository
+
+    // Is this outbox enabled?
     override val enabled by lazy {
         lemlineConfig.outbox().wait().enabled().getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()
-            ?: lemlineConfig.messaging().consumer().enabled()
+            ?: lemlineConfig.messaging().workflows().getOrNull()?.consumer()?.enabled() ?: false
     }
 
     // Outbox processing configuration
-    private val outboxConf by lazy { lemlineConfig.outbox().wait().outbox() }
-    override val processingBatchSize by lazy { outboxConf.batchSize() }
-    override val processingMaxAttempts by lazy { outboxConf.maxAttempts() }
-    override val processingInitialDelayAttempt by lazy { outboxConf.initialDelay() }
-    override val processingPeriod by lazy { outboxConf.every() }
+    override val outboxConf by lazy { lemlineConfig.outbox().wait().outbox() }
 
     // Cleanup configuration
-    private val cleanupConf by lazy { lemlineConfig.outbox().wait().cleanup() }
-    override val cleanupAfter by lazy { cleanupConf.after() }
-    override val cleanupBatchSize by lazy { cleanupConf.batchSize() }
-    override val cleanupPeriod by lazy { cleanupConf.every() }
+    override val cleanupConf by lazy { lemlineConfig.outbox().wait().cleanup() }
 }

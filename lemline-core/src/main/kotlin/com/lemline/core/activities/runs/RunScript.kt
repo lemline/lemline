@@ -15,10 +15,12 @@ import java.io.File
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Paths
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
+@ExperimentalTime
 internal suspend fun RunInstance.runScript(runScript: RunScript): JsonElement {
-    logInfo { "Executing run script: ${node.name}" }
+    logger.debug { "Executing run script: ${node.name}" }
 
     val scriptUnion = runScript.script
     val script: Script? = scriptUnion.get()
@@ -36,19 +38,19 @@ internal suspend fun RunInstance.runScript(runScript: RunScript): JsonElement {
             val filePath = Paths.get(URI.create(uri))
             if (!Files.exists(filePath)) {
                 val errorMsg = "File not found from $uri"
-                onError(CONFIGURATION, errorMsg)
+                raiseError(CONFIGURATION, errorMsg)
             }
             try {
                 Files.readString(filePath)
             } catch (e: Exception) {
                 val errorMsg = "Failed to read script from $uri: ${e.message}"
-                onError(COMMUNICATION, errorMsg)
+                raiseError(COMMUNICATION, errorMsg)
             }
         }
 
         else -> {
             val errorMsg = "Unsupported script type: ${script?.javaClass?.simpleName}"
-            onError(RUNTIME, errorMsg)
+            raiseError(RUNTIME, errorMsg)
         }
     }
 
@@ -81,13 +83,13 @@ internal suspend fun RunInstance.runScript(runScript: RunScript): JsonElement {
         )
     }
 
-    logDebug { "Script language: $language" }
-    logDebug { "Script content length: ${scriptContent.length} characters" }
-    logDebug { "Arguments: $arguments" }
-    logDebug { "Environment: $environment" }
+    logger.debug { "Script language: $language" }
+    logger.debug { "Script content length: ${scriptContent.length} characters" }
+    logger.debug { "Arguments: $arguments" }
+    logger.debug { "Environment: $environment" }
 
     val returnType = runScript.`return` ?: STDOUT  // Default to stdout return type
-    logDebug { "Return: $returnType" }
+    logger.debug { "Return: $returnType" }
 
     try {
         val scriptRun = Script(
@@ -102,22 +104,22 @@ internal suspend fun RunInstance.runScript(runScript: RunScript): JsonElement {
         if (!await) {
             // Launch process and return immediately (do not wait for completion)
             val process = scriptRun.executeAsync()
-            logDebug { "Launched script asynchronously with PID: ${process.pid()}" }
+            logger.debug { "Launched script asynchronously with PID: ${process.pid()}" }
             // As per DSL, output for await: false is the transformed input
             return transformedInput
         }
 
         val processResult = scriptRun.execute()
 
-        logDebug { "Script execution completed with exit code: ${processResult.code}" }
-        logDebug { "stdout: ${processResult.stdout}" }
-        logDebug { "stderr: ${processResult.stderr}" }
+        logger.debug { "Script execution completed with exit code: ${processResult.code}" }
+        logger.debug { "stdout: ${processResult.stdout}" }
+        logger.debug { "stderr: ${processResult.stderr}" }
 
         // Configure output based on the return type
         return processResult.get(returnType)
     } catch (e: Exception) {
-        logError(e) { "Failed to execute script" }
+        logger.error(e) { "Failed to execute script" }
         val errorMsg = "Script execution failed: ${e.message}"
-        onError(COMMUNICATION, errorMsg)
+        raiseError(COMMUNICATION, errorMsg)
     }
 }

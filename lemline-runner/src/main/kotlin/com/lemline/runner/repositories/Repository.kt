@@ -1,71 +1,82 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
-import com.lemline.runner.models.UuidV7Entity
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
-import java.time.Instant
+import java.sql.Timestamp
+import java.sql.Types
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlin.time.toKotlinInstant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-abstract class Repository<T : UuidV7Entity> {
+abstract class Repository<T> {
 
-    internal abstract val databaseManager: DatabaseManager
+    companion object {
+        const val CREATED_AT_COLUMN = "created_at"
+        const val UPDATED_AT_COLUMN = "updated_at"
+    }
+
+    /**
+     * The database manager instance used to access the database.
+     */
+    protected abstract val databaseManager: DatabaseManager
 
     /**
      * The name of the database table associated with this repository.
-     * This property must be implemented by concrete repositories to specify
-     * the table name used for database operations.
      */
-    internal abstract val tableName: String
+    protected abstract val tableName: String
 
     /**
-     * Returns the column names for the table, comma-separated.
-     * This should include all columns that are part of the upsert operation.
+     * A map associating column names with functions responsible for binding column values
+     * to the respective placeholders in a SQL `PreparedStatement`.
      */
-    protected abstract val columns: List<String>
+    protected abstract val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit>
+
 
     /**
-     * Defines the columns that constitute the primary or unique key for the entity.
-     * Used for UPSERT's ON CONFLICT clause and UPDATE's WHERE clause.
+     * A list of column names that are part of the primary keys of the table.
      */
     protected abstract val keyColumns: List<String>
 
     /**
-     * Populates the `PreparedStatement` with the values from the given entity for an update operation.
-     * This method must be implemented by concrete repositories to map the entity's properties
-     * to the corresponding SQL parameters in the prepared statement.
-     *
-     * @param entity The entity containing the values to set in the statement
-     * @return The `PreparedStatement` with the populated values
+     * A list of all columns in the table
      */
-    protected abstract fun PreparedStatement.bindUpdateWith(entity: T): PreparedStatement
-
+    private val allColumns by lazy { prepareStatementMap.keys + CREATED_AT_COLUMN + UPDATED_AT_COLUMN }
 
     /**
-     * Populates the `PreparedStatement` with the values from the given entity for an insert operation.
-     * This method must be implemented by concrete repositories to map the entity's properties
-     * to the corresponding SQL parameters in the prepared statement.
-     *
-     * @param entity The entity containing the values to set in the statement
-     * @return The `PreparedStatement` with the populated values
+     * A list of columns that are not part of the primary or unique key.
      */
-    protected abstract fun PreparedStatement.bindInsertWith(entity: T): PreparedStatement
+    private val updatableColumns by lazy { allColumns.filter { !keyColumns.contains(it) && it != CREATED_AT_COLUMN } }
 
-    /**
-     * Populates the `PreparedStatement` with the values from the given entity for a delete operation.
-     * This method must be implemented by concrete repositories to map the entity's properties
-     * to the corresponding SQL parameters in the prepared statement.
-     *
-     * @param entity The entity containing the key values.
-     * @return The PreparedStatement with key values bound.
-     */
-    protected abstract fun PreparedStatement.bindDeleteWith(entity: T): PreparedStatement
+
+    private fun bindInsert(stmt: PreparedStatement, entity: T) {
+        allColumns.mapIndexed { index, column ->
+            when (column) {
+                CREATED_AT_COLUMN -> stmt.setTimestamp(index + 1, Timestamp.from(java.time.Instant.now()))
+                UPDATED_AT_COLUMN -> stmt.setNull(index + 1, Types.TIMESTAMP)
+                else -> prepareStatementMap[column]!!(stmt, entity, index + 1)
+            }
+        }
+    }
+
+    private fun bindUpdate(stmt: PreparedStatement, entity: T) {
+        updatableColumns.mapIndexed { index, column ->
+            when (column) {
+                UPDATED_AT_COLUMN -> stmt.setTimestamp(index + 1, Timestamp.from(java.time.Instant.now()))
+                else -> prepareStatementMap[column]!!(stmt, entity, index + 1)
+            }
+        }
+    }
+
+    private fun bindKeys(stmt: PreparedStatement, entity: T, startIndex: Int = 0) {
+        keyColumns.mapIndexed { index, column -> prepareStatementMap[column]!!(stmt, entity, startIndex + index + 1) }
+    }
 
     /**
      * Executes a block of code within a database transaction.
@@ -99,11 +110,6 @@ abstract class Repository<T : UuidV7Entity> {
 
     /**
      * Creates a model instance from a ResultSet.
-     * This method must be implemented by concrete repositories to handle
-     * the specific mapping of database columns to model properties.
-     *
-     * @param rs The ResultSet containing the current row
-     * @return A new model instance populated with data from the ResultSet
      */
     internal abstract fun createModel(rs: ResultSet): T
 
@@ -111,168 +117,17 @@ abstract class Repository<T : UuidV7Entity> {
      * Inserts a new entity.
      */
     suspend fun insert(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
-        val sql = getInsertSql()
-        conn.prepareStatement(sql).use { stmt ->
-            stmt.bindInsertWith(entity)
+        conn.prepareStatement(insertSql).use { stmt ->
+            bindInsert(stmt, entity)
             stmt.executeUpdate()
         }
     }
 
-    /**
-     * Inserts a list of new entities using a batch operation.
-     *
-     * @return The number of rows affected (0 or greater).
-     */
-    suspend fun insert(entities: List<T>, connection: Connection? = null): Int = withConnection(connection) { conn ->
-        if (entities.isEmpty()) return@withConnection 0
-        val sql = getInsertSql()
-        conn.prepareStatement(sql).use { stmt ->
-            for (entity in entities) {
-                stmt.bindInsertWith(entity)
-                stmt.addBatch()
-            }
-            stmt.executeBatch().count { it != 0 }
-        }
-    }
+    private val insertSql by lazy {
+        val colsCsv = allColumns.joinToString { q(it) }  // Comma-separated column names, e.g., "id","message",…
+        val valsCsv = allColumns.joinToString { "?" }    // Comma-separated placeholders, e.g., ?,?,?
 
-    /**
-     * Updates an existing entity.
-     *
-     * @return The number of rows affected (0 or 1).
-     */
-    suspend fun update(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
-        val sql = getUpdateSql()
-        conn.prepareStatement(sql).use { stmt ->
-            stmt.bindUpdateWith(entity)
-            stmt.executeUpdate()
-        }
-    }
-
-    /**
-     * Updates a list of existing entities using a batch operation.
-     *
-     * @return The number of rows affected (0 or greater).
-     */
-    suspend fun update(entities: List<T>, connection: Connection? = null): Int = withConnection(connection) { conn ->
-        if (entities.isEmpty()) return@withConnection 0
-        val sql = getUpdateSql()
-        conn.prepareStatement(sql).use { stmt ->
-            for (entity in entities) {
-                stmt.bindUpdateWith(entity)
-                stmt.addBatch()
-            }
-            stmt.executeBatch().count { it != 0 }
-        }
-    }
-
-    /**
-     * Retrieves an entity by its ID.
-     *
-     * @return The entity with the specified ID, or null if not found.
-     */
-    suspend fun findById(id: String, connection: Connection? = null): T? = withConnection(connection) { conn ->
-        val sql = "SELECT * FROM $tableName WHERE id = ? LIMIT 1"
-        conn.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, id)
-            stmt.executeQuery().use { rs ->
-                if (rs.next()) createModel(rs) else null
-            }
-        }
-    }
-
-    /**
-     * Retrieves all entities from the table.
-     * This method uses a native SQL query to fetch all records.
-     * Use with caution as this operation can be expensive for large tables.
-     *
-     * @return A list of all entities in the table.
-     */
-    suspend fun listAll(connection: Connection? = null): List<T> = withConnection(connection) { conn ->
-        val sql = "SELECT * FROM $tableName"
-        conn.prepareStatement(sql).use { stmt ->
-            stmt.executeQuery().use { rs ->
-                buildList {
-                    while (rs.next()) {
-                        add(createModel(rs))
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Deletes an entity based on its key columns.
-     *
-     * @return The number of rows affected (0 or 1).
-     */
-    suspend fun delete(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
-        val sql = getDeleteSql()
-        conn.prepareStatement(sql).use { stmt ->
-            stmt.bindDeleteWith(entity)
-            stmt.executeUpdate()
-        }
-    }
-
-    /**
-     * Deletes a list of entities based on their key columns.
-     * This method uses batch operations for better performance.
-     * The operation is transactional and will be rolled back if any deletion fails.
-     *
-     * @return The number of rows affected (0 or greater).
-     */
-    suspend fun delete(entities: List<T>, connection: Connection? = null): Int = withConnection(connection) { conn ->
-        if (entities.isEmpty()) return@withConnection 0
-        val sql = getDeleteSql()
-        conn.prepareStatement(sql).use { stmt ->
-            for (entity in entities) {
-                stmt.bindDeleteWith(entity)
-                stmt.addBatch()
-            }
-            stmt.executeBatch().count { it != 0 }
-        }
-    }
-
-    /**
-     * Deletes all workflows from the database.
-     * This method is transactional and uses a native SQL query to delete all workflows.
-     * Use with caution as this operation cannot be undone.
-     *
-     * @return The number of workflows deleted
-     */
-    suspend fun deleteAll(connection: Connection? = null): Int = withConnection(connection) { conn ->
-        val sql = "DELETE FROM $tableName"
-        conn.prepareStatement(sql).use { stmt ->
-            stmt.executeUpdate()
-        }
-    }
-
-    /**
-     * Counts the total number of records in the table.
-     * This method uses a native SQL query to count all records.
-     *
-     * @return The total number of records in the table
-     */
-    suspend fun count(connection: Connection? = null): Long = withConnection(connection) { conn ->
-        val sql = "SELECT COUNT(id) FROM $tableName"
-        conn.prepareStatement(sql).use { stmt ->
-            stmt.executeQuery().use { rs ->
-                if (rs.next()) rs.getLong(1) else 0L
-            }
-        }
-    }
-
-    private fun getUpdateSql(): String {
-        val setClause = columns.filterNot { it in (keyColumns + "id") }.joinToString { "${q(it)} = ?" }
-        val whereClause = keyColumns.joinToString(separator = " AND ") { "${q(it)} = ?" }
-
-        return "UPDATE $tableName SET $setClause WHERE $whereClause"
-    }
-
-    private fun getInsertSql(): String {
-        val colsCsv = columns.joinToString { q(it) }  // Comma-separated column names, e.g., "id","message",…
-        val valsCsv = columns.joinToString { "?" }    // Comma-separated placeholders, e.g., ?,?,?
-
-        return when (databaseManager.dbType) {
+        when (databaseManager.dbType) {
             DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> """
                     INSERT INTO $tableName ($colsCsv)
                     VALUES ($valsCsv)
@@ -288,11 +143,146 @@ abstract class Repository<T : UuidV7Entity> {
         }
     }
 
-    private fun getDeleteSql(): String {
+    /**
+     * Inserts a list of new entities using a batch operation.
+     *
+     * @return The number of rows affected (0 or greater).
+     */
+    suspend fun insert(entities: List<T>, connection: Connection? = null): Int = withConnection(connection) { conn ->
+        if (entities.isEmpty()) return@withConnection 0
+        conn.prepareStatement(insertSql).use { stmt ->
+            for (entity in entities) {
+                bindInsert(stmt, entity)
+                stmt.addBatch()
+            }
+            stmt.executeBatch().count { it != 0 }
+        }
+    }
+
+    /**
+     * Updates an existing entity.
+     *
+     * @return The number of rows affected (0 or 1).
+     */
+    open suspend fun update(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
+        conn.prepareStatement(updateSql).use { stmt ->
+            bindUpdate(stmt, entity)
+            bindKeys(stmt, entity, updatableColumns.size)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val updateSql by lazy {
+        val setClause = updatableColumns.joinToString { "${q(it)} = ?" }
+        val whereClause = keyColumns.joinToString(separator = " AND ") { "${q(it)} = ?" }
+
+        "UPDATE $tableName SET $setClause WHERE $whereClause"
+    }
+
+    /**
+     * Updates a list of existing entities using a batch operation.
+     *
+     * @return The number of rows affected (0 or greater).
+     */
+    suspend fun update(entities: List<T>, connection: Connection? = null): Int = withConnection(connection) { conn ->
+        if (entities.isEmpty()) return@withConnection 0
+        conn.prepareStatement(updateSql).use { stmt ->
+            for (entity in entities) {
+                bindUpdate(stmt, entity)
+                bindKeys(stmt, entity, updatableColumns.size)
+                stmt.addBatch()
+            }
+            stmt.executeBatch().count { it != 0 }
+        }
+    }
+
+    /**
+     * Retrieves all entities from the table.
+     * This method uses a native SQL query to fetch all records.
+     * Use with caution as this operation can be expensive for large tables.
+     *
+     * @return A list of all entities in the table.
+     */
+    suspend fun listAll(connection: Connection? = null): List<T> = withConnection(connection) { conn ->
+        conn.prepareStatement(listAllSQL).use { stmt ->
+            stmt.executeQuery().use { rs ->
+                buildList {
+                    while (rs.next()) {
+                        add(createModel(rs))
+                    }
+                }
+            }
+        }
+    }
+
+    private val listAllSQL by lazy { "SELECT * FROM $tableName" }
+
+    /**
+     * Deletes an entity based on its key columns.
+     *
+     * @return The number of rows affected (0 or 1).
+     */
+    suspend fun delete(entity: T, connection: Connection? = null): Int = withConnection(connection) { conn ->
+        conn.prepareStatement(deleteSql).use { stmt ->
+            bindKeys(stmt, entity)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val deleteSql: String by lazy {
         val whereClause = keyColumns.joinToString(separator = " AND ") { "$it = ?" }
 
-        return "DELETE FROM $tableName WHERE $whereClause"
+        "DELETE FROM $tableName WHERE $whereClause"
     }
+
+    /**
+     * Deletes a list of entities based on their key columns.
+     * This method uses batch operations for better performance.
+     * The operation is transactional and will be rolled back if any deletion fails.
+     *
+     * @return The number of rows affected (0 or greater).
+     */
+    suspend fun delete(entities: List<T>, connection: Connection? = null): Int = withConnection(connection) { conn ->
+        if (entities.isEmpty()) return@withConnection 0
+        conn.prepareStatement(deleteSql).use { stmt ->
+            for (entity in entities) {
+                bindKeys(stmt, entity)
+                stmt.addBatch()
+            }
+            stmt.executeBatch().count { it != 0 }
+        }
+    }
+
+    /**
+     * Deletes all workflows from the database.
+     * This method is transactional and uses a native SQL query to delete all workflows.
+     * Use with caution as this operation cannot be undone.
+     *
+     * @return The number of workflows deleted
+     */
+    suspend fun deleteAll(connection: Connection? = null): Int = withConnection(connection) { conn ->
+        conn.prepareStatement(deleteAllSql).use { stmt ->
+            stmt.executeUpdate()
+        }
+    }
+
+    private val deleteAllSql by lazy { "DELETE FROM $tableName" }
+
+    /**
+     * Counts the total number of records in the table.
+     * This method uses a native SQL query to count all records.
+     *
+     * @return The total number of records in the table
+     */
+    suspend fun count(connection: Connection? = null): Long = withConnection(connection) { conn ->
+        conn.prepareStatement(countSql).use { stmt ->
+            stmt.executeQuery().use { rs ->
+                if (rs.next()) rs.getLong(1) else 0L
+            }
+        }
+    }
+
+    private val countSql by lazy { "SELECT COUNT(*) FROM $tableName" }
 
     // Helper that returns the dialect-specific quoting of an SQL identifier.
     private fun q(id: String): String = when (databaseManager.dbType) {
@@ -311,9 +301,9 @@ abstract class Repository<T : UuidV7Entity> {
      * @param connection An optional `Connection` instance. If null, a new connection is obtained from the datasource.
      * @param block A lambda function that takes a `Connection` as a parameter and returns a result of type `R`.
      * @return The result of executing the provided block with a `Connection`.
-     * @throws SQLException If an error occurs while acquiring or using the connection from the datasource.
+     * @throws java.sql.SQLException If an error occurs while acquiring or using the connection from the datasource.
      */
-    protected suspend fun <R> withConnection(connection: Connection?, block: (Connection) -> R): R =
+    protected suspend fun <R> withConnection(connection: Connection?, block: suspend (Connection) -> R): R =
         withContext(Dispatchers.IO) {
             when (connection) {
                 null -> databaseManager.datasource.connection.use { block(it) }
@@ -321,5 +311,6 @@ abstract class Repository<T : UuidV7Entity> {
             }
         }
 
-    protected fun ResultSet.getInstant(column: String): Instant? = getTimestamp(column)?.toInstant()
+    @ExperimentalTime
+    protected fun ResultSet.getInstant(col: String): Instant? = getTimestamp(col)?.toInstant()?.toKotlinInstant()
 }

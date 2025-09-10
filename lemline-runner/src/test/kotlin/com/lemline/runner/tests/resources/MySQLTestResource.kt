@@ -22,13 +22,18 @@ class MySQLTestResource : QuarkusTestResourceLifecycleManager {
         mysql.start()
 
         // Return the profile setting
-        return mapOf(
+        val properties = mapOf(
             "lemline.database.mysql.host" to mysql.host,
             "lemline.database.mysql.port" to mysql.firstMappedPort.toString(),
             "lemline.database.mysql.name" to mysql.databaseName,
             "lemline.database.mysql.username" to mysql.username,
             "lemline.database.mysql.password" to mysql.password,
         )
+
+        // Set as system properties so that [LemlineConfigSource] can see them.
+        properties.forEach { (k, v) -> System.setProperty(k, v) }
+
+        return properties
     }
 
     override fun stop() {

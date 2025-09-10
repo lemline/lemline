@@ -1,0 +1,100 @@
+<configuration>
+
+    <!-- Encoder JSON performant (logstash-logback-encoder) -->
+    <!-- Dépendance Gradle :
+         implementation("net.logstash.logback:logstash-logback-encoder:7.4") -->
+
+    <!-- Appender JSON vers la console -->
+    <appender name="JSON_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <!-- Timestamp ISO8601 -->
+                <timestamp>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+
+                <!-- Niveau, logger, thread, message -->
+                <pattern>
+                    <pattern>
+                        {
+                        "level": "%level",
+                        "logger": "%logger{36}",
+                        "thread": "%thread",
+                        "message": "%message"
+                        }
+                    </pattern>
+                </pattern>
+
+                <!-- MDC ciblé : on exporte seulement ce qui est nécessaire -->
+                <mdc>
+                    <includeMdcKeyName>workflowId</includeMdcKeyName>
+                    <includeMdcKeyName>workflowName</includeMdcKeyName>
+                    <includeMdcKeyName>workflowVersion</includeMdcKeyName>
+                </mdc>
+
+                <!-- Contexte appli (optionnel) -->
+                <loggerName/>
+                <context/>
+
+                <!-- Stacktrace lisible (compressé en une ligne) -->
+                <stackTrace>
+                    <fieldName>exception</fieldName>
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter">
+                        <maxDepthPerThrowable>30</maxDepthPerThrowable>
+                        <maxLength>8192</maxLength>
+                        <shortenedClassNameLength>20</shortenedClassNameLength>
+                        <rootCauseFirst>true</rootCauseFirst>
+                    </throwableConverter>
+                </stackTrace>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- Appender fichier (rolling) pour prod -->
+    <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/app.json</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/app.%d{yyyy-MM-dd}.%i.json.gz</fileNamePattern>
+            <maxFileSize>50MB</maxFileSize>
+            <maxHistory>14</maxHistory>
+            <totalSizeCap>3GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp>
+                    <timeZone>UTC</timeZone>
+                </timestamp>
+                <pattern>
+                    <pattern>
+                        { "level":"%level","logger":"%logger{36}","thread":"%thread","message":"%message" }
+                    </pattern>
+                </pattern>
+                <mdc>
+                    <includeMdcKeyName>workflowId</includeMdcKeyName>
+                    <includeMdcKeyName>workflowName</includeMdcKeyName>
+                    <includeMdcKeyName>workflowVersion</includeMdcKeyName>
+                </mdc>
+                <stackTrace>
+                    <fieldName>exception</fieldName>
+                    <throwableConverter class="net.logstash.logback.stacktrace.ShortenedThrowableConverter"/>
+                </stackTrace>
+            </providers>
+        </encoder>
+    </appender>
+
+    <!-- Async pour amortir l’I/O et la sérialisation JSON -->
+    <appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender">
+        <queueSize>8192</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <neverBlock>true</neverBlock> <!-- évite de bloquer le flux applicatif -->
+        <appender-ref ref="JSON_CONSOLE"/>
+        <!-- En prod, tu peux ajouter le fichier aussi :
+        <appender-ref ref="JSON_FILE"/> -->
+    </appender>
+
+    <!-- Log root -->
+    <root level="INFO">
+        <appender-ref ref="ASYNC"/>
+    </root>
+
+</configuration>

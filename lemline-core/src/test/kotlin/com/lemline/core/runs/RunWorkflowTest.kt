@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.runs
 
-import com.lemline.core.getWorkflowInstance
+import com.lemline.core.getWorkflowProcessor
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class RunWorkflowTest {
 
     val factorialWorkflowYaml = """
@@ -45,7 +47,7 @@ do:
 
     @Test
     fun `should run sub-workflow synchronously and return correct result`() = runTest {
-        val instance = getWorkflowInstance(
+        val instance = getWorkflowProcessor(
             factorialWorkflowYaml,
             JsonObject(mapOf("n" to JsonPrimitive(5))),
             "factorial",

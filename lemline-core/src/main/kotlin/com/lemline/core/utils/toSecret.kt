@@ -4,6 +4,7 @@ package com.lemline.core.utils
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.nodes.NodeInstance
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
+import kotlin.time.ExperimentalTime
 
 /**
  * Resolves a secret value based on the provided name.
@@ -19,11 +20,12 @@ import io.serverlessworkflow.impl.expressions.ExpressionUtils
  * @return The resolved secret value as a `String`.
  * @throws com.lemline.core.errors.WorkflowException if the secret is not found or if the expression evaluation fails.
  */
+@ExperimentalTime
 internal fun NodeInstance<*>.toSecret(name: String): String = when (ExpressionUtils.isExpr(name)) {
     true -> toSecret(evalString(transformedInput, ExpressionUtils.trimExpr(name), name))
     // if the name is the name of a secret in the workflow definition, return the value of the secret
     false -> when (name in rootInstance.secrets.keys) {
-        true -> rootInstance.secrets[name]?.toString() ?: onError(CONFIGURATION, "Secret '$name' not found")
+        true -> rootInstance.secrets[name]?.toString() ?: raiseError(CONFIGURATION, "Secret '$name' not found")
         false -> name
     }
 }

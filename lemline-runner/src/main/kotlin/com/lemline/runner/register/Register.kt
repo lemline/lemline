@@ -22,7 +22,13 @@ import org.flywaydb.core.Flyway
  *
  */
 @RegisterForReflection(
-    targets = [Workflow::class, DateTimeDescriptor::class, Config::class, AgroalDataSource::class, Flyway::class],
+    targets = [
+        Workflow::class,
+        DateTimeDescriptor::class,
+        Config::class,
+        AgroalDataSource::class,
+        Flyway::class
+    ],
     registerFullHierarchy = true
 )
 internal class Register

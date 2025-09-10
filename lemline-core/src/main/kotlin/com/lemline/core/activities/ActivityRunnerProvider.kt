@@ -11,6 +11,7 @@ import com.lemline.core.instances.ListenInstance
 import com.lemline.core.instances.RunInstance
 import com.lemline.core.instances.WaitInstance
 import kotlin.reflect.KClass
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -22,6 +23,7 @@ import kotlinx.serialization.json.JsonElement
  *     that dispatches to the default, built-in runners for all known sealed subtypes
  *     of `ActivityInstance`.
  */
+@ExperimentalTime
 class ActivityRunnerProvider(
     private val customRunners: Map<KClass<out ActivityInstance<*>>, ActivityRunner<*>> = emptyMap(),
 ) {

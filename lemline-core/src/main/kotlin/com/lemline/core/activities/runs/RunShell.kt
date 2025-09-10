@@ -8,10 +8,10 @@ import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.ST
 import kotlinx.serialization.json.JsonElement
 
 internal suspend fun RunInstance.runShell(runShell: RunShell): JsonElement {
-    logInfo { "Executing run shell command: ${node.name}" }
+    logger.debug { "Executing run shell command: ${node.name}" }
 
     val shellConfig = runShell.shell
-    logDebug { "Shell config: $shellConfig" }
+    logger.debug { "Shell config: $shellConfig" }
 
     // Evaluate command through expression evaluator
     val command = evalString(
@@ -20,7 +20,7 @@ internal suspend fun RunInstance.runShell(runShell: RunShell): JsonElement {
         "shell.command"
     )
 
-    logDebug { "Evaluated command: $command" }
+    logger.debug { "Evaluated command: $command" }
 
     // Evaluate arguments if present
     val arguments = shellConfig.arguments?.additionalProperties
@@ -48,15 +48,15 @@ internal suspend fun RunInstance.runShell(runShell: RunShell): JsonElement {
         )
     }
 
-    logDebug { "Shell command: $command" }
-    logDebug { "Arguments: $arguments" }
-    logDebug { "Environment: $environment" }
+    logger.debug { "Shell command: $command" }
+    logger.debug { "Arguments: $arguments" }
+    logger.debug { "Environment: $environment" }
 
     val awaitCompletion = runShell.isAwait
     val returnType = runShell.`return` ?: STDOUT  // Default to stdout return type
 
-    logDebug { "Await: $awaitCompletion" }
-    logDebug { "Return: $returnType" }
+    logger.debug { "Await: $awaitCompletion" }
+    logger.debug { "Return: $returnType" }
 
     try {
         val shellRun = Shell(
@@ -67,22 +67,22 @@ internal suspend fun RunInstance.runShell(runShell: RunShell): JsonElement {
 
         if (!awaitCompletion) {
             val process = shellRun.executeAsync()
-            logDebug { "Launched shell command asynchronously with PID: ${process.pid()}" }
+            logger.debug { "Launched shell command asynchronously with PID: ${process.pid()}" }
             // As per DSL, output for await: false is the transformed input
             return transformedInput
         }
 
         val processResult = shellRun.execute()
 
-        logDebug { "Shell execution completed with exit code: ${processResult.code}" }
-        logDebug { "stdout: ${processResult.stdout}" }
-        logDebug { "stderr: ${processResult.stderr}" }
+        logger.debug { "Shell execution completed with exit code: ${processResult.code}" }
+        logger.debug { "stdout: ${processResult.stdout}" }
+        logger.debug { "stderr: ${processResult.stderr}" }
 
         // Configure output based on the return type
         return processResult.get(returnType)
     } catch (e: Exception) {
-        logError(e) { "Failed to execute shell command" }
+        logger.error(e) { "Failed to execute shell command" }
         val errorMsg = "Shell command execution failed: ${e.message}"
-        onError(COMMUNICATION, errorMsg)
+        raiseError(COMMUNICATION, errorMsg)
     }
 }

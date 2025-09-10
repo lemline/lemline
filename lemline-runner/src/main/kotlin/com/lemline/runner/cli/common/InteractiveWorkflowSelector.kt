@@ -2,6 +2,7 @@
 package com.lemline.runner.cli.common
 
 import com.github.zafarkhaja.semver.Version
+import com.lemline.common.values.WorkflowName
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
@@ -19,7 +20,7 @@ class InteractiveWorkflowSelector @Inject constructor(
      * and returns the list of pairs (number, WorkflowModel) for selection.
      * Returns null if no workflows are found.
      */
-    suspend fun prepareSelection(filterName: String? = null): List<Pair<Int, DefinitionModel>>? {
+    suspend fun prepareSelection(filterName: WorkflowName? = null): List<Pair<Int, DefinitionModel>>? {
         val workflows = if (filterName != null) {
             definitionRepository.listByName(filterName)
         } else {
@@ -33,11 +34,11 @@ class InteractiveWorkflowSelector @Inject constructor(
 
         // Group by name and sort versions using SemVer within each group
         val groupedAndSorted = workflows
-            .groupBy { it.name }
+            .groupBy { it.name.toString() }
             .entries
             .sortedBy { it.key } // Sort groups by name
             .associate { (name, versions) -> // Use associate for Map<String, List<WorkflowModel>>
-                name to versions.sortedWith(compareBy { runCatching { Version.parse(it.version) }.getOrNull() })
+                name to versions.sortedWith(compareBy { runCatching { Version.parse(it.version.toString()) }.getOrNull() })
             }
 
         // Generate the selection list (needed for return value)

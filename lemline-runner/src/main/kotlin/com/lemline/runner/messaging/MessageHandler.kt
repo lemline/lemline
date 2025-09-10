@@ -1,361 +1,320 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.common.LogContext
-import com.lemline.common.debug
-import com.lemline.common.error
-import com.lemline.common.info
-import com.lemline.common.logger
-import com.lemline.common.warn
-import com.lemline.common.withLoggingContext
-import com.lemline.core.errors.WorkflowException
-import com.lemline.core.nodes.NodePosition
-import com.lemline.core.workflows.Workflows
-import com.lemline.runner.StepByStepRunner
-import com.lemline.runner.config.CONSUMER_ENABLED
-import com.lemline.runner.config.MESSAGING_CONSUMER_PARALLELISM
-import com.lemline.runner.metrics.MessageSubscriberMetrics
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.DATABASE_ERROR
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.DEFINITION_NOT_FOUND
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.INVALID_STATE
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.IO_ERROR
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.MESSAGE_EMISSION_ERROR
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.PROCESSING_ERROR
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.SECRETS_RETRIEVAL_FAILED
-import com.lemline.runner.metrics.MessageSubscriberMetrics.Companion.FailureReasons.WORKFLOW_ERROR_PREFIX
-import com.lemline.runner.models.RetryModel
-import com.lemline.runner.outbox.OutBoxStatus
-import com.lemline.runner.repositories.DefinitionRepository
-import com.lemline.runner.repositories.RetryRepository
-import com.lemline.runner.secrets.Secrets
-import io.quarkus.runtime.Startup
-import io.serverlessworkflow.api.types.Workflow
-import jakarta.annotation.PostConstruct
-import jakarta.annotation.PreDestroy
-import jakarta.enterprise.context.ApplicationScoped
-import jakarta.inject.Inject
-import java.io.IOException
-import java.sql.SQLException
-import java.time.Instant
-import java.util.concurrent.CompletableFuture
-import java.util.concurrent.ConcurrentHashMap
-import kotlinx.coroutines.future.await
-import kotlinx.serialization.json.JsonElement
-import org.eclipse.microprofile.config.inject.ConfigProperty
-import org.eclipse.microprofile.reactive.messaging.Channel
-import org.eclipse.microprofile.reactive.messaging.Emitter
-import org.eclipse.microprofile.reactive.messaging.Message as ReactiveMessage
-import org.reactivestreams.Publisher
+import com.lemline.common.logger.Logger
+import com.lemline.common.logger.withSuspendLoggingContext
+import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowVersion
+import com.lemline.runner.failures.FailureReasons.getFailureReason
+import com.lemline.runner.healthcheck.FatalAckLiveness.livenessDownOnFatal
+import com.lemline.runner.healthcheck.RetryReadiness.readinessDownDuringRetries
+import com.lemline.runner.models.WithInstanceInfo
+import io.quarkus.smallrye.reactivemessaging.ackSuspending
+import io.quarkus.smallrye.reactivemessaging.nackSuspending
+import java.util.concurrent.CompletionException
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.TimeUnit
+import kotlin.random.Random
+import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeout
+import org.apache.kafka.common.errors.RetriableException
+import org.eclipse.microprofile.reactive.messaging.Message
 
-internal const val WORKFLOW_IN = "workflows-in"
-internal const val WORKFLOW_OUT = "workflows-out"
+@ExperimentalTime
+internal interface MessageHandler<T : WithInstanceInfo> {
 
-/**
- * MessageHandler is responsible for consuming workflow messages from the incoming channel,
- * processing them, and sending the results to the outgoing channel. It orchestrates
- * the entire lifecycle of a message.
- */
-@Startup
-@ApplicationScoped
-internal class MessageHandler @Inject constructor(
-    @ConfigProperty(name = MESSAGING_CONSUMER_PARALLELISM) private val maxParallelism: Int,
-    @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
-    @Channel(WORKFLOW_IN) private val publisher: Publisher<ReactiveMessage<String>>,
-    @Channel(WORKFLOW_OUT) private val emitter: Emitter<String>,
-    private val definitionRepository: DefinitionRepository,
-    private val retryRepository: RetryRepository,
-    private val stepByStepRunner: StepByStepRunner,
-    private val metrics: MessageSubscriberMetrics
-) {
-    val logger = logger()
+    suspend fun Message<String>.deserialize(): T
 
-    // The subscriber is now initialized with the new handleMessage signature
-    private val subscriber = MessageSubscriber(publisher, ::handleMessage, maxParallelism, metrics, logger)
+    suspend fun T.handle(): T?
 
-    @PostConstruct
-    fun init() {
-        if (enabled) {
-            subscriber.subscribe()
-            logger.info { "✅ Consumer enabled" }
-        } else {
-            logger.info { "❌ Consumer disabled" }
-        }
-    }
+    suspend fun T.emit()
 
-    @PreDestroy
-    fun shutdown() {
-        subscriber.onShutdown()
+    val logger: Logger
+
+    val metrics: MessageSubscriberMetrics
+
+    val onCompleteTest: (Message<String>, T?) -> Unit
+
+    val onFailureTest: (Message<String>, Throwable?) -> Unit
+
+    suspend fun handleMessage(message: Message<String>) {
+        var next: T? = null
+        var workflowId: WorkflowId? = null
+        var workflowName: WorkflowName? = null
+        var workflowVersion: WorkflowVersion? = null
+
+        // --- Deserialization ---
+        val msg: T = message.tryWithCompensation {
+            logger.debug { "Received: ${message.toLogString()}" }
+            metrics.recordDeserializationDuration {
+                try {
+                    message.deserialize().also {
+                        // deserialisation succeeded
+                        workflowId = it.workflowId
+                        workflowName = it.workflowName
+                        workflowVersion = it.workflowVersion
+                        metrics.deserializationCompleted(workflowName, workflowVersion)
+                    }
+                } catch (e: Exception) {
+                    metrics.deserializationFailed(e)
+                    throw e
+                }
+            }
+        }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles (neg)ack if block fails
+
+        // --- Processing ---
+        message.tryWithCompensation(workflowId, workflowName, workflowVersion) {
+            // We log here to get context
+            logger.debug { "Deserialized ${message.toLogString()}: $msg" }
+            // Process et get next message
+            next = metrics.recordProcessingDuration(workflowName, workflowVersion) {
+                try {
+                    msg.handle().also {
+                        logger.debug { "Processed: ${message.toLogString()}" }
+                        metrics.processingCompleted(workflowName, workflowVersion)
+                    }
+                } catch (e: Exception) {
+                    val reason = if (e is CompensationException) e.reason else getFailureReason(e)
+                    metrics.processingFailed(reason, workflowName, workflowVersion)
+                    throw e
+                }
+            }
+            // Serialize and emit the next message if any
+            next?.emit()
+        }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles (neg)ack if block fails
+
+        onCompleteTest(message, next)
+        // Success Path
+        message.acknowledgeWithRetry(workflowName, workflowVersion)
     }
 
     /**
-     * Handles the entire lifecycle of an incoming reactive message. This includes deserialization,
-     * processing, emission of the next step, and finally acknowledgment (ack/nack).
+     * Attempts to execute a suspending block within a log context.
+     * If failing,
+     * - the compensation actions of the CompensationException are executed, and the message is acknowledged.
+     * - if failing again, the message is negatively acknowledged.
      *
-     * This function is designed to be resilient and will not throw exceptions, instead handling
-     * failures by logging, recording metrics, and saving messages for retry or inspection.
+     * @return The result of the block if successful, else null
      *
-     * @param item The raw reactive message from the messaging system.
+     * @throws Exception If an error occurs during (negative) acknowledgment
      */
-    suspend fun handleMessage(item: ReactiveMessage<String>) {
-        // --- Step 1: Deserialization ---
-        val message = deserializeMessage(item) ?: return
+    suspend fun <S> Message<String>.tryWithCompensation(
+        workflowId: WorkflowId? = null,
+        workflowName: WorkflowName? = null,
+        workflowVersion: WorkflowVersion? = null,
+        block: suspend () -> S
+    ): Result<S> = withSuspendLoggingContext(workflowId, workflowName, workflowVersion) {
+        try {
+            Result.success(block())
+        } catch (compensation: CompensationException) {
+            try {
+                compensation.run()
+                acknowledgeWithRetry(workflowName, workflowVersion)
+                Result.failure(compensation)
+            } catch (e: Exception) {
+                // Failure path
+                logger.error(e) { "Failed to execute compensation for ${toLogString()}" }
+                negAcknowledgeWithRetry(e, workflowName, workflowVersion)
+                Result.failure(e)
+            }
+        } catch (e: Exception) {
+            // Failure path
+            logger.error(e) { "Failed to process ${toLogString()}" }
+            negAcknowledgeWithRetry(e, workflowName, workflowVersion)
+            Result.failure(e)
+        }
+    }
 
-        val workflowName = message.name
-        val workflowVersion = message.version
+    /**
+     * Acknowledges the current message with retry logic.
+     *
+     * If the acknowledgment fails, an exception is thrown to trigger a broker reconnection
+     */
+    suspend fun Message<String>.acknowledgeWithRetry(
+        workflowName: WorkflowName?,
+        workflowVersion: WorkflowVersion?
+    ) = try {
+        ackWithRetry()
+        logger.debug { "Message ACKed: ${toLogString()}" }
+        metrics.ackCompleted(workflowName, workflowVersion)
+    } catch (e: Exception) {
+        logger.error(e) { "Failed to ACK message: ${toLogString()}" }
+        metrics.ackFailed(workflowName, workflowVersion)
+        throw e
+    }
 
-        withLoggingContext(
-            LogContext.WORKFLOW_ID to message.states[NodePosition.root]?.workflowId,
-            LogContext.WORKFLOW_NAME to workflowName,
-            LogContext.WORKFLOW_VERSION to workflowVersion,
-            LogContext.NODE_POSITION to message.position.toString(),
-        ) {
-            metrics.recordProcessingDuration(workflowName, workflowVersion) {
-                try {
-                    // --- Step 2: Get Workflow Definition ---
-                    val workflow = findWorkflowDefinition(item, workflowName, workflowVersion)
-                    // --- Step 3: Get secrets for this workflow ---
-                    val secrets = findSecrets(item, workflow)
-                    // --- Step 4: Run instance ---
-                    val nextMessage = runInstance(item, message, secrets)
-                    // --- Step 5: Emit next message ---
-                    emitMessage(item, nextMessage)
-                    // --- Step 6: Acknowledgment (Success Path) ---
-                    metrics.processingCompleted(workflowName, workflowVersion)
-                    ack(item, workflowName, workflowVersion)
-                    // For testing: complete the future
-                    processingMessages.remove(item.payload)?.complete(nextMessage?.toJsonString())
-                } catch (e: ProcessingException) {
-                    // For testing: complete the future
-                    processingMessages.remove(item.payload)?.completeExceptionally(e.cause)
+    /**
+     * Acknowledges a message with retry logic, ensuring retries with exponential backoff if the acknowledgment fails.
+     * The method implements local retries to keep acknowledgment and processing within the defined time and attempt limits.
+     *
+     * @param maxAttempts The maximum number of retry attempts for acknowledgment. Defaults to 6.
+     * @param totalBudgetMs The total allowable time budget for acknowledgment retries, in milliseconds. Defaults to 60,000 ms.
+     * @param singleAttemptTimeoutMs The timeout for a single acknowledgment attempt, in milliseconds. Defaults to 10,000 ms.
+     */
+    private suspend fun Message<*>.ackWithRetry(
+        maxAttempts: Int = 6,
+        totalBudgetMs: Long = 6_000, // Keep local retry+processing under throttled.unprocessed-record-max-age.ms
+        singleAttemptTimeoutMs: Long = 1_000
+    ) = retry(
+        label = "ACK",
+        maxAttempts = maxAttempts,
+        totalBudgetMs = totalBudgetMs,
+        singleAttemptTimeoutMs = singleAttemptTimeoutMs,
+        onRetryStart = { readinessDownDuringRetries.set(true) },
+        onFatalFailure = { _, _, _ -> livenessDownOnFatal.set(true) }
+    ) {
+        ackSuspending()
+    }
+
+    /**
+     * Handles the process of negatively acknowledging a message with retry logic.
+     * If the retry attempts fail, the message is quarantined locally, and an acknowledgment
+     * is attempted to ensure the message is processed within the defined constraints.
+     *
+     * If quarantining locally or the acknowledgment fails, an exception is thrown to trigger a broker reconnection
+     */
+    suspend fun Message<String>.negAcknowledgeWithRetry(
+        e: Exception,
+        workflowName: WorkflowName?,
+        workflowVersion: WorkflowVersion?
+    ) = try {
+        nackWithRetry(e)
+        logger.warn { "Message NACKed: ${toLogString()} - should be sent to the DLQ by brokers" }
+        metrics.nackCompleted(workflowName, workflowVersion)
+    } catch (e: Exception) {
+        logger.error(e) { "Failed to NACK message: ${toLogString()}" }
+        metrics.nackFailed(workflowName, workflowVersion)
+        throw e
+    }
+
+    /**
+     * Attempts to negatively acknowledge a message multiple times with retry logic.
+     * This method supports configurable retry attempts, a total time budget for retries,
+     * and a timeout for each individual attempt. The negative acknowledgment is performed
+     * asynchronously, with detailed handling for failed attempts.
+     *
+     * @param cause The exception or error that caused the message to be negatively acknowledged.
+     * @param maxAttempts The maximum number of retry attempts. Default is 6.
+     * @param totalBudgetMs The total time budget in milliseconds for all retry attempts combined. Default is 60,000 ms.
+     * @param singleAttemptTimeoutMs The timeout in milliseconds for each individual retry attempt. Default is 10,000 ms.
+     */
+    private suspend fun Message<*>.nackWithRetry(
+        cause: Throwable,
+        maxAttempts: Int = 6,
+        totalBudgetMs: Long = 6_000,
+        singleAttemptTimeoutMs: Long = 1_000
+    ) = retry(
+        label = "NACK",
+        maxAttempts = maxAttempts,
+        totalBudgetMs = totalBudgetMs,
+        singleAttemptTimeoutMs = singleAttemptTimeoutMs,
+        onRetryStart = { readinessDownDuringRetries.set(true) },
+        onFatalFailure = { _, _, _ -> livenessDownOnFatal.set(true) }
+    ) {
+        nackSuspending(cause)
+    }
+
+    /**
+     * Retries the execution of a given suspending block of code until it succeeds, the maximum number of attempts
+     * is reached, or the total time budget in milliseconds is exceeded. The retry logic includes handling exceptions
+     * and applying an exponential backoff mechanism to space out subsequent attempts.
+     *
+     * This is a generic retry function that can be reused across different operations.
+     *
+     * @param label A descriptive label for the retry operation, used in logging to track the operation being attempted.
+     * @param maxAttempts The maximum number of retry attempts allowed before giving up.
+     * @param totalBudgetMs The total allowable time budget for retries, in milliseconds, after which retries will stop.
+     * @param onRetryStart Called when starting a retry attempt (attempt > 0). Optional.
+     * @param onFatalFailure Called when all retries are exhausted. Optional.
+     * @param block The suspending block of code to execute and retry upon failure.
+     */
+
+    suspend fun retry(
+        label: String,
+        maxAttempts: Int = 6,
+        totalBudgetMs: Long = 30_000,
+        singleAttemptTimeoutMs: Long = 15_000,
+        onRetryStart: (() -> Unit)? = null,
+        onFatalFailure: ((Exception, Int, Long) -> Unit)? = null,
+        block: suspend () -> Unit
+    ) {
+        var attempt = 0
+        val start = System.nanoTime()
+        while (true) {
+            try {
+                if (attempt > 0) onRetryStart?.invoke()
+                withTimeout(singleAttemptTimeoutMs) {
+                    block()
                 }
+                return
+            } catch (e: Exception) {
+                attempt++
+                val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
+                val retriable = isRetriable(e)
+                if (!retriable || attempt >= maxAttempts || elapsedMs >= totalBudgetMs) {
+                    logger.error(e) { "$label failed after $attempt attempts (${elapsedMs}ms)" }
+                    onFatalFailure?.invoke(e, attempt, elapsedMs)
+                    throw e
+                }
+                logger.debug(e) { "$label failed at $attempt attempt (${elapsedMs}ms) - retrying" }
+                sleepBackoff(attempt)
             }
         }
     }
 
     /**
-     * Deserializes the message payload. Returns the Message object on success, or null on failure.
-     * Handles its own metrics, logging, and persistence of failed messages.
-     */
-    private suspend fun deserializeMessage(item: ReactiveMessage<String>): Message? = try {
-        val message = metrics.recordDeserializationDuration { Message.fromJsonString(item.payload) }
-        metrics.deserializationCompleted(message.name, message.version)
-        message
-    } catch (e: Exception) {
-        logger.error(e) { "Failed to deserialize message: ${item.payload}" }
-        metrics.deserializationFailed(getFailureReason(e))
-        // Deserialization failure is fatal for this message. Save and NACK.
-        saveMsgAsFailed(item, item.payload, e, UNKNOWN, UNKNOWN)
-        null
-    }
-
-    /**
-     * Retrieves a workflow definition based on the provided name and version.
-     * This method first attempts to fetch the workflow from a cache. If not found,
-     * it retrieves the definition from a repository, parses it, and stores it in the cache.
-     * If the workflow is still not found, it handles the error and returns null.
-     */
-    private suspend fun findWorkflowDefinition(
-        item: ReactiveMessage<String>,
-        workflowName: String,
-        workflowVersion: String
-    ): Workflow {
-        // Try to get from cache first, then from repository if not found
-        val workflow = Workflows.getOrNull(workflowName, workflowVersion)
-            ?: definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
-                ?.definition
-                ?.let { Workflows.parseAndPut(it) }
-
-        // If workflow is null, handle the error
-        if (workflow == null) {
-            metrics.processingFailed(DEFINITION_NOT_FOUND, workflowName, workflowVersion)
-            val cause = IllegalStateException("Workflow $workflowName:$workflowVersion not found")
-            saveMsgAsFailed(item, item.payload, cause, workflowName, workflowVersion)
-            throw ProcessingException(cause = cause)
-        }
-
-        return workflow
-
-    }
-
-    /**
-     * Retrieves the necessary secrets for a workflow and handles any errors that occur during the process.
+     * Determines whether the given throwable is considered retriable based on its root cause.
      *
-     * If an error occurs while obtaining the secrets, the error is logged,
-     * metrics are updated to reflect the failure, and the message is saved for manual inspection.
+     * @param t The throwable to evaluate.
+     * @return True if the throwable is retriable, false otherwise.
      */
-    private suspend fun findSecrets(
-        item: ReactiveMessage<String>,
-        workflow: Workflow,
-    ): Map<String, JsonElement> = try {
-        Secrets.getForWorkflow(workflow)
-    } catch (e: Exception) {
-        logger.error(e) { "Unable to get needed secrets" }
-        metrics.processingFailed(SECRETS_RETRIEVAL_FAILED, workflow.document.name, workflow.document.version)
-        saveMsgAsFailed(item, item.payload, e, workflow.document.name, workflow.document.version)
-        throw ProcessingException(cause = e)
-    }
+    private fun isRetriable(t: Throwable): Boolean {
+        val c = rootCause(t)
+        // We check class names for RabbitMQ exceptions as we cannot add imports here.
+        val isRabbitMqTransient = when (c?.javaClass?.name) {
+            "com.rabbitmq.client.ShutdownSignalException",
+            "com.rabbitmq.client.AlreadyClosedException" -> true
 
-    /**
-     * Executes a workflow instance constructed from the provided message, state, and secrets.
-     *
-     * This method attempts to run the workflow instance step by step using the `stepByStepRunner`.
-     * If execution fails, it logs the failure, updates processing metrics, and stores the message
-     * in the retry table for manual inspection.
-     */
-    private suspend fun runInstance(
-        item: ReactiveMessage<String>,
-        message: Message,
-        secrets: Map<String, JsonElement>
-    ): Message? {
-        val instance = message.toWorkflowInstance(secrets)
-        return try {
-            stepByStepRunner.run(instance)
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to run instance. Storing current state in the retry table for manual inspection." }
-            metrics.processingFailed(getFailureReason(e), message.name, message.version)
-            saveMsgAsFailed(item, instance.toMessage().toJsonString(), e, message.name, message.version)
-            throw ProcessingException(cause = e)
+            else -> false
         }
+        val isSqlTransient = c?.javaClass?.name?.startsWith("java.sql.SQLTransient") == true
+
+        return c is TimeoutCancellationException || // <- coroutine timeout exception
+            c is RetriableException || // <- kafka exception
+            c is java.io.IOException || // <- IO exception (e.g. connection reset)
+            isRabbitMqTransient || isSqlTransient
+    }
+
+    private fun rootCause(t: Throwable?): Throwable? {
+        var e = t
+        while (e is ExecutionException || e is CompletionException) e = e.cause
+        return e ?: t
     }
 
     /**
-     * Emits the next message in a workflow to the messaging system.
+     * Suspends the execution of the coroutine for a time duration that increases exponentially
+     * based on the retry attempt. This backoff mechanism helps in mitigating frequent retries
+     * in case of repeated failures.
      *
-     * This method serializes the given message into a JSON string and sends it using the emitter.
-     * If the emission fails, the message is logged, metrics are updated to reflect the failure,
-     * and the message is stored in the retry table for reprocessing.
-     * The method ensures that no unhandled exceptions are propagated.
+     * @param attempt The number of retry attempts made so far, zero-based. This determines the backoff delay duration.
+     * @param minMs The minimum duration in milliseconds for the initial backoff delay. Default value is 100 milliseconds.
+     * @param maxMs The maximum duration in milliseconds for the backoff delay, preventing excessive delay. Default value is 5000 milliseconds.
      */
-    private suspend fun emitMessage(
-        item: ReactiveMessage<String>,
-        nextMessage: Message?
-    ) {
-        val msg = nextMessage?.toJsonString() ?: return
-        return try {
-            emitter.send(msg).await()
-            logger.debug { "Emitted next message: $msg" }
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to emit next message. Message will be stored in the retry table instead to be re-emit later" }
-            metrics.processingFailed(MESSAGE_EMISSION_ERROR, nextMessage.name, nextMessage.version)
-            saveMsgForRetry(item, msg, e, nextMessage.name, nextMessage.version)
-            throw ProcessingException(cause = e)
-        }
+    private suspend fun sleepBackoff(attempt: Int, minMs: Long = 100, maxMs: Long = 5_000) {
+        val pow = 1L shl attempt.coerceAtMost(5) // 1,2,4,8,16,32
+        val base = (minMs * pow).coerceAtMost(maxMs)
+        val jitter = Random.nextLong(0, base / 2 + 1)
+        delay(base + jitter)
     }
-
-    /**
-     * Determines a low-cardinality failure reason from an exception for use in metrics.
-     * This is crucial for creating actionable alerts and dashboards without overwhelming
-     * the metrics backend.
-     */
-    private fun getFailureReason(e: Throwable): String = when (e) {
-        // Domain-specific errors from the workflow engine
-        is WorkflowException -> WORKFLOW_ERROR_PREFIX + e.error.type.lowercase()
-
-        // --- Database & Persistence Errors ---
-        is SQLException -> DATABASE_ERROR
-
-        // --- I/O and Network Errors ---
-        is IOException -> IO_ERROR
-
-        // --- Application State Errors ---
-        is IllegalStateException -> INVALID_STATE
-
-        // --- Fallback for any other uncategorized exception ---
-        else -> PROCESSING_ERROR
-    }
-
-    private suspend fun saveMsgAsFailed(
-        current: ReactiveMessage<String>,
-        next: String,
-        cause: Exception?,
-        workflowName: String,
-        workflowVersion: String
-    ) = try {
-        val retryModel = RetryModel(
-            message = next,
-            lastError = cause?.stackTraceToString(),
-            delayedUntil = Instant.now(),
-            status = OutBoxStatus.FAILED,
-        )
-        retryRepository.insert(retryModel)
-        // as the responsibility of the message is transferred to the database, we acknowledge the message
-        ack(current, workflowName, workflowVersion)
-    } catch (e: Exception) {
-        logger.error(e) { "Failed to insert message as failed, the initial message will be neg-acknowledged: $next" }
-        nack(current, e, workflowName, workflowVersion)
-    }
-
-    private suspend fun saveMsgForRetry(
-        current: ReactiveMessage<String>,
-        next: String,
-        cause: Exception,
-        workflowName: String,
-        workflowVersion: String
-    ) = try {
-        // save the next message for re-emission
-        val retryModel = RetryModel(
-            message = next,
-            lastError = cause.stackTraceToString(),
-            delayedUntil = Instant.now(),
-            status = OutBoxStatus.PENDING,
-        )
-        retryRepository.insert(retryModel)
-        // as the responsibility of the message is transferred to the database, we acknowledge the message
-        ack(current, workflowName, workflowVersion)
-    } catch (e: Exception) {
-        logger.error(e) { "Failed to insert next message for retry, neg-acknowledging the initial message: $next" }
-        nack(current, e, workflowName, workflowVersion)
-    }
-
-    /**
-     * Acknowledges a reactive message to indicate successful processing.
-     * If the acknowledgment fails, logs the error and increments the failure metrics counter.
-     *
-     * @param item The reactive message being acknowledged.
-     * @param workflowName The name of the workflow associated with the message.
-     * @param workflowVersion The version of the workflow associated with the message.
-     */
-    private fun ack(item: ReactiveMessage<String>, workflowName: String, workflowVersion: String) {
-        try {
-            logger.debug { "ACKing message: ${item.payload}" }
-            item.ack()
-            metrics.ackCompleted(workflowName, workflowVersion)
-        } catch (e: Exception) {
-            logger.error(e) { "CRITICAL: Failed to ACK message. Duplicate processing may occur: ${item.payload}" }
-            metrics.ackFailed(workflowName, workflowVersion)
-        }
-    }
-
-    /**
-     * Handles the negative acknowledgment (NACK) for a reactive message, including logging,
-     * metrics increment, and exception handling if the NACK operation fails.
-     *
-     * @param item The reactive message to be negatively acknowledged.
-     * @param reason The exception that triggered the negative acknowledgment.
-     * @param workflowName The name of the workflow associated with the message.
-     * @param workflowVersion The version of the workflow associated with the message.
-     */
-    private fun nack(item: ReactiveMessage<String>, reason: Exception, workflowName: String, workflowVersion: String) {
-        try {
-            logger.debug { "NACKing message: ${item.payload}" }
-            item.nack(reason)
-            metrics.nackCompleted(workflowName, workflowVersion)
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to NACK message. This message should be represented by brokers: ${item.payload}" }
-            metrics.nackFailed(workflowName, workflowVersion)
-        }
-    }
-
-    // For testing purposes
-    private val processingMessages = ConcurrentHashMap<String, CompletableFuture<String?>>()
-
-    // For testing purposes
-    internal fun waitForProcessing(msg: String): CompletableFuture<String?> =
-        processingMessages.computeIfAbsent(msg) { CompletableFuture() }
-
-    internal class ProcessingException(cause: Throwable) : RuntimeException(cause)
 
     companion object {
-        private const val UNKNOWN = "unknown"
+        private const val UNKNOWN = ""
+        val UNKNOWN_NAME = WorkflowName(UNKNOWN)
+        val UNKNOWN_VERSION = WorkflowVersion(UNKNOWN)
     }
 }
+
+class CompensationException(val reason: String, val run: suspend () -> Unit) : RuntimeException()

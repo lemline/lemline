@@ -1,174 +1,198 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.common.error
-import com.lemline.common.info
-import com.lemline.common.warn
-import com.lemline.runner.metrics.MessageSubscriberMetrics
+import com.lemline.common.logger.logger
+import com.lemline.runner.models.WithInstanceInfo
+import io.quarkus.runtime.ShutdownEvent
+import jakarta.annotation.PostConstruct
+import jakarta.enterprise.event.Observes
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelChildren
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.future.future
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
-import org.eclipse.microprofile.reactive.messaging.Message as ReactiveMessage
+import org.eclipse.microprofile.reactive.messaging.Message
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
-import org.slf4j.Logger
 
-/**
- * A reactive message subscriber that processes messages asynchronously with controlled parallelism.
- *
- * This subscriber is a generic dispatcher. It delegates the entire message lifecycle,
- * including processing and acknowledgement, to the provided `handleMessage` function.
- *
- * @param P The type of the message payload
- * @param T The type of the reactive message that wraps the payload
- * @param publisher The source of messages to subscribe to
- * @param handleMessage Suspending function that handles the full lifecycle of each message.
- * @param maxParallelism Maximum number of messages that can be processed concurrently
- * @param metrics Metrics collector for monitoring processing statistics
- * @param logger Logger instance for recording events and errors
- */
+@ExperimentalTime
+internal abstract class MessageSubscriber<T : WithInstanceInfo>() : Subscriber<Message<String>> {
 
-internal class MessageSubscriber<P, T : ReactiveMessage<P>>(
-    private val publisher: Publisher<T>,
-    private val handleMessage: suspend (item: T) -> Unit, // Changed signature
-    private val maxParallelism: Int,
-    private val metrics: MessageSubscriberMetrics,
-    private val logger: Logger
-) : Subscriber<T> {
+    abstract val maxConcurrency: Long
+    abstract val enabled: Boolean
+    abstract val publisher: Publisher<Message<String>>
+    abstract val handler: MessageHandler<T>
+    abstract val metrics: MessageSubscriberMetrics
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, throwable ->
-        logger.error(throwable) { "Unhandled coroutine exception in consumer" }
-    })
+    val logger = logger()
 
-    private val semaphore = Semaphore(maxParallelism)
+    private val gracePeriod = 5000L
+
+    private val scope: CoroutineScope =
+        CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, e ->
+            if (!isShutdown.get() && (e is Exception)) {
+                logger.warn(e) { "Error processing message, will attempt to recover." }
+                // restart the subscription on another coroutine
+                reSubscribe()
+            }
+        })
+
+
+    @PostConstruct
+    fun init() {
+        if (enabled) {
+            logger.info { "✅ Consumer enabled" }
+            subscribe()
+        } else {
+            logger.info { "❌ Consumer disabled" }
+        }
+    }
+
+    // Quarkus will wait for the completion of performGracefulShutdown() before shutting down
+    fun onQuarkusShutdown(@Observes event: ShutdownEvent) {
+        logger.info { "🛑 ShutdownEvent received - initiating graceful shutdown" }
+        performGracefulShutdown()
+    }
 
     private lateinit var subscription: Subscription
 
     // Add state tracking
-    private var isSubscribed = false
-    private var isShutdown = false
+    private var isResubscribing = AtomicBoolean(false)
+    private var isSubscribed = AtomicBoolean(false)
+    private var isShutdown = AtomicBoolean(false)
 
+    internal fun reSubscribe() {
+        if (!isResubscribing.compareAndSet(false, true)) {
+            logger.warn { "reSubscribe already ongoing - ignoring" }
+            return
+        }
+        if (isSubscribed.get()) {
+            cancelSubscription()
+            // wait for active messages to complete
+            gracefulWaitForCompletion()
+        }
+        // restart the subscription
+        subscribe()
+    }
 
-    fun subscribe() = synchronized(this) {
-        if (isSubscribed) {
+    internal fun subscribe() {
+        if (!isSubscribed.compareAndSet(false, true)) {
             logger.warn { "Subscribe called more than once - ignoring" }
             return
         }
-        isSubscribed = true
         publisher.subscribe(this)
     }
 
-    override fun onSubscribe(s: Subscription) = synchronized(this) {
-        if (isShutdown) {
+    override fun onSubscribe(s: Subscription) {
+        if (isShutdown.get()) {
             s.cancel()
             return
         }
         subscription = s
-        subscription.request(maxParallelism.toLong())
+        subscription.request(maxConcurrency)
+        isResubscribing.set(false)
     }
 
-    override fun onNext(item: T) {
-        // Record metric as soon as the message is received from the stream.
-        metrics.received()
-
-        // Check if we are already shutting down before launching a new coroutine.
-        if (isShutdown) {
-            // The scope is shutting down. We cannot process this message.
-            // By not acknowledging or unacknowledging it, we rely on the broker's
-            // standard redelivery mechanism.
-            logger.warn { "Received message after subscriber shutdown. It will be redelivered by the broker. Message: $item" }
+    override fun onNext(item: Message<String>) {
+        if (isShutdown.get()) {
+            logger.warn { "Received message after subscriber shutdown. It will be redelivered by the broker. Message: ${item.toLogString()}" }
             return
         }
 
         scope.launch {
-            if (!semaphore.tryAcquire()) {
-                metrics.saturated()
-                // Wait for a slot to become available
-                semaphore.acquire()
-            }
-
+            metrics.received()
             metrics.incrementActive()
             try {
-                // Delegate the entire message lifecycle to the handler.
-                // The handler is responsible for processing, ack/nack, and its own error handling.
-                handleMessage(item)
-            } catch (e: Exception) {
-                // This is a safety net. The handler should not throw exceptions.
-                // If it does, it indicates a bug in the handler's own try/catch logic.
-                logger.error(e) { "CRITICAL: Unhandled exception from message handler. The message's state is now unknown and it may be redelivered or lost." }
+                handler.handleMessage(item)
             } finally {
-                semaphore.release()
                 metrics.decrementActive()
-                requestNext()
             }
+            requestNext()
         }
     }
 
     override fun onError(t: Throwable) {
-        logger.error(t) { "Error on subscription" }
-        onShutdown()
+        if (!isShutdown.get()) {
+            logger.error(t) { "Error on subscription" }
+            reSubscribe()
+        }
     }
 
     override fun onComplete() {
         logger.info { "Subscription completed" }
-        onShutdown()
+        //onShutdown()
     }
 
-    internal fun onShutdown(timeoutMs: Long = 5000) = synchronized(this) {
-        if (isShutdown) return
-        isShutdown = true
+    private fun performGracefulShutdown() {
+        if (!isShutdown.compareAndSet(false, true)) {
+            logger.warn { "🛑 Graceful shutdown already initiated - ignoring" }
+            return
+        }
+
+        logger.info { "🛑 Starting graceful shutdown" }
+
+        // Stop receiving messages
         cancelSubscription()
-        // wait for active messages to complete
-        gracePeriod(timeoutMs)
+
+        // Wait for active messages to complete
+        gracefulWaitForCompletion()
+
+        // Shutdown du scope
+        scope.cancel()
+        logger.info { "🏁 scope cancelled" }
     }
 
     private fun requestNext() {
         try {
             // Only request more if we are not shutting down
-            if (!isShutdown) subscription.request(1)
+            if (!isShutdown.get()) subscription.request(1)
         } catch (e: Exception) {
             logger.warn(e) { "Failed to request next message" }
         }
     }
-
-    // acknowledge and unacknowledge methods are now removed from this class.
 
     private fun cancelSubscription() {
         if (::subscription.isInitialized) {
             try {
                 logger.info { "🔻 Shutting down consumer" }
                 subscription.cancel()
+                isSubscribed.set(false)
             } catch (e: Exception) {
                 logger.error(e) { "Error canceling subscription" }
             }
         }
     }
 
-    private fun gracePeriod(timeoutMs: Long) {
-        // Launch a coroutine to handle the shutdown
-        CoroutineScope(Dispatchers.Default).future {
-            try {
-                // Wait for active messages to complete (with timeout)
-                withTimeout(timeoutMs) {
-                    while (metrics.getActiveCount() > 0) {
-                        delay(100)
-                    }
+    private fun gracefulWaitForCompletion() = runBlocking {
+        try {
+            withTimeout(gracePeriod) {
+                logger.info { "⏳ Waiting for ${metrics.getActiveCount()} active messages to complete" }
+
+                // Wait for coroutines currently processing messages
+                scope.coroutineContext.job.children.forEach { it.join() }
+
+                // check also metrics
+                while (metrics.getActiveCount() > 0) {
+                    delay(10)
                 }
-                logger.info { "✅ All messages processed, completing shutdown" }
-            } catch (_: TimeoutCancellationException) {
-                logger.warn { "⚠️ Graceful shutdown timed out with ${metrics.getActiveCount()} messages still active" }
-            } finally {
-                scope.cancel()
             }
-        }.join()
+            logger.info { "✅ All messages processed gracefully" }
+        } catch (_: TimeoutCancellationException) {
+            val remainingCount = metrics.getActiveCount()
+            logger.warn { "⚠️ Graceful shutdown timed out with $remainingCount messages still active" }
+            scope.coroutineContext.job.cancelChildren()
+        } catch (e: Exception) {
+            logger.error(e) { "💥 Error during graceful shutdown" }
+        }
     }
 }

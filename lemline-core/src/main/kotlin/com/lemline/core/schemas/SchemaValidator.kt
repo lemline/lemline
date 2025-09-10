@@ -2,7 +2,7 @@
 package com.lemline.core.schemas
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import com.networknt.schema.JsonSchemaFactory
 import com.networknt.schema.SpecVersion.VersionFlag
 import com.networknt.schema.ValidationMessage
@@ -33,6 +33,19 @@ object SchemaValidator {
     }
 
     private fun validateSchema(node: JsonNode, schema: JsonNode) {
+        // Early check for simple 'required' fields to provide clearer error messages
+        if (schema.has("required") && node.isObject) {
+            val required = schema["required"].mapNotNull { it.asText(null) }
+            if (required.isNotEmpty()) {
+                val present = node.fieldNames().asSequence().toSet()
+                val missing = required.filterNot { it in present }
+                if (missing.isNotEmpty()) {
+                    val missingMsg = missing.joinToString(", ") { "'" + it + "'" }
+                    throw IllegalArgumentException("There are JsonSchema validation errors:\nMissing required field(s): $missingMsg")
+                }
+            }
+        }
+
         val report = jsonSchemaFactory.getSchema(schema).validate(node)
         if (report.isNotEmpty()) {
             val sb = StringBuilder("There are JsonSchema validation errors:")

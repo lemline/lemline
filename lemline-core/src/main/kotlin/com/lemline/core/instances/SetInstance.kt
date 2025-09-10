@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.instances
 
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import io.serverlessworkflow.api.types.SetTask
+import kotlin.time.ExperimentalTime
 
+@ExperimentalTime
 class SetInstance(override val node: Node<SetTask>, override val parent: NodeInstance<*>) :
     NodeInstance<SetTask>(node, parent) {
 

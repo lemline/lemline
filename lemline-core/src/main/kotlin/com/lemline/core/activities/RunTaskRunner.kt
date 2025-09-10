@@ -9,6 +9,7 @@ import com.lemline.core.instances.RunInstance
 import io.serverlessworkflow.api.types.RunScript
 import io.serverlessworkflow.api.types.RunShell
 import io.serverlessworkflow.api.types.RunWorkflow
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -16,6 +17,7 @@ import kotlinx.serialization.json.JsonElement
  * It inspects the task configuration and dispatches to the appropriate
  * execution logic for running a shell command or a script.
  */
+@ExperimentalTime
 class RunTaskRunner : ActivityRunner<RunInstance> {
     override suspend fun run(instance: RunInstance): JsonElement {
         // Delegate to the appropriate private helper and set the rawOutput
@@ -23,7 +25,7 @@ class RunTaskRunner : ActivityRunner<RunInstance> {
             is RunScript -> instance.runScript(run)
             is RunShell -> instance.runShell(run)
             is RunWorkflow -> instance.runWorkflow(run)
-            else -> instance.onError(RUNTIME, "Unsupported run type: ${run.javaClass.simpleName}")
+            else -> instance.raiseError(RUNTIME, "Unsupported run type: ${run.javaClass.simpleName}")
         }
     }
 }

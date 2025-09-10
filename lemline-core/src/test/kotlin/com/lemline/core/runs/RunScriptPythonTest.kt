@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.runs
 
-import com.lemline.core.getWorkflowInstance
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
+import com.lemline.core.getWorkflowProcessor
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.impl.WorkflowStatus
 import java.io.File
 import java.nio.file.Path
 import kotlin.test.assertTrue
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
 import org.junit.jupiter.api.io.TempDir
 
+@ExperimentalTime
 class RunScriptPythonTest {
 
     @TempDir
@@ -58,7 +60,7 @@ class RunScriptPythonTest {
                         print('Hello, World!')
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -81,7 +83,7 @@ class RunScriptPythonTest {
                           uri: "file://${testScriptFile.absolutePath}"
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -106,7 +108,7 @@ class RunScriptPythonTest {
                     return: stderr
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -139,7 +141,7 @@ class RunScriptPythonTest {
                         "key2": "value2"
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -172,7 +174,7 @@ class RunScriptPythonTest {
                         ANOTHER_VAR: "12345"
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -200,7 +202,7 @@ class RunScriptPythonTest {
                     return: stderr
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -229,7 +231,7 @@ class RunScriptPythonTest {
                     return: code
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         instance.run()
         instance.run()
 
@@ -255,7 +257,7 @@ class RunScriptPythonTest {
                         print('found' if 'testfile.txt' in os.listdir('.') else 'not found')
         """.trimIndent()
 
-        val instance = getWorkflowInstance(workflowYaml, LemlineJson.jsonObject)
+        val instance = getWorkflowProcessor(workflowYaml, LemlineJson.jsonObject)
         // Set working directory manually if your test harness supports it
         instance.run()
         instance.run()

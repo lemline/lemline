@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
-import com.lemline.core.json.NodePositionSerializer
+import com.lemline.common.json.LemlineJson
 import kotlinx.serialization.Serializable
 
 /**
@@ -16,10 +16,10 @@ data class NodePosition(private val path: List<String> = listOf()) {
     /**
      * Json pointer representation. (e.g., "/do/0/do")
      */
-    val jsonPointer by lazy {
+    val positionPointer by lazy {
         when (path.isEmpty()) {
-            true -> JsonPointer.root
-            else -> JsonPointer("/${path.joinToString("/")}")
+            true -> PositionPointer.root
+            else -> PositionPointer("/${path.joinToString("/")}")
         }
     }
 
@@ -28,7 +28,7 @@ data class NodePosition(private val path: List<String> = listOf()) {
      *
      * @return The JSON pointer string (e.g., "/do/0/do")
      */
-    override fun toString() = jsonPointer.toString()
+    override fun toString() = positionPointer.toString()
 
     /**
      * Adds a name component to the JSON pointer path.
@@ -74,6 +74,11 @@ data class NodePosition(private val path: List<String> = listOf()) {
         get() = if (path.isEmpty()) null else NodePosition(path.dropLast(1))
 
     companion object {
-        val root = JsonPointer.root.toPosition()
+        val root = PositionPointer.root.toPosition()
+
+        fun from(path: String) = PositionPointer(path).toPosition()
+
+        fun fromJsonString(jsonString: String): NodePosition = LemlineJson.decodeFromString(jsonString)
+
     }
 }

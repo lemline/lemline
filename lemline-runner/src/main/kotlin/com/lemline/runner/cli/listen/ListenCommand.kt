@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.listen
 
-import com.lemline.common.logger
+import com.lemline.common.logger.logger
 import com.lemline.runner.cli.GlobalMixin
 import io.quarkus.arc.Unremovable
 import io.quarkus.runtime.Quarkus
@@ -66,9 +66,9 @@ class ListenCommand : Runnable {
                                 %@@%%@
                    """.trimIndent().lines()
 
-        mascotLines.forEach { line -> logger.info(line) }
+        mascotLines.forEach { line -> logger.info { line } }
 
-        logger.info("Start consuming messages...")
+        logger.info { "Start consuming messages..." }
         Quarkus.waitForExit()
     }
 }

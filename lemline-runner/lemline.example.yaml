@@ -1,0 +1,134 @@
+# ----------------------------------------------------------------------------
+# Lemline Worker - Example Configuration (application.yaml)
+# ----------------------------------------------------------------------------
+#
+# This file provides examples of how to configure Lemline to connect to
+# your specific infrastructure (Database and Message Broker).
+#
+# How to use:
+# 1. Rename this file to `application.yaml`.
+# 2. Place it in the same directory as the Lemline binary or in a standard
+#    configuration location (e.g., /etc/lemline/, ~/.config/lemline/).
+# 3. Configure the `lemline.database` and `lemline.messaging` sections below.
+#    The database and messaging types are INFERRED automatically based on which
+#    configuration block you provide (e.g., `postgresql`, `kafka`).
+# 4. Set required environment variables (e.g., for passwords) or replace
+#    the `${VAR_NAME:default}` placeholders with your actual values.
+#
+# Lemline automatically translates these settings into the required framework
+# configurations. Only the settings for the provided block will be used
+# (e.g., `lemline.messaging.kafka.*` is used if a `kafka:` block is present).
+#
+# ----------------------------------------------------------------------------
+# Quick Start Minimal Example (PostgreSQL + Kafka with defaults):
+# ----------------------------------------------------------------------------
+# lemline:
+#   database:
+#     postgresql:
+#       # Assumes PG on localhost:5432, user postgres, password via environment variable
+#   messaging:
+#     kafka:
+#       # Assumes Kafka on localhost:9092
+#       # Optional: Set KAFKA_USER/PASSWORD env vars if needed
+# ----------------------------------------------------------------------------
+# Recommended Environment Variables:
+# ----------------------------------------------------------------------------
+# For security and flexibility, it's best to configure secrets via environment variables:
+# - LEMLINE_DB_PASSWORD
+# - LEMLINE_KAFKA_PASSWORD (if using Kafka SASL)
+# - LEMLINE_RABBITMQ_PASSWORD (if using RabbitMQ authentication)
+# You can also override other settings like LEMLINE_DB_HOST, LEMLINE_KAFKA_BROKERS, etc.
+# ----------------------------------------------------------------------------
+
+# ----------------------------------------------------------------------------
+# Quarkus Core Settings (Only advanced settings exposed)
+# ----------------------------------------------------------------------------
+quarkus:
+
+  # --- App Configuration ---
+  application:
+    name: lemline-runner
+    version: 1.0.0 # Replace with actual version
+
+  # --- Logging Configuration ---
+  # Logging is configured using standard Quarkus properties for full flexibility.
+  # See: https://quarkus.io/guides/logging
+  log:
+    level: INFO # Default log level
+    category:
+      "com.lemline":
+        level: INFO
+    console:
+      format: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5p [%X{requestId},%X{workflowId},%X{correlationId}] [%c{2.}] (%t) %s%e%n"
+      color: true
+
+# ----------------------------------------------------------------------------
+# Lemline Infrastructure Settings
+# ----------------------------------------------------------------------------
+lemline:
+  # --- Database Configuration ---
+  # The database type is inferred from the block you configure below (e.g., `postgresql` or `mysql`).
+  database:
+
+    # Create the schema history table if it doesn't exist: true | false
+    baseline-on-migrate: true
+
+    # Apply database migrations at startup: true | false
+    migrate-at-start: true
+
+    # --- PostgreSQL Settings (Uncomment and configure to use PostgreSQL) ---
+    postgresql:
+      host: ${LEMLINE_PG_HOST:localhost}
+      port: ${LEMLINE_PG_PORT:5432}
+      username: ${LEMLINE_PG_USER:postgres}
+      password: ${LEMLINE_PG_PASSWORD:postgres} # RECOMMENDED: Set via LEMLINE_PG_PASSWORD env var!
+      name: ${LEMLINE_PG_DB_NAME:lemline}
+
+    # --- MySQL Settings (Uncomment and configure to use MySQL) ---
+    # mysql:
+    #  host: ${LEMLINE_MYSQL_HOST:localhost}
+    #  port: ${LEMLINE_MYSQL_PORT:3306}
+    #  username: ${LEMLINE_MYSQL_USER:root}
+    #  password: ${LEMLINE_MYSQL_PASSWORD:password} # RECOMMENDED: Set via LEMLINE_MYSQL_PASSWORD env var!
+    #  name: ${LEMLINE_MYSQL_DB_NAME:lemline}
+
+  # --- Messaging Configuration ---
+  # The messaging type is inferred from the block you configure below (e.g., `kafka` or `rabbitmq`).
+  messaging:
+
+    # --- Kafka Specific Settings (Uncomment and configure to use Kafka) ---
+    kafka:
+      brokers: ${LEMLINE_KAFKA_BROKERS:localhost:9092}
+      # security-protocol: ${LEMLINE_KAFKA_SECURITY_PROTOCOL:PLAINTEXT}  # PLAINTEXT|SSL|SASL_PLAINTEXT|SASL_SSL
+      # sasl-mechanism: ${LEMLINE_KAFKA_SASL_MECHANISM:}                 # e.g., PLAIN
+      # sasl-username: ${LEMLINE_KAFKA_USER:}
+      # sasl-password: ${LEMLINE_KAFKA_PASSWORD:}                        # set via env/secret manager
+      workflows:
+        topic: ${LEMLINE_WORKFLOWS_TOPIC:lemline-workflows}
+        consumer:
+          concurrency: ${LEMLINE_WORKFLOWS_CONCURRENCY:10}
+          dlq: ${LEMLINE_WORKFLOWS_DLQ:lemline-workflows-dlq}
+          group-id: ${LEMLINE_WORKFLOWS_KAFKA_GROUP_ID:lemline-workflows-g1}
+      ingestion:
+        topic: ${LEMLINE_INGESTION_TOPIC:lemline-ingestion}
+        consumer:
+          concurrency: ${LEMLINE_INGESTION_CONCURRENCY:5}
+          dlq: ${LEMLINE_INGESTION_DLQ:lemline-ingestion-dlq}
+          group-id: ${LEMLINE_INGESTION_KAFKA_GROUP_ID:lemline-ingestion-g1}
+
+    # --- RabbitMQ Specific Settings (Uncomment and configure to use RabbitMQ) ---
+    rabbitmq:
+      hostname: ${LEMLINE_RABBITMQ_HOST:localhost}
+      port: ${LEMLINE_RABBITMQ_PORT:5672}
+      username: ${LEMLINE_RABBITMQ_USER:}
+      password: ${LEMLINE_RABBITMQ_PASSWORD:}
+      # Optional: Configure exchange (if used, remove/comment out the 'queue:' line above)
+      # exchange-name: my_exchange
+      # Optional: TLS/SSL configuration
+      # ssl-enabled: false
+      workflows:
+        virtual-host: ${LEMLINE_WORKFLOWS_RABBITMQ_VHOST:/}
+        queue: ${LEMLINE_WORKFLOWS_TOPIC:lemline}
+        consumer:
+          concurrency: ${LEMLINE_WORKFLOWS_CONCURRENCY:5}
+          dlq: ${LEMLINE_WORKFLOWS_DLQ:lemline-ingestion-dlq}

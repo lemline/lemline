@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.core.instances
 
+import com.lemline.core.errors.WorkflowError
+import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodeInstance
 import com.lemline.core.utils.toDuration
@@ -13,6 +17,8 @@ import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.WaitTask
+import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
 
 /**
  * Sealed base class for all activity node instances.
@@ -28,8 +34,23 @@ sealed class ActivityInstance<T : TaskBase>(
     parent: NodeInstance<*>?,
 ) : NodeInstance<T>(node, parent) {
     final override suspend fun run() {
-        rawOutput = workflowInstance.activityRunnerProvider.run(this)
+        rawOutput = processor.activityRunnerProvider.run(this)
     }
+
+    override fun raiseError(
+        type: WorkflowErrorType,
+        title: String?,
+        details: String?,
+        status: Int?,
+    ): Nothing = raise(
+        error = WorkflowError(
+            errorType = type,
+            title = title ?: "Unknown Error",
+            details = details,
+            status = status ?: type.defaultStatus,
+            position = node.position,
+        )
+    )
 }
 
 // --- Concrete Activity Instance Definitions ---
@@ -61,5 +82,5 @@ class WaitInstance(node: Node<WaitTask>, parent: NodeInstance<*>) :
      * Duration for which the workflow should wait before resuming.
      * The duration is extracted from the WaitTask and converted to a Duration using ISO-8601 duration format.
      * Examples: "PT15S" (15 seconds), "PT1H" (1 hour), "P1D" (1 day) */
-    val delay by lazy { node.task.wait.toDuration() }
+    val delay: Duration by lazy { node.task.wait.toDuration() }
 }

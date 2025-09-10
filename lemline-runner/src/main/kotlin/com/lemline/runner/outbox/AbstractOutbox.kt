@@ -1,24 +1,30 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.common.error
-import com.lemline.common.logger
-import com.lemline.runner.config.toDuration
+import com.lemline.common.logger.logger
+import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.messaging.instances.InstanceMessageEmitter
 import com.lemline.runner.models.OutboxModel
+import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository
-import io.quarkus.smallrye.reactivemessaging.sendSuspending
+import io.quarkus.runtime.ShutdownEvent
 import jakarta.annotation.PostConstruct
-import jakarta.annotation.PreDestroy
+import jakarta.enterprise.event.Observes
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
-import org.eclipse.microprofile.reactive.messaging.Emitter
-import org.slf4j.Logger
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * AbstractOutbox provides base functionality for outbox pattern implementations.
@@ -31,32 +37,32 @@ import org.slf4j.Logger
  * multiple instances of the same operation from running simultaneously.
  *
  * @param T Type of the message entity (must implement OutboxModel interface)
- * @see OutboxProcessor for the core message processing logic
+ * @see OutboxRelay for the core message processing logic
  */
+@ExperimentalTime
+@ExperimentalSerializationApi
 internal abstract class AbstractOutbox<T : OutboxModel>() {
-    protected val logger: Logger by lazy { logger() }
+    protected val logger by lazy { logger() }
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     protected abstract val enabled: Boolean
 
-    protected abstract val processingBatchSize: Int
-    protected abstract val processingPeriod: String
-    protected abstract val processingMaxAttempts: Int
-    protected abstract val processingInitialDelayAttempt: String
+    protected abstract val failureRepository: FailureRepository
+    protected abstract val outboxRepository: OutboxRepository<T>
+    protected abstract val instanceEmitter: InstanceMessageEmitter
 
-    protected abstract val cleanupAfter: String
-    protected abstract val cleanupBatchSize: Int
-    protected abstract val cleanupPeriod: String
+    protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig?
+    protected abstract val cleanupConf: LemlineConfiguration.OutboxCleanupConfig
 
-    protected abstract val repository: OutboxRepository<T>
-    protected abstract val emitter: Emitter<String>
+    private val gracePeriod = 5000L
 
-    private val outboxProcessor by lazy {
-        OutboxProcessor(
+    private val outboxRelay by lazy {
+        OutboxRelay(
             logger = logger,
-            repository = repository,
-            processor = ::process,
+            failureRepository = failureRepository,
+            outboxRepository = outboxRepository,
+            relay = ::process,
         )
     }
 
@@ -66,48 +72,82 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     private val outboxCleaningExecutor = Executors.newSingleThreadScheduledExecutor()
     private val outboxCleaning = AtomicBoolean(false)
 
-    open suspend fun process(model: T) {
-        emitter.sendSuspending(model.message)
+    private val isShuttingDown = AtomicBoolean(false)
+
+    open suspend fun process(entity: T) {
+        instanceEmitter.send(entity.instanceMessage)
     }
 
     @PostConstruct
     fun init() {
         if (!enabled) {
-            logger.debug("🚫 Outbox disabled by config")
+            logger.debug { "🚫 Outbox disabled by config" }
             return
         }
 
         // Schedule outbox processing
-        val outboxPeriodSeconds = processingPeriod.toDuration().toSeconds()
-        outboxProcessingExecutor.scheduleAtFixedRate(
-            { scope.launch { outbox() } },
-            0,
-            outboxPeriodSeconds,
-            TimeUnit.SECONDS
-        )
-        logger.info("⏱️ Outbox processing scheduled every ${outboxPeriodSeconds}s")
+        outboxConf?.every?.inWholeSeconds?.let { period ->
+            outboxProcessingExecutor.scheduleAtFixedRate(
+                { scope.launch { outbox() } },
+                0,
+                period,
+                TimeUnit.SECONDS
+            )
+            logger.info { "⏱️ Outbox processing scheduled every ${period}s" }
+        }
 
         // Schedule cleanup
-        val cleanupPeriodSeconds = cleanupPeriod.toDuration().toSeconds()
+        val cleanupPeriodSeconds = cleanupConf.every.inWholeSeconds
         outboxCleaningExecutor.scheduleAtFixedRate(
             { scope.launch { cleanup() } },
             0,
             cleanupPeriodSeconds,
             TimeUnit.SECONDS
         )
-        logger.info("⏱️ Outbox cleaning scheduled every ${cleanupPeriodSeconds}s")
+        logger.info { "⏱️ Outbox cleaning scheduled every ${cleanupPeriodSeconds}s" }
     }
 
-    @PreDestroy
-    private fun shutdown() {
-        logger.info("🛑 Shutting down outbox...")
+    // Quarkus will wait for the completion of performGracefulShutdown() before shutting down
+    fun onQuarkusShutdown(@Observes event: ShutdownEvent) {
+        logger.info { "🛑 ShutdownEvent received - initiating graceful shutdown" }
+        performGracefulShutdown(gracePeriod)
+    }
 
-        // Cancel coroutines
-        scope.cancel()
+    private fun performGracefulShutdown(timeoutMs: Long) {
+        if (!isShuttingDown.compareAndSet(false, true)) {
+            logger.info { "🛑 Shutdown already in progress - ignoring" }
+            return
+        }
 
-        // Shutdown executors
+        logger.info { "🛑 Shutting down outbox..." }
+
+        // Shutdown executors first (prevents new coroutine launches)
         shutdownExecutor(outboxProcessingExecutor, "processing")
         shutdownExecutor(outboxCleaningExecutor, "cleaning")
+
+        // Wait for active coroutines to complete (non-blocking)
+        gracefulWaitForCompletion(timeoutMs)
+    }
+
+    private fun gracefulWaitForCompletion(timeoutMs: Long) {
+        // Use a separate thread to avoid blocking @PreDestroy
+        try {
+            runBlocking {
+                withTimeout(timeoutMs) {
+                    // Wait for all child coroutines to complete
+                    scope.coroutineContext.job.children.forEach { it.join() }
+                }
+                logger.info { "✅ All scheduled tasks processed, completing shutdown" }
+            }
+        } catch (_: TimeoutCancellationException) {
+            logger.warn { "⚠️ Graceful shutdown timed out with tasks still being processed" }
+        } catch (e: Exception) {
+            logger.error(e) { "💥 Error during graceful shutdown" }
+        } finally {
+            // Always cancel remaining coroutines
+            scope.cancel()
+            logger.info { "🏁 Outbox scope cancelled" }
+        }
     }
 
     /**
@@ -115,16 +155,21 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      * This method uses an `AtomicBoolean` to prevent overlapping executions.
      */
     private suspend fun outbox() {
+        if (isShuttingDown.get()) {
+            logger.debug { "⏹️ Skipping outbox processing: shutdown in progress" }
+            return
+        }
+
         if (!outboxProcessing.compareAndSet(false, true)) {
-            logger.warn("⏭ Skipping scheduled outbox processing: previous execution still running")
+            logger.warn { "⏭ Skipping scheduled outbox processing: previous execution still running" }
             return
         }
 
         try {
-            outboxProcessor.process(
-                processingBatchSize,
-                processingMaxAttempts,
-                processingInitialDelayAttempt.toDuration(),
+            outboxRelay.process(
+                batchSize = outboxConf!!.batchSize,
+                maxAttempts = outboxConf!!.maxAttempts,
+                initialDelay = outboxConf!!.initialDelay,
             )
         } catch (e: Exception) {
             logger.error(e) { "💥 Error during outbox processing" }
@@ -138,15 +183,21 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      * This method uses an `AtomicBoolean` to prevent overlapping executions.
      */
     private suspend fun cleanup() {
+        if (isShuttingDown.get()) {
+            logger.debug { "⏹️ Skipping outbox cleaning: shutdown in progress" }
+            return
+        }
+
+
         if (!outboxCleaning.compareAndSet(false, true)) {
-            logger.warn("⏭ Skipping scheduled outbox cleaning: previous execution still running")
+            logger.warn { "⏭ Skipping scheduled outbox cleaning: previous execution still running" }
             return
         }
 
         try {
-            outboxProcessor.cleanup(
-                cleanupAfter.toDuration(),
-                cleanupBatchSize,
+            outboxRelay.cleanup(
+                afterDelay = cleanupConf.after,
+                batchSize = cleanupConf.batchSize,
             )
         } catch (e: Exception) {
             logger.error(e) { "💥 Error during outbox cleaning" }
@@ -162,18 +213,20 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      * this fails, it forces the termination of all tasks. It also accounts for interrupted exceptions,
      * ensuring the current thread's interrupt status is reasserted.
      */
-    private fun shutdownExecutor(executor: java.util.concurrent.ScheduledExecutorService, name: String) {
-        executor.shutdown() // stop accepting new tasks
+    private fun shutdownExecutor(executor: ScheduledExecutorService, name: String) {
         try {
-            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                logger.warn("⚠️ Forcing shutdown of outbox $name executor")
+            //Stop accepting new scheduled tasks
+            executor.shutdown()
+
+            if (!executor.awaitTermination(gracePeriod, TimeUnit.MILLISECONDS)) {
+                logger.warn { "⚠️ Forcing shutdown of outbox $name executor" }
                 executor.shutdownNow()
             } else {
-                logger.info("✅ Outbox $name executor stopped gracefully")
+                logger.info { "✅ Outbox $name executor stopped gracefully" }
             }
         } catch (_: InterruptedException) {
             // The current thread was interrupted while waiting
-            logger.error("💥 Interrupted while shutting down outbox $name executor")
+            logger.error { "💥 Interrupted while shutting down outbox $name executor" }
             executor.shutdownNow()
             Thread.currentThread().interrupt() // <- reassert the interrupt status
         }

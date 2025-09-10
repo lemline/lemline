@@ -1,29 +1,31 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.activities
 
+import com.lemline.common.json.LemlineJson
+import com.lemline.common.json.LemlineJson.toJsonPrimitive
 import com.lemline.core.activities.calls.HttpCall
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.instances.CallHttpInstance
-import com.lemline.core.json.LemlineJson
-import com.lemline.core.json.LemlineJson.toJsonPrimitive
 import com.lemline.core.utils.getAuthenticationPolicyByName
 import com.lemline.core.utils.toAuthenticationPolicy
 import com.lemline.core.utils.toSecret
 import com.lemline.core.utils.toUrl
 import io.ktor.http.*
 import io.serverlessworkflow.api.types.HTTPArguments
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
+@ExperimentalTime
 class HttpCallRunner : ActivityRunner<CallHttpInstance> {
     override suspend fun run(instance: CallHttpInstance): JsonElement {
         // The HttpCall helper is instantiated here, using method references from the instance
         val httpCall = HttpCall(
             getSecretByName = instance::toSecret,
             getAuthenticationPolicyByName = instance::getAuthenticationPolicyByName,
-            onError = instance::onError,
+            raiseError = instance::raiseError,
         )
 
-        instance.logInfo { "Executing HTTP call: ${instance.node.name}" }
+        instance.logger.debug { "Executing HTTP call: ${instance.node.name}" }
 
         val httpArgs = instance.node.task.with
 
@@ -33,7 +35,7 @@ class HttpCallRunner : ActivityRunner<CallHttpInstance> {
             "GET" -> HttpMethod.Get
             "PUT" -> HttpMethod.Put
             "DELETE" -> HttpMethod.Delete
-            else -> instance.onError(WorkflowErrorType.CONFIGURATION, "Unsupported HTTP method: ${httpArgs.method}")
+            else -> instance.raiseError(WorkflowErrorType.CONFIGURATION, "Unsupported HTTP method: ${httpArgs.method}")
         }
 
         // Extract other arguments using the instance

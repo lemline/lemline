@@ -8,6 +8,7 @@ import com.lemline.runner.LemlineApplication
 import com.lemline.runner.cli.GlobalMixin
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.config.Config
 import picocli.CommandLine.Command
 import picocli.CommandLine.ITypeConverter
@@ -44,6 +45,7 @@ class ConfigCommand : Runnable {
     @Inject
     lateinit var lemlineConfig: Config
 
+    @ExperimentalSerializationApi
     override fun run() {
 
         val properties = lemlineConfig.propertyNames.asSequence()
@@ -51,12 +53,13 @@ class ConfigCommand : Runnable {
             .filter { it.isNotBlank() } // Skip empty property names
             .sorted()
             .associateWith {
-                lemlineConfig.getOptionalValue(it, String::class.java).orElse("")
+                lemlineConfig.getConfigValue(it).value
+                //lemlineConfig.getOptionalValue(it, String::class.java).orElse("")
             }
 
         println(
             "# Configuration from " +
-                (LemlineApplication.Companion.configPath?.toAbsolutePath()?.let { "$it + " } ?: "") +
+                (LemlineApplication.configPath?.toAbsolutePath()?.let { "$it + " } ?: "") +
                 "default values."
         )
         when (format) {

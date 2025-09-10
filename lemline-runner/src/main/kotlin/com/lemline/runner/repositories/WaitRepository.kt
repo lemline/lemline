@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.models.WAIT_TABLE
-import com.lemline.runner.models.WaitModel
+import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.outbox.OutboxRelay
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.time.Instant
+import java.sql.ResultSet
+import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
+
+const val WAIT_TABLE = "lemline_waits"
 
 /**
  * Repository for managing wait messages in the outbox pattern.
@@ -20,29 +23,29 @@ import java.time.Instant
  * ensuring reliable message delivery in distributed systems.
  *
  * @see OutboxRepository for base functionality and documentation
- * @see WaitModel for the message model
- * @see OutboxProcessor for the processing logic
+ * @see WaitOutboxModel for the message model
+ * @see OutboxRelay for the processing logic
  */
 @ApplicationScoped
-internal class WaitRepository : OutboxRepository<WaitModel>() {
+@ExperimentalSerializationApi
+@ExperimentalTime
+internal class WaitRepository : OutboxRepository<WaitOutboxModel>() {
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = WAIT_TABLE
 
-    override fun createModel(
-        id: String,
-        message: String,
-        status: OutBoxStatus,
-        delayedUntil: Instant?,
-        attemptCount: Int,
-        lastError: String?,
-    ) = WaitModel(
-        id = id,
-        message = message,
-        status = status,
-        delayedUntil = delayedUntil,
-        attemptCount = attemptCount,
-        lastError = lastError
-    )
+    @ExperimentalTime
+    override fun createModel(rs: ResultSet) = WaitOutboxModel(
+        id = getIDV7(rs, ID_COLUMN)!!,
+        instanceMessage = rs.getInstanceMessage()!!,
+        outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
+        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
+    ).apply {
+        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN)
+        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN)
+        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN)
+        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN)
+        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN)
+    }
 }

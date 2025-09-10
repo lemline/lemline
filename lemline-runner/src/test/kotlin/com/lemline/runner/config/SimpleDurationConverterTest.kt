@@ -1,13 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
-import java.time.Duration
+import io.quarkus.test.junit.TestProfile
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 @QuarkusTest
+@TestProfile(InMemoryProfile::class)
 internal class SimpleDurationConverterTest {
 
     @Test
@@ -19,7 +25,7 @@ internal class SimpleDurationConverterTest {
         val duration = input.toDuration()
 
         // Then
-        assertEquals(Duration.ofSeconds(30), duration)
+        assertEquals(30.seconds, duration)
     }
 
     @Test
@@ -31,7 +37,7 @@ internal class SimpleDurationConverterTest {
         val duration = input.toDuration()
 
         // Then
-        assertEquals(Duration.ofMinutes(5), duration)
+        assertEquals(5.minutes, duration)
     }
 
     @Test
@@ -43,7 +49,7 @@ internal class SimpleDurationConverterTest {
         val duration = input.toDuration()
 
         // Then
-        assertEquals(Duration.ofHours(2), duration)
+        assertEquals(2.hours, duration)
     }
 
     @Test
@@ -55,7 +61,7 @@ internal class SimpleDurationConverterTest {
         val duration = input.toDuration()
 
         // Then
-        assertEquals(Duration.ofDays(7), duration)
+        assertEquals(7.days, duration)
     }
 
     @Test
@@ -67,7 +73,7 @@ internal class SimpleDurationConverterTest {
         val duration = input.toDuration()
 
         // Then
-        assertEquals(Duration.ofSeconds(30), duration)
+        assertEquals(30.seconds, duration)
     }
 
     @Test
@@ -79,7 +85,7 @@ internal class SimpleDurationConverterTest {
         val duration = input.toDuration()
 
         // Then
-        assertEquals(Duration.ofSeconds(30), duration)
+        assertEquals(30.seconds, duration)
     }
 
     @Test

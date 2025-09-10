@@ -3,7 +3,6 @@
 <buildprofiles xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                xsi:noNamespaceSchemaLocation="https://resources.jetbrains.com/writerside/1.0/build-profiles.xsd">
 
-    <variables></variables>
     <build-profile instance="docs">
         <variables>
             <!-- Theme settings to use system preference -->
@@ -15,10 +14,18 @@
             <noindex-content>true</noindex-content>
         </variables>
     </build-profile>
-    <llms-txt single-file="true"/>
     <footer>
-        <copyright>2025 Zenaton (c)</copyright>
+        <copyright>2025 Gilles Barbier (c)</copyright>
         <!--        <social type="twitter" href="https://twitter.com/onwriterside"/>-->
         <!--        <link href="https://blog.jetbrains.com">Blog</link>-->
     </footer>
+    <build-profile instance="lemline">
+        <variables>
+            <noindex-content>true</noindex-content>
+            <primary-color>purple</primary-color>
+            <header-logo>sw-logo.png</header-logo>
+            <custom-favicons>favicon.ico</custom-favicons>
+        </variables>
+        <llms-txt single-file="true"/>
+    </build-profile>
 </buildprofiles>

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.Token.BRANCHES
 import com.lemline.core.nodes.Token.CATCH
 import com.lemline.core.nodes.Token.DO
@@ -41,7 +41,7 @@ import kotlinx.serialization.json.JsonObject
  */
 data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name: String, val parent: Node<*>? = null) {
     val definition: JsonObject = LemlineJson.encodeToElement(task)
-    val reference: String = position.jsonPointer.toString()
+    val reference: String = position.positionPointer.toString()
 
     /**
      * The list of task nodes depending on this one
@@ -72,7 +72,7 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
         is RaiseTask,
         is SetTask,
         is SwitchTask,
-        -> false
+            -> false
 
         is CallAsyncAPI,
         is CallGRPC,
@@ -83,7 +83,7 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
         is ListenTask,
         is RunTask,
         is WaitTask,
-        -> true
+            -> true
 
         else -> throw IllegalArgumentException("Unknown task type: ${task.javaClass.name}")
     }
@@ -99,9 +99,9 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
         val nodes = mutableSetOf<String>()
         val edges = mutableSetOf<String>()
 
-        fun processNode(node: Node<*>, parentId: JsonPointer? = null) {
+        fun processNode(node: Node<*>, parentId: PositionPointer? = null) {
             val taskType = node.task.javaClass.simpleName
-            val nodeId = node.position.jsonPointer
+            val nodeId = node.position.positionPointer
 
             // Add node with task type and initialPosition
             val nodeLabel = "\"${node.name}\n($taskType)\""

@@ -2,7 +2,11 @@
 package com.lemline.runner.messaging
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
-import com.lemline.runner.messaging.bases.WorkflowConsumerTest
+import com.lemline.runner.messaging.base.WorkflowConsumerTest
+import com.lemline.runner.messaging.database.DATABASE_IN_CHANNEL
+import com.lemline.runner.messaging.database.DATABASE_OUT_CHANNEL
+import com.lemline.runner.messaging.instances.WORKFLOWS_IN_CHANNEL
+import com.lemline.runner.messaging.instances.WORKFLOWS_OUT_CHANNEL
 import com.lemline.runner.tests.profiles.RabbitMQProfile
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
@@ -14,6 +18,8 @@ import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.junit.jupiter.api.Tag
 
@@ -25,6 +31,8 @@ import org.junit.jupiter.api.Tag
 @TestProfile(RabbitMQProfile::class)
 @Tag("integration")
 @EnabledOnlyIfDockerAvailable
+@ExperimentalTime
+@ExperimentalSerializationApi
 internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 
     @ConfigProperty(name = "rabbitmq-host")
@@ -39,15 +47,23 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
     @ConfigProperty(name = "rabbitmq-password")
     lateinit var rabbitmqPassword: String
 
-    @ConfigProperty(name = "mp.messaging.incoming.$WORKFLOW_IN.queue.name")
-    lateinit var queueIn: String
+    @ConfigProperty(name = "mp.messaging.incoming.$WORKFLOWS_IN_CHANNEL.queue.name")
+    lateinit var instanceQueueIn: String
 
-    @ConfigProperty(name = "mp.messaging.outgoing.$WORKFLOW_OUT.queue.name")
-    lateinit var queueOut: String
+    @ConfigProperty(name = "mp.messaging.outgoing.$WORKFLOWS_OUT_CHANNEL.queue.name")
+    lateinit var instanceQueueOut: String
+
+    @ConfigProperty(name = "mp.messaging.incoming.$DATABASE_IN_CHANNEL.queue.name")
+    lateinit var databaseQueueIn: String
+
+    @ConfigProperty(name = "mp.messaging.outgoing.$DATABASE_OUT_CHANNEL.queue.name")
+    lateinit var databaseQueueOut: String
 
     private lateinit var connection: Connection
-    private lateinit var channel: Channel
-    private val deliveries = LinkedBlockingQueue<Delivery>()
+    private lateinit var instanceChannel: Channel
+    private lateinit var databaseChannel: Channel
+    private val instanceDeliveries = LinkedBlockingQueue<Delivery>()
+    private val databaseDeliveries = LinkedBlockingQueue<Delivery>()
 
     override fun setupMessaging() {
         // Setup RabbitMQ connection
@@ -58,47 +74,79 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
             password = rabbitmqPassword
         }
         connection = factory.newConnection()
-        channel = connection.createChannel()
+        instanceChannel = connection.createChannel()
+        databaseChannel = connection.createChannel()
 
         // In testing, queues In and Out must be different
-        require(queueIn != queueOut) {
-            "For RabbitMQ *testing*, queues In ($queueIn) and Out ($queueOut) must be different"
+        require(instanceQueueIn != instanceQueueOut) {
+            "For RabbitMQ *testing*, queues In ($instanceQueueIn) and Out ($instanceQueueOut) must be different"
+        }
+        require(databaseQueueIn != databaseQueueOut) {
+            "For RabbitMQ *testing*, queues In ($databaseQueueIn) and Out ($databaseQueueOut) must be different"
         }
 
         // Declare the incoming queue
-        channel.queueDeclare(queueIn, true, false, false, null)
+        val instanceArgs = mapOf(
+            "x-dead-letter-exchange" to "$WORKFLOWS_IN_CHANNEL.dlx",
+            "x-dead-letter-routing-key" to "lemline-workflows.dlq"
+        )
+        instanceChannel.queueDeclare(instanceQueueIn, true, false, false, instanceArgs)
+        val databaseArgs = mapOf(
+            "x-dead-letter-exchange" to "$DATABASE_IN_CHANNEL.dlx",
+            "x-dead-letter-routing-key" to "lemline-ingestion.dlq"
+        )
+        databaseChannel.queueDeclare(databaseQueueIn, true, false, false, databaseArgs)
 
         // Explicitly declare the exchange that SmallRye will default to
-        channel.exchangeDeclare(WORKFLOW_OUT, "topic", true)
+        instanceChannel.exchangeDeclare(WORKFLOWS_OUT_CHANNEL, "topic", true)
+        databaseChannel.exchangeDeclare(DATABASE_OUT_CHANNEL, "topic", true)
 
         // Declare the outgoing queue (where this test consumes)
-        channel.queueDeclare(queueOut, true, false, false, null)
+        instanceChannel.queueDeclare(instanceQueueOut, true, false, false, null)
+        databaseChannel.queueDeclare(databaseQueueOut, true, false, false, null)
 
         // Bind the outgoing queue to the exchange with an EMPTY routing key,
         // matching the default behavior observed in the logs.
-        channel.queueBind(queueOut, WORKFLOW_OUT, "") // routingKey = ""
+        instanceChannel.queueBind(instanceQueueOut, WORKFLOWS_OUT_CHANNEL, "") // routingKey = ""
+        databaseChannel.queueBind(databaseQueueOut, DATABASE_OUT_CHANNEL, "") // routingKey = ""
 
         // Purge queues
-        channel.queuePurge(queueIn)
-        channel.queuePurge(queueOut)
+        instanceChannel.queuePurge(instanceQueueIn)
+        instanceChannel.queuePurge(instanceQueueOut)
+        databaseChannel.queuePurge(databaseQueueIn)
+        databaseChannel.queuePurge(databaseQueueOut)
 
         // Setup consumer
-        val deliverCallback = DeliverCallback { _, delivery ->
+        val instanceCallback = DeliverCallback { _, delivery ->
             println("Received message on output queue: ${String(delivery.body)}")
-            deliveries.offer(delivery)
+            instanceDeliveries.offer(delivery)
         }
-        channel.basicConsume(queueOut, true, deliverCallback) { }
+        instanceChannel.basicConsume(instanceQueueOut, true, instanceCallback) { }
+        val databaseCallback = DeliverCallback { _, delivery ->
+            println("Received message on output queue: ${String(delivery.body)}")
+            databaseDeliveries.offer(delivery)
+        }
+        databaseChannel.basicConsume(databaseQueueOut, true, databaseCallback) { }
     }
 
     override fun cleanupMessaging() {
-        if (::channel.isInitialized) channel.close()
+        if (::instanceChannel.isInitialized) instanceChannel.close()
+        if (::databaseChannel.isInitialized) databaseChannel.close()
         if (::connection.isInitialized) connection.close()
     }
 
-    override fun sendMessage(message: String) {
-        channel.basicPublish("", queueIn, MessageProperties.PERSISTENT_TEXT_PLAIN, message.toByteArray())
+    override fun sendInstanceMessage(message: String) {
+        instanceChannel.basicPublish(
+            "",
+            instanceQueueIn,
+            MessageProperties.PERSISTENT_TEXT_PLAIN,
+            message.toByteArray()
+        )
     }
 
-    override fun receiveMessage(timeout: Long, unit: TimeUnit): String? =
-        deliveries.poll(timeout, unit)?.let { String(it.body) }
+    override fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? =
+        instanceDeliveries.poll(timeout, unit)?.let { String(it.body) }
+
+    override fun receiveDatabaseMessage(timeout: Long, unit: TimeUnit): String? =
+        databaseDeliveries.poll(timeout, unit)?.let { String(it.body) }
 }

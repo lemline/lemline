@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.runs
 
-import com.lemline.core.getWorkflowInstance
+import com.lemline.core.getWorkflowProcessor
 import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class FlowDirectiveTest {
 
     @Test
@@ -26,7 +28,7 @@ class FlowDirectiveTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -60,7 +62,7 @@ class FlowDirectiveTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -89,7 +91,7 @@ class FlowDirectiveTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -118,7 +120,7 @@ class FlowDirectiveTest {
                   set:
                     value: @{ .value + "3" }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -152,7 +154,7 @@ class FlowDirectiveTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -181,7 +183,7 @@ class FlowDirectiveTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -210,7 +212,7 @@ class FlowDirectiveTest {
                   set:
                     value: @{ .value + "3" }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -244,7 +246,7 @@ class FlowDirectiveTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -273,7 +275,7 @@ class FlowDirectiveTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -310,7 +312,7 @@ class FlowDirectiveTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()

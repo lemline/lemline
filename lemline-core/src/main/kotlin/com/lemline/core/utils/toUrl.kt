@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.core.utils
 
 import com.lemline.core.errors.WorkflowErrorType
@@ -7,6 +9,7 @@ import com.lemline.core.nodes.NodeInstance
 import io.serverlessworkflow.api.types.UriTemplate
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
+import kotlin.time.ExperimentalTime
 
 internal fun UriTemplate.toUrl(
     onError: (type: WorkflowErrorType, message: String?, details: String?, code: Int?) -> Nothing,
@@ -24,7 +27,7 @@ internal fun NodeInstance<*>.toUrl(uriTemplate: UriTemplate): String = when (val
     is URI -> templateValue.toString()
     // TODO literalUriTemplate
     is String -> templateValue
-    else -> onError(RUNTIME, "Unsupported UriTemplate type: ${templateValue?.javaClass?.name}")
+    else -> raiseError(RUNTIME, "Unsupported UriTemplate type: ${templateValue?.javaClass?.name}")
 }
 
 /**

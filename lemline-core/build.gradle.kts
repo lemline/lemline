@@ -4,6 +4,8 @@ plugins {
     id("buildsrc.convention.kotlin-jvm")
     // Apply Kotlin Serialization plugin from `gradle/libs.versions.toml`.
     alias(libs.plugins.kotlinPluginSerialization)
+
+    id("java-test-fixtures")
 }
 
 /**
@@ -31,6 +33,9 @@ tasks.test {
 
 dependencies {
     implementation(project(":lemline-common"))
+
+    // Add kotlinx-coroutines-slf4j for MDC context support in coroutines
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.7.3")
 
     // Apply the kotlinx bundle of dependencies from the version catalog (`gradle/libs.versions.toml`).
     implementation(libs.bundles.kotlinxEcosystem)
@@ -70,4 +75,9 @@ dependencies {
     // Logging for tests
     testImplementation("io.github.oshai:kotlin-logging-jvm:7.0.7")
     testImplementation("ch.qos.logback:logback-classic:1.5.18")
+
+    // Tests Fixtures
+    testFixturesImplementation(enforcedPlatform(libs.kotest.bom))
+    testFixturesImplementation(libs.bundles.kotlinxEcosystem)
+    testFixturesImplementation(testFixtures(project(":lemline-common")))
 }

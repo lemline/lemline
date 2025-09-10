@@ -27,9 +27,8 @@ class PostgresProfile : QuarkusTestProfile {
         return mapOf(
             // Database configuration
             DATABASE_TYPE to DB_TYPE_POSTGRESQL,
-
             // Messaging configuration
-            MESSAGING_TYPE to MSG_TYPE_IN_MEMORY
+            MESSAGING_TYPE to MSG_TYPE_IN_MEMORY,
         )
     }
 

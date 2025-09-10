@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.nodes
 
-import com.lemline.core.json.LemlineJson
-import kotlinx.datetime.Instant
-import kotlinx.serialization.Contextual
+import com.lemline.common.json.LemlineJson
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonObject
  * Contain initialStates variables for the task during execution.
  * Some value such as forIndex as specific to a specific task
  */
+@ExperimentalTime
 @Serializable
 data class NodeState(
     @SerialName(ATTEMPT_INDEX) var attemptIndex: Int = ATTEMPT_INDEX_DEFAULT,
@@ -21,18 +22,9 @@ data class NodeState(
     @SerialName(RAW_INPUT) var rawInput: JsonElement? = null,
     @SerialName(RAW_OUTPUT) var rawOutput: JsonElement? = null,
     @SerialName(CONTEXT) var context: JsonObject = LemlineJson.jsonObject,
-    @SerialName(WORKFLOW_ID) var workflowId: String? = null,
-    @SerialName(PARENT) var parent: Parent? = null,
-    @SerialName(STARTED_AT) @Contextual var startedAt: Instant? = null,
+    @SerialName(STARTED_AT) var startedAt: Instant? = null,
     @SerialName(FOR_INDEX) var forIndex: Int = FOR_INDEX_DEFAULT,
 ) {
-
-    @Serializable
-    data class Parent(
-        @SerialName(WORKFLOW_ID) var workflowId: String,
-        @SerialName(IS_WAITING) var isWaiting: Boolean
-    )
-
     /**
      * Those constants MUST NOT be changed to ensure backward compatibility of messages
      */
@@ -43,7 +35,6 @@ data class NodeState(
         const val RAW_OUTPUT = "out"
         const val CONTEXT = "ctx"
         const val WORKFLOW_ID = "wid"
-        const val PARENT = "par"
         const val IS_WAITING = "wai"
         const val STARTED_AT = "sat"
         const val FOR_INDEX = "for"

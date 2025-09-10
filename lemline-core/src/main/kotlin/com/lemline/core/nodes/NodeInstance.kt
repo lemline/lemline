@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.core.nodes
 
-import com.lemline.common.debug
-import com.lemline.common.error
-import com.lemline.common.info
-import com.lemline.common.logger
-import com.lemline.common.warn
-import com.lemline.common.withWorkflowContext
+import com.lemline.common.json.LemlineJson
+import com.lemline.common.json.LemlineJson.toJsonElement
+import com.lemline.common.logger.logger
 import com.lemline.core.errors.WorkflowError
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
@@ -19,10 +18,8 @@ import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.instances.RootInstance
 import com.lemline.core.instances.TryInstance
-import com.lemline.core.json.LemlineJson
-import com.lemline.core.json.LemlineJson.toJsonElement
+import com.lemline.core.processor.Processor
 import com.lemline.core.schemas.SchemaValidator
-import com.lemline.core.workflows.WorkflowInstance
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
@@ -32,8 +29,9 @@ import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.api.types.SubflowInput
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import kotlinx.datetime.Instant
-import kotlinx.datetime.toJavaInstant
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlin.time.toJavaInstant
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -45,39 +43,10 @@ import kotlinx.serialization.json.booleanOrNull
  * Base class for all task instances.
  * Task instances maintain the initialStates of a task during execution.
  */
+@ExperimentalTime
 abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val parent: NodeInstance<*>?) {
-    private val logger = logger()
 
-    private fun <T> withWorkflowContext(block: () -> T) = withWorkflowContext(
-        workflowId = rootInstance.workflowDescriptor.id,
-        workflowName = rootInstance.node.task.document.name,
-        workflowVersion = rootInstance.node.task.document.version,
-        nodePosition = node.position.toString(),
-        block = block,
-    )
-
-    /**
-     * Local debug function that sets the workflow context each time it's called
-     */
-    internal fun logDebug(e: Throwable? = null, message: () -> String) =
-        withWorkflowContext { logger.debug(e, message) }
-
-    /**
-     * Local info function that sets the workflow context each time it's called
-     */
-    internal fun logInfo(e: Throwable? = null, message: () -> String) = withWorkflowContext { logger.info(e, message) }
-
-    /**
-     * Local warn function that sets the workflow context each time it's called
-     */
-    internal fun logWarn(e: Throwable? = null, message: () -> String) =
-        withWorkflowContext { logger.warn(e, message) }
-
-    /**
-     * Local error function that sets the workflow context each time it's called
-     */
-    internal fun logError(e: Throwable? = null, message: () -> String) =
-        withWorkflowContext { logger.error(e, message) }
+    val logger = logger()
 
     /**
      * Node internal initialStates
@@ -101,15 +70,15 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         when (this) {
             is RootInstance -> this
             else -> parent?.rootInstance
-                ?: onError(RUNTIME, "$this is not root, but does not have a parent")
+                ?: raiseError(RUNTIME, "$this is not root, but does not have a parent")
         }
     }
 
     /**
      * Workflow instance that this node belongs to.
      */
-    open val workflowInstance: WorkflowInstance by lazy {
-        rootInstance.workflowInstance
+    open val processor: Processor by lazy {
+        rootInstance.processor
     }
 
     /**
@@ -260,7 +229,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
                 FlowDirectiveEnum.END -> rootInstance
             }
 
-            else -> onError(CONFIGURATION, "Unknown directive: $directive")
+            else -> raiseError(CONFIGURATION, "Unknown directive: $directive")
         }
     }
 
@@ -269,27 +238,27 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
      */
     private fun gotoByName(name: String): NodeInstance<*> {
         val target = children.indexOfFirst { it.node.name == name }
-        if (target == -1) onError(CONFIGURATION, "'.then' directive '$name' not found")
+        if (target < 0) raiseError(CONFIGURATION, "'.then' directive '$name' not found")
         childIndex = target
         return children[target]
     }
 
     private fun logEntering() {
-        logDebug { "Entering node ${node.name} (${node.task::class.simpleName})" }
-        logDebug { "      rawInput         = $rawInput" }
-        logDebug { "      scope            = $scope" }
-        logDebug { "      transformedInput = $transformedInput" }
+        logger.debug { "Entering node ${node.name} (${node.task::class.simpleName})" }
+        logger.debug { "      rawInput         = $rawInput" }
+        logger.debug { "      scope            = $scope" }
+        logger.debug { "      transformedInput = $transformedInput" }
     }
 
     private fun logLeaving() {
-        logDebug { "Leaving node ${node.name} (${node.task::class.simpleName})" }
-        logDebug { "      rawOutput         = $rawOutput" }
-        logDebug { "      scope             = $scope" }
-        logDebug { "      transformedOutput = $transformedOutput" }
+        logger.debug { "Leaving node ${node.name} (${node.task::class.simpleName})" }
+        logger.debug { "      rawOutput         = $rawOutput" }
+        logger.debug { "      scope             = $scope" }
+        logger.debug { "      transformedOutput = $transformedOutput" }
     }
 
     private fun logSkipping() {
-        logDebug { "Skipping node ${node.name} (${node.task::class.simpleName})" }
+        logger.debug { "Skipping node ${node.name} (${node.task::class.simpleName})" }
     }
 
     internal fun skippingUpTo(next: NodeInstance<*>) {
@@ -354,15 +323,14 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
      * It evaluates the `if` condition against the transformed input and returns true if the task should start,
      * or false if it should be skipped.
      *
-     * The `if` condition is evaluated using the transformed input, which is set during the `onStart()` method.
-     *
      * @return true if the task should start, false otherwise
      */
     open fun shouldStart(): Boolean {
         // Test if the task should be executed
-        val shouldStart = node.task.`if`
-            ?.let { evalBoolean(transformedInput, it, ".if") }
-            ?: true
+        val shouldStart = when (val `if` = node.task.`if`) {
+            null -> true
+            else -> evalBoolean(transformedInput, `if`, ".if", scope)
+        }
 
         return shouldStart
     }
@@ -382,7 +350,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     private fun validate(data: JsonElement, schemaUnion: SchemaUnion) = try {
         SchemaValidator.validate(data, schemaUnion)
     } catch (e: Exception) {
-        onError(VALIDATION, e.message, e.stackTraceToString())
+        raiseError(VALIDATION, e.message, e.stackTraceToString())
     }
 
     /**
@@ -392,7 +360,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonPrimitive && it.isString) {
                 true -> it.content
-                false -> onError(EXPRESSION, "'.$name' expression must be a string, but is '$it'")
+                false -> raiseError(EXPRESSION, "'.$name' expression must be a string, but is '$it'")
             }
         }
 
@@ -400,7 +368,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonPrimitive && it.booleanOrNull != null) {
                 true -> it.boolean
-                false -> onError(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
+                false -> raiseError(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
             }
         }
 
@@ -408,7 +376,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonArray) {
                 true -> it.toList()
-                false -> onError(EXPRESSION, "'.$name' expression must be an array, but is '$it'")
+                false -> raiseError(EXPRESSION, "'.$name' expression must be an array, but is '$it'")
             }
         }
 
@@ -416,7 +384,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
         eval(data, expr, scope).let {
             when (it is JsonObject) {
                 true -> it
-                false -> onError(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
+                false -> raiseError(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
             }
         }
 
@@ -435,14 +403,14 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     private fun eval(data: JsonElement, expr: String, scope: JsonObject = this.scope) = try {
         JQExpression.eval(data, JsonPrimitive(expr), scope, false)
     } catch (e: Exception) {
-        onError(EXPRESSION, e.message, e.stackTraceToString())
+        raiseError(EXPRESSION, e.message, e.stackTraceToString())
     }
 
     protected fun eval(data: JsonElement, expr: JsonElement, scope: JsonObject = this.scope, force: Boolean = false) =
         try {
             JQExpression.eval(data, expr, scope, force)
         } catch (e: Exception) {
-            onError(EXPRESSION, e.message, e.stackTraceToString())
+            raiseError(EXPRESSION, e.message, e.stackTraceToString())
         }
 
     /**
@@ -459,37 +427,28 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     /**
      * Create an error and raise it
      */
-    internal fun onError(
+    internal open fun raiseError(
         type: WorkflowErrorType,
         title: String?,
         details: String? = null,
         status: Int? = null,
-    ): Nothing {
-        val error = WorkflowError(
+    ): Nothing = raise(
+        error = WorkflowError(
             errorType = type,
             title = title ?: "Unknown Error",
             details = details,
             status = status ?: type.defaultStatus,
             position = node.position,
         )
-
-        raise(error)
-    }
+    )
 
     /**
-     * Raise an error and propagate it to the parent
+     * send an exception that will be caught by the WorkflowInstance::run
      */
-    protected fun raise(error: WorkflowError): Nothing {
-        // get catching try
-        val catching: TryInstance? = getTry(error)
-
-        // send an exception that will be caught by the WorkflowInstance::run
-        throw WorkflowException(
-            raising = this,
-            catching = catching,
-            error = error,
-        )
-    }
+    protected fun raise(error: WorkflowError): Nothing = throw WorkflowException(
+        raising = this,
+        error = error,
+    )
 
     internal fun resetUpTo(node: NodeInstance<*>) {
         reset()
@@ -504,7 +463,7 @@ abstract class NodeInstance<T : TaskBase>(open val node: Node<T>, open val paren
     /**
      * Get the try parent (if any)
      */
-    private fun getTry(error: WorkflowError): TryInstance? = when (this) {
+    fun getTry(error: WorkflowError): TryInstance? = when (this) {
         is TryInstance -> if (isCatching(error)) this else parent.getTry(error)
         else -> parent?.getTry(error)
     }

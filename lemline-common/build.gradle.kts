@@ -22,17 +22,15 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
 
     // Add Kotlin Serialization
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.2")
+    implementation(libs.kotlinxSerializationJson)
 
     // UUID Creator
-    implementation("com.github.f4b6a3:uuid-creator:6.0.0")
+    implementation(libs.uuidCreator)
 
     // Testing
-    testFixturesImplementation(kotlin("test"))
-    testFixturesImplementation(enforcedPlatform("io.kotest:kotest-bom:5.8.1"))
+    testImplementation(kotlin("test"))
+
+    // Tests Fixtures
+    testFixturesImplementation(enforcedPlatform(libs.kotest.bom))
     testFixturesImplementation("io.kotest:kotest-runner-junit5")
-    testFixturesImplementation("io.kotest:kotest-assertions-core")
-    testFixturesImplementation("io.kotest:kotest-framework-api")
-    testFixturesImplementation("io.mockk:mockk:1.13.9")
 }

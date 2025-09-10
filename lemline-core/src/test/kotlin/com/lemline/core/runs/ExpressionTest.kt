@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.runs
 
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.RuntimeDescriptor
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
-import com.lemline.core.getWorkflowInstance
-import com.lemline.core.json.LemlineJson
+import com.lemline.core.getWorkflowProcessor
 import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class ExpressionTest {
 
     @Test
@@ -27,7 +29,7 @@ class ExpressionTest {
                   set:
                     number: @{ @context.ctx.foo }
         """
-        val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(doYaml, JsonObject(mapOf()))
 
         instance.run()
 
@@ -50,7 +52,7 @@ class ExpressionTest {
                   set:
                     number: @{ @context.ctx.foo }
         """
-        val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(doYaml, JsonObject(mapOf()))
 
         instance.run()
 
@@ -74,7 +76,7 @@ class ExpressionTest {
                   set:
                     number: @{ @context.ctx.foo }
         """
-        val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(doYaml, JsonObject(mapOf()))
 
         instance.run()
 
@@ -93,7 +95,7 @@ class ExpressionTest {
                   set:
                     taskFromScope: @{ @task }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(0))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(0))
 
         instance.run()
 
@@ -120,17 +122,17 @@ class ExpressionTest {
                   set:
                     workflowFromScope: @{ @workflow }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(0))
+        val workflowProcessor = getWorkflowProcessor(doYaml, JsonPrimitive(0))
 
-        instance.run()
+        workflowProcessor.run()
 
         val expected = WorkflowDescriptor(
-            id = instance.id,
+            id = workflowProcessor.workflowState.workflowId.toString(),
             definition = JsonObject(mapOf()),
             input = JsonPrimitive(0),
             startedAt = JsonObject(mapOf()),
         )
-        val actual = (instance.rootInstance.transformedOutput as JsonObject)["workflowFromScope"] as JsonObject
+        val actual = (workflowProcessor.rootInstance.transformedOutput as JsonObject)["workflowFromScope"] as JsonObject
         assertEquals(JsonPrimitive(expected.id), actual["id"])
         assertEquals(expected.input, actual["input"])
     }
@@ -144,7 +146,7 @@ class ExpressionTest {
                   set:
                     runtimeFromScope: @{ @runtime }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(0))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(0))
 
         instance.run()
 

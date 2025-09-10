@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.runs
 
-import com.lemline.core.getWorkflowInstance
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
+import com.lemline.core.getWorkflowProcessor
 import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class ForTest {
 
     @Test
@@ -24,7 +26,7 @@ class ForTest {
                  output:
                    as:  .counter
         """
-        val instance = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
@@ -51,7 +53,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
@@ -78,7 +80,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(1, 2, 3))))
+        val instance = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(1, 2, 3))))
 
         // run (one shot)
         instance.run()
@@ -104,7 +106,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(4, 5, 6))))
+        val instance = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(4, 5, 6))))
 
         // run (one shot)
         instance.run()
@@ -131,7 +133,7 @@ class ForTest {
                  output:
                    as: @{ .counter }
         """
-        val instance = getWorkflowInstance(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(4, 5, 6))))
+        val instance = getWorkflowProcessor(doYaml, LemlineJson.encodeToElement(mapOf("input" to listOf(4, 5, 6))))
 
         // run (one shot)
         instance.run()

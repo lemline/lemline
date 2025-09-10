@@ -10,6 +10,8 @@ import jakarta.inject.Inject
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.nio.charset.StandardCharsets
+import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import picocli.CommandLine
@@ -20,6 +22,8 @@ import picocli.CommandLine
  */
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
+@ExperimentalSerializationApi
+@ExperimentalTime
 class ConfigCommandTest {
 
     @Inject

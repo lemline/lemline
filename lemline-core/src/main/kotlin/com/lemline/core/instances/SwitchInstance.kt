@@ -6,7 +6,9 @@ import com.lemline.core.nodes.NodeInstance
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.SwitchItem
 import io.serverlessworkflow.api.types.SwitchTask
+import kotlin.time.ExperimentalTime
 
+@ExperimentalTime
 class SwitchInstance(override val node: Node<SwitchTask>, override val parent: NodeInstance<*>) :
     NodeInstance<SwitchTask>(node, parent) {
 

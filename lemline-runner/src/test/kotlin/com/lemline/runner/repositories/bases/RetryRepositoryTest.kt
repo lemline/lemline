@@ -1,20 +1,28 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.runner.models.RetryModel
+import com.lemline.common.random.random
+import com.lemline.runner.models.RetryOutboxModel
+import com.lemline.runner.random.random
 import com.lemline.runner.repositories.RetryRepository
 import jakarta.inject.Inject
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.serialization.ExperimentalSerializationApi
 
 
 /**
  * Abstract base class for retry repository tests.
  */
-internal abstract class RetryRepositoryTest : OutboxRepositoryTest<RetryModel>() {
+@ExperimentalTime
+@ExperimentalSerializationApi
+internal abstract class RetryRepositoryTest : OutboxRepositoryTest<RetryOutboxModel>() {
 
     @Inject
     override lateinit var repository: RetryRepository
 
-    override fun createWithMessage(message: String) = RetryModel(message = message)
+    override fun createRandomEntity() = RetryOutboxModel.random()
 
-    override fun copyModel(model: RetryModel, message: String) = model.copy(message = message)
+    override fun changeDelayedUntil(model: RetryOutboxModel) =
+        model.copy().apply { outboxDelayedUntil = Instant.random() }
 }

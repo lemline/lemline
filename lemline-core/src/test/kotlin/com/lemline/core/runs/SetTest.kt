@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.runs
 
-import com.lemline.core.getWorkflowInstance
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
+import com.lemline.core.getWorkflowProcessor
 import kotlin.test.assertEquals
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class SetTest {
 
     @Test
@@ -19,7 +21,7 @@ class SetTest {
                 set:
                   counter: 0
         """
-        val instance = getWorkflowInstance(doYaml, JsonObject(mapOf()))
+        val instance = getWorkflowProcessor(doYaml, JsonObject(mapOf()))
 
         // run (one shot)
         instance.run()
@@ -39,7 +41,7 @@ class SetTest {
                 set:
                   counter:  .
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(1))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(1))
 
         // run (one shot)
         instance.run()
@@ -59,7 +61,7 @@ class SetTest {
                 set:
                   counter: @{ . + 1 }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(1))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(1))
 
         // run (one shot)
         instance.run()
@@ -81,7 +83,7 @@ class SetTest {
                     a: 0
                     b: @{ . }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(1))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(1))
 
         // run (one shot)
         instance.run()
@@ -109,7 +111,7 @@ class SetTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()
@@ -142,7 +144,7 @@ class SetTest {
             output:
               as: @{ .value }
         """
-        val instance = getWorkflowInstance(doYaml, JsonPrimitive(""))
+        val instance = getWorkflowProcessor(doYaml, JsonPrimitive(""))
 
         // run (one shot)
         instance.run()

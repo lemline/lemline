@@ -11,41 +11,41 @@ import io.serverlessworkflow.api.types.RaiseTask
 import io.serverlessworkflow.api.types.RaiseTaskError
 import io.serverlessworkflow.api.types.UriTemplate
 import java.net.URI
+import kotlin.time.ExperimentalTime
 
+@ExperimentalTime
 class RaiseInstance(override val node: Node<RaiseTask>, override val parent: NodeInstance<*>) :
     NodeInstance<RaiseTask>(node, parent) {
 
     private val error by lazy { node.task.raise.error.getError() }
 
-    override suspend fun run() {
-        val error = WorkflowError(
+    override suspend fun run() = raise(
+        WorkflowError(
             type = error.getErrorType(),
             status = error.status,
-            instance = node.position.jsonPointer.toString(),
+            instance = node.position.positionPointer.toString(),
             title = error.title,
             details = error.detail,
         )
-
-        raise(error)
-    }
+    )
 
     private fun Error.getErrorType() = when (val errorType = type.get()) {
         is UriTemplate -> errorType.getErrorType() // TODO interpret URI
         is String -> errorType
-        else -> onError(RUNTIME, "Unknown Error type '$errorType'")
+        else -> raiseError(RUNTIME, "Unknown Error type '$errorType'")
     }
 
     private fun UriTemplate.getErrorType() = when (val errorType = get()) {
         is URI -> errorType.toString()
         is String -> errorType
-        else -> onError(RUNTIME, "Unknown Uri Template '$errorType'")
+        else -> raiseError(RUNTIME, "Unknown Uri Template '$errorType'")
     }
 
     private fun RaiseTaskError.getError(): Error = when (val error = get()) {
         is String -> rootInstance.node.task.use?.errors?.additionalProperties?.get(error)
-            ?: onError(CONFIGURATION, "Error '$error' not found")
+            ?: raiseError(CONFIGURATION, "Error '$error' not found")
 
         is Error -> error
-        else -> onError(RUNTIME, "Unknown Error '$error'")
+        else -> raiseError(RUNTIME, "Unknown Error '$error'")
     }
 }

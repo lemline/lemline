@@ -1,32 +1,45 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
-import com.lemline.common.info
-import com.lemline.common.logger
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
-import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
-import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
-import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_RABBITMQ
-import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_CONNECTOR
-import com.lemline.runner.messaging.WORKFLOW_IN
-import com.lemline.runner.messaging.WORKFLOW_OUT
+import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.DB_MIGRATE_AT_START_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.INGESTION_TOPIC_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_HOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PASSWORD_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.MYSQL_USERNAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_HOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_NAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.WORKFLOWS_TOPIC_DEFAULT
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithDefault
-import io.smallrye.config.WithName
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Pattern
 import java.util.*
 
-const val PRODUCER_ENABLED = "lemline.messaging.producer.enabled"
-const val CONSUMER_ENABLED = "lemline.messaging.consumer.enabled"
 const val DATABASE_TYPE = "lemline.database.type"
 const val MESSAGING_TYPE = "lemline.messaging.type"
-const val MESSAGING_CONSUMER_PARALLELISM = "lemline.messaging.consumer.parallelism"
 const val MIGRATE_AT_START = "lemline.database.migrate-at-start"
+
+const val WORKFLOWS_PRODUCER_ENABLED = "lemline.messaging.workflows.producer.enabled"
+const val WORKFLOWS_CONSUMER_ENABLED = "lemline.messaging.workflows.consumer.enabled"
+const val WORKFLOWS_CONSUMER_CONCURRENCY = "lemline.messaging.workflows.consumer.concurrency"
+
+const val DATABASE_PRODUCER_ENABLED = "lemline.messaging.database.producer.enabled"
+const val DATABASE_CONSUMER_ENABLED = "lemline.messaging.database.consumer.enabled"
+const val INGESTION_CONSUMER_CONCURRENCY = "lemline.messaging.database.consumer.concurrency"
 
 /**
  * Type-safe configuration mapping for Lemline.
@@ -50,8 +63,8 @@ const val MIGRATE_AT_START = "lemline.database.migrate-at-start"
  *    - Converted automatically: lemline.database.type -> LEMLINE_DATABASE_TYPE
  *    - Case-insensitive matching
  *
- * @see LemlineConfigSourceFactory for configuration transformation
- * @see https://quarkus.io/guides/config-reference for Quarkus configuration details
+ * @see LemlineConfigSource for configuration transformation
+ * @see [https://quarkus.io/guides/config-reference] for Quarkus configuration details
  */
 @Suppress("unused")
 @ConfigMapping(prefix = "lemline")
@@ -64,272 +77,110 @@ interface LemlineConfiguration {
 
     /**
      * Database configuration mapping.
-     * Supports multiple database types with type-safe configuration.
-     *
-     * Configuration Example:
-     * ```yaml
-     * lemline:
-     *   database:
-     *     type: postgresql
-     *     migrateAtStart: true
-     *     postgresql:
-     *       host: localhost
-     *       port: 5432
-     * ```
      */
     interface DatabaseConfig {
 
-
         /**
-         * Database type. Must be one of: in-memory, postgresql, mysql
+         * Database type.
+         * If not provided, it will be set in [LemlineConfigSource]
          */
         @Pattern(regexp = "in-memory|postgresql|mysql")
-        @WithDefault(DB_TYPE_IN_MEMORY)
         fun type(): String
 
         /**
          * Whether to run database migrations at startup
-         * Default: false
          */
-        @WithDefault("false")
+        @WithDefault(DB_MIGRATE_AT_START_DEFAULT)
         fun migrateAtStart(): Boolean
 
         /**
          * Whether to baseline existing database
-         * Default: false
          */
-        @WithDefault("false")
+        @WithDefault(DB_BASELINE_ON_MIGRATE_DEFAULT)
         fun baselineOnMigrate(): Boolean
 
-        // DB-Specific settings
-        fun postgresql(): PostgreSQLConfig
-        fun mysql(): MySQLConfig
+        /**
+         * Optional PostgresSQL configuration
+         */
+        fun postgresql(): Optional<PostgreSQLConfig>
 
-        companion object {
-            fun toQuarkusProperties(config: DatabaseConfig): Map<String, String> {
-                val props = mutableMapOf<String, String>()
-
-                when (config.type()) {
-                    DB_TYPE_IN_MEMORY -> {
-                        props["quarkus.datasource.username"] = LemlineConfigConstants.DEFAULT_H2_USERNAME
-                        props["quarkus.datasource.password"] = LemlineConfigConstants.DEFAULT_H2_PASSWORD
-                        props["quarkus.datasource.jdbc.url"] =
-                            "jdbc:h2:mem:${LemlineConfigConstants.DEFAULT_H2_DB_NAME};DB_CLOSE_DELAY=-1;MODE=PostgreSQL"
-                    }
-
-                    DB_TYPE_POSTGRESQL -> {
-                        val pgConfig = config.postgresql()
-                        props["quarkus.datasource.postgresql.username"] = pgConfig.username()
-                        props["quarkus.datasource.postgresql.password"] = pgConfig.getPassword()
-                        props["quarkus.datasource.postgresql.jdbc.url"] =
-                            "jdbc:postgresql://${pgConfig.host()}:${pgConfig.port()}/${pgConfig.name()}"
-                    }
-
-                    DB_TYPE_MYSQL -> {
-                        val mysqlConfig = config.mysql()
-                        props["quarkus.datasource.mysql.username"] = mysqlConfig.username()
-                        props["quarkus.datasource.mysql.password"] = mysqlConfig.getPassword()
-                        props["quarkus.datasource.mysql.jdbc.url"] =
-                            "jdbc:mysql://${mysqlConfig.host()}:${mysqlConfig.port()}/${mysqlConfig.name()}" +
-                                "?useSSL=false" +
-                                "&allowPublicKeyRetrieval=true" +
-                                "&sessionVariables=sql_mode='STRICT_ALL_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ZERO_DATE,NO_ZERO_IN_DATE,NO_ENGINE_SUBSTITUTION'" +
-                                "&continueBatchOnError=false"
-                    }
-                }
-
-                return props
-            }
-        }
+        /**
+         * Optional MySQL configuration
+         */
+        fun mysql(): Optional<MySQLConfig>
     }
 
     /**
      * PostgresSQL-specific configuration.
-     * Required when the database type is "postgresql".
      */
     interface PostgreSQLConfig {
-        @WithDefault("localhost")
+        @WithDefault(POSTGRES_HOST_DEFAULT)
         fun host(): String
 
-        @WithDefault("5432")
-        @Min(1)
+        @WithDefault(POSTGRES_PORT_DEFAULT)
         fun port(): Int
 
-        @WithDefault("postgres")
+        @WithDefault(POSTGRES_USERNAME_DEFAULT)
         fun username(): String
 
-        @WithDefault("postgres")
-        @WithName("password")
-        fun getPassword(): String
+        @WithDefault(POSTGRES_PASSWORD_DEFAULT)
+        fun password(): Optional<String>
 
-        @WithDefault("lemline")
-        fun name(): String
+        @WithDefault(POSTGRES_NAME_DEFAULT)
+        fun name(): Optional<String>
     }
 
     /**
      * MySQL-specific configuration.
-     * Required when the database type is "mysql".
      */
     interface MySQLConfig {
-        @WithDefault("localhost")
+        @WithDefault(MYSQL_HOST_DEFAULT)
         fun host(): String
 
-        @WithDefault("3306")
-        @Min(1)
-        fun port(): Int
+        @WithDefault(MYSQL_PORT_DEFAULT)
+        fun port(): Optional<Int>
 
-        @WithDefault("mysql")
-        fun username(): String
+        @WithDefault(MYSQL_USERNAME_DEFAULT)
+        fun username(): Optional<String>
 
-        @WithDefault("mysql")
-        @WithName("password")
-        fun getPassword(): String
+        @WithDefault(MYSQL_PASSWORD_DEFAULT)
+        fun password(): Optional<String>
 
-        @WithDefault("lemline")
-        fun name(): String
+        @WithDefault(MYSQL_NAME_DEFAULT)
+        fun name(): Optional<String>
     }
 
     /**
      * Messaging configuration mapping.
-     * Supports multiple messaging systems with type-safe configuration.
-     *
-     * Configuration Example:
-     * ```yaml
-     * lemline:
-     *   messaging:
-     *     type: kafka
-     *     kafka:
-     *       brokers: localhost:9092
-     *       topic: workflows-in
-     * ```
      */
     interface MessagingConfig {
 
-        // Producer settings
-        fun producer(): ProducerConfig
-
-        // Consumer settings
-        fun consumer(): ConsumerConfig
-
         /**
-         * Messaging type. Must be one of: in-memory, kafka, rabbitmq
-         * Default: in-memory
+         * Database type.
+         * If not provided, it will be set in [LemlineConfigSource]
          */
-        @WithDefault("in-memory")
         @Pattern(regexp = "in-memory|kafka|rabbitmq")
         fun type(): String
 
-        // Broker Specific settings
-        fun kafka(): KafkaConfig
-        fun rabbitmq(): RabbitMQConfig
+        fun workflows(): Optional<ChannelConfig>
 
-        companion object {
-            val logger = logger()
 
-            fun toQuarkusProperties(
-                config: MessagingConfig
-            ): Map<String, String> {
-                val props = mutableMapOf<String, String>()
-                val incoming = "mp.messaging.incoming.$WORKFLOW_IN"
-                val outgoing = "mp.messaging.outgoing.$WORKFLOW_OUT"
-                props["$outgoing.merge"] = "true"
+        fun database(): Optional<ChannelConfig>
 
-                // set the messaging type (only if the app is on the consumer profile)
-                when (config.type()) {
-                    MSG_TYPE_IN_MEMORY -> {
-                        props["$incoming.connector"] = IN_MEMORY_CONNECTOR
-                        props["$outgoing.connector"] = IN_MEMORY_CONNECTOR
-                    }
+        /**
+         * Optional Kafka configuration
+         */
+        fun kafka(): Optional<KafkaConfig>
 
-                    MSG_TYPE_KAFKA -> {
-                        val kafkaConfig = config.kafka()
-                        // Server configuration
-                        props["kafka.bootstrap.servers"] = kafkaConfig.brokers()
+        /**
+         * Optional RabbitMQ configuration
+         */
+        fun rabbitmq(): Optional<RabbitMQConfig>
+    }
 
-                        // Incoming channel
-                        if (config.consumer().enabled()) {
-                            logger.info { "✅ Consumer Kafka enabled" }
-                            props["$incoming.connector"] = KAFKA_CONNECTOR
-                            props["$incoming.topic"] = kafkaConfig.topic()
-                            props["$incoming.group.id"] = kafkaConfig.groupId()
-                            props["$incoming.auto.offset.reset"] = kafkaConfig.offsetReset()
-                            props["$incoming.failure-strategy"] = "dead-letter-queue"
-                            props["$incoming.dead-letter-queue.topic"] =
-                                kafkaConfig.topicDlq().orElse("${kafkaConfig.topic()}-dlq")
-                            props["$incoming.value.deserializer"] =
-                                "org.apache.kafka.common.serialization.StringDeserializer"
-                        } else {
-                            logger.info { "❌ Consumer Kafka disabled" }
-                        }
-                        // Outgoing channel
-                        if (config.producer().enabled()) {
-                            logger.info { "✅ Producer Kafka enabled" }
-                            props["$outgoing.connector"] = KAFKA_CONNECTOR
-                            props["$outgoing.topic"] = kafkaConfig.topicOut().orElse(kafkaConfig.topic())
-                            props["$outgoing.value.serializer"] =
-                                "org.apache.kafka.common.serialization.StringSerializer"
-                        } else {
-                            logger.info { "❌ Producer Kafka disabled" }
-                        }
-
-                        // Other settings
-                        kafkaConfig.securityProtocol().ifPresent { props["kafka.security.protocol"] = it }
-                        kafkaConfig.saslMechanism().ifPresent { props["kafka.sasl.mechanism"] = it }
-
-                        if (kafkaConfig.saslUsername().isPresent && kafkaConfig.getSaslPassword().isPresent) {
-                            props["kafka.sasl.jaas.config"] =
-                                "org.apache.kafka.common.security.plain.PlainLoginModule required " +
-                                    "username=\"${kafkaConfig.saslUsername().get()}\" " +
-                                    "password=\"${kafkaConfig.getSaslPassword().get()}\";"
-
-                            if (!props.containsKey("kafka.sasl.mechanism")) {
-                                props["kafka.sasl.mechanism"] = "PLAIN"
-                            }
-                        }
-                    }
-
-                    MSG_TYPE_RABBITMQ -> {
-                        val rabbitConfig = config.rabbitmq()
-                        // Server configuration
-                        props["rabbitmq-host"] = rabbitConfig.hostname()
-                        props["rabbitmq-port"] = rabbitConfig.port().toString()
-                        props["rabbitmq-username"] = rabbitConfig.username()
-                        props["rabbitmq-password"] = rabbitConfig.getPassword()
-                        rabbitConfig.virtualHost().let { props["rabbitmq-virtual-host"] = it }
-
-                        // Incoming channel
-                        if (config.consumer().enabled()) {
-                            logger.info { "✅ Consumer RabbitMQ enabled" }
-                            props["$incoming.connector"] = RABBITMQ_CONNECTOR
-                            props["$incoming.queue.name"] = rabbitConfig.queue()
-                            props["$incoming.queue.durable"] = "true"
-                            props["$incoming.auto-ack"] = "false"
-                            props["$incoming.deserializer"] = "java.lang.String"
-                            props["$incoming.queue.arguments.x-dead-letter-exchange"] = "dlx"
-                            props["$incoming.queue.arguments.x-dead-letter-routing-key"] =
-                                rabbitConfig.queueDlq().orElse("${rabbitConfig.queue()}-dlq")
-                        } else {
-                            logger.info { "❌ Consumer RabbitMQ disabled" }
-                        }
-                        // Outgoing channel
-                        if (config.producer().enabled()) {
-                            logger.info { "✅ Producer RabbitMQ enabled" }
-                            props["$outgoing.connector"] = RABBITMQ_CONNECTOR
-                            props["$outgoing.queue.name"] = rabbitConfig.queueOut().orElse(rabbitConfig.queue())
-                            props["$outgoing.serializer"] = "java.lang.String"
-                        } else {
-                            logger.info { "❌ Producer RabbitMQ disabled" }
-                        }
-
-                        // Other settings
-                        rabbitConfig.exchangeName().ifPresent { props["$outgoing.exchange.name"] = it }
-                        rabbitConfig.sslEnabled().ifPresent { props["rabbitmq-ssl"] = it.toString() }
-                    }
-                }
-
-                return props
-            }
-        }
+    interface ChannelConfig {
+        fun producer(): ProducerConfig
+        fun consumer(): ConsumerConfig
     }
 
     interface ProducerConfig {
@@ -341,103 +192,147 @@ interface LemlineConfiguration {
         @WithDefault("false")
         fun enabled(): Boolean
 
-        @WithDefault("64")
-        fun parallelism(): Int
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Long
     }
 
     /**
      * Kafka-specific configuration.
-     * Required when messaging.type is "kafka".
      */
     interface KafkaConfig {
-        @WithDefault("localhost:9092")
+        @WithDefault(KAFKA_BROKERS_DEFAULT)
         fun brokers(): String
 
-        @WithDefault("lemline")
-        fun topic(): String
-
-        @WithDefault("group-1")
-        fun groupId(): String
-
-        @WithDefault("earliest")
-        @Pattern(regexp = "earliest|latest")
-        fun offsetReset(): String
-
-        // Optional settings
-        fun topicDlq(): Optional<String>
-        fun topicOut(): Optional<String>
+        // Optional
         fun securityProtocol(): Optional<String>
         fun saslMechanism(): Optional<String>
         fun saslUsername(): Optional<String>
+        fun saslPassword(): Optional<String>
 
-        @WithName("saslPassword")
-        fun getSaslPassword(): Optional<String>
+        fun workflows(): KafkaWorkflowsConfig
+        fun database(): KafkaIngestionConfig
+    }
+
+    interface KafkaWorkflowsConfig {
+        @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
+        fun topic(): String
+        fun consumer(): KafkaConsumerWorkflowsConfig
+        fun producer(): KafkaProducerConfig
+    }
+
+    interface KafkaIngestionConfig {
+        @WithDefault(INGESTION_TOPIC_DEFAULT)
+        fun topic(): String
+        fun consumer(): KafkaConsumerDatabaseConfig
+        fun producer(): KafkaProducerConfig
+    }
+
+    interface KafkaConsumerWorkflowsConfig {
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Int
+
+        @WithDefault(KAFKA_WORKFLOWS_GROUP_ID_DEFAULT)
+        fun groupId(): String
+
+        @Pattern(regexp = "latest|earliest")
+        @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
+        fun offsetReset(): String
+
+        fun topicDlq(): Optional<String>
+
+        fun topicOut(): Optional<String>
+    }
+
+    interface KafkaConsumerDatabaseConfig {
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Int
+
+        @WithDefault(KAFKA_DATABASE_GROUP_ID_DEFAULT)
+        fun groupId(): String
+
+        @Pattern(regexp = "latest|earliest")
+        @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
+        fun offsetReset(): String
+
+        fun topicDlq(): Optional<String>
+
+        fun topicOut(): Optional<String>
+    }
+
+    interface KafkaProducerConfig {
+        fun topicOut(): Optional<String>
     }
 
     /**
      * RabbitMQ-specific configuration.
-     * Required when messaging.type is "rabbitmq".
+     * IMPORTANT: default values are not applied here, but in [LemlineConfigSource].
+     * Adding default values here would automatically create an entry in the configuration.
      */
     interface RabbitMQConfig {
-        @WithDefault("localhost")
-        fun hostname(): String
+        fun hostname(): Optional<String>
+        fun port(): Optional<Int>
+        fun username(): Optional<String>
+        fun password(): Optional<String>
+        fun sslEnabled(): Optional<Boolean>
+        fun virtualHost(): Optional<String>
 
-        @WithDefault("5672")
-        fun port(): Int
+        fun workflows(): RabbitWorkflowsConfig
+        fun database(): RabbitIngestionConfig
+    }
 
-        @WithDefault("guest")
-        fun username(): String
+    interface RabbitWorkflowsConfig {
+        @WithDefault(RABBITMQ_VHOST_DEFAULT)
+        fun virtualHost(): Optional<String>
 
-        @WithDefault("guest")
-        @WithName("password")
-        fun getPassword(): String
-
-        @WithDefault("/")
-        fun virtualHost(): String
-
-        @WithDefault("lemline")
+        @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
         fun queue(): String
+        fun consumer(): RabbitConsumerConfig
+        fun producer(): RabbitProducerConfig
+    }
 
+    interface RabbitIngestionConfig {
+        @WithDefault(RABBITMQ_VHOST_DEFAULT)
+        fun virtualHost(): Optional<String>
+
+        @WithDefault(INGESTION_TOPIC_DEFAULT)
+        fun queue(): String
+        fun consumer(): RabbitConsumerConfig
+        fun producer(): RabbitProducerConfig
+    }
+
+    interface RabbitConsumerConfig {
+        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+        fun concurrency(): Int
         fun queueDlq(): Optional<String>
+    }
+
+    interface RabbitProducerConfig {
         fun queueOut(): Optional<String>
         fun exchangeName(): Optional<String>
-        fun sslEnabled(): Optional<Boolean>
     }
 
     interface OutboxConfig {
         fun enabled(): Optional<Boolean>
-        fun wait(): WaitOutboxConfig
-        fun retry(): RetryOutboxConfig
-        fun runWorkflow(): RunWorkflowOutboxConfig
+        fun wait(): ProcessOutboxConfig
+        fun retry(): ProcessOutboxConfig
+        fun schedule(): ProcessOutboxConfig
+        fun parent(): CleanupOutboxConfig
     }
 
     /**
-     * Wait service configuration.
-     * Controls the behavior of the wait message processing.
+     * Process and cleanup configuration.
      */
-    interface WaitOutboxConfig {
+    interface ProcessOutboxConfig {
         fun enabled(): Optional<Boolean>
         fun outbox(): OutboxProcessingConfig
         fun cleanup(): OutboxCleanupConfig
     }
 
     /**
-     * Retry service configuration.
-     * Controls the behavior of the retry message processing.
+     * Only cleanup configuration.
      */
-    interface RetryOutboxConfig {
+    interface CleanupOutboxConfig {
         fun enabled(): Optional<Boolean>
-        fun outbox(): OutboxProcessingConfig
-        fun cleanup(): OutboxCleanupConfig
-    }
-
-    /**
-     * Run Workflow service configuration.
-     * Controls the behavior of the run workflow message processing.
-     */
-    interface RunWorkflowOutboxConfig {
-        fun enabled(): Optional<Boolean>
-        fun outbox(): OutboxProcessingConfig
         fun cleanup(): OutboxCleanupConfig
     }
 
@@ -448,14 +343,12 @@ interface LemlineConfiguration {
     interface OutboxProcessingConfig {
         /**
          * Processing interval
-         * Default: 10 second
          */
         @WithDefault("10s")
         fun every(): String
 
         /**
          * Maximum number of messages to process in one batch
-         * Default: 1000
          */
         @WithDefault("1000")
         @Min(1)
@@ -463,7 +356,6 @@ interface LemlineConfiguration {
 
         /**
          * Initial delay before starting processing
-         * Default: 30 seconds
          */
         @WithDefault("30s")
         fun initialDelay(): String
@@ -475,6 +367,11 @@ interface LemlineConfiguration {
         @WithDefault("5")
         @Min(1)
         fun maxAttempts(): Int
+
+        val every get() = every().toDuration()
+        val batchSize get() = batchSize()
+        val initialDelay get() = initialDelay().toDuration()
+        val maxAttempts get() = maxAttempts()
     }
 
     /**
@@ -484,14 +381,12 @@ interface LemlineConfiguration {
     interface OutboxCleanupConfig {
         /**
          * Cleanup interval
-         * Default: 1 hour
          */
         @WithDefault("1h")
         fun every(): String
 
         /**
          * Age of messages to clean up
-         * Default: 7 days
          */
         @WithDefault("7d")
         fun after(): String
@@ -503,28 +398,20 @@ interface LemlineConfiguration {
         @WithDefault("1000")
         @Min(1)
         fun batchSize(): Int
+
+        val every get() = every().toDuration()
+        val after get() = after().toDuration()
+        val batchSize get() = batchSize()
     }
 
     /**
      * Metrics configuration
-     * Defines configuration properties for metrics collection.
      */
     interface MetricsConfig {
-        @WithDefault("8080")
+        @WithDefault(METRICS_PORT_DEFAULT)
         fun port(): Int
 
-        @WithDefault("/q/metrics")
+        @WithDefault(METRICS_PATH_DEFAULT)
         fun path(): String
-
-        companion object {
-            fun toQuarkusProperties(config: MetricsConfig): Map<String, String> {
-                val props = mutableMapOf<String, String>()
-                props["quarkus.http.port"] = config.port().toString()
-                props["quarkus.http.ssl-port"] = config.port().toString()
-                props["quarkus.micrometer.export.prometheus.path"] = config.path()
-
-                return props
-            }
-        }
     }
 }

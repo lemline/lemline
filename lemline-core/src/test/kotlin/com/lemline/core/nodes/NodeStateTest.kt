@@ -2,9 +2,10 @@
 package com.lemline.core.nodes
 
 import com.fasterxml.jackson.databind.node.JsonNodeFactory
-import com.lemline.core.json.LemlineJson
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.set
-import kotlinx.datetime.Instant
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -13,6 +14,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
+@ExperimentalTime
 class NodeStateTest {
     private val jsonFactory = JsonNodeFactory.instance
 
@@ -44,9 +46,7 @@ class NodeStateTest {
         assertNull(state.rawInput)
         assertNull(state.rawOutput)
         assertTrue(state.context.isEmpty())
-        assertNull(state.workflowId)
         assertNull(state.startedAt)
-        assertNull(state.parent)
         assertEquals(NodeState.FOR_INDEX_DEFAULT, state.forIndex)
     }
 
@@ -63,8 +63,6 @@ class NodeStateTest {
                 rawInput = LemlineJson.jsonObject.set("input", "test")
                 rawOutput = LemlineJson.jsonObject.set("output", "result")
                 context = LemlineJson.jsonObject.set("contextKey", "contextValue")
-                workflowId = "test-workflow"
-                parent = NodeState.Parent("parent-test-workflow", true)
                 startedAt = testInstant
                 forIndex = 3
             }
@@ -127,12 +125,11 @@ class NodeStateTest {
         @Test
         fun `default values should not appear during serialization`() {
             val state = NodeState().apply {
-                workflowId = "test-workflow"
                 childIndex = 1
             }
 
             assertEquals(
-                """{"idx":1,"wid":"test-workflow"}""",
+                """{"idx":1}""",
                 LemlineJson.encodeToString(state),
             )
         }

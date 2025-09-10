@@ -14,20 +14,25 @@ class PostgresTestResource : QuarkusTestResourceLifecycleManager {
 
     override fun start(): Map<String, String> {
         postgres = PostgreSQLContainer(DockerImageName.parse("postgres:14-alpine"))
-            .withDatabaseName("swruntime_test")
+            .withDatabaseName("lemline_test")
             .withUsername("test")
             .withPassword("test")
 
         postgres.start()
 
-        // Properties passed here are picked up by LemlineConfigSourceFactory
-        return mapOf(
+        val properties = mapOf(
+            "lemline.database.type" to "postgresql",
             "lemline.database.postgresql.host" to postgres.host,
             "lemline.database.postgresql.port" to postgres.firstMappedPort.toString(),
             "lemline.database.postgresql.name" to postgres.databaseName,
             "lemline.database.postgresql.username" to postgres.username,
             "lemline.database.postgresql.password" to postgres.password
         )
+
+        // Set as system properties so that [LemlineConfigSource] can see them.
+        properties.forEach { (k, v) -> System.setProperty(k, v) }
+
+        return properties
     }
 
     override fun stop() {
