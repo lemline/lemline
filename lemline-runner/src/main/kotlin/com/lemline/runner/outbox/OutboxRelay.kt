@@ -225,6 +225,6 @@ internal class OutboxRelay<T : OutboxModel>(
         }
     }
 
-    private fun Int.messages(): String = this.toString() + " message" + if (this == 1) "" else "s"
-    private fun Int.batches(): String = this.toString() + " batch" + if (this == 1) "" else "es"
+    private fun Int.messages(): String = this.toString() + " message" + if (this <= 1) "" else "s"
+    private fun Int.batches(): String = this.toString() + " batch" + if (this <= 1) "" else "es"
 }

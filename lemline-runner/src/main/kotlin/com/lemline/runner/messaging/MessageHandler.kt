@@ -63,7 +63,7 @@ internal interface MessageHandler<T : WithInstanceInfo> {
                     throw e
                 }
             }
-        }.getOrElse { return } // <- tryWithCompensation handles (neg)acknowledgment if the block fails
+        }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles (neg)ack if block fails
 
         // --- Processing ---
         message.tryWithCompensation(workflowId, workflowName, workflowVersion) {
@@ -84,7 +84,7 @@ internal interface MessageHandler<T : WithInstanceInfo> {
             }
             // Serialize and emit the next message if any
             next?.emit()
-        }.getOrElse { return } // <- tryWithCompensation handles (neg)acknowledgment if the block fails
+        }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles (neg)ack if block fails
 
         onCompleteTest(message, next)
         // Success Path
@@ -113,19 +113,17 @@ internal interface MessageHandler<T : WithInstanceInfo> {
             try {
                 compensation.run()
                 acknowledgeWithRetry(workflowName, workflowVersion)
-                onFailureTest(this, compensation)
+                Result.failure(compensation)
             } catch (e: Exception) {
                 // Failure path
                 logger.error(e) { "Failed to execute compensation for ${toLogString()}" }
                 negAcknowledgeWithRetry(e, workflowName, workflowVersion)
-                onFailureTest(this, e)
+                Result.failure(e)
             }
-            Result.failure(compensation)
         } catch (e: Exception) {
             // Failure path
             logger.error(e) { "Failed to process ${toLogString()}" }
             negAcknowledgeWithRetry(e, workflowName, workflowVersion)
-            onFailureTest(this, e)
             Result.failure(e)
         }
     }
@@ -184,7 +182,7 @@ internal interface MessageHandler<T : WithInstanceInfo> {
         workflowVersion: WorkflowVersion?
     ) = try {
         nackWithRetry(e)
-        logger.info { "Message NACKed: ${toLogString()} - should be sent to the DLQ by brokers" }
+        logger.warn { "Message NACKed: ${toLogString()} - should be sent to the DLQ by brokers" }
         metrics.nackCompleted(workflowName, workflowVersion)
     } catch (e: Exception) {
         logger.error(e) { "Failed to NACK message: ${toLogString()}" }
