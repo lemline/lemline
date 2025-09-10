@@ -29,7 +29,7 @@ class ScheduleOutBoxModelTest {
         val sz = nullable(model.scheduleZone)
 
         Assertions.assertEquals(
-            with(model) { """{"id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf,"sa":$sa,"se":$se,"sc":$sc,"sz":$sz}""" },
+            with(model) { """{"t":"s","id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf,"sa":$sa,"se":$se,"sc":$sc,"sz":$sz}""" },
             encoded,
         )
 

@@ -44,12 +44,6 @@ fun JsonElement.Companion.random(): JsonElement {
     }
 }
 
-fun JsonElement.Companion.nullableRandom() = when (Random.nextBoolean()) {
-    true -> random()
-    false -> null
-}
-
-
 fun NodePosition.Companion.random() = NodePosition(listOf(String.random(), String.random(), String.random()))
 
 fun NodeState.Companion.random() = NodeState(

@@ -25,7 +25,7 @@ class WaitOutBoxModelTest {
         val sf = nullable(model.outboxScheduledFor)
 
         Assertions.assertEquals(
-            with(model) { """{"id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf}""" },
+            with(model) { """{"t":"w","id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf}""" },
             encoded,
         )
 

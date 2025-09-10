@@ -24,7 +24,7 @@ class FailureModelTest {
         val em = nullable(model.errorMessage)
 
         Assertions.assertEquals(
-            with(model) { """{"id":"$id","i":$i,"p":$p,"er":"$errorReason","ec":"$errorClass","em":$em,"es":"$errorStackTrace"}""" },
+            with(model) { """{"t":"f","id":"$id","i":$i,"p":$p,"er":"$errorReason","ec":"$errorClass","em":$em,"es":"$errorStackTrace"}""" },
             encoded,
         )
 

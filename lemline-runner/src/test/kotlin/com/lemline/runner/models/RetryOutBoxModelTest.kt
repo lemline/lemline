@@ -38,7 +38,7 @@ class RetryOutBoxModelTest {
         val em = nullable(model.errorMessage)
 
         Assertions.assertEquals(
-            with(model) { """{"id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf,"er":"$errorReason","ec":"$errorClass","em":$em,"es":"$errorStackTrace"}""" },
+            with(model) { """{"t":"r","id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf,"er":"$errorReason","ec":"$errorClass","em":$em,"es":"$errorStackTrace"}""" },
             encoded,
         )
 
