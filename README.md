@@ -277,7 +277,7 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 - [ ] Catalog
 - [ ] Extensions
 
-## 📬 Contact & Contributions
+## 📬 Contact
 Have a feature request, question, or an idea for improvement? We’d love to hear from you.
 
 For custom requests, consulting, or paid contributions, feel free to reach out directly:
