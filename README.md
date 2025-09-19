@@ -7,10 +7,6 @@
 
 [![License](https://img.shields.io/badge/License-BSL%201.1-blue.svg)](LICENSE.md)
 
-> **⚠️ Active Development**
-> Lemline is currently under active development and should be considered alpha software.
-> It is **not yet recommended for production use**. APIs and functionality may change without notice.
-
 Lemline is a modern runtime for the [Serverless Workflow DSL](https://github.com/serverlessworkflow/specification)
 version 1.0,
 enabling the execution of complex workflows defined in YAML or JSON **on top of your existing infrastructure**. It
@@ -26,56 +22,89 @@ This allows Lemline to orchestrate business processes that would typically be im
 (peer-to-peer communication between services) without needing a database for every interaction.
 
 To achieve this, Lemline compresses the workflow's current state and includes it within the event messages.
-The database is only used when necessary, such as when dealing with time delays, retrying failed tasks,
-or managing fan-in scenarios (waiting for multiple parallel tasks to complete).
+The database is only used when strictly necessary, such as when dealing with time delays, retrying failed tasks,
+or waiting for multiple tasks to complete in parallel.
 
 ## ✨ Features
 
 * **Serverless Workflow DSL Execution:** Faithfully implements
   the [Serverless Workflow specification](https://serverlessworkflow.io) for defining and running workflows.
-* **Modern Tech Stack:** Utilizes Quarkus and SmallRye Reactive Messaging for a robust and efficient
-  runtime.
-* **Asynchronous Processing:** Leverages reactive principles for high-throughput, non-blocking
-  task execution.
-* **Database Integration:** Supports persistent workflow data .
-    * *Lemline is currently tested with PostgreSQL and MySQL.*
-* **Event-Driven:** Built on Quarkus's reactive messaging capabilities (SmallRye Reactive Messaging) for seamless
-  integration with event streams.
-    * *While SmallRye Reactive Messaging supports various brokers (Kafka, AMQP, MQTT, etc.), Lemline is currently
-      tested with Kafka and RabbitMQ.*
+* **Event-Driven Orchestration** State transitions are carried within broker messages, minimizing database load and improving throughput.
+* **Micrometer Integration** Built-in metrics and health checks, exposed through a dedicated endpoint for observability.
+* **Resilient Error Management** Automatic retries, failure tracking, and clear separation between infrastructure and business logic errors.
+* **Stateless Workers** Horizontal scaling is as simple as starting more Lemline workers. No sticky sessions, no shared state.
+* **Quarkus Native Binary** Deploy Lemline as a lean, self-contained binary built with GraalVM/Mandrel. Startup in milliseconds, reduced memory footprint, perfect for containerized and serverless environments.
+
+## 🏗 Architecture
+
+Lemline runs **on top of your existing infrastructure**.  
+All you need to deploy are stateless Lemline Runners that connect to **your event broker** and **your database**.  
+
+- **Event Broker** (Kafka, RabbitMQ, …) transports workflow state through messages.  
+- **Database** (PostgreSQL, MySQL, …) is used only when strictly necessary: timers, retries, and checkpoints.  
+- **Stateless Lemline Runners** orchestrate workflows, make calls to your services, and scale horizontally with no coordination overhead.  
+
+```mermaid
+flowchart LR
+    %% Force left/middle/right alignment
+    subgraph Infra["Your Infra"]
+        direction TB
+        Broker["Your Event Broker<br/>(Kafka, RabbitMQ)"]
+        DB["Your Database<br/>(Postgres, MySQL)"]
+    end
+
+    subgraph Lemline["Stateless Lemline Workers"]
+        direction TB
+        L1[Lemline Runner]
+        L2[Lemline Runner]
+        L3[Lemline Runner]
+    end
+
+    subgraph Apps["Your Applications / Services"]
+        direction TB
+        A1[Service A]
+        A2[Service B]
+        A3[Service C]
+    end
+
+    %% Connections
+    Broker <--> L1
+    DB <--> L1
+    L1 <--> A1
+    L1 <--> A2
+    L1 <--> A3
+```
+Other databases and brokers (e.g. Pulsar, SQS, Pub/Sub, Service Bus) are on the roadmap.
 
 ## 📦 Modules
 
 * **`lemline-core`:** Contains the core implementation of the Serverless Workflow DSL types and logic.
-* **`lemline-runner`:** Provides the Quarkus-based runtime environment. It uses reactive messaging to read and publish
-  events, manages workflow state, and interacts with databases.
-* **`lemline-docs`:** (Planned/Included) Documentation for the project and potentially the DSL nuances specific to
-  Lemline.
-
+* **`lemline-runner`:** Quarkus-based runtime. Handles message I/O, workflow state management, and integration with databases/brokers.
+* **`lemline-docs`:** (WIP) Documentation for the project.
+  
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-* Java Development Kit (JDK) 17+
-* A running instance of a supported database (e.g., PostgreSQL, MySQL)
-* A running instance of a supported message broker (e.g. Kafka, RabbitMQ)
+* Java 17+ (for development mode)
+* A supported database (PostgreSQL/MySQL)
+* A supported broker (Kafka/RabbitMQ)
 
 ### Building
 
 ```bash
-./gradlew build
+./gradlew :lemline-runner:build
 ```
 
 ### Running the Runner (Development Mode)
 
-Ensure your database and message broker (if needed) are configured in
-`lemline-runner/src/main/resources/application.properties`.
+Set up a `.lemline.yaml` file with your database and event broker configuration. Then run:
 
 ```bash
-./gradlew :lemline-runner:quarkusDev
+java  -jar lemline-runner/build/quarkus-app/quarkus-run.jar listen --info
 ```
 
-The runner will start, connect to the database/broker, and begin processing workflows.
+The runner connects to your broker and DB, then begins orchestrating workflows.
 
 You can find more information about database and message broker configuration in
 the [lemline-runner README](lemline-runner/README.md).
@@ -95,9 +124,9 @@ runtime.
     * Options:
         * `-f`, `--format <format>`: Specifies the output format (e.g., `yaml`, `properties`). Default is `yaml`.
         * `-a`, `--all`: Shows all properties, including Quarkus-specific properties, not just `lemline.*`.
-* **`definition`**: Manages workflow definitions. (Further subcommands and options would be detailed here if applicable)
-* **`instance`**: Manages workflow instances. (Further subcommands and options would be detailed here if applicable)
-* **`migrate`**: Handles database migrations. (Further subcommands and options would be detailed here if applicable)
+* **`definition`**: Manages workflow definitions. 
+* **`instance`**: Manages workflow instances. 
+* **`migrate`**: Handles database migrations. 
 
 ### Running Tests
 
@@ -105,6 +134,11 @@ runtime.
 ./gradlew test
 ```
 
+### 📊 Observability
+
+* Micrometer Metrics: Exposes Prometheus-compatible metrics for workflows, retries, and failures.
+* Health Checks: Ready/live endpoints integrated into the Quarkus runtime.
+  
 ## 📚 Documentation
 
 * **Serverless Workflow DSL Specification:**
@@ -125,19 +159,33 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 To produce a native image of the runner, you need to have GraalVM installed in your environment.
 We recommend using 24.1.2.r23-mandrel.
 
-To build a linux native image (on Docker), run the following command:
+The binary will be created in `lemline-runner/build/lemline-runner-$version-runner`.
+
+### Linux native image
+
+On a mac, use the following command to build a Linux native image:
 
 ```bash
-./gradlew :lemline-runner:build -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -Dquarkus.native.container-build=true 
+./gradlew :lemline-runner:assemble -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -Dquarkus.native.container-build=true 
 ```
 
-On a macOS system, you can use the following command to build a macOS native image:
+You can skip the container option if you are already on Linux.
+
+### MacOS native image
+
+On a mac, use the following command to build a macOS native image:
 
 ```bash
-./gradlew clean :lemline-runner:assemble -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false --no-daemon --rerun-tasks
+./gradlew clean :lemline-runner:assemble -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false 
 ```
 
-The binary will be created in `lemline-runner/build/lemline-runner-$version-runner`
+### Windows native image
+
+On Windows, use the following command to build a macOS native image:
+
+```bash
+gradlew.bat -p lemline-runner quarkusBuild -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false
+```
 
 ## 👨‍Development
 
@@ -147,7 +195,6 @@ Currently implemented features are:
 
 - [x] PostgreSQL
 - [x] MySQL
-- [ ] MariaDB
 - [ ] Oracle
 - [ ] SQL Server
 
@@ -156,7 +203,6 @@ Currently implemented features are:
 - [x] Kafka
 - [x] RabbitMQ
 - [ ] Pulsar
-- [ ] MQTT
 - [ ] Amazon SQS
 - [ ] Google Pub/Sub
 - [ ] Azure Service Bus
@@ -167,10 +213,11 @@ Currently implemented features are:
 - [x] Set
 - [x] Do
 - [x] Raise
+- [x] For
 - [ ] Listen
 - [ ] Emit
 - [ ] Fork
-- [x] For
+      
 - Try:
     - [x] Retry
     - [x] Catch
