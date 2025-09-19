@@ -134,7 +134,39 @@ runtime.
 ./gradlew test
 ```
 
-### 📊 Observability
+### Native Image
+
+To produce a native image of the runner, you need to have GraalVM installed in your environment.
+We recommend using 24.1.2.r23-mandrel.
+
+The binary will be created in `lemline-runner/build/lemline-runner-$version-runner`.
+
+#### Linux native image
+
+On a mac, use the following command to build a Linux native image:
+
+```bash
+./gradlew :lemline-runner:assemble -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -Dquarkus.native.container-build=true 
+```
+
+You can skip the container option if you are already on Linux.
+
+#### MacOS native image
+
+On a mac, use the following command to build a macOS native image:
+
+```bash
+./gradlew clean :lemline-runner:assemble -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false 
+```
+
+#### Windows native image
+
+On Windows, use the following command to build a macOS native image:
+
+```bash
+gradlew.bat -p lemline-runner quarkusBuild -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false
+```
+## 📊 Observability
 
 * Micrometer Metrics: Exposes Prometheus-compatible metrics for workflows, retries, and failures.
 * Health Checks: Ready/live endpoints integrated into the Quarkus runtime.
@@ -154,42 +186,8 @@ Contributions are welcome! Please follow the guidelines in our [CONTRIBUTING.md]
 
 This project is licensed under the [Business Source License 1.1](LICENSE.md).
 
-## 💻 Native Image
 
-To produce a native image of the runner, you need to have GraalVM installed in your environment.
-We recommend using 24.1.2.r23-mandrel.
-
-The binary will be created in `lemline-runner/build/lemline-runner-$version-runner`.
-
-### Linux native image
-
-On a mac, use the following command to build a Linux native image:
-
-```bash
-./gradlew :lemline-runner:assemble -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false -Dquarkus.native.container-build=true 
-```
-
-You can skip the container option if you are already on Linux.
-
-### MacOS native image
-
-On a mac, use the following command to build a macOS native image:
-
-```bash
-./gradlew clean :lemline-runner:assemble -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false 
-```
-
-### Windows native image
-
-On Windows, use the following command to build a macOS native image:
-
-```bash
-gradlew.bat -p lemline-runner quarkusBuild -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false
-```
-
-## 👨‍Development
-
-Currently implemented features are:
+## 📝 Roadmap
 
 ### Databases
 
