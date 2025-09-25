@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.lemline.common.json.JsonSerializable
 import com.lemline.common.values.IDV7
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
-import com.lemline.runner.messaging.JsonSerializable
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
@@ -38,6 +38,8 @@ data class FailureModel(
     @SerialName("es")
     val errorStackTrace: String,
 ) : InstanceModel, JsonSerializable {
+
+    override val workflowInfo get() = instanceMessage?.workflowInfo
 
     override val workflowState get() = instanceMessage?.workflowState
 

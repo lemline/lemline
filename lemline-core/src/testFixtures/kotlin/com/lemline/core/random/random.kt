@@ -5,6 +5,7 @@ package com.lemline.core.random
 
 import com.lemline.common.random.random
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -22,13 +23,19 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 
+fun JsonElement.Companion.nullableRandom(): JsonElement {
+    return when (Random.nextBoolean()) {
+        true -> JsonNull
+        false -> random()
+    }
+}
+
 fun JsonElement.Companion.random(): JsonElement {
-    return when (Random.nextInt(6)) {
-        0 -> JsonNull
-        1 -> JsonPrimitive(Random.nextBoolean())
-        2 -> JsonPrimitive(Random.nextInt())
-        3 -> JsonPrimitive(Random.nextDouble())
-        4 -> JsonPrimitive(String.random())
+    return when (Random.nextInt(5)) {
+        0 -> JsonPrimitive(Random.nextBoolean())
+        1 -> JsonPrimitive(Random.nextInt())
+        2 -> JsonPrimitive(Random.nextDouble())
+        3 -> JsonPrimitive(String.random())
         else -> when (Random.nextBoolean()) {
             true -> buildJsonArray {
                 repeat(Random.nextInt(1, 4)) {
@@ -65,11 +72,14 @@ fun NodeStates.Companion.random() = NodeStates(
     )
 )
 
-fun WorkflowState.Companion.random(): WorkflowState = WorkflowState(
+fun WorkflowState.Companion.random() = WorkflowState(
+    currentPosition = NodePosition.random(),
+    currentStates = NodeStates.random(),
+)
+
+fun WorkflowInfo.Companion.random() = WorkflowInfo(
     workflowId = WorkflowId.random(),
     workflowNamespace = WorkflowNamespace.random(),
     workflowName = WorkflowName.random(),
     workflowVersion = WorkflowVersion.random(),
-    currentPosition = NodePosition.random(),
-    currentStates = NodeStates.random(),
 )

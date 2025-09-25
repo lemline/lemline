@@ -2,6 +2,7 @@
 package com.lemline.core.definitions
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -79,6 +80,13 @@ object DefinitionCache {
     @JvmStatic
     fun getOrNull(namespace: WorkflowNamespace, name: WorkflowName, version: WorkflowVersion): Workflow? =
         workflowCache[WorkflowIndex(namespace, name, version)]
+
+    @JvmStatic
+    fun getOrNull(workflowInfo: WorkflowInfo): Workflow? = getOrNull(
+        workflowInfo.workflowNamespace,
+        workflowInfo.workflowName,
+        workflowInfo.workflowVersion
+    )
 
     /**
      * Retrieves the root node of the given workflow.

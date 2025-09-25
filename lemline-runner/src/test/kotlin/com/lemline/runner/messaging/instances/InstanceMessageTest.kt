@@ -17,7 +17,7 @@ internal class InstanceMessageTest {
 
         // When
         Assertions.assertEquals(
-            """{"s":${instanceMessage.workflowState.toJsonString()},"p":"${instanceMessage.parentId}"}""",
+            """{"i":${instanceMessage.workflowInfo.toJsonString()},"s":${instanceMessage.workflowState.toJsonString()},"p":"${instanceMessage.parentId}"}""",
             instanceMessage.toJsonString(),
         )
     }

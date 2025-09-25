@@ -28,19 +28,10 @@ data class IngestionMessage(
     constructor(model: InstanceModel) : this(instanceModels = listOf(model))
 
     init {
-        require(instanceModels.map { it.workflowId }
+        require(instanceModels.map { it.workflowInfo }
             .distinct().size == 1) { "All models must be from the same workflow" }
     }
 
     @Transient
-    override val workflowId = instanceModels.first().workflowId
-
-    @Transient
-    override val workflowNamespace = instanceModels.first().workflowNamespace
-
-    @Transient
-    override val workflowName = instanceModels.first().workflowName
-
-    @Transient
-    override val workflowVersion = instanceModels.first().workflowVersion
+    override val workflowInfo = instanceModels.first().workflowInfo
 }

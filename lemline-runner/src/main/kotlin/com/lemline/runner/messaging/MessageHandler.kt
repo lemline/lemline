@@ -3,13 +3,13 @@ package com.lemline.runner.messaging
 
 import com.lemline.common.logger.Logger
 import com.lemline.common.logger.withSuspendLoggingContext
-import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WithInstanceInfo
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.healthcheck.FatalAckLiveness.livenessDownOnFatal
 import com.lemline.runner.healthcheck.RetryReadiness.readinessDownDuringRetries
-import com.lemline.runner.models.WithInstanceInfo
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
 import java.util.concurrent.CompletionException
@@ -42,9 +42,7 @@ internal interface MessageHandler<T : WithInstanceInfo> {
 
     suspend fun handleMessage(message: Message<String>) {
         var next: T? = null
-        var workflowId: WorkflowId? = null
-        var workflowName: WorkflowName? = null
-        var workflowVersion: WorkflowVersion? = null
+        var workflowInfo: WorkflowInfo? = null
 
         // --- Deserialization ---
         val msg: T = message.tryWithCompensation {
@@ -53,10 +51,8 @@ internal interface MessageHandler<T : WithInstanceInfo> {
                 try {
                     message.deserialize().also {
                         // deserialisation succeeded
-                        workflowId = it.workflowId
-                        workflowName = it.workflowName
-                        workflowVersion = it.workflowVersion
-                        metrics.deserializationCompleted(workflowName, workflowVersion)
+                        workflowInfo = it.workflowInfo
+                        metrics.deserializationCompleted(workflowInfo)
                     }
                 } catch (e: Exception) {
                     metrics.deserializationFailed(e)
@@ -66,19 +62,19 @@ internal interface MessageHandler<T : WithInstanceInfo> {
         }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles (neg)ack if block fails
 
         // --- Processing ---
-        message.tryWithCompensation(workflowId, workflowName, workflowVersion) {
+        message.tryWithCompensation(workflowInfo) {
             // We log here to get context
             logger.debug { "Deserialized ${message.toLogString()}: $msg" }
             // Process et get next message
-            next = metrics.recordProcessingDuration(workflowName, workflowVersion) {
+            next = metrics.recordProcessingDuration(workflowInfo) {
                 try {
                     msg.handle().also {
                         logger.debug { "Processed: ${message.toLogString()}" }
-                        metrics.processingCompleted(workflowName, workflowVersion)
+                        metrics.processingCompleted(workflowInfo)
                     }
                 } catch (e: Exception) {
                     val reason = if (e is CompensationException) e.reason else getFailureReason(e)
-                    metrics.processingFailed(reason, workflowName, workflowVersion)
+                    metrics.processingFailed(reason, workflowInfo)
                     throw e
                 }
             }
@@ -88,7 +84,7 @@ internal interface MessageHandler<T : WithInstanceInfo> {
 
         onCompleteTest(message, next)
         // Success Path
-        message.acknowledgeWithRetry(workflowName, workflowVersion)
+        message.acknowledgeWithRetry(workflowInfo)
     }
 
     /**
@@ -102,28 +98,26 @@ internal interface MessageHandler<T : WithInstanceInfo> {
      * @throws Exception If an error occurs during (negative) acknowledgment
      */
     suspend fun <S> Message<String>.tryWithCompensation(
-        workflowId: WorkflowId? = null,
-        workflowName: WorkflowName? = null,
-        workflowVersion: WorkflowVersion? = null,
+        workflowInfo: WorkflowInfo? = null,
         block: suspend () -> S
-    ): Result<S> = withSuspendLoggingContext(workflowId, workflowName, workflowVersion) {
+    ): Result<S> = withSuspendLoggingContext(workflowInfo) {
         try {
             Result.success(block())
         } catch (compensation: CompensationException) {
             try {
                 compensation.run()
-                acknowledgeWithRetry(workflowName, workflowVersion)
+                acknowledgeWithRetry(workflowInfo)
                 Result.failure(compensation)
             } catch (e: Exception) {
                 // Failure path
                 logger.error(e) { "Failed to execute compensation for ${toLogString()}" }
-                negAcknowledgeWithRetry(e, workflowName, workflowVersion)
+                negAcknowledgeWithRetry(e, workflowInfo)
                 Result.failure(e)
             }
         } catch (e: Exception) {
             // Failure path
             logger.error(e) { "Failed to process ${toLogString()}" }
-            negAcknowledgeWithRetry(e, workflowName, workflowVersion)
+            negAcknowledgeWithRetry(e, workflowInfo)
             Result.failure(e)
         }
     }
@@ -134,15 +128,14 @@ internal interface MessageHandler<T : WithInstanceInfo> {
      * If the acknowledgment fails, an exception is thrown to trigger a broker reconnection
      */
     suspend fun Message<String>.acknowledgeWithRetry(
-        workflowName: WorkflowName?,
-        workflowVersion: WorkflowVersion?
+        workflowInfo: WorkflowInfo?,
     ) = try {
         ackWithRetry()
         logger.debug { "Message ACKed: ${toLogString()}" }
-        metrics.ackCompleted(workflowName, workflowVersion)
+        metrics.ackCompleted(workflowInfo)
     } catch (e: Exception) {
         logger.error(e) { "Failed to ACK message: ${toLogString()}" }
-        metrics.ackFailed(workflowName, workflowVersion)
+        metrics.ackFailed(workflowInfo)
         throw e
     }
 
@@ -178,15 +171,14 @@ internal interface MessageHandler<T : WithInstanceInfo> {
      */
     suspend fun Message<String>.negAcknowledgeWithRetry(
         e: Exception,
-        workflowName: WorkflowName?,
-        workflowVersion: WorkflowVersion?
+        workflowInfo: WorkflowInfo?
     ) = try {
         nackWithRetry(e)
         logger.warn { "Message NACKed: ${toLogString()} - should be sent to the DLQ by brokers" }
-        metrics.nackCompleted(workflowName, workflowVersion)
+        metrics.nackCompleted(workflowInfo)
     } catch (e: Exception) {
         logger.error(e) { "Failed to NACK message: ${toLogString()}" }
-        metrics.nackFailed(workflowName, workflowVersion)
+        metrics.nackFailed(workflowInfo)
         throw e
     }
 

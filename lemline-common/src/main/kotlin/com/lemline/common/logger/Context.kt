@@ -3,9 +3,7 @@
 
 package com.lemline.common.logger
 
-import com.lemline.common.values.WorkflowId
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowVersion
+import com.lemline.common.values.WorkflowInfo
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.ThreadContextElement
@@ -16,6 +14,7 @@ import org.slf4j.MDC
  * Standard context keys used in logging for consistent logging.
  */
 private const val WORKFLOW_ID = "workflowId"
+private const val WORKFLOW_NAMESPACE = "workflowNamespace"
 private const val WORKFLOW_NAME = "workflowName"
 private const val WORKFLOW_VERSION = "workflowVersion"
 
@@ -40,9 +39,7 @@ private fun Map<String, String?>.compact(): Map<String, String> =
  * everything, and restores the previous MDC when the coroutine leaves the dispatcher thread.
  */
 data class WorkflowLoggingContext(
-    val workflowId: String,
-    val workflowName: String,
-    val workflowVersion: String,
+    val workflowInfo: WorkflowInfo? = null,
     val additionalContext: Map<String, String?> = emptyMap()
 ) : ThreadContextElement<Map<String, String>?>,
     AbstractCoroutineContextElement(WorkflowLoggingContext) {
@@ -53,9 +50,10 @@ data class WorkflowLoggingContext(
      * Exposes all desired MDC entries, possibly containing nulls (which are ignored on apply).
      */
     fun toMDCEntries(): Map<String, String?> = buildMap {
-        put(WORKFLOW_ID, workflowId)
-        put(WORKFLOW_NAME, workflowName)
-        put(WORKFLOW_VERSION, workflowVersion)
+        put(WORKFLOW_ID, workflowInfo?.workflowId?.toString() ?: "")
+        put(WORKFLOW_NAMESPACE, workflowInfo?.workflowNamespace?.toString() ?: "")
+        put(WORKFLOW_NAME, workflowInfo?.workflowName?.toString() ?: "")
+        put(WORKFLOW_VERSION, workflowInfo?.workflowVersion?.toString() ?: "")
         putAll(additionalContext)
     }
 
@@ -120,15 +118,14 @@ inline fun <T> withThreadMDC(vararg pairs: Pair<String, String?>, block: () -> T
  * Runs [block] with workflow-specific MDC keys on the current thread (non-suspend).
  */
 fun <T> withThreadLoggingContext(
-    workflowId: WorkflowId? = null,
-    workflowName: WorkflowName? = null,
-    workflowVersion: WorkflowVersion? = null,
+    workflowInfo: WorkflowInfo? = null,
     additional: Map<String, String?> = emptyMap(),
     block: () -> T
 ): T = withThreadMDC(
-    WORKFLOW_ID to (workflowId?.toString() ?: ""),
-    WORKFLOW_NAME to (workflowName?.toString() ?: ""),
-    WORKFLOW_VERSION to (workflowVersion?.toString() ?: ""),
+    WORKFLOW_ID to (workflowInfo?.workflowId?.toString() ?: ""),
+    WORKFLOW_NAMESPACE to (workflowInfo?.workflowNamespace?.toString() ?: ""),
+    WORKFLOW_NAME to (workflowInfo?.workflowName?.toString() ?: ""),
+    WORKFLOW_VERSION to (workflowInfo?.workflowVersion?.toString() ?: ""),
     *additional.entries.map { it.key to it.value }.toTypedArray(),
     block = block
 )
@@ -143,16 +140,12 @@ fun <T> withThreadLoggingContext(
  * on each thread the coroutine runs on, and restores the previous MDC automatically.
  */
 suspend inline fun <T> withSuspendLoggingContext(
-    workflowId: WorkflowId? = null,
-    workflowName: WorkflowName? = null,
-    workflowVersion: WorkflowVersion? = null,
+    workflowInfo: WorkflowInfo? = null,
     additional: Map<String, String?> = emptyMap(),
     crossinline block: suspend () -> T
 ): T {
     val element = WorkflowLoggingContext(
-        workflowId = workflowId?.toString() ?: "",
-        workflowName = workflowName?.toString() ?: "",
-        workflowVersion = workflowVersion?.toString() ?: "",
+        workflowInfo = workflowInfo,
         additionalContext = additional
     )
     return withContext(element) { block() }

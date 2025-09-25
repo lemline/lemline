@@ -3,9 +3,9 @@
 
 package com.lemline.runner.models
 
+import com.lemline.common.json.JsonSerializable
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
-import com.lemline.runner.messaging.JsonSerializable
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.random.random
 import kotlin.test.Test

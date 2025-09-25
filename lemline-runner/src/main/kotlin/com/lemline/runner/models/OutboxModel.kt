@@ -79,5 +79,7 @@ sealed class OutboxModel() : InstanceModel {
 
     override val workflowState get() = instanceMessage.workflowState
 
+    override val workflowInfo get() = instanceMessage.workflowInfo
+
     override val parentId get() = instanceMessage.parentId
 }

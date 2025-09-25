@@ -100,14 +100,16 @@ internal class DatabaseMessageHandler(
                 instanceEmitter.send(parent.instanceMessage)
                 // set parent status as SENT (allowing table cleaning by the outbox)
                 parentRepository.update(parent)
-                logger.debug { "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId ($workflowName), set up to restart at position ${parent.workflowState.currentPosition} with output $output" }
+                logger.debug {
+                    "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId (${workflowName}), set up to restart at position ${parent.workflowState.currentPosition} with output $output"
+                }
             }
                 ?: error("CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted.")
         }
 
         // Case of workflow completion with scheduled after
         if (isScheduledAfter) {
-            scheduleRepository.findByWorkflowId(workflowId)?.let { schedule ->
+            scheduleRepository.findByWorkflowId(workflowId!!)?.let { schedule ->
                 // updates the scheduled execution instant from the after property.
                 schedule.scheduleAfterCompletion()
                 scheduleRepository.update(schedule)

@@ -104,7 +104,7 @@ data class ScheduleOutboxModel(
         }
         // set a new id for the next workflow instance
         instanceMessage = instanceMessage.copy(
-            workflowState = instanceMessage.workflowState.duplicate(newId),
+            workflowInfo = instanceMessage.workflowInfo.duplicate(newId),
         )
     }
 

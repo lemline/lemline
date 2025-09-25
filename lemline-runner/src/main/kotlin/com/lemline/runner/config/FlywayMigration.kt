@@ -15,13 +15,13 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
  */
 @ApplicationScoped
 class FlywayMigration(
-    @ConfigProperty(name = "quarkus.profile")
+    @param:ConfigProperty(name = "quarkus.profile")
     val profile: String,
 
-    @ConfigProperty(name = DATABASE_TYPE)
+    @param:ConfigProperty(name = DATABASE_TYPE)
     val db: String,
 
-    @ConfigProperty(name = MIGRATE_AT_START)
+    @param:ConfigProperty(name = MIGRATE_AT_START)
     val migrateAtStart: Boolean,
 ) {
     private val log = logger()

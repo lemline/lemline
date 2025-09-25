@@ -2,7 +2,7 @@
 package com.lemline.runner.messaging
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.models.WithInstanceInfo
+import com.lemline.common.values.WithInstanceInfo
 import io.quarkus.runtime.ShutdownEvent
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.event.Observes

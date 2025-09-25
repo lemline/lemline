@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowVersion
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_NAME
 import com.lemline.runner.messaging.MessageHandler.Companion.UNKNOWN_VERSION
@@ -65,10 +64,10 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
     /**
      * Increments the counter for successful deserialization.
      */
-    fun deserializationCompleted(workflowName: WorkflowName?, workflowVersion: WorkflowVersion?) = registry.counter(
+    fun deserializationCompleted(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_DESERIALIZATION_COMPLETED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
@@ -82,57 +81,57 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
     /**
      * Increments the counter for successfully processed messages.
      */
-    fun processingCompleted(workflowName: WorkflowName?, workflowVersion: WorkflowVersion?) = registry.counter(
+    fun processingCompleted(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_PROCESSING_COMPLETED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
      * Increments the counter for failed message processing attempts.
      */
-    fun processingFailed(reason: String, workflowName: WorkflowName?, workflowVersion: WorkflowVersion?) =
+    fun processingFailed(reason: String, workflowInfo: WorkflowInfo?) =
         registry.counter(
             METRIC_PROCESSING_FAILED_TOTAL,
             TAG_REASON, reason,
-            TAG_WORKFLOW_NAME, (workflowName ?: UNKNOWN_NAME).toString(),
-            TAG_WORKFLOW_VERSION, (workflowVersion ?: UNKNOWN_VERSION).toString()
+            TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
+            TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
         ).increment()
 
     /**
      * Increments the counter for successfully acknowledged messages.
      */
-    fun ackCompleted(workflowName: WorkflowName?, workflowVersion: WorkflowVersion?) = registry.counter(
+    fun ackCompleted(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_ACK_COMPLETED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
      * Increments the counter for failed acknowledgment attempts.
      */
-    fun ackFailed(workflowName: WorkflowName?, workflowVersion: WorkflowVersion?) = registry.counter(
+    fun ackFailed(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_ACK_FAILED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
      * Increments the counter for successfully unacknowledged messages.
      */
-    fun nackCompleted(workflowName: WorkflowName?, workflowVersion: WorkflowVersion?) = registry.counter(
+    fun nackCompleted(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_NACK_COMPLETED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /**
      * Increments the counter for failed negative-acknowledgment attempts.
      */
-    fun nackFailed(workflowName: WorkflowName?, workflowVersion: WorkflowVersion?) = registry.counter(
+    fun nackFailed(workflowInfo: WorkflowInfo?) = registry.counter(
         METRIC_NACK_FAILED_TOTAL,
-        TAG_WORKFLOW_NAME, (workflowName ?: UNKNOWN_NAME).toString(),
-        TAG_WORKFLOW_VERSION, (workflowVersion ?: UNKNOWN_VERSION).toString()
+        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
     ).increment()
 
     /** Returns the current count of active messages. */
@@ -155,17 +154,13 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
     /**
      * Records the duration of processing
      */
-    suspend fun <T> recordProcessingDuration(
-        workflowName: WorkflowName?,
-        workflowVersion: WorkflowVersion?,
-        block: suspend () -> T
-    ): T {
+    suspend fun <T> recordProcessingDuration(workflowInfo: WorkflowInfo?, block: suspend () -> T): T {
         val timer = registry.timer(
             METRIC_PROCESSING_DURATION,
             TAG_WORKFLOW_NAME,
-            (workflowName ?: UNKNOWN_NAME).toString(),
+            (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
             TAG_WORKFLOW_VERSION,
-            (workflowVersion ?: UNKNOWN_VERSION).toString()
+            (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
         )
         val start = markNow()
         return try {

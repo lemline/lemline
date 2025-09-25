@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.database
 
+import com.lemline.common.json.JsonSerializable
 import com.lemline.common.json.LemlineJson
-import com.lemline.runner.messaging.JsonSerializable
-import com.lemline.runner.models.WithInstanceInfo
+import com.lemline.common.values.WithInstanceInfo
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonClassDiscriminator
