@@ -1,8 +1,9 @@
 -- Use the table name from com.lemline.runner.repositories.SCHEDULE_TABLE
-CREATE TABLE lemline_schedules
+CREATE TABLE IF NOT EXISTS lemline_schedules
 (
     id                      UUID PRIMARY KEY,
     workflow_id             UUID UNIQUE              NOT NULL,
+    workflow_namespace      VARCHAR(255)             NOT NULL,
     workflow_name           VARCHAR(255)             NOT NULL,
     workflow_version        VARCHAR(255)             NOT NULL,
     workflow_position       CLOB                     NOT NULL,

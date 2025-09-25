@@ -3,6 +3,7 @@ package com.lemline.core.activities.runs
 
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowException
@@ -17,6 +18,7 @@ import kotlinx.serialization.json.JsonElement
 internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElement {
     logger.debug { "Executing run workflow command: ${node.name}" }
 
+    val subWorkflowNamespace = WorkflowNamespace(runWorkflow.workflow.namespace)
     val subWorkflowName = WorkflowName(runWorkflow.workflow.name)
     val subWorkflowVersion = WorkflowVersion(runWorkflow.workflow.version)
 
@@ -32,6 +34,7 @@ internal suspend fun RunInstance.runWorkflow(runWorkflow: RunWorkflow): JsonElem
 
     // Create the sub-workflow instance. It will be used in both await and non-await cases.
     val subProcessor: Processor = Processor.createNew(
+        namespace = subWorkflowNamespace,
         name = subWorkflowName,
         version = subWorkflowVersion,
         id = WorkflowId.random(),

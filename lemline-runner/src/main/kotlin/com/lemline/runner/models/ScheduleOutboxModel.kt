@@ -9,6 +9,7 @@ import com.cronutils.parser.CronParser
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.utils.toDuration
 import com.lemline.runner.messaging.instances.InstanceMessage
@@ -122,6 +123,7 @@ data class ScheduleOutboxModel(
 
         fun from(
             workflowId: WorkflowId,
+            workflowNamespace: WorkflowNamespace,
             workflowName: WorkflowName,
             workflowVersion: WorkflowVersion,
             workflowInput: JsonElement,
@@ -145,6 +147,7 @@ data class ScheduleOutboxModel(
                 id = IDV7.random(),
                 instanceMessage = InstanceMessage.new(
                     workflowId = workflowId,
+                    workflowNamespace = workflowNamespace,
                     workflowName = workflowName,
                     workflowVersion = workflowVersion,
                     workflowInput = workflowInput,

@@ -3,6 +3,7 @@ package com.lemline.runner.cli.definitions
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache as Workflows
 import com.lemline.runner.cli.GlobalMixin
@@ -34,6 +35,7 @@ class DefinitionGetCommandTest {
     private lateinit var selector: InteractiveWorkflowSelector
     private lateinit var objectMapper: ObjectMapper
 
+    private var workflowNamespace = WorkflowNamespace("test")
     private var workflowName = WorkflowName("testWorkflow")
     private var workflowVersion = WorkflowVersion("1.0.0")
     private lateinit var workflowDefinition: DefinitionModel
@@ -57,15 +59,17 @@ class DefinitionGetCommandTest {
         injectField(command, "objectMapper", objectMapper)
         injectField(command, "mixin", GlobalMixin())
 
+        workflowNamespace = WorkflowNamespace("test")
         workflowName = WorkflowName("testWorkflow")
         workflowVersion = WorkflowVersion("1.0.0")
         workflowDefinition = DefinitionModel(
+            namespace = workflowNamespace,
             name = workflowName,
             version = workflowVersion,
             definition = """
                 document:
                   dsl: 1.0.0
-                  namespace: test
+                  namespace: $workflowNamespace
                   name: $workflowName
                   version: '$workflowVersion'
                 do:
@@ -74,8 +78,14 @@ class DefinitionGetCommandTest {
             """.trimIndent()
         )
 
-        coEvery { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
-        coEvery { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
+        coEvery {
+            definitionRepository.findByNameAndVersion(
+                workflowNamespace,
+                workflowName,
+                workflowVersion
+            )
+        } returns workflowDefinition
+        coEvery { definitionRepository.listByName(workflowNamespace, workflowName) } returns listOf(workflowDefinition)
 
         // Save original streams
         originalOut = System.out
@@ -102,12 +112,13 @@ class DefinitionGetCommandTest {
         @Test
         fun `should fetch and display workflow when name and version are provided`() {
             // When
-            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString())
+            val exitCode =
+                cmd.execute(workflowNamespace.toString(), workflowName.toString(), workflowVersion.toString())
 
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain workflowDefinition.definition
-            coVerify { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) }
+            coVerify { definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion) }
         }
 
         @Test
@@ -115,15 +126,28 @@ class DefinitionGetCommandTest {
             // Given
             val nonExistentName = WorkflowName("nonExistentWorkflow")
             val nonExistentVersion = WorkflowVersion("9.9.9")
-            coEvery { definitionRepository.findByNameAndVersion(nonExistentName, nonExistentVersion) } returns null
+            coEvery {
+                definitionRepository.findByNameAndVersion(
+                    workflowNamespace,
+                    nonExistentName,
+                    nonExistentVersion
+                )
+            } returns null
 
             // When
-            val exitCode = cmd.execute(nonExistentName.toString(), nonExistentVersion.toString())
+            val exitCode =
+                cmd.execute(workflowNamespace.toString(), nonExistentName.toString(), nonExistentVersion.toString())
 
             // Then
             exitCode shouldBe 0 // Command doesn't throw, just prints error
             errStream.toString() shouldContain "not found"
-            coVerify { definitionRepository.findByNameAndVersion(nonExistentName, nonExistentVersion) }
+            coVerify {
+                definitionRepository.findByNameAndVersion(
+                    workflowNamespace,
+                    nonExistentName,
+                    nonExistentVersion
+                )
+            }
         }
 
         @Test
@@ -143,7 +167,13 @@ class DefinitionGetCommandTest {
             } returns jsonOutput
 
             // When
-            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--format", "JSON")
+            val exitCode = cmd.execute(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--format",
+                "JSON"
+            )
 
             // Then
             exitCode shouldBe 0
@@ -159,44 +189,44 @@ class DefinitionGetCommandTest {
         fun `should use selector when only name is provided`() {
             // Given
             val selectionList = listOf(1 to workflowDefinition)
-            coEvery { selector.prepareSelection(filterName = workflowName) } returns selectionList
+            coEvery { selector.prepareSelection(workflowNamespace, filterName = workflowName) } returns selectionList
 
             // When
-            val exitCode = cmd.execute(workflowName.toString())
+            val exitCode = cmd.execute(workflowNamespace.toString(), workflowName.toString())
 
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain workflowDefinition.definition
-            coVerify { selector.prepareSelection(filterName = workflowName) }
+            coVerify { selector.prepareSelection(workflowNamespace, filterName = workflowName) }
         }
 
         @Test
         fun `should use selector when no parameters are provided`() {
             // Given
             val selectionList = listOf(1 to workflowDefinition)
-            coEvery { selector.prepareSelection(filterName = null) } returns selectionList
+            coEvery { selector.prepareSelection(workflowNamespace, filterName = null) } returns selectionList
 
             // When
-            val exitCode = cmd.execute()
+            val exitCode = cmd.execute(workflowNamespace.toString())
 
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain workflowDefinition.definition
-            coVerify { selector.prepareSelection(filterName = null) }
+            coVerify { selector.prepareSelection(workflowNamespace, filterName = null) }
         }
 
         @Test
         fun `should handle empty selection list`() {
             // Given
-            coEvery { selector.prepareSelection(filterName = null) } returns null
+            coEvery { selector.prepareSelection(workflowNamespace, filterName = null) } returns null
 
             // When
-            val exitCode = cmd.execute()
+            val exitCode = cmd.execute(workflowNamespace.toString())
 
             // Then
             exitCode shouldBe 0
             // No output expected as selector already prints the "No workflows found" message
-            coVerify { selector.prepareSelection(filterName = null) }
+            coVerify { selector.prepareSelection(workflowNamespace, filterName = null) }
         }
     }
 

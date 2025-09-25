@@ -27,6 +27,8 @@ sealed interface InstanceModel : WithId, WithInstanceInfo, JsonSerializable {
 
     override val workflowId get() = workflowState?.workflowId
 
+    override val workflowNamespace get() = workflowState?.workflowNamespace
+
     override val workflowName get() = workflowState?.workflowName
 
     override val workflowVersion get() = workflowState?.workflowVersion

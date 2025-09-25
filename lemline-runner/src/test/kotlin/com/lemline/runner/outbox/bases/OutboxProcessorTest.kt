@@ -358,7 +358,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert
         coVerify(exactly = 0) { mockedProcessor(any(modelClass)) }
-        outboxRepository.count() shouldBe 0
+        outboxRepository.countAll() shouldBe 0
     }
 
     /**
@@ -382,7 +382,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         outboxRelay.cleanup(retentionDelay, batchSize)
 
         // Assert
-        outboxRepository.count() shouldBe 0
+        outboxRepository.countAll() shouldBe 0
     }
 
     /**
@@ -423,6 +423,6 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         outboxRelay.cleanup(afterDelay, batchSize)
 
         // Assert
-        outboxRepository.count() shouldBe 0
+        outboxRepository.countAll() shouldBe 0
     }
 }

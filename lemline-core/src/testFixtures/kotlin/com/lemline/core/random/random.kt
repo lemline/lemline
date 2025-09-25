@@ -6,6 +6,7 @@ package com.lemline.core.random
 import com.lemline.common.random.random
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
@@ -66,6 +67,7 @@ fun NodeStates.Companion.random() = NodeStates(
 
 fun WorkflowState.Companion.random(): WorkflowState = WorkflowState(
     workflowId = WorkflowId.random(),
+    workflowNamespace = WorkflowNamespace.random(),
     workflowName = WorkflowName.random(),
     workflowVersion = WorkflowVersion.random(),
     currentPosition = NodePosition.random(),

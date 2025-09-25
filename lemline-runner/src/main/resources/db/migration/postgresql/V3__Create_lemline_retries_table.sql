@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS lemline_retries
 (
     id                      uuid PRIMARY KEY,
     workflow_id             uuid           NOT NULL,
+    workflow_namespace      VARCHAR(255)   NOT NULL,
     workflow_name           VARCHAR(255)   NOT NULL,
     workflow_version        VARCHAR(255)   NOT NULL,
     workflow_position       TEXT           NOT NULL,

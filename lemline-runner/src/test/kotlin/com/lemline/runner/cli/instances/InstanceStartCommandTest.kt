@@ -2,6 +2,7 @@
 package com.lemline.runner.cli.instances
 
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.nodes.NodePosition
@@ -49,6 +50,7 @@ class InstanceStartCommandTest {
     private lateinit var instanceEmitter: InstanceMessageEmitter
     private lateinit var databaseEmitter: DatabaseMessageEmitter
 
+    private var workflowNamespace = WorkflowNamespace("test")
     private var workflowName = WorkflowName("testWorkflow")
     private var workflowNameWithSchema = WorkflowName("testWorkflowWithSchema")
     private var workflowVersion = WorkflowVersion("1.0.0")
@@ -60,6 +62,7 @@ class InstanceStartCommandTest {
     private lateinit var messageSlot: CapturingSlot<InstanceMessage>
 
     private val workflowDefinition = DefinitionModel(
+        namespace = workflowNamespace,
         name = workflowName,
         version = workflowVersion,
         definition = """
@@ -75,6 +78,7 @@ class InstanceStartCommandTest {
     )
 
     private val workflowWithSchema = DefinitionModel(
+        namespace = workflowNamespace,
         name = workflowNameWithSchema,
         version = workflowVersion,
         definition = """
@@ -118,13 +122,15 @@ class InstanceStartCommandTest {
 
         // Configure a repository to return this workflow
         coEvery {
-            definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
+            definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion)
         } returns workflowDefinition
         coEvery {
-            definitionRepository.findByNameAndVersion(workflowNameWithSchema, workflowVersion)
+            definitionRepository.findByNameAndVersion(workflowNamespace, workflowNameWithSchema, workflowVersion)
         } returns workflowWithSchema
-        coEvery { definitionRepository.listByName(workflowName) } returns listOf(workflowDefinition)
-        coEvery { definitionRepository.listByName(workflowNameWithSchema) } returns listOf(workflowWithSchema)
+        coEvery { definitionRepository.listByName(workflowNamespace, workflowName) } returns listOf(workflowDefinition)
+        coEvery { definitionRepository.listByName(workflowNamespace, workflowNameWithSchema) } returns listOf(
+            workflowWithSchema
+        )
 
         definitions = Definitions()
         definitions.inject("definitionRepository", definitionRepository)
@@ -193,7 +199,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         // Build the expected JSON object explicitly for clarity
         val expectedJson = buildJsonObject {
@@ -211,7 +223,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         // Build the expected nested JSON object
         val expectedJson = buildJsonObject {
@@ -231,7 +249,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         // Single quotes are normalized by the parser; expect standard JSON keys/values
         val expectedJson = buildJsonObject {
@@ -249,7 +273,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         val expectedJson = buildJsonObject {
             put("key", "value")
@@ -266,7 +296,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         val expectedJson = buildJsonArray {
             add(JsonPrimitive(1))
@@ -285,7 +321,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         val expectedJson = buildJsonObject {
             put("items", buildJsonArray {
@@ -304,7 +346,8 @@ class InstanceStartCommandTest {
     @Test
     fun `should use empty JSON object when no input is provided`() {
         // When & Then
-        val sentMessage = executeCommandAndVerify(workflowName.toString(), workflowVersion.toString())
+        val sentMessage =
+            executeCommandAndVerify(workflowNamespace.toString(), workflowName.toString(), workflowVersion.toString())
 
         // Get the raw input as a JsonElement
         val rawInput = sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput
@@ -320,7 +363,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive("just a string")
     }
@@ -332,7 +381,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive(42)
     }
@@ -344,7 +399,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive("42")
     }
@@ -356,7 +417,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive("42")
     }
@@ -368,7 +435,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive(true)
     }
@@ -380,7 +453,13 @@ class InstanceStartCommandTest {
 
         // When & Then
         val sentMessage =
-            executeCommandAndVerify(workflowName.toString(), workflowVersion.toString(), "--input", inputJsonString)
+            executeCommandAndVerify(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--input",
+                inputJsonString
+            )
 
         sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive("true")
     }
@@ -389,7 +468,13 @@ class InstanceStartCommandTest {
     fun `should validate input against schema when schema exists`() {
         // Execute command with valid input matching the schema
         val validInput = """{"userId": "user123", "firstName": "john", "lastName": "doe"}"""
-        val exitCode = cmd.execute(workflowNameWithSchema.toString(), workflowVersion.toString(), "--input", validInput)
+        val exitCode = cmd.execute(
+            workflowNamespace.toString(),
+            workflowNameWithSchema.toString(),
+            workflowVersion.toString(),
+            "--input",
+            validInput
+        )
 
         // Verify command was successful
         exitCode shouldBe 0
@@ -399,7 +484,13 @@ class InstanceStartCommandTest {
     fun `should validate input against schema when schema exists (only required)`() {
         // Execute command with valid input matching the schema
         val validInput = """{"userId": "user123", "lastName": "doe"}"""
-        val exitCode = cmd.execute(workflowNameWithSchema.toString(), workflowVersion.toString(), "--input", validInput)
+        val exitCode = cmd.execute(
+            workflowNamespace.toString(),
+            workflowNameWithSchema.toString(),
+            workflowVersion.toString(),
+            "--input",
+            validInput
+        )
 
         // Verify command was successful
         exitCode shouldBe 0
@@ -423,7 +514,13 @@ class InstanceStartCommandTest {
         // Execute command with invalid input (missing required lastName field)
         val invalidInput = """{"userId": "user123"}"""
         val code =
-            spyCmd.execute(workflowNameWithSchema.toString(), workflowVersion.toString(), "--input", invalidInput)
+            spyCmd.execute(
+                workflowNamespace.toString(),
+                workflowNameWithSchema.toString(),
+                workflowVersion.toString(),
+                "--input",
+                invalidInput
+            )
 
         println("code = $code")
         // Verify the error message was captured

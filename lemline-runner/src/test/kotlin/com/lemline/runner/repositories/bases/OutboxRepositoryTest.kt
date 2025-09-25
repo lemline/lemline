@@ -555,13 +555,13 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `count should return 0 for an empty table`() = runTest {
         // Given
-        val count = repository.count()
+        val count = repository.countAll()
 
         // When
         insertEntities(10)
 
         // Then
-        repository.count() shouldBe count + 10
+        repository.countAll() shouldBe count + 10
     }
 
     /**
@@ -574,7 +574,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         insertEntities(10)
 
         // When
-        val count = repository.count()
+        val count = repository.countAll()
         val allMessages = repository.listAll()
 
         // Then

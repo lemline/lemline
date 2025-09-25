@@ -3,10 +3,12 @@ package com.lemline.runner.cli.definitions
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
+import com.lemline.runner.cli.exceptions.CliException
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
@@ -42,15 +44,22 @@ class DefinitionGetCommand : Runnable {
 
     @Parameters(
         index = "0",
-        arity = "0..1",
-        description = ["Optional name of the workflow to get directly."]
+        arity = "1",
+        description = ["Namespace of the workflow to get."]
     )
-    var name: String? = null
+    var namespace: String? = null
 
     @Parameters(
         index = "1",
         arity = "0..1",
-        description = ["Optional version of the workflow (requires name)."]
+        description = ["Optional name of the workflow to get."]
+    )
+    var name: String? = null
+
+    @Parameters(
+        index = "2",
+        arity = "0..1",
+        description = ["Optional version of the workflow to get."]
     )
     var version: String? = null
 
@@ -61,6 +70,10 @@ class DefinitionGetCommand : Runnable {
     )
     var format: OutputFormat = OutputFormat.YAML
 
+    val workflowNamespace by lazy {
+        namespace?.let { WorkflowNamespace(it) } ?: cliError("Workflow namespace must be provided")
+    }
+
     val workflowName by lazy { name?.let { WorkflowName(it) } }
 
     val workflowVersion by lazy { version?.let { WorkflowVersion(it) } }
@@ -70,9 +83,10 @@ class DefinitionGetCommand : Runnable {
         try {
             if (workflowName != null && workflowVersion != null) {
                 // Direct fetch: Both name and version provided - runs once and exits
-                val selectedWorkflow = definitionRepository.findByNameAndVersion(workflowName!!, workflowVersion!!)
+                val selectedWorkflow =
+                    definitionRepository.findByNameAndVersion(workflowNamespace, workflowName!!, workflowVersion!!)
                 if (selectedWorkflow == null) {
-                    System.err.println("ERROR: Workflow '$workflowName' version '$workflowVersion' not found.")
+                    System.err.println("ERROR: Workflow '$workflowName' version '$workflowVersion' not found in namespace '$workflowNamespace'.")
                     return@runBlocking // Exit if direct fetch fails
                 }
                 displayWorkflowDefinition(selectedWorkflow)
@@ -80,7 +94,7 @@ class DefinitionGetCommand : Runnable {
                 // --- Interactive selection mode ---
 
                 // Prepare selection (displays the list if needed)
-                val selectionList = selector.prepareSelection(filterName = workflowName)
+                val selectionList = selector.prepareSelection(workflowNamespace, filterName = workflowName)
                     ?: return@runBlocking // Exit if nothing found
 
                 // Handle a single result directly
@@ -97,7 +111,7 @@ class DefinitionGetCommand : Runnable {
                     when {
                         input.isNullOrEmpty() -> {
                             // Blank input: Redisplay the list and re-prompt
-                            selector.prepareSelection(filterName = workflowName) ?: break
+                            selector.prepareSelection(workflowNamespace, filterName = workflowName) ?: break
                             continue
                         }
 
@@ -151,4 +165,6 @@ class DefinitionGetCommand : Runnable {
         // Assuming stored definition is already valid YAML
         OutputFormat.YAML -> println(definitionModel.definition)
     }
+
+    internal fun cliError(msg: String): Nothing = throw CliException(msg)
 }

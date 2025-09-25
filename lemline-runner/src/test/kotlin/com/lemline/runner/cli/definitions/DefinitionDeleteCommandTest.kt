@@ -2,6 +2,7 @@
 package com.lemline.runner.cli.definitions
 
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
@@ -33,6 +34,7 @@ class DefinitionDeleteCommandTest {
     private lateinit var originalErr: PrintStream
     private lateinit var originalIn: java.io.InputStream
 
+    private var workflowNamespace = WorkflowNamespace("test")
     private var workflowName = WorkflowName("testWorkflow")
     private var workflowVersion = WorkflowVersion("1.0.0")
     private lateinit var workflowDefinition: DefinitionModel
@@ -50,15 +52,16 @@ class DefinitionDeleteCommandTest {
         injectField(command, "selector", selector)
         injectField(command, "mixin", GlobalMixin())
 
-        workflowName = WorkflowName("testWorkflow")
+        workflowNamespace = WorkflowNamespace("test")
         workflowVersion = WorkflowVersion("1.0.0")
         workflowDefinition = DefinitionModel(
+            namespace = workflowNamespace,
             name = workflowName,
             version = workflowVersion,
             definition = """
                 document:
                   dsl: 1.0.0
-                  namespace: test
+                  namespace: $workflowNamespace
                   name: $workflowName
                   version: '$workflowVersion'
                 do:
@@ -68,12 +71,13 @@ class DefinitionDeleteCommandTest {
         )
 
         workflowDefinition2 = DefinitionModel(
+            namespace = workflowNamespace,
             name = workflowName,
             version = WorkflowVersion("2.0.0"),
             definition = """
                 document:
                   dsl: 1.0.0
-                  namespace: test
+                  namespace: $workflowNamespace
                   name: $workflowName
                   version: '2.0.0'
                 do:
@@ -82,8 +86,14 @@ class DefinitionDeleteCommandTest {
             """.trimIndent()
         )
 
-        coEvery { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) } returns workflowDefinition
-        coEvery { definitionRepository.listByName(workflowName) } returns listOf(
+        coEvery {
+            definitionRepository.findByNameAndVersion(
+                workflowNamespace,
+                workflowName,
+                workflowVersion
+            )
+        } returns workflowDefinition
+        coEvery { definitionRepository.listByName(workflowNamespace, workflowName) } returns listOf(
             workflowDefinition,
             workflowDefinition2
         )
@@ -120,13 +130,18 @@ class DefinitionDeleteCommandTest {
             coEvery { definitionRepository.delete(workflowDefinition) } returns 1
 
             // When
-            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--force")
+            val exitCode = cmd.execute(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--force"
+            )
 
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "Successfully deleted"
             outStream.toString() shouldContain "(forced)"
-            coVerify { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) }
+            coVerify { definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion) }
             coVerify { definitionRepository.delete(workflowDefinition) }
         }
 
@@ -137,46 +152,46 @@ class DefinitionDeleteCommandTest {
             coEvery { definitionRepository.delete(workflowVersions) } returns 2
 
             // When
-            val exitCode = cmd.execute(workflowName.toString(), "--force")
+            val exitCode = cmd.execute(workflowNamespace.toString(), workflowName.toString(), "--force")
 
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "Successfully deleted 2 versions"
             outStream.toString() shouldContain "(forced)"
-            coVerify { definitionRepository.listByName(workflowName) }
+            coVerify { definitionRepository.listByName(workflowNamespace, workflowName) }
             coVerify { definitionRepository.delete(workflowVersions) }
         }
 
         @Test
         fun `should delete all workflows when no args are provided with force flag`() {
             // Given
-            coEvery { definitionRepository.count() } returns 5
-            coEvery { definitionRepository.deleteAll() } returns 5
+            coEvery { definitionRepository.countAllInNamespace(workflowNamespace) } returns 5
+            coEvery { definitionRepository.deleteAllInNamespace(workflowNamespace) } returns 5
 
             // When
-            val exitCode = cmd.execute("--force")
+            val exitCode = cmd.execute(workflowNamespace.toString(), "--force")
 
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "Successfully deleted 5 workflows"
             outStream.toString() shouldContain "(forced)"
-            coVerify { definitionRepository.count() }
-            coVerify { definitionRepository.deleteAll() }
+            coVerify { definitionRepository.countAllInNamespace(workflowNamespace) }
+            coVerify { definitionRepository.deleteAllInNamespace(workflowNamespace) }
         }
 
         @Test
         fun `should handle no workflows found when deleting all with force flag`() {
             // Given
-            coEvery { definitionRepository.count() } returns 0
+            coEvery { definitionRepository.countAllInNamespace(workflowNamespace) } returns 0
 
             // When
-            val exitCode = cmd.execute("--force")
+            val exitCode = cmd.execute(workflowNamespace.toString(), "--force")
 
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "No workflows found to delete"
-            coVerify { definitionRepository.count() }
-            coVerify(exactly = 0) { definitionRepository.deleteAll() }
+            coVerify { definitionRepository.countAllInNamespace(workflowNamespace) }
+            coVerify(exactly = 0) { definitionRepository.deleteAllInNamespace(any()) }
         }
 
         @Test
@@ -184,15 +199,32 @@ class DefinitionDeleteCommandTest {
             // Given
             val nonExistentName = WorkflowName("nonExistentWorkflow")
             val nonExistentVersion = WorkflowVersion("9.9.9")
-            coEvery { definitionRepository.findByNameAndVersion(nonExistentName, nonExistentVersion) } returns null
+            coEvery {
+                definitionRepository.findByNameAndVersion(
+                    workflowNamespace,
+                    nonExistentName,
+                    nonExistentVersion
+                )
+            } returns null
 
             // When
-            val exitCode = cmd.execute(nonExistentName.toString(), nonExistentVersion.toString(), "--force")
+            val exitCode = cmd.execute(
+                workflowNamespace.toString(),
+                nonExistentName.toString(),
+                nonExistentVersion.toString(),
+                "--force"
+            )
 
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "not found"
-            coVerify { definitionRepository.findByNameAndVersion(nonExistentName, nonExistentVersion) }
+            coVerify {
+                definitionRepository.findByNameAndVersion(
+                    workflowNamespace,
+                    nonExistentName,
+                    nonExistentVersion
+                )
+            }
         }
     }
 
@@ -203,15 +235,20 @@ class DefinitionDeleteCommandTest {
             // Given
             coEvery { definitionRepository.delete(workflowDefinition) } returns 1
             coEvery {
-                definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
+                definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion)
             } returns workflowDefinition
 
             // When - force flag will bypass the confirmation
-            val exitCode = cmd.execute(workflowName.toString(), workflowVersion.toString(), "--force")
+            val exitCode = cmd.execute(
+                workflowNamespace.toString(),
+                workflowName.toString(),
+                workflowVersion.toString(),
+                "--force"
+            )
 
             // Then
             exitCode shouldBe 0
-            coVerify { definitionRepository.findByNameAndVersion(workflowName, workflowVersion) }
+            coVerify { definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion) }
             coVerify { definitionRepository.delete(workflowDefinition) }
         }
 
@@ -225,16 +262,16 @@ class DefinitionDeleteCommandTest {
         @Test
         fun `should delete all when no parameters are provided with force`() {
             // Given
-            coEvery { definitionRepository.count() } returns 5
-            coEvery { definitionRepository.deleteAll() } returns 5
+            coEvery { definitionRepository.countAllInNamespace(workflowNamespace) } returns 5
+            coEvery { definitionRepository.deleteAllInNamespace(workflowNamespace) } returns 5
 
             // When - using force with no parameters
-            val exitCode = cmd.execute("--force")
+            val exitCode = cmd.execute(workflowNamespace.toString(), "--force")
 
             // Then
             exitCode shouldBe 0
-            coVerify { definitionRepository.count() }
-            coVerify { definitionRepository.deleteAll() }
+            coVerify { definitionRepository.countAllInNamespace(workflowNamespace) }
+            coVerify { definitionRepository.deleteAllInNamespace(workflowNamespace) }
         }
 
         // This test is covered by 'should use selector when only name is provided'
@@ -244,15 +281,15 @@ class DefinitionDeleteCommandTest {
         @Test
         fun `should handle empty selection list`() {
             // Given
-            coEvery { selector.prepareSelection(filterName = null) } returns null
+            coEvery { selector.prepareSelection(workflowNamespace, filterName = null) } returns null
 
             // When
-            val exitCode = cmd.execute()
+            val exitCode = cmd.execute(workflowNamespace.toString())
 
             // Then
             exitCode shouldBe 0
             // No output expected as selector already prints the "No workflows found" message
-            coVerify { selector.prepareSelection(filterName = null) }
+            coVerify { selector.prepareSelection(workflowNamespace, filterName = null) }
         }
     }
 

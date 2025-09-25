@@ -4,6 +4,7 @@ package com.lemline.runner.cli.instances
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.exceptions.CliException
@@ -46,13 +47,20 @@ class InstanceStartCommand : Runnable {
 
     @Parameters(
         index = "0",
-        arity = "0..1",
+        arity = "1",
+        description = ["Namespace of the workflow to start."]
+    )
+    var namespace: String? = null
+
+    @Parameters(
+        index = "1",
+        arity = "1",
         description = ["Name of the workflow to start."]
     )
     var name: String? = null
 
     @Parameters(
-        index = "1",
+        index = "2",
         arity = "0..1",
         description = ["Optional version of the workflow."]
     )
@@ -71,7 +79,10 @@ class InstanceStartCommand : Runnable {
     var zone: String? = null
 
     override fun run(): Unit = runBlocking {
+        if (namespace.isNullOrBlank()) cliError("Workflow namespace must be provided")
         if (name.isNullOrBlank()) cliError("Workflow name must be provided")
+
+        val workflowNamespace = WorkflowNamespace(namespace!!)
         val workflowName = WorkflowName(name!!)
         val workflowInput = getInput(input)
 
@@ -84,6 +95,7 @@ class InstanceStartCommand : Runnable {
         // For the two last cases, we sent an IngestionMessage (first database ingestion, then only after starting the instance)
         val (instanceMessage, scheduleOutboxModel) = starter.getStartingMessages(
             workflowId = workflowId,
+            workflowNamespace = workflowNamespace,
             workflowName = workflowName,
             optionalVersion = version?.let { WorkflowVersion(it) },
             workflowInput = workflowInput,

@@ -34,7 +34,7 @@ do:
         - callFactorialNMinus1:
             run:
               workflow:
-                namespace: another-one
+                namespace: test
                 name: factorial
                 version: '0.1.0'
                 input:
@@ -48,10 +48,10 @@ do:
     @Test
     fun `should run sub-workflow synchronously and return correct result`() = runTest {
         val instance = getWorkflowProcessor(
-            factorialWorkflowYaml,
-            JsonObject(mapOf("n" to JsonPrimitive(5))),
-            "factorial",
-            "0.1.0"
+            doYaml = factorialWorkflowYaml,
+            input = JsonObject(mapOf("n" to JsonPrimitive(5))),
+            name = "factorial",
+            version = "0.1.0"
         )
 
         val result = instance.run()

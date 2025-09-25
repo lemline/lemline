@@ -2,10 +2,12 @@
 package com.lemline.core.definitions
 
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.utils.name
+import com.lemline.core.utils.namespace
 import com.lemline.core.utils.version
 import com.lemline.core.workflows.index
 import io.kotest.matchers.shouldBe
@@ -129,7 +131,7 @@ class DefinitionsTest {
         workflow.shouldBeInstanceOf<Workflow>()
 
         // Verify the workflow is in the cache
-        val cachedWorkflow = DefinitionCache.getOrNull(workflow.name, workflow.version)
+        val cachedWorkflow = DefinitionCache.getOrNull(workflow.namespace, workflow.name, workflow.version)
         cachedWorkflow shouldNotBe null
         cachedWorkflow?.document?.name shouldBe workflow.document.name
 
@@ -164,7 +166,8 @@ class DefinitionsTest {
     @Test
     fun `getOrNull should return null for non-existent workflow`() {
         // When
-        val result = DefinitionCache.getOrNull(WorkflowName("non-existent"), WorkflowVersion("1.0.0"))
+        val result =
+            DefinitionCache.getOrNull(WorkflowNamespace("test"), WorkflowName("non-existent"), WorkflowVersion("1.0.0"))
 
         // Then
         result shouldBe null
@@ -176,7 +179,7 @@ class DefinitionsTest {
         val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
 
         // When
-        val result = DefinitionCache.getOrNull(workflow.name, workflow.version)
+        val result = DefinitionCache.getOrNull(workflow.namespace, workflow.name, workflow.version)
 
         // Then
         result shouldBe workflow
@@ -219,6 +222,7 @@ class DefinitionsTest {
     fun `workflow index should work correctly`() {
         // Given
         val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
+        val workflowNamespace = workflow.namespace
         val workflowName = workflow.name
         val workflowVersion = workflow.version
 
@@ -226,11 +230,12 @@ class DefinitionsTest {
         val index = workflow.index
 
         // Then
-        index.first shouldBe workflowName
-        index.second shouldBe workflowVersion
+        index.namespace shouldBe workflowNamespace
+        index.name shouldBe workflowName
+        index.version shouldBe workflowVersion
 
         // Verify the index is used correctly for caching
-        val cachedWorkflow = DefinitionCache.getOrNull(workflowName, workflowVersion)
+        val cachedWorkflow = DefinitionCache.getOrNull(workflowNamespace, workflowName, workflowVersion)
         cachedWorkflow shouldBe workflow
     }
 
@@ -292,9 +297,10 @@ class DefinitionsTest {
 
         // Verify all workflows were cached correctly
         results.forEachIndexed { i, workflow ->
+            val workflowNamespace = workflow.namespace
             val name = workflow.name
             val version = workflow.version
-            val cachedWorkflow = DefinitionCache.getOrNull(name, version)
+            val cachedWorkflow = DefinitionCache.getOrNull(workflowNamespace, name, version)
 
             // Should be in cache
             cachedWorkflow shouldBe workflow
