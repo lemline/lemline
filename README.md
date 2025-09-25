@@ -29,20 +29,25 @@ or waiting for multiple tasks to complete in parallel.
 
 * **Serverless Workflow DSL Execution:** Faithfully implements
   the [Serverless Workflow specification](https://serverlessworkflow.io) for defining and running workflows.
-* **Event-Driven Orchestration** State transitions are carried within broker messages, minimizing database load and improving throughput.
+* **Event-Driven Orchestration** State transitions are carried within broker messages, minimizing database load and
+  improving throughput.
 * **Micrometer Integration** Built-in metrics and health checks, exposed through a dedicated endpoint for observability.
-* **Resilient Error Management** Automatic retries, failure tracking, and clear separation between infrastructure and business logic errors.
-* **Stateless Workers** Horizontal scaling is as simple as starting more Lemline workers. No sticky sessions, no shared state.
-* **Quarkus Native Binary** Deploy Lemline as a lean, self-contained binary built with GraalVM/Mandrel. Startup in milliseconds, reduced memory footprint, perfect for containerized and serverless environments.
+* **Resilient Error Management** Automatic retries, failure tracking, and clear separation between infrastructure and
+  business logic errors.
+* **Stateless Workers** Horizontal scaling is as simple as starting more Lemline workers. No sticky sessions, no shared
+  state.
+* **Quarkus Native Binary** Deploy Lemline as a lean, self-contained binary built with GraalVM/Mandrel. Startup in
+  milliseconds, reduced memory footprint, perfect for containerized and serverless environments.
 
 ## 🏗 Architecture
 
 Lemline runs **on top of your existing infrastructure**.  
-All you need to deploy are stateless Lemline Runners that connect to **your event broker** and **your database**.  
+All you need to deploy are stateless Lemline Runners that connect to **your event broker** and **your database**.
 
-- **Event Broker** (Kafka, RabbitMQ, …) transports workflow state through messages.  
-- **Database** (PostgreSQL, MySQL, …) is used only when strictly necessary: timers, retries, and checkpoints.  
-- **Stateless Lemline Runners** orchestrate workflows, make calls to your services, and scale horizontally with no coordination overhead.  
+- **Event Broker** (Kafka, RabbitMQ, …) transports workflow state through messages.
+- **Database** (PostgreSQL, MySQL, …) is used only when strictly necessary: timers, retries, and checkpoints.
+- **Stateless Lemline Runners** orchestrate workflows, make calls to your services, and scale horizontally with no
+  coordination overhead.
 
 ```mermaid
 flowchart LR
@@ -74,14 +79,16 @@ flowchart LR
     L1 <--> A2
     L1 <--> A3
 ```
+
 Other databases and brokers (e.g. Pulsar, SQS, Pub/Sub, Service Bus) are on the roadmap.
 
 ## 📦 Modules
 
 * **`lemline-core`:** Contains the core implementation of the Serverless Workflow DSL types and logic.
-* **`lemline-runner`:** Quarkus-based runtime. Handles message I/O, workflow state management, and integration with databases/brokers.
+* **`lemline-runner`:** Quarkus-based runtime. Handles message I/O, workflow state management, and integration with
+  databases/brokers.
 * **`lemline-docs`:** (WIP) Documentation for the project.
-  
+
 ## 🚀 Getting Started
 
 ### Prerequisites
@@ -124,9 +131,9 @@ runtime.
     * Options:
         * `-f`, `--format <format>`: Specifies the output format (e.g., `yaml`, `properties`). Default is `yaml`.
         * `-a`, `--all`: Shows all properties, including Quarkus-specific properties, not just `lemline.*`.
-* **`definition`**: Manages workflow definitions. 
-* **`instance`**: Manages workflow instances. 
-* **`migrate`**: Handles database migrations. 
+* **`definition`**: Manages workflow definitions.
+* **`instance`**: Manages workflow instances.
+* **`migrate`**: Handles database migrations.
 
 ### Running Tests
 
@@ -166,11 +173,12 @@ On Windows, use the following command to build a macOS native image:
 ```bash
 gradlew.bat -p lemline-runner quarkusBuild -Dquarkus.native.enabled=true -Dquarkus.package.jar.enabled=false
 ```
+
 ## 📊 Observability
 
 * Micrometer Metrics: Exposes Prometheus-compatible metrics for workflows, retries, and failures.
 * Health Checks: Ready/live endpoints integrated into the Quarkus runtime.
-  
+
 ## 📚 Documentation
 
 * **Serverless Workflow DSL Specification:**
@@ -185,7 +193,6 @@ Contributions are welcome! Please follow the guidelines in our [CONTRIBUTING.md]
 ## 📜 License
 
 This project is licensed under the [Business Source License 1.1](LICENSE.md).
-
 
 ## 📝 Roadmap
 
@@ -215,7 +222,7 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 - [ ] Listen
 - [ ] Emit
 - [ ] Fork
-      
+
 - Try:
     - [x] Retry
     - [x] Catch
@@ -274,11 +281,12 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 
 ### Others
 
-- [ ] Namespace
+- [x] Namespace
 - [ ] Catalog
 - [ ] Extensions
 
 ## 📬 Contact
+
 Have a feature request, question, or an idea for improvement? We’d love to hear from you.
 
 For custom requests, consulting, or paid contributions, feel free to reach out directly:

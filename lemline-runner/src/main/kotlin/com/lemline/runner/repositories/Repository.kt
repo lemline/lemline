@@ -203,17 +203,18 @@ abstract class Repository<T> {
      *
      * @return A list of all entities in the table.
      */
-    suspend fun listAll(connection: Connection? = null): List<T> = withConnection(connection) { conn ->
-        conn.prepareStatement(listAllSQL).use { stmt ->
-            stmt.executeQuery().use { rs ->
-                buildList {
-                    while (rs.next()) {
-                        add(createModel(rs))
+    suspend fun listAll(connection: Connection? = null): List<T> =
+        withConnection(connection) { conn ->
+            conn.prepareStatement(listAllSQL).use { stmt ->
+                stmt.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            add(createModel(rs))
+                        }
                     }
                 }
             }
         }
-    }
 
     private val listAllSQL by lazy { "SELECT * FROM $tableName" }
 
@@ -274,7 +275,7 @@ abstract class Repository<T> {
      *
      * @return The total number of records in the table
      */
-    suspend fun count(connection: Connection? = null): Long = withConnection(connection) { conn ->
+    suspend fun countAll(connection: Connection? = null): Long = withConnection(connection) { conn ->
         conn.prepareStatement(countSql).use { stmt ->
             stmt.executeQuery().use { rs ->
                 if (rs.next()) rs.getLong(1) else 0L

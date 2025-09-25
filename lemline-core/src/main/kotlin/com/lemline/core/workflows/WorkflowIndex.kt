@@ -2,13 +2,22 @@
 package com.lemline.core.workflows
 
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import io.serverlessworkflow.api.types.Workflow
 
 /**
- * Pair representing the index of a workflow consisting of its name and version.
+ * Uniquely identifying a workflow by its namespace, name and version.
  */
-typealias WorkflowIndex = Pair<WorkflowName, WorkflowVersion>
+data class WorkflowIndex(
+    val namespace: WorkflowNamespace,
+    val name: WorkflowName,
+    val version: WorkflowVersion
+)
 
-val Workflow.index: WorkflowIndex
-    get() = WorkflowName(document.name) to WorkflowVersion(document.version)
+val Workflow.index
+    get() = WorkflowIndex(
+        WorkflowNamespace(document.namespace),
+        WorkflowName(document.name),
+        WorkflowVersion(document.version)
+    )

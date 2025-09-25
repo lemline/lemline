@@ -4,6 +4,7 @@ package com.lemline.runner.messaging.database
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -20,6 +21,7 @@ import kotlinx.serialization.json.JsonElement
 @SerialName("c") // <- type discriminator for polymorphic serialization
 data class CompletedMessage(
     override val workflowId: WorkflowId,
+    override val workflowNamespace: WorkflowNamespace,
     override val workflowName: WorkflowName,
     override val workflowVersion: WorkflowVersion,
     val parentId: IDV7?,

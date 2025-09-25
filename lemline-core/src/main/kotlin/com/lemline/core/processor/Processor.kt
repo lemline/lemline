@@ -5,6 +5,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.RuntimeDescriptor
 import com.lemline.core.activities.ActivityRunnerProvider
@@ -78,6 +79,7 @@ class Processor(
     var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
 ) {
     val workflowId = workflowState.workflowId
+    val workflowNamespace = workflowState.workflowNamespace
     val workflowName = workflowState.workflowName
     val workflowVersion = workflowState.workflowVersion
 
@@ -104,6 +106,7 @@ class Processor(
         @JvmStatic
         @JvmOverloads
         fun createNew(
+            namespace: WorkflowNamespace,
             name: WorkflowName,
             version: WorkflowVersion,
             id: WorkflowId,
@@ -113,6 +116,7 @@ class Processor(
         ) = Processor(
             workflowState = WorkflowState(
                 workflowId = id,
+                workflowNamespace = namespace,
                 workflowName = name,
                 workflowVersion = version,
                 currentStates = NodeStates.new(rawInput),
@@ -146,7 +150,7 @@ class Processor(
     val workflow: Workflow
 
     init {
-        workflow = DefinitionCache.getOrNull(workflowName, workflowVersion)
+        workflow = DefinitionCache.getOrNull(workflowNamespace, workflowName, workflowVersion)
             ?: error("workflow definition not found")
         // get root state from instance
         val rootState = workflowState.currentStates[NodePosition.root]

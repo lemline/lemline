@@ -2,9 +2,11 @@
 package com.lemline.runner.cli.definitions
 
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
+import com.lemline.runner.cli.exceptions.CliException
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
@@ -42,15 +44,22 @@ open class DefinitionDeleteCommand : Runnable {
 
     @Parameters(
         index = "0",
-        arity = "0..1",
-        description = ["Optional name of the workflow to get directly."]
+        arity = "1",
+        description = ["Namespace of the workflows to delete."]
     )
-    var name: String? = null
+    var namespace: String? = null
 
     @Parameters(
         index = "1",
         arity = "0..1",
-        description = ["Optional version of the workflow (requires name)."]
+        description = ["Optional name of the workflow to delete."]
+    )
+    var name: String? = null
+
+    @Parameters(
+        index = "2",
+        arity = "0..1",
+        description = ["Optional version of the workflow to delete."]
     )
     var version: String? = null
 
@@ -61,6 +70,9 @@ open class DefinitionDeleteCommand : Runnable {
     )
     var force: Boolean = false
 
+    val workflowNamespace by lazy {
+        namespace?.let { WorkflowNamespace(it) } ?: cliError("Workflow namespace must be provided")
+    }
     val workflowName by lazy { name?.let { WorkflowName(it) } }
     val workflowVersion by lazy { version?.let { WorkflowVersion(it) } }
 
@@ -78,16 +90,15 @@ open class DefinitionDeleteCommand : Runnable {
 
     private suspend fun handleForcedDeletion() {
         when {
-            name == null -> deleteAllWorkflows()
-            version == null -> deleteAllVersionsByName(workflowName!!)
+            name == null -> deleteAllWorkflowsInNamespace()
+            version == null -> deleteAllVersionsByNameInNamespace(workflowName!!)
             else -> deleteSpecificVersion(workflowName!!, workflowVersion!!)
         }
     }
 
     private suspend fun handleInteractiveDeletion() {
-        val workflowName = name?.let { WorkflowName(it) }
         // --- Prepare and display list ONCE ---
-        var currentSelectionList = selector.prepareSelection(workflowName)?.toMutableList()
+        var currentSelectionList = selector.prepareSelection(workflowNamespace, workflowName)?.toMutableList()
             ?: return // Exit if nothing found initially
 
         // --- Prompt loop ---
@@ -118,7 +129,8 @@ open class DefinitionDeleteCommand : Runnable {
             when {
                 input.isNullOrEmpty() -> {
                     // Blank input: Redisplay the list and re-prompt
-                    currentSelectionList = selector.prepareSelection(workflowName)?.toMutableList() ?: break
+                    currentSelectionList =
+                        selector.prepareSelection(workflowNamespace, workflowName)?.toMutableList() ?: break
                     continue
                 }
 
@@ -156,8 +168,8 @@ open class DefinitionDeleteCommand : Runnable {
 
     // --- Methods used for BOTH Forced & Intercative Deletion --- //
 
-    private suspend fun deleteAllWorkflows() {
-        val workflowCount = definitionRepository.count()
+    private suspend fun deleteAllWorkflowsInNamespace() {
+        val workflowCount = definitionRepository.countAllInNamespace(workflowNamespace)
         if (workflowCount == 0L) {
             println("No workflows found to delete.")
             return
@@ -165,12 +177,12 @@ open class DefinitionDeleteCommand : Runnable {
         val subject = "ALL $workflowCount workflows"
         if (!confirmDeletion(subject)) return
 
-        val deletedCount = definitionRepository.deleteAll()
+        val deletedCount = definitionRepository.deleteAllInNamespace(workflowNamespace)
         println("Successfully deleted $deletedCount workflows." + if (force) " (forced)" else "")
     }
 
-    private suspend fun deleteAllVersionsByName(workflowName: WorkflowName): Boolean {
-        val workflowsToDelete = definitionRepository.listByName(workflowName)
+    private suspend fun deleteAllVersionsByNameInNamespace(workflowName: WorkflowName): Boolean {
+        val workflowsToDelete = definitionRepository.listByName(workflowNamespace, workflowName)
         if (workflowsToDelete.isEmpty()) {
             println("No workflows found with name '$workflowName'.")
             return false
@@ -190,7 +202,7 @@ open class DefinitionDeleteCommand : Runnable {
     }
 
     private suspend fun deleteSpecificVersion(name: WorkflowName, version: WorkflowVersion): Boolean {
-        val workflowToDelete = definitionRepository.findByNameAndVersion(name, version)
+        val workflowToDelete = definitionRepository.findByNameAndVersion(workflowNamespace, name, version)
             ?: run {
                 println("Workflow '$name' version '$version' not found.")
                 return false
@@ -227,7 +239,7 @@ open class DefinitionDeleteCommand : Runnable {
             try {
                 val deletedCount = if (filterName == null) {
                     // If no filter was applied, '*' means delete absolutely all
-                    definitionRepository.deleteAll()
+                    definitionRepository.deleteAllInNamespace(workflowNamespace)
                 } else {
                     // If a name filter was applied, '*' means delete all versions of that name
                     definitionRepository.delete(workflowsToDelete)
@@ -269,4 +281,7 @@ open class DefinitionDeleteCommand : Runnable {
     // Helper for concise exception throwing
     private fun ExecutionException(message: String, cause: Throwable? = null) =
         CommandLine.ExecutionException(CommandLine(this), message, cause)
+
+    internal fun cliError(msg: String): Nothing = throw CliException(msg)
+
 }

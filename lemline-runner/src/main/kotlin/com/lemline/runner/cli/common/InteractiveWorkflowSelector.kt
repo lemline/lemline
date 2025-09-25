@@ -3,6 +3,7 @@ package com.lemline.runner.cli.common
 
 import com.github.zafarkhaja.semver.Version
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
@@ -20,11 +21,14 @@ class InteractiveWorkflowSelector @Inject constructor(
      * and returns the list of pairs (number, WorkflowModel) for selection.
      * Returns null if no workflows are found.
      */
-    suspend fun prepareSelection(filterName: WorkflowName? = null): List<Pair<Int, DefinitionModel>>? {
+    suspend fun prepareSelection(
+        workflowNamespace: WorkflowNamespace,
+        filterName: WorkflowName? = null
+    ): List<Pair<Int, DefinitionModel>>? {
         val workflows = if (filterName != null) {
-            definitionRepository.listByName(filterName)
+            definitionRepository.listByName(workflowNamespace, filterName)
         } else {
-            definitionRepository.listAll()
+            definitionRepository.listAllInNamespace(workflowNamespace)
         }
 
         if (workflows.isEmpty()) {

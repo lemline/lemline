@@ -100,10 +100,10 @@ internal abstract class FailureRepositoryTest {
             FailureModel.from(IDV7.random(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
         }
         repository.insert(failures)
-        repository.count() shouldBe 3
+        repository.countAll() shouldBe 3
 
         repository.deleteAll()
-        repository.count() shouldBe 0
+        repository.countAll() shouldBe 0
         repository.listAll() shouldHaveSize 0
     }
 

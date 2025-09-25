@@ -3,6 +3,7 @@ package com.lemline.core.definitions
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
@@ -76,7 +77,8 @@ object DefinitionCache {
      * @throws IllegalStateException if the workflow is not found.
      */
     @JvmStatic
-    fun getOrNull(name: WorkflowName, version: WorkflowVersion): Workflow? = workflowCache[name to version]
+    fun getOrNull(namespace: WorkflowNamespace, name: WorkflowName, version: WorkflowVersion): Workflow? =
+        workflowCache[WorkflowIndex(namespace, name, version)]
 
     /**
      * Retrieves the root node of the given workflow.

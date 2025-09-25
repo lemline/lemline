@@ -7,6 +7,7 @@ import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * This class contains
@@ -31,7 +32,15 @@ data class IngestionMessage(
             .distinct().size == 1) { "All models must be from the same workflow" }
     }
 
+    @Transient
     override val workflowId = instanceModels.first().workflowId
+
+    @Transient
+    override val workflowNamespace = instanceModels.first().workflowNamespace
+
+    @Transient
     override val workflowName = instanceModels.first().workflowName
+
+    @Transient
     override val workflowVersion = instanceModels.first().workflowVersion
 }

@@ -5,6 +5,7 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.activities.runs.getInputFor
 import com.lemline.core.errors.WorkflowException
@@ -121,6 +122,7 @@ internal class StepByStepRunner @Inject constructor(
 
         val (instanceMessage, scheduleOutboxModel) = stater.getStartingMessages(
             workflowId = WorkflowId.random(),
+            workflowNamespace = WorkflowNamespace(runWorkflow.workflow.namespace),
             workflowName = WorkflowName(runWorkflow.workflow.name),
             optionalVersion = WorkflowVersion(runWorkflow.workflow.version),
             workflowInput = runWorkflow.getInputFor(runInstance),
@@ -147,6 +149,7 @@ internal class StepByStepRunner @Inject constructor(
         if (parentId != null || isScheduledAfter) {
             val completedMessage = CompletedMessage(
                 workflowId = workflowId,
+                workflowNamespace = workflowNamespace,
                 workflowName = workflowName,
                 workflowVersion = workflowVersion,
                 parentId = parentId,

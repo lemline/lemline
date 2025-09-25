@@ -95,15 +95,15 @@ internal class InstanceMessageHandler(
      */
     private suspend fun InstanceMessage.findWorkflowDefinition(): Workflow = try {
         // Try to get from cache first, then from repository if not found
-        DefinitionCache.getOrNull(workflowName, workflowVersion)
-            ?: definitionRepository.findByNameAndVersion(workflowName, workflowVersion)
+        DefinitionCache.getOrNull(workflowNamespace, workflowName, workflowVersion)
+            ?: definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion)
                 ?.definition
                 ?.let { DefinitionCache.parseAndPut(it) }
     } catch (e: Exception) {
         logger.error(e) { "Error during workflow definition retrieval." }
         emitToRetry(e, getFailureReason(e))
     } ?: run {
-        val errorMsg = "Workflow ${workflowName}:${workflowVersion} not found."
+        val errorMsg = "Workflow ${workflowNamespace}:${workflowName}:${workflowVersion} not found."
         logger.error { "$errorMsg Storing the message in the $RETRY_TABLE table for manual inspection." }
         emitAsFailed(IllegalStateException(errorMsg), DEFINITION_MISSING)
     }

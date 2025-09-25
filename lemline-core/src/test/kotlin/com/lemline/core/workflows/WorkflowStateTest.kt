@@ -4,6 +4,7 @@ package com.lemline.core.workflows
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
@@ -36,6 +37,7 @@ class WorkflowStateTest {
         val input = JsonPrimitive("in")
         val ws = WorkflowState.new(
             workflowId = WorkflowId.random(),
+            workflowNamespace = WorkflowNamespace("test"),
             workflowName = WorkflowName("orders"),
             workflowVersion = WorkflowVersion("v1"),
             input = input,
@@ -53,6 +55,7 @@ class WorkflowStateTest {
     fun `setCurrentTaskOutput() should mutate current state's rawOutput`() {
         val ws = WorkflowState.new(
             workflowId = WorkflowId.random(),
+            workflowNamespace = WorkflowNamespace("test"),
             workflowName = WorkflowName("orders"),
             workflowVersion = WorkflowVersion("v1"),
             input = JsonPrimitive("in"),
@@ -66,6 +69,7 @@ class WorkflowStateTest {
     fun `duplicate() should copy the state with a new id only`() {
         val original = WorkflowState.new(
             workflowId = WorkflowId.random(),
+            workflowNamespace = WorkflowNamespace("test"),
             workflowName = WorkflowName("orders"),
             workflowVersion = WorkflowVersion("v1"),
             input = JsonPrimitive("in"),
@@ -89,6 +93,7 @@ class WorkflowStateTest {
     fun `serialization uses compact field names for backward compatibility`() {
         val ws = WorkflowState.new(
             workflowId = WorkflowId.random(),
+            workflowNamespace = WorkflowNamespace("test"),
             workflowName = WorkflowName("orders"),
             workflowVersion = WorkflowVersion("v1"),
             input = JsonPrimitive("hello"),
@@ -98,12 +103,14 @@ class WorkflowStateTest {
         require(json is JsonObject)
         val keys = json.keys
         assertTrue("i" in keys)
+        assertTrue("a" in keys)
         assertTrue("n" in keys)
         assertTrue("v" in keys)
         assertTrue("p" in keys)
         assertTrue("s" in keys)
         // Ensure no long names accidentally appear
         assertTrue("workflowId" !in keys)
+        assertTrue("workflowNamespace" !in keys)
         assertTrue("workflowName" !in keys)
         assertTrue("workflowVersion" !in keys)
         assertTrue("currentPosition" !in keys)

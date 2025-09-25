@@ -3,6 +3,7 @@ package com.lemline.runner.messaging.base
 
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.messaging.CompensationException
@@ -95,6 +96,7 @@ internal abstract class WorkflowConsumerTest {
 
         // Create test workflow definition
         val definitionModel = DefinitionModel(
+            namespace = WorkflowNamespace("test"),
             name = WorkflowName("test-workflow"),
             version = WorkflowVersion("1.0.0"),
             definition = """
@@ -194,6 +196,7 @@ internal abstract class WorkflowConsumerTest {
         // Given
         val instanceMessage = InstanceMessage.new(
             workflowId = WorkflowId.random(),
+            workflowNamespace = WorkflowNamespace("test"),
             workflowName = WorkflowName("test-workflow"),
             workflowVersion = WorkflowVersion("1.0.0"),
             workflowInput = JsonPrimitive("task"),
@@ -272,6 +275,7 @@ internal abstract class WorkflowConsumerTest {
         // Given
         val instanceMessage = InstanceMessage.new(
             workflowId = WorkflowId.random(),
+            workflowNamespace = WorkflowNamespace("test"),
             workflowName = WorkflowName("test-workflow"),
             workflowVersion = WorkflowVersion("1.0.0"),
             workflowInput = JsonPrimitive("retry"),
@@ -317,6 +321,7 @@ internal abstract class WorkflowConsumerTest {
         // Given
         val instanceMessage = InstanceMessage.new(
             WorkflowId.random(),
+            workflowNamespace = WorkflowNamespace("test"),
             WorkflowName("test-workflow"),
             WorkflowVersion("1.0.0"),
             JsonPrimitive("wait"),
@@ -358,10 +363,11 @@ internal abstract class WorkflowConsumerTest {
     fun `should handle completed workflow without sending message`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.new(
-            WorkflowId.random(),
-            WorkflowName("test-workflow"),
-            WorkflowVersion("1.0.0"),
-            JsonPrimitive("completed"),
+            workflowId = WorkflowId.random(),
+            workflowNamespace = WorkflowNamespace("test"),
+            workflowName = WorkflowName("test-workflow"),
+            workflowVersion = WorkflowVersion("1.0.0"),
+            workflowInput = JsonPrimitive("completed"),
         )
 
         // When

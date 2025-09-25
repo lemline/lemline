@@ -4,6 +4,7 @@ package com.lemline.runner.starters
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.runner.definitions.Definitions
@@ -35,6 +36,7 @@ class Starter {
      */
     suspend fun getStartingMessages(
         workflowId: WorkflowId,
+        workflowNamespace: WorkflowNamespace,
         workflowName: WorkflowName,
         optionalVersion: WorkflowVersion?,
         workflowInput: JsonElement,
@@ -43,7 +45,7 @@ class Starter {
         onError: (String) -> Nothing,
     ): Pair<InstanceMessage?, ScheduleOutboxModel?> {
         // Retrieve the workflow definition from the repository
-        val workflow = definitions.get(workflowName, optionalVersion)
+        val workflow = definitions.get(workflowNamespace, workflowName, optionalVersion)
             ?: onError("Workflow $workflowName (version=${optionalVersion ?: "latest"}) not found.")
 
         val workflowVersion = WorkflowVersion(workflow.document.version)
@@ -55,6 +57,7 @@ class Starter {
         val instanceMessage = when (workflow.schedule?.cron.isNullOrBlank()) {
             true -> InstanceMessage.new(
                 workflowId = workflowId,
+                workflowNamespace = workflowNamespace,
                 workflowName = workflowName,
                 workflowVersion = workflowVersion,
                 workflowInput = workflowInput,
@@ -69,6 +72,7 @@ class Starter {
             null -> null
             else -> ScheduleOutboxModel.from(
                 workflowId = workflowId,
+                workflowNamespace = workflowNamespace,
                 workflowName = workflowName,
                 workflowVersion = workflowVersion,
                 workflowInput = workflowInput,

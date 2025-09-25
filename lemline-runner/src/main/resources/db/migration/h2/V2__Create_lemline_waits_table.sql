@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS lemline_waits
 (
     id                      UUID PRIMARY KEY,
     workflow_id             UUID                     NOT NULL,
+    workflow_namespace      VARCHAR(255)             NOT NULL,
     workflow_name           VARCHAR(255)             NOT NULL,
     workflow_version        VARCHAR(255)             NOT NULL,
     workflow_position       CLOB                     NOT NULL,

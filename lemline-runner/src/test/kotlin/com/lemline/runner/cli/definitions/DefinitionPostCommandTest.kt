@@ -2,6 +2,7 @@
 package com.lemline.runner.cli.definitions
 
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache as Workflows
 import com.lemline.runner.cli.GlobalMixin
@@ -41,6 +42,7 @@ class DefinitionPostCommandTest {
     @TempDir
     lateinit var tempDir: File
 
+    private var workflowNamespace = WorkflowNamespace("test")
     private var workflowName = WorkflowName("testWorkflow")
     private var workflowVersion = WorkflowVersion("1.0.0")
     private lateinit var workflowDefinition: String
@@ -61,6 +63,7 @@ class DefinitionPostCommandTest {
         injectField(command, "definitionRepository", definitionRepository)
         injectField(command, "mixin", GlobalMixin())
 
+        workflowNamespace = WorkflowNamespace("test")
         workflowName = WorkflowName("testWorkflow")
         workflowVersion = WorkflowVersion("1.0.0")
         workflowDefinition = """
@@ -77,6 +80,7 @@ class DefinitionPostCommandTest {
         workflow = mockk(relaxed = true)
 
         workflowModel = DefinitionModel(
+            namespace = workflowNamespace,
             name = workflowName,
             version = workflowVersion,
             definition = workflowDefinition

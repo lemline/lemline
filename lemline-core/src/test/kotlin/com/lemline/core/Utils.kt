@@ -4,6 +4,7 @@ package com.lemline.core
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.processor.Processor
@@ -33,6 +34,7 @@ internal fun loadWorkflowFromYaml(resourcePath: String): Workflow {
 internal fun getWorkflowProcessor(
     doYaml: String,
     input: JsonElement,
+    namespace: String = "test",
     name: String = "workflow-${doYaml.hashCode()}",
     version: String = "0.1.0",
     id: WorkflowId = WorkflowId.random(),
@@ -40,7 +42,7 @@ internal fun getWorkflowProcessor(
     val document =
         """document:
               dsl: '1.0.0'
-              namespace: test
+              namespace: $namespace
               name: $name
               version: $version
         """.trimIndent()
@@ -48,6 +50,7 @@ internal fun getWorkflowProcessor(
     DefinitionCache.parseAndPut(workflowYaml)
 
     return Processor.createNew(
+        namespace = WorkflowNamespace(namespace),
         name = WorkflowName(name),
         version = WorkflowVersion(version),
         id = id,

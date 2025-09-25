@@ -4,6 +4,7 @@ package com.lemline.core.workflows
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import kotlin.time.ExperimentalTime
@@ -18,6 +19,11 @@ data class WorkflowState(
      * The ID of the workflow.
      */
     @SerialName("i") val workflowId: WorkflowId,
+
+    /**
+     * The namespace of the workflow.
+     */
+    @SerialName("a") val workflowNamespace: WorkflowNamespace,
 
     /**
      * The name of the workflow.
@@ -59,11 +65,13 @@ data class WorkflowState(
          */
         fun new(
             workflowId: WorkflowId,
+            workflowNamespace: WorkflowNamespace,
             workflowName: WorkflowName,
             workflowVersion: WorkflowVersion,
             input: JsonElement,
         ) = WorkflowState(
             workflowId = workflowId,
+            workflowNamespace = workflowNamespace,
             workflowName = workflowName,
             workflowVersion = workflowVersion,
             currentPosition = NodePosition.root,
