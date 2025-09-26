@@ -3,6 +3,7 @@ package com.lemline.runner.repositories
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -64,16 +65,16 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
         super.prepareStatementMap + mapOf(
             WORKFLOW_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setIDV7(stmt, idx, entity.workflowState?.workflowId?.value)
+                setIDV7(stmt, idx, entity.workflowId?.value)
             },
             WORKFLOW_NAMESPACE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.workflowState?.workflowNamespace?.toString())
+                stmt.setString(idx, entity.workflowNamespace?.toString())
             },
             WORKFLOW_NAME_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.workflowState?.workflowName?.toString())
+                stmt.setString(idx, entity.workflowName?.toString())
             },
             WORKFLOW_VERSION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.workflowState?.workflowVersion?.toString())
+                stmt.setString(idx, entity.workflowVersion?.toString())
             },
             WORKFLOW_POSITION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 stmt.setString(idx, entity.workflowState?.currentPosition?.toString())
@@ -90,11 +91,13 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
     protected fun ResultSet.getInstanceMessage(): InstanceMessage? = when (val id = getIDV7(this, WORKFLOW_ID_COLUMN)) {
         null -> null
         else -> InstanceMessage(
-            workflowState = WorkflowState(
+            workflowInfo = WorkflowInfo(
                 workflowId = WorkflowId(id),
                 workflowNamespace = WorkflowNamespace(getString(WORKFLOW_NAMESPACE_COLUMN)),
                 workflowName = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
                 workflowVersion = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
+            ),
+            workflowState = WorkflowState(
                 currentPosition = NodePosition.from(getString(WORKFLOW_POSITION_COLUMN)),
                 currentStates = NodeStates.fromJsonString(getString(WORKFLOW_STATE_COLUMN)),
             ),

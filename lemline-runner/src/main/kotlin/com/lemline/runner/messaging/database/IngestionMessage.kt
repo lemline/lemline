@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.database
 
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.InstanceModel
 import kotlin.time.ExperimentalTime
@@ -28,19 +29,10 @@ data class IngestionMessage(
     constructor(model: InstanceModel) : this(instanceModels = listOf(model))
 
     init {
-        require(instanceModels.map { it.workflowId }
+        require(instanceModels.map { it.workflowInfo }
             .distinct().size == 1) { "All models must be from the same workflow" }
     }
 
     @Transient
-    override val workflowId = instanceModels.first().workflowId
-
-    @Transient
-    override val workflowNamespace = instanceModels.first().workflowNamespace
-
-    @Transient
-    override val workflowName = instanceModels.first().workflowName
-
-    @Transient
-    override val workflowVersion = instanceModels.first().workflowVersion
+    override val workflowInfo: WorkflowInfo? = instanceModels.first().workflowInfo
 }

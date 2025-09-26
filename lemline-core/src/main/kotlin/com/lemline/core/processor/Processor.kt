@@ -3,7 +3,9 @@ package com.lemline.core.processor
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
+import com.lemline.common.values.WithOptionalWorkflowInfo
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -74,14 +76,11 @@ import kotlinx.serialization.json.JsonElement
 @ExperimentalTime
 @Suppress("unused")
 class Processor(
+    override val workflowInfo: WorkflowInfo,
     val workflowState: WorkflowState,
     secrets: Map<String, JsonElement>,
     var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
-) {
-    val workflowId = workflowState.workflowId
-    val workflowNamespace = workflowState.workflowNamespace
-    val workflowName = workflowState.workflowName
-    val workflowVersion = workflowState.workflowVersion
+) : WithOptionalWorkflowInfo {
 
     val logger = logger()
 
@@ -114,11 +113,13 @@ class Processor(
             secrets: Map<String, JsonElement> = emptyMap(),
             activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
         ) = Processor(
-            workflowState = WorkflowState(
+            WorkflowInfo(
                 workflowId = id,
                 workflowNamespace = namespace,
                 workflowName = name,
                 workflowVersion = version,
+            ),
+            WorkflowState(
                 currentStates = NodeStates.new(rawInput),
                 currentPosition = NodePosition.root,
             ),
@@ -150,8 +151,7 @@ class Processor(
     val workflow: Workflow
 
     init {
-        workflow = DefinitionCache.getOrNull(workflowNamespace, workflowName, workflowVersion)
-            ?: error("workflow definition not found")
+        workflow = DefinitionCache.getOrNull(workflowInfo) ?: error("workflow definition not found")
         // get root state from instance
         val rootState = workflowState.currentStates[NodePosition.root]
             ?: error("no initial state provided for the root node")
@@ -168,7 +168,7 @@ class Processor(
         rootInstance.secrets = secrets
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
-            id = workflowId.toString(),
+            id = workflowInfo.workflowId.toString(),
             definition = LemlineJson.encodeToElement(workflow),
             input = rawInput,
             startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant())),
@@ -275,7 +275,7 @@ class Processor(
 
                 // retry if the TryInstance has a delay configured
                 if (tryInstance.delay != null) {
-                    logger.info { "on $workflowId - Retry with delay: ${tryInstance.delay}" }
+                    logger.info { "on ${workflowInfo.workflowId} - Retry with delay: ${tryInstance.delay}" }
                     // reinit childIndex, as we are going to retry
                     tryInstance.childIndex = -1
                     // Update node position after setting retry
@@ -509,5 +509,5 @@ class Processor(
      * @throws IllegalStateException Always thrown with the provided message.
      */
     private fun error(message: Any): Nothing =
-        throw IllegalStateException("Workflow $workflowName (version $workflowVersion)): $message")
+        throw IllegalStateException("Workflow ${workflowInfo.workflowName} (version ${workflowInfo.workflowVersion})): $message")
 }

@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.instances
 
+import com.lemline.common.json.JsonSerializable
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WithDefiniteWorkflowInfo
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.processor.Processor
 import com.lemline.core.workflows.WorkflowState
-import com.lemline.runner.messaging.JsonSerializable
-import com.lemline.runner.models.WithInstanceInfo
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -24,28 +25,21 @@ data class InstanceMessage(
     /**
      * Description of the workflow instance
      */
+    @SerialName("i") override val workflowInfo: WorkflowInfo,
+
+    /**
+     * Description of the workflow instance
+     */
     @SerialName("s") val workflowState: WorkflowState,
 
     /**
      * Parent's model ID waiting for this instance completion, if any.
      */
     @SerialName("p") val parentId: IDV7? = null
-) : WithInstanceInfo, JsonSerializable {
+) : WithDefiniteWorkflowInfo, JsonSerializable {
 
     @Transient
     lateinit var message: Message<String>
-
-    @Transient
-    override val workflowNamespace = workflowState.workflowNamespace
-
-    @Transient
-    override val workflowName = workflowState.workflowName
-
-    @Transient
-    override val workflowVersion = workflowState.workflowVersion
-
-    @Transient
-    override val workflowId = workflowState.workflowId
 
     override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
@@ -69,11 +63,13 @@ data class InstanceMessage(
             workflowInput: JsonElement,
             parentId: IDV7? = null,
         ) = InstanceMessage(
-            workflowState = WorkflowState.new(
+            WorkflowInfo(
                 workflowId = workflowId,
                 workflowNamespace = workflowNamespace,
                 workflowName = workflowName,
                 workflowVersion = workflowVersion,
+            ),
+            workflowState = WorkflowState.new(
                 input = workflowInput,
             ),
             parentId = parentId,

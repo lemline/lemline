@@ -6,10 +6,7 @@ package com.lemline.runner.random
 import com.lemline.common.random.nullableRandom
 import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowId
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.NodeState
 import com.lemline.core.random.random
@@ -38,16 +35,13 @@ fun WorkflowState.Companion.random(): WorkflowState {
     val randomPos = NodePosition.random()
 
     return WorkflowState(
-        workflowId = WorkflowId.random(),
-        workflowNamespace = WorkflowNamespace.random(),
-        workflowName = WorkflowName.random(),
-        workflowVersion = WorkflowVersion.random(),
         currentPosition = randomPos,
         currentStates = NodeStates(mapOf(randomPos to NodeState.random())),
     )
 }
 
 fun InstanceMessage.Companion.random() = InstanceMessage(
+    workflowInfo = WorkflowInfo.random(),
     workflowState = WorkflowState.random(),
     parentId = IDV7.random()
 )
@@ -115,10 +109,7 @@ fun CompletedMessage.Companion.random(): CompletedMessage {
     val parentId = IDV7.nullableRandom()
 
     return CompletedMessage(
-        workflowId = WorkflowId.random(),
-        workflowNamespace = WorkflowNamespace.random(),
-        workflowName = WorkflowName.random(),
-        workflowVersion = WorkflowVersion.random(),
+        workflowInfo = WorkflowInfo.random(),
         parentId = parentId,
         output = if (parentId == null) null else JsonElement.random(),
         isScheduledAfter = Random.nextBoolean(),

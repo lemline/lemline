@@ -2,10 +2,8 @@
 package com.lemline.runner.messaging.database
 
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowId
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
+import com.lemline.common.values.WithDefiniteWorkflowInfo
+import com.lemline.common.values.WorkflowInfo
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -20,14 +18,15 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 @SerialName("c") // <- type discriminator for polymorphic serialization
 data class CompletedMessage(
-    override val workflowId: WorkflowId,
-    override val workflowNamespace: WorkflowNamespace,
-    override val workflowName: WorkflowName,
-    override val workflowVersion: WorkflowVersion,
+    @SerialName("i")
+    override val workflowInfo: WorkflowInfo,
+    @SerialName("p")
     val parentId: IDV7?,
+    @SerialName("o")
     val output: JsonElement?,
+    @SerialName("sa")
     val isScheduledAfter: Boolean
-) : DatabaseMessage {
+) : DatabaseMessage, WithDefiniteWorkflowInfo {
     init {
         require((parentId == null) == (output == null)) { "Output must be defined if parentId is not null" }
     }

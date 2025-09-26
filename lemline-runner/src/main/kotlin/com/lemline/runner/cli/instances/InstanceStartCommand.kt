@@ -103,7 +103,8 @@ class InstanceStartCommand : Runnable {
             zoneId = getZoneId(),
         ) { cliError(it) }
 
-        val workflowVersion = instanceMessage?.workflowVersion ?: scheduleOutboxModel?.workflowVersion
+        val workflowVersion =
+            instanceMessage?.workflowVersion ?: scheduleOutboxModel?.workflowVersion
 
         when (scheduleOutboxModel) {
             null -> instanceEmitter.send(instanceMessage!!)
