@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.lemline.common.values.WithDefiniteWorkflowInfo
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
@@ -23,7 +24,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
  */
 @ExperimentalSerializationApi
 @ExperimentalTime
-sealed class OutboxModel() : InstanceModel {
+sealed class OutboxModel() : InstanceModel, WithDefiniteWorkflowInfo {
 
     abstract val instanceMessage: InstanceMessage
 

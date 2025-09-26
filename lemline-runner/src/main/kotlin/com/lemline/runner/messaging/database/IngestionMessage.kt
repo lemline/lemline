@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.database
 
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.InstanceModel
 import kotlin.time.ExperimentalTime
@@ -33,5 +34,5 @@ data class IngestionMessage(
     }
 
     @Transient
-    override val workflowInfo = instanceModels.first().workflowInfo
+    override val workflowInfo: WorkflowInfo? = instanceModels.first().workflowInfo
 }

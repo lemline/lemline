@@ -3,7 +3,7 @@ package com.lemline.runner.messaging
 
 import com.lemline.common.logger.Logger
 import com.lemline.common.logger.withSuspendLoggingContext
-import com.lemline.common.values.WithInstanceInfo
+import com.lemline.common.values.WithOptionalWorkflowInfo
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
@@ -24,7 +24,7 @@ import org.apache.kafka.common.errors.RetriableException
 import org.eclipse.microprofile.reactive.messaging.Message
 
 @ExperimentalTime
-internal interface MessageHandler<T : WithInstanceInfo> {
+internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
 
     suspend fun Message<String>.deserialize(): T
 

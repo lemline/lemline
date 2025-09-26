@@ -2,6 +2,7 @@
 package com.lemline.runner.messaging.database
 
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WithDefiniteWorkflowInfo
 import com.lemline.common.values.WorkflowInfo
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -25,7 +26,7 @@ data class CompletedMessage(
     val output: JsonElement?,
     @SerialName("sa")
     val isScheduledAfter: Boolean
-) : DatabaseMessage {
+) : DatabaseMessage, WithDefiniteWorkflowInfo {
     init {
         require((parentId == null) == (output == null)) { "Output must be defined if parentId is not null" }
     }

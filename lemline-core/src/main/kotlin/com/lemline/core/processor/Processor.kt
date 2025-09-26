@@ -3,7 +3,7 @@ package com.lemline.core.processor
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
-import com.lemline.common.values.WithInstanceInfo
+import com.lemline.common.values.WithOptionalWorkflowInfo
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
@@ -80,7 +80,7 @@ class Processor(
     val workflowState: WorkflowState,
     secrets: Map<String, JsonElement>,
     var activityRunnerProvider: ActivityRunnerProvider = ActivityRunnerProvider.default,
-) : WithInstanceInfo {
+) : WithOptionalWorkflowInfo {
 
     val logger = logger()
 
