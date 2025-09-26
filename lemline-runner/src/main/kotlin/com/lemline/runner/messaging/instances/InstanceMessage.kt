@@ -26,6 +26,7 @@ data class InstanceMessage(
      * Description of the workflow instance
      */
     @SerialName("i") override val workflowInfo: WorkflowInfo,
+
     /**
      * Description of the workflow instance
      */

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
+import com.lemline.common.json.JsonSerializable
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import kotlin.time.ExperimentalTime
@@ -19,8 +20,10 @@ data class WorkflowState(
     /**
      * A map of the current states (per position)
      */
-    @SerialName("s") val currentStates: NodeStates,
-) {
+    @SerialName("s") val currentStates: NodeStates
+
+) : JsonSerializable {
+
     /**
      * Sets the output of the current task.
      */
@@ -28,7 +31,7 @@ data class WorkflowState(
         currentStates[currentPosition]!!.rawOutput = output
     }
 
-    fun toJsonString(): String = LemlineJson.encodeToString(this)
+    override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
     companion object {
         /**
