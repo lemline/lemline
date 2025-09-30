@@ -12,23 +12,25 @@ import com.lemline.core.nodes.NodeState
 import com.lemline.core.random.random
 import com.lemline.core.workflows.NodeStates
 import com.lemline.core.workflows.WorkflowState
-import com.lemline.runner.messaging.database.CompletedMessage
+import com.lemline.runner.messaging.ingestion.WorkflowCompletedMessage
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.FailureModel
-import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.models.ParentOutboxModel
-import com.lemline.runner.models.RetryOutboxModel
-import com.lemline.runner.models.ScheduleOutboxModel
-import com.lemline.runner.models.WaitOutboxModel
-import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.models.ForkModel
+import com.lemline.runner.models.ParentModel
+import com.lemline.runner.models.RetryModel
+import com.lemline.runner.models.ScheduleModel
+import com.lemline.runner.models.WaitModel
+import com.lemline.runner.models.bases.OptionalOutboxModel
+import com.lemline.runner.models.bases.OutboxModel
+import com.lemline.runner.outbox.bases.RunStatus
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
-fun OutBoxStatus.Companion.random() = Random.nextInt(OutBoxStatus.entries.size).let {
-    OutBoxStatus.entries[it]
+fun RunStatus.Companion.random() = Random.nextInt(RunStatus.entries.size).let {
+    RunStatus.entries[it]
 }
 
 fun WorkflowState.Companion.random(): WorkflowState {
@@ -61,54 +63,72 @@ fun FailureModel.Companion.random() = FailureModel(
     errorStackTrace = String.random(),
 )
 
-fun OutboxModel.randomize(nullableDelayed: Boolean = false) = apply {
-    outboxDelayedUntil = if (nullableDelayed) Instant.nullableRandom() else Instant.random()
-    outboxAttemptCount = Int.random()
-    outboxErrorClass = String.nullableRandom()
-    outboxErrorMessage = String.nullableRandom()
+fun OptionalOutboxModel.randomize() = apply {
+    runDelayedUntil = Instant.nullableRandom()
+    runAttemptCount = Int.random()
+    runLastErrorClass = String.nullableRandom()
+    runLastErrorMessage = String.nullableRandom()
 }
 
-fun ParentOutboxModel.Companion.random() = ParentOutboxModel(
-    id = IDV7.random(),
-    instanceMessage = InstanceMessage.random(),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.nullableRandom(), // <- Nullable
-).also { it.randomize(nullableDelayed = true) }
+fun OutboxModel.randomize() = apply {
+    runDelayedUntil = Instant.random()
+    runAttemptCount = Int.random()
+    runLastErrorClass = String.nullableRandom()
+    runLastErrorMessage = String.nullableRandom()
+}
 
-fun ScheduleOutboxModel.Companion.random() = ScheduleOutboxModel(
+fun ParentModel.Companion.random() = ParentModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage.random(),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.nullableRandom(), // <- nullable
+    runStatus = RunStatus.random(),
+    runAt = Instant.nullableRandom(), // <- Nullable
+)
+
+fun ForkModel.Companion.random() = ForkModel(
+    id = IDV7.random(),
+    workflowInfo = WorkflowInfo.random(),
+    forkId = IDV7.random(),
+    forkPosition = NodePosition.random(),
+    forkName = String.random(),
+    forkOutput = String.nullableRandom(),
+    runStatus = RunStatus.random(),
+    runAt = Instant.nullableRandom(), // <- Nullable
+)
+
+fun ScheduleModel.Companion.random() = ScheduleModel(
+    id = IDV7.random(),
+    instanceMessage = InstanceMessage.random(),
+    runStatus = RunStatus.random(),
+    runAt = Instant.nullableRandom(), // <- nullable
     scheduleAfter = String.nullableRandom(),
     scheduleEvery = String.nullableRandom(),
     scheduleCron = String.nullableRandom(),
     scheduleZone = String.nullableRandom(),
-).also { it.randomize(nullableDelayed = true) }
+).also { it.randomize() }
 
-fun RetryOutboxModel.Companion.random() = RetryOutboxModel(
+fun RetryModel.Companion.random() = RetryModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage.random(),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.random(), // <- Not nullable
+    runStatus = RunStatus.random(),
+    runAt = Instant.random(), // <- Not nullable
     errorReason = String.random(),
     errorClass = String.random(),
     errorMessage = String.nullableRandom(),
     errorStackTrace = String.random(),
 ).also { it.randomize() }
 
-fun WaitOutboxModel.Companion.random() = WaitOutboxModel(
+fun WaitModel.Companion.random() = WaitModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage.random(),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.random(), // <- Not nullable
+    runStatus = RunStatus.random(),
+    runAt = Instant.random(), // <- Not nullable
 ).also { it.randomize() }
 
 
-fun CompletedMessage.Companion.random(): CompletedMessage {
+fun WorkflowCompletedMessage.Companion.random(): WorkflowCompletedMessage {
     val parentId = IDV7.nullableRandom()
 
-    return CompletedMessage(
+    return WorkflowCompletedMessage(
         workflowInfo = WorkflowInfo.random(),
         parentId = parentId,
         output = if (parentId == null) null else JsonElement.random(),

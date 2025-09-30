@@ -15,12 +15,12 @@ import com.lemline.runner.failures.FailureReasons.WORKFLOW_INIT_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.messaging.database.DATABASE_OUT_CHANNEL
-import com.lemline.runner.messaging.database.DatabaseMessageEmitter
-import com.lemline.runner.messaging.database.IngestionMessage
+import com.lemline.runner.messaging.ingestion.DATABASE_OUT_CHANNEL
+import com.lemline.runner.messaging.ingestion.IngestionMessageEmitter
+import com.lemline.runner.messaging.ingestion.IngestionMessages
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
-import com.lemline.runner.models.RetryOutboxModel
+import com.lemline.runner.models.RetryModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.FAILURE_TABLE
 import com.lemline.runner.repositories.RETRY_TABLE
@@ -44,7 +44,7 @@ import org.jetbrains.annotations.TestOnly
 @ApplicationScoped
 internal class InstanceMessageHandler(
     private val instanceEmitter: InstanceMessageEmitter,
-    private val databaseEmitter: DatabaseMessageEmitter,
+    private val databaseEmitter: IngestionMessageEmitter,
     private val definitionRepository: DefinitionRepository,
     private val stepByStepRunner: StepByStepRunner,
     override val metrics: InstanceMessageSubscriberMetrics,
@@ -182,7 +182,7 @@ internal class InstanceMessageHandler(
     }
 
     private suspend fun Message<String>.deserializationFailed(cause: Exception) {
-        val failure = IngestionMessage(
+        val failure = IngestionMessages(
             FailureModel.from(
                 id = IDV7.random(),
                 payload = payload,
@@ -209,17 +209,17 @@ internal class InstanceMessageHandler(
             error = error,
             reason = reason,
         )
-        databaseEmitter.send(IngestionMessage(failure))
+        databaseEmitter.send(IngestionMessages(failure))
     }
 
     private suspend fun InstanceMessage.saveForRetry(cause: Exception, reason: String) {
-        val retry = RetryOutboxModel.from(
+        val retry = RetryModel.from(
             id = IDV7.random(),
             instance = this,
             outboxScheduledFor = Clock.System.now(), // <- TODO check first date
             error = cause,
             reason = reason,
         )
-        databaseEmitter.send(IngestionMessage(retry))
+        databaseEmitter.send(IngestionMessages(retry))
     }
 }

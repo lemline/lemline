@@ -3,12 +3,12 @@ package com.lemline.runner.outbox
 
 import com.lemline.common.values.IDV7
 import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.OutboxRepository
 import com.lemline.runner.repositories.WaitRepository
+import com.lemline.runner.repositories.bases.OutboxRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -25,7 +25,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @TestProfile(InMemoryProfile::class)
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() {
+internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitModel>() {
 
     @Inject // Inject the specific repository
     lateinit var waitRepository: WaitRepository
@@ -34,15 +34,15 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
     override lateinit var failureRepository: FailureRepository
 
     // Implement the abstract repository property
-    override val outboxRepository: OutboxRepository<WaitOutboxModel> by lazy { waitRepository }
+    override val outboxRepository: OutboxRepository<WaitModel> by lazy { waitRepository }
 
     // Implement the abstract KClass property
-    override val modelClass: KClass<WaitOutboxModel> = WaitOutboxModel::class
+    override val modelClass: KClass<WaitModel> = WaitModel::class
 
     // Implement the abstract factory method
-    override fun createTestModel(payload: String) = WaitOutboxModel(
+    override fun createTestModel(payload: String) = WaitModel(
         id = IDV7.random(),
         instanceMessage = InstanceMessage.random(),
-        outboxScheduledFor = Clock.System.now(),
+        runAt = Clock.System.now(),
     )
 }

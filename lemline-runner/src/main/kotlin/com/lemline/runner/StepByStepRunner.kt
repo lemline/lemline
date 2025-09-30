@@ -19,13 +19,13 @@ import com.lemline.runner.exceptions.TaskCompletedException
 import com.lemline.runner.exceptions.TaskRetriedException
 import com.lemline.runner.exceptions.WaitStartedException
 import com.lemline.runner.failures.FailureReasons.getFailureReason
-import com.lemline.runner.messaging.database.CompletedMessage
-import com.lemline.runner.messaging.database.DatabaseMessageEmitter
-import com.lemline.runner.messaging.database.IngestionMessage
+import com.lemline.runner.messaging.ingestion.IngestionMessageEmitter
+import com.lemline.runner.messaging.ingestion.IngestionMessages
+import com.lemline.runner.messaging.ingestion.WorkflowCompletedMessage
 import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.models.ParentOutboxModel
-import com.lemline.runner.models.RetryOutboxModel
-import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.models.ParentModel
+import com.lemline.runner.models.RetryModel
+import com.lemline.runner.models.WaitModel
 import com.lemline.runner.starters.Starter
 import io.quarkus.runtime.Startup
 import io.serverlessworkflow.api.types.RunWorkflow
@@ -46,7 +46,7 @@ import kotlinx.serialization.json.JsonElement
 @Startup
 @ApplicationScoped
 internal class StepByStepRunner @Inject constructor(
-    private val databaseEmitter: DatabaseMessageEmitter,
+    private val databaseEmitter: IngestionMessageEmitter,
     private val stater: Starter
 ) {
     val logger = logger()
@@ -114,10 +114,10 @@ internal class StepByStepRunner @Inject constructor(
     ): InstanceMessage? {
         // insert the parent workflow without delayedUntil
         // TODO make id idempotent
-        val parentOutboxModel = ParentOutboxModel(
+        val parentModel = ParentModel(
             id = IDV7.random(),
             instanceMessage = this,
-            outboxScheduledFor = null,
+            runAt = null,
         )
 
         val (instanceMessage, scheduleOutboxModel) = stater.getStartingMessages(
@@ -126,14 +126,14 @@ internal class StepByStepRunner @Inject constructor(
             workflowName = WorkflowName(runWorkflow.workflow.name),
             optionalVersion = WorkflowVersion(runWorkflow.workflow.version),
             workflowInput = runWorkflow.getInputFor(runInstance),
-            parentId = parentOutboxModel.id,
+            parentId = parentModel.id,
             zoneId = null
         ) { error(it) }
 
         // As we already have a ParentOutboxModel, we always send an IngestionMessage
         // The instance will be started only after the parent (and possible schedule) ingestion
-        val ingestionMessage = IngestionMessage(
-            instanceModels = listOfNotNull(parentOutboxModel, scheduleOutboxModel),
+        val ingestionMessage = IngestionMessages(
+            ingestionModels = listOfNotNull(parentModel, scheduleOutboxModel),
             instanceMessages = listOfNotNull(instanceMessage)
         )
 
@@ -147,13 +147,13 @@ internal class StepByStepRunner @Inject constructor(
      */
     private suspend fun InstanceMessage.onWorkflowCompleted(output: JsonElement, isScheduledAfter: Boolean) {
         if (parentId != null || isScheduledAfter) {
-            val completedMessage = CompletedMessage(
+            val workflowCompletedMessage = WorkflowCompletedMessage(
                 workflowInfo = workflowInfo,
                 parentId = parentId,
                 output = if (parentId != null) output else null,
                 isScheduledAfter = isScheduledAfter
             )
-            databaseEmitter.send(completedMessage)
+            databaseEmitter.send(workflowCompletedMessage)
         }
     }
 
@@ -166,7 +166,7 @@ internal class StepByStepRunner @Inject constructor(
     private suspend fun InstanceMessage.onRetry(tryInstance: TryInstance, e: WorkflowException) {
         val delay = tryInstance.delay ?: error("No delay set in in $tryInstance")
 
-        val retryMessage = RetryOutboxModel.from(
+        val retryMessage = RetryModel.from(
             id = IDV7.random(),
             instance = this,
             outboxScheduledFor = Clock.System.now().plus(delay),
@@ -174,7 +174,7 @@ internal class StepByStepRunner @Inject constructor(
             reason = getFailureReason(e)
         )
         // Send the message to ingest into the retry table
-        databaseEmitter.send(IngestionMessage(retryMessage))
+        databaseEmitter.send(IngestionMessages(retryMessage))
     }
 
     /**
@@ -184,12 +184,12 @@ internal class StepByStepRunner @Inject constructor(
      * asynchronously through the WaitOutbox.
      */
     private suspend fun InstanceMessage.onWait(delay: Duration) {
-        val waitMessage = WaitOutboxModel(
+        val waitMessage = WaitModel(
             id = IDV7.random(),
             instanceMessage = this,
-            outboxScheduledFor = Clock.System.now().plus(delay),
+            runAt = Clock.System.now().plus(delay),
         )
         // Send the message to ingest into the wait table
-        databaseEmitter.send(IngestionMessage(waitMessage))
+        databaseEmitter.send(IngestionMessages(waitMessage))
     }
 }

@@ -127,6 +127,8 @@ dependencies {
     testImplementation("org.testcontainers:mysql")
     testImplementation("org.testcontainers:kafka")
     testImplementation("org.testcontainers:rabbitmq")
+    testImplementation(testFixtures(project(":lemline-common")))
+    testImplementation(testFixtures(project(":lemline-core")))
 
     // Tests Fixtures
     testFixturesImplementation(kotlin("test"))

@@ -5,6 +5,8 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.models.DefinitionModel
+import com.lemline.runner.repositories.bases.DatabaseManager
+import com.lemline.runner.repositories.bases.Repository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
@@ -17,10 +19,10 @@ const val DEFINITION_TABLE = "lemline_definitions"
 class DefinitionRepository : Repository<DefinitionModel>() {
 
     companion object {
-        internal const val WORKFLOW_DEFINITION_COLUMN = "definition"
         internal const val WORKFLOW_NAMESPACE_COLUMN = "namespace"
         internal const val WORKFLOW_NAME_COLUMN = "name"
         internal const val WORKFLOW_VERSION_COLUMN = "version"
+        internal const val WORKFLOW_DEFINITION_COLUMN = "definition"
     }
 
     @Inject
@@ -29,9 +31,6 @@ class DefinitionRepository : Repository<DefinitionModel>() {
     override val tableName = DEFINITION_TABLE
 
     override val prepareStatementMap: Map<String, (PreparedStatement, DefinitionModel, Int) -> Unit> = mapOf(
-        WORKFLOW_DEFINITION_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
-            stmt.setString(idx, entity.definition)
-        },
         WORKFLOW_NAMESPACE_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
             stmt.setString(idx, entity.namespace.toString())
         },
@@ -40,10 +39,14 @@ class DefinitionRepository : Repository<DefinitionModel>() {
         },
         WORKFLOW_VERSION_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
             stmt.setString(idx, entity.version.toString())
+        },
+        WORKFLOW_DEFINITION_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
+            stmt.setString(idx, entity.definition)
         }
     )
 
-    override val keyColumns: List<String> = listOf(WORKFLOW_NAME_COLUMN, WORKFLOW_VERSION_COLUMN)
+    override val keyColumns: List<String> =
+        listOf(WORKFLOW_NAMESPACE_COLUMN, WORKFLOW_NAME_COLUMN, WORKFLOW_VERSION_COLUMN)
 
     /**
      * Creates a model instance from a ResultSet.

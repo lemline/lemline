@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
+import com.lemline.common.json.JsonSerializable
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.workflows.WorkflowState
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.models.bases.OutboxModelBase
+import com.lemline.runner.models.bases.WithOptionalInstanceMessage
+import com.lemline.runner.outbox.bases.RunStatus
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -22,7 +23,7 @@ data class FailureModel(
     override val id: IDV7,
 
     @SerialName("i")
-    var instanceMessage: InstanceMessage?,
+    override var instanceMessage: InstanceMessage?,
 
     @SerialName("p")
     val payload: String?,
@@ -37,14 +38,9 @@ data class FailureModel(
     val errorMessage: String?,
 
     @SerialName("es")
-    val errorStackTrace: String,
-) : InstanceModel {
+    val errorStackTrace: String
 
-    override val workflowInfo: WorkflowInfo? get() = instanceMessage?.workflowInfo
-
-    override val workflowState: WorkflowState? get() = instanceMessage?.workflowState
-
-    override val parentId: IDV7? get() = instanceMessage?.parentId
+) : IngestionModel, WithOptionalInstanceMessage, JsonSerializable {
 
     companion object {
         fun from(
@@ -77,17 +73,17 @@ data class FailureModel(
             errorStackTrace = error.stackTraceToString()
         )
 
-        fun from(outbox: OutboxModel): FailureModel {
-            require(outbox.outBoxStatus == OutBoxStatus.FAILED) { "The outbox status must be FAILED" }
+        fun from(outbox: OutboxModelBase): FailureModel {
+            require(outbox.runStatus == RunStatus.FAILED) { "The outbox status must be FAILED" }
 
             return FailureModel(
-                id = IDV7.from(outbox.id),
+                id = outbox.id,
                 instanceMessage = outbox.instanceMessage,
                 payload = null,
                 errorReason = FailureReasons.OUTBOX_FAILURE,
-                errorClass = outbox.outboxErrorClass!!,
-                errorMessage = outbox.outboxErrorMessage,
-                errorStackTrace = outbox.outboxErrorStackTrace!!
+                errorClass = outbox.runLastErrorClass!!,
+                errorMessage = outbox.runLastErrorMessage,
+                errorStackTrace = outbox.runLastErrorStackTrace!!
             )
         }
     }

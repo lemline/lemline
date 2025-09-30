@@ -72,7 +72,6 @@ interface LemlineConfiguration {
     fun config(): Optional<String>
     fun database(): DatabaseConfig
     fun messaging(): MessagingConfig
-    fun outbox(): OutboxConfig
     fun metrics(): MetricsConfig
 
     /**
@@ -108,6 +107,11 @@ interface LemlineConfiguration {
          * Optional MySQL configuration
          */
         fun mysql(): Optional<MySQLConfig>
+
+        /**
+         * Optional Tables configuration
+         */
+        fun tables(): TablesConfig
     }
 
     /**
@@ -151,6 +155,119 @@ interface LemlineConfiguration {
     }
 
     /**
+     * Tables configuration.
+     */
+    interface TablesConfig {
+        fun waits(): OutboxTableConfig
+        fun retries(): OutboxTableConfig
+        fun schedules(): OutboxTableConfig
+        fun parents(): CleanerTableConfig
+        fun forks(): CleanerTableConfig
+
+        /**
+         * Process and cleanup configuration.
+         */
+        interface OutboxTableConfig {
+            fun name(): Optional<String>
+            fun outbox(): OutboxConfig
+            fun cleanup(): CleanerConfig
+        }
+
+        /**
+         * Table configuration with cleanup
+         */
+        interface CleanerTableConfig {
+            fun name(): Optional<String>
+            fun cleanup(): CleanerConfig
+        }
+
+        /**
+         * Table configuration with cleanup and outbox
+         */
+        interface OutboxConfig {
+            fun enabled(): Optional<Boolean>
+
+            /**
+             * Processing interval
+             */
+            @WithDefault("10s")
+            fun every(): String
+
+            /**
+             * Maximum number of messages to process in one batch
+             */
+            @WithDefault("1000")
+            @Min(1)
+            fun batchSize(): Int
+
+            /**
+             * Initial delay before starting processing
+             */
+            @WithDefault("30s")
+            fun initialDelay(): String
+
+            /**
+             * Maximum number of processing attempts
+             * Default: 5
+             */
+            @WithDefault("5")
+            @Min(1)
+            fun maxAttempts(): Int
+
+            /**
+             * Grace period for graceful shutdown
+             */
+            @WithDefault("5s")
+            fun gracePeriod(): String
+
+            val every get() = every().toDuration()
+            val batchSize get() = batchSize()
+            val initialDelay get() = initialDelay().toDuration()
+            val maxAttempts get() = maxAttempts()
+            val gracePeriod get() = gracePeriod().toDuration()
+        }
+
+        /**
+         * Cleanup configuration.
+         * Controls the behavior of message cleanup in the outbox pattern.
+         */
+        interface CleanerConfig {
+            fun enabled(): Optional<Boolean>
+
+            /**
+             * Cleanup interval
+             */
+            @WithDefault("1h")
+            fun every(): String
+
+            /**
+             * Age of messages to clean up
+             */
+            @WithDefault("7d")
+            fun after(): String
+
+            /**
+             * Maximum number of messages to clean up in one batch
+             * Default: 1000
+             */
+            @WithDefault("1000")
+            @Min(1)
+            fun batchSize(): Int
+
+            /**
+             * Grace period for graceful shutdown
+             */
+            @WithDefault("5s")
+            fun gracePeriod(): String
+
+            val every get() = every().toDuration()
+            val after get() = after().toDuration()
+            val batchSize get() = batchSize()
+            val gracePeriod get() = gracePeriod().toDuration()
+        }
+    }
+
+    /**
      * Messaging configuration mapping.
      */
     interface MessagingConfig {
@@ -176,91 +293,91 @@ interface LemlineConfiguration {
          * Optional RabbitMQ configuration
          */
         fun rabbitmq(): Optional<RabbitMQConfig>
-    }
 
-    interface ChannelConfig {
-        fun producer(): ProducerConfig
-        fun consumer(): ConsumerConfig
-    }
+        interface ChannelConfig {
+            fun producer(): ProducerConfig
+            fun consumer(): ConsumerConfig
+        }
 
-    interface ProducerConfig {
-        @WithDefault("false")
-        fun enabled(): Boolean
-    }
+        interface ProducerConfig {
+            @WithDefault("false")
+            fun enabled(): Boolean
+        }
 
-    interface ConsumerConfig {
-        @WithDefault("false")
-        fun enabled(): Boolean
+        interface ConsumerConfig {
+            @WithDefault("false")
+            fun enabled(): Boolean
 
-        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
-        fun concurrency(): Long
-    }
+            @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+            fun concurrency(): Long
+        }
 
-    /**
-     * Kafka-specific configuration.
-     */
-    interface KafkaConfig {
-        @WithDefault(KAFKA_BROKERS_DEFAULT)
-        fun brokers(): String
+        /**
+         * Kafka-specific configuration.
+         */
+        interface KafkaConfig {
+            @WithDefault(KAFKA_BROKERS_DEFAULT)
+            fun brokers(): String
 
-        // Optional
-        fun securityProtocol(): Optional<String>
-        fun saslMechanism(): Optional<String>
-        fun saslUsername(): Optional<String>
-        fun saslPassword(): Optional<String>
+            // Optional
+            fun securityProtocol(): Optional<String>
+            fun saslMechanism(): Optional<String>
+            fun saslUsername(): Optional<String>
+            fun saslPassword(): Optional<String>
 
-        fun workflows(): KafkaWorkflowsConfig
-        fun database(): KafkaIngestionConfig
-    }
+            fun workflows(): KafkaWorkflowsConfig
+            fun database(): KafkaIngestionConfig
 
-    interface KafkaWorkflowsConfig {
-        @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
-        fun topic(): String
-        fun consumer(): KafkaConsumerWorkflowsConfig
-        fun producer(): KafkaProducerConfig
-    }
+            interface KafkaWorkflowsConfig {
+                @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
+                fun topic(): String
+                fun consumer(): KafkaConsumerWorkflowsConfig
+                fun producer(): KafkaProducerConfig
+            }
 
-    interface KafkaIngestionConfig {
-        @WithDefault(INGESTION_TOPIC_DEFAULT)
-        fun topic(): String
-        fun consumer(): KafkaConsumerDatabaseConfig
-        fun producer(): KafkaProducerConfig
-    }
+            interface KafkaIngestionConfig {
+                @WithDefault(INGESTION_TOPIC_DEFAULT)
+                fun topic(): String
+                fun consumer(): KafkaConsumerDatabaseConfig
+                fun producer(): KafkaProducerConfig
+            }
 
-    interface KafkaConsumerWorkflowsConfig {
-        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
-        fun concurrency(): Int
+            interface KafkaConsumerWorkflowsConfig {
+                @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+                fun concurrency(): Int
 
-        @WithDefault(KAFKA_WORKFLOWS_GROUP_ID_DEFAULT)
-        fun groupId(): String
+                @WithDefault(KAFKA_WORKFLOWS_GROUP_ID_DEFAULT)
+                fun groupId(): String
 
-        @Pattern(regexp = "latest|earliest")
-        @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
-        fun offsetReset(): String
+                @Pattern(regexp = "latest|earliest")
+                @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
+                fun offsetReset(): String
 
-        fun topicDlq(): Optional<String>
+                fun topicDlq(): Optional<String>
 
-        fun topicOut(): Optional<String>
-    }
+                fun topicOut(): Optional<String>
+            }
 
-    interface KafkaConsumerDatabaseConfig {
-        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
-        fun concurrency(): Int
+            interface KafkaConsumerDatabaseConfig {
+                @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+                fun concurrency(): Int
 
-        @WithDefault(KAFKA_DATABASE_GROUP_ID_DEFAULT)
-        fun groupId(): String
+                @WithDefault(KAFKA_DATABASE_GROUP_ID_DEFAULT)
+                fun groupId(): String
 
-        @Pattern(regexp = "latest|earliest")
-        @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
-        fun offsetReset(): String
+                @Pattern(regexp = "latest|earliest")
+                @WithDefault(KAFKA_OFFSET_RESET_DEFAULT)
+                fun offsetReset(): String
 
-        fun topicDlq(): Optional<String>
+                fun topicDlq(): Optional<String>
 
-        fun topicOut(): Optional<String>
-    }
+                fun topicOut(): Optional<String>
+            }
 
-    interface KafkaProducerConfig {
-        fun topicOut(): Optional<String>
+            interface KafkaProducerConfig {
+                fun topicOut(): Optional<String>
+            }
+        }
     }
 
     /**
@@ -278,130 +395,37 @@ interface LemlineConfiguration {
 
         fun workflows(): RabbitWorkflowsConfig
         fun database(): RabbitIngestionConfig
-    }
 
-    interface RabbitWorkflowsConfig {
-        @WithDefault(RABBITMQ_VHOST_DEFAULT)
-        fun virtualHost(): Optional<String>
+        interface RabbitWorkflowsConfig {
+            @WithDefault(RABBITMQ_VHOST_DEFAULT)
+            fun virtualHost(): Optional<String>
 
-        @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
-        fun queue(): String
-        fun consumer(): RabbitConsumerConfig
-        fun producer(): RabbitProducerConfig
-    }
+            @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
+            fun queue(): String
+            fun consumer(): RabbitConsumerConfig
+            fun producer(): RabbitProducerConfig
+        }
 
-    interface RabbitIngestionConfig {
-        @WithDefault(RABBITMQ_VHOST_DEFAULT)
-        fun virtualHost(): Optional<String>
+        interface RabbitIngestionConfig {
+            @WithDefault(RABBITMQ_VHOST_DEFAULT)
+            fun virtualHost(): Optional<String>
 
-        @WithDefault(INGESTION_TOPIC_DEFAULT)
-        fun queue(): String
-        fun consumer(): RabbitConsumerConfig
-        fun producer(): RabbitProducerConfig
-    }
+            @WithDefault(INGESTION_TOPIC_DEFAULT)
+            fun queue(): String
+            fun consumer(): RabbitConsumerConfig
+            fun producer(): RabbitProducerConfig
+        }
 
-    interface RabbitConsumerConfig {
-        @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
-        fun concurrency(): Int
-        fun queueDlq(): Optional<String>
-    }
+        interface RabbitConsumerConfig {
+            @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
+            fun concurrency(): Int
+            fun queueDlq(): Optional<String>
+        }
 
-    interface RabbitProducerConfig {
-        fun queueOut(): Optional<String>
-        fun exchangeName(): Optional<String>
-    }
-
-    interface OutboxConfig {
-        fun enabled(): Optional<Boolean>
-        fun wait(): ProcessOutboxConfig
-        fun retry(): ProcessOutboxConfig
-        fun schedule(): ProcessOutboxConfig
-        fun parent(): CleanupOutboxConfig
-    }
-
-    /**
-     * Process and cleanup configuration.
-     */
-    interface ProcessOutboxConfig {
-        fun enabled(): Optional<Boolean>
-        fun outbox(): OutboxProcessingConfig
-        fun cleanup(): OutboxCleanupConfig
-    }
-
-    /**
-     * Only cleanup configuration.
-     */
-    interface CleanupOutboxConfig {
-        fun enabled(): Optional<Boolean>
-        fun cleanup(): OutboxCleanupConfig
-    }
-
-    /**
-     * Outbox pattern configuration.
-     * Controls the behavior of message processing in the outbox pattern.
-     */
-    interface OutboxProcessingConfig {
-        /**
-         * Processing interval
-         */
-        @WithDefault("10s")
-        fun every(): String
-
-        /**
-         * Maximum number of messages to process in one batch
-         */
-        @WithDefault("1000")
-        @Min(1)
-        fun batchSize(): Int
-
-        /**
-         * Initial delay before starting processing
-         */
-        @WithDefault("30s")
-        fun initialDelay(): String
-
-        /**
-         * Maximum number of processing attempts
-         * Default: 5
-         */
-        @WithDefault("5")
-        @Min(1)
-        fun maxAttempts(): Int
-
-        val every get() = every().toDuration()
-        val batchSize get() = batchSize()
-        val initialDelay get() = initialDelay().toDuration()
-        val maxAttempts get() = maxAttempts()
-    }
-
-    /**
-     * Cleanup configuration.
-     * Controls the behavior of message cleanup in the outbox pattern.
-     */
-    interface OutboxCleanupConfig {
-        /**
-         * Cleanup interval
-         */
-        @WithDefault("1h")
-        fun every(): String
-
-        /**
-         * Age of messages to clean up
-         */
-        @WithDefault("7d")
-        fun after(): String
-
-        /**
-         * Maximum number of messages to clean up in one batch
-         * Default: 1000
-         */
-        @WithDefault("1000")
-        @Min(1)
-        fun batchSize(): Int
-
-        val every get() = every().toDuration()
-        val after get() = after().toDuration()
-        val batchSize get() = batchSize()
+        interface RabbitProducerConfig {
+            fun queueOut(): Optional<String>
+            fun exchangeName(): Optional<String>
+        }
     }
 
     /**

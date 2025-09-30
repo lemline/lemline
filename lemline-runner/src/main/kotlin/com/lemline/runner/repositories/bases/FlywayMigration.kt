@@ -1,0 +1,44 @@
+package com.lemline.runner.repositories.bases
+
+import com.lemline.common.logger.logger
+import com.lemline.runner.config.DATABASE_TYPE
+import com.lemline.runner.config.LemlineConfigConstants
+import com.lemline.runner.config.MIGRATE_AT_START
+import io.quarkus.runtime.StartupEvent
+import jakarta.enterprise.context.ApplicationScoped
+import jakarta.enterprise.event.Observes
+import jakarta.inject.Inject
+import org.eclipse.microprofile.config.inject.ConfigProperty
+
+/**
+ * Ensures that Flyway database migrations are applied during application startup
+ * After applying the LemlineConfigSourceFactory,
+ */
+@ApplicationScoped
+class FlywayMigration(
+    @param:ConfigProperty(name = "quarkus.profile")
+    val profile: String,
+
+    @param:ConfigProperty(name = DATABASE_TYPE)
+    val db: String,
+
+    @param:ConfigProperty(name = MIGRATE_AT_START)
+    val migrateAtStart: Boolean,
+) {
+    private val log = logger()
+
+    @Inject
+    private lateinit var databaseManager: DatabaseManager
+
+    fun onStart(@Observes event: StartupEvent) {
+        // Run migrations:
+        // - if the profile is "test" - as databases are recreated for each test
+        // - if the database type is in-memory - as it is provided by the app
+        // - if migrateAtStart is true - as it is requested by the user
+        if (profile == "test" || db == LemlineConfigConstants.DB_TYPE_IN_MEMORY || migrateAtStart) {
+            // migrate custom Flyway
+            databaseManager.flyway.migrate()
+            log.info { "Flyway migrations applied successfully on ${databaseManager.dbType} database." }
+        }
+    }
+}

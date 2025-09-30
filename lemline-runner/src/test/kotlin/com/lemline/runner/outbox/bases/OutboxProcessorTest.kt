@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox.bases
 
-import com.lemline.common.logger.logger
-import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.outbox.OutBoxStatus.FAILED
-import com.lemline.runner.outbox.OutBoxStatus.PENDING
-import com.lemline.runner.outbox.OutBoxStatus.SENT
-import com.lemline.runner.outbox.OutboxRelay
+import com.lemline.runner.config.LemlineConfiguration.TablesConfig.OutboxConfig
+import com.lemline.runner.models.bases.OutboxModelBase
+import com.lemline.runner.models.bases.runDelayedUntil
+import com.lemline.runner.outbox.bases.RunStatus.DONE
+import com.lemline.runner.outbox.bases.RunStatus.FAILED
+import com.lemline.runner.outbox.bases.RunStatus.PENDING
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.OutboxRepository
+import com.lemline.runner.repositories.bases.OutboxRepositoryBase
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -18,6 +18,7 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.just
 import io.mockk.mockk
+import java.util.*
 import kotlin.reflect.KClass
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.days
@@ -33,7 +34,6 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
-
 @ExperimentalTime
 infix fun Instant.shouldBeAfter(date: Instant) = (this > date) shouldBe true
 
@@ -47,13 +47,13 @@ infix fun Instant.shouldBeAfter(date: Instant) = (this > date) shouldBe true
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class OutboxProcessorTest<T : OutboxModel> {
+internal abstract class OutboxProcessorTest<T : OutboxModelBase> {
 
     // Abstract repository to be provided by subclasses
     abstract val failureRepository: FailureRepository
 
     // Abstract repository to be provided by subclasses
-    abstract val outboxRepository: OutboxRepository<T>
+    abstract val outboxRepository: OutboxRepositoryBase<T>
 
     // Abstract Kotlin class reference needed for MockK
     abstract val modelClass: KClass<T>
@@ -63,19 +63,30 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
     // Mock and processor using the generic type T
     private val mockedProcessor = mockk<suspend (T) -> Unit>()
-    private val outboxRelay: OutboxRelay<T> by lazy {
-        OutboxRelay(
-            logger = logger(),
-            failureRepository = failureRepository,
-            outboxRepository = outboxRepository,
-            relay = mockedProcessor,
-        )
-    }
 
     // Default test configuration
     private val batchSize = 10
     private val maxAttempts = 3
     private val initialDelay = 1.seconds // 1 second
+
+    // Create a concrete implementation class instead of anonymous object
+    private class TestOutboxConfig : OutboxConfig {
+        override fun enabled() = Optional.of(true)
+        override fun every() = "10s"
+        override fun batchSize() = 10
+        override fun initialDelay() = "1s"
+        override fun maxAttempts() = 3
+        override fun gracePeriod() = "5s"
+    }
+
+    private val outbox by lazy {
+        Outbox(
+            failureRepository = failureRepository,
+            outboxRepository = outboxRepository,
+            relay = mockedProcessor,
+            outboxConfig = TestOutboxConfig()
+        )
+    }
 
     @BeforeEach
     fun setup() = runTest {
@@ -111,7 +122,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         outboxRepository.insert(message)
 
         // Act
-        outboxRelay.process(batchSize, maxAttempts, initialDelay)
+        outbox.run()
 
         // Assert
         // Verify the mock was called at least once
@@ -119,9 +130,9 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         val processedMessage = outboxRepository.findById(message.id)
         processedMessage shouldNotBe null
-        processedMessage?.outBoxStatus shouldBe SENT
-        processedMessage?.outboxAttemptCount shouldBe 1
-        processedMessage?.outboxErrorClass shouldBe null
+        processedMessage?.runStatus shouldBe DONE
+        processedMessage?.runAttemptCount shouldBe 1
+        processedMessage?.runLastErrorClass shouldBe null
     }
 
     /**
@@ -162,36 +173,36 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Act: First process call (fails)
         val now = Clock.System.now()
-        outboxRelay.process(batchSize, maxAttempts, initialDelay)
+        outbox.run()
 
         // Assert: First attempt failed - Check DB state
         coVerify(exactly = 1) { mockedProcessor(any(modelClass)) } // Verify it was called once
         val updated = outboxRepository.findById(original.id)!!
 
-        updated.outBoxStatus shouldBe PENDING
-        updated.outboxAttemptCount shouldBe 1
-        updated.outboxErrorMessage shouldContain failureException.message!!
+        updated.runStatus shouldBe PENDING
+        updated.runAttemptCount shouldBe 1
+        updated.runLastErrorMessage shouldContain failureException.message!!
 
         // Calculate expected delay using exponential backoff - 20% jitter
         val expectedMinDelay = initialDelay.inWholeMilliseconds * 0.8
-        updated.outboxDelayedUntil!! shouldBeAfter (now + expectedMinDelay.milliseconds)
+        updated.runDelayedUntil!! shouldBeAfter (now + expectedMinDelay.milliseconds)
 
         // waiting for the next attempt
-        delay(updated.outboxDelayedUntil!! - now)
+        delay(updated.runDelayedUntil!! - now)
 
         // Arrange: Setup mock to succeed on subsequent calls
         coEvery { mockedProcessor(any(modelClass)) } just Runs
 
         // Act: Second process call (should succeed now)
-        outboxRelay.process(batchSize, maxAttempts, initialDelay)
+        outbox.run()
 
         // Assert: A second attempt succeeded - Check DB state
         coVerify(exactly = 2) { mockedProcessor(any(modelClass)) } // Verify it was called again
         val final = outboxRepository.findById(original.id)!!
 
-        final.outBoxStatus shouldBe SENT // Status updated
-        final.outboxAttemptCount shouldBe 2
-        final.outboxErrorMessage shouldContain failureException.message!! // Error remains
+        final.runStatus shouldBe DONE // Status updated
+        final.runAttemptCount shouldBe 2
+        final.runLastErrorMessage shouldContain failureException.message!! // Error remains
 
         Unit
     }
@@ -218,7 +229,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Arrange
         val original = createTestModel(payload = "FailPayload")
         outboxRepository.insert(original)
-        val originalDelayedUntil = original.outboxDelayedUntil!!
+        val originalDelayedUntil = original.runDelayedUntil!!
 
         val failureException = RuntimeException("Persistent failure!")
         // Set up the mock to always fail
@@ -229,26 +240,26 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         for (attempt in 1..maxAttempts) {
             val now = Clock.System.now()
             // when
-            outboxRelay.process(batchSize, maxAttempts, initialDelay)
+            outbox.run()
             // then
             val updated = outboxRepository.findById(original.id)!!
             if (attempt < maxAttempts) {
-                updated.outBoxStatus shouldBe PENDING
-                updated.outboxAttemptCount shouldBe attempt
-                updated.outboxErrorMessage shouldContain failureException.message!!
-                updated.outboxDelayedUntil!! shouldBeAfter lastDelayedUntil
+                updated.runStatus shouldBe PENDING
+                updated.runAttemptCount shouldBe attempt
+                updated.runLastErrorMessage shouldContain failureException.message!!
+                updated.runDelayedUntil!! shouldBeAfter lastDelayedUntil
                 // Calculate expected delay using exponential backoff - 20% jitter
                 val expectedMinDelay = (initialDelay.inWholeMilliseconds * (1L shl (attempt - 1)) * 0.8).toLong()
-                updated.outboxDelayedUntil!! shouldBeAfter (now + expectedMinDelay.milliseconds)
-                lastDelayedUntil = updated.outboxDelayedUntil!!
+                updated.runDelayedUntil!! shouldBeAfter (now + expectedMinDelay.milliseconds)
+                lastDelayedUntil = updated.runDelayedUntil!!
                 // waiting for the next attempt
-                delay(updated.outboxDelayedUntil!! - now)
+                delay(updated.runDelayedUntil!! - now)
             } else {
                 // Final attempt check
-                updated.outBoxStatus shouldBe FAILED
-                updated.outboxAttemptCount shouldBe maxAttempts
-                updated.outboxErrorMessage shouldContain failureException.message!!
-                updated.outboxDelayedUntil shouldBe lastDelayedUntil
+                updated.runStatus shouldBe FAILED
+                updated.runAttemptCount shouldBe maxAttempts
+                updated.runLastErrorMessage shouldContain failureException.message!!
+                updated.runDelayedUntil shouldBe lastDelayedUntil
             }
         }
     }
@@ -275,65 +286,16 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         outboxRepository.insert(messages)
 
         // Act
-        outboxRelay.process(batchSize, maxAttempts, initialDelay)
+        outbox.run()
 
         // Assert
         coVerify(exactly = 5) { mockedProcessor(any(modelClass)) }
         val processedMessages = outboxRepository.listAll()
         processedMessages shouldHaveSize 5
         processedMessages.forEach { msg ->
-            msg.outBoxStatus shouldBe SENT
-            msg.outboxAttemptCount shouldBe 1
+            msg.runStatus shouldBe DONE
+            msg.runAttemptCount shouldBe 1
         }
-    }
-
-    /**
-     * **Scenario: **Tests the cleanup logic removes old SENT entities, retaining others.
-     *
-     * **Arrange:**
-     * - Creates and persists entities with different statuses (SENT, PENDING, FAILED).
-     * - Updates the `delayedUntil` timestamp of some entities (including the old SENT one) to be older than the retention cutoff using a repository update.
-     *
-     * **Act:**
-     * - Calls `outboxProcessor.cleanup()`.
-     *
-     * **Assert:**
-     * - Verifies the old SENT entity was deleted (findById is null).
-     * - Verifies the recent SENT, PENDING, and FAILED entities were retained (findById is not null).
-     */
-    @Test
-    fun `cleanup should remove old SENT messages`() = runTest {
-        // Arrange
-        val retentionDelay = 7.days
-        val wayBeforeCutoff = Clock.System.now() - 8.days
-
-        // Create messages using abstract factory
-        val oldSentMessage = createTestModel("old_sent").apply {
-            outBoxStatus = SENT
-            outboxDelayedUntil = wayBeforeCutoff
-        }
-        val recentSentMessage = createTestModel("recent_sent").apply {
-            outBoxStatus = SENT
-            outboxDelayedUntil = Clock.System.now()
-        }
-        val pendingMessage = createTestModel("pending").apply {
-            outBoxStatus = PENDING
-            outboxDelayedUntil = wayBeforeCutoff
-        }
-        val failedMessage = createTestModel("failed").apply {
-            outBoxStatus = FAILED
-            outboxDelayedUntil = wayBeforeCutoff
-        }
-        outboxRepository.insert(listOf(oldSentMessage, recentSentMessage, pendingMessage, failedMessage))
-
-        // Act
-        outboxRelay.cleanup(retentionDelay, 2) // Use small batch size for testing
-
-        // Assert
-        outboxRepository.findById(oldSentMessage.id) shouldBe null // Should be deleted
-        outboxRepository.findById(recentSentMessage.id) shouldNotBe null // Should remain
-        outboxRepository.findById(pendingMessage.id) shouldNotBe null // Should remain (not SENT)
-        outboxRepository.findById(failedMessage.id) shouldNotBe null // Should remain (not SENT)
     }
 
     /**
@@ -354,7 +316,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Arrange: No messages persisted (due to setup)
 
         // Act
-        outboxRelay.process(batchSize, maxAttempts, initialDelay)
+        outbox.run()
 
         // Assert
         coVerify(exactly = 0) { mockedProcessor(any(modelClass)) }
@@ -379,50 +341,10 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         val retentionDelay = 7.days
 
         // Act
-        outboxRelay.cleanup(retentionDelay, batchSize)
+        outbox.run()
 
         // Assert
         outboxRepository.countAll() shouldBe 0
     }
 
-    /**
-     * **Scenario: **Tests that cleanup processes all messages, even if it requires more than 3 chunks.
-     *
-     * **Arrange:**
-     * - Creates and persists a large number of SENT messages (more than 3 chunks worth)
-     * - Sets all messages to be older than the retention cutoff
-     *
-     * **Act:**
-     * - Calls `outboxProcessor.cleanup()` with a small batch size
-     *
-     * **Assert:**
-     * - Verifies that all SENT messages were deleted
-     * - Verifies that the cleanup process continued until all messages were processed
-     */
-    @Test
-    fun `cleanup should process all messages even if it requires more than 3 chunks`() = runTest {
-        // Arrange
-        val afterDelay = 7.days
-        val cutoff = Clock.System.now() - afterDelay - 1.days
-        val wayBeforeCutoff = cutoff - 1.days
-
-        // Create more messages than can be processed in 3 chunks
-        val batchSize = 10 // Small batch size to ensure multiple chunks
-        val totalMessages = batchSize * 50 // More than 3 chunks worth of messages
-        val messages = List(totalMessages) { index ->
-            createTestModel("message_$index").apply {
-                outBoxStatus = SENT
-                outboxDelayedUntil = wayBeforeCutoff
-            }
-        }
-
-        // Persist all messages
-        outboxRepository.insert(messages)
-
-        // Act
-        outboxRelay.cleanup(afterDelay, batchSize)
-
-        // Assert
-        outboxRepository.countAll() shouldBe 0
-    }
 }

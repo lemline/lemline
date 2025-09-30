@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.common.random.random
-import com.lemline.runner.models.ParentOutboxModel
+import com.lemline.runner.models.ParentModel
+import com.lemline.runner.outbox.bases.RunStatus
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.ParentRepository
 import jakarta.inject.Inject
@@ -16,13 +16,15 @@ import kotlinx.serialization.ExperimentalSerializationApi
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class ParentRepositoryTest : OutboxRepositoryTest<ParentOutboxModel>() {
+internal abstract class ParentRepositoryTest : CleanerRepositoryTest<ParentModel>() {
 
     @Inject
     override lateinit var repository: ParentRepository
 
-    override fun createRandomEntity() = ParentOutboxModel.random()
+    override fun createRandomEntity(
+        runStatus: RunStatus,
+        runAt: Instant
+    ) = ParentModel.random().copy(runStatus = runStatus, runAt = runAt)
 
-    override fun changeDelayedUntil(model: ParentOutboxModel) =
-        model.copy().apply { outboxDelayedUntil = Instant.random() }
+    override fun modify(model: ParentModel) = ParentModel.random().copy(id = model.id)
 }

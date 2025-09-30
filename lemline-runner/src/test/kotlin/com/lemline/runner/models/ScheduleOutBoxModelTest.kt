@@ -2,7 +2,7 @@
 package com.lemline.runner.models
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.outbox.bases.RunStatus
 import com.lemline.runner.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -16,13 +16,13 @@ class ScheduleOutBoxModelTest {
 
     @Test
     fun `ScheduleOutboxModel serializes and deserializes and keep the same fields`() {
-        val model = ScheduleOutboxModel.random()
+        val model = ScheduleModel.random()
         val encoded = model.toJsonString()
 
         // default are removed from json string
-        val status = if (model.outBoxStatus == OutBoxStatus.PENDING) "" else ""","s":"${model.outBoxStatus}""""
+        val status = if (model.runStatus == RunStatus.PENDING) "" else ""","s":"${model.runStatus}""""
         // nullable properties
-        val sf = nullable(model.outboxScheduledFor)
+        val sf = nullable(model.runAt)
         val sa = nullable(model.scheduleAfter)
         val se = nullable(model.scheduleEvery)
         val sc = nullable(model.scheduleCron)
@@ -33,7 +33,7 @@ class ScheduleOutBoxModelTest {
             encoded,
         )
 
-        val decoded = LemlineJson.decodeFromString<ScheduleOutboxModel>(encoded)
+        val decoded = LemlineJson.decodeFromString<ScheduleModel>(encoded)
         assertEquals(model, decoded)
     }
 

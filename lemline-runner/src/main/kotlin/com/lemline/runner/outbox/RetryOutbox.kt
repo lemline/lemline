@@ -3,54 +3,55 @@ package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.instances.InstanceMessageEmitter
-import com.lemline.runner.models.RetryOutboxModel
+import com.lemline.runner.models.RetryModel
+import com.lemline.runner.outbox.bases.Outbox
+import com.lemline.runner.outbox.bases.Scheduler
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.RetryRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import kotlin.jvm.optionals.getOrNull
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
- * `RetryOutbox` specializes `AbstractOutbox` to implement the outbox pattern for retrying failed operations.
- *
  * This class coordinates retry logic in two main areas:
  * - In workflow execution via [com.lemline.runner.StepByStepRunner]:
  *   - Uses `WorkflowInstance.onRetry()` to handle retries defined by the workflow itself.
  * - In message processing via [com.lemline.runner.messaging.instances.InstanceMessageHandler]:
  *   - `Message<String>.saveAsFailed()` records non-recoverable failures.
  *   - `Message<String>.saveForRetry()` schedules recoverable failures for future retry attempts.
+ *
+ * Inherits core scheduling functionality from the [Scheduler] class, integrating Quarkus lifecycle
+ * events to ensure proper startup and shutdown behavior.
  */
 @Startup
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
+internal class RetryOutbox : Scheduler() {
 
     @Inject
-    override lateinit var instanceEmitter: InstanceMessageEmitter
+    private lateinit var instanceEmitter: InstanceMessageEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
 
     @Inject
-    override lateinit var failureRepository: FailureRepository
+    private lateinit var failureRepository: FailureRepository
 
     @Inject
-    override lateinit var outboxRepository: RetryRepository
+    private lateinit var outboxRepository: RetryRepository
 
-    // Is this outbox enabled?
-    override val enabled by lazy {
-        lemlineConfig.outbox().retry().enabled().getOrNull()
-            ?: lemlineConfig.outbox().enabled().getOrNull()
-            ?: lemlineConfig.messaging().workflows().getOrNull()?.consumer()?.enabled() ?: false
+    override val description: String = "Retries table outbox"
+
+    override val schedulable by lazy {
+        Outbox(
+            failureRepository = failureRepository,
+            outboxRepository = outboxRepository,
+            outboxConfig = lemlineConfig.database().tables().retries().outbox(),
+        ) { entity: RetryModel ->
+            instanceEmitter.send(entity.instanceMessage)
+        }
     }
-
-    // Outbox processing configuration
-    override val outboxConf by lazy { lemlineConfig.outbox().retry().outbox() }
-
-    // Cleanup configuration
-    override val cleanupConf by lazy { lemlineConfig.outbox().retry().cleanup() }
 }

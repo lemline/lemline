@@ -25,7 +25,7 @@ interface WithOptionalWorkflowInfo {
     val workflowVersion: WorkflowVersion? get() = workflowInfo?.workflowVersion
 }
 
-interface WithDefiniteWorkflowInfo : WithOptionalWorkflowInfo {
+interface WithWorkflowInfo : WithOptionalWorkflowInfo {
     override val workflowInfo: WorkflowInfo
 
     /**

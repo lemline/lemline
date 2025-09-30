@@ -3,13 +3,14 @@ package com.lemline.runner.messaging
 
 import com.lemline.common.logger.Logger
 import com.lemline.common.logger.withSuspendLoggingContext
-import com.lemline.common.values.WithOptionalWorkflowInfo
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.healthcheck.FatalAckLiveness.livenessDownOnFatal
 import com.lemline.runner.healthcheck.RetryReadiness.readinessDownDuringRetries
+import com.lemline.runner.models.bases.WithOptionalWorkflowInfo
+import com.lemline.runner.models.bases.WithWorkflowInfo
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
 import java.util.concurrent.CompletionException
@@ -24,7 +25,7 @@ import org.apache.kafka.common.errors.RetriableException
 import org.eclipse.microprofile.reactive.messaging.Message
 
 @ExperimentalTime
-internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
+internal interface MessageHandler<T> {
 
     suspend fun Message<String>.deserialize(): T
 
@@ -51,7 +52,11 @@ internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
                 try {
                     message.deserialize().also {
                         // deserialisation succeeded
-                        workflowInfo = it.workflowInfo
+                        workflowInfo = when (it) {
+                            is WithOptionalWorkflowInfo -> it.workflowInfo
+                            is WithWorkflowInfo -> it.workflowInfo
+                            else -> null
+                        }
                         metrics.deserializationCompleted(workflowInfo)
                     }
                 } catch (e: Exception) {

@@ -8,8 +8,8 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.exceptions.CliException
-import com.lemline.runner.messaging.database.DatabaseMessageEmitter
-import com.lemline.runner.messaging.database.IngestionMessage
+import com.lemline.runner.messaging.ingestion.IngestionMessageEmitter
+import com.lemline.runner.messaging.ingestion.IngestionMessages
 import com.lemline.runner.messaging.instances.InstanceMessageEmitter
 import com.lemline.runner.starters.Starter
 import io.quarkus.arc.Unremovable
@@ -43,7 +43,7 @@ class InstanceStartCommand : Runnable {
     private lateinit var instanceEmitter: InstanceMessageEmitter
 
     @Inject
-    private lateinit var databaseEmitter: DatabaseMessageEmitter
+    private lateinit var databaseEmitter: IngestionMessageEmitter
 
     @Parameters(
         index = "0",
@@ -109,8 +109,8 @@ class InstanceStartCommand : Runnable {
         when (scheduleOutboxModel) {
             null -> instanceEmitter.send(instanceMessage!!)
             else -> databaseEmitter.send(
-                IngestionMessage(
-                    instanceModels = mutableListOf(scheduleOutboxModel),
+                IngestionMessages(
+                    ingestionModels = mutableListOf(scheduleOutboxModel),
                     instanceMessages = listOfNotNull(instanceMessage)
                 )
             )

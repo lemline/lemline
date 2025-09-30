@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.outbox.OutBoxStatus.FAILED
-import com.lemline.runner.outbox.OutBoxStatus.PENDING
-import com.lemline.runner.outbox.OutBoxStatus.SENT
-import com.lemline.runner.repositories.OutboxRepository
+import com.lemline.common.random.nullableRandom
+import com.lemline.common.random.random
+import com.lemline.runner.models.bases.OutboxModelBase
+import com.lemline.runner.models.bases.runDelayedUntil
+import com.lemline.runner.outbox.bases.RunStatus
+import com.lemline.runner.outbox.bases.RunStatus.DONE
+import com.lemline.runner.outbox.bases.RunStatus.FAILED
+import com.lemline.runner.outbox.bases.RunStatus.PENDING
+import com.lemline.runner.random.random
 import io.kotest.common.runBlocking
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -44,16 +48,24 @@ import org.junit.jupiter.api.Test
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class OutboxRepositoryTest<T : OutboxModel> {
+internal abstract class OutboxRepositoryTest<T : OutboxModelBase> {
 
     /** The repository implementation being tested */
-    internal abstract val repository: OutboxRepository<T>
+    internal abstract val repository: OutboxRepositoryBase<T>
 
     /** Method to create a new instance of the model being tested */
-    internal abstract fun createRandomEntity(): T
+    internal abstract fun createRandomEntity(
+        runStatus: RunStatus = RunStatus.random(),
+        runAt: Instant = Instant.random(),
+        runDelayedUntil: Instant = Instant.random(),
+        runAttemptCount: Int = Int.random(),
+        runLastErrorClass: String? = String.nullableRandom(),
+        runLastErrorMessage: String? = String.nullableRandom(),
+        runLastErrorStackTrace: String? = String.nullableRandom()
+    ): T
 
     /** Method to create a new instance of the model being tested */
-    internal abstract fun changeDelayedUntil(model: T): T
+    internal abstract fun modify(model: T): T
 
     /**
      * Cleans up the database before each test to ensure a clean state.
@@ -75,9 +87,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         maxAttempts: Int = Int.MAX_VALUE,
         cutoffDate: Instant = Clock.System.now()
     ): List<T> = filter { entity ->
-        entity.outBoxStatus == PENDING &&
-            (entity.outboxDelayedUntil?.let { it <= cutoffDate } ?: false) &&
-            entity.outboxAttemptCount < maxAttempts
+        entity.runStatus == PENDING &&
+            (entity.runDelayedUntil?.let { it <= cutoffDate } ?: false) &&
+            entity.runAttemptCount < maxAttempts
     }
 
     /**
@@ -89,7 +101,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     private fun List<T>.filterEntitiesToDelete(
         cutoffDate: Instant = Clock.System.now()
     ): List<T> = filter { entity ->
-        entity.outBoxStatus == SENT && (entity.outboxDelayedUntil?.let { it <= cutoffDate } ?: false)
+        entity.runStatus == DONE && (entity.runAt?.let { it <= cutoffDate } ?: false)
     }
 
     /**
@@ -125,7 +137,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         maxAttempts: Int = Int.MAX_VALUE,
         limit: Int = Int.MAX_VALUE,
         connection: Connection? = null
-    ): List<T> = repository.findEntitiesToProcess(maxAttempts = maxAttempts, limit = limit, connection)
+    ): List<T> = repository.findEntitiesToSend(maxAttempts = maxAttempts, limit = limit, connection)
 
     /**
      * Finds and locks messages that are ready to be deleted.
@@ -289,7 +301,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                                 // get messages to process
                                 val results = findMessagesToProcess(maxAttempts, limit, connection)
                                 // mark messages as sent
-                                results.forEach { it.outBoxStatus = SENT }
+                                results.forEach { it.runStatus = DONE }
                                 // save them
                                 repository.update(results, connection)
                                 // record processed messages
@@ -393,7 +405,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                                         // get messages to process
                                         val results = findMessagesToProcess(maxAttempts, limit, connection)
                                         // mark messages as sent
-                                        results.forEach { it.outBoxStatus = SENT }
+                                        results.forEach { it.runStatus = DONE }
                                         // delete them
                                         repository.delete(results, connection)
                                         // record processed messages
@@ -482,11 +494,11 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `insert should handle concurrent transactions correctly`() = runTest {
         // Given
-        val message = createRandomEntity().apply {
-            outBoxStatus = PENDING
-            outboxDelayedUntil = Clock.System.now()
-            outboxAttemptCount = 0
-        }
+        val message = createRandomEntity(
+            runStatus = PENDING,
+            runDelayedUntil = Clock.System.now(),
+            runAttemptCount = 0
+        )
 
         val nThreads = 5
         val executor = Executors.newFixedThreadPool(nThreads)
@@ -521,7 +533,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `update should handle concurrent transactions correctly`() = runTest {
         // Given
         val original = insertRandomEntity()
-        val updated = changeDelayedUntil(original)
+        val updated = modify(original)
 
         val nThreads = 5
         val executor = Executors.newFixedThreadPool(nThreads)
@@ -546,7 +558,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         // Then
         exceptions.shouldBeEmpty()
         val persistedMessage = repository.findById(original.id)
-        persistedMessage?.outboxDelayedUntil shouldBe updated.outboxDelayedUntil
+        persistedMessage shouldBe updated
     }
 
     /**
@@ -613,7 +625,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         repository.insert(messages)
 
         // update by changing the status of all messages
-        messagesToUpdate.forEach { it.outboxAttemptCount = 100 }
+        messagesToUpdate.forEach { it.runAttemptCount = 100 }
 
         // When
         repository.update(messagesToUpdate) shouldBe 5
@@ -621,9 +633,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         // Then
         messages.forEachIndexed { index, message ->
             if (index < 5)
-                repository.findById(message.id)!!.outboxAttemptCount shouldBe 100
+                repository.findById(message.id)!!.runAttemptCount shouldBe 100
             else
-                repository.findById(message.id)!!.outboxAttemptCount shouldBeLessThan 100
+                repository.findById(message.id)!!.runAttemptCount shouldBeLessThan 100
         }
     }
 
@@ -642,25 +654,24 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `insert existing entity should fail`() = runTest {
         val original = insertRandomEntity()
-        val updated = changeDelayedUntil(original)
+        val updated = modify(original)
 
         repository.insert(updated) shouldBe 0
 
         val retrieved = repository.findById(original.id)
-        retrieved shouldNotBe null
-        retrieved?.outboxDelayedUntil shouldBe original.outboxDelayedUntil
+        retrieved shouldBe original
     }
 
     @Test
     fun `update existing entity should be successful`() = runTest {
         val original: T = insertRandomEntity()
-        val updated = changeDelayedUntil(original)
+        val updated = modify(original)
 
         repository.update(updated) shouldBe 1
 
         val retrieved = repository.findById(original.id)
         retrieved shouldNotBe null
-        retrieved?.outboxDelayedUntil shouldBe updated.outboxDelayedUntil
+        retrieved shouldBe updated
     }
 
     @Test
@@ -678,7 +689,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `update list should update only existing`() = runTest {
         val original = insertRandomEntity()
-        val updated = changeDelayedUntil(original)
+        val updated = modify(original)
         val newEntity1 = createRandomEntity()
         val newEntity2 = createRandomEntity()
 
@@ -688,7 +699,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
         // Verify updates
         val retrievedUpdated = repository.findById(original.id)
-        retrievedUpdated?.outboxDelayedUntil shouldBe updated.outboxDelayedUntil
+        retrievedUpdated shouldBe updated
 
         // Verify inserts
         repository.findById(newEntity1.id) shouldBe null
@@ -698,7 +709,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `insert list should insert only non-existing`() = runTest {
         val original = insertRandomEntity()
-        val updated = changeDelayedUntil(original)
+        val updated = modify(original)
         val newEntity1 = createRandomEntity()
         val newEntity2 = createRandomEntity()
 
@@ -708,7 +719,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
         // Verify updates
         val retrievedUpdated = repository.findById(original.id)
-        retrievedUpdated?.outboxDelayedUntil shouldBe original.outboxDelayedUntil
+        retrievedUpdated shouldBe original
 
         // Verify inserts
         repository.findById(newEntity1.id) shouldNotBe null
@@ -835,16 +846,16 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
             val duration = randomNonZero(1000).hours
             val status = when (Random.nextInt(0, 2)) {
                 0 -> PENDING
-                1 -> SENT
+                1 -> DONE
                 else -> FAILED
             }
             val attemptCount = Random.nextInt(0, 5)
 
-            createRandomEntity().apply {
-                this.outBoxStatus = status
-                this.outboxDelayedUntil = now + duration
-                this.outboxAttemptCount = attemptCount
-            }
+            createRandomEntity(
+                runStatus = status,
+                runDelayedUntil = now + duration,
+                runAttemptCount = attemptCount
+            )
         }
         repository.insert(messages)
         return messages

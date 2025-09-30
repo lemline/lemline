@@ -4,7 +4,7 @@ package com.lemline.runner.models
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.outbox.bases.RunStatus
 import com.lemline.runner.random.random
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
@@ -24,11 +24,11 @@ class ScheduleModelTest {
         scheduleCron: String? = null,
         outboxScheduledFor: Instant? = null,
         scheduleZone: String? = null
-    ) = ScheduleOutboxModel(
+    ) = ScheduleModel(
         id = IDV7.random(),
         instanceMessage = InstanceMessage.random(),
-        outBoxStatus = OutBoxStatus.PENDING,
-        outboxScheduledFor = outboxScheduledFor,
+        runStatus = RunStatus.PENDING,
+        runAt = outboxScheduledFor,
         scheduleCron = scheduleCron,
         scheduleAfter = scheduleAfter,
         scheduleEvery = scheduleEvery,
@@ -42,7 +42,7 @@ class ScheduleModelTest {
         model.prepareNextScheduled(WorkflowId.random())
         // The next execution should be exactly one minute after the outboxScheduledFor time
         val expected = Instant.parse("2023-01-01T00:01:00Z")
-        assertEquals(expected, model.outboxScheduledFor)
+        assertEquals(expected, model.runAt)
     }
 
     @Test
@@ -55,7 +55,7 @@ class ScheduleModelTest {
     fun `should return null when outboxScheduledFor is null`() {
         val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = null)
         model.prepareNextScheduled(WorkflowId.random())
-        assertNull(model.outboxScheduledFor)
+        assertNull(model.runAt)
     }
 
     @Test
@@ -68,7 +68,7 @@ class ScheduleModelTest {
         model.prepareNextScheduled(WorkflowId.random())
         // The next execution should be the next year
         val expected = Instant.parse("2024-01-01T00:00:00Z")
-        assertEquals(expected, model.outboxScheduledFor)
+        assertEquals(expected, model.runAt)
     }
 
     @Test
@@ -82,6 +82,6 @@ class ScheduleModelTest {
 
         // 9 AM in New York on Jan 1st is 14:00 UTC
         val expected = Instant.parse("2023-01-01T14:00:00Z")
-        assertEquals(expected, model.outboxScheduledFor)
+        assertEquals(expected, model.runAt)
     }
 }

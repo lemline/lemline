@@ -2,5 +2,5 @@
 package com.lemline.common.json
 
 interface JsonSerializable {
-    fun toJsonString(): String
+    fun toJsonString() = LemlineJson.encodeToString(this)
 }

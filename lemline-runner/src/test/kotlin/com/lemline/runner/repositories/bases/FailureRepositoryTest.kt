@@ -36,33 +36,8 @@ internal abstract class FailureRepositoryTest {
     }
 
     @Test
-    fun `should insert and retrieve a failure with all fields`() = runTest {
-        val ex = IllegalStateException("boom")
-        val model = FailureModel.from(
-            id = IDV7.random(),
-            instance = InstanceMessage.random(),
-            error = ex,
-        )
-
-        repository.insert(model) shouldBe 1
-
-        // listAll should return the same model
-        val all = repository.listAll()
-        all shouldHaveSize 1
-        val retrieved = all.first()
-
-        // basic id and instance mapping
-        retrieved shouldBe model
-    }
-
-    @Test
-    fun `should insert and retrieve a failure with only payload`() = runTest {
-        val ex = IllegalStateException("boom")
-        val model = FailureModel.from(
-            id = IDV7.random(),
-            payload = "payload",
-            error = ex,
-        )
+    fun `should insert and retrieve a failure`() = runTest {
+        val model = FailureModel.random()
 
         repository.insert(model) shouldBe 1
 
@@ -86,10 +61,10 @@ internal abstract class FailureRepositoryTest {
 
         repository.insert(listOf(f1, f2, f3))
 
-        val found1 = repository.findWithWorkflowId(instance1.workflowId)
+        val found1 = repository.findByWorkflowId(instance1.workflowId)
         found1.map { it.payload }.toSet() shouldBe setOf("m1", "m2")
 
-        val found2 = repository.findWithWorkflowId(instance2.workflowId)
+        val found2 = repository.findByWorkflowId(instance2.workflowId)
         found2.map { it.payload }.toSet() shouldBe setOf("m3")
     }
 
@@ -110,7 +85,7 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `deleteById should remove an existing failure`() = runTest {
         // Given
-        val failure = FailureModel.from(IDV7.random(), InstanceMessage.random(), RuntimeException("boom"))
+        val failure = FailureModel.random()
         repository.insert(failure)
 
         // When
@@ -124,7 +99,7 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `deleteById should return 0 if failure does not exist`() = runTest {
         // Given
-        val failure = FailureModel.from(IDV7.random(), InstanceMessage.random(), RuntimeException("boom"))
+        val failure = FailureModel.random()
         repository.insert(failure)
         val randomId = IDV7.random()
 

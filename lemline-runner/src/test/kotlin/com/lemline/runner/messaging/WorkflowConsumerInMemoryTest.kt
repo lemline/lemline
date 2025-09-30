@@ -2,8 +2,8 @@
 package com.lemline.runner.messaging
 
 import com.lemline.runner.messaging.base.WorkflowConsumerTest
-import com.lemline.runner.messaging.database.DATABASE_IN_CHANNEL
-import com.lemline.runner.messaging.database.DATABASE_OUT_CHANNEL
+import com.lemline.runner.messaging.ingestion.DATABASE_IN_CHANNEL
+import com.lemline.runner.messaging.ingestion.DATABASE_OUT_CHANNEL
 import com.lemline.runner.messaging.instances.WORKFLOWS_IN_CHANNEL
 import com.lemline.runner.messaging.instances.WORKFLOWS_OUT_CHANNEL
 import com.lemline.runner.tests.profiles.InMemoryProfile

@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.models.ParentOutboxModel
-import com.lemline.runner.outbox.OutBoxStatus
-import com.lemline.runner.outbox.OutboxRelay
+import com.lemline.core.workflows.WorkflowState
+import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.models.ParentModel
+import com.lemline.runner.repositories.bases.DatabaseManager
+import com.lemline.runner.repositories.bases.OptionalCleanerRepository
+import com.lemline.runner.repositories.capabilities.InfoCapable
+import com.lemline.runner.repositories.capabilities.StateCapable
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.ResultSet
@@ -22,30 +26,46 @@ const val PARENT_TABLE = "lemline_parents"
  * uses native SQL queries with SKIP LOCKED for parallel processing safety,
  * ensuring reliable message delivery in distributed systems.
  *
- * @see OutboxRepository for base functionality and documentation
- * @see ParentOutboxModel for the message model
- * @see OutboxRelay for the processing logic
+ * @see com.lemline.runner.repositories.bases.OutboxRepository for base functionality and documentation
+ * @see ParentModel for the message model
+ * @see OutboxRunnner for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class ParentRepository : OutboxRepository<ParentOutboxModel>() {
+internal class ParentRepository : OptionalCleanerRepository<ParentModel>() {
 
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = PARENT_TABLE
 
-    override fun createModel(rs: ResultSet) = ParentOutboxModel(
-        id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage()!!,
-        outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
-        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
-    ).apply {
-        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN)
-        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN)
-        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN)
-        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN)
-        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN)
-    }
+    val infoCapable by lazy { InfoCapable(this) }
+    val stateCapabilities by lazy { StateCapable(this) }
+
+    override val prepareStatementMap = super.prepareStatementMap +
+        infoCapable.mapping + stateCapabilities.mapping
+
+
+    private val ResultSet.nodePosition get() = with(stateCapabilities) { this@nodePosition.nodePosition }
+    private val ResultSet.nodeStates get() = with(stateCapabilities) { this@nodeStates.nodeStates }
+    private val ResultSet.workflowInfo get() = with(infoCapable) { this@workflowInfo.workflowInfo }
+    private val ResultSet.parentId get() = with(stateCapabilities) { this@parentId.parentId }
+
+    private val ResultSet.instanceMessage
+        get() = InstanceMessage(
+            workflowInfo = workflowInfo,
+            workflowState = WorkflowState(
+                currentPosition = nodePosition,
+                currentStates = nodeStates,
+            ),
+            parentId = parentId
+        )
+
+    override fun createModel(rs: ResultSet) = ParentModel(
+        id = rs.id,
+        instanceMessage = rs.instanceMessage,
+        runStatus = rs.runStatus,
+        runAt = rs.runAt,
+    )
 }

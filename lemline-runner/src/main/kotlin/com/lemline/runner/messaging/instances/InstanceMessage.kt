@@ -4,7 +4,7 @@ package com.lemline.runner.messaging.instances
 import com.lemline.common.json.JsonSerializable
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WithDefiniteWorkflowInfo
+import com.lemline.common.values.WithWorkflowInfo
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
@@ -36,7 +36,7 @@ data class InstanceMessage(
      * Parent's model ID waiting for this instance completion, if any.
      */
     @SerialName("p") val parentId: IDV7? = null
-) : WithDefiniteWorkflowInfo, JsonSerializable {
+) : WithWorkflowInfo, JsonSerializable {
 
     @Transient
     lateinit var message: Message<String>

@@ -7,16 +7,16 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.messaging.CompensationException
-import com.lemline.runner.messaging.database.DatabaseMessage
-import com.lemline.runner.messaging.database.DatabaseMessageHandler
-import com.lemline.runner.messaging.database.IngestionMessage
+import com.lemline.runner.messaging.ingestion.IngestionMessage
+import com.lemline.runner.messaging.ingestion.IngestionMessageHandler
+import com.lemline.runner.messaging.ingestion.IngestionMessages
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.messaging.instances.InstanceMessageHandler
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.models.FailureModel
-import com.lemline.runner.models.RetryOutboxModel
-import com.lemline.runner.models.WaitOutboxModel
-import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.models.RetryModel
+import com.lemline.runner.models.WaitModel
+import com.lemline.runner.outbox.bases.RunStatus
 import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -65,11 +65,11 @@ internal abstract class WorkflowConsumerTest {
     lateinit var instanceMessageHandler: InstanceMessageHandler
 
     @Inject
-    lateinit var databaseMessageHandler: DatabaseMessageHandler
+    lateinit var ingestionMessageHandler: IngestionMessageHandler
 
     val processingMessages = ConcurrentHashMap<String, CompletableFuture<InstanceMessage?>>()
 
-    val databaseMessages = ConcurrentHashMap<String, CompletableFuture<DatabaseMessage?>>()
+    val ingestionMessages = ConcurrentHashMap<String, CompletableFuture<IngestionMessage?>>()
 
     @BeforeEach
     fun setup() = runTest {
@@ -86,12 +86,12 @@ internal abstract class WorkflowConsumerTest {
             processingMessages.remove(msg.payload)?.complete(o)
         }
 
-        databaseMessageHandler.onFailureTest = { msg: Message<String>, e: Throwable? ->
-            databaseMessages.remove(msg.payload)?.completeExceptionally(e)
+        ingestionMessageHandler.onFailureTest = { msg: Message<String>, e: Throwable? ->
+            ingestionMessages.remove(msg.payload)?.completeExceptionally(e)
         }
 
-        databaseMessageHandler.onCompleteTest = { msg: Message<String>, o: DatabaseMessage? ->
-            databaseMessages.remove(msg.payload)?.complete(o)
+        ingestionMessageHandler.onCompleteTest = { msg: Message<String>, o: IngestionMessage? ->
+            ingestionMessages.remove(msg.payload)?.complete(o)
         }
 
         // Create test workflow definition
@@ -244,11 +244,11 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
+            val msg = IngestionMessage.fromJsonString(this) as IngestionMessages
             println("msg=$msg")
             msg.instanceMessages.isEmpty() shouldBe true
-            msg.instanceModels.size shouldBe 1
-            val failure = msg.instanceModels[0] as FailureModel
+            msg.ingestionModels.size shouldBe 1
+            val failure = msg.ingestionModels[0] as FailureModel
             failure.instanceMessage shouldBe null
             failure.payload shouldBe invalidMessage
             failure.errorReason shouldBe DESERIALIZATION_FAILURE
@@ -289,14 +289,14 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
+            val msg = IngestionMessage.fromJsonString(this) as IngestionMessages
             msg.instanceMessages.isEmpty() shouldBe true
-            msg.instanceModels.size shouldBe 1
-            val retry = msg.instanceModels[0] as RetryOutboxModel
+            msg.ingestionModels.size shouldBe 1
+            val retry = msg.ingestionModels[0] as RetryModel
             retry.instanceMessage.workflowState.currentPosition.toString() shouldBe "/do/3/retryCase"
             retry.errorReason shouldBe "https://serverlessworkflow.io/errors/not-implemented"
-            retry.outBoxStatus shouldBe OutBoxStatus.PENDING
-            retry.outboxScheduledFor shouldNotBe null
+            retry.runStatus shouldBe RunStatus.PENDING
+            retry.runAt shouldNotBe null
         }
     }
 
@@ -335,13 +335,13 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
+            val msg = IngestionMessage.fromJsonString(this) as IngestionMessages
             msg.instanceMessages.isEmpty() shouldBe true
-            msg.instanceModels.size shouldBe 1
-            val retry = msg.instanceModels[0] as WaitOutboxModel
+            msg.ingestionModels.size shouldBe 1
+            val retry = msg.ingestionModels[0] as WaitModel
             retry.instanceMessage.workflowState.currentPosition.toString() shouldBe "/do/2/waitCase"
-            retry.outBoxStatus shouldBe OutBoxStatus.PENDING
-            retry.outboxScheduledFor shouldNotBe null
+            retry.runStatus shouldBe RunStatus.PENDING
+            retry.runAt shouldNotBe null
         }
     }
 

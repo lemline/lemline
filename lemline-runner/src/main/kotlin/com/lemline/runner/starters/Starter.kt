@@ -9,7 +9,7 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.models.ScheduleOutboxModel
+import com.lemline.runner.models.ScheduleModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.time.ZoneId
@@ -26,7 +26,7 @@ class Starter {
     private lateinit var definitions: Definitions
 
     /**
-     * Returns a pair of [InstanceMessage] and [ScheduleOutboxModel]
+     * Returns a pair of [InstanceMessage] and [ScheduleModel]
      *
      * Depending on the schedule of the workflow, different messages are needed:
      *      - no schedule -> a single instanceMessage
@@ -43,7 +43,7 @@ class Starter {
         parentId: IDV7?,
         zoneId: ZoneId?,
         onError: (String) -> Nothing,
-    ): Pair<InstanceMessage?, ScheduleOutboxModel?> {
+    ): Pair<InstanceMessage?, ScheduleModel?> {
         // Retrieve the workflow definition from the repository
         val workflow = definitions.get(workflowNamespace, workflowName, optionalVersion)
             ?: onError("Workflow $workflowName (version=${optionalVersion ?: "latest"}) not found.")
@@ -70,7 +70,7 @@ class Starter {
         // create the scheduleMessage if a schedule is present
         val scheduleOutboxModel = when (workflow.schedule) {
             null -> null
-            else -> ScheduleOutboxModel.from(
+            else -> ScheduleModel.from(
                 workflowId = workflowId,
                 workflowNamespace = workflowNamespace,
                 workflowName = workflowName,
