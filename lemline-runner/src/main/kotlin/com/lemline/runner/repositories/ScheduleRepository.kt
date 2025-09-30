@@ -70,4 +70,3 @@ class ScheduleRepository : OptionalOutboxRepository<ScheduleModel>() {
         runLastErrorStackTrace = rs.runLastErrorStackTrace
     }
 }
-

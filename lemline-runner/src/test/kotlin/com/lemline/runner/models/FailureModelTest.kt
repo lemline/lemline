@@ -16,7 +16,7 @@ class FailureModelTest {
     @Test
     fun `FailureModel serializes and deserializes and keep the same fields`() {
         val model = FailureModel.random()
-        val encoded = model.toJsonString()
+        val encoded = LemlineJson.encodeToString<IngestionModel>(model)
 
         // nullable properties
         val i = nullable(model.instanceMessage)

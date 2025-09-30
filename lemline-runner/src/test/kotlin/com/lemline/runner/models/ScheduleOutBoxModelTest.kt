@@ -17,19 +17,19 @@ class ScheduleOutBoxModelTest {
     @Test
     fun `ScheduleOutboxModel serializes and deserializes and keep the same fields`() {
         val model = ScheduleModel.random()
-        val encoded = model.toJsonString()
+        val encoded = LemlineJson.encodeToString<IngestionModel>(model)
 
         // default are removed from json string
-        val status = if (model.runStatus == RunStatus.PENDING) "" else ""","s":"${model.runStatus}""""
+        val status = if (model.runStatus == RunStatus.PENDING) "" else ""","rs":"${model.runStatus}""""
         // nullable properties
-        val sf = nullable(model.runAt)
+        val ra = nullable(model.runAt)
         val sa = nullable(model.scheduleAfter)
         val se = nullable(model.scheduleEvery)
         val sc = nullable(model.scheduleCron)
         val sz = nullable(model.scheduleZone)
 
         Assertions.assertEquals(
-            with(model) { """{"t":"s","id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf,"sa":$sa,"se":$se,"sc":$sc,"sz":$sz}""" },
+            with(model) { """{"t":"s","id":"$id","i":${instanceMessage.toJsonString()}$status,"ra":$ra,"sa":$sa,"se":$se,"sc":$sc,"sz":$sz}""" },
             encoded,
         )
 

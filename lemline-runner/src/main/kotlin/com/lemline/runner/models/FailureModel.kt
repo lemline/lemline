@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.common.json.JsonSerializable
 import com.lemline.common.values.IDV7
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
@@ -40,7 +39,7 @@ data class FailureModel(
     @SerialName("es")
     val errorStackTrace: String
 
-) : IngestionModel, WithOptionalInstanceMessage, JsonSerializable {
+) : IngestionModel, WithOptionalInstanceMessage {
 
     companion object {
         fun from(

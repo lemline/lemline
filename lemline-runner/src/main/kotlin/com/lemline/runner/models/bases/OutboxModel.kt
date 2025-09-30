@@ -3,11 +3,10 @@
 
 package com.lemline.runner.models.bases
 
-import com.lemline.common.json.JsonSerializable
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-sealed interface OutboxModelBase : CleanerModelBase, OutboxColumnsBase, WithInstanceMessage, JsonSerializable
+sealed interface OutboxModelBase : CleanerModelBase, OutboxColumnsBase, WithInstanceMessage
 
 interface OptionalOutboxModel : OptionalCleanerModel, OutboxModelBase, OptionalOutboxColumns
 

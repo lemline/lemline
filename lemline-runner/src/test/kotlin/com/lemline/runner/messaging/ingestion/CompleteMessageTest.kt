@@ -25,7 +25,7 @@ internal class CompleteMessageTest {
         val output = nullable(original.output)
         assertEquals(
             with(original) {
-                """{"t":"c","i":${workflowInfo.toJsonString()},"p":$parentId,"o":$output,"sa":$isScheduledAfter}"""
+                """{"t":"wc","i":${workflowInfo.toJsonString()},"p":$parentId,"o":$output,"sa":$isScheduledAfter}"""
             },
             serialized,
         )

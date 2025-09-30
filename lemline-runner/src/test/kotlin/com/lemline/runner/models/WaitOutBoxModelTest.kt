@@ -17,15 +17,15 @@ class WaitOutBoxModelTest {
     @Test
     fun `WaitOutboxModel serializes and deserializes and keep the same fields`() {
         val model = WaitModel.random()
-        val encoded = model.toJsonString()
+        val encoded = LemlineJson.encodeToString<IngestionModel>(model)
 
         // default are removed from json string
-        val status = if (model.runStatus == RunStatus.PENDING) "" else ""","s":"${model.runStatus}""""
+        val status = if (model.runStatus == RunStatus.PENDING) "" else ""","rs":"${model.runStatus}""""
         // nullable properties
-        val sf = nullable(model.runAt)
+        val ra = nullable(model.runAt)
 
         Assertions.assertEquals(
-            with(model) { """{"t":"w","id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf}""" },
+            with(model) { """{"t":"w","id":"$id","i":${instanceMessage.toJsonString()}$status,"ra":$ra}""" },
             encoded,
         )
 

@@ -29,16 +29,16 @@ class RetryOutBoxModelTest {
     @Test
     fun `RetryOutboxModel serializes and deserializes and keep the same fields`() {
         val model = RetryModel.random()
-        val encoded = model.toJsonString()
+        val encoded = LemlineJson.encodeToString<IngestionModel>(model)
 
         // default are removed from json string
-        val status = if (model.runStatus == RunStatus.PENDING) "" else ""","s":"${model.runStatus}""""
+        val status = if (model.runStatus == RunStatus.PENDING) "" else ""","rs":"${model.runStatus}""""
         // nullable properties
-        val sf = nullable(model.runAt)
+        val ra = nullable(model.runAt)
         val em = nullable(model.errorMessage)
 
         Assertions.assertEquals(
-            with(model) { """{"t":"r","id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf,"er":"$errorReason","ec":"$errorClass","em":$em,"es":"$errorStackTrace"}""" },
+            with(model) { """{"t":"r","id":"$id","i":${instanceMessage.toJsonString()}$status,"ra":$ra,"er":"$errorReason","ec":"$errorClass","em":$em,"es":"$errorStackTrace"}""" },
             encoded,
         )
 

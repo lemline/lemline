@@ -22,7 +22,7 @@ internal class ForkCleaner : Scheduler() {
 
     @Inject
     private lateinit var forkRepository: ForkRepository
-    
+
     override val description: String = "Forks table cleaning"
 
     override val schedulable by lazy {

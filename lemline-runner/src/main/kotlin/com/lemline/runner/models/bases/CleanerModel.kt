@@ -3,13 +3,12 @@
 
 package com.lemline.runner.models.bases
 
-import com.lemline.common.json.JsonSerializable
 import com.lemline.runner.outbox.bases.RunStatus
 import com.lemline.runner.repositories.capabilities.IdColumn
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 
-sealed interface CleanerModelBase : CleanerColumnsBase, JsonSerializable
+sealed interface CleanerModelBase : CleanerColumnsBase
 
 interface OptionalCleanerModel : CleanerModelBase, OptionalCleanerColumns
 

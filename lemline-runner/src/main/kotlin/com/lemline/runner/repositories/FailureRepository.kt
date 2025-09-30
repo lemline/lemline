@@ -107,7 +107,7 @@ class FailureRepository : Repository<FailureModel>(),
     override val prepareStatementMap by lazy {
         idCapabilities.mapping + infoCapabilities.mapping + stateCapabilities.mapping + failureMapping
     }
-    
+
     override val keyColumns = listOf(ID_COLUMN)
 
     private val ResultSet.id get() = with(idCapabilities) { this@id.id }

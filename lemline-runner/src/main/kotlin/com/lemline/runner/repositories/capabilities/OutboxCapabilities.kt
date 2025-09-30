@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 @file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 
 package com.lemline.runner.repositories.capabilities

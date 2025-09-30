@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.nodes.NodePosition
@@ -43,8 +42,4 @@ data class ForkModel(
     @SerialName("ra")
     override var runAt: Instant?
 
-) : IngestionModel, WithWorkflowInfo, OptionalCleanerModel {
-    companion object {
-        fun fromJsonString(jsonString: String) = LemlineJson.decodeFromString<ForkModel>(jsonString)
-    }
-}
+) : IngestionModel, WithWorkflowInfo, OptionalCleanerModel

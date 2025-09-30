@@ -78,4 +78,3 @@ internal class Cleaner<T : CleanerColumnsBase>(
         // The next scheduled run will try again
     }
 }
-

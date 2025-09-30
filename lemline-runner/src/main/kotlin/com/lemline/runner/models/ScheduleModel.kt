@@ -41,7 +41,7 @@ data class ScheduleModel(
     override var instanceMessage: InstanceMessage,
 
     @SerialName("rs")
-    override var runStatus: RunStatus,
+    override var runStatus: RunStatus = RunStatus.PENDING,
 
     @SerialName("ra")
     override var runAt: Instant?,
