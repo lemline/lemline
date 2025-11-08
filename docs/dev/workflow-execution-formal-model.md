@@ -21,8 +21,16 @@ transformation.
 4. [Node Type Implementations](#node-type-implementations)
     - DoTask, ForTask, SwitchTask, TryTask, ActivityTask
 5. [Dataset Transformation Pipeline](#dataset-transformation-pipeline)
-6. [Complete Example](#complete-example)
-7. [Summary](#summary)
+6. [Expression Evaluation Scope](#expression-evaluation-scope)
+    - Scope vs Dataset
+    - Scope Structure
+    - Task Descriptor
+    - Hierarchical Scope Building
+    - Where Scope is Used
+    - ForTask Scope Examples
+    - Scope and Dataset Interaction
+7. [Complete Example](#complete-example)
+8. [Summary](#summary)
 
 ---
 
@@ -71,7 +79,11 @@ InstanceState = (currentNode, currentStates)
 Where:
 
 - `currentNode`: Node - Currently executing node
-- `currentStates`: Map<NodePosition, NodeState> - State for each node
+- `currentStates`: Map<NodePosition, MutableState> - **Mutable state only** for each node
+
+**State Optimization**: Node state separates immutable fields (computed once, never saved) from mutable fields (
+serialized for resumption). Only the minimal mutable state is stored in `currentStates`, reducing serialization
+overhead.
 
 **Invariant**: The instance state must always be **consistent** - the `currentStates` map must contain valid state for
 `currentNode` and all its ancestors.
@@ -205,14 +217,22 @@ These orchestrate the execution flow in a functional style: `(next, dataset, flo
 
 **Why this separation?**
 
-Scope-dependent operations need access to:
+Scope-dependent operations need access to a hierarchical **scope** that contains:
 
-- Task context (name, reference, definition, startedAt, input, output)
-- Parent scopes (recursively merged)
-- Variables from For loops, etc.
+- Task context (`$task.*`: name, reference, definition, startedAt, input, output)
+- Parent scopes (recursively merged up the tree)
+- Node-specific variables (e.g., `$item`, `$index` from ForTask)
+- Workflow context (`$context`, `$workflow.*`, `$runtime.*`)
 
-This scope is internal to the node instance and shouldn't be passed around as a parameter. Making these operations
-instance methods encapsulates this complexity.
+The scope is built hierarchically by:
+
+1. Starting with node-specific variables (e.g., `$item`, `$index` from ForTask)
+2. Merging current task descriptor (`$task.*`, `$input`, `$output`)
+3. Recursively merging with parent scope
+
+This creates a scope chain where inner tasks can access outer task variables and metadata. This scope is internal to the
+node instance and shouldn't be passed around as a parameter. Making these operations instance methods encapsulates this
+complexity.
 
 ### Entry Points
 
@@ -229,7 +249,7 @@ enter(node, datasetFromParent):
     // ===========================================
 
     // Check if condition - skip if false
-    // (instance method - needs scope from task + parents)
+    // (instance method - needs scope: $task.*, $input, parent scopes, node variables)
     if not node.checkIf(datasetFromParent):
         // Skip this node entirely (no state initialization)
         // Return to parent - parent.continue() will advance to next sibling
@@ -243,11 +263,11 @@ enter(node, datasetFromParent):
     node.startedAt = now()
 
     // Validate input against schema (throws ValidationError)
-    // (instance method - needs scope for error context)
+    // (instance method - needs scope for error context and expression evaluation)
     node.validateInput(datasetFromParent)
 
     // Apply input transformation (throws ExpressionError)
-    // (instance method - needs scope from task + parents)
+    // (instance method - evaluates expressions with scope: $input, $task.*, $context, etc.)
     val transformedInput = node.evaluateInput(datasetFromParent)
 
     // Initialize type-specific state (implementation-dependent)
@@ -355,15 +375,15 @@ exitToUp(node, datasetForExit):
     // ===========================================
 
     // Execute action (eg. HTTP call, throws ActionError)
-    // (instance method - might need scope for error context)
+    // (instance method - might need scope for error context and expression evaluation)
     val rawOutput = node.execute(datasetForExit)
 
     // Apply output transformation (throws ExpressionError)
-    // (instance method - needs scope from task + parents)
+    // (instance method - evaluates expressions with scope: $output, $task.*, $context, etc.)
     val transformedOutput = node.evaluateOutput(rawOutput)
 
     // Validate output schema (throws ValidationError)
-    // (instance method - needs scope for error context)
+    // (instance method - needs scope for error context and expression evaluation)
     node.validateOutput(transformedOutput)
 
     // ===========================================
@@ -536,55 +556,77 @@ from wherever the exception occurred.
 Each node type implements the execution interface with type-specific behavior. The node's `.state` structure and the
 implementation of key methods vary by type.
 
+### State Architecture
+
+To optimize serialization and avoid copying data unnecessarily, node state separates **immutable** fields (computed
+once, never saved) from **mutable** fields (must be serialized for resumption):
+
+```kotlin
+abstract class NodeState<M>(
+    open val startedAt: Instant,    // Immutable - never needs saving
+    open var mutable: M              // Mutable state - needs serialization
+) {
+    abstract fun shouldExit(): Boolean
+    abstract fun nextChildIndex(): Int
+    abstract fun continue()
+}
+```
+
+**Key Benefits**:
+
+- **Immutable fields** (e.g., `startedAt`, `collection`, `doSize`) are computed once and never saved
+- **Mutable fields** (e.g., current index, attempt count) are isolated in a data class for efficient serialization
+- Only the minimal state needed for resumption is persisted
+
 ### Interface Methods
 
-All node types have their own state type, that must implement:
+All node state types must implement:
 
-```
-.startedAt: Instant?
+```kotlin
+.startedAt: Instant              // When node started (immutable)
+.mutable: M                      // Type-specific mutable state
 
-// Update internal state based on child result and flow directive
-continue(datasetFromChild, flowDirective)
-
-// Check if node has completed its work
-shouldExit() : Boolean
-
-// Get the next child to process
-nextChild() : Node
-
-// Initialize type-specific state
-init(transformedInput)
+shouldExit(): Boolean            // Check if node has completed its work
+nextChildIndex(): Int            // Get index of next child to process
+continue()                       // Update mutable state (advance indices, etc.)
 ```
 
 ### DoTask (Sequential Execution)
 
 Executes children sequentially in order.
 
-**State Type**:
+**State Types**:
 
 ```kotlin
-class DoTaskState {
-    .startedAt: Instant
-    .childIndex: Int  // Current child position
+// Mutable state - serialized for resumption
+data class DoMutableState(
+    val childIndex: Int  // Current child position
+)
 
-    // Initialize state
-    init(transformedInput):
-    childIndex = -1
-
-    // Update state based on child result and flow directive
-    continue(dataset, flowDirective):
-    if flowDirective is $name:
-    childIndex = indexOfChild($name)  // Jump to named child
-    else:
-    childIndex++  // Next child
+// Complete state - combines immutable and mutable
+class DoTaskState(
+    val doSize: Int,                                    // Immutable - number of children
+    override val startedAt: Instant,                    // Immutable - when task started
+    override var mutable: DoMutableState = DoMutableState(-1)  // Mutable - what gets saved
+) : NodeState<DoMutableState>(startedAt, mutable) {
 
     // Check if all children have been processed
-    shouldExit():
-    return childIndex >= children.length
+    override fun shouldExit(): Boolean = mutable.childIndex >= doSize
 
-    // Get next child to process
-    nextChild():
-    return children[childIndex]
+    // Get index of next child to process
+    override fun nextChildIndex(): Int = mutable.childIndex
+
+    // Update state - advance or jump to named child
+    override fun continue() {
+        // Implementation handles flowDirective to either increment or jump
+        mutable = mutable.copy(childIndex = mutable.childIndex + 1)
+    }
+
+    // Jump to named child
+    fun gotoChild(name: String) {
+        val targetIndex = findChildIndexByName(name)
+        mutable = mutable.copy(childIndex = targetIndex)
+    }
 }
 ```
 
@@ -592,34 +634,42 @@ class DoTaskState {
 
 Executes child repeatedly for each item in a collection.
 
-**State Type**:
+**State Types**:
 
 ```kotlin
-class ForTaskState {
-    .startedAt: Instant
-    .forIndex: Int        // Current iteration index
-    .collection: List     // Items to iterate (computed once)
+// Mutable state - serialized for resumption
+data class ForMutableState(
+    val forIndex: Int  // Current iteration index
+)
 
-    // Initialize state - evaluate collection once
-    init(transformedInput):
-    collection = node.evaluate(transformedInput, node.definition.for.in )
-    forIndex = -1
-
-    // Update state - advance to next iteration
-    continue(dataset, flowDirective):
-    forIndex++
+// Complete state - combines immutable and mutable
+class ForTaskState(
+    val collection: List<JsonElement>,                  // Immutable - computed once, never saved
+    override val startedAt: Instant,                    // Immutable - when task started
+    override var mutable: ForMutableState = ForMutableState(-1)  // Mutable - what gets saved
+) : NodeState<ForMutableState>(startedAt, mutable) {
 
     // Check if iteration is complete
-    shouldExit():
-    if forIndex >= collection.length:
-    return true
-    if node.definition.while is not null:
-    return not node.evaluate(node.definition.while, currentContext)
-    return false
+    override fun shouldExit(): Boolean {
+        if (mutable.forIndex >= collection.size) return true
+        // Check while condition if present
+        if (whileCondition != null) {
+            return !evaluateWhile()  // Stop if condition becomes false
+        }
+        return false
+    }
 
-    // Get next child - same child, different iteration
-    nextChild():
-    return node.doBody
+    // Get index of next child (always 0 - same child, different iteration)
+    override fun nextChildIndex(): Int = 0  // Always the doBody child
+
+    // Update state - advance to next iteration
+    override fun continue() {
+        mutable = mutable.copy(forIndex = mutable.forIndex + 1)
+    }
+
+    // Get current iteration variables for scope
+    fun getCurrentItem(): JsonElement = collection[mutable.forIndex]
+    fun getCurrentIndex(): Int = mutable.forIndex
 }
 ```
 
@@ -634,109 +684,162 @@ class ForTaskState {
 - **Output Semantics**: ForTask returns the **last child's output from the last iteration**. This is standard flow task
   behavior.
 
+**Scope Management**:
+
+ForTask adds iteration variables to the scope at the start of each iteration:
+
+```
+// Computed when entering child (at start of iteration)
+scope[$item] = collection[forIndex]    // Default name: "item" (or custom from for.each)
+scope[$index] = forIndex               // Default name: "index" (or custom from for.at)
+```
+
+Children can then access these via expressions:
+
+- `.item.id` - Access current item's id field
+- `.index` - Access current iteration index (0-based)
+- `$task.input` - Access task's raw input (via scope, not dataset)
+
+The scope is hierarchical, so children also have access to:
+
+- Parent ForTask's iteration variables (if nested)
+- All ancestor task descriptors (`$task.*`)
+- Workflow context (`$context`, `$workflow.*`)
+
 ### SwitchTask (Conditional Branching)
 
 Evaluates cases and executes one branch.
 
-**State Type**:
+**State Types**:
 
 ```kotlin
-class SwitchTaskState {
-    .startedAt: Instant
-    .selectedCase: Int  // Which case was selected
+// Mutable state - serialized for resumption
+data class SwitchMutableState(
+    val selectedCase: Int,      // Which case was selected
+    val hasExecuted: Boolean    // Whether the case has been executed
+)
 
-    // Initialize state - evaluate cases to find match
-    init(transformedInput):
-    for (index, case) in node.definition.switch:
-    if case.when is null or node.evaluate(transformedInput, case.when):
-    selectedCase = index
-    return
-    throw Error("No switch case matched")
+// Complete state - combines immutable and mutable
+class SwitchTaskState(
+    override val startedAt: Instant,                    // Immutable - when task started
+    override var mutable: SwitchMutableState            // Mutable - what gets saved
+) : NodeState<SwitchMutableState>(startedAt, mutable) {
 
-    // Update state - switch executes only once
-    continue(dataset, flowDirective):
-    // No update needed
+    // Initialize - evaluate cases to find match (called once at enter)
+    companion object {
+        fun selectCase(transformedInput: JsonElement, cases: List<Case>): Int {
+            for ((index, case) in cases.withIndex()) {
+                if (case.`when` == null || evaluate(transformedInput, case.`when`)) {
+                    return index
+                }
+            }
+            throw Error("No switch case matched")
+        }
+    }
 
-    // Check if done - always true (executes once)
-    shouldExit():
-    return true
+    // Check if done - true after executing the selected case
+    override fun shouldExit(): Boolean = mutable.hasExecuted
 
-    // Get next child - should not be called
-    nextChild():
-    throw Error("Switch task should exit after case selection")
+    // Get index of next child - returns the selected case index
+    override fun nextChildIndex(): Int = mutable.selectedCase
+
+    // Update state - mark as executed after case completes
+    override fun continue() {
+        mutable = mutable.copy(hasExecuted = true)
+    }
 }
 ```
 
-**Note**: Uses `case.then` flowDirective to navigate to target sibling.
+**Note**: Uses `case.then` flowDirective to navigate to target sibling after the case completes.
 
 ### TryTask (Error Handling)
 
 Attempts execution with catch blocks for errors.
 
-**State Type**:
+**State Types**:
 
 ```kotlin
-class TryTaskState {
-    .startedAt: Instant
-    .attemptIndex: Int            // Current retry attempt
-    .inCatch: Boolean             // Whether in catch block
-    .catchIndex: Int              // Which catch block is active
-    .lastError: Error?            // Last caught error
-    .maxAttempts: Int             // Retry limit
-    .transformedInput: JsonElement?  // Original input for retries/catch (cleared after entering catch)
+// Mutable state - serialized for resumption
+data class TryMutableState(
+    val attemptIndex: Int,      // Current retry attempt (0-based)
+    val inCatch: Boolean,       // Whether in catch block
+    val catchIndex: Int,        // Which catch block is active (-1 if not in catch)
+    val lastError: WorkflowError?  // Last caught error (for context)
+)
 
-    // Initialize state - prepare for try block execution
-    init(transformedInput):
-    this.transformedInput = transformedInput  // Store for retries and catch
-    maxAttempts = node.definition.retry?.limit ?? 1
-    attemptIndex = 0
-    inCatch = false
-    catchIndex = -1
-
-    // Update state after child completion
-    continue(dataset, flowDirective):
-    if inCatch:
-    // Catch block completed successfully - mark as done
-    // No further update needed
-    else:
-    // Try block completed successfully - mark as done
-    attemptIndex = maxAttempts  // Skip retries
+// Complete state - combines immutable and mutable
+class TryTaskState(
+    val maxAttempts: Int,                               // Immutable - retry limit from definition
+    val transformedInput: JsonElement?,                 // Immutable - cached for retries (not serialized)
+    override val startedAt: Instant,                    // Immutable - when task started
+    override var mutable: TryMutableState = TryMutableState(
+        attemptIndex = 0,
+        inCatch = false,
+        catchIndex = -1,
+        lastError = null
+    )
+) : NodeState<TryMutableState>(startedAt, mutable) {
 
     // Check if done
-    shouldExit():
-    if inCatch:
-    return true  // Catch block completed
-    if attemptIndex >= maxAttempts:
-    return true  // Try succeeded or all retries exhausted
-    return false
+    override fun shouldExit(): Boolean {
+        if (mutable.inCatch) return true  // Catch block completed
+        if (mutable.attemptIndex >= maxAttempts) return true  // Try succeeded or retries exhausted
+        return false
+    }
 
-    // Get next child based on state
-    nextChild():
-    if inCatch:
-    return node.catchBlocks[catchIndex]
-    else:
-    return node.doBody
+    // Get index of next child based on state
+    override fun nextChildIndex(): Int {
+        return if (mutable.inCatch) mutable.catchIndex else 0  // 0 = doBody
+    }
+
+    // Update state after child completion
+    override fun continue() {
+        if (mutable.inCatch) {
+            // Catch block completed - mark as done (no state change needed)
+        } else {
+            // Try block completed successfully - skip retries
+            mutable = mutable.copy(attemptIndex = maxAttempts)
+        }
+    }
 
     // Check if should retry (called by handleException before entering catch)
-    shouldRetry():
-    return attemptIndex < maxAttempts
+    fun shouldRetry(): Boolean = mutable.attemptIndex < maxAttempts
+
+    // Increment retry attempt (called by retryTryBlock)
+    fun incrementAttempt() {
+        mutable = mutable.copy(attemptIndex = mutable.attemptIndex + 1)
+    }
 
     // Transition to catch block (called by enterCatch)
-    enterCatch(exception):
-    inCatch = true
-    lastError = exception
-    catchIndex = findMatchingCatch(exception)
-    transformedInput = null  // Clear after transitioning (no longer needed)
+    fun enterCatch(exception: WorkflowError, catchIndex: Int) {
+        mutable = TryMutableState(
+            attemptIndex = mutable.attemptIndex,
+            inCatch = true,
+            catchIndex = catchIndex,
+            lastError = exception
+        )
+    }
 
     // Find which catch block matches this exception
-    findMatchingCatch(exception):
-    for (index, catchDef) in node.definition.catch:
-    if catchDef.errors is null or catchDef.errors.contains(exception.type):
-    return index
-    // Should never happen - canCatch() ensures a match exists
-    throw Error("No matching catch block")
+    fun findMatchingCatch(exception: WorkflowError, catchBlocks: List<CatchDef>): Int {
+        for ((index, catchDef) in catchBlocks.withIndex()) {
+            if (catchDef.errors == null || catchDef.errors.contains(exception.type)) {
+                return index
+            }
+        }
+        throw Error("No matching catch block")  // Should never happen - canCatch() ensures match
+    }
 }
 ```
+
+**Serialized State**: Only `TryMutableState(attemptIndex = 2, inCatch = false, catchIndex = -1, lastError = null)` is
+saved.
+
+**Important Notes**:
+
+- `maxAttempts` is computed once from definition and never saved
+- `transformedInput` is cached in-memory for retries but NOT serialized (recomputed on resume)
+- Only the minimal retry state is persisted
 
 **TryTask Methods**:
 
@@ -781,29 +884,34 @@ return false  // No matching catch block
 
 Tasks with actions but no children (Set, CallHTTP, Emit, etc.).
 
-**State Type**:
+**State Types**:
 
 ```kotlin
-class ActivityTaskState {
-    .startedAt: Instant
+// Mutable state - serialized for resumption
+data class ActivityMutableState(
+    val hasExecuted: Boolean = false  // Whether action has been executed
+)
 
-    // Initialize state - no additional setup needed
-    init(transformedInput):
-    // No additional state needed
+// Complete state - combines immutable and mutable
+class ActivityTaskState(
+    override val startedAt: Instant,                    // Immutable - when task started
+    override var mutable: ActivityMutableState = ActivityMutableState()  // Mutable - what gets saved
+) : NodeState<ActivityMutableState>(startedAt, mutable) {
 
-    // Update state - no children to process
-    continue(dataset, flowDirective):
-    // No update needed
+    // Check if done - true after execution
+    override fun shouldExit(): Boolean = mutable.hasExecuted
 
-    // Check if done - always true
-    shouldExit():
-    return true
+    // Get index of next child - no children
+    override fun nextChildIndex(): Int = -1  // Indicates no children
 
-    // Get next child - no children
-    nextChild():
-    return null
+    // Update state - mark as executed
+    override fun continue() {
+        mutable = mutable.copy(hasExecuted = true)
+    }
 }
 ```
+
+**Note**: Activity tasks execute their action (Set, CallHTTP, etc.) once and immediately exit to parent.
 
 ---
 
@@ -887,222 +995,350 @@ flowchart LR
 
 ---
 
-## Complete Example
+## Expression Evaluation Scope
 
-### Workflow Definition
+Throughout workflow execution, expressions need access to contextual data beyond just the dataset that flows through the
+tree. This contextual data is provided through a **scope** - a hierarchical structure that contains task metadata,
+workflow state, and node-specific variables.
+
+### Scope vs Dataset
+
+**Dataset** and **Scope** serve different purposes:
+
+| Aspect       | Dataset                                  | Scope                                     |
+|--------------|------------------------------------------|-------------------------------------------|
+| **Purpose**  | Data being transformed by workflow       | Context for expression evaluation         |
+| **Flow**     | Flows through tree as function parameter | Computed per node from hierarchical chain |
+| **Storage**  | Not stored (functional parameter)        | Not stored (computed from state)          |
+| **Access**   | Via `.fieldName` expressions             | Via `$variable` expressions               |
+| **Mutation** | Transformed by tasks                     | Read-only during expression evaluation    |
+
+**Example**:
 
 ```yaml
-document:
-    dsl: '1.0.0'
-    namespace: example
-    name: order-processing
-    version: 1.0.0
 do:
-    -   validateOrder:
-            if: .order.requiresValidation == true
+    -   processItem:
             set:
-                validated: true
+                # Dataset access: .order.id
+                # Reads from the dataset flowing into this task
+                orderId: .order.id
 
-    -   processItems:
-            for:
-                each: item
-                at: index
-                in: .order.items
-            do:
-                -   processItem:
-                        set:
-                            itemId: .item.id
-                            price: .item.price
+                # Scope access: $task.name
+                # Reads from the task descriptor in the scope
+                taskName: $task.name
 
-    -   routeOrder:
-            switch:
-                -   urgent:
-                        when: .order.priority == "urgent"
-                        then: processUrgent
-                -   normal:
-                        then: processNormal
-
-    -   processUrgent:
-            set:
-                status: "urgent_processed"
-
-    -   processNormal:
-            set:
-                status: "normal_processed"
+                # Mixed: evaluates against dataset, but scope provides $context
+                total: .price + $context.taxRate
 ```
 
-### Execution Trace
+### Scope Structure
 
-**Input**:
+The scope contains the following top-level variables:
 
-```json
-{
-    "order": {
-        "requiresValidation": false,
-        "priority": "urgent",
-        "items": [
-            {
-                "id": 1,
-                "price": 10
-            },
-            {
-                "id": 2,
-                "price": 20
-            }
-        ]
-    }
+```
+Scope = {
+  $context: JsonObject           // Workflow-level exported values (from export.as)
+  $input: JsonElement            // Current task's raw input
+  $output: JsonElement?          // Current task's raw output (nullable, only available after execution)
+  $secrets: Map<String, *>       // Secret values (e.g., API keys)
+  $task: TaskDescriptor          // Current task metadata
+  $workflow: WorkflowDescriptor  // Workflow metadata and state
+  $runtime: RuntimeDescriptor    // Runtime information (timestamps, etc.)
+  $authorization: AuthorizationDescriptor  // Authentication/authorization context
+
+  // Plus node-specific variables:
+  $item: JsonElement?            // Current item in ForTask iteration
+  $index: Int?                   // Current index in ForTask iteration
+  // ... other node-specific variables
 }
 ```
 
-**Trace**: WARNING - THIS IS WRING AND WILL BE UPDATED LATER
+### Task Descriptor ($task.*)
 
-| Step | Current Node   | Direction | Dataset             | FlowDirective   | State Change               | Reason                                        |
-|------|----------------|-----------|---------------------|-----------------|----------------------------|-----------------------------------------------|
-| 1    | Root           | DOWN      | {order:{...}}       | -               | Init Root state            | Start                                         |
-| 2    | DoTask         | DOWN      | {order:{...}}       | -               | Init DoTask, childIndex=-1 | Enter DoTask                                  |
-| 3    | validateOrder  | SKIP      | {order:{...}}       | -               | DoTask.childIndex=1        | if: .requiresValidation == false              |
-| 4    | processItems   | DOWN      | {order:{...}}       | -               | Init ForTask, forIndex=-1  | Enter ForTask                                 |
-| 5    | processItems   | ITERATE   | {order:{...}}       | -               | forIndex=0                 | First iteration, scope: item={id:1,price:10}  |
-| 6    | ForBody DoTask | DOWN      | {order:{...}}       | -               | Init ForBody DoTask        | Enter loop body                               |
-| 7    | processItem    | UP        | {itemId:1,price:10} | null (continue) | Execute set, clear state   | Eval .item.id/.item.price from scope          |
-| 8    | ForBody DoTask | UP        | {itemId:1,price:10} | null (continue) | Clear ForBody state        | FlowDirective: continue                       |
-| 9    | processItems   | ITERATE   | {itemId:1,price:10} | -               | forIndex=1                 | Second iteration, scope: item={id:2,price:20} |
-| 10   | ForBody DoTask | DOWN      | {itemId:1,price:10} | -               | Init ForBody DoTask        | Enter loop body                               |
-| 11   | processItem    | UP        | {itemId:2,price:20} | null (continue) | Execute set, clear state   | Eval .item.id/.item.price from scope          |
-| 12   | ForBody DoTask | UP        | {itemId:2,price:20} | null (continue) | Clear ForBody state        | FlowDirective: continue                       |
-| 13   | processItems   | UP        | {itemId:2,price:20} | null (continue) | Clear ForTask state        | forIndex=2 >= items.length                    |
-| 14   | DoTask         | UP        | {itemId:2,price:20} | null (continue) | Clear DoTask state         | FlowDirective: continue (no more children)    |
-| 15   | Root           | UP        | {itemId:2,price:20} | null (continue) | Clear Root state           | Workflow COMPLETED                            |
+The task descriptor provides metadata about the currently executing task:
 
-**Final Output**: `{itemId:2, price:20}`
-
-**Note**: This example workflow is simplified to demonstrate ForTask mechanics. In practice, the `routeOrder` and
-`processUrgent` tasks would fail because the dataset `{itemId:2,price:20}` doesn't contain `.order.priority`. A real
-workflow would need to preserve the order data through the loop.
-
-**Key Observations**:
-
-1. **ForTask Output Semantics (Step 13)**:
-    - `processItems` ForTask returns `{itemId:2,price:20}` (the last iteration's output)
-    - This is standard flow task behavior - ForTask doesn't preserve the original input
-    - Each iteration receives the previous iteration's output as input
-
-2. **ForTask Iteration Variables (Steps 5, 9)**:
-    - `item` and `index` are **scope variables**, not dataset fields
-    - Step 5: Dataset is `{order:{...}}`, scope includes `item={id:1,price:10}` and `index=0`
-    - Step 9: Dataset is `{itemId:1,price:10}`, scope includes `item={id:2,price:20}` and `index=1`
-    - Children access these via expressions (e.g., `.item.id` evaluates to `1` then `2`)
-
-3. **Dataset Flow Across Iterations**:
-    - Iteration 1: Receives `{order:{...}}` (ForTask's input) → outputs `{itemId:1,price:10}`
-    - Iteration 2: Receives `{itemId:1,price:10}` (previous output) → outputs `{itemId:2,price:20}`
-    - This allows iterations to accumulate state or transform data progressively
-
-4. **Direction Semantics**:
-    - **DOWN**: Entering a child or sibling (current → child/sibling)
-    - **UP**: Returning to parent (current → parent)
-    - **SKIP**: Conditional skip, jumping to next sibling
-    - **ITERATE**: ForTask advancing to next iteration
-
----
-
-## Try/Catch Example
-
-### Workflow Definition with Error Handling
-
-```yaml
-document:
-    dsl: '1.0.0'
-    namespace: example
-    name: payment-processing
-    version: 1.0.0
-do:
-    -   processPayment:
-            try:
-                do:
-                    -   validateCard:
-                            call: http
-                            with:
-                                method: post
-                                uri: https://api.payment.com/validate
-                    -   chargeCard:
-                            call: http
-                            with:
-                                method: post
-                                uri: https://api.payment.com/charge
-            catch:
-                errors:
-                    - validation
-                as:
-                    validationError:
-                        do:
-                            -   logError:
-                                    set:
-                                        status: "validation_failed"
-                                        message: .error.title
-                errors:
-                    - runtime
-                as:
-                    runtimeError:
-                        do:
-                            -   retryLater:
-                                    set:
-                                        status: "retry_scheduled"
-                                        message: .error.title
+```
+TaskDescriptor = {
+  name: String              // Task name (e.g., "validateOrder")
+  reference: String         // Unique task reference ID
+  definition: JsonObject    // Full task definition from workflow DSL
+  input: JsonElement?       // Task's raw input (before input.from transformation)
+  output: JsonElement?      // Task's raw output (before output.as transformation, nullable)
+  startedAt: JsonObject?    // Timestamp when task started (ISO-8601 format)
+}
 ```
 
-### Execution Trace (Validation Error Scenario)
+**Usage Examples**:
 
-**Input**: `{cardNumber: "invalid", amount: 100}`
+- `$task.name` - Get current task name
+- `$task.input.orderId` - Access raw input before transformation
+- `$task.startedAt` - Get task start timestamp
+- `$task.definition.then` - Access task's flow directive
 
-**Trace**: WARNING - THIS IS WRING AND WILL BE UPDATED LATER
+### Hierarchical Scope Building
 
-| Step | Current Node    | Direction | Dataset                                             | FlowDirective   | State Change                     | Reason                                 |
-|------|-----------------|-----------|-----------------------------------------------------|-----------------|----------------------------------|----------------------------------------|
-| 1    | Root            | DOWN      | {cardNumber:"invalid",amount:100}                   | -               | Init Root                        | Start                                  |
-| 2    | DoTask          | DOWN      | {cardNumber:"invalid",amount:100}                   | -               | Init DoTask                      | Enter DoTask                           |
-| 3    | processPayment  | DOWN      | {cardNumber:"invalid",amount:100}                   | -               | Init TryTask, attemptIndex=0     | Enter TryTask                          |
-| 4    | TryBody DoTask  | DOWN      | {cardNumber:"invalid",amount:100}                   | -               | Init try body DoTask             | Enter try body                         |
-| 5    | validateCard    | DOWN      | {cardNumber:"invalid",amount:100}                   | -               | Init validateCard                | Call HTTP validation                   |
-| 5a   | validateCard    | EXCEPTION | {cardNumber:"invalid",amount:100}                   | -               | State rolled back                | HTTP returns 400 validation error      |
-| 6    | processPayment  | CATCH     | {cardNumber:"invalid",amount:100,error:{...}}       | -               | enterCatch(), inCatch=true       | findCatchingTry() found processPayment |
-| 7    | validationError | DOWN      | {cardNumber:"invalid",amount:100,error:{...}}       | -               | Init catch DoTask                | Enter validation error catch block     |
-| 8    | logError        | UP        | {status:"validation_failed",message:"Invalid card"} | null (continue) | Execute set, clear state         | Log the validation error               |
-| 9    | validationError | UP        | {status:"validation_failed",message:"Invalid card"} | null (continue) | Clear catch DoTask               | Catch block completed                  |
-| 10   | processPayment  | UP        | {status:"validation_failed",message:"Invalid card"} | null (continue) | Clear TryTask, shouldExit()=true | Try/catch completed                    |
-| 11   | DoTask          | UP        | {status:"validation_failed",message:"Invalid card"} | null (continue) | Clear DoTask                     | No more children                       |
-| 12   | Root            | UP        | {status:"validation_failed",message:"Invalid card"} | null (continue) | Clear Root                       | Workflow COMPLETED                     |
+The scope is built hierarchically, merging node-specific variables with task context and parent scopes:
 
-**Final Output**: `{status: "validation_failed", message: "Invalid card"}`
+```
+buildScope(node):
+  // Start with node-specific variables
+  scope = node.variables  // e.g., {$item: ..., $index: ...} for ForTask
 
-### Key Observations
+  // Merge current task context
+  scope = scope.merge({
+    $context: workflow.context,
+    $input: node.rawInput,
+    $output: node.rawOutput,
+    $task: {
+      name: node.name,
+      reference: node.reference,
+      definition: node.definition,
+      input: node.rawInput,
+      output: node.rawOutput,
+      startedAt: node.startedAt
+    },
+    $workflow: ...,
+    $runtime: ...,
+    $secrets: ...,
+    $authorization: ...
+  })
 
-1. **Exception Flow (Step 5a → 6)**:
-    - Exception thrown in `validateCard` during HTTP call
-    - Main loop catches exception and restores `validateCard` state
-    - `handleException()` walks up parent chain: validateCard → TryBody DoTask → processPayment (TryTask)
-    - `processPayment.canCatch()` returns true (has catch block for "validation" errors)
-    - `enterCatch()` transitions TryTask state to catch mode and returns `(validationError, datasetWithError, Continue)`
+  // Recursively merge with parent scope
+  if node.parent is not null:
+    scope = scope.merge(node.parent.scope)
 
-2. **Dataset with Error Context (Step 6)**:
-    - Original dataset: `{cardNumber:"invalid",amount:100}`
-    - Merged with error:
-      `{cardNumber:"invalid",amount:100,error:{type:"validation",status:400,title:"Invalid card",...}}`
-    - Catch block can access both original input and error details
+  return scope
+```
 
-3. **State Rollback (Step 5a)**:
-    - Before exception: `validateCard` state was being initialized
-    - After rollback: `validateCard` state restored to pre-execution snapshot
-    - This ensures clean state if workflow is persisted/resumed
+**Merge Semantics**: When merging scopes, child values take precedence over parent values. This means:
 
-4. **Try/Catch Completion (Step 10)**:
-    - After catch block completes, `processPayment.shouldExit()` returns true
-    - TryTask returns to parent with catch block's output
-    - Workflow continues normally (no re-throw)
+- Inner tasks can override outer task variables (if they define the same variable name)
+- Each task's `$task.*` refers to its own metadata, not its parent's
+- Node-specific variables (like `$item`) are scoped to their defining node and descendants
 
-5. **Alternative Path (Runtime Error)**:
-    - If `chargeCard` threw a runtime error instead, `findMatchingCatch()` would select the second catch block
-    - Each catch block is independent and handles specific error types
+### Where Scope is Used
+
+Scope is used throughout expression evaluation:
+
+1. **Conditional Check** (`if` expression):
+   ```yaml
+   validateOrder:
+     if: .order.total > 100 and $context.validateLargeOrders == true
+   ```
+
+2. **Input Transformation** (`input.from` expression):
+   ```yaml
+   processOrder:
+     input:
+       from:
+         orderId: .id
+         taskName: $task.name
+         processedAt: $runtime.now
+   ```
+
+3. **Output Transformation** (`output.as` expression):
+   ```yaml
+   callAPI:
+     output:
+       as:
+         result: .response.data
+         apiCallDuration: $task.startedAt | elapsed
+   ```
+
+4. **Export to Context** (`export.as` expression):
+   ```yaml
+   calculateTax:
+     export:
+       as:
+         taxRate: .computed.rate
+         calculatedBy: $task.name
+   ```
+
+5. **Action Execution** (e.g., HTTP call with expressions in headers):
+   ```yaml
+   callService:
+     call: http
+     with:
+       headers:
+         X-Task-Name: $task.name
+         X-Correlation-Id: $workflow.id
+   ```
+
+6. **ForTask Collection** (`for.in` expression):
+   ```yaml
+   processItems:
+     for:
+       each: item
+       in: .order.items  # Evaluated with scope
+   ```
+
+7. **SwitchTask Conditions** (`switch.when` expressions):
+   ```yaml
+   routeOrder:
+     switch:
+       - urgent:
+           when: .priority == "urgent" and $context.urgentProcessingEnabled
+       - normal:
+           when: true
+   ```
+
+### ForTask Scope Example
+
+ForTask adds iteration-specific variables to the scope:
+
+```yaml
+do:
+    -   processOrders:
+            for:
+                each: order      # Variable name (default: "item")
+                at: orderIndex   # Variable name (default: "index")
+                in: .orders      # Evaluated once with parent scope
+            do:
+                -   processOrder:
+                        set:
+                            # Access iteration variables from scope
+                            id: $order.id
+                            position: $orderIndex
+
+                            # Access parent task metadata
+                            parentTask: $task.name  # Will be "processOrder" (current task)
+
+                            # Access dataset
+                            customerId: .customerId  # From dataset flowing into processOrder
+```
+
+**Scope during iteration 0**:
+
+```
+{
+  $order: {id: 123, ...},        // From for.each
+  $orderIndex: 0,                 // From for.at
+  $task: {name: "processOrder", ...},  // Current task
+  $input: {...},                  // processOrder's input
+  $context: {...},                // Workflow context
+  // ... parent scope variables
+}
+```
+
+### Nested ForTask Scope
+
+When ForTasks are nested, the scope chain contains all ancestor iteration variables:
+
+```yaml
+do:
+    -   processOrders:
+            for:
+                each: order
+                in: .orders
+            do:
+                -   processItems:
+                        for:
+                            each: item
+                            in: $order.items  # Access outer loop variable
+                        do:
+                            -   processItem:
+                                    set:
+                                        # Access both loop variables
+                                        orderId: $order.id
+                                        itemId: $item.id
+
+                                        # Access current task metadata
+                                        taskName: $task.name  # "processItem"
+```
+
+**Scope for inner task**:
+
+```
+{
+  $item: {id: 456, ...},           // Inner loop variable
+  $order: {id: 123, ...},          // Outer loop variable (from parent scope)
+  $task: {name: "processItem", ...},
+  $input: {...},
+  $context: {...},
+  // ... more parent scope variables
+}
+```
+
+### Scope and Dataset Interaction
+
+Expressions can reference both dataset and scope:
+
+```yaml
+calculateTotal:
+    input:
+        from:
+            # Dataset access
+            basePrice: .price
+            quantity: .quantity
+
+            # Scope access
+            taxRate: $context.taxRate
+
+            # Mixed - expression evaluated against dataset, but with scope available
+            total: (.price * .quantity) * (1 + $context.taxRate)
+
+            # Task metadata
+            calculatedBy: $task.name
+            calculatedAt: $task.startedAt
+```
+
+**Dataset flowing in**:
+
+```json
+{
+    "price": 100,
+    "quantity": 2
+}
+```
+
+**Scope during evaluation**:
+
+```json
+{
+    "$context": {
+        "taxRate": 0.1
+    },
+    "$task": {
+        "name": "calculateTotal",
+        "startedAt": "2024-01-15T10:30:00Z"
+    },
+    "$input": {
+        "price": 100,
+        "quantity": 2
+    },
+    ...
+}
+```
+
+**Transformed input (result)**:
+
+```json
+{
+    "basePrice": 100,
+    "quantity": 2,
+    "taxRate": 0.1,
+    "total": 220,
+    "calculatedBy": "calculateTotal",
+    "calculatedAt": "2024-01-15T10:30:00Z"
+}
+```
+
+### Key Differences: Dataset vs Scope
+
+1. **Dataset** is what flows through the tree:
+    - Enter from parent: receives parent's output
+    - Exit to parent: returns transformed output
+    - Modified by `input.from`, `output.as` transformations
+    - Represents the "data being processed"
+
+2. **Scope** is contextual information for expressions:
+    - Built hierarchically from node state + parent scopes
+    - Provides task metadata, iteration variables, workflow state
+    - Read-only during expression evaluation
+    - Represents "where and how we're executing"
+
+**Analogy**: Think of the dataset as the "arguments" to a function, and scope as the "closure variables" and "metadata"
+available during execution.
 
 ---
 
@@ -1127,18 +1363,22 @@ do:
     - Workflow is a tree with horizontal siblings and vertical parent-child relationships
     - Navigation is functional: each function returns `(next, dataset, flowDirective)`
 
-3. **Minimal State**
-    - Only execution progress is stored (`.startedAt`, `.state`)
+3. **Minimal State with Immutable/Mutable Separation**
+    - State separates **immutable** fields (never saved) from **mutable** fields (serialized)
+    - Immutable: `startedAt`, `collection`, `doSize`, `maxAttempts` (computed once, cached in-memory)
+    - Mutable: `childIndex`, `forIndex`, `attemptIndex`, `inCatch`, etc. (minimal state for resumption)
     - Dataset flows as parameters (not stored)
     - Intermediate values are local variables (`val transformedInput`, `val rawOutput`)
 
 4. **Node Type State Classes**
-    - Each node type defines its own state class
+    - Base class: `NodeState<M>(startedAt: Instant, mutable: M)`
+    - Each node type defines:
+        - A mutable data class (e.g., `DoMutableState(childIndex: Int)`)
+        - A complete state class extending `NodeState<M>`
     - All state classes implement:
-        - `init(transformedInput)`: Initialize node-specific state
-        - `continue(dataset, flowDirective)`: Update state on re-entry
-        - `shouldExit()`: Check if node has completed
-        - `nextChild()`: Get next child to process
+        - `shouldExit(): Boolean` - Check if node has completed
+        - `nextChildIndex(): Int` - Get index of next child to process
+        - `continue()` - Update mutable state (creates new copy)
 
 5. **FlowDirective Navigation**
     - `continue`: Proceed to next sibling
@@ -1152,12 +1392,20 @@ do:
       `node.validateOutput()` → `val transformedOutput`
     - All transformation operations are instance methods (need scope)
 
-7. **Conditional Navigation**
+7. **Expression Evaluation Scope** (computed, not stored)
+    - Hierarchical context for expression evaluation
+    - Contains: `$task.*`, `$input`, `$output`, `$context`, `$workflow.*`, `$runtime.*`, node variables (`$item`,
+      `$index`)
+    - Built by merging: node variables → task descriptor → parent scope (recursively)
+    - Separate from dataset: dataset flows through tree, scope provides contextual metadata
+    - Used by: `if` conditions, `input.from`, `output.as`, `export.as`, action parameters
+
+8. **Conditional Navigation**
     - `if`: Skip node if condition false
     - `switch`: Select branch based on data
     - `for`: Iterate over collection
 
-8. **Exception Handling**
+9. **Exception Handling**
     - **State Rollback**: Node state cloned before execution and restored on exception
     - **Try/Catch**: TryTask walks up parent chain to find matching catch block
     - **Error Context**: Catch blocks receive original dataset merged with error information
@@ -1168,11 +1416,13 @@ do:
 This functional model provides:
 
 - ✅ **Minimal state** - Only execution progress stored
+- ✅ **Optimized serialization** - Immutable/mutable separation avoids copying unchanging data (startedAt, collection,
+  doSize)
 - ✅ **State atomicity** - State is either fully updated or fully rolled back on exception
 - ✅ **Safe resumption** - Checkpoint after each successful step ensures consistent state for persistence
 - ✅ **Clear semantics** - Pure function composition with explicit state mutations
 - ✅ **Easy testing** - Functions are testable in isolation
-- ✅ **Serializability** - State is minimal and explicit
+- ✅ **Serializability** - State is minimal and explicit (only mutable fields serialized)
 - ✅ **Horizontal scaling** - Any worker can resume from checkpointed state
 - ✅ **Deterministic replay** - Same state + dataset → same result
 - ✅ **Error recovery** - Try/catch blocks handle exceptions with type matching and state rollback
