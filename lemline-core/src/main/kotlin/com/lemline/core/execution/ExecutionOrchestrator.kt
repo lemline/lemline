@@ -3,6 +3,7 @@
 
 package com.lemline.core.execution
 
+import com.lemline.common.logger.logger
 import com.lemline.core.execution.models.StepResult
 import com.lemline.core.execution.nodes.NodeInstance
 import io.serverlessworkflow.api.types.FlowDirective
@@ -63,6 +64,8 @@ import kotlinx.serialization.json.JsonElement
  */
 object ExecutionOrchestrator {
 
+    private val logger = logger()
+
     /**
      * Execute workflow from input to completion.
      *
@@ -82,13 +85,17 @@ object ExecutionOrchestrator {
         var dataset = input
         var flowDirective: FlowDirective? = null
 
+        logger.debug { "Executing node: ${current?.node?.name} with input: $dataset" }
         while (current != null) {
+
             // Execute one step
             with(run(current, dataset, flowDirective)) {
                 current = this.next
                 dataset = this.dataset
                 flowDirective = this.flowDirective
             }
+
+            logger.debug { "Executing node: ${current?.node?.name} with input: $dataset" }
 
             // ← Checkpoint: state is consistent for persistence
             // This is where the state could be serialized and saved
