@@ -69,17 +69,20 @@ class ForProcessor(
     override fun getNextStepInfo(
         state: ForState,
         dataset: JsonElement,
-        nodeName: String?
+        nodeName: String?,
+        exprArgs: ExprArgs,
+        context: TaskContext
     ): Triple<NodeState?, Node<*>?, FlowDirective?> {
         // get an updated state for the current node
         val updatedState = getNextState(state)
 
-        // Note: evalWhile needs exprArgs but we don't have it here
-        // This will be fixed when we update getNextStepInfo signature
-        // For now, we'll use a workaround with empty exprArgs
-        return when (updatedState.index >= updatedState.collection!!.size) {
-            true -> Triple(null, node.parent, getFlowDirective()) // <= clear the state, target the parent
-            false -> Triple(
+        // Check if we should continue looping (while condition and collection bounds)
+        val shouldContinue = updatedState.index < updatedState.collection!!.size &&
+            evalWhile(dataset, exprArgs, context)
+
+        return when (shouldContinue) {
+            false -> Triple(null, node.parent, getFlowDirective()) // <= clear the state, target the parent
+            true -> Triple(
                 updatedState,
                 node.children?.firstOrNull(),
                 null
@@ -94,11 +97,16 @@ class ForProcessor(
         index = state.index + 1
     )
 
-    private fun evalWhile(dataset: JsonElement, exprArgs: ExprArgs): Boolean {
+    private fun evalWhile(dataset: JsonElement, exprArgs: ExprArgs, context: TaskContext): Boolean {
         val whileCondition = node.task.`while` ?: return true
-        return evalBoolean(dataset, whileCondition, "while", exprArgs)
+        val scope = buildScope(exprArgs, context, input = dataset)
+        return evalBoolean(dataset, whileCondition, "while", scope)
     }
 
-    private fun evalForIn(dataset: JsonElement, exprArgs: ExprArgs) =
-        evalList(dataset, node.task.`for`.`in`, "for.in", exprArgs)
+    private fun evalForIn(dataset: JsonElement, exprArgs: ExprArgs): List<JsonElement> {
+        // For.in is evaluated during createState, before full context exists
+        // Use minimal scope with just input data
+        val scope = buildScopeForIf(exprArgs, dataset)
+        return evalList(dataset, node.task.`for`.`in`, "for.in", scope)
+    }
 }

@@ -11,9 +11,10 @@ import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
 import com.lemline.core.execution.models.StepResult
 import com.lemline.core.execution.state.ExprArgs
-import com.lemline.core.execution.state.NoState
 import com.lemline.core.execution.state.NodeState
+import com.lemline.core.execution.state.merge
 import com.lemline.core.expressions.JQExpression
+import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.nodes.Node
 import com.lemline.core.schemas.SchemaValidator
 import io.serverlessworkflow.api.types.FlowDirective
@@ -58,10 +59,16 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * Subclasses override this for specific action implementations.
      *
      * @param input Transformed input for action execution
+     * @param exprArgs Expression arguments from parent scopes
+     * @param context Execution context
      * @return Raw output from action
      * @throws WorkflowException if action execution fails
      */
-    open suspend fun execute(input: JsonElement): JsonElement = input
+    open suspend fun execute(
+        input: JsonElement,
+        exprArgs: ExprArgs,
+        context: TaskContext
+    ): JsonElement = input
 
     /**
      * Determine:
@@ -72,11 +79,17 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * The default implementation returns (null, parent, flowDirective), which is the implementation for a leaf (activity, switch, ...)
      *
      * @param state Type-safe state for this node
+     * @param dataset Current dataset
+     * @param nodeName Optional node name for goto directives
+     * @param exprArgs Expression arguments from parent scopes
+     * @param context Execution context
      */
     open fun getNextStepInfo(
         state: S,
         dataset: JsonElement,
-        nodeName: String? = null
+        nodeName: String? = null,
+        exprArgs: ExprArgs,
+        context: TaskContext
     ): Triple<NodeState?, Node<*>?, FlowDirective?> =
         Triple(null, node.parent, getFlowDirective())
 
@@ -96,7 +109,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
         // Create execution context
         val now = Clock.System.now()
-        var context = ExecutionContext(
+        var context = TaskContext(
             startedAt = now,
             rawInput = dataset
         )
@@ -129,7 +142,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         exprArgs: ExprArgs
     ): StepResult {
         // Create minimal context for re-entry (no start time needed as already started)
-        val context = ExecutionContext(startedAt = Clock.System.now())
+        val context = TaskContext(startedAt = Clock.System.now())
 
         return when (val directive = flowDirective?.get()) {
             is FlowDirectiveEnum -> when (directive) {
@@ -156,11 +169,17 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         state: S,
         dataset: JsonElement,
         exprArgs: ExprArgs,
-        context: ExecutionContext,
+        context: TaskContext,
         nodeName: String? = null
     ): StepResult {
         // get the next node and an updated state for the current node
-        val (updatedState, nextNode, currentFlowDirective) = getNextStepInfo(state, dataset, nodeName)
+        val (updatedState, nextNode, currentFlowDirective) = getNextStepInfo(
+            state,
+            dataset,
+            nodeName,
+            exprArgs,
+            context
+        )
 
         // check if we should return to parent
         return when (nextNode == node.parent) {
@@ -185,11 +204,11 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         dataset: JsonElement,
         currentFlowDirective: FlowDirective?,
         exprArgs: ExprArgs,
-        context: ExecutionContext
+        context: TaskContext
     ): StepResult {
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
-        val rawOutput = execute(dataset)
+        val rawOutput = execute(dataset, exprArgs, context)
 
         // Update context with raw output
         var outputContext = context.copy(rawOutput = rawOutput)
@@ -238,7 +257,8 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      */
     fun checkIf(dataset: JsonElement, exprArgs: ExprArgs): Boolean {
         val ifCondition = node.task.`if` ?: return true
-        return evalBoolean(dataset, ifCondition, ".if", exprArgs)
+        val scope = buildScopeForIf(exprArgs, dataset)
+        return evalBoolean(dataset, ifCondition, ".if", scope)
     }
 
     /**
@@ -249,7 +269,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * @param context Execution context
      * @throws WorkflowException if validation fails
      */
-    private fun validateInput(rawInput: JsonElement, exprArgs: ExprArgs, context: ExecutionContext) {
+    private fun validateInput(rawInput: JsonElement, exprArgs: ExprArgs, context: TaskContext) {
         node.task.input?.schema?.let { schema ->
             validate(rawInput, schema)
         }
@@ -261,14 +281,15 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * Evaluates the task's `input.from` expression to transform the input dataset.
      * If no `input.from` is defined, returns dataset unchanged.
      *
-     * @param dataset Input dataset from parent
+     * @param rawInput Input dataset from parent
      * @param exprArgs Expression arguments for scope
      * @param context Execution context
      * @return Transformed input
      * @throws WorkflowException if evaluation fails
      */
-    private fun transformInput(rawInput: JsonElement, exprArgs: ExprArgs, context: ExecutionContext): JsonElement {
-        return eval(rawInput, node.task.input?.from, exprArgs)
+    private fun transformInput(rawInput: JsonElement, exprArgs: ExprArgs, context: TaskContext): JsonElement {
+        val scope = buildScope(exprArgs, context, input = rawInput)
+        return eval(rawInput, node.task.input?.from, scope)
     }
 
     /**
@@ -277,13 +298,14 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * Evaluates the task's `output.as` expression to produce the transformed output.
      * If no `output.as` is defined, returns the dataset unchanged.
      *
-     * @param dataset The output dataset to be transformed.
+     * @param rawOutput The output dataset to be transformed.
      * @param exprArgs Expression arguments for scope
      * @param context Execution context
      * @return The transformed output dataset.
      */
-    private fun transformOutput(rawOutput: JsonElement, exprArgs: ExprArgs, context: ExecutionContext): JsonElement {
-        return eval(rawOutput, node.task.output?.`as`, exprArgs)
+    private fun transformOutput(rawOutput: JsonElement, exprArgs: ExprArgs, context: TaskContext): JsonElement {
+        val scope = buildScope(exprArgs, context, input = context.transformedInput, output = rawOutput)
+        return eval(rawOutput, node.task.output?.`as`, scope)
     }
 
     /**
@@ -294,7 +316,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * @param context Execution context
      * @throws WorkflowException if validation fails
      */
-    fun validateOutput(transformedOutput: JsonElement, exprArgs: ExprArgs, context: ExecutionContext) {
+    fun validateOutput(transformedOutput: JsonElement, exprArgs: ExprArgs, context: TaskContext) {
         node.task.output?.schema?.let { schema ->
             validate(transformedOutput, schema)
         }
@@ -317,6 +339,54 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // ========================================
     // Expression Evaluation Helpers
     // ========================================
+
+    /**
+     * Build complete scope for expression evaluation by merging exprArgs with ExecutionContext.
+     *
+     * According to the Serverless Workflow spec, expressions should have access to:
+     * - Variables from parent scopes (loop variables, etc.) - from exprArgs
+     * - $task.* - task descriptor (name, reference, startedAt, input, output)
+     * - $input - current input data
+     * - $output - current output data
+     *
+     * @param exprArgs Expression arguments from parent scopes (loop vars, etc.)
+     * @param context Execution context with task timing and data
+     * @param input Current input for $input scope variable
+     * @param output Current output for $output scope variable (optional)
+     * @return Complete scope as JsonObject for JQ evaluation
+     */
+    protected fun buildScope(
+        exprArgs: ExprArgs,
+        context: TaskContext,
+        input: JsonElement?,
+        output: JsonElement? = null
+    ): JsonObject {
+        val scope = Scope(
+            task = context.toTaskDescriptor(node),
+            input = input,
+            output = output
+        ).toJsonObject()
+
+        return exprArgs.merge(scope)
+    }
+
+    /**
+     * Build minimal scope for conditional checks (if expressions).
+     *
+     * Used before task execution starts, when no ExecutionContext exists yet.
+     * Provides access to input data and parent scope variables.
+     *
+     * @param exprArgs Expression arguments from parent scopes (loop vars, etc.)
+     * @param input Current input for $input scope variable
+     * @return Minimal scope as JsonObject for JQ evaluation
+     */
+    protected fun buildScopeForIf(exprArgs: ExprArgs, input: JsonElement): JsonObject {
+        val scope = com.lemline.core.expressions.scopes.Scope(
+            input = input
+        ).toJsonObject()
+
+        return exprArgs.merge(scope)
+    }
 
     private fun validate(data: JsonElement, schemaUnion: SchemaUnion) = try {
         SchemaValidator.validate(data, schemaUnion)

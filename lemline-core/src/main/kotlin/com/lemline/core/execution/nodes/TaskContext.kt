@@ -43,7 +43,7 @@ import kotlinx.serialization.json.JsonElement
  * @property transformedOutput Output after output.as transformation
  */
 @ExperimentalTime
-data class ExecutionContext(
+data class TaskContext(
     val startedAt: Instant,
     val rawInput: JsonElement? = null,
     val transformedInput: JsonElement? = null,

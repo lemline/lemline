@@ -56,7 +56,9 @@ class DoProcessor(
     override fun getNextStepInfo(
         state: DoState,
         dataset: JsonElement,
-        nodeName: String?
+        nodeName: String?,
+        exprArgs: ExprArgs,
+        context: TaskContext
     ): Triple<NodeState?, Node<*>?, FlowDirective?> {
         val nextIndex = getNextIndex(state, nodeName)
         val updatedState = state.copy(index = nextIndex)

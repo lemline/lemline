@@ -68,25 +68,35 @@ class SwitchProcessor(
     override fun getNextStepInfo(
         state: NoState,
         dataset: JsonElement,
-        nodeName: String?
+        nodeName: String?,
+        exprArgs: ExprArgs,
+        context: TaskContext
     ): Triple<NodeState?, Node<*>?, FlowDirective?> {
 
         var directive: FlowDirective? = null
 
-        // evaluate the different cases
-        // Note: evalBoolean needs exprArgs but we don't have it here
-        // This will need to be addressed by updating getNextStepInfo signature
+        // Build scope for evaluating when conditions
+        val scope = buildScope(exprArgs, context, input = dataset)
+
+        // Evaluate the different cases in order
         for (item: SwitchItem in node.task.switch) {
-            if (item.switchCase.`when` == null) {
+            val whenCondition = item.switchCase.`when`
+
+            // If no when condition, this is a default case - always matches
+            if (whenCondition == null) {
                 directive = item.switchCase.then
                 break
             }
-            // TODO: Need exprArgs to evaluate when condition
-            // For now, skipping evaluation
+
+            // Evaluate the when condition
+            if (evalBoolean(dataset, whenCondition, "switch.when", scope)) {
+                directive = item.switchCase.then
+                break
+            }
         }
 
         if (directive == null) {
-            raiseError(WorkflowErrorType.EXPRESSION, "No case matches")
+            raiseError(WorkflowErrorType.EXPRESSION, "No case matches in switch statement")
         }
 
         return Triple(null, node.parent, directive)

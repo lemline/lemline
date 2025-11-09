@@ -12,4 +12,3 @@ import kotlinx.serialization.Serializable
 data class NoState(
     override val startedAt: Instant = Clock.System.now(),
 ) : NodeState()
-
