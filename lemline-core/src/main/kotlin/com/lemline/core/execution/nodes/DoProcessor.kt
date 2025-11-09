@@ -4,8 +4,8 @@
 package com.lemline.core.execution.nodes
 
 import com.lemline.core.execution.state.DoState
-import com.lemline.core.execution.state.ExprArgs
 import com.lemline.core.execution.state.NodeState
+import com.lemline.core.execution.state.Scope
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.DoTask
 import io.serverlessworkflow.api.types.FlowDirective
@@ -42,13 +42,12 @@ import kotlinx.serialization.json.JsonElement
  * 4. Re-enter: childIndex = 3 (>= children.size, exit)
  *
  * @property node Immutable DoTask definition
- * @property parent Parent node instance (or null for root)
  */
 class DoProcessor(
     node: Node<DoTask>
 ) : NodeProcessor<DoTask, DoState>(node) {
 
-    override fun createState(dataset: JsonElement, exprArgs: ExprArgs): DoState = DoState(
+    override fun createState(transformedInput: JsonElement, scope: Scope): DoState = DoState(
         startedAt = Clock.System.now(),
         index = -1
     )
@@ -57,8 +56,7 @@ class DoProcessor(
         state: DoState,
         dataset: JsonElement,
         nodeName: String?,
-        exprArgs: ExprArgs,
-        context: TaskContext
+        scope: Scope,
     ): Triple<NodeState?, Node<*>?, FlowDirective?> {
         val nextIndex = getNextIndex(state, nodeName)
         val updatedState = state.copy(index = nextIndex)

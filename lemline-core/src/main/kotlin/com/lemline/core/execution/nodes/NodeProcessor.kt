@@ -10,11 +10,10 @@ import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
 import com.lemline.core.execution.models.StepResult
-import com.lemline.core.execution.state.ExprArgs
 import com.lemline.core.execution.state.NodeState
+import com.lemline.core.execution.state.Scope
 import com.lemline.core.execution.state.merge
 import com.lemline.core.expressions.JQExpression
-import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.nodes.Node
 import com.lemline.core.schemas.SchemaValidator
 import io.serverlessworkflow.api.types.FlowDirective
@@ -43,13 +42,13 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // ========================================
 
     /**
-     * Create initial state for this node.
+     * Create the initial state for this node.
      * Subclasses override to create their specific state type.
      *
-     * @param dataset Transformed input dataset
-     * @param exprArgs Expression arguments for scope (loop variables, etc.)
+     * @param transformedInput Transformed input dataset
+     * @param scope Expression arguments
      */
-    abstract fun createState(dataset: JsonElement, exprArgs: ExprArgs): S
+    abstract fun createState(transformedInput: JsonElement, scope: Scope): S
 
     /**
      * Execute node action (for activity tasks).
@@ -58,17 +57,15 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * Activity tasks perform their action and return the result.
      * Subclasses override this for specific action implementations.
      *
-     * @param input Transformed input for action execution
-     * @param exprArgs Expression arguments from parent scopes
-     * @param context Execution context
+     * @param transformedInput Transformed input for action execution
+     * @param scope complete Scope
      * @return Raw output from action
-     * @throws WorkflowException if action execution fails
+     * @throws com.lemline.core.errors.WorkflowException if action execution fails
      */
     open suspend fun execute(
-        input: JsonElement,
-        exprArgs: ExprArgs,
-        context: TaskContext
-    ): JsonElement = input
+        transformedInput: JsonElement,
+        scope: Scope,
+    ): JsonElement = transformedInput
 
     /**
      * Determine:
@@ -81,15 +78,13 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * @param state Type-safe state for this node
      * @param dataset Current dataset
      * @param nodeName Optional node name for goto directives
-     * @param exprArgs Expression arguments from parent scopes
-     * @param context Execution context
+     * @param scope Scope
      */
     open fun getNextStepInfo(
         state: S,
         dataset: JsonElement,
         nodeName: String? = null,
-        exprArgs: ExprArgs,
-        context: TaskContext
+        scope: Scope,
     ): Triple<NodeState?, Node<*>?, FlowDirective?> =
         Triple(null, node.parent, getFlowDirective())
 
@@ -97,37 +92,37 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // Entering a Node for the first time
     // ========================================
 
-    suspend fun enterFromParent(dataset: JsonElement, exprArgs: ExprArgs): StepResult {
+    suspend fun enterFromParent(rawInput: JsonElement, parentScope: Scope): StepResult {
+        // Create execution context
+        val now = Clock.System.now()
+
+        var taskContext = TaskContext(startedAt = now)
 
         // if this node is conditional, check if it should be executed, if not return to parent
-        if (!checkIf(dataset, exprArgs)) return StepResult(
+        if (!checkIf(rawInput, parentScope.merge(taskContext.toScope(node)))) return StepResult(
             next = node.parent,
-            dataset = dataset,
+            dataset = rawInput,
             stateUpdates = emptyMap(),
             flowDirective = null  // Continue to next sibling
         )
 
-        // Create execution context
-        val now = Clock.System.now()
-        var context = TaskContext(
-            startedAt = now,
-            rawInput = dataset
-        )
-
         // Validate input against schema (throws ValidationException)
-        validateInput(dataset, exprArgs, context)
+        validateInput(rawInput)
+
+        // Update context with raw input
+        taskContext = taskContext.copy(rawInput = rawInput)
 
         // Apply input transformation (throws ExpressionException)
-        val transformedInput = transformInput(dataset, exprArgs, context)
+        val transformedInput = transformInput(rawInput, parentScope.merge(taskContext.toScope(node)))
 
         // Update context with transformed input
-        context = context.copy(transformedInput = transformedInput)
+        taskContext = taskContext.copy(transformedInput = transformedInput)
 
         // state creation
-        val state = createState(transformedInput, exprArgs)
+        val state = createState(transformedInput, parentScope.merge(taskContext.toScope(node)))
 
         // get the next node and an updated state for the current node
-        return continueTo(state, transformedInput, exprArgs, context)
+        return continueTo(state, transformedInput, parentScope, taskContext)
     }
 
     // ========================================
@@ -139,23 +134,21 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         state: S,
         flowDirective: FlowDirective?,
         datasetFromChild: JsonElement,
-        exprArgs: ExprArgs
+        parentScope: Scope
     ): StepResult {
-        // Create minimal context for re-entry (no start time needed as already started)
-        val context = TaskContext(startedAt = Clock.System.now())
 
         return when (val directive = flowDirective?.get()) {
             is FlowDirectiveEnum -> when (directive) {
                 // END: Workflow complete - recursive unwinding
                 FlowDirectiveEnum.END -> continueToEnd(datasetFromChild)
                 // EXIT: exit current node
-                FlowDirectiveEnum.EXIT -> continueToParent(datasetFromChild, getFlowDirective(), exprArgs, context)
+                FlowDirectiveEnum.EXIT -> continueToParent(datasetFromChild, getFlowDirective(), parentScope, null)
                 // CONTINUE: continue
-                FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild, exprArgs, context)
+                FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild, parentScope, null)
             }
 
             // Goto named sibling or null
-            is String, null -> continueTo(state, datasetFromChild, exprArgs, context, directive)
+            is String, null -> continueTo(state, datasetFromChild, parentScope, null, directive)
 
             else -> throw IllegalArgumentException("Unknown flow directive: $directive")
         }
@@ -168,8 +161,8 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     suspend fun continueTo(
         state: S,
         dataset: JsonElement,
-        exprArgs: ExprArgs,
-        context: TaskContext,
+        parentScope: Scope,
+        taskContext: TaskContext?,
         nodeName: String? = null
     ): StepResult {
         // get the next node and an updated state for the current node
@@ -177,14 +170,13 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
             state,
             dataset,
             nodeName,
-            exprArgs,
-            context
+            parentScope.merge(taskContext?.toScope(node))
         )
 
         // check if we should return to parent
         return when (nextNode == node.parent) {
             // case of leaf (activities, switch, ...) OR end of a control flow
-            true -> continueToParent(dataset, currentFlowDirective, exprArgs, context)
+            true -> continueToParent(dataset, currentFlowDirective, parentScope, taskContext)
 
             // control flows that are not completed (do, for, ...), going to a child
             false -> StepResult(
@@ -203,24 +195,21 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     internal suspend fun continueToParent(
         dataset: JsonElement,
         currentFlowDirective: FlowDirective?,
-        exprArgs: ExprArgs,
-        context: TaskContext
+        parentScope: Scope,
+        taskContext: TaskContext?
     ): StepResult {
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
-        val rawOutput = execute(dataset, exprArgs, context)
+        val rawOutput = execute(dataset, parentScope.merge(taskContext?.toScope(node)))
 
         // Update context with raw output
-        var outputContext = context.copy(rawOutput = rawOutput)
+        val outputContext = taskContext?.copy(rawOutput = rawOutput)
 
         // Apply output transformation (throws ExpressionException)
-        val transformedOutput = transformOutput(rawOutput, exprArgs, outputContext)
-
-        // Update context with transformed output
-        outputContext = outputContext.copy(transformedOutput = transformedOutput)
+        val transformedOutput = transformOutput(rawOutput, parentScope.merge(outputContext?.toScope(node)))
 
         // Validate output (throws ValidationException)
-        validateOutput(transformedOutput, exprArgs, outputContext)
+        validateOutput(transformedOutput)
 
         return StepResult(
             node.parent,
@@ -251,25 +240,22 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * Evaluates the task's `if` expression using scope for context.
      * If no `if` is defined, returns true (always execute).
      *
-     * @param dataset Input dataset for expression evaluation
-     * @param exprArgs Expression arguments for scope
+     * @param rawInput Input dataset for expression evaluation
+     * @param scope Expression arguments
      * @return true if task should execute, false to skip
      */
-    fun checkIf(dataset: JsonElement, exprArgs: ExprArgs): Boolean {
+    fun checkIf(rawInput: JsonElement, scope: Scope): Boolean {
         val ifCondition = node.task.`if` ?: return true
-        val scope = buildScopeForIf(exprArgs, dataset)
-        return evalBoolean(dataset, ifCondition, ".if", scope)
+        return evalBoolean(rawInput, ifCondition, ".if", scope)
     }
 
     /**
      * Validate input against schema.
      *
-     * @param dataset Input dataset to validate
-     * @param exprArgs Expression arguments for scope
-     * @param context Execution context
-     * @throws WorkflowException if validation fails
+     * @param rawInput Input dataset to validate
+     * @throws com.lemline.core.errors.WorkflowException if validation fails
      */
-    private fun validateInput(rawInput: JsonElement, exprArgs: ExprArgs, context: TaskContext) {
+    private fun validateInput(rawInput: JsonElement) {
         node.task.input?.schema?.let { schema ->
             validate(rawInput, schema)
         }
@@ -282,13 +268,11 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * If no `input.from` is defined, returns dataset unchanged.
      *
      * @param rawInput Input dataset from parent
-     * @param exprArgs Expression arguments for scope
-     * @param context Execution context
+     * @param scope Expression arguments
      * @return Transformed input
-     * @throws WorkflowException if evaluation fails
+     * @throws com.lemline.core.errors.WorkflowException if evaluation fails
      */
-    private fun transformInput(rawInput: JsonElement, exprArgs: ExprArgs, context: TaskContext): JsonElement {
-        val scope = buildScope(exprArgs, context, input = rawInput)
+    private fun transformInput(rawInput: JsonElement, scope: Scope): JsonElement {
         return eval(rawInput, node.task.input?.from, scope)
     }
 
@@ -299,24 +283,20 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * If no `output.as` is defined, returns the dataset unchanged.
      *
      * @param rawOutput The output dataset to be transformed.
-     * @param exprArgs Expression arguments for scope
-     * @param context Execution context
+     * @param scope Expression arguments
      * @return The transformed output dataset.
      */
-    private fun transformOutput(rawOutput: JsonElement, exprArgs: ExprArgs, context: TaskContext): JsonElement {
-        val scope = buildScope(exprArgs, context, input = context.transformedInput, output = rawOutput)
+    private fun transformOutput(rawOutput: JsonElement, scope: Scope): JsonElement {
         return eval(rawOutput, node.task.output?.`as`, scope)
     }
 
     /**
      * Validate output against schema.
      *
-     * @param output Output dataset to validate
-     * @param exprArgs Expression arguments for scope
-     * @param context Execution context
-     * @throws WorkflowException if validation fails
+     * @param transformedOutput Output dataset to validate
+     * @throws com.lemline.core.errors.WorkflowException if validation fails
      */
-    fun validateOutput(transformedOutput: JsonElement, exprArgs: ExprArgs, context: TaskContext) {
+    fun validateOutput(transformedOutput: JsonElement) {
         node.task.output?.schema?.let { schema ->
             validate(transformedOutput, schema)
         }
@@ -339,54 +319,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // ========================================
     // Expression Evaluation Helpers
     // ========================================
-
-    /**
-     * Build complete scope for expression evaluation by merging exprArgs with ExecutionContext.
-     *
-     * According to the Serverless Workflow spec, expressions should have access to:
-     * - Variables from parent scopes (loop variables, etc.) - from exprArgs
-     * - $task.* - task descriptor (name, reference, startedAt, input, output)
-     * - $input - current input data
-     * - $output - current output data
-     *
-     * @param exprArgs Expression arguments from parent scopes (loop vars, etc.)
-     * @param context Execution context with task timing and data
-     * @param input Current input for $input scope variable
-     * @param output Current output for $output scope variable (optional)
-     * @return Complete scope as JsonObject for JQ evaluation
-     */
-    protected fun buildScope(
-        exprArgs: ExprArgs,
-        context: TaskContext,
-        input: JsonElement?,
-        output: JsonElement? = null
-    ): JsonObject {
-        val scope = Scope(
-            task = context.toTaskDescriptor(node),
-            input = input,
-            output = output
-        ).toJsonObject()
-
-        return exprArgs.merge(scope)
-    }
-
-    /**
-     * Build minimal scope for conditional checks (if expressions).
-     *
-     * Used before task execution starts, when no ExecutionContext exists yet.
-     * Provides access to input data and parent scope variables.
-     *
-     * @param exprArgs Expression arguments from parent scopes (loop vars, etc.)
-     * @param input Current input for $input scope variable
-     * @return Minimal scope as JsonObject for JQ evaluation
-     */
-    protected fun buildScopeForIf(exprArgs: ExprArgs, input: JsonElement): JsonObject {
-        val scope = com.lemline.core.expressions.scopes.Scope(
-            input = input
-        ).toJsonObject()
-
-        return exprArgs.merge(scope)
-    }
 
     private fun validate(data: JsonElement, schemaUnion: SchemaUnion) = try {
         SchemaValidator.validate(data, schemaUnion)
@@ -439,26 +371,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         JQExpression.eval(data, expr, scope, force)
     } catch (e: Exception) {
         raiseError(EXPRESSION, e.message, e.stackTraceToString())
-    }
-
-    // ========================================
-    // Flow Directive Application
-    // ========================================
-
-    /**
-     * Apply flow directive to update state.
-     *
-     * This method updates the node's mutable state based on the flow directive.
-     * Having this in NodeInstance (instead of NodeState) allows access to the
-     * immutable node definition for metadata like child names.
-     *
-     * Default implementation does nothing (for activity tasks that don't navigate).
-     * Flow tasks override this to implement their navigation logic.
-     *
-     * @param gotoTarget Target task name for goto, or null for default continue
-     */
-    open fun applyFlowDirective(gotoTarget: String?) {
-        // Default: do nothing (activity tasks)
     }
 
     // ========================================

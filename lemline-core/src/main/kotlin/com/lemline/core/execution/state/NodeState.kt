@@ -18,6 +18,6 @@ sealed class NodeState {
     abstract val startedAt: Instant
 
     @Transient
-    open val exprArgs: ExprArgs = JsonObject(mapOf())
+    open val scope: Scope = JsonObject(mapOf())
 
 }

@@ -1,13 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.execution.nodes
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.nodes.Node
-import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
-import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
-import kotlin.time.toJavaInstant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -45,11 +40,6 @@ class NodeDescriptor private constructor(
      * (calculated on demand from rawOutput and runtime descriptor)
      */
     var transformedOutput: JsonElement? = null
-
-    @ExperimentalTime
-    fun setStartedAt(startedAt: Instant) {
-        this.startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant()))
-    }
 
     val taskDescriptor: TaskDescriptor
         get() = TaskDescriptor(

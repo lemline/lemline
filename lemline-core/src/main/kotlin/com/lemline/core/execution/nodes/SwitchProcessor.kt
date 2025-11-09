@@ -4,9 +4,9 @@
 package com.lemline.core.execution.nodes
 
 import com.lemline.core.errors.WorkflowErrorType
-import com.lemline.core.execution.state.ExprArgs
 import com.lemline.core.execution.state.NoState
 import com.lemline.core.execution.state.NodeState
+import com.lemline.core.execution.state.Scope
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.SwitchItem
@@ -57,26 +57,21 @@ import kotlinx.serialization.json.JsonElement
  * The selected case's `then` directive is returned to the parent
  *
  * @property node Immutable SwitchTask definition
- * @property parent Parent node instance
  */
 class SwitchProcessor(
     node: Node<SwitchTask>,
 ) : NodeProcessor<SwitchTask, NoState>(node) {
 
-    override fun createState(dataset: JsonElement, exprArgs: ExprArgs): NoState = NoState()
+    override fun createState(transformedInput: JsonElement, scope: Scope): NoState = NoState()
 
     override fun getNextStepInfo(
         state: NoState,
         dataset: JsonElement,
         nodeName: String?,
-        exprArgs: ExprArgs,
-        context: TaskContext
+        scope: Scope,
     ): Triple<NodeState?, Node<*>?, FlowDirective?> {
 
         var directive: FlowDirective? = null
-
-        // Build scope for evaluating when conditions
-        val scope = buildScope(exprArgs, context, input = dataset)
 
         // Evaluate the different cases in order
         for (item: SwitchItem in node.task.switch) {

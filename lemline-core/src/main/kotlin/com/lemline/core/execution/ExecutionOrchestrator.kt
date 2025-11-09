@@ -10,9 +10,9 @@ import com.lemline.core.execution.nodes.ForProcessor
 import com.lemline.core.execution.nodes.NodeProcessor
 import com.lemline.core.execution.nodes.SetProcessor
 import com.lemline.core.execution.nodes.SwitchProcessor
-import com.lemline.core.execution.state.ExprArgs
 import com.lemline.core.execution.state.MutableStates
 import com.lemline.core.execution.state.NodeState
+import com.lemline.core.execution.state.Scope
 import com.lemline.core.execution.state.States
 import com.lemline.core.execution.state.merge
 import com.lemline.core.execution.state.updateWith
@@ -159,8 +159,8 @@ object ExecutionOrchestrator {
      * @param states The `States` map containing the state information for each node.
      * @return An `ExprArgs` map that combines the expression arguments of the current node and its parent hierarchy.
      */
-    private fun getExprArgs(current: Node<*>, states: States): ExprArgs =
-        (states[current]?.exprArgs ?: buildJsonObject { })
+    private fun getExprArgs(current: Node<*>, states: States): Scope =
+        (states[current]?.scope ?: buildJsonObject { })
             // Recursively merge with parent scope
             .merge(current.parent?.let { getExprArgs(it, states) })
 

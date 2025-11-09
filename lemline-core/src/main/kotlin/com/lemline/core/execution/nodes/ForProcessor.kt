@@ -3,9 +3,9 @@
 
 package com.lemline.core.execution.nodes
 
-import com.lemline.core.execution.state.ExprArgs
 import com.lemline.core.execution.state.ForState
 import com.lemline.core.execution.state.NodeState
+import com.lemline.core.execution.state.Scope
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.ForTask
@@ -54,31 +54,31 @@ import kotlinx.serialization.json.JsonElement
  * - **Final output**: Last iteration's output (or original input if collection is empty)
  *
  * @property node Immutable ForTask definition
- * @property parent Parent node instance
  */
 class ForProcessor(
     node: Node<ForTask>
 ) : NodeProcessor<ForTask, ForState>(node) {
 
-    override fun createState(dataset: JsonElement, exprArgs: ExprArgs): ForState = ForState(
-        startedAt = Clock.System.now(),
-        collection = evalForIn(dataset, exprArgs),
-        index = -1
-    )
+    override fun createState(transformedInput: JsonElement, scope: Scope): ForState {
+        return ForState(
+            startedAt = Clock.System.now(),
+            collection = evalForIn(transformedInput, scope),
+            index = -1
+        )
+    }
 
     override fun getNextStepInfo(
         state: ForState,
         dataset: JsonElement,
         nodeName: String?,
-        exprArgs: ExprArgs,
-        context: TaskContext
+        scope: Scope,
     ): Triple<NodeState?, Node<*>?, FlowDirective?> {
         // get an updated state for the current node
         val updatedState = getNextState(state)
 
         // Check if we should continue looping (while condition and collection bounds)
         val shouldContinue = updatedState.index < updatedState.collection!!.size &&
-            evalWhile(dataset, exprArgs, context)
+            evalWhile(dataset, scope)
 
         return when (shouldContinue) {
             false -> Triple(null, node.parent, getFlowDirective()) // <= clear the state, target the parent
@@ -97,16 +97,13 @@ class ForProcessor(
         index = state.index + 1
     )
 
-    private fun evalWhile(dataset: JsonElement, exprArgs: ExprArgs, context: TaskContext): Boolean {
+    private fun evalWhile(dataset: JsonElement, scope: Scope): Boolean {
         val whileCondition = node.task.`while` ?: return true
-        val scope = buildScope(exprArgs, context, input = dataset)
         return evalBoolean(dataset, whileCondition, "while", scope)
     }
 
-    private fun evalForIn(dataset: JsonElement, exprArgs: ExprArgs): List<JsonElement> {
+    private fun evalForIn(dataset: JsonElement, scope: Scope): List<JsonElement> {
         // For.in is evaluated during createState, before full context exists
-        // Use minimal scope with just input data
-        val scope = buildScopeForIf(exprArgs, dataset)
         return evalList(dataset, node.task.`for`.`in`, "for.in", scope)
     }
 }

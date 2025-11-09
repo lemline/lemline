@@ -27,7 +27,7 @@ data class ForState(
     @Transient
     lateinit var forAt: String
 
-    override val exprArgs by lazy {
+    override val scope by lazy {
         buildJsonObject {
             put("for.each", JsonPrimitive(forEach))
             put("for.at", JsonPrimitive(forAt))

@@ -17,7 +17,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 @Serializable
 data class RootState(
     override val startedAt: Instant,
-    val context: ExprArgs = JsonObject(emptyMap()),
+    val context: Scope = JsonObject(emptyMap()),
 ) : NodeState() {
 
     @Transient
@@ -26,7 +26,7 @@ data class RootState(
     @Transient
     lateinit var workflowDescriptor: WorkflowDescriptor
 
-    override val exprArgs: ExprArgs by lazy {
+    override val scope: Scope by lazy {
         buildJsonObject {
             put("context", context)
             put("runtime", Json.encodeToJsonElement(RuntimeDescriptor))

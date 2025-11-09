@@ -4,13 +4,16 @@
 package com.lemline.core.execution.nodes
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.core.execution.state.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 
 /**
  * Immutable execution context for a single step.
@@ -67,4 +70,6 @@ data class TaskContext(
             output = rawOutput
         )
     }
+
+    fun toScope(node: Node<*>) = Json.encodeToJsonElement(toTaskDescriptor(node)) as Scope
 }
