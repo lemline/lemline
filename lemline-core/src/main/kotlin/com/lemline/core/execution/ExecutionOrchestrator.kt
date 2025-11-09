@@ -12,6 +12,7 @@ import com.lemline.core.execution.nodes.SetProcessor
 import com.lemline.core.execution.nodes.SwitchProcessor
 import com.lemline.core.execution.state.ExprArgs
 import com.lemline.core.execution.state.MutableStates
+import com.lemline.core.execution.state.NodeState
 import com.lemline.core.execution.state.States
 import com.lemline.core.execution.state.merge
 import com.lemline.core.execution.state.updateWith
@@ -129,6 +130,7 @@ object ExecutionOrchestrator {
      * @param flowDirective Navigation instruction (null on first entry)
      * @return StepResult with next node, dataset, deltaStates, and flow directive
      */
+    @Suppress("UNCHECKED_CAST")
     suspend fun <T : TaskBase> runStep(
         node: Node<T>,
         dataset: JsonElement,
@@ -137,14 +139,15 @@ object ExecutionOrchestrator {
     ): StepResult {
         val state = states[node]
         val exprArgs = getExprArgs(node, states)
-        val processor: NodeProcessor<T> = getNodeProcessor(node, exprArgs)
+        val processor = getNodeProcessor(node, exprArgs)
 
         return if (state == null) {
             // First time entering this node - doesn't need states
             processor.enterFromParent(dataset)
         } else {
             // Re-entering after a child completed
-            processor.enterFromChild(state, flowDirective, dataset)
+            // Safe cast: state was created by the same processor type, so types match
+            (processor as NodeProcessor<T, NodeState>).enterFromChild(state, flowDirective, dataset)
         }
     }
 
@@ -166,7 +169,7 @@ object ExecutionOrchestrator {
     private fun <T : TaskBase> getNodeProcessor(
         node: Node<T>,
         exprArgs: ExprArgs
-    ): NodeProcessor<T> {
+    ): NodeProcessor<T, *> {
         return when (node.task) {
             is DoTask -> DoProcessor(node as Node<DoTask>, exprArgs)
             is ForTask -> ForProcessor(node as Node<ForTask>, exprArgs)
@@ -174,7 +177,7 @@ object ExecutionOrchestrator {
             is SwitchTask -> SwitchProcessor(node as Node<SwitchTask>, exprArgs)
 
             else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
-        } as NodeProcessor<T>
+        } as NodeProcessor<T, *>
     }
 
 

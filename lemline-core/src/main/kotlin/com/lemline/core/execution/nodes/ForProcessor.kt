@@ -59,7 +59,7 @@ import kotlinx.serialization.json.JsonElement
 class ForProcessor(
     node: Node<ForTask>,
     exprArgs: ExprArgs
-) : NodeProcessor<ForTask>(node, exprArgs) {
+) : NodeProcessor<ForTask, ForState>(node, exprArgs) {
 
     override fun createState(dataset: JsonElement): ForState = ForState(
         startedAt = Clock.System.now(),
@@ -68,11 +68,10 @@ class ForProcessor(
     )
 
     override fun getNextStepInfo(
-        state: NodeState,
+        state: ForState,
         dataset: JsonElement,
         nodeName: String?
     ): Triple<NodeState?, Node<*>?, FlowDirective?> {
-        state as ForState
         // get an updated state for the current node
         val updatedState = getNextState(state)
 
@@ -93,7 +92,10 @@ class ForProcessor(
         index = state.index + 1
     )
 
-    private fun evalWhile(dataset: JsonElement) = evalBoolean(dataset, node.task.`while`, "while")
+    private fun evalWhile(dataset: JsonElement): Boolean {
+        val whileCondition = node.task.`while` ?: return true
+        return evalBoolean(dataset, whileCondition, "while")
+    }
 
     private fun evalForIn(dataset: JsonElement) = evalList(dataset, node.task.`for`.`in`, "for.in")
 }

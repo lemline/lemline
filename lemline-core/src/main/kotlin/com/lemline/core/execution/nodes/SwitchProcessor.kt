@@ -5,6 +5,7 @@ package com.lemline.core.execution.nodes
 
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.execution.state.ExprArgs
+import com.lemline.core.execution.state.NoState
 import com.lemline.core.execution.state.NodeState
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.FlowDirective
@@ -61,10 +62,12 @@ import kotlinx.serialization.json.JsonElement
 class SwitchProcessor(
     node: Node<SwitchTask>,
     exprArgs: ExprArgs,
-) : NodeProcessor<SwitchTask>(node, exprArgs) {
+) : NodeProcessor<SwitchTask, NoState>(node, exprArgs) {
+
+    override fun createState(dataset: JsonElement): NoState = NoState()
 
     override fun getNextStepInfo(
-        state: NodeState,
+        state: NoState,
         dataset: JsonElement,
         nodeName: String?
     ): Triple<NodeState?, Node<*>?, FlowDirective?> {

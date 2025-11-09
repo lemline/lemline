@@ -47,7 +47,7 @@ import kotlinx.serialization.json.JsonElement
 class DoProcessor(
     node: Node<DoTask>,
     exprArgs: ExprArgs
-) : NodeProcessor<DoTask>(node, exprArgs) {
+) : NodeProcessor<DoTask, DoState>(node, exprArgs) {
 
     override fun createState(dataset: JsonElement): DoState = DoState(
         startedAt = Clock.System.now(),
@@ -55,11 +55,10 @@ class DoProcessor(
     )
 
     override fun getNextStepInfo(
-        state: NodeState,
+        state: DoState,
         dataset: JsonElement,
         nodeName: String?
     ): Triple<NodeState?, Node<*>?, FlowDirective?> {
-        (state as DoState)
         val nextIndex = getNextIndex(state, nodeName)
         val updatedState = state.copy(index = nextIndex)
         return when (nextIndex >= (node.children?.size ?: 0)) {

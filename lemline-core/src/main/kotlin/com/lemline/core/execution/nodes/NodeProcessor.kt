@@ -32,7 +32,7 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
 
 @ExperimentalTime
-abstract class NodeProcessor<T : TaskBase>(
+abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     val node: Node<T>,
     val exprArgs: ExprArgs
 ) {
@@ -48,7 +48,11 @@ abstract class NodeProcessor<T : TaskBase>(
     // Type Specific Actions
     // ========================================
 
-    open fun createState(dataset: JsonElement): NodeState = NoState()
+    /**
+     * Create initial state for this node.
+     * Subclasses override to create their specific state type.
+     */
+    abstract fun createState(dataset: JsonElement): S
 
     /**
      * Execute node action (for activity tasks).
@@ -70,9 +74,11 @@ abstract class NodeProcessor<T : TaskBase>(
      * - the flow directive for the parent (if any)
      *
      * The default implementation returns (null, parent, flowDirective), which is the implementation for a leaf (activity, switch, ...)
+     *
+     * @param state Type-safe state for this node
      */
     open fun getNextStepInfo(
-        state: NodeState,
+        state: S,
         dataset: JsonElement,
         nodeName: String? = null
     ): Triple<NodeState?, Node<*>?, FlowDirective?> =
@@ -123,7 +129,7 @@ abstract class NodeProcessor<T : TaskBase>(
 
     // here we process the current node, knowing that we come from a child node that output dataset and flow directive
     suspend fun enterFromChild(
-        state: NodeState,
+        state: S,
         flowDirective: FlowDirective?,
         datasetFromChild: JsonElement
     ): StepResult =
@@ -147,7 +153,7 @@ abstract class NodeProcessor<T : TaskBase>(
     // CONTINUE
     // ========================================
 
-    suspend fun continueTo(state: NodeState, dataset: JsonElement, nodeName: String? = null): StepResult {
+    suspend fun continueTo(state: S, dataset: JsonElement, nodeName: String? = null): StepResult {
         // get the next node and an updated state for the current node
         val (updatedState, nextNode, currentFlowDirective) = getNextStepInfo(state, dataset, nodeName)
 
