@@ -4,24 +4,17 @@
 package com.lemline.core.execution.nodes
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.execution.state.ActivityTaskState
-import com.lemline.core.execution.state.NodeState
+import com.lemline.core.execution.state.ExprArgs
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.SetTask
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
 /**
- * Node instance for SetTask (data manipulation).
+ * Node instance for SetTask (data manipulation) - pure functional model.
  *
  * SetTask evaluates expressions and merges the results into the dataset.
  * It's an activity task (leaf node) with no children.
- *
- * ## Execution Flow
- *
- * 1. Enter: Initialize state
- * 2. Execute: Evaluate set expressions and merge into input
- * 3. Exit: Return merged data to parent
  *
  * ## Example Workflow
  *
@@ -53,20 +46,10 @@ import kotlinx.serialization.json.JsonElement
  * @property node Immutable SetTask definition
  * @property parent Parent node instance
  */
-class SetNodeInstance(
+class SetProcessor(
     node: Node<SetTask>,
-    parent: NodeInstance<*>?
-) : NodeInstance<SetTask>(node, parent) {
-
-    /**
-     * State for activity task (minimal, just hasExecuted flag).
-     */
-    override var state: NodeState<*> = ActivityTaskState()
-
-    init {
-        // Activity tasks have no children
-        children = emptyList()
-    }
+    exprArgs: ExprArgs,
+) : NodeProcessor<SetTask>(node, exprArgs) {
 
     /**
      * Execute SetTask action.
@@ -82,6 +65,6 @@ class SetNodeInstance(
         val setExpressions = LemlineJson.encodeToElement(node.task.set)
 
         // Evaluate and merge into input
-        return eval(input, setExpressions, scope, force = true)
+        return eval(input, setExpressions, exprArgs, force = true)
     }
 }

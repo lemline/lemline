@@ -46,15 +46,17 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
     /**
      * The list of task nodes depending on this one
      */
-    internal val children: List<Node<*>>? = when (task) {
-        is RootTask -> task.parseChildren()
-        is DoTask -> task.parseChildren(position, this)
-        is ForTask -> task.parseChildren(position, this)
-        is TryTask -> task.parseChildren(position, this)
-        is ForkTask -> task.parseChildren(position, this)
-        is ListenTask -> task.parseChildren(position, this)
-        is CallAsyncAPI -> task.parseChildren(position, this)
-        else -> null
+    internal val children: List<Node<*>>? by lazy {
+        when (task) {
+            is RootTask -> task.parseChildren()
+            is DoTask -> task.parseChildren(position, this)
+            is ForTask -> task.parseChildren(position, this)
+            is TryTask -> task.parseChildren(position, this)
+            is ForkTask -> task.parseChildren(position, this)
+            is ListenTask -> task.parseChildren(position, this)
+            is CallAsyncAPI -> task.parseChildren(position, this)
+            else -> null
+        }
     }
 
     /**

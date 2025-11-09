@@ -60,7 +60,7 @@ class ExecutionOrchestratorTest {
 
         // Execute workflow with empty input
         val input = buildJsonObject { }
-        val output = ExecutionOrchestrator.execute(rootInstance, input)
+        val output = ExecutionOrchestrator.run(rootInstance, input)
 
         // Verify output contains the status field
         val outputObj = output as JsonObject
@@ -101,7 +101,7 @@ class ExecutionOrchestratorTest {
 
         // Execute workflow with empty input
         val input = buildJsonObject { }
-        val output = ExecutionOrchestrator.execute(rootInstance, input)
+        val output = ExecutionOrchestrator.run(rootInstance, input)
 
         // Verify output contains both fields (merged sequentially)
         val outputObj = output as JsonObject
@@ -143,7 +143,7 @@ class ExecutionOrchestratorTest {
         val input = buildJsonObject {
             put("inputField", "testValue")
         }
-        val output = ExecutionOrchestrator.execute(rootInstance, input)
+        val output = ExecutionOrchestrator.run(rootInstance, input)
 
         // Verify output contains the result with evaluated expression
         val outputObj = output as JsonObject
@@ -195,7 +195,7 @@ class ExecutionOrchestratorTest {
                         buildJsonObject { put("id", 3) }
                     )))
         }
-        val output = ExecutionOrchestrator.execute(rootInstance, input)
+        val output = ExecutionOrchestrator.run(rootInstance, input)
 
         // Verify output - last iteration should have processed=true
         val outputObj = output as JsonObject
@@ -249,7 +249,7 @@ class ExecutionOrchestratorTest {
                 )
             )
         }
-        val output = ExecutionOrchestrator.execute(rootInstance, input)
+        val output = ExecutionOrchestrator.run(rootInstance, input)
 
         // Verify output - should have last item (30) and last index (2)
         val outputObj = output as JsonObject
@@ -295,10 +295,165 @@ class ExecutionOrchestratorTest {
         val input = buildJsonObject {
             put("items", kotlinx.serialization.json.JsonArray(emptyList()))
         }
-        val output = ExecutionOrchestrator.execute(rootInstance, input)
+        val output = ExecutionOrchestrator.run(rootInstance, input)
 
         // Verify output - should NOT have 'ran' since loop body never executed
         val outputObj = output as JsonObject
         assertTrue(!outputObj.containsKey("ran"))
+    }
+
+    @Test
+    fun `test switch task with first case match`() = runTest {
+        // Define workflow: SwitchTask that matches first case
+        val workflowYaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: switch-first
+              version: 0.1.0
+            do:
+              - routeOrder:
+                  switch:
+                    - urgent:
+                        when: .priority == "urgent"
+                        then: handleUrgent
+                    - normal:
+                        when: .priority == "normal"
+                        then: handleNormal
+              - handleUrgent:
+                  set:
+                    status: '"urgent"'
+                  then: exit
+              - handleNormal:
+                  set:
+                    status: '"normal"'
+                  then: exit
+        """.trimIndent()
+
+        // Parse workflow definition and build node tree
+        DefinitionCache.parseAndPut(workflowYaml)
+        val workflow = DefinitionCache.getOrNull(
+            WorkflowNamespace("test"),
+            WorkflowName("switch-first"),
+            WorkflowVersion("0.1.0")
+        )!!
+        val rootNode = DefinitionCache.getRootNode(workflow)
+
+        // Build node instance
+        val rootInstance = buildNodeInstance(rootNode, null)
+
+        // Execute workflow with priority=urgent
+        val input = buildJsonObject {
+            put("priority", "urgent")
+        }
+        val output = ExecutionOrchestrator.run(rootInstance, input)
+
+        // Verify output - should have status="urgent"
+        val outputObj = output as JsonObject
+        assertTrue(outputObj.containsKey("status"))
+        assertEquals("urgent", LemlineJson.decodeFromElement<String>(outputObj["status"]!!))
+    }
+
+    @Test
+    fun `test switch task with second case match`() = runTest {
+        // Define workflow: SwitchTask that matches second case
+        val workflowYaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: switch-second
+              version: 0.1.0
+            do:
+              - routeOrder:
+                  switch:
+                    - urgent:
+                        when: .priority == "urgent"
+                        then: handleUrgent
+                    - normal:
+                        when: .priority == "normal"
+                        then: handleNormal
+              - handleUrgent:
+                  set:
+                    status: '"urgent"'
+                  then: exit
+              - handleNormal:
+                  set:
+                    status: '"normal"'
+                  then: exit
+        """.trimIndent()
+
+        // Parse workflow definition and build node tree
+        DefinitionCache.parseAndPut(workflowYaml)
+        val workflow = DefinitionCache.getOrNull(
+            WorkflowNamespace("test"),
+            WorkflowName("switch-second"),
+            WorkflowVersion("0.1.0")
+        )!!
+        val rootNode = DefinitionCache.getRootNode(workflow)
+
+        // Build node instance
+        val rootInstance = buildNodeInstance(rootNode, null)
+
+        // Execute workflow with priority=normal
+        val input = buildJsonObject {
+            put("priority", "normal")
+        }
+        val output = ExecutionOrchestrator.run(rootInstance, input)
+
+        // Verify output - should have status="normal"
+        val outputObj = output as JsonObject
+        assertTrue(outputObj.containsKey("status"))
+        assertEquals("normal", LemlineJson.decodeFromElement<String>(outputObj["status"]!!))
+    }
+
+    @Test
+    fun `test switch task with default case`() = runTest {
+        // Define workflow: SwitchTask with default case (no when condition)
+        val workflowYaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: switch-default
+              version: 0.1.0
+            do:
+              - routeOrder:
+                  switch:
+                    - urgent:
+                        when: .priority == "urgent"
+                        then: handleUrgent
+                    - default:
+                        then: handleDefault
+              - handleUrgent:
+                  set:
+                    status: '"urgent"'
+                  then: exit
+              - handleDefault:
+                  set:
+                    status: '"default"'
+                  then: exit
+        """.trimIndent()
+
+        // Parse workflow definition and build node tree
+        DefinitionCache.parseAndPut(workflowYaml)
+        val workflow = DefinitionCache.getOrNull(
+            WorkflowNamespace("test"),
+            WorkflowName("switch-default"),
+            WorkflowVersion("0.1.0")
+        )!!
+        val rootNode = DefinitionCache.getRootNode(workflow)
+
+        // Build node instance
+        val rootInstance = buildNodeInstance(rootNode, null)
+
+        // Execute workflow with priority=low (doesn't match first case)
+        val input = buildJsonObject {
+            put("priority", "low")
+        }
+        val output = ExecutionOrchestrator.run(rootInstance, input)
+
+        // Verify output - should have status="default"
+        val outputObj = output as JsonObject
+        assertTrue(outputObj.containsKey("status"))
+        assertEquals("default", LemlineJson.decodeFromElement<String>(outputObj["status"]!!))
     }
 }
