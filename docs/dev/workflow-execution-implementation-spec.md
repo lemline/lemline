@@ -1,14 +1,14 @@
 # Workflow Execution Implementation Specification
 
-**Version**: 1.1
+**Version**: 1.2
 **Date Started**: 2025-01-08
 **Date Updated**: 2025-11-09
-**Status**: In Progress - Phase 1A ✅ | Phase 1B ✅ | Phase 1C In Progress
+**Status**: In Progress - Phase 1A ✅ | Phase 1B ✅ | Phase 1C ✅
 
 > **Implementation Status**:
 > - Phase 1A: Core foundation complete and compiling (~1,437 lines)
 > - Phase 1B: DoTask and SetTask implementations complete with tests (~381 lines)
-> - Phase 1C: ForTask iteration (next priority)
+> - Phase 1C: ForTask iteration complete with scope variables (~218 lines + 3 tests)
 >
 > See [PHASE_1_COMPLETE.md](./PHASE_1_COMPLETE.md) for details.
 
@@ -807,10 +807,29 @@ data class ForMutableState(
 /**
  * Complete state for ForTask.
  * Executes child repeatedly for each item in collection.
+ *
+ * ## Implementation Note: Lazy Collection Evaluation
+ *
+ * The collection is evaluated lazily in ForNodeInstance.scope getter to avoid
+ * circular dependencies:
+ * - scope getter needs to add $item and $index variables
+ * - To get current item, we need the evaluated collection
+ * - Collection evaluation (JQ expression) requires scope
+ * - This creates a circular dependency
+ *
+ * Solution:
+ * 1. Initialize ForTaskState with empty collection
+ * 2. In scope getter, check if collection is empty and rawInput is available
+ * 3. Evaluate collection expression using parent scope (not current scope)
+ * 4. Use isInitializing flag to prevent re-entry during evaluation
+ * 5. Update state with evaluated collection
+ *
+ * This approach ensures collection is evaluated once with proper scope context.
  */
 class ForTaskState(
     /**
-     * Collection to iterate over (immutable, cached from input).
+     * Collection to iterate over (immutable, cached from expression evaluation).
+     * Evaluated lazily on first access to avoid circular dependency.
      */
     val collection: List<JsonElement>,
 
@@ -859,7 +878,8 @@ class ForTaskState(
     }
 
     override fun init(transformedInput: JsonElement) {
-        // Collection is already set from definition evaluation
+        // Collection is evaluated lazily in ForNodeInstance.scope getter
+        // This avoids circular dependency between scope and collection evaluation
         // Nothing to do here
     }
 

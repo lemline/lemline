@@ -3,9 +3,9 @@
 
 package com.lemline.core.execution.nodes
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.core.execution.state.ForTaskState
 import com.lemline.core.execution.state.NodeState
+import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.ExperimentalTime
@@ -158,7 +158,7 @@ class ForNodeInstance(
                     transformedInput,
                     JsonPrimitive(collectionExpr),
                     parentScopeOnly,
-                    false
+                    true  // force = true to always evaluate the expression
                 )
 
                 // Convert to list
@@ -193,7 +193,7 @@ class ForNodeInstance(
      */
     private fun evaluateExpression(data: JsonElement, expr: String): JsonElement {
         // Use the LemlineJson's JQ evaluator directly
-        return com.lemline.core.expressions.JQExpression.eval(
+        return JQExpression.eval(
             data,
             JsonPrimitive(expr),
             scope,

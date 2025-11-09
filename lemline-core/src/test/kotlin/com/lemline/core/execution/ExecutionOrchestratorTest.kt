@@ -90,9 +90,9 @@ class ExecutionOrchestratorTest {
         // Parse workflow definition and build node tree
         DefinitionCache.parseAndPut(workflowYaml)
         val workflow = DefinitionCache.getOrNull(
-            com.lemline.common.values.WorkflowNamespace("test"),
-            com.lemline.common.values.WorkflowName("sequential-set"),
-            com.lemline.common.values.WorkflowVersion("0.1.0")
+            WorkflowNamespace("test"),
+            WorkflowName("sequential-set"),
+            WorkflowVersion("0.1.0")
         )!!
         val rootNode = DefinitionCache.getRootNode(workflow)
 
@@ -114,7 +114,7 @@ class ExecutionOrchestratorTest {
     @Test
     fun `test set task with expression evaluation`() = runTest {
         // Define workflow: SetTask that references input
-        val workflowYaml = """
+        val workflowYaml = $$"""
             document:
               dsl: '1.0.0'
               namespace: test
@@ -124,15 +124,15 @@ class ExecutionOrchestratorTest {
               - setResult:
                   set:
                     result:
-                      inputValue: ${'$'}input.inputField
+                      inputValue: $input.inputField
         """.trimIndent()
 
         // Parse workflow definition and build node tree
         DefinitionCache.parseAndPut(workflowYaml)
         val workflow = DefinitionCache.getOrNull(
-            com.lemline.common.values.WorkflowNamespace("test"),
-            com.lemline.common.values.WorkflowName("set-with-expression"),
-            com.lemline.common.values.WorkflowVersion("0.1.0")
+            WorkflowNamespace("test"),
+            WorkflowName("set-with-expression"),
+            WorkflowVersion("0.1.0")
         )!!
         val rootNode = DefinitionCache.getRootNode(workflow)
 
@@ -176,9 +176,9 @@ class ExecutionOrchestratorTest {
         // Parse workflow definition and build node tree
         DefinitionCache.parseAndPut(workflowYaml)
         val workflow = DefinitionCache.getOrNull(
-            com.lemline.common.values.WorkflowNamespace("test"),
-            com.lemline.common.values.WorkflowName("for-iteration"),
-            com.lemline.common.values.WorkflowVersion("0.1.0")
+            WorkflowNamespace("test"),
+            WorkflowName("for-iteration"),
+            WorkflowVersion("0.1.0")
         )!!
         val rootNode = DefinitionCache.getRootNode(workflow)
 
@@ -187,11 +187,13 @@ class ExecutionOrchestratorTest {
 
         // Execute workflow with input containing an array
         val input = buildJsonObject {
-            put("items", kotlinx.serialization.json.JsonArray(listOf(
-                buildJsonObject { put("id", 1) },
-                buildJsonObject { put("id", 2) },
-                buildJsonObject { put("id", 3) }
-            )))
+            put(
+                "items", kotlinx.serialization.json.JsonArray(
+                    listOf(
+                        buildJsonObject { put("id", 1) },
+                        buildJsonObject { put("id", 2) },
+                        buildJsonObject { put("id", 3) }
+                    )))
         }
         val output = ExecutionOrchestrator.execute(rootInstance, input)
 
@@ -199,5 +201,104 @@ class ExecutionOrchestratorTest {
         val outputObj = output as JsonObject
         assertTrue(outputObj.containsKey("processed"))
         assertEquals(true, LemlineJson.decodeFromElement<Boolean>(outputObj["processed"]!!))
+    }
+
+    @Test
+    fun `test for task with scope variables`() = runTest {
+        // Define workflow: ForTask that uses $item and $index scope variables
+        val workflowYaml = $$"""
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: for-with-scope
+              version: 0.1.0
+            do:
+              - processNumbers:
+                  for:
+                    each: num
+                    at: idx
+                    in: .numbers
+                  do:
+                    - collectData:
+                        set:
+                          lastNumber: $num
+                          lastIndex: $idx
+        """.trimIndent()
+
+        // Parse workflow definition and build node tree
+        DefinitionCache.parseAndPut(workflowYaml)
+        val workflow = DefinitionCache.getOrNull(
+            WorkflowNamespace("test"),
+            WorkflowName("for-with-scope"),
+            WorkflowVersion("0.1.0")
+        )!!
+        val rootNode = DefinitionCache.getRootNode(workflow)
+
+        // Build node instance
+        val rootInstance = buildNodeInstance(rootNode, null)
+
+        // Execute workflow with input containing an array of numbers
+        val input = buildJsonObject {
+            put(
+                "numbers", kotlinx.serialization.json.JsonArray(
+                    listOf(
+                        kotlinx.serialization.json.JsonPrimitive(10),
+                        kotlinx.serialization.json.JsonPrimitive(20),
+                        kotlinx.serialization.json.JsonPrimitive(30)
+                    )
+                )
+            )
+        }
+        val output = ExecutionOrchestrator.execute(rootInstance, input)
+
+        // Verify output - should have last item (30) and last index (2)
+        val outputObj = output as JsonObject
+        assertTrue(outputObj.containsKey("lastNumber"))
+        assertTrue(outputObj.containsKey("lastIndex"))
+        assertEquals(30, LemlineJson.decodeFromElement<Int>(outputObj["lastNumber"]!!))
+        assertEquals(2, LemlineJson.decodeFromElement<Int>(outputObj["lastIndex"]!!))
+    }
+
+    @Test
+    fun `test for task with empty collection`() = runTest {
+        // Define workflow: ForTask with empty collection
+        val workflowYaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: for-empty
+              version: 0.1.0
+            do:
+              - processEmpty:
+                  for:
+                    each: item
+                    in: .items
+                  do:
+                    - shouldNotRun:
+                        set:
+                          ran: true
+        """.trimIndent()
+
+        // Parse workflow definition and build node tree
+        DefinitionCache.parseAndPut(workflowYaml)
+        val workflow = DefinitionCache.getOrNull(
+            WorkflowNamespace("test"),
+            WorkflowName("for-empty"),
+            WorkflowVersion("0.1.0")
+        )!!
+        val rootNode = DefinitionCache.getRootNode(workflow)
+
+        // Build node instance
+        val rootInstance = buildNodeInstance(rootNode, null)
+
+        // Execute workflow with empty array
+        val input = buildJsonObject {
+            put("items", kotlinx.serialization.json.JsonArray(emptyList()))
+        }
+        val output = ExecutionOrchestrator.execute(rootInstance, input)
+
+        // Verify output - should NOT have 'ran' since loop body never executed
+        val outputObj = output as JsonObject
+        assertTrue(!outputObj.containsKey("ran"))
     }
 }
