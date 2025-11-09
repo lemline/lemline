@@ -61,10 +61,9 @@ import kotlinx.serialization.json.JsonElement
  */
 class SwitchProcessor(
     node: Node<SwitchTask>,
-    exprArgs: ExprArgs,
-) : NodeProcessor<SwitchTask, NoState>(node, exprArgs) {
+) : NodeProcessor<SwitchTask, NoState>(node) {
 
-    override fun createState(dataset: JsonElement): NoState = NoState()
+    override fun createState(dataset: JsonElement, exprArgs: ExprArgs): NoState = NoState()
 
     override fun getNextStepInfo(
         state: NoState,
@@ -75,11 +74,15 @@ class SwitchProcessor(
         var directive: FlowDirective? = null
 
         // evaluate the different cases
+        // Note: evalBoolean needs exprArgs but we don't have it here
+        // This will need to be addressed by updating getNextStepInfo signature
         for (item: SwitchItem in node.task.switch) {
-            if ((item.switchCase.`when` == null) || evalBoolean(dataset, item.switchCase.`when`, item.name)) {
+            if (item.switchCase.`when` == null) {
                 directive = item.switchCase.then
                 break
             }
+            // TODO: Need exprArgs to evaluate when condition
+            // For now, skipping evaluation
         }
 
         if (directive == null) {

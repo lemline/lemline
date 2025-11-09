@@ -33,16 +33,9 @@ import kotlinx.serialization.json.booleanOrNull
 
 @ExperimentalTime
 abstract class NodeProcessor<T : TaskBase, S : NodeState>(
-    val node: Node<T>,
-    val exprArgs: ExprArgs
+    val node: Node<T>
 ) {
     val logger = logger()
-
-    // ========================================
-    // Scope Building (for Expression Evaluation)
-    // ========================================
-
-    val nodeDescriptor = NodeDescriptor.from(node)
 
     // ========================================
     // Type Specific Actions
@@ -51,8 +44,11 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     /**
      * Create initial state for this node.
      * Subclasses override to create their specific state type.
+     *
+     * @param dataset Transformed input dataset
+     * @param exprArgs Expression arguments for scope (loop variables, etc.)
      */
-    abstract fun createState(dataset: JsonElement): S
+    abstract fun createState(dataset: JsonElement, exprArgs: ExprArgs): S
 
     /**
      * Execute node action (for activity tasks).
@@ -88,39 +84,37 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // Entering a Node for the first time
     // ========================================
 
-    suspend fun enterFromParent(dataset: JsonElement): StepResult {
+    suspend fun enterFromParent(dataset: JsonElement, exprArgs: ExprArgs): StepResult {
 
         // if this node is conditional, check if it should be executed, if not return to parent
-        if (!checkIf(dataset)) return StepResult(
+        if (!checkIf(dataset, exprArgs)) return StepResult(
             next = node.parent,
             dataset = dataset,
             stateUpdates = emptyMap(),
             flowDirective = null  // Continue to next sibling
         )
 
-        // starting now
+        // Create execution context
         val now = Clock.System.now()
-
-        // Set startedAt for task descriptor (for scope building)
-        nodeDescriptor.setStartedAt(now)
-
-        // Set raw input (for scope building)
-        nodeDescriptor.rawInput = dataset
+        var context = ExecutionContext(
+            startedAt = now,
+            rawInput = dataset
+        )
 
         // Validate input against schema (throws ValidationException)
-        validateInput(dataset)
+        validateInput(dataset, exprArgs, context)
 
         // Apply input transformation (throws ExpressionException)
-        val transformedInput = transformInput(dataset)
+        val transformedInput = transformInput(dataset, exprArgs, context)
 
-        // Set transformed input (for scope building)
-        nodeDescriptor.transformedInput = transformedInput
+        // Update context with transformed input
+        context = context.copy(transformedInput = transformedInput)
 
         // state creation
-        val state = createState(transformedInput)
+        val state = createState(transformedInput, exprArgs)
 
         // get the next node and an updated state for the current node
-        return continueTo(state, transformedInput)
+        return continueTo(state, transformedInput, exprArgs, context)
     }
 
     // ========================================
@@ -131,36 +125,47 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     suspend fun enterFromChild(
         state: S,
         flowDirective: FlowDirective?,
-        datasetFromChild: JsonElement
-    ): StepResult =
-        when (val directive = flowDirective?.get()) {
+        datasetFromChild: JsonElement,
+        exprArgs: ExprArgs
+    ): StepResult {
+        // Create minimal context for re-entry (no start time needed as already started)
+        val context = ExecutionContext(startedAt = Clock.System.now())
+
+        return when (val directive = flowDirective?.get()) {
             is FlowDirectiveEnum -> when (directive) {
                 // END: Workflow complete - recursive unwinding
                 FlowDirectiveEnum.END -> continueToEnd(datasetFromChild)
                 // EXIT: exit current node
-                FlowDirectiveEnum.EXIT -> continueToParent(datasetFromChild, getFlowDirective())
+                FlowDirectiveEnum.EXIT -> continueToParent(datasetFromChild, getFlowDirective(), exprArgs, context)
                 // CONTINUE: continue
-                FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild)
+                FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild, exprArgs, context)
             }
 
             // Goto named sibling or null
-            is String, null -> continueTo(state, datasetFromChild, directive)
+            is String, null -> continueTo(state, datasetFromChild, exprArgs, context, directive)
 
             else -> throw IllegalArgumentException("Unknown flow directive: $directive")
         }
+    }
 
     // ========================================
     // CONTINUE
     // ========================================
 
-    suspend fun continueTo(state: S, dataset: JsonElement, nodeName: String? = null): StepResult {
+    suspend fun continueTo(
+        state: S,
+        dataset: JsonElement,
+        exprArgs: ExprArgs,
+        context: ExecutionContext,
+        nodeName: String? = null
+    ): StepResult {
         // get the next node and an updated state for the current node
         val (updatedState, nextNode, currentFlowDirective) = getNextStepInfo(state, dataset, nodeName)
 
         // check if we should return to parent
         return when (nextNode == node.parent) {
             // case of leaf (activities, switch, ...) OR end of a control flow
-            true -> continueToParent(dataset, currentFlowDirective)
+            true -> continueToParent(dataset, currentFlowDirective, exprArgs, context)
 
             // control flows that are not completed (do, for, ...), going to a child
             false -> StepResult(
@@ -176,22 +181,27 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // EXIT
     // ========================================
 
-    internal suspend fun continueToParent(dataset: JsonElement, currentFlowDirective: FlowDirective?): StepResult {
+    internal suspend fun continueToParent(
+        dataset: JsonElement,
+        currentFlowDirective: FlowDirective?,
+        exprArgs: ExprArgs,
+        context: ExecutionContext
+    ): StepResult {
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
         val rawOutput = execute(dataset)
 
-        // Set raw input (for scope building)
-        nodeDescriptor.rawOutput = rawOutput
+        // Update context with raw output
+        var outputContext = context.copy(rawOutput = rawOutput)
 
         // Apply output transformation (throws ExpressionException)
-        val transformedOutput = transformOutput(rawOutput)
+        val transformedOutput = transformOutput(rawOutput, exprArgs, outputContext)
 
-        // Set transformed output (for scope building)
-        nodeDescriptor.transformedOutput = transformedOutput
+        // Update context with transformed output
+        outputContext = outputContext.copy(transformedOutput = transformedOutput)
 
         // Validate output (throws ValidationException)
-        validateOutput(transformedOutput)
+        validateOutput(transformedOutput, exprArgs, outputContext)
 
         return StepResult(
             node.parent,
@@ -223,9 +233,10 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * If no `if` is defined, returns true (always execute).
      *
      * @param dataset Input dataset for expression evaluation
+     * @param exprArgs Expression arguments for scope
      * @return true if task should execute, false to skip
      */
-    fun checkIf(dataset: JsonElement): Boolean {
+    fun checkIf(dataset: JsonElement, exprArgs: ExprArgs): Boolean {
         val ifCondition = node.task.`if` ?: return true
         return evalBoolean(dataset, ifCondition, ".if", exprArgs)
     }
@@ -234,9 +245,11 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * Validate input against schema.
      *
      * @param dataset Input dataset to validate
+     * @param exprArgs Expression arguments for scope
+     * @param context Execution context
      * @throws WorkflowException if validation fails
      */
-    private fun validateInput(rawInput: JsonElement) {
+    private fun validateInput(rawInput: JsonElement, exprArgs: ExprArgs, context: ExecutionContext) {
         node.task.input?.schema?.let { schema ->
             validate(rawInput, schema)
         }
@@ -249,11 +262,13 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * If no `input.from` is defined, returns dataset unchanged.
      *
      * @param dataset Input dataset from parent
+     * @param exprArgs Expression arguments for scope
+     * @param context Execution context
      * @return Transformed input
      * @throws WorkflowException if evaluation fails
      */
-    private fun transformInput(rawInput: JsonElement): JsonElement {
-        return eval(rawInput, node.task.input?.from)
+    private fun transformInput(rawInput: JsonElement, exprArgs: ExprArgs, context: ExecutionContext): JsonElement {
+        return eval(rawInput, node.task.input?.from, exprArgs)
     }
 
     /**
@@ -263,19 +278,23 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * If no `output.as` is defined, returns the dataset unchanged.
      *
      * @param dataset The output dataset to be transformed.
+     * @param exprArgs Expression arguments for scope
+     * @param context Execution context
      * @return The transformed output dataset.
      */
-    private fun transformOutput(rawOutput: JsonElement): JsonElement {
-        return eval(rawOutput, node.task.output?.`as`)
+    private fun transformOutput(rawOutput: JsonElement, exprArgs: ExprArgs, context: ExecutionContext): JsonElement {
+        return eval(rawOutput, node.task.output?.`as`, exprArgs)
     }
 
     /**
      * Validate output against schema.
      *
      * @param output Output dataset to validate
+     * @param exprArgs Expression arguments for scope
+     * @param context Execution context
      * @throws WorkflowException if validation fails
      */
-    fun validateOutput(transformedOutput: JsonElement) {
+    fun validateOutput(transformedOutput: JsonElement, exprArgs: ExprArgs, context: ExecutionContext) {
         node.task.output?.schema?.let { schema ->
             validate(transformedOutput, schema)
         }
@@ -309,7 +328,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         data: JsonElement,
         expr: String,
         name: String,
-        scope: JsonObject = this.exprArgs
+        scope: JsonObject
     ): Boolean = eval(data, expr, scope).let {
         when (it is JsonPrimitive && it.booleanOrNull != null) {
             true -> it.boolean
@@ -321,7 +340,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         data: JsonElement,
         expr: String,
         name: String,
-        scope: JsonObject = this.exprArgs
+        scope: JsonObject
     ) = eval(data, expr, scope).let {
         when (it is JsonArray) {
             true -> it.toList()
@@ -329,13 +348,13 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         }
     }
 
-    private fun eval(data: JsonElement, inputFrom: InputFrom?, scope: JsonObject = this.exprArgs) =
+    private fun eval(data: JsonElement, inputFrom: InputFrom?, scope: JsonObject) =
         inputFrom?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
 
-    private fun eval(data: JsonElement, outputAs: OutputAs?, scope: JsonObject = this.exprArgs) =
+    private fun eval(data: JsonElement, outputAs: OutputAs?, scope: JsonObject) =
         outputAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
 
-    private fun eval(data: JsonElement, expr: String, scope: JsonObject = this.exprArgs) = try {
+    private fun eval(data: JsonElement, expr: String, scope: JsonObject) = try {
         JQExpression.eval(data, JsonPrimitive(expr), scope, false)
     } catch (e: Exception) {
         raiseError(EXPRESSION, e.message, e.stackTraceToString())
@@ -344,7 +363,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     protected fun eval(
         data: JsonElement,
         expr: JsonElement,
-        scope: JsonObject = this.exprArgs,
+        scope: JsonObject,
         force: Boolean = false
     ) = try {
         JQExpression.eval(data, expr, scope, force)

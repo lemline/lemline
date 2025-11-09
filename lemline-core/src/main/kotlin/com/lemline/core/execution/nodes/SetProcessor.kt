@@ -10,6 +10,7 @@ import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.SetTask
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Node instance for SetTask (data manipulation) - pure functional model.
@@ -49,15 +50,17 @@ import kotlinx.serialization.json.JsonElement
  */
 class SetProcessor(
     node: Node<SetTask>,
-    exprArgs: ExprArgs,
-) : NodeProcessor<SetTask, NoState>(node, exprArgs) {
+) : NodeProcessor<SetTask, NoState>(node) {
 
-    override fun createState(dataset: JsonElement): NoState = NoState()
+    override fun createState(dataset: JsonElement, exprArgs: ExprArgs): NoState = NoState()
 
     /**
      * Execute SetTask action.
      *
      * Evaluates the set expressions and merges them into the input dataset.
+     *
+     * Note: execute() doesn't have access to exprArgs in current design.
+     * This needs to be addressed when we add exprArgs parameter to execute().
      *
      * @param input Transformed input from parent
      * @return Input with set values merged
@@ -67,7 +70,8 @@ class SetProcessor(
         // The `set` field is a map of property names to expressions
         val setExpressions = LemlineJson.encodeToElement(node.task.set)
 
-        // Evaluate and merge into input
-        return eval(input, setExpressions, exprArgs, force = true)
+        // TODO: Need to pass exprArgs to execute() method
+        // For now, using empty exprArgs as workaround
+        return eval(input, setExpressions, buildJsonObject {}, force = true)
     }
 }

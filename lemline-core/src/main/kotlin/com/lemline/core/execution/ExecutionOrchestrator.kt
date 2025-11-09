@@ -139,15 +139,15 @@ object ExecutionOrchestrator {
     ): StepResult {
         val state = states[node]
         val exprArgs = getExprArgs(node, states)
-        val processor = getNodeProcessor(node, exprArgs)
+        val processor = getNodeProcessor(node)
 
         return if (state == null) {
-            // First time entering this node - doesn't need states
-            processor.enterFromParent(dataset)
+            // First time entering this node - pass exprArgs as parameter
+            processor.enterFromParent(dataset, exprArgs)
         } else {
             // Re-entering after a child completed
             // Safe cast: state was created by the same processor type, so types match
-            (processor as NodeProcessor<T, NodeState>).enterFromChild(state, flowDirective, dataset)
+            (processor as NodeProcessor<T, NodeState>).enterFromChild(state, flowDirective, dataset, exprArgs)
         }
     }
 
@@ -167,14 +167,13 @@ object ExecutionOrchestrator {
 
     @Suppress("UNCHECKED_CAST")
     private fun <T : TaskBase> getNodeProcessor(
-        node: Node<T>,
-        exprArgs: ExprArgs
+        node: Node<T>
     ): NodeProcessor<T, *> {
         return when (node.task) {
-            is DoTask -> DoProcessor(node as Node<DoTask>, exprArgs)
-            is ForTask -> ForProcessor(node as Node<ForTask>, exprArgs)
-            is SetTask -> SetProcessor(node as Node<SetTask>, exprArgs)
-            is SwitchTask -> SwitchProcessor(node as Node<SwitchTask>, exprArgs)
+            is DoTask -> DoProcessor(node as Node<DoTask>)
+            is ForTask -> ForProcessor(node as Node<ForTask>)
+            is SetTask -> SetProcessor(node as Node<SetTask>)
+            is SwitchTask -> SwitchProcessor(node as Node<SwitchTask>)
 
             else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
         } as NodeProcessor<T, *>

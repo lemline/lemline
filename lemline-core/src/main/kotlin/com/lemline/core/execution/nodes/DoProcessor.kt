@@ -45,11 +45,10 @@ import kotlinx.serialization.json.JsonElement
  * @property parent Parent node instance (or null for root)
  */
 class DoProcessor(
-    node: Node<DoTask>,
-    exprArgs: ExprArgs
-) : NodeProcessor<DoTask, DoState>(node, exprArgs) {
+    node: Node<DoTask>
+) : NodeProcessor<DoTask, DoState>(node) {
 
-    override fun createState(dataset: JsonElement): DoState = DoState(
+    override fun createState(dataset: JsonElement, exprArgs: ExprArgs): DoState = DoState(
         startedAt = Clock.System.now(),
         index = -1
     )
