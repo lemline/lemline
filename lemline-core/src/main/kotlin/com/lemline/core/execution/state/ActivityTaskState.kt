@@ -77,8 +77,7 @@ class ActivityTaskState(
     }
 
     override fun nextChildIndex(): Int {
-        // No children
-        return -1
+        throw UnsupportedOperationException("Activity tasks don't have children")
     }
 
     override fun applyFlowDirective(gotoTarget: String?) {

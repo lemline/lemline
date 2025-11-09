@@ -8,6 +8,7 @@ import com.lemline.core.execution.state.NodeState
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import io.serverlessworkflow.api.types.DoTask
+import io.serverlessworkflow.api.types.ForTask
 import io.serverlessworkflow.api.types.SetTask
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -126,9 +127,9 @@ fun buildNodeInstance(node: Node<*>, parent: NodeInstance<*>?): NodeInstance<*> 
 
         is DoTask -> DoNodeInstance(node as Node<DoTask>, parent)
         is SetTask -> SetNodeInstance(node as Node<SetTask>, parent)
+        is ForTask -> ForNodeInstance(node as Node<ForTask>, parent)
 
         // TODO: Add more task types as we implement them
-        // is ForTask -> ForNodeInstance(node as Node<ForTask>, parent)
         // is SwitchTask -> SwitchNodeInstance(node as Node<SwitchTask>, parent)
         // is CallHTTP -> CallHttpInstance(node as Node<CallHTTP>, parent)
 
