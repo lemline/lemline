@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 @file:OptIn(kotlin.time.ExperimentalTime::class)
 
-package com.lemline.core.execution.state
+package com.lemline.core.execution.states
 
 import com.lemline.core.errors.WorkflowError
+import com.lemline.core.execution.context.Scope
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient

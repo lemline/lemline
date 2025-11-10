@@ -1,10 +1,6 @@
-// SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
-package com.lemline.core.execution.nodes
+package com.lemline.core.execution.context
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.execution.state.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
@@ -86,10 +82,7 @@ data class TaskContext(
             input = transformedInput,  // Use transformed input, not raw input
             output = rawOutput  // Use raw output for output transformations
         ).toJsonObject()
-
-        // Debug: Print what we're creating
-        println("DEBUG toScope() for ${node.name}: transformedInput=$transformedInput, rawInput=$rawInput, scope=$scope")
-
+        
         return scope
     }
 }

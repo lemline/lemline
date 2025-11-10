@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution.state
+package com.lemline.core.execution.states
 
+import com.lemline.core.execution.context.Scope
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Clock
@@ -8,7 +9,6 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject

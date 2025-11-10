@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 @file:OptIn(ExperimentalTime::class)
 
-package com.lemline.core.execution.nodes
+package com.lemline.core.execution.processors
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.WorkflowError
 import com.lemline.core.execution.ExecutionOrchestrator
+import com.lemline.core.execution.context.Scope
 import com.lemline.core.execution.models.StepResult
-import com.lemline.core.execution.state.NodeState
-import com.lemline.core.execution.state.Scope
-import com.lemline.core.execution.state.TryState
+import com.lemline.core.execution.states.NodeState
+import com.lemline.core.execution.states.TryState
 import com.lemline.core.nodes.Node
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration

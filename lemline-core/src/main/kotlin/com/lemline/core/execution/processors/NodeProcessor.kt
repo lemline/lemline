@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 @file:OptIn(ExperimentalTime::class)
 
-package com.lemline.core.execution.nodes
+package com.lemline.core.execution.processors
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
@@ -10,10 +10,11 @@ import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
 import com.lemline.core.errors.WorkflowException
+import com.lemline.core.execution.context.Scope
+import com.lemline.core.execution.context.TaskContext
+import com.lemline.core.execution.context.merge
 import com.lemline.core.execution.models.StepResult
-import com.lemline.core.execution.state.NodeState
-import com.lemline.core.execution.state.Scope
-import com.lemline.core.execution.state.merge
+import com.lemline.core.execution.states.NodeState
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask

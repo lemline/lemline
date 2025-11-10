@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution.state
+package com.lemline.core.execution.states
 
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime

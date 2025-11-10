@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 @file:OptIn(ExperimentalTime::class)
 
-package com.lemline.core.execution.nodes
+package com.lemline.core.execution.processors
 
-import com.lemline.core.execution.state.DoState
-import com.lemline.core.execution.state.Scope
+import com.lemline.core.execution.context.Scope
+import com.lemline.core.execution.states.DoState
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.DoTask
 import kotlin.time.Clock
