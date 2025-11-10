@@ -64,7 +64,7 @@ class ForProcessor(
             startedAt = Clock.System.now(),
             collection = evalForIn(transformedInput, scope),
             index = -1
-        )
+        ).from(node)
     }
 
     override fun getNextStepInfo(
@@ -95,7 +95,7 @@ class ForProcessor(
         startedAt = state.startedAt,
         collection = state.collection,
         index = state.index + 1
-    )
+    ).from(node)
 
     private fun evalWhile(dataset: JsonElement, scope: Scope): Boolean {
         val whileCondition = node.task.`while` ?: return true

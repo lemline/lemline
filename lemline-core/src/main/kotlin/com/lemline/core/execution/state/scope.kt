@@ -7,14 +7,14 @@ import kotlinx.serialization.json.buildJsonObject
 typealias Scope = JsonObject
 
 /**
- * Merges the current `ExprArgs` map with another `ExprArgs` map.
+ * Merges the current `Scope` map with another `Scope` map.
  * Entries from the other map will overwrite entries in the current map if the keys are the same.
  *
- * @param other Another `ExprArgs` map to merge with the current map. If null, only the current map will be returned.
- * @return A new `ExprArgs` map containing the merged key-value pairs from both maps.
+ * @param other Another `Scope` map to merge with the current map. If null, only the current map will be returned.
+ * @return A new `Scope` map containing the merged key-value pairs from both maps.
  */
 internal fun Scope.merge(other: Scope?): Scope =
     buildJsonObject {
-        other?.forEach { put(it.key, it.value) }
-        this@merge.forEach { put(it.key, it.value) }
+        this@merge.forEach { put(it.key, it.value) }  // Put base scope first
+        other?.forEach { put(it.key, it.value) }      // Then overwrite with other scope
     }

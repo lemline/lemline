@@ -27,13 +27,14 @@ data class ForState(
     @Transient
     lateinit var forAt: String
 
-    override val scope by lazy {
-        buildJsonObject {
-            put("for.each", JsonPrimitive(forEach))
-            put("for.at", JsonPrimitive(forAt))
-            put("for.in", JsonArray(collection!!))
+    override val scope: Scope
+        get() = buildJsonObject {
+            // Add iteration variables with current values
+            if (index >= 0 && index < (collection?.size ?: 0)) {
+                put(forEach, collection!![index])
+                put(forAt, JsonPrimitive(index))
+            }
         }
-    }
 
     fun from(node: Node<ForTask>): ForState {
         forEach = node.task.`for`.each ?: "item"

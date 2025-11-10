@@ -57,3 +57,40 @@ internal fun getWorkflowProcessor(
         rawInput = input,
     )
 }
+
+/**
+ * Helper function to get workflow node for testing ExecutionOrchestrator.
+ *
+ * @param doYaml The workflow do section in YAML format (will have @ replaced with $)
+ * @param namespace Optional namespace
+ * @param name Optional workflow name
+ * @param version Optional workflow version
+ * @return Root Node for use with ExecutionOrchestrator.run()
+ */
+internal fun getWorkflowNode(
+    doYaml: String,
+    namespace: String = "test",
+    name: String = "workflow-${doYaml.hashCode()}",
+    version: String = "0.1.0",
+): com.lemline.core.nodes.Node<com.lemline.core.nodes.RootTask> {
+    val document =
+        """document:
+              dsl: '1.0.0'
+              namespace: $namespace
+              name: $name
+              version: $version
+        """.trimIndent()
+    // Replace @ with $ only for workflow scope variables
+    val processedYaml = doYaml.trimIndent()
+        .replace("@item", "\$item")
+        .replace("@index", "\$index")
+        .replace("@task", "\$task")
+        .replace("@workflow", "\$workflow")
+        .replace("@input", "\$input")
+        .replace("@output", "\$output")
+        .replace("@context", "\$context")
+        .replace("@runtime", "\$runtime")
+    val workflowYaml = document + "\n" + processedYaml
+    val workflow = DefinitionCache.parseAndPut(workflowYaml)
+    return DefinitionCache.getRootNode(workflow)
+}

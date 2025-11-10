@@ -8,6 +8,7 @@ import com.lemline.core.execution.models.StepResult
 import com.lemline.core.execution.nodes.DoProcessor
 import com.lemline.core.execution.nodes.ForProcessor
 import com.lemline.core.execution.nodes.NodeProcessor
+import com.lemline.core.execution.nodes.RootProcessor
 import com.lemline.core.execution.nodes.SetProcessor
 import com.lemline.core.execution.nodes.SwitchProcessor
 import com.lemline.core.execution.state.MutableStates
@@ -17,6 +18,7 @@ import com.lemline.core.execution.state.States
 import com.lemline.core.execution.state.merge
 import com.lemline.core.execution.state.updateWith
 import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.RootTask
 import io.serverlessworkflow.api.types.DoTask
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.ForTask
@@ -115,7 +117,7 @@ object ExecutionOrchestrator {
             }
         }
 
-        return dataset
+        return input
     }
 
     /**
@@ -138,16 +140,16 @@ object ExecutionOrchestrator {
         flowDirective: FlowDirective?
     ): StepResult {
         val state = states[node]
-        val exprArgs = getExprArgs(node, states)
+        val scope = getScope(node, states)
         val processor = getNodeProcessor(node)
 
         return if (state == null) {
             // First time entering this node - pass exprArgs as parameter
-            processor.enterFromParent(dataset, exprArgs)
+            processor.enterFromParent(dataset, scope)
         } else {
             // Re-entering after a child completed
             // Safe cast: state was created by the same processor type, so types match
-            (processor as NodeProcessor<T, NodeState>).enterFromChild(state, flowDirective, dataset, exprArgs)
+            processor.enterFromChild(state, flowDirective, dataset, scope)
         }
     }
 
@@ -159,24 +161,25 @@ object ExecutionOrchestrator {
      * @param states The `States` map containing the state information for each node.
      * @return An `ExprArgs` map that combines the expression arguments of the current node and its parent hierarchy.
      */
-    private fun getExprArgs(current: Node<*>, states: States): Scope =
+    private fun getScope(current: Node<*>, states: States): Scope =
         (states[current]?.scope ?: buildJsonObject { })
             // Recursively merge with parent scope
-            .merge(current.parent?.let { getExprArgs(it, states) })
+            .merge(current.parent?.let { getScope(it, states) })
 
 
     @Suppress("UNCHECKED_CAST")
     private fun <T : TaskBase> getNodeProcessor(
         node: Node<T>
-    ): NodeProcessor<T, *> {
+    ): NodeProcessor<T, NodeState> {
         return when (node.task) {
+            is RootTask -> RootProcessor(node as Node<RootTask>)
             is DoTask -> DoProcessor(node as Node<DoTask>)
             is ForTask -> ForProcessor(node as Node<ForTask>)
             is SetTask -> SetProcessor(node as Node<SetTask>)
             is SwitchTask -> SwitchProcessor(node as Node<SwitchTask>)
 
             else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
-        } as NodeProcessor<T, *>
+        } as NodeProcessor<T, NodeState>
     }
 
 
