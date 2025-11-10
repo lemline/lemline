@@ -4,18 +4,22 @@
 package com.lemline.core.execution
 
 import com.lemline.common.logger.logger
+import com.lemline.core.errors.WorkflowException
 import com.lemline.core.execution.models.StepResult
 import com.lemline.core.execution.nodes.DoProcessor
 import com.lemline.core.execution.nodes.ForProcessor
 import com.lemline.core.execution.nodes.NodeProcessor
+import com.lemline.core.execution.nodes.RaiseProcessor
 import com.lemline.core.execution.nodes.RootProcessor
 import com.lemline.core.execution.nodes.SetProcessor
 import com.lemline.core.execution.nodes.SwitchProcessor
+import com.lemline.core.execution.nodes.TryProcessor
 import com.lemline.core.execution.state.MutableStates
 import com.lemline.core.execution.state.NodeState
 import com.lemline.core.execution.state.RootState
 import com.lemline.core.execution.state.Scope
 import com.lemline.core.execution.state.States
+import com.lemline.core.execution.state.TryState
 import com.lemline.core.execution.state.merge
 import com.lemline.core.execution.state.updateWith
 import com.lemline.core.nodes.Node
@@ -23,9 +27,11 @@ import com.lemline.core.nodes.RootTask
 import io.serverlessworkflow.api.types.DoTask
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.ForTask
+import io.serverlessworkflow.api.types.RaiseTask
 import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
+import io.serverlessworkflow.api.types.TryTask
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -95,7 +101,7 @@ object ExecutionOrchestrator {
     suspend fun run(
         node: Node<*>,
         dataset: JsonElement,
-        states: MutableStates = mutableMapOf()
+        states: MutableStates = mutableMapOf(),
     ): JsonElement {
 
         // Keep track of the root node to update its context
@@ -121,8 +127,20 @@ object ExecutionOrchestrator {
 
                 // ← Checkpoint: state is consistent for persistence
                 // This is where the states map could be serialized and saved
+            } catch (e: WorkflowException) {
+                logger.debug { "WorkflowException caught at node: ${current?.name}, finding handler..." }
+                val errorResult = handleException(current!!, e, states.toMap())
+
+                // Apply error handling deltas and continue
+                current = errorResult.nextNode
+                input = errorResult.dataset
+                flowDirective = errorResult.flowDirective
+                states.updateWith(errorResult.stateUpdates)
+                // Note: newContext not expected from error handling
+
             } catch (e: Exception) {
-                // States unchanged since run() is pure - no rollback needed
+                // Non-workflow exceptions (bugs) - fail immediately
+                // States unchanged since runStep() is pure - no rollback needed
                 logger.error(e) { "Workflow execution failed at node: ${current?.name ?: "unknown"}" }
                 throw e
             }
@@ -148,7 +166,7 @@ object ExecutionOrchestrator {
         node: Node<T>,
         dataset: JsonElement,
         states: States,
-        flowDirective: FlowDirective?
+        flowDirective: FlowDirective?,
     ): StepResult {
         val state = states[node]
         val scope = getScope(node, states)
@@ -188,6 +206,8 @@ object ExecutionOrchestrator {
             is ForTask -> ForProcessor(node as Node<ForTask>)
             is SetTask -> SetProcessor(node as Node<SetTask>)
             is SwitchTask -> SwitchProcessor(node as Node<SwitchTask>)
+            is TryTask -> TryProcessor(node as Node<TryTask>)
+            is RaiseTask -> RaiseProcessor(node as Node<RaiseTask>)
 
             else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
         } as NodeProcessor<T, NodeState>
@@ -213,7 +233,56 @@ object ExecutionOrchestrator {
                 // Replace context with new context (as per Serverless Workflow spec)
                 states[rootNode] = rootState.copyWithContext(newContext)
             }
+
             else -> throw IllegalStateException("State of root node ${rootNode.reference}, not a RootState: $rootState")
         }
     }
+
+    /**
+     * Handle exception by finding a TryTask and returning appropriate state transition.
+     *
+     * This is a pure function that converts an exception into a StepResult with explicit
+     * state deltas for retry or catch behavior.
+     *
+     * @param failingNode Node where exception occurred
+     * @param exception WorkflowException that was thrown
+     * @param states Current states map (immutable)
+     * @return StepResult with state deltas for retry or catch
+     *
+     * @throws WorkflowException if no handler found
+     */
+    private fun handleException(
+        failingNode: Node<*>,
+        exception: WorkflowException,
+        states: States,
+    ): StepResult {
+        // Find nearest TryTask that can handle this error
+        var tryNode: Node<*>? = failingNode
+
+        while (tryNode != null) {
+            if (tryNode.task is TryTask) {
+                @Suppress("UNCHECKED_CAST")
+                tryNode as Node<TryTask>
+                // current scope of the try node
+                val tryScope = getScope(tryNode, states)
+                // current state of the try node
+                val tryState = states[tryNode] as TryState
+                // build a processor for the try node
+                val processor = getNodeProcessor(tryNode) as TryProcessor
+                // check that this node actually can handle this error
+                if (processor.isCatching(exception.error, tryState, tryScope)) {
+                    return processor.handleError(
+                        failingNode = failingNode,
+                        state = tryState,
+                        tryScope
+                    )
+                }
+            }
+            tryNode = tryNode.parent
+        }
+        // No handler found - fail workflow
+        throw exception
+    }
+
+
 }

@@ -6,6 +6,7 @@ package com.lemline.core.execution.models
 import com.lemline.core.execution.state.NodeState
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.FlowDirective
+import kotlin.time.Duration
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -57,6 +58,7 @@ data class StepResult(
     val nextNode: Node<*>?,
     val dataset: JsonElement,
     val stateUpdates: Map<Node<*>, NodeState?>,
-    val flowDirective: FlowDirective?,
-    val newContext: JsonObject? = null
+    val flowDirective: FlowDirective? = null,
+    val newContext: JsonObject? = null,
+    val delay: Duration? = null
 )

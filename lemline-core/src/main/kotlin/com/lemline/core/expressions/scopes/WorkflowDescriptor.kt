@@ -18,7 +18,7 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class WorkflowDescriptor(
     val id: String,
-    val definition: JsonObject,
+    // val definition: JsonObject,
     val input: JsonElement,
     private val startedAt: JsonObject,
 )

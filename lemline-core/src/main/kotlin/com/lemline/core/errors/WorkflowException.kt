@@ -18,15 +18,15 @@ import kotlin.time.ExperimentalTime
  */
 @ExperimentalTime
 open class WorkflowException(
-    val raising: NodeInstance<*>,
+    val raising: NodeInstance<*>?,
     val error: WorkflowError
 ) : RuntimeException() {
 
     /**
      * Returns the try instance catching the exception, if any.
      */
-    fun getTry(): TryInstance? = raising.getTry(error)
+    fun getTry(): TryInstance? = raising!!.getTry(error)
 
     override fun toString() =
-        "WorkflowException(raising=${raising.node.name}:${raising.node.position}, error=$error)"
+        "WorkflowException(raising=${raising?.node?.name}:${raising?.node?.position}, error=$error)"
 }

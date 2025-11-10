@@ -169,7 +169,7 @@ class Processor(
         rootInstance.runtimeDescriptor = RuntimeDescriptor
         rootInstance.workflowDescriptor = WorkflowDescriptor(
             id = workflowInfo.workflowId.toString(),
-            definition = LemlineJson.encodeToElement(workflow),
+            //definition = LemlineJson.encodeToElement(workflow),
             input = rawInput,
             startedAt = LemlineJson.encodeToElement(DateTimeDescriptor.from(startedAt.toJavaInstant())),
         )

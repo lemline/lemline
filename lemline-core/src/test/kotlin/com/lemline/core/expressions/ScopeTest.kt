@@ -29,7 +29,7 @@ class ScopeTest :
         val testStartedAt = DateTimeDescriptor.from(Instant.now())
         val testWorkflowDescriptor = WorkflowDescriptor(
             id = UUID.randomUUID().toString(),
-            definition = LemlineJson.encodeToElement(workflow),
+            //definition = LemlineJson.encodeToElement(workflow),
             input = testInput,
             startedAt = LemlineJson.encodeToElement(testStartedAt),
         )

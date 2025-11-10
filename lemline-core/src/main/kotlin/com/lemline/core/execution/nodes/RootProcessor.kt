@@ -51,9 +51,8 @@ class RootProcessor(
         startedAt = Clock.System.now(),
         id = UUID.randomUUID().toString(),
         input = transformedInput,
-    ).apply {
-        definition = node.definition
-    }
+        hasRun = false,
+    )
 
     override fun getNextStepInfo(
         state: RootState,

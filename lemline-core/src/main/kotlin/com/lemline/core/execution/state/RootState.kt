@@ -14,7 +14,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 
@@ -24,35 +23,29 @@ data class RootState(
     val id: String,
     val input: JsonElement,
     val context: Scope = buildJsonObject {},
-    val hasRun: Boolean = false,
+    val hasRun: Boolean,
 ) : NodeState() {
 
     @Transient
-    var secrets: Map<String, String> = emptyMap()
+    lateinit var secrets: Map<String, String>
 
-    @Transient
-    lateinit var definition: JsonObject
+    private val workflowDescriptor
+        get() = WorkflowDescriptor(
+            id, input,
+            LemlineJson.encodeToElement(
+                DateTimeDescriptor.from(startedAt.toJavaInstant())
+            ),
+        )
 
     // Compute scope fresh each time to reflect current context
-    override val scope: Scope
-        get() = buildJsonObject {
+    override val scope: Scope by lazy {
+        buildJsonObject {
             put("context", context)
             put("runtime", Json.encodeToJsonElement(RuntimeDescriptor))
-            put("secrets", Json.encodeToJsonElement(secrets))
-            // Only add workflow if definition is initialized
-            if (::definition.isInitialized) {
-                put(
-                    "workflow", Json.encodeToJsonElement(
-                        WorkflowDescriptor(
-                            id, definition, input,
-                            LemlineJson.encodeToElement(
-                                DateTimeDescriptor.from(startedAt.toJavaInstant())
-                            ),
-                        )
-                    )
-                )
-            }
+            //put("secrets", Json.encodeToJsonElement(secrets))
+            put("workflow", Json.encodeToJsonElement(workflowDescriptor))
         }
+    }
 
     /**
      * Creates a new RootState with updated context, copying all transient fields.
@@ -69,9 +62,8 @@ data class RootState(
             hasRun = hasRun,
         )
         // copy also transient fields
-        state.secrets = this.secrets
-        if (::definition.isInitialized) state.definition = definition
-        
+        if (this::secrets.isInitialized) state.secrets = this.secrets
+
         return state
     }
 }

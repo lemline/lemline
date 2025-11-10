@@ -15,6 +15,7 @@ import com.lemline.core.execution.state.Scope
 import com.lemline.core.execution.state.merge
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.RootTask
 import com.lemline.core.schemas.SchemaValidator
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
@@ -451,6 +452,15 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // Create a minimal old NodeInstance for exception
         // This is a temporary hack until we fully migrate to new execution model
         throw WorkflowExecutionException(error.title ?: error.type, Exception(error.details))
+    }
+
+    protected fun getRootTask(): RootTask {
+        var rootNode: Node<*> = node
+        while (rootNode.parent != null) rootNode = rootNode.parent
+
+        if (rootNode.task !is RootTask) throw IllegalStateException("RootNode is not a RootTask! $rootNode")
+
+        return rootNode.task
     }
 }
 
