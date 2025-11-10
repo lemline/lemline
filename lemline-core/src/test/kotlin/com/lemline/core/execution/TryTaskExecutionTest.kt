@@ -181,7 +181,7 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - error data is accessible in catch block`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - trySomething:
                   try:
@@ -194,8 +194,8 @@ class TryTaskExecutionTest {
                     do:
                       - handleError:
                           set:
-                            errorType: ${'$'}{ .error.type }
-                            errorStatus: ${'$'}{ .error.status }
+                            errorType: ${ $error.type }
+                            errorStatus: ${ $error.status }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -209,7 +209,7 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - custom error variable name`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - trySomething:
                   try:
@@ -223,8 +223,8 @@ class TryTaskExecutionTest {
                     do:
                       - handleError:
                           set:
-                            issueType: ${'$'}{ .issue.type }
-                            issueStatus: ${'$'}{ .issue.status }
+                            issueType: ${ $issue.type }
+                            issueStatus: ${ $issue.status }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -238,7 +238,7 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - when condition matches`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - trySomething:
                   try:
@@ -248,7 +248,7 @@ class TryTaskExecutionTest {
                             type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
                             status: 500
                   catch:
-                    when: ${'$'}{ @error.status == 500 }
+                    when: ${ $error.status == 500 }
                     do:
                       - handleError:
                           set:
@@ -262,7 +262,7 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - when condition does not match`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - trySomething:
                   try:
@@ -272,7 +272,7 @@ class TryTaskExecutionTest {
                             type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
                             status: 500
                   catch:
-                    when: ${'$'}{ @error.status == 404 }
+                    when: ${ $error.status == 404 }
                     do:
                       - handleError:
                           set:
@@ -287,7 +287,7 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - exceptWhen condition excludes error`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - trySomething:
                   try:
@@ -297,7 +297,7 @@ class TryTaskExecutionTest {
                             type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
                             status: 500
                   catch:
-                    exceptWhen: ${'$'}{ @error.status == 500 }
+                    exceptWhen: ${ $error.status == 500 }
                     do:
                       - handleError:
                           set:
@@ -312,7 +312,7 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - exceptWhen condition allows error`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - trySomething:
                   try:
@@ -322,7 +322,7 @@ class TryTaskExecutionTest {
                             type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
                             status: 500
                   catch:
-                    exceptWhen: ${'$'}{ @error.status == 404 }
+                    exceptWhen: ${ $error.status == 404 }
                     do:
                       - handleError:
                           set:
@@ -336,7 +336,7 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - successful try block does not enter catch`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - trySomething:
                   try:
@@ -350,7 +350,7 @@ class TryTaskExecutionTest {
                             caught: true
               - afterTry:
                   set:
-                    final: ${'$'}{ .success }
+                    final: ${ .success }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -361,13 +361,13 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - input transformation error is caught`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - trySomething:
                   try:
                     - badTransform:
                         input:
-                          from: @invalidExpression
+                          from: "${ invalid syntax [ }"
                         set:
                           value: "should not reach here"
                   catch:
@@ -448,7 +448,7 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - state is properly cleaned on retry`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - trySomething:
                   try:
@@ -469,7 +469,7 @@ class TryTaskExecutionTest {
                           set:
                             caught: true
                             # If state wasn't cleaned, we'd still have step1 and step2 data
-                            hasStep: ${'$'}{ .step // "none" }
+                            hasStep: ${ .step // "none" }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -482,7 +482,7 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - original input is preserved in catch block`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - prepareData:
                   set:
@@ -502,7 +502,7 @@ class TryTaskExecutionTest {
                       - handleError:
                           set:
                             # Should have access to input from before try block
-                            receivedValue: ${'$'}{ .initialValue }
+                            receivedValue: ${ .initialValue }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -543,13 +543,13 @@ class TryTaskExecutionTest {
 
     @Test
     fun `try catch - output transformation error is caught`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - trySomething:
                   try:
                     - badOutput:
                         output:
-                          as: @invalidExpression
+                          as: "${ invalid syntax [ }"
                         set:
                           value: "test"
                   catch:

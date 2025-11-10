@@ -273,8 +273,9 @@ object ExecutionOrchestrator {
                 if (processor.isCatching(exception.error, tryState, tryScope)) {
                     return processor.handleError(
                         failingNode = failingNode,
+                        error = exception.error,
                         state = tryState,
-                        tryScope
+                        scope = tryScope
                     )
                 }
             }

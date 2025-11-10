@@ -79,6 +79,7 @@ class TryProcessor(
         transformedInput = transformedInput,  // Store for retries/catch
         attemptIndex = -1,
         runningCatch = false,
+        errorAs = node.task.catch?.`as` ?: "error"
     )
 
     /**
@@ -159,6 +160,7 @@ class TryProcessor(
      */
     internal fun handleError(
         failingNode: Node<*>,
+        error: WorkflowError,
         state: TryState,
         scope: Scope
     ): StepResult {
@@ -170,14 +172,14 @@ class TryProcessor(
             shouldRetry -> StepResult(
                 nextNode = getTryNode(),  // Re-enter try body
                 dataset = state.transformedInput,  // Original input
-                stateUpdates = updatesToCleanState(failingNode, state.newAttemptState()),
+                stateUpdates = updatesToCleanState(failingNode, state.newAttemptState(error)),
                 delay = retryPolicy!!.getRetryDelay(state.attemptIndex)
             )
             // Otherwise, enter the catch block
             else -> StepResult(
                 nextNode = getCatchNode(),  // Re-enter try body
                 dataset = state.transformedInput,  // Original input
-                stateUpdates = updatesToCleanState(failingNode, state.toCatchState()),
+                stateUpdates = updatesToCleanState(failingNode, state.toCatchState(error)),
             )
         }
     }

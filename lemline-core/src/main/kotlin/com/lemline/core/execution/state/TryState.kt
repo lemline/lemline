@@ -3,9 +3,14 @@
 
 package com.lemline.core.execution.state
 
+import com.lemline.core.errors.WorkflowError
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 
 /**
  * State for TryTask execution.
@@ -42,20 +47,37 @@ data class TryState(
     val transformedInput: JsonElement,
     val attemptIndex: Int,
     val runningCatch: Boolean,
+    val lastError: WorkflowError? = null,
+    @Transient
+    val errorAs: String = "error"
 ) : NodeState() {
 
-    fun newAttemptState(): TryState = TryState(
+    fun newAttemptState(error: WorkflowError? = null): TryState = TryState(
         startedAt = startedAt,
         transformedInput = transformedInput,
         attemptIndex = attemptIndex + 1,
         runningCatch = false,
+        lastError = lastError,
+        errorAs = errorAs
     )
 
-    fun toCatchState(): TryState = TryState(
+    fun toCatchState(error: WorkflowError): TryState = TryState(
         startedAt = startedAt,
         transformedInput = transformedInput,
         attemptIndex = attemptIndex,
         runningCatch = true, // <= flag used to avoid catching an exception from the catch block
+        lastError = error,
+        errorAs = errorAs
     )
+
+    /**
+     * If it exists, add the error to the scope
+     */
+    override val scope: Scope by lazy {
+        buildJsonObject {
+            lastError?.let { put(errorAs, Json.encodeToJsonElement(it)) }
+        }
+    }
+
 
 }

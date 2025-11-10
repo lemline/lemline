@@ -9,6 +9,7 @@ import com.lemline.core.errors.WorkflowError
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
+import com.lemline.core.errors.WorkflowException
 import com.lemline.core.execution.models.StepResult
 import com.lemline.core.execution.state.NodeState
 import com.lemline.core.execution.state.Scope
@@ -46,23 +47,11 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     /**
      * Create the initial state for this node.
      * Subclasses override to create their specific state type.
-     *
-     * @param transformedInput Transformed input dataset
-     * @param scope Expression arguments
      */
     abstract fun createState(transformedInput: JsonElement, scope: Scope): S
 
     /**
      * Execute node action (for activity tasks).
-     *
-     * Flow tasks return the input unchanged (no action).
-     * Activity tasks perform their action and return the result.
-     * Subclasses override this for specific action implementations.
-     *
-     * @param transformedInput Transformed input for action execution
-     * @param scope complete Scope
-     * @return Raw output from action
-     * @throws com.lemline.core.errors.WorkflowException if action execution fails
      */
     open suspend fun execute(
         transformedInput: JsonElement,
@@ -76,11 +65,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * - the flow directive for the parent (if any)
      *
      * The default implementation returns (null, parent, flowDirective), which is the implementation for a leaf (activity, switch, ...)
-     *
-     * @param state Type-safe state for this node
-     * @param dataset Current dataset
-     * @param nodeName Optional node name for goto directives
-     * @param scope Scope
      */
     open fun getNextStepInfo(
         state: S,
@@ -255,13 +239,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     /**
      * Check if condition for conditional execution.
-     *
-     * Evaluates the task's `if` expression using scope for context.
-     * If no `if` is defined, returns true (always execute).
-     *
-     * @param rawInput Input dataset for expression evaluation
-     * @param scope Expression arguments
-     * @return true if task should execute, false to skip
      */
     fun checkIf(rawInput: JsonElement, scope: Scope): Boolean {
         val ifCondition = node.task.`if` ?: return true
@@ -270,9 +247,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     /**
      * Validate input against schema.
-     *
-     * @param rawInput Input dataset to validate
-     * @throws com.lemline.core.errors.WorkflowException if validation fails
      */
     private fun validateInput(rawInput: JsonElement) {
         node.task.input?.schema?.let { schema ->
@@ -282,14 +256,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     /**
      * Transform input using input.from expression.
-     *
-     * Evaluates the task's `input.from` expression to transform the input dataset.
-     * If no `input.from` is defined, returns dataset unchanged.
-     *
-     * @param rawInput Input dataset from parent
-     * @param scope Expression arguments
-     * @return Transformed input
-     * @throws com.lemline.core.errors.WorkflowException if evaluation fails
      */
     private fun transformInput(rawInput: JsonElement, scope: Scope): JsonElement {
         return eval(rawInput, node.task.input?.from, scope)
@@ -297,13 +263,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     /**
      * Transforms the output dataset using the task's `output.as` expression.
-     *
-     * Evaluates the task's `output.as` expression to produce the transformed output.
-     * If no `output.as` is defined, returns the dataset unchanged.
-     *
-     * @param rawOutput The output dataset to be transformed.
-     * @param scope Expression arguments
-     * @return The transformed output dataset.
      */
     private fun transformOutput(rawOutput: JsonElement, scope: Scope): JsonElement {
         return eval(rawOutput, node.task.output?.`as`, scope)
@@ -311,14 +270,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     /**
      * Exports data to workflow context using the task's `export.as` expression.
-     *
-     * Evaluates the task's `export.as` expression to produce the context data.
-     * The result will be merged into the workflow's `$context` variable.
-     * If no `export.as` is defined, returns null (no export).
-     *
-     * @param transformedOutput The transformed output dataset to export from
-     * @param scope Expression arguments
-     * @return The exported context data, or null if no export is defined
      */
     private fun exportToContext(transformedOutput: JsonElement, scope: Scope): JsonObject? {
         val exportDef = node.task.export ?: return null
@@ -336,9 +287,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     /**
      * Validate output against schema.
-     *
-     * @param transformedOutput Output dataset to validate
-     * @throws com.lemline.core.errors.WorkflowException if validation fails
      */
     fun validateOutput(transformedOutput: JsonElement) {
         node.task.output?.schema?.let { schema ->
@@ -348,13 +296,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     /**
      * Get flow directive from definition.
-     *
-     * Returns the task's `then` field as a FlowDirective (from SDK).
-     *
-     * Most tasks return the `then` field from the definition.
-     * SwitchTask overrides this to return the selected case's `then` directive.
-     *
-     * @return Flow directive (from SDK, or null if not specified)
      */
     fun getFlowDirective(): FlowDirective? {
         return node.task.then
@@ -450,10 +391,12 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
             position = node.position,
         )
         // Create a minimal old NodeInstance for exception
-        // This is a temporary hack until we fully migrate to new execution model
-        throw WorkflowExecutionException(error.title ?: error.type, Exception(error.details))
+        throw WorkflowException(null, error)
     }
 
+    /**
+     * Retrieves the root task of the current node by traversing up the hierarchy.
+     */
     protected fun getRootTask(): RootTask {
         var rootNode: Node<*> = node
         while (rootNode.parent != null) rootNode = rootNode.parent
@@ -463,15 +406,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         return rootNode.task
     }
 }
-
-/**
- * Workflow execution exception.
- * Used when we can't use the old WorkflowException (which requires old NodeInstance).
- */
-class WorkflowExecutionException(
-    message: String,
-    cause: Throwable? = null
-) : RuntimeException(message, cause)
 
 /**
  * Represents the result of determining the next navigation step within a workflow or process.
