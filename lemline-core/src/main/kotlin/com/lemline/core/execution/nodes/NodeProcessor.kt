@@ -85,8 +85,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         dataset: JsonElement,
         nodeName: String? = null,
         scope: Scope,
-    ): Triple<NodeState?, Node<*>?, FlowDirective?> =
-        Triple(null, node.parent, getFlowDirective())
+    ) = NextStepInfo(null, node.parent, getFlowDirective())
 
     // ========================================
     // Entering a Node for the first time
@@ -160,7 +159,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     suspend fun continueTo(
         state: S,
-        dataset: JsonElement,
+        transformedInput: JsonElement,
         parentScope: Scope,
         taskContext: TaskContext?,
         nodeName: String? = null
@@ -168,7 +167,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // get the next node and an updated state for the current node
         val (updatedState, nextNode, currentFlowDirective) = getNextStepInfo(
             state,
-            dataset,
+            transformedInput,
             nodeName,
             parentScope.merge(taskContext?.toScope(node))
         )
@@ -176,12 +175,12 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // check if we should return to parent
         return when (nextNode == node.parent) {
             // case of leaf (activities, switch, ...) OR end of a control flow
-            true -> continueToParent(dataset, currentFlowDirective, parentScope, taskContext)
+            true -> continueToParent(transformedInput, currentFlowDirective, parentScope, taskContext)
 
             // control flows that are not completed (do, for, ...), going to a child
             false -> StepResult(
                 nextNode,
-                dataset,
+                transformedInput,
                 mapOf(node to updatedState),
                 null
             )
@@ -404,3 +403,17 @@ class WorkflowExecutionException(
     message: String,
     cause: Throwable? = null
 ) : RuntimeException(message, cause)
+
+/**
+ * Represents the result of determining the next navigation step within a workflow or process.
+ *
+ * Components:
+ * - A `NodeState?`: The updated state of the current node, null indicates node is completed
+ * - A `Node<*>?`: The next node to navigate to, null indicates navigation ends
+ * - A `FlowDirective?`: Directives influencing the parent execution flow (if any)
+ */
+data class NextStepInfo(
+    val updatedCurrentState: NodeState?,
+    val nextNode: Node<*>?,
+    val flowDirective: FlowDirective?
+)

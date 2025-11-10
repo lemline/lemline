@@ -5,7 +5,6 @@ package com.lemline.core.execution.nodes
 
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.execution.state.NoState
-import com.lemline.core.execution.state.NodeState
 import com.lemline.core.execution.state.Scope
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.FlowDirective
@@ -69,7 +68,7 @@ class SwitchProcessor(
         dataset: JsonElement,
         nodeName: String?,
         scope: Scope,
-    ): Triple<NodeState?, Node<*>?, FlowDirective?> {
+    ): NextStepInfo {
 
         var directive: FlowDirective? = null
 
@@ -83,7 +82,7 @@ class SwitchProcessor(
                 break
             }
 
-            // Evaluate the when condition
+            // Evaluate when condition
             if (evalBoolean(dataset, whenCondition, "switch.when", scope)) {
                 directive = item.switchCase.then
                 break
@@ -94,6 +93,10 @@ class SwitchProcessor(
             raiseError(WorkflowErrorType.EXPRESSION, "No case matches in switch statement")
         }
 
-        return Triple(null, node.parent, directive)
+        return NextStepInfo(
+            updatedCurrentState = null,
+            nextNode = node.parent,
+            flowDirective = directive
+        )
     }
 }

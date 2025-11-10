@@ -4,11 +4,9 @@
 package com.lemline.core.execution.nodes
 
 import com.lemline.core.execution.state.DoState
-import com.lemline.core.execution.state.NodeState
 import com.lemline.core.execution.state.Scope
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.DoTask
-import io.serverlessworkflow.api.types.FlowDirective
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -57,17 +55,38 @@ class DoProcessor(
         dataset: JsonElement,
         nodeName: String?,
         scope: Scope,
-    ): Triple<NodeState?, Node<*>?, FlowDirective?> {
+    ): NextStepInfo {
         val nextIndex = getNextIndex(state, nodeName)
         val updatedState = state.copy(index = nextIndex)
         return when (nextIndex >= (node.children?.size ?: 0)) {
-            true -> Triple(null, node.parent, getFlowDirective())
-            false -> Triple(updatedState, node.children?.get(nextIndex), null)
+            true -> NextStepInfo(
+                updatedCurrentState = null,
+                nextNode = node.parent,
+                flowDirective = getFlowDirective()
+            )
+
+            false -> NextStepInfo(
+                updatedCurrentState = updatedState,
+                nextNode = getChildByIndex(nextIndex),
+                flowDirective = null
+            )
         }
     }
 
     private fun getNextIndex(state: DoState, name: String?): Int = when (name) {
         null -> state.index + 1
-        else -> node.children?.indexOfFirst { it.name == name } ?: throw NoSuchElementException()
+        else -> getChildIndexByName(name)
+    }
+
+    private fun getChildByIndex(index: Int): Node<*> = node.children?.getOrNull(index) ?: throw NoSuchElementException(
+        "No child with index '$index' found in node ${node.reference}"
+    )
+
+    private fun getChildIndexByName(name: String): Int {
+        val index = node.children?.indexOfFirst { it.name == name } ?: -1
+        if (index < 0) {
+            throw NoSuchElementException("No child with name '$name' found in node ${node.reference}")
+        }
+        return index
     }
 }

@@ -72,69 +72,32 @@ flowchart TD
 
 The complete execution state is represented as:
 
-```
-InstanceState = (currentNode, states)
-```
+- `currentNode`: Node<*> - Node to be executed (immutable topology)
+- `dataset`: JsonElement - the data to be processed by this node (must contain valid state for `currentNode` and all its
+  ancestors.)
+- `Map<Node<*>, NodeState>` - Runtime state for each active node (keyed by node)
+- `flowDirective`: FlowDirective? - Optional navigation instruction from child to parent
 
-Where:
-
-- `currentNode`: Node<*> - Currently executing node (immutable topology)
-- `states`: Map<Node<*>, NodeState> - Runtime state for each active node (keyed by node reference)
-
-**Key Separation**:
-
-- `Node<*>` represents the **immutable workflow topology** (what tasks exist, their structure)
-- `Map<Node<*>, NodeState>` represents the **mutable runtime state** (where we are in execution)
-
-**Invariant**: The instance state must always be **consistent** - the `states` map must contain valid state for
-`currentNode` and all its ancestors.
-
-### Dataset
-
-A **dataset** (JSON value) is transported and transformed as execution moves through the tree:
-
-```
-Dataset = JsonElement
-```
-
-The dataset flows:
-
-- **Down**: From parent to child
-- **Up**: From child to parent
-
-### FlowDirective
-
-A **FlowDirective** is a navigation instruction that guides execution flow after a task completes. It is defined in the
-task's `.then` field.
-
-**Possible Values**:
+A **FlowDirective** is a navigation instruction that guides parent execution flow after a leaf task completes. It is
+defined in the
+task's `.then` field:
 
 - `null` or `CONTINUE`: Continue to next sibling in parent's child list
 - `EXIT`: Return to parent immediately
 - `END`: Return to root (complete workflow)
 - `"taskName"`: Jump to specific sibling task by name
 
-**Example**:
+The dataset flows:
 
-```yaml
-do:
-    -   processOrder:
-            set: { status: "processed" }
-            then: notifyCustomer  # FlowDirective: jump to sibling "notifyCustomer"
-
-    -   validateOrder:
-            if: .needsValidation
-            call: http
-            then: exit  # FlowDirective: return to parent immediately
-```
-
----
+- **Down**: From parent to child
+- **Up**: From child to parent
 
 ## Traveling through the Tree
 
 ### Main Execution Loop
 
-The workflow execution is a loop that repeatedly calls the `runStep` function until completion, with exception handling for
+The workflow execution is a loop that repeatedly calls the `runStep` function until completion, with exception handling
+for
 error recovery:
 
 ```kotlin
@@ -144,7 +107,7 @@ fun run(node: Node<*>, dataset: JsonElement, states: MutableStates = mutableMapO
     var flowDirective: FlowDirective? = null
 
     while (current != null) {
-        try:
+        try {
             // Execute current node - pure function returns step result
             val stepResult = runStep(current, input, states.toMap(), flowDirective)
 
@@ -184,8 +147,8 @@ fun MutableStates.updateWith(stateUpdates: Map<Node<*>, NodeState?>) {
 - **Pure Function**: `run()` takes immutable inputs and returns new values (no side effects)
 - **Delta States**: Only changed states are returned, making mutations explicit
 - **No Clone Needed**: Since `run()` is pure, `states` remains unchanged on exception - no need to clone
-- **Atomic Updates**: `applyDelta()` creates a new states map - either apply all changes or none
-- **Checkpointing**: After applying delta, state is consistent for persistence
+- **Atomic Updates**: `updateWith()` update the current states
+- **Checkpointing**: After applying delta, states is consistent for persistence
 - Loop terminates when `current` becomes `null` (workflow complete)
 - Dataset flows as function parameters (functional, no storage)
 
@@ -259,6 +222,7 @@ All return: `StepResult(next, dataset, stateUpdates, flowDirective)`
 **Building Scope**:
 
 Scope is built hierarchically by combining:
+
 1. Node-specific scope variables (from `NodeState.scope` property, e.g., `$item`, `$index` for ForTask)
 2. TaskContext scope (from `TaskContext.toScope()`, provides `$task`, `$input`, `$output`)
 3. Parent scope (recursive merge up the tree)
@@ -462,7 +426,8 @@ suspend fun enterFromChild(
 
 ### Continue Function
 
-Determines the next step based on state and optional task name (for goto). This is a **pure function** - computes navigation
+Determines the next step based on state and optional task name (for goto). This is a **pure function** - computes
+navigation
 without mutating state.
 
 ```kotlin
@@ -605,7 +570,8 @@ stateDiagram-v2
 
 ## Error Handling
 
-**Note**: Error handling with Try/Catch is not yet fully implemented in the current execution model. The sections below describe the planned design for when it is implemented.
+**Note**: Error handling with Try/Catch is not yet fully implemented in the current execution model. The sections below
+describe the planned design for when it is implemented.
 
 ### Exception Flow
 
@@ -758,6 +724,7 @@ sealed class NodeState {
 - `NoState` (for leaf nodes like SetTask): No additional fields beyond `startedAt`
 
 **Key Difference from Document**:
+
 - **No `rawInput` or `transformedInput`** stored in state
 - These are managed via temporary `TaskContext` during execution
 - This minimizes state size for serialization/persistence
@@ -768,15 +735,18 @@ When persisting workflow state for resumption (e.g., to database or message brok
 serialized. The current implementation uses a **minimal state** approach:
 
 **What is serialized**:
+
 - `startedAt: Instant` - Timestamp when node started
 - Node-specific runtime state (e.g., `index` for DoTask, `collection` + `index` for ForTask)
 
 **What is NOT serialized**:
+
 - `rawInput` / `transformedInput` - Not stored in state (managed via TaskContext during execution)
 - `scope` - Computed on-demand from state + parent chain (marked `@Transient`)
 - Node variable names (`forEach`, `forAt` in ForState) - Marked `@Transient`, recomputed from definition
 
 **Trade-offs**:
+
 1. **Smaller serialized state** - Less data to persist, faster serialization
 2. **Re-computation on resume** - Must re-evaluate `for.in` expression and rebuild scope from definition
 3. **Requires deterministic expressions** - Expressions must produce same results when re-evaluated

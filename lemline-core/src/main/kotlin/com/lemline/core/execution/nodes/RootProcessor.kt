@@ -3,12 +3,11 @@
 
 package com.lemline.core.execution.nodes
 
-import com.lemline.core.execution.state.DoState
-import com.lemline.core.execution.state.NodeState
+import com.lemline.core.execution.state.RootState
 import com.lemline.core.execution.state.Scope
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
-import io.serverlessworkflow.api.types.FlowDirective
+import java.util.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -46,29 +45,37 @@ import kotlinx.serialization.json.JsonElement
  */
 class RootProcessor(
     node: Node<RootTask>
-) : NodeProcessor<RootTask, DoState>(node) {
+) : NodeProcessor<RootTask, RootState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): DoState = DoState(
+    override fun createState(transformedInput: JsonElement, scope: Scope): RootState = RootState(
         startedAt = Clock.System.now(),
-        index = -1
-    )
+        id = UUID.randomUUID().toString(),
+        input = transformedInput,
+    ).apply {
+        definition = node.definition
+    }
 
     override fun getNextStepInfo(
-        state: DoState,
+        state: RootState,
         dataset: JsonElement,
         nodeName: String?,
         scope: Scope,
-    ): Triple<NodeState?, Node<*>?, FlowDirective?> {
-        val nextIndex = getNextIndex(state, nodeName)
-        val updatedState = state.copy(index = nextIndex)
-        return when (nextIndex >= (node.children?.size ?: 0)) {
-            true -> Triple(null, node.parent, getFlowDirective())
-            false -> Triple(updatedState, node.children?.get(nextIndex), null)
+    ): NextStepInfo = when (state.hasRun) {
+        true -> NextStepInfo(
+            updatedCurrentState = null,
+            nextNode = null,
+            flowDirective = null
+        )
+
+        false -> {
+            val updatedState = state.copy(hasRun = true)
+            NextStepInfo(
+                updatedCurrentState = updatedState,
+                nextNode = getDoNode(),
+                flowDirective = null
+            )
         }
     }
 
-    private fun getNextIndex(state: DoState, name: String?): Int = when (name) {
-        null -> state.index + 1
-        else -> node.children?.indexOfFirst { it.name == name } ?: throw NoSuchElementException()
-    }
+    private fun getDoNode() = node.children?.getOrNull(0) ?: throw NoSuchElementException("RootTask has no do task")
 }

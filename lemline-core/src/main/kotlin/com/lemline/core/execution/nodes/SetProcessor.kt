@@ -8,10 +8,10 @@ import com.lemline.core.execution.state.NoState
 import com.lemline.core.execution.state.Scope
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.SetTask
+import io.serverlessworkflow.api.types.SetTaskConfiguration
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Node instance for SetTask (data manipulation) - pure functional model.
@@ -73,12 +73,11 @@ class SetProcessor(
         var currentDataset = transformedInput
 
         // Convert set to JsonObject to iterate over entries
-        val setExpressions = LemlineJson.encodeToElement(node.task.set) as? JsonObject
-            ?: throw IllegalArgumentException("Set task must contain an object")
+        val setExpressions = LemlineJson.encodeToElement(getSet()) as JsonObject
 
         // Iterate through each set expression
         for ((key, valueExpr) in setExpressions) {
-            // Evaluate the expression against current dataset
+            // Evaluate the expression against the current dataset
             val evaluatedValue = eval(currentDataset, valueExpr, scope, force = false)
 
             // Merge into current dataset
@@ -90,4 +89,6 @@ class SetProcessor(
 
         return currentDataset
     }
+
+    private fun getSet(): SetTaskConfiguration = node.task.set ?: throw NoSuchElementException("SetTask has no set")
 }
