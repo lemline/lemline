@@ -18,10 +18,21 @@ transformation.
     - Enter from Down
     - Continue Function
     - Exit to Up Function
-4. [Node Type Implementations](#node-type-implementations)
-    - DoTask, ForTask, SwitchTask, TryTask, ActivityTask
-5. [Dataset Transformation Pipeline](#dataset-transformation-pipeline)
-6. [Expression Evaluation Scope](#expression-evaluation-scope)
+4. [Error Handling](#error-handling)
+    - Core Concepts
+    - Exception Flow
+    - Handler Search Principles
+    - Retry vs Catch Decision
+    - Retry Behavior
+    - Catch Behavior
+    - Error Matching Filters
+    - State Structure
+    - RaiseTask
+    - Key Design Principles
+5. [Node Type Implementations](#node-type-implementations)
+    - DoTask, ForTask, SwitchTask, TryTask, RaiseTask, ActivityTask
+6. [Dataset Transformation Pipeline](#dataset-transformation-pipeline)
+7. [Expression Evaluation Scope](#expression-evaluation-scope)
     - Scope vs Dataset
     - Scope Structure
     - Task Descriptor
@@ -29,8 +40,8 @@ transformation.
     - Where Scope is Used
     - ForTask Scope Examples
     - Scope and Dataset Interaction
-7. [Complete Example](#complete-example)
-8. [Summary](#summary)
+8. [Complete Example](#complete-example)
+9. [Summary](#summary)
 
 ---
 
@@ -193,247 +204,225 @@ When **exiting to parent** (work complete):
 Error handling in Lemline follows a **pure functional approach** where exceptions are caught by the orchestrator and
 converted to explicit state transitions. This maintains consistency with the overall pure functional execution model.
 
-### Overview
+### Core Concepts
 
-When an exception occurs during workflow execution:
+**Exception-Based Control Flow**: When a workflow error occurs (from a RaiseTask or an activity failure), it throws a
+`WorkflowException` that propagates up the call stack until caught by the orchestrator's main execution loop.
 
-1. **Exception Thrown**: A processor throws `WorkflowException` during `runStep()`
+**Handler Search**: The orchestrator walks up the parent chain looking for a `TryTask` node that can handle the error
+based on error filters and conditions.
+
+**State Transition**: The TryTask processor examines the error and decides whether to retry the try block or enter the
+catch block, returning a `StepResult` with explicit state deltas.
+
+**Pure Functions**: All error handling logic is implemented as pure functions that return state changes rather than
+mutating state directly.
+
+### Exception Flow
+
+When a `WorkflowException` is thrown during workflow execution:
+
+1. **Exception Caught**: The orchestrator's main loop catches the exception
 2. **State Unchanged**: Because `runStep()` is pure, the states map remains unchanged (no rollback needed)
-3. **Handler Search**: The orchestrator finds the nearest `TryTask` ancestor that can handle the error
-4. **Pure State Transition**: A pure `handleException()` function returns `StepResult` with explicit state deltas
-5. **State Applied**: The orchestrator applies state changes and continues execution (retry or catch)
+3. **Handler Search**: The orchestrator walks up the parent chain to find a `TryTask` that can handle the error
+4. **Error Matching**: Each `TryTask` is tested to see if it can catch this error (based on filters and conditions)
+5. **State Transition**: The matching `TryTask` processor returns a `StepResult` with state deltas for retry or catch
+6. **State Applied**: The orchestrator applies state changes and continues execution
 
-### Exception Flow in Orchestrator
+```mermaid
+flowchart TD
+    Execute[Execute Step] --> Success{Success?}
+    Success -->|Yes| Continue[Continue to Next Step]
+    Success -->|No| Exception[WorkflowException Thrown]
+    Exception --> FindHandler[Walk Parent Chain]
+    FindHandler --> TryNode{Found TryTask?}
+    TryNode -->|No| Fail[Workflow Fails]
+    TryNode -->|Yes| CheckMatch{Can Catch?}
+    CheckMatch -->|No| FindHandler
+    CheckMatch -->|Yes| DecideAction{Should Retry?}
+    DecideAction -->|Yes| Retry[Clean State & Retry Try Block]
+    DecideAction -->|No| Catch[Clean State & Enter Catch Block]
+    Retry --> Continue
+    Catch --> Continue
+```
 
-The main execution loop catches exceptions and handles them via pure functions:
+### Handler Search Principles
 
-```kotlin
-while (current != null) {
-    try {
-        // Pure function - if it throws, state is unchanged
-        val stepResult = runStep(current, input, states.toMap(), flowDirective)
+**Parent Chain Walk**: The search starts at the failing node's parent and walks up the tree until it finds a `TryTask`
+or reaches the root.
 
-        current = stepResult.nextNode
-        input = stepResult.dataset
-        flowDirective = stepResult.flowDirective
-        states.updateWith(stepResult.stateUpdates)
+**Matching Logic**: For each `TryTask` encountered, the processor checks:
 
-    } catch (e: WorkflowException) {
-        // Call pure error handler - returns StepResult with state deltas
-        val errorResult = handleException(current, e, states.toMap(), input)
+1. **Not Already in Catch**: If `runningCatch` flag is true, skip (prevents catching errors from catch block itself)
+2. **Error Filters**: Match against `errors.with.type`, `errors.with.status`, `errors.with.instance`, etc.
+3. **Conditions**: Evaluate `when` and `exceptWhen` expressions with error available in scope
 
-        // Apply error handling deltas and continue
-        current = errorResult.nextNode
-        input = errorResult.dataset
-        flowDirective = errorResult.flowDirective
-        states.updateWith(errorResult.stateUpdates)
+**First Match Wins**: The first `TryTask` that passes all checks handles the error. If no handler matches, the workflow
+fails.
+
+### Retry vs Catch Decision
+
+Once a matching `TryTask` is found, the processor decides whether to retry or catch:
+
+**Retry Conditions** (all must be true):
+
+- Retry policy exists in the catch block
+- `attemptIndex < limit.attempt.count`
+- `duration < limit.duration` (if specified)
+- `when` condition is true (if specified in retry policy)
+- `exceptWhen` condition is false (if specified in retry policy)
+
+**Catch Fallback**: If any retry condition fails, execution enters the catch block instead.
+
+### Retry Behavior
+
+When retry is selected:
+
+1. **State Cleaning**: All states from the failing node up to (but not including) the TryTask are deleted
+2. **Attempt Increment**: The TryTask's `attemptIndex` is incremented
+3. **Return to Try Block**: Execution resumes at the try block's first child
+4. **Original Input**: The stored `transformedInput` is used (same as initial attempt)
+5. **Delay**: If retry policy specifies a delay, the step result includes it for scheduling
+
+**Retry Delay Calculation**:
+
+- Starts with `retry.delay` base duration
+- Applies backoff strategy: constant, linear, or exponential
+- Adds random jitter if configured
+- Respects `retry.limit.attempt.duration` maximum
+
+### Catch Behavior
+
+When catch block is entered:
+
+1. **State Cleaning**: All states from the failing node up to (but not including) the TryTask are deleted
+2. **Catch Flag**: The TryTask's `runningCatch` flag is set to true (prevents re-catching)
+3. **Error Storage**: The error is stored in `lastError` field of TryState
+4. **Scope Addition**: The error is added to scope under configurable name (default: `$error`)
+5. **Enter Catch Block**: Execution continues at the catch block's first child
+6. **Original Input**: The stored `transformedInput` is used as input to catch block
+
+**Error in Scope**: The catch block and its children can access the error via scope:
+
+- `$error.type` - Error type URI
+- `$error.status` - HTTP status code
+- `$error.instance` - JSON Pointer to failing node
+- `$error.title` - Human-readable summary
+- `$error.details` - Detailed explanation
+
+### Error Matching Filters
+
+**Static Filters** (`errors.with.*`):
+
+- `type`: Match error type URI (string comparison)
+- `status`: Match HTTP status code (integer comparison)
+- `instance`: Match JSON Pointer to error origin
+- `title`: Match error title
+- `details`: Match error details
+
+**Dynamic Conditions**:
+
+- `when`: JQ expression that must evaluate to true (error available as `$error` in scope)
+- `exceptWhen`: JQ expression that must evaluate to false
+
+**Example**:
+
+```yaml
+catch:
+    errors:
+        with:
+            type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
+            status: 503
+    when: $error.details | contains("timeout")
+    exceptWhen: $error.instance | contains("healthCheck")
+```
+
+### State Structure
+
+**TryState Fields**:
+
+- `startedAt`: When the try block first started
+- `transformedInput`: Input after `input.from` transformation (stored for retries/catch)
+- `attemptIndex`: Current attempt number (0 = first attempt, 1 = first retry, etc.)
+- `runningCatch`: Boolean flag indicating catch block is executing
+- `lastError`: The most recent error caught (for scope access)
+- `errorAs`: Variable name for error in scope (default: "error")
+
+**Scope Property**: TryState provides a computed `scope` property that includes the error:
+
+```json
+{
+    "$error": {
+        "type": "https://serverlessworkflow.io/spec/1.0.0/errors/communication",
+        "status": 503,
+        "instance": "#/tasks/0/callAPI",
+        "title": "Service Unavailable",
+        "details": "Connection timeout after 30s"
     }
 }
 ```
 
-### Finding a Handling Try Block
+### RaiseTask
 
-Walk up the parent chain to find a `TryTask` that can handle the error:
+**Purpose**: Explicitly raise a workflow error from within a workflow definition.
 
-```kotlin
-fun findHandlingTry(
-    failingNode: Node<*>,
-    exception: WorkflowException,
-    states: States
-): Node<TryTask>? {
-    var current: Node<*>? = failingNode
+**Behavior**:
 
-    while (current != null) {
-        if (current.task is TryTask) {
-            val tryState = states[current] as? TryState
-            val processor = getNodeProcessor(current) as TryProcessor
+- Evaluates error definition to create `WorkflowError` object
+- Throws `WorkflowException` which propagates to orchestrator
+- Can be caught by ancestor `TryTask` like any other error
 
-            // Check if this TryTask can handle the error (retry or catch)
-            if (tryState != null &&
-                (processor.shouldRetry(tryState, exception) ||
-                 processor.canCatch(current, exception))) {
-                return current as Node<TryTask>
-            }
-        }
-        current = current.parent
-    }
+**Example**:
 
-    return null  // No handler found - workflow will fail
-}
-```
-
-### Handle Exception (Pure Function)
-
-Convert exception to state transition:
-
-```kotlin
-fun handleException(
-    failingNode: Node<*>,
-    exception: WorkflowException,
-    states: States,
-    dataset: JsonElement
-): StepResult {
-    // Find nearest TryTask that can handle this error
-    val tryNode = findHandlingTry(failingNode, exception, states)
-        ?: throw exception  // No handler found - workflow fails
-
-    val tryState = states[tryNode] as TryState
-    val tryProcessor = getNodeProcessor(tryNode) as TryProcessor
-
-    return if (tryProcessor.shouldRetry(tryState, exception)) {
-        // Retry: reset state, increment attempt, return to try body
-        createRetryResult(tryNode, tryState, failingNode, states)
-    } else {
-        // Catch: reset state, enter catch block with error data
-        createCatchResult(tryNode, tryState, failingNode, exception, states)
-    }
-}
-```
-
-### Retry Result (Pure Function)
-
-When retry is needed, return explicit state deltas:
-
-```kotlin
-fun createRetryResult(
-    tryNode: Node<TryTask>,
-    tryState: TryState,
-    failingNode: Node<*>,
-    states: States
-): StepResult {
-    // Build state updates map
-    val stateUpdates = buildMap {
-        // Remove all states from failing node up to try body (exclusive)
-        collectNodesToRemove(failingNode, tryNode, states).forEach { node ->
-            put(node, null)  // null = delete state
-        }
-
-        // Update try state with incremented attempt
-        put(tryNode, tryState.copy(attemptIndex = tryState.attemptIndex + 1))
-    }
-
-    return StepResult(
-        nextNode = tryNode.children?.firstOrNull(),  // Re-enter try body
-        dataset = tryState.transformedInput,  // Original input
-        stateUpdates = stateUpdates,
-        flowDirective = null,
-        newContext = null
-    )
-}
-```
-
-### Catch Result (Pure Function)
-
-When entering catch block, return explicit state deltas with error data:
-
-```kotlin
-fun createCatchResult(
-    tryNode: Node<TryTask>,
-    tryState: TryState,
-    failingNode: Node<*>,
-    exception: WorkflowException,
-    states: States
-): StepResult {
-    val tryProcessor = getNodeProcessor(tryNode) as TryProcessor
-    val catchIndex = tryProcessor.findMatchingCatch(tryNode, exception)
-
-    // Build state updates map
-    val stateUpdates = buildMap {
-        // Remove all states from failing node up to try body (exclusive)
-        collectNodesToRemove(failingNode, tryNode, states).forEach { node ->
-            put(node, null)  // null = delete state
-        }
-
-        // Update try state to enter catch mode
-        put(tryNode, tryState.copy(
-            inCatch = true,
-            catchIndex = catchIndex,
-            lastError = exception.toErrorObject(),
-            transformedInput = null  // Clear to save memory
-        ))
-    }
-
-    // Get the matching catch block
-    val catchChild = tryNode.children?.get(catchIndex + 1)  // +1 because first child is try body
-
-    // Prepare dataset with error information
-    val datasetWithError = tryState.transformedInput.mergeWith(
-        buildJsonObject {
-            put("error", exception.toErrorObject())
-        }
-    )
-
-    return StepResult(
-        nextNode = catchChild,
-        dataset = datasetWithError,
-        stateUpdates = stateUpdates,
-        flowDirective = null,
-        newContext = null
-    )
-}
-```
-
-### Collecting Nodes to Remove
-
-Helper to identify which states need deletion:
-
-```kotlin
-fun collectNodesToRemove(
-    failingNode: Node<*>,
-    tryNode: Node<*>,
-    states: States
-): List<Node<*>> {
-    val toRemove = mutableListOf<Node<*>>()
-    var current: Node<*>? = failingNode
-
-    // Walk up from failing node until we reach try node
-    while (current != null && current != tryNode) {
-        if (states.containsKey(current)) {
-            toRemove.add(current)
-        }
-        current = current.parent
-    }
-
-    return toRemove
-}
+```yaml
+validateOrder:
+    if: .total < 0
+    raise:
+        error:
+            type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+            status: 400
+            title: Invalid Order Total
+            details: Order total cannot be negative
 ```
 
 ### Key Design Principles
 
 **Pure Functional State Transitions**:
+
 - `runStep()` is pure - if it throws, states map is unchanged
-- `handleException()` is pure - returns explicit `StepResult` with state deltas
+- Error handling returns explicit `StepResult` with state deltas
 - No state mutations - all changes via `stateUpdates: Map<Node<*>, NodeState?>`
 - State deltas show exactly what changed (null = delete, non-null = insert/update)
 
 **No Rollback Needed**:
+
 - Exception during `runStep()` leaves state unchanged (pure function failed)
-- `handleException()` computes deltas from that consistent checkpoint
+- Error handler computes deltas from that consistent checkpoint
 - Orchestrator applies deltas atomically via `states.updateWith()`
 
-**Retry Behavior**:
-- TryTask stores `transformedInput` for consistent retry input
-- Each retry increments `attemptIndex` in TryState
-- States from failing node up to try body are removed (fresh start)
-- Execution continues from first child of TryTask (try body)
+**Stored Input for Consistency**:
 
-**Catch Behavior**:
-- Catch blocks receive TryTask's original `transformedInput` plus error data
-- Error data is merged into dataset (accessible via expressions)
-- Error also available in scope as `$error` for conditions
-- TryState updated to `inCatch = true`, `catchIndex` set to matching catch
-- `transformedInput` cleared to save memory (no longer needed)
+- TryTask stores `transformedInput` (only flow task that does this)
+- Retries receive identical input for deterministic re-execution
+- Catch blocks receive same input plus error information
 
-**Error Type Matching**:
-- Each catch block can specify error filters (`errors.with.type`, `errors.with.status`)
-- Catch blocks can use `when` conditions for dynamic matching
-- First matching catch block is selected
-- If no catch matches, exception propagates to next TryTask ancestor
+**State Cleaning**:
 
-**Parent Chain Search**:
+- States from failing node up to try body are removed via state deltas
+- Ensures clean re-execution without stale state
+- Explicit deletions visible in `stateUpdates` map
+
+**Hierarchical Error Handling**:
+
 - TryTask doesn't need to be immediate parent - can be any ancestor
 - Search walks up parent chain until handler found or root reached
-- If no handler found, workflow fails with original exception
+- Multiple TryTask levels create nested error handling scopes
+
+**Catch Block Protection**:
+
+- `runningCatch` flag prevents re-catching errors from catch block itself
+- Errors in catch block propagate to next TryTask ancestor
+- Prevents infinite error handling loops
 
 ---
 
@@ -809,105 +798,187 @@ Attempts execution with retry and catch blocks for error handling.
 @Serializable
 data class TryState(
     override val startedAt: Instant,        // When task started
-    val transformedInput: JsonElement?,     // After input.from (for retries/catch)
-    val attemptIndex: Int,                  // Current retry attempt (0-based)
-    val inCatch: Boolean,                   // Whether in catch block
-    val catchIndex: Int,                    // Which catch block is active (-1 if not in catch)
-    val lastError: JsonObject?              // Last caught error (for context)
-) : NodeState()
+    val transformedInput: JsonElement,      // After input.from (for retries/catch)
+    val attemptIndex: Int,                  // Current retry attempt (-1 before first attempt)
+    val runningCatch: Boolean,              // Whether currently executing catch block
+    val lastError: WorkflowError?,          // Last caught error (for scope access)
+    val errorAs: String                     // Variable name for error in scope (default: "error")
+) : NodeState() {
+    // Computed scope property that includes error if present
+    override val scope: Scope
+        get() = buildJsonObject {
+            lastError?.let { put(errorAs, Json.encodeToJsonElement(it)) }
+        }
+}
 ```
 
 **Node-Type-Specific Operations**:
 
+The TryProcessor manages two distinct execution paths:
+
+1. **Normal Flow** (no exception): Create state → enter try block → complete → exit to parent
+2. **Error Flow** (exception caught): Determine retry vs catch → clean state → return to try or enter catch
+
+**Initial State Creation**:
+
 ```kotlin
-class TryProcessor(node: Node<TryTask>) : NodeProcessor<TryTask, TryState>(node) {
+override fun createState(transformedInput: JsonElement, scope: Scope): TryState =
+    TryState(
+        startedAt = Clock.System.now(),
+        transformedInput = transformedInput,  // Store for retries/catch
+        attemptIndex = -1,                    // Will be incremented to 0 on first attempt
+        runningCatch = false,
+        lastError = null,
+        errorAs = node.task.catch?.`as` ?: "error"
+    )
+```
 
-    // Create initial state
-    override fun createState(transformedInput: JsonElement, scope: Scope): TryState =
-        TryState(
-            startedAt = Clock.System.now(),
-            transformedInput = transformedInput,  // Store for retries/catch
-            attemptIndex = 0,
-            inCatch = false,
-            catchIndex = -1,
-            lastError = null
+**Normal Navigation** (called by orchestrator when no exception):
+
+```kotlin
+override fun getNextStepInfo(
+    state: TryState,
+    dataset: JsonElement,
+    nodeName: String?,
+    scope: Scope,
+): NextStepInfo = when (state.attemptIndex < 0) {
+    // First attempt - enter try block
+    true -> NextStepInfo(
+        updatedCurrentState = state.copy(attemptIndex = 0),
+        nextNode = getTryNode(),  // First child
+        flowDirective = null
+    )
+    // Try or catch block completed - exit to parent
+    false -> NextStepInfo(
+        updatedCurrentState = null,  // Clean state
+        nextNode = node.parent,
+        flowDirective = getFlowDirective()
+    )
+}
+```
+
+**Error Matching** (called by orchestrator when exception occurs):
+
+```kotlin
+internal fun isCatching(error: WorkflowError, state: TryState, scope: Scope): Boolean {
+    // Don't catch errors from catch block itself
+    if (state.runningCatch) return false
+
+    // Must have catch block defined
+    val catchDef = node.task.catch ?: return false
+
+    // Test error filters (type, status, instance, title, details)
+    catchDef.errors?.with?.let { filter ->
+        if (filter.type != null && filter.type != error.type) return false
+        if (filter.status > 0 && filter.status != error.status) return false
+        // ... other filters
+    }
+
+    // Build scope with error for condition evaluation
+    val filterScope = scope.merge(buildJsonObject {
+        put(errorAs, LemlineJson.encodeToElement(error))
+    })
+
+    // Test when/exceptWhen conditions
+    catchDef.`when`?.let { if (!evalBoolean(..., filterScope)) return false }
+    catchDef.exceptWhen?.let { if (evalBoolean(..., filterScope)) return false }
+
+    return true
+}
+```
+
+**Error Handling** (returns state transition):
+
+```kotlin
+internal fun handleError(
+    failingNode: Node<*>,
+    error: WorkflowError,
+    state: TryState,
+    scope: Scope
+): StepResult {
+    val shouldRetry = shouldRetry(state, scope)
+
+    return when {
+        // Retry if conditions met
+        shouldRetry -> StepResult(
+            nextNode = getTryNode(),
+            dataset = state.transformedInput,
+            stateUpdates = updatesToCleanState(failingNode, state.copy(attemptIndex = state.attemptIndex + 1)),
+            delay = retryPolicy.getRetryDelay(state.attemptIndex)
         )
-
-    // Determine next step - called by continueTo()
-    override fun getNextStepInfo(
-        state: TryState,
-        dataset: JsonElement,
-        nodeName: String?,
-        scope: Scope,
-    ): Triple<NodeState?, Node<*>?, FlowDirective?> {
-        return if (state.inCatch) {
-            // Catch block completed - exit to parent
-            Triple(null, node.parent, getFlowDirective())
-        } else {
-            // Try block completed successfully - exit to parent
-            Triple(null, node.parent, getFlowDirective())
-        }
-    }
-
-    // Check if should retry (called by handleException in orchestrator)
-    fun shouldRetry(state: TryState, exception: WorkflowException): Boolean {
-        val catchDef = node.task.catch ?: return false
-        val retryConfig = catchDef.retry ?: return false
-        val limit = retryConfig.limit?.attempt?.count ?: 1
-
-        return state.attemptIndex < limit
-    }
-
-    // Check if this TryTask can catch the given exception
-    fun canCatch(node: Node<TryTask>, exception: WorkflowException): Boolean {
-        val catchDef = node.task.catch ?: return false
-        val doCatchDef = catchDef.`do` ?: return false  // Must have do block
-
-        // Check error filters
-        val errorFilter = catchDef.errors?.`with`
-        if (errorFilter != null) {
-            // Type filter
-            if (errorFilter.type != null && exception.error.type != errorFilter.type) {
-                return false
-            }
-            // Status filter
-            if (errorFilter.status != null && exception.error.status != errorFilter.status) {
-                return false
-            }
-        }
-
-        // when/exceptWhen conditions evaluated during execution
-        return true
-    }
-
-    // Find matching catch block index (currently single catch block supported)
-    fun findMatchingCatch(node: Node<TryTask>, exception: WorkflowException): Int {
-        val catchDef = node.task.catch
-            ?: throw IllegalStateException("No catch block defined")
-
-        // For now, return 0 (single catch block in DSL)
-        // The spec defines TryTask.catch as a single object, not a list
-        return 0
+        // Otherwise enter catch block
+        else -> StepResult(
+            nextNode = getCatchNode(),
+            dataset = state.transformedInput,
+            stateUpdates = updatesToCleanState(failingNode, state.copy(runningCatch = true, lastError = error))
+        )
     }
 }
 ```
 
-**Important Notes**:
+**Important Design Notes**:
 
-- **Stored Input**: TryTask stores `transformedInput` to provide consistent input for retries and catch blocks. This is
-  the only flow task that stores input.
-- **Retry First**: When the try body throws an exception, `handleException()` checks `shouldRetry()` before entering
-  catch. If retries remain, state is reset and execution returns to try body.
-- **State Reset**: Both retry and catch operations remove states from the failing node up to the try body (via state
-  deltas in `StepResult`), ensuring clean re-execution.
-- **Catch After Retries**: Only when `attemptIndex >= limit` (retries exhausted) does `handleException()` enter
-  the catch block.
-- **Error Type Matching**: Catch blocks can specify error filters (`errors.with.type`, `errors.with.status`) and
-  conditions (`when`, `exceptWhen`) to selectively handle errors.
-- **Dataset Flow**:
-    - Retries receive the stored `transformedInput` (no error info)
-    - Catch blocks receive the stored `transformedInput` plus error information merged in
-    - After entering catch, `transformedInput` is set to null to save memory
+- **Stored Input**: TryTask is the only flow task that stores `transformedInput` - needed for consistent retry/catch input
+- **Two Children**: First child is try block (DoTask), second child is catch block (optional DoTask)
+- **Attempt Index**: Starts at -1, incremented to 0 on first entry, incremented again on each retry
+- **Running Catch Flag**: Prevents re-catching errors thrown from catch block itself
+- **Error in Scope**: The error is available to catch block children via `$error` (or custom name)
+- **State Cleaning**: Both retry and catch operations delete all states from failing node up to try block
+- **Retry First**: If retry conditions are met, retry takes precedence over catch
+- **Delay Support**: Retry can include a delay with backoff and jitter for scheduling
+
+### RaiseTask (Error Raising)
+
+Explicitly raises a workflow error that can be caught by a TryTask ancestor.
+
+**State Type**:
+
+```kotlin
+// Node state - serialized for resumption (minimal state for activity task)
+@Serializable
+data class NoState(
+    override val startedAt: Instant
+) : NodeState()
+```
+
+**Execution Behavior**:
+
+```kotlin
+override suspend fun execute(transformedInput: JsonElement, scope: Scope): JsonElement {
+    // Create WorkflowError from error definition
+    val error = WorkflowError(
+        type = errorDef.getErrorType(),
+        status = errorDef.status,
+        instance = node.position.positionPointer.toString(),
+        title = errorDef.title,
+        details = errorDef.details
+    )
+
+    // Throw WorkflowException - caught by orchestrator
+    throw WorkflowException(null, error)
+}
+```
+
+**Important Design Notes**:
+
+- **Activity Task**: RaiseTask is an activity task (no children) that throws an exception
+- **Error Definition**: Can be inline error object or reference to named error in `workflow.use.errors`
+- **Exception Propagation**: The exception propagates to the orchestrator's main loop
+- **Handler Search**: Orchestrator walks up parent chain to find matching TryTask
+- **No Return**: The task never completes normally - always throws exception
+
+**Example**:
+
+```yaml
+validateInput:
+    if: .total < 0
+    raise:
+        error:
+            type: https://serverlessworkflow.io/spec/1.0.0/errors/validation
+            status: 400
+            title: Invalid Input
+            details: Total cannot be negative
+```
 
 ### ActivityTask (Leaf Nodes)
 
@@ -916,43 +987,37 @@ Tasks with actions but no children (Set, CallHTTP, Emit, etc.).
 **State Type**:
 
 ```kotlin
-// Node state - serialized for resumption
-data class ActivityState(
-    val startedAt: Instant,           // When task started
-    val rawInput: JsonElement,        // Original input
-    val transformedInput: JsonElement // After input.from transformation
-)
+// Node state - serialized for resumption (minimal state for activity tasks)
+@Serializable
+data class NoState(
+    override val startedAt: Instant
+) : NodeState()
 ```
 
-**Pure State Operations**:
+**Execution Behavior**:
+
+Activity tasks follow a simple pattern:
+
+1. **Create State**: Minimal state with just `startedAt` timestamp
+2. **Execute Action**: Perform task-specific action (HTTP call, set data, emit event, etc.)
+3. **Return Output**: Return transformed output and exit to parent immediately
+
+**Example - SetTask**:
 
 ```kotlin
-// Create initial state (called by enter())
-fun ActivityNode.createInitialState(
-    startedAt: Instant,
-    rawInput: JsonElement,
-    transformedInput: JsonElement
-): ActivityState = ActivityState(
-    startedAt = startedAt,
-    rawInput = rawInput,
-    transformedInput = transformedInput
-)
-
-// Update state after child completes (called by reEnter())
-// Not applicable - activity tasks have no children
-
-// Advance state for navigation (called by continue())
-fun ActivityNode.advanceState(
-    currentState: ActivityState,
-    flowDirective: FlowDirective
-): ActivityState = currentState  // No advancement
-
-// Check if done - always exit immediately
-fun ActivityNode.shouldExit(state: ActivityState): Boolean = true
+override suspend fun execute(transformedInput: JsonElement, scope: Scope): JsonElement {
+    // Build output from set definition
+    return buildJsonObject {
+        node.task.set.forEach { (key, valueExpr) ->
+            val value = eval(transformedInput, valueExpr, key, scope)
+            put(key, value)
+        }
+    }
+}
 ```
 
-**Note**: Activity tasks execute their action (Set, CallHTTP, etc.) in `exitToUp()` and immediately return to parent.
-Since `shouldExit()` returns true, `continue()` always calls `exitToUp()`.
+**Note**: Activity tasks have no children and no navigation logic. They execute their action and immediately exit to
+parent with transformed output.
 
 ---
 
@@ -1465,10 +1530,13 @@ available during execution.
     - `switch`: Select branch based on data
     - `for`: Iterate over collection
 
-11. **Exception Handling**
+11. **Exception Handling** (Try/Catch/Raise)
+    - **Pure State Transitions**: Exceptions are caught and converted to explicit StepResult with state deltas
+    - **Handler Search**: Walk parent chain to find TryTask that matches error filters and conditions
+    - **Retry vs Catch**: TryTask decides whether to retry (with delay/backoff) or enter catch block
+    - **State Cleaning**: Both retry and catch delete states from failing node up to try block
+    - **Error in Scope**: Catch blocks access error via `$error` (or custom name) in scope
     - **No Rollback Needed**: Pure functions don't mutate state, so exceptions leave `states` unchanged
-    - **Try/Catch**: Not yet implemented (placeholder for future error handling)
-    - Current behavior: Exceptions are re-thrown to caller
 
 ### Benefits
 
