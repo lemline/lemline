@@ -8,6 +8,7 @@ import com.lemline.core.errors.WorkflowException
 import com.lemline.core.execution.context.Scope
 import com.lemline.core.execution.context.merge
 import com.lemline.core.execution.models.StepResult
+import com.lemline.core.execution.processors.CallHttpProcessor
 import com.lemline.core.execution.processors.DoProcessor
 import com.lemline.core.execution.processors.ForProcessor
 import com.lemline.core.execution.processors.NodeProcessor
@@ -24,6 +25,7 @@ import com.lemline.core.execution.states.TryState
 import com.lemline.core.execution.states.updateWith
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
+import io.serverlessworkflow.api.types.CallHTTP
 import io.serverlessworkflow.api.types.DoTask
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.ForTask
@@ -124,25 +126,18 @@ object ExecutionOrchestrator {
                         updateRootContext(current, states, exported)
                     }
                 }
-
                 // ← Checkpoint: state is consistent for persistence
-                // This is where the states map could be serialized and saved
             } catch (e: WorkflowException) {
                 logger.debug { "WorkflowException caught at node: ${current?.name}, finding handler..." }
-                val errorResult = handleException(current!!, e, states.toMap())
-
-                // Apply error handling deltas and continue
-                current = errorResult.nextNode
-                input = errorResult.dataset
-                flowDirective = errorResult.flowDirective
-                states.updateWith(errorResult.stateUpdates)
-                // Note: newContext not expected from error handling
-
-            } catch (e: Exception) {
-                // Non-workflow exceptions (bugs) - fail immediately
-                // States unchanged since runStep() is pure - no rollback needed
-                logger.error(e) { "Workflow execution failed at node: ${current?.name ?: "unknown"}" }
-                throw e
+                // handleException is also a pure function
+                with(handleException(current!!, e, states.toMap())) {
+                    // Apply error handling deltas and continue
+                    current = this.nextNode
+                    input = this.dataset
+                    flowDirective = this.flowDirective
+                    states.updateWith(this.stateUpdates)
+                    // Note: newContext not expected from error handling
+                }
             }
         }
 
@@ -183,37 +178,6 @@ object ExecutionOrchestrator {
     }
 
     /**
-     * Retrieves the `ExprArgs` associated with the given node by combining its own expression arguments
-     * with those of its parent nodes in the tree, if present.
-     *
-     * @param current The current `Node` for which to retrieve the expression arguments.
-     * @param states The `States` map containing the state information for each node.
-     * @return An `ExprArgs` map that combines the expression arguments of the current node and its parent hierarchy.
-     */
-    private fun getScope(current: Node<*>, states: States): Scope =
-        (states[current]?.scope ?: buildJsonObject { })
-            // Recursively merge with parent scope
-            .merge(current.parent?.let { getScope(it, states) })
-
-
-    @Suppress("UNCHECKED_CAST")
-    private fun <T : TaskBase> getNodeProcessor(
-        node: Node<T>
-    ): NodeProcessor<T, NodeState> {
-        return when (node.task) {
-            is RootTask -> RootProcessor(node as Node<RootTask>)
-            is DoTask -> DoProcessor(node as Node<DoTask>)
-            is ForTask -> ForProcessor(node as Node<ForTask>)
-            is SetTask -> SetProcessor(node as Node<SetTask>)
-            is SwitchTask -> SwitchProcessor(node as Node<SwitchTask>)
-            is TryTask -> TryProcessor(node as Node<TryTask>)
-            is RaiseTask -> RaiseProcessor(node as Node<RaiseTask>)
-
-            else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
-        } as NodeProcessor<T, NodeState>
-    }
-
-    /**
      * Updates the RootState context with the new context.
      *
      * @param node The current node of the workflow
@@ -236,6 +200,37 @@ object ExecutionOrchestrator {
 
             else -> throw IllegalStateException("State of root node ${rootNode.reference}, not a RootState: $rootState")
         }
+    }
+
+    /**
+     * Retrieves the `ExprArgs` associated with the given node by combining its own expression arguments
+     * with those of its parent nodes in the tree, if present.
+     */
+    private fun getScope(current: Node<*>, states: States): Scope =
+        (states[current]?.scope ?: buildJsonObject { })
+            // Recursively merge with parent scope
+            .merge(current.parent?.let { getScope(it, states) })
+
+
+    /**
+     * Retrieves the appropriate `NodeProcessor` for the given `Node` based on the type of task associated with the node.
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun <T : TaskBase> getNodeProcessor(
+        node: Node<T>
+    ): NodeProcessor<T, NodeState> {
+        return when (node.task) {
+            is RootTask -> RootProcessor(node as Node<RootTask>)
+            is DoTask -> DoProcessor(node as Node<DoTask>)
+            is ForTask -> ForProcessor(node as Node<ForTask>)
+            is SetTask -> SetProcessor(node as Node<SetTask>)
+            is SwitchTask -> SwitchProcessor(node as Node<SwitchTask>)
+            is TryTask -> TryProcessor(node as Node<TryTask>)
+            is RaiseTask -> RaiseProcessor(node as Node<RaiseTask>)
+            is CallHTTP -> CallHttpProcessor(node as Node<CallHTTP>)
+
+            else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
+        } as NodeProcessor<T, NodeState>
     }
 
     /**
