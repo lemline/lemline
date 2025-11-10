@@ -94,477 +94,97 @@ The dataset flows:
 
 ## Traveling through the Tree
 
-### Main Execution Loop
-
-The workflow execution is a loop that repeatedly calls the `runStep` function until completion, with exception handling
-for
-error recovery:
-
-```kotlin
-fun run(node: Node<*>, dataset: JsonElement, states: MutableStates = mutableMapOf()): JsonElement {
-    var current: Node<*>? = node
-    var input: JsonElement = dataset
-    var flowDirective: FlowDirective? = null
-
-    while (current != null) {
-        try {
-            // Execute current node - pure function returns step result
-            val stepResult = runStep(current, input, states.toMap(), flowDirective)
-
-            current = stepResult.next
-            input = stepResult.dataset
-            flowDirective = stepResult.flowDirective
-
-            // Apply state changes atomically
-            states.updateWith(stepResult.stateUpdates)
-
-            // ← Checkpoint here for workflow persistence (state is consistent)
-
-        } catch (e: Exception) {
-            // Handle exception - states is unchanged since runStep() is pure
-            throw e  // Currently re-throws; will add try/catch handling later
-        }
-    }
-
-    return input  // Final workflow output
-}
-
-// Apply state updates
-fun MutableStates.updateWith(stateUpdates: Map<Node<*>, NodeState?>) {
-    for ((node, state) in stateUpdates) {
-        if (state == null) {
-            remove(node)  // Delete state
-        } else {
-            this[node] = state  // Update or insert state
-        }
-    }
-}
-```
-
-**Key Points**:
-
-- Each iteration processes one execution step
-- **Pure Function**: `run()` takes immutable inputs and returns new values (no side effects)
-- **Delta States**: Only changed states are returned, making mutations explicit
-- **No Clone Needed**: Since `run()` is pure, `states` remains unchanged on exception - no need to clone
-- **Atomic Updates**: `updateWith()` update the current states
-- **Checkpointing**: After applying delta, states is consistent for persistence
-- Loop terminates when `current` becomes `null` (workflow complete)
-- Dataset flows as function parameters (functional, no storage)
-
-### The RunStep Function
-
-The `runStep` function determines whether to enter a node for the first time or re-enter after a child. It is a **pure
-function** - takes immutable inputs and returns new values without side effects:
-
-```kotlin
-fun <T : TaskBase> runStep(
-    node: Node<T>,
-    dataset: JsonElement,
-    states: States,
-    flowDirective: FlowDirective?
-): StepResult {
-    val state = states[node]
-    val scope = getScope(node, states)
-    val processor = getNodeProcessor(node)
-
-    return if (state == null) {
-        // First time entering this node - pass scope as parameter
-        processor.enterFromParent(dataset, scope)
-    } else {
-        // Re-entering after a child completed
-        processor.enterFromChild(state, flowDirective, dataset, scope)
-    }
-}
-```
-
-**Parameters**:
-
-- `node`: Node<T> - The current node (immutable topology)
-- `dataset`: JsonElement - Data flowing into this node
-- `states`: Map<Node<*>, NodeState> - All active node states
-- `flowDirective`: FlowDirective? - Navigation instruction (null on first entry)
-
-**Returns**: `StepResult(next, dataset, stateUpdates, flowDirective)` where:
-
-- `next`: Node<*>? - Next node to execute (null if workflow complete)
-- `dataset`: JsonElement - Transformed dataset
-- `stateUpdates`: Map<Node<*>, NodeState?> - State changes (null value = deletion)
-- `flowDirective`: FlowDirective? - Next navigation instruction
-
----
-
-## Node Entry and Exit
-
-### Pure Functions with Scope Building
-
-The execution model uses **pure functions** that take states as input and return delta states as output:
-
-**Pure Orchestration Functions** (in `NodeProcessor`):
-
-- `enterFromParent(dataset, parentScope)` - Entry from parent (no state exists yet)
-- `enterFromChild(state, flowDirective, dataset, parentScope)` - Re-entry from child
-- `continueTo(state, dataset, parentScope, taskContext, nodeName?)` - Navigation decision
-- `continueToParent(dataset, flowDirective, parentScope, taskContext)` - Exit to parent
-- `continueToEnd(dataset)` - End directive (recursive unwinding)
-
-All return: `StepResult(next, dataset, stateUpdates, flowDirective)`
-
-**Helper Functions** (Scope-Dependent Operations):
-
-- `checkIf(rawInput, scope)` - Evaluate `if` condition (needs scope)
-- `validateInput(rawInput)` - Validate input schema
-- `transformInput(rawInput, scope)` - Transform input with `input.from` (needs scope)
-- `validateOutput(transformedOutput)` - Validate output schema
-- `transformOutput(rawOutput, scope)` - Transform output with `output.as` (needs scope)
-- `execute(transformedInput, scope)` - Execute action (might need scope for context)
-
-**Building Scope**:
-
-Scope is built hierarchically by combining:
-
-1. Node-specific scope variables (from `NodeState.scope` property, e.g., `$item`, `$index` for ForTask)
-2. TaskContext scope (from `TaskContext.toScope()`, provides `$task`, `$input`, `$output`)
-3. Parent scope (recursive merge up the tree)
-
-```kotlin
-// Get scope for a node - recursively merges with parent scope
-fun getScope(current: Node<*>, states: States): Scope =
-    (states[current]?.scope ?: buildJsonObject { })  // Node-specific variables
-        .merge(current.parent?.let { getScope(it, states) })  // Parent scope
-
-// TaskContext provides temporary execution context (not stored in state)
-data class TaskContext(
-    val startedAt: Instant,
-    val rawInput: JsonElement? = null,
-    val transformedInput: JsonElement? = null,
-    val rawOutput: JsonElement? = null,
-    val transformedOutput: JsonElement? = null
-) {
-    fun toScope(node: Node<*>): Scope {
-        return Scope(
-            task = TaskDescriptor(
-                name = node.name,
-                reference = node.reference,
-                definition = node.definition,
-                startedAt = startedAt,
-                input = rawInput,
-                output = rawOutput
-            ),
-            input = transformedInput,  // $input is transformed input
-            output = rawOutput          // $output is raw output
-        ).toJsonObject()
-    }
-}
-
-// Node-specific scope (ForState example)
-@Serializable
-data class ForState(
-    override val startedAt: Instant,
-    val collection: List<JsonElement>?,
-    val index: Int
-) : NodeState() {
-    override val scope: Scope
-        get() = buildJsonObject {
-            // Add iteration variables with current values
-            if (index >= 0 && index < (collection?.size ?: 0)) {
-                put(forEach, collection!![index])  // $item (or custom name)
-                put(forAt, JsonPrimitive(index))   // $index (or custom name)
-            }
-        }
-}
-```
-
-**Key Points**:
-
-- TaskContext is **temporary** (created during execution, not stored)
-- States only contain **minimal execution state** (startedAt + node-specific fields)
-- Scope is **computed on-demand** from states + TaskContext
-- Parent scope is merged **recursively** up the tree
-
-### Entry Points
-
-A node can be entered from two directions:
-
-#### Enter from Parent
-
-Called when entering a node for the first time from its parent. This is a **pure function** - it computes new state
-without mutating the input.
-
-```kotlin
-suspend fun enterFromParent(rawInput: JsonElement, parentScope: Scope): StepResult {
-    // ===========================================
-    // PHASE 1: Create Execution Context
-    // ===========================================
-
-    var taskContext = TaskContext(startedAt = Clock.System.now())
-
-    // ===========================================
-    // PHASE 2: Conditional Check
-    // ===========================================
-
-    // Check if condition - skip if false
-    if (!checkIf(rawInput, parentScope.merge(taskContext.toScope(node)))) {
-        return StepResult(
-            next = node.parent,
-            dataset = rawInput,
-            stateUpdates = emptyMap(),  // No state created
-            flowDirective = null  // Continue to next sibling
-        )
-    }
-
-    // ===========================================
-    // PHASE 3: Input Processing
-    // ===========================================
-
-    // Validate input against schema (throws ValidationException)
-    validateInput(rawInput)
-
-    // Update context with raw input
-    taskContext = taskContext.copy(rawInput = rawInput)
-
-    // Apply input transformation (throws ExpressionException)
-    val transformedInput = transformInput(rawInput, parentScope.merge(taskContext.toScope(node)))
-
-    // Update context with transformed input
-    taskContext = taskContext.copy(transformedInput = transformedInput)
-
-    // ===========================================
-    // PHASE 4: State Creation
-    // ===========================================
-
-    // Create initial node state (node-type-specific)
-    val state = createState(transformedInput, parentScope.merge(taskContext.toScope(node)))
-
-    // ===========================================
-    // PHASE 5: Determine Next Step
-    // ===========================================
-
-    // Delegate to continueTo() to decide where to go
-    return continueTo(state, transformedInput, parentScope, taskContext)
-}
-```
-
-**Parameters**:
-
-- `rawInput`: JsonElement - Parent's output (becomes this node's raw input)
-- `parentScope`: Scope - Parent's scope (for expression evaluation)
-
-**Returns**: `StepResult(next, dataset, stateUpdates, flowDirective)`
-
-**Phases**:
-
-1. **Create Context**: Initialize TaskContext with startedAt timestamp
-2. **Conditional Check**: Evaluate `if` condition, skip if false (no state changes)
-3. **Input Processing**: Validate and transform input, update TaskContext
-4. **State Creation**: Call node-type-specific `createState()` (minimal state)
-5. **Navigate**: Call `continueTo()` to decide next node
-
-#### Enter from Child
-
-Called when returning to a node after a child completes. This is a **pure function** - it computes updated state without
-mutating the input.
-
-```kotlin
-suspend fun enterFromChild(
-    state: S,
-    flowDirective: FlowDirective?,
-    datasetFromChild: JsonElement,
-    parentScope: Scope
-): StepResult {
-    return when (val directive = flowDirective?.get()) {
-        is FlowDirectiveEnum -> when (directive) {
-            // END: Workflow complete - recursive unwinding
-            FlowDirectiveEnum.END -> continueToEnd(datasetFromChild)
-
-            // EXIT: exit current node
-            FlowDirectiveEnum.EXIT -> continueToParent(
-                datasetFromChild,
-                getFlowDirective(),
-                parentScope,
-                null
-            )
-
-            // CONTINUE: continue
-            FlowDirectiveEnum.CONTINUE -> continueTo(
-                state,
-                datasetFromChild,
-                parentScope,
-                null
-            )
-        }
-
-        // Goto named sibling or null (treat as CONTINUE)
-        is String, null -> continueTo(
-            state,
-            datasetFromChild,
-            parentScope,
-            null,
-            directive
-        )
-
-        else -> throw IllegalArgumentException("Unknown flow directive: $directive")
-    }
-}
-```
-
-**Parameters**:
-
-- `state`: S - This node's current state (type-safe for node type)
-- `flowDirective`: FlowDirective? - Navigation instruction from child's `.then` field
-- `datasetFromChild`: JsonElement - Child's output result
-- `parentScope`: Scope - Parent's scope (for expression evaluation)
-
-**Returns**: `StepResult(next, dataset, stateUpdates, flowDirective)`
-
-**Flow Directive Handling**:
-
-- **END**: Call `continueToEnd()` for recursive unwinding
-- **EXIT**: Call `continueToParent()` to exit immediately
-- **CONTINUE** or **null**: Call `continueTo()` to navigate to next step
-- **String (goto)**: Call `continueTo()` with task name to jump to sibling
-
-### Continue Function
-
-Determines the next step based on state and optional task name (for goto). This is a **pure function** - computes
-navigation
-without mutating state.
-
-```kotlin
-suspend fun continueTo(
-    state: S,
-    dataset: JsonElement,
-    parentScope: Scope,
-    taskContext: TaskContext?,
-    nodeName: String? = null
-): StepResult {
-    // Get the next node and an updated state for the current node
-    val (updatedState, nextNode, currentFlowDirective) = getNextStepInfo(
-        state,
-        dataset,
-        nodeName,
-        parentScope.merge(taskContext?.toScope(node))
-    )
-
-    // Check if we should return to parent
-    return when (nextNode == node.parent) {
-        // Case of leaf (activities, switch, ...) OR end of a control flow
-        true -> continueToParent(dataset, currentFlowDirective, parentScope, taskContext)
-
-        // Control flows that are not completed (do, for, ...), going to a child
-        false -> StepResult(
-            nextNode,
-            dataset,
-            mapOf(node to updatedState),  // Update state
-            null  // Clear flow directive when going to child
-        )
-    }
-}
-```
-
-**Parameters**:
-
-- `state`: S - This node's current state (type-safe for node type)
-- `dataset`: JsonElement - Dataset to use for navigation
-- `parentScope`: Scope - Parent's scope
-- `taskContext`: TaskContext? - Execution context (null when re-entering from child)
-- `nodeName`: String? - Optional task name for goto navigation
-
-**Returns**: `StepResult(next, dataset, stateUpdates, flowDirective)`
-
-**Logic**:
-
-1. Call node-type-specific `getNextStepInfo()` to compute next step
-2. If next node is parent → call `continueToParent()` (node is done)
-3. If next node is child → return StepResult with updated state and child node
-
-### Continue to Parent Function
-
-Computes output and returns to parent. This is a **pure function** - computes output and returns delta indicating state
-deletion.
-
-```kotlin
-internal suspend fun continueToParent(
-    dataset: JsonElement,
-    currentFlowDirective: FlowDirective?,
-    parentScope: Scope,
-    taskContext: TaskContext?
-): StepResult {
-    // ===========================================
-    // Compute Output
-    // ===========================================
-
-    // Execute action (e.g., HTTP call, set data)
-    // For flow tasks, this just returns input unchanged
-    val rawOutput = execute(dataset, parentScope.merge(taskContext?.toScope(node)))
-
-    // Update context with raw output
-    val outputContext = taskContext?.copy(rawOutput = rawOutput)
-
-    // Apply output transformation (throws ExpressionException)
-    val transformedOutput = transformOutput(
-        rawOutput,
-        parentScope.merge(outputContext?.toScope(node))
-    )
-
-    // Validate output (throws ValidationException)
-    validateOutput(transformedOutput)
-
-    // ===========================================
-    // Prepare Return
-    // ===========================================
-
-    return StepResult(
-        node.parent,
-        transformedOutput,
-        mapOf(node to null),  // Delta: remove this node's state
-        currentFlowDirective  // Pass flow directive to parent
-    )
-}
-```
-
-**Parameters**:
-
-- `dataset`: JsonElement - Dataset to use for computing output
-- `currentFlowDirective`: FlowDirective? - Navigation instruction from node definition
-- `parentScope`: Scope - Parent's scope
-- `taskContext`: TaskContext? - Execution context (null when re-entering from child)
-
-**Returns**: `StepResult(parent, transformedOutput, stateUpdates, flowDirective)`
-
-**Flow**: `dataset` → execute action → `rawOutput` → transform → `transformedOutput` → validate
-
-**State Cleanup**: Returns `stateUpdates` with `null` value to remove this node's state from the map
-
-### Execution State Machine
+Workflow execution is a step-by-step loop that navigates through the node tree. Each iteration:
+
+1. **Executes one step** by calling the current node's processor
+2. **Updates state atomically** based on what the processor returns
+3. **Moves to the next node** (child, parent, or sibling)
+4. **Terminates** when the current node becomes null (workflow complete)
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Enter: enter(datasetFromParent)
-    Enter --> CheckIf: Check if condition
-    CheckIf --> Skip: false
-    Skip --> [*]: Return to parent
-    CheckIf --> Initialize: true
-    Initialize --> Continue1: continue(transformedInput)
-    Continue1 --> GoDown: Has more children
-    Continue1 --> ExitUp: No more children
-    GoDown --> ChildExec: Child executes
-    ChildExec --> ReEnter: reEnter(datasetFromChild, flowDirective)
-    ReEnter --> UpdateState: state.continue()
-    UpdateState --> Continue2: continue(dataset, flowDirective)
-    Continue2 --> GoDown: Has more children
-    Continue2 --> ExitUp: No more children
-    ExitUp --> Compute: Compute output
-    Compute --> Clear: clearState()
-    Clear --> [*]: Return (parent, output, flowDirective)
+    [*] --> EnterFromParent: First visit
+    EnterFromParent --> CheckCondition: Evaluate 'if'
+    CheckCondition --> SkipNode: false
+    SkipNode --> [*]: Return to parent
+    CheckCondition --> ProcessInput: true
+    ProcessInput --> CreateState: Validate & transform
+    CreateState --> DetermineNext: Decide navigation
+    DetermineNext --> GoToChild: Has work (control flow)
+    DetermineNext --> ExitToParent: Done (leaf node)
+    GoToChild --> ChildExecutes: Child runs
+    ChildExecutes --> EnterFromChild: Child completes
+    EnterFromChild --> HandleDirective: Interpret flow directive
+    HandleDirective --> ExitToParent: EXIT/END
+    HandleDirective --> ContinueToNext: CONTINUE/goto
+    ContinueToNext --> GoToChild: More children
+    ContinueToNext --> ExitToParent: No more children
+    ExitToParent --> ComputeOutput: Execute action & transform
+    ComputeOutput --> CleanupState: Delete state
+    CleanupState --> [*]: Return to parent
 ```
 
-**Legend**:
+### Core Concepts
 
-- **Enter**: First visit from parent
-- **ReEnter**: Returning from child
-- **Continue**: Determine next step based on state and flowDirective
-- **ExitUp**: Compute output and return to parent
+**Pure Functional Design**: Each step is a pure function that takes immutable state and returns new values. This means:
+- State never mutates in place
+- Failed operations leave state unchanged (no rollback needed)
+- Each step is a consistent checkpoint for persistence
+
+**Two Entry Paths**: A node can be entered in two ways:
+- **From Parent** (`enterFromParent`): First time visiting - no state exists yet
+- **From Child** (`enterFromChild`): Returning after a child completes - state already exists
+
+**State Flow**: The processor returns a `StepResult` containing:
+- `next`: The next node to execute (null = workflow complete)
+- `dataset`: Transformed data to pass to the next node
+- `stateUpdates`: Changes to persist (null value = delete that node's state)
+- `flowDirective`: Optional navigation instruction (CONTINUE, EXIT, END, or task name for goto)
+
+### Scope Building
+
+Scope provides the context for expression evaluation (JQ expressions in `input.from`, `output.as`, conditions). It's built hierarchically:
+
+1. **Node-specific variables**: From `NodeState.scope` (e.g., `$item` and `$index` for ForTask iterations)
+2. **Task context**: From temporary `TaskContext` (provides `$task`, `$input`, `$output` during execution)
+3. **Parent scope**: Recursively merged from parent nodes up the tree
+
+This creates a scope chain where inner tasks can access outer task variables, workflow metadata, and runtime context.
+
+### Node Execution Flow
+
+When **entering from parent** (first visit):
+1. Check `if` condition → skip to parent if false (no state created)
+2. Validate and transform input using parent scope
+3. Create minimal initial state (startedAt + node-specific fields)
+4. Determine next node (child to execute, or parent if done)
+
+When **entering from child** (returning):
+1. Interpret flow directive (END, EXIT, CONTINUE, or goto task name)
+2. Navigate accordingly (continue to next child, exit to parent, or unwind to root)
+
+When **exiting to parent** (work complete):
+1. Execute node's action (HTTP call, data transformation, etc.)
+2. Transform and validate output using current scope
+3. Delete this node's state (cleanup)
+4. Return transformed output to parent with flow directive
+
+### Navigation Rules
+
+**Control Flow Nodes** (do, for, try):
+- Create state on first entry
+- Navigate to first child
+- On return from child, update state and decide: next child or exit to parent
+
+**Leaf Nodes** (set, call, switch):
+- Create state, execute action immediately
+- Exit to parent with transformed output
+
+**Flow Directives** (from `.then` field):
+- `null`/`CONTINUE`: Continue to next sibling
+- `EXIT`: Return to parent immediately
+- `END`: Unwind to root (complete workflow)
+- `"taskName"`: Jump to named sibling task
 
 ---
 
@@ -850,6 +470,19 @@ class DoProcessor(node: Node<DoTask>) : NodeProcessor<DoTask, DoState>(node) {
 ### ForTask (Iteration)
 
 Executes child repeatedly for each item in a collection.
+
+```mermaid
+stateDiagram-v2
+    [*] --> EvaluateCollection: Enter from parent
+    EvaluateCollection --> CreateState: Evaluate for.in
+    CreateState --> IncrementIndex: index = -1
+    IncrementIndex --> CheckCondition: index++
+    CheckCondition --> ExecuteChild: index < size && while
+    CheckCondition --> ExitToParent: Done
+    ExecuteChild --> ChildRuns: With $item, $index in scope
+    ChildRuns --> IncrementIndex: Child completes
+    ExitToParent --> [*]: Return last output
+```
 
 **State Type**:
 
@@ -1385,36 +1018,32 @@ TaskDescriptor = {
 
 The scope is built hierarchically, merging node-specific variables with task context and parent scopes:
 
+```mermaid
+flowchart TB
+    Node[Current Node Scope]
+    NodeVars["Node-specific variables<br/>(e.g., $item, $index for ForTask)"]
+    TaskCtx["Task Context<br/>($task, $input, $output)"]
+    GlobalCtx["Global Context<br/>($workflow, $context, $runtime, $secrets)"]
+    ParentScope[Parent Node Scope<br/>recursive merge]
+    FinalScope[Final Scope for Expression Evaluation]
+
+    NodeVars --> Node
+    TaskCtx --> Node
+    GlobalCtx --> Node
+    Node --> FinalScope
+    ParentScope --> FinalScope
+
+    style FinalScope fill:#e1f5e1
+    style NodeVars fill:#fff3cd
+    style TaskCtx fill:#d1ecf1
+    style GlobalCtx fill:#f8d7da
 ```
-buildScope(node):
-  // Start with node-specific variables
-  scope = node.variables  // e.g., {$item: ..., $index: ...} for ForTask
 
-  // Merge current task context
-  scope = scope.merge({
-    $context: workflow.context,
-    $input: node.rawInput,
-    $output: node.rawOutput,
-    $task: {
-      name: node.name,
-      reference: node.reference,
-      definition: node.definition,
-      input: node.rawInput,
-      output: node.rawOutput,
-      startedAt: node.startedAt
-    },
-    $workflow: ...,
-    $runtime: ...,
-    $secrets: ...,
-    $authorization: ...
-  })
-
-  // Recursively merge with parent scope
-  if node.parent is not null:
-    scope = scope.merge(node.parent.scope)
-
-  return scope
-```
+**Scope Composition** (from highest to lowest precedence):
+1. **Node-specific variables**: `$item`, `$index` (ForTask), etc.
+2. **Task context**: `$task`, `$input`, `$output` for current node
+3. **Global context**: `$workflow`, `$context`, `$runtime`, `$secrets`, `$authorization`
+4. **Parent scope**: Recursively merged from parent nodes up the tree
 
 **Merge Semantics**: When merging scopes, child values take precedence over parent values. This means:
 
