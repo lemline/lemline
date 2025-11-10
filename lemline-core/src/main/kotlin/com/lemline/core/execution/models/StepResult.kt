@@ -7,6 +7,7 @@ import com.lemline.core.execution.state.NodeState
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.FlowDirective
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Result of a single execution step in the pure functional model.
@@ -16,6 +17,7 @@ import kotlinx.serialization.json.JsonElement
  * - The dataset to pass to the next node
  * - Delta states (explicit state changes to apply)
  * - The flow directive indicating navigation intent
+ * - The exported context (from export.as directive)
  *
  * ## Pure Functional Model
  *
@@ -45,14 +47,16 @@ import kotlinx.serialization.json.JsonElement
  * }
  * ```
  *
- * @property next The next node to execute (null if workflow complete)
+ * @property nextNode The next node to execute (null if workflow complete)
  * @property dataset The dataset to pass to the next node
  * @property stateUpdates State changes to apply (position -> state or null for deletion)
  * @property flowDirective The navigation instruction for the next step (from SDK)
+ * @property newContext The context exported by this task (from export.as directive, null if no export)
  */
 data class StepResult(
-    val next: Node<*>?,
+    val nextNode: Node<*>?,
     val dataset: JsonElement,
     val stateUpdates: Map<Node<*>, NodeState?>,
-    val flowDirective: FlowDirective?
+    val flowDirective: FlowDirective?,
+    val newContext: JsonObject? = null
 )

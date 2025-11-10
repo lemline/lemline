@@ -16,6 +16,7 @@ import com.lemline.core.execution.state.merge
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import com.lemline.core.schemas.SchemaValidator
+import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
 import io.serverlessworkflow.api.types.InputFrom
@@ -95,11 +96,12 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // Create execution context
         val now = Clock.System.now()
 
-        var taskContext = TaskContext(startedAt = now)
+        // create a mutable local task context
+        var context = TaskContext(startedAt = now)
 
         // if this node is conditional, check if it should be executed, if not return to parent
-        if (!checkIf(rawInput, parentScope.merge(taskContext.toScope(node)))) return StepResult(
-            next = node.parent,
+        if (!checkIf(rawInput, mergeScope(parentScope, context))) return StepResult(
+            nextNode = node.parent,
             dataset = rawInput,
             stateUpdates = emptyMap(),
             flowDirective = null  // Continue to next sibling
@@ -109,19 +111,19 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         validateInput(rawInput)
 
         // Update context with raw input
-        taskContext = taskContext.copy(rawInput = rawInput)
+        context = context.copy(rawInput = rawInput)
 
         // Apply input transformation (throws ExpressionException)
-        val transformedInput = transformInput(rawInput, parentScope.merge(taskContext.toScope(node)))
+        val transformedInput = transformInput(rawInput, mergeScope(parentScope, context))
 
         // Update context with transformed input
-        taskContext = taskContext.copy(transformedInput = transformedInput)
+        context = context.copy(transformedInput = transformedInput)
 
         // state creation
-        val state = createState(transformedInput, parentScope.merge(taskContext.toScope(node)))
+        val state = createState(transformedInput, mergeScope(parentScope, context))
 
         // get the next node and an updated state for the current node
-        return continueTo(state, transformedInput, parentScope, taskContext)
+        return continueTo(state, transformedInput, parentScope, context)
     }
 
     // ========================================
@@ -169,7 +171,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
             state,
             transformedInput,
             nodeName,
-            parentScope.merge(taskContext?.toScope(node))
+            mergeScope(parentScope, taskContext)
         )
 
         // check if we should return to parent
@@ -197,24 +199,34 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         parentScope: Scope,
         taskContext: TaskContext?
     ): StepResult {
+        // create a mutable local task context
+        var context = taskContext
+
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
-        val rawOutput = execute(dataset, parentScope.merge(taskContext?.toScope(node)))
+        val rawOutput = execute(dataset, mergeScope(parentScope, context))
 
         // Update context with raw output
-        val outputContext = taskContext?.copy(rawOutput = rawOutput)
+        context = context?.copy(rawOutput = rawOutput)
 
         // Apply output transformation (throws ExpressionException)
-        val transformedOutput = transformOutput(rawOutput, parentScope.merge(outputContext?.toScope(node)))
+        val transformedOutput = transformOutput(rawOutput, mergeScope(parentScope, context))
 
         // Validate output (throws ValidationException)
         validateOutput(transformedOutput)
+
+        // Update context with transformed output
+        context = context?.copy(transformedOutput = transformedOutput)
+
+        // Export to context if export.as is defined (throws ExpressionException or ValidationException)
+        val exportedContext = exportToContext(transformedOutput, mergeScope(parentScope, context))
 
         return StepResult(
             node.parent,
             transformedOutput,
             mapOf(node to null),
-            currentFlowDirective
+            currentFlowDirective,
+            exportedContext
         )
     }
 
@@ -223,11 +235,18 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // ========================================
 
     internal fun continueToEnd(dataset: JsonElement) = StepResult(
-        next = node.parent,
+        nextNode = node.parent,
         dataset = dataset,
         stateUpdates = mapOf(node to null), // clear the state of the current node
         flowDirective = FlowDirective().withFlowDirectiveEnum(FlowDirectiveEnum.END)  // Pass END up the chain
     )
+
+    // ========================================
+    // Scope Method
+    // ========================================
+
+    private fun mergeScope(parentScope: Scope, taskContext: TaskContext?) =
+        parentScope.merge(taskContext?.toScope(node))
 
     // ========================================
     // Instance Methods (Scope-Dependent Operations)
@@ -290,6 +309,31 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     }
 
     /**
+     * Exports data to workflow context using the task's `export.as` expression.
+     *
+     * Evaluates the task's `export.as` expression to produce the context data.
+     * The result will be merged into the workflow's `$context` variable.
+     * If no `export.as` is defined, returns null (no export).
+     *
+     * @param transformedOutput The transformed output dataset to export from
+     * @param scope Expression arguments
+     * @return The exported context data, or null if no export is defined
+     */
+    private fun exportToContext(transformedOutput: JsonElement, scope: Scope): JsonObject? {
+        val exportDef = node.task.export ?: return null
+
+        // Evaluate export.as expression with transformed output as input
+        val exportedData = evalObject(transformedOutput, exportDef.`as`, "export.as", scope)
+
+        // Validate exported data against schema if provided
+        exportDef.schema?.let { schema ->
+            validate(exportedData, schema)
+        }
+
+        return exportedData
+    }
+
+    /**
      * Validate output against schema.
      *
      * @param transformedOutput Output dataset to validate
@@ -349,11 +393,26 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         }
     }
 
+    private fun evalObject(
+        data: JsonElement,
+        expr: ExportAs,
+        name: String,
+        scope: JsonObject
+    ) = eval(data, expr, scope).let {
+        when (it is JsonObject) {
+            true -> it
+            false -> raiseError(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
+        }
+    }
+
     private fun eval(data: JsonElement, inputFrom: InputFrom?, scope: JsonObject) =
         inputFrom?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
 
     private fun eval(data: JsonElement, outputAs: OutputAs?, scope: JsonObject) =
         outputAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
+
+    private fun eval(data: JsonElement, exportAs: ExportAs?, scope: JsonObject) =
+        exportAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
 
     private fun eval(data: JsonElement, expr: String, scope: JsonObject) = try {
         JQExpression.eval(data, JsonPrimitive(expr), scope, false)

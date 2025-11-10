@@ -7,6 +7,8 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.RootTask
 import com.lemline.core.processor.Processor
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
@@ -72,7 +74,7 @@ internal fun getWorkflowNode(
     namespace: String = "test",
     name: String = "workflow-${doYaml.hashCode()}",
     version: String = "0.1.0",
-): com.lemline.core.nodes.Node<com.lemline.core.nodes.RootTask> {
+): Node<RootTask> {
     val document =
         """document:
               dsl: '1.0.0'
@@ -82,15 +84,16 @@ internal fun getWorkflowNode(
         """.trimIndent()
     // Replace @ with $ only for workflow scope variables
     val processedYaml = doYaml.trimIndent()
-        .replace("@item", "\$item")
-        .replace("@index", "\$index")
-        .replace("@task", "\$task")
-        .replace("@workflow", "\$workflow")
-        .replace("@input", "\$input")
-        .replace("@output", "\$output")
-        .replace("@context", "\$context")
-        .replace("@runtime", "\$runtime")
+        .replace("@item", $$"$item")
+        .replace("@index", $$"$index")
+        .replace("@task", $$"$task")
+        .replace("@workflow", $$"$workflow")
+        .replace("@input", $$"$input")
+        .replace("@output", $$"$output")
+        .replace("@context", $$"$context")
+        .replace("@runtime", $$"$runtime")
     val workflowYaml = document + "\n" + processedYaml
     val workflow = DefinitionCache.parseAndPut(workflowYaml)
+
     return DefinitionCache.getRootNode(workflow)
 }

@@ -33,21 +33,45 @@ data class RootState(
     @Transient
     lateinit var definition: JsonObject
 
-    override val scope: Scope by lazy {
-        buildJsonObject {
+    // Compute scope fresh each time to reflect current context
+    override val scope: Scope
+        get() = buildJsonObject {
             put("context", context)
             put("runtime", Json.encodeToJsonElement(RuntimeDescriptor))
             put("secrets", Json.encodeToJsonElement(secrets))
-            put(
-                "workflow", Json.encodeToJsonElement(
-                    WorkflowDescriptor(
-                        id, definition, input,
-                        LemlineJson.encodeToElement(
-                            DateTimeDescriptor.from(startedAt.toJavaInstant())
-                        ),
+            // Only add workflow if definition is initialized
+            if (::definition.isInitialized) {
+                put(
+                    "workflow", Json.encodeToJsonElement(
+                        WorkflowDescriptor(
+                            id, definition, input,
+                            LemlineJson.encodeToElement(
+                                DateTimeDescriptor.from(startedAt.toJavaInstant())
+                            ),
+                        )
                     )
                 )
-            )
+            }
         }
+
+    /**
+     * Creates a new RootState with updated context, copying all transient fields.
+     *
+     * @param newContext The new context to use
+     * @return A new RootState with the updated context
+     */
+    fun copyWithContext(newContext: Scope): RootState {
+        val state = RootState(
+            startedAt = startedAt,
+            id = id,
+            input = input,
+            context = newContext,
+            hasRun = hasRun,
+        )
+        // copy also transient fields
+        state.secrets = this.secrets
+        if (::definition.isInitialized) state.definition = definition
+        
+        return state
     }
 }

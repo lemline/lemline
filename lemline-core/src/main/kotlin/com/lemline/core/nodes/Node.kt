@@ -48,7 +48,7 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
      */
     internal val children: List<Node<*>>? by lazy {
         when (task) {
-            is RootTask -> task.parseChildren()
+            is RootTask -> task.parseChildren(this)
             is DoTask -> task.parseChildren(position, this)
             is ForTask -> task.parseChildren(position, this)
             is TryTask -> task.parseChildren(position, this)
@@ -139,12 +139,12 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
     }
 }
 
-private fun RootTask.parseChildren(): List<Node<*>> = listOf(
+private fun RootTask.parseChildren(parent: Node<*>?): List<Node<*>> = listOf(
     Node(
         NodePosition.root.addToken(DO),
         DoTask(`do`),
         "$DO",
-        null,
+        parent,
     ),
 )
 

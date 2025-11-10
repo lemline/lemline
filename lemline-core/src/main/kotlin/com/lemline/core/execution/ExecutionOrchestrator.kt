@@ -13,6 +13,7 @@ import com.lemline.core.execution.nodes.SetProcessor
 import com.lemline.core.execution.nodes.SwitchProcessor
 import com.lemline.core.execution.state.MutableStates
 import com.lemline.core.execution.state.NodeState
+import com.lemline.core.execution.state.RootState
 import com.lemline.core.execution.state.Scope
 import com.lemline.core.execution.state.States
 import com.lemline.core.execution.state.merge
@@ -27,6 +28,7 @@ import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 
 /**
@@ -90,8 +92,13 @@ object ExecutionOrchestrator {
      * @return The final output dataset
      * @throws Exception if any error occurs during execution
      */
-    suspend fun run(node: Node<*>, dataset: JsonElement, states: MutableStates = mutableMapOf()): JsonElement {
+    suspend fun run(
+        node: Node<*>,
+        dataset: JsonElement,
+        states: MutableStates = mutableMapOf()
+    ): JsonElement {
 
+        // Keep track of the root node to update its context
         var current: Node<*>? = node
         var input: JsonElement = dataset
         var flowDirective: FlowDirective? = null
@@ -101,11 +108,15 @@ object ExecutionOrchestrator {
                 logger.debug { "Executing node: ${current!!.name} with input: $input" }
                 // Execute one step - runStep is a pure function
                 with(runStep(current, input, states.toMap(), flowDirective)) {
-                    current = this.next
+                    current = this.nextNode
                     input = this.dataset
                     flowDirective = this.flowDirective
                     // Apply changes
                     states.updateWith(this.stateUpdates)
+                    // Merge exported context into RootState if present
+                    this.newContext?.let { exported ->
+                        updateRootContext(current, states, exported)
+                    }
                 }
 
                 // ← Checkpoint: state is consistent for persistence
@@ -182,5 +193,27 @@ object ExecutionOrchestrator {
         } as NodeProcessor<T, NodeState>
     }
 
+    /**
+     * Updates the RootState context with the new context.
+     *
+     * @param node The current node of the workflow
+     * @param states The mutable states map
+     * @param newContext The new context data
+     */
+    private fun updateRootContext(node: Node<*>?, states: MutableStates, newContext: JsonObject) {
+        if (node == null) return
 
+        var rootNode: Node<*> = node
+        while (rootNode.parent != null) rootNode = rootNode.parent
+
+        // Get the current root state (must exist, as root is always entered first)
+        when (val rootState = states[rootNode]) {
+            null -> throw IllegalStateException("RootState not found for node '${rootNode.name}' - workflow not properly initialized")
+            is RootState -> {
+                // Replace context with new context (as per Serverless Workflow spec)
+                states[rootNode] = rootState.copyWithContext(newContext)
+            }
+            else -> throw IllegalStateException("State of root node ${rootNode.reference}, not a RootState: $rootState")
+        }
+    }
 }
