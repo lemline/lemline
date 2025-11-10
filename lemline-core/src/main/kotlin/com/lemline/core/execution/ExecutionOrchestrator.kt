@@ -14,6 +14,7 @@ import com.lemline.core.execution.processors.ForProcessor
 import com.lemline.core.execution.processors.NodeProcessor
 import com.lemline.core.execution.processors.RaiseProcessor
 import com.lemline.core.execution.processors.RootProcessor
+import com.lemline.core.execution.processors.RunScriptProcessor
 import com.lemline.core.execution.processors.RunShellProcessor
 import com.lemline.core.execution.processors.SetProcessor
 import com.lemline.core.execution.processors.SwitchProcessor
@@ -31,6 +32,8 @@ import io.serverlessworkflow.api.types.DoTask
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.ForTask
 import io.serverlessworkflow.api.types.RaiseTask
+import io.serverlessworkflow.api.types.RunScript
+import io.serverlessworkflow.api.types.RunShell
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SwitchTask
@@ -230,7 +233,15 @@ object ExecutionOrchestrator {
             is TryTask -> TryProcessor(node as Node<TryTask>)
             is RaiseTask -> RaiseProcessor(node as Node<RaiseTask>)
             is CallHTTP -> CallHttpProcessor(node as Node<CallHTTP>)
-            is RunTask -> RunShellProcessor(node as Node<RunTask>)
+            is RunTask -> {
+                // Dispatch to appropriate run processor based on run configuration type
+                val runTask = node as Node<RunTask>
+                when (runTask.task.run.get()) {
+                    is RunShell -> RunShellProcessor(runTask)
+                    is RunScript -> RunScriptProcessor(runTask)
+                    else -> throw IllegalArgumentException("Unknown run task type: ${runTask.task.run.get()?.javaClass?.simpleName}")
+                }
+            }
 
             else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
         } as NodeProcessor<T, NodeState>
