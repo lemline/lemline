@@ -30,7 +30,7 @@ class RunShellExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `shell can execute simple command`() = runTest {
-        val yaml = $$"""
+        val yaml = """
             do:
               - echoHello:
                   run:
@@ -46,7 +46,7 @@ class RunShellExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `shell can execute command with arguments`() = runTest {
-        val yaml = $$"""
+        val yaml = """
             do:
               - echoWithArgs:
                   run:
@@ -64,14 +64,14 @@ class RunShellExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `shell can use environment variables`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - printEnv:
                   run:
                     shell:
                       command: sh
                       arguments:
-                        "-c": echo ${'$'}MY_VAR
+                        "-c": echo $MY_VAR
                       environment:
                         MY_VAR: TestValue
         """
@@ -201,7 +201,7 @@ class RunShellExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `shell can use expressions in environment variables`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - setVar:
                   set:
@@ -211,9 +211,9 @@ class RunShellExecutionTest {
                     shell:
                       command: sh
                       arguments:
-                        "-c": echo ${'$'}MY_VAR
+                        "-c": echo $MY_VAR
                       environment:
-                        MY_VAR: ${'$'}{ .varValue }
+                        MY_VAR: ${ .varValue }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))

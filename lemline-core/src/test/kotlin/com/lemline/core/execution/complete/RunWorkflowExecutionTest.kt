@@ -36,18 +36,18 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can execute simple sub-workflow`() = runTest {
         // Define a simple child workflow that doubles the input
-        val childWorkflowYaml = $"""
+        val childWorkflowYaml = $$"""
             do:
               - double:
                   set:
-                    result: ${'$'}{ .value * 2 }
+                    result: ${ .value * 2 }
         """
 
         // Register the child workflow in the cache
         getWorkflowNode(childWorkflowYaml, namespace = "test", name = "doubler", version = "0.1.0")
 
         // Parent workflow that calls the child
-        val parentWorkflowYaml = $"""
+        val parentWorkflowYaml = $$"""
             do:
               - callDoubler:
                   run:
@@ -68,17 +68,17 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can pass input to sub-workflow`() = runTest {
         // Child workflow that greets by name
-        val childWorkflowYaml = $"""
+        val childWorkflowYaml = $$"""
             do:
               - greet:
                   set:
-                    greeting: ${'$'}{ "Hello, " + .name + "!" }
+                    greeting: ${ "Hello, " + .name + "!" }
         """
 
         getWorkflowNode(childWorkflowYaml, namespace = "test", name = "greeter", version = "0.1.0")
 
         // Parent workflow
-        val parentWorkflowYaml = $"""
+        val parentWorkflowYaml = $$"""
             do:
               - setName:
                   set:
@@ -90,7 +90,7 @@ class RunWorkflowExecutionTest {
                       name: greeter
                       version: '0.1.0'
                       input:
-                        name: ${'$'}{ .userName }
+                        name: ${ .userName }
         """
 
         val rootNode = getWorkflowNode(parentWorkflowYaml, namespace = "test", name = "parent", version = "0.1.0")
@@ -102,12 +102,12 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can execute recursive factorial calculation`() = runTest {
         // Recursive factorial workflow
-        val factorialYaml = $"""
+        val factorialYaml = $$"""
             do:
               - checkBaseCase:
                   switch:
                     - base:
-                        when: ${'$'}{ .n == 1 }
+                        when: ${ .n == 1 }
                         then: returnOne
                     - default:
                         then: computeRecursive
@@ -126,10 +126,10 @@ class RunWorkflowExecutionTest {
                             name: factorial
                             version: '0.1.0'
                             input:
-                              n: ${'$'}{ .n - 1 }
+                              n: ${ .n - 1 }
                     - multiplyResults:
                         set:
-                          n: ${'$'}{ .n * ${'$'}workflow.input.n }
+                          n: ${ .n * $workflow.input.n }
                         then: end
         """
 
@@ -146,25 +146,25 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can call multiple sub-workflows in sequence`() = runTest {
         // First child workflow
-        val adderYaml = $"""
+        val adderYaml = $$"""
             do:
               - add:
                   set:
-                    result: ${'$'}{ .a + .b }
+                    result: ${ .a + .b }
         """
         getWorkflowNode(adderYaml, namespace = "test", name = "adder", version = "0.1.0")
 
         // Second child workflow
-        val multiplierYaml = $"""
+        val multiplierYaml = $$"""
             do:
               - multiply:
                   set:
-                    result: ${'$'}{ .value * 2 }
+                    result: ${ .value * 2 }
         """
         getWorkflowNode(multiplierYaml, namespace = "test", name = "multiplier", version = "0.1.0")
 
         // Parent workflow calling both
-        val parentYaml = $"""
+        val parentYaml = $$"""
             do:
               - callAdder:
                   run:
@@ -182,7 +182,7 @@ class RunWorkflowExecutionTest {
                       name: multiplier
                       version: '0.1.0'
                       input:
-                        value: ${'$'}{ .result }
+                        value: ${ .result }
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")
@@ -195,17 +195,17 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can use sub-workflow output in subsequent tasks`() = runTest {
         // Child workflow that processes data
-        val processorYaml = $"""
+        val processorYaml = $$"""
             do:
               - process:
                   set:
                     processed: true
-                    value: ${'$'}{ .input * 10 }
+                    value: ${ .input * 10 }
         """
         getWorkflowNode(processorYaml, namespace = "test", name = "processor", version = "0.1.0")
 
         // Parent workflow
-        val parentYaml = $"""
+        val parentYaml = $$"""
             do:
               - callProcessor:
                   run:
@@ -217,8 +217,8 @@ class RunWorkflowExecutionTest {
                         input: 5
               - useResult:
                   set:
-                    finalValue: ${'$'}{ .value + 10 }
-                    wasProcessed: ${'$'}{ .processed }
+                    finalValue: ${ .value + 10 }
+                    wasProcessed: ${ .processed }
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")
@@ -231,7 +231,7 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow output can be transformed with output as`() = runTest {
         // Child workflow
-        val childYaml = $"""
+        val childYaml = $$"""
             do:
               - compute:
                   set:
@@ -241,7 +241,7 @@ class RunWorkflowExecutionTest {
         getWorkflowNode(childYaml, namespace = "test", name = "child", version = "0.1.0")
 
         // Parent workflow with output transformation
-        val parentYaml = $"""
+        val parentYaml = $$"""
             do:
               - callChild:
                   run:
@@ -250,7 +250,7 @@ class RunWorkflowExecutionTest {
                       name: child
                       version: '0.1.0'
                   output:
-                    as: '${'$'}{ {result: .value} }'
+                    as: '${ {result: .value} }'
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")
@@ -263,17 +263,17 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can execute sub-workflow with complex input`() = runTest {
         // Child workflow that processes complex data
-        val processorYaml = $"""
+        val processorYaml = $$"""
             do:
               - process:
                   set:
-                    fullName: ${'$'}{ .firstName + " " + .lastName }
-                    age: ${'$'}{ .age }
+                    fullName: ${ .firstName + " " + .lastName }
+                    age: ${ .age }
         """
         getWorkflowNode(processorYaml, namespace = "test", name = "person-processor", version = "0.1.0")
 
         // Parent workflow
-        val parentYaml = $"""
+        val parentYaml = $$"""
             do:
               - callProcessor:
                   run:
@@ -297,16 +297,16 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can chain multiple nested sub-workflows`() = runTest {
         // Level 3 workflow
-        val level3Yaml = $"""
+        val level3Yaml = $$"""
             do:
               - compute:
                   set:
-                    result: ${'$'}{ .value + 1 }
+                    result: ${ .value + 1 }
         """
         getWorkflowNode(level3Yaml, namespace = "test", name = "level3", version = "0.1.0")
 
         // Level 2 workflow calls level 3
-        val level2Yaml = $"""
+        val level2Yaml = $$"""
             do:
               - callLevel3:
                   run:
@@ -315,12 +315,12 @@ class RunWorkflowExecutionTest {
                       name: level3
                       version: '0.1.0'
                       input:
-                        value: ${'$'}{ .value * 2 }
+                        value: ${ .value * 2 }
         """
         getWorkflowNode(level2Yaml, namespace = "test", name = "level2", version = "0.1.0")
 
         // Level 1 workflow calls level 2
-        val level1Yaml = $"""
+        val level1Yaml = $$"""
             do:
               - callLevel2:
                   run:
@@ -329,12 +329,12 @@ class RunWorkflowExecutionTest {
                       name: level2
                       version: '0.1.0'
                       input:
-                        value: ${'$'}{ .value + 3 }
+                        value: ${ .value + 3 }
         """
         getWorkflowNode(level1Yaml, namespace = "test", name = "level1", version = "0.1.0")
 
         // Root workflow calls level 1
-        val rootYaml = $"""
+        val rootYaml = $$"""
             do:
               - callLevel1:
                   run:
@@ -356,7 +356,7 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can execute sub-workflow with default input`() = runTest {
         // Child workflow that uses input or defaults
-        val childYaml = $"""
+        val childYaml = $$"""
             do:
               - setDefaults:
                   set:
@@ -365,7 +365,7 @@ class RunWorkflowExecutionTest {
         getWorkflowNode(childYaml, namespace = "test", name = "defaulter", version = "0.1.0")
 
         // Parent workflow without explicit input
-        val parentYaml = $"""
+        val parentYaml = $$"""
             do:
               - callChild:
                   run:
@@ -384,7 +384,7 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can execute sub-workflow asynchronously without waiting`() = runTest {
         // Child workflow
-        val childYaml = $"""
+        val childYaml = $$"""
             do:
               - slowTask:
                   set:
@@ -393,7 +393,7 @@ class RunWorkflowExecutionTest {
         getWorkflowNode(childYaml, namespace = "test", name = "slow-workflow", version = "0.1.0")
 
         // Parent workflow with await: false
-        val parentYaml = $"""
+        val parentYaml = $$"""
             do:
               - callAsync:
                   run:
@@ -419,17 +419,17 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can use workflow context in sub-workflow calls`() = runTest {
         // Child workflow
-        val childYaml = $"""
+        val childYaml = $$"""
             do:
               - compute:
                   set:
-                    doubled: ${'$'}{ .original * 2 }
-                    parentValue: ${'$'}{ .original }
+                    doubled: ${ .original * 2 }
+                    parentValue: ${ .original }
         """
         getWorkflowNode(childYaml, namespace = "test", name = "context-user", version = "0.1.0")
 
         // Parent workflow that passes context
-        val parentYaml = $"""
+        val parentYaml = $$"""
             do:
               - setContext:
                   set:
@@ -441,7 +441,7 @@ class RunWorkflowExecutionTest {
                       name: context-user
                       version: '0.1.0'
                       input:
-                        original: ${'$'}{ .myValue }
+                        original: ${ .myValue }
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")

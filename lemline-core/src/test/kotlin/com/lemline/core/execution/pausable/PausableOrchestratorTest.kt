@@ -150,11 +150,11 @@ class PausableOrchestratorTest {
             do:
               - launchChild:
                   run:
+                    await: false
                     workflow:
                       name: asyncChild
                       namespace: test
                       version: '0.1.0'
-                      await: false
         """
         val rootNode = getWorkflowNode(parentYaml)
         val result = PausableOrchestrator.run(rootNode, JsonObject(emptyMap()))
@@ -199,10 +199,9 @@ class PausableOrchestratorTest {
         // Should pause after shell command completes
         assertIs<PausableResult.ActivityCompleted>(result)
 
-        // Output should contain shell result
-        val output = result.output as JsonObject
-        assertTrue(output.containsKey("stdout"))
-        assertTrue(output["stdout"]?.jsonPrimitive?.content?.contains("Hello World") == true)
+        // Output should be JsonPrimitive with shell stdout
+        val output = result.output as kotlinx.serialization.json.JsonPrimitive
+        assertTrue(output.content.contains("Hello World"))
     }
 
     // Note: Script test removed - JavaScript engine not available in test environment
@@ -284,8 +283,8 @@ class PausableOrchestratorTest {
 
         // Should execute all set tasks, then pause after shell command
         assertIs<PausableResult.ActivityCompleted>(result)
-        val output = result.output as JsonObject
-        assertTrue(output.containsKey("stdout"))
+        val output = result.output as kotlinx.serialization.json.JsonPrimitive
+        assertTrue(output.content.contains("done"))
     }
 
     // ========================================
@@ -324,14 +323,16 @@ class PausableOrchestratorTest {
               - initialize:
                   set:
                     values: [1, 2, 3]
+                    sum: 0
               - process:
                   for:
-                    each: item
                     in: ${'$'}{ .values }
-                    do:
-                      - transform:
-                          set:
-                            current: ${'$'}{ .item * 2 }
+                  do:
+                    - transform:
+                        set:
+                          sum: ${'$'}{ .sum + @item }
+                  output:
+                    as: ${'$'}{ . }
               - callActivity:
                   run:
                     shell:
