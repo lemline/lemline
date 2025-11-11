@@ -20,6 +20,7 @@ import com.lemline.core.execution.processors.RunWorkflowProcessor
 import com.lemline.core.execution.processors.SetProcessor
 import com.lemline.core.execution.processors.SwitchProcessor
 import com.lemline.core.execution.processors.TryProcessor
+import com.lemline.core.execution.processors.WaitProcessor
 import com.lemline.core.execution.states.MutableStates
 import com.lemline.core.execution.states.NodeState
 import com.lemline.core.execution.states.RootState
@@ -41,6 +42,7 @@ import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TryTask
+import io.serverlessworkflow.api.types.WaitTask
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -235,6 +237,7 @@ object ExecutionOrchestrator {
             is TryTask -> TryProcessor(node as Node<TryTask>)
             is RaiseTask -> RaiseProcessor(node as Node<RaiseTask>)
             is CallHTTP -> CallHttpProcessor(node as Node<CallHTTP>)
+            is WaitTask -> WaitProcessor(node as Node<WaitTask>)
             is RunTask -> {
                 // Dispatch to appropriate run processor based on run configuration type
                 val runTask = node as Node<RunTask>
