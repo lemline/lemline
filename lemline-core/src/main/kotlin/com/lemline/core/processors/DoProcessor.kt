@@ -4,8 +4,8 @@
 package com.lemline.core.processors
 
 import com.lemline.core.execution.context.Scope
-import com.lemline.core.states.DoState
 import com.lemline.core.nodes.Node
+import com.lemline.core.states.DoState
 import io.serverlessworkflow.api.types.DoTask
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -53,10 +53,10 @@ class DoProcessor(
     override fun getNextStepInfo(
         state: DoState,
         dataset: JsonElement,
-        nodeName: String?,
         scope: Scope,
+        namedNode: String?,
     ): NextStepInfo {
-        val nextIndex = getNextIndex(state, nodeName)
+        val nextIndex = getNextIndex(state, namedNode)
         val updatedState = state.copy(index = nextIndex)
         return when (nextIndex >= (node.children?.size ?: 0)) {
             true -> NextStepInfo(

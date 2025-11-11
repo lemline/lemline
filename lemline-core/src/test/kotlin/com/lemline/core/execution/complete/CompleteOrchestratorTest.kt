@@ -3,8 +3,6 @@ package com.lemline.core.execution.complete
 
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.getWorkflowNode
-import com.lemline.core.nodes.Node
-import com.lemline.core.states.NodeState
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
@@ -41,12 +39,13 @@ class CompleteOrchestratorTest {
     // ========================================
 
     @Test
-    fun `should execute simple workflow with set tasks`() = runTest {
+    fun `should execute simple workflow with set tasks and then directive`() = runTest {
         val yaml = $$"""
             do:
               - step1:
                   set:
                     value: 1
+                  then: step3
               - step2:
                   set:
                     value: 2
@@ -57,7 +56,7 @@ class CompleteOrchestratorTest {
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
-        assertEquals(20, output["result"]?.jsonPrimitive?.int)
+        assertEquals(10, output["result"]?.jsonPrimitive?.int)
     }
 
     @Test

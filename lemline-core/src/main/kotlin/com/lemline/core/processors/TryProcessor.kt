@@ -92,8 +92,8 @@ class TryProcessor(
     override fun getNextStepInfo(
         state: TryState,
         dataset: JsonElement,
-        nodeName: String?,
         scope: Scope,
+        namedNode: String?,
     ) = when (state.attemptIndex < 0) {
         // first attempt
         true -> NextStepInfo(

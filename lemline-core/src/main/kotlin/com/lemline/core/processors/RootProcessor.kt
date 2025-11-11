@@ -4,9 +4,9 @@
 package com.lemline.core.processors
 
 import com.lemline.core.execution.context.Scope
-import com.lemline.core.states.RootState
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.states.RootState
 import java.util.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -57,8 +57,8 @@ class RootProcessor(
     override fun getNextStepInfo(
         state: RootState,
         dataset: JsonElement,
-        nodeName: String?,
         scope: Scope,
+        namedNode: String?,
     ): NextStepInfo = when (state.hasRun) {
         true -> NextStepInfo(
             updatedCurrentState = null,

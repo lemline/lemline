@@ -5,8 +5,8 @@ package com.lemline.core.processors
 
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.execution.context.Scope
-import com.lemline.core.states.NoState
 import com.lemline.core.nodes.Node
+import com.lemline.core.states.NoState
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.SwitchItem
 import io.serverlessworkflow.api.types.SwitchTask
@@ -66,8 +66,8 @@ class SwitchProcessor(
     override fun getNextStepInfo(
         state: NoState,
         dataset: JsonElement,
-        nodeName: String?,
         scope: Scope,
+        namedNode: String?,
     ): NextStepInfo {
 
         var directive: FlowDirective? = null

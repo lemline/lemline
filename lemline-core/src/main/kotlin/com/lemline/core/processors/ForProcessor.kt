@@ -4,8 +4,8 @@
 package com.lemline.core.processors
 
 import com.lemline.core.execution.context.Scope
-import com.lemline.core.states.ForState
 import com.lemline.core.nodes.Node
+import com.lemline.core.states.ForState
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -68,8 +68,8 @@ class ForProcessor(
     override fun getNextStepInfo(
         state: ForState,
         dataset: JsonElement,
-        transformedInput: String?,
         scope: Scope,
+        transformedInput: String?,
     ): NextStepInfo {
         // get an updated state for the current node
         val updatedState = getNextState(state)

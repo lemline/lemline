@@ -236,6 +236,7 @@ abstract class BaseOrchestrator {
     ): StepResult {
         val processor = getNodeProcessor(currentNode)
         val scope = getScope(currentNode, states)
+        
         return processor.completeTask(
             rawOutput = childOutput,
             currentFlowDirective = processor.getFlowDirective(),

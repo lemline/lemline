@@ -71,17 +71,18 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     /**
      * Determine:
-     * - the updated state of the current node
+     * - the updated state after the current node
      * - the next node (parent or child)
      * - the flow directive for the parent (if any)
      *
-     * The default implementation returns (null, parent, flowDirective), which is the implementation for a leaf (activity, switch, ...)
+     * The default implementation is the implementation for a leaf (activity, switch, ...)
+     * Other tasks MUST redefine this method.
      */
     open fun getNextStepInfo(
         state: S,
         dataset: JsonElement,
-        nodeName: String? = null,
         scope: Scope,
+        namedNode: String? = null,
     ) = NextStepInfo(null, node.parent, getFlowDirective())
 
     // ========================================
@@ -157,15 +158,11 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         transformedInput: JsonElement,
         parentScope: Scope,
         taskContext: TaskContext?,
-        nodeName: String? = null
+        namedNode: String? = null
     ): StepResult {
         // get the next node and an updated state for the current node
-        val (updatedState, nextNode, currentFlowDirective) = getNextStepInfo(
-            state,
-            transformedInput,
-            nodeName,
-            mergeScope(parentScope, taskContext)
-        )
+        val (updatedState, nextNode, currentFlowDirective) =
+            getNextStepInfo(state, transformedInput, mergeScope(parentScope, taskContext), namedNode)
 
         // check if we should return to parent
         return when (nextNode == node.parent) {
@@ -173,14 +170,20 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
             true -> continueToParent(transformedInput, currentFlowDirective, parentScope, taskContext)
 
             // control flows that are not completed (do, for, ...), going to a child
-            false -> StepResult(
-                nextNode,
-                transformedInput,
-                mapOf(node to updatedState),
-                null
-            )
+            false -> continueToChild(nextNode, transformedInput, updatedState)
         }
     }
+
+    internal fun continueToChild(
+        childNode: Node<*>?,
+        childRawInput: JsonElement,
+        updatedState: NodeState?
+    ) = StepResult(
+        childNode,
+        childRawInput,
+        mapOf(node to updatedState),
+        null
+    )
 
     // ========================================
     // EXIT
@@ -198,10 +201,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
         val rawOutput = execute(dataset, mergeScope(parentScope, context))
-
-        // Update context with raw output
-        context = context?.copy(rawOutput = rawOutput)
-
+        
         // Complete the task with the raw output
         return completeTask(rawOutput, currentFlowDirective, parentScope, context)
     }
