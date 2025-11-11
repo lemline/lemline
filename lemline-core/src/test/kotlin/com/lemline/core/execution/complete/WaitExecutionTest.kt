@@ -26,7 +26,7 @@ class WaitExecutionTest {
 
     @Test
     fun `workflow can wait for fixed duration`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - waitFiveSeconds:
                   wait: PT0.1S
@@ -41,7 +41,7 @@ class WaitExecutionTest {
 
     @Test
     fun `workflow can wait with seconds duration`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - waitSeconds:
                   wait: PT0.1S
@@ -56,7 +56,7 @@ class WaitExecutionTest {
 
     @Test
     fun `workflow can wait with milliseconds duration`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - waitMillis:
                   wait: PT0.05S
@@ -71,7 +71,7 @@ class WaitExecutionTest {
 
     @Test
     fun `workflow can have multiple wait tasks in sequence`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - firstWait:
                   wait: PT0.05S
@@ -88,7 +88,7 @@ class WaitExecutionTest {
 
     @Test
     fun `wait task preserves input data`() = runTest {
-        val yaml = $"""
+        val yaml = $$"""
             do:
               - setData:
                   set:
@@ -99,8 +99,8 @@ class WaitExecutionTest {
               - verifyData:
                   set:
                     verified: true
-                    originalMessage: ${'$'}{ .message }
-                    originalCount: ${'$'}{ .count }
+                    originalMessage: ${ .message }
+                    originalCount: ${ .count }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -112,7 +112,7 @@ class WaitExecutionTest {
 
     @Test
     fun `wait task works with input transformation`() = runTest {
-        val yaml = $"""
+        val yaml = $$"""
             do:
               - prepareData:
                   set:
@@ -120,10 +120,10 @@ class WaitExecutionTest {
               - waitWithInput:
                   wait: PT0.01S
                   input:
-                    from: '${'$'}{ {doubled: .value * 2} }'
+                    from: '${ {doubled: .value * 2} }'
               - useResult:
                   set:
-                    finalValue: ${'$'}{ .doubled }
+                    finalValue: ${ .doubled }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -133,7 +133,7 @@ class WaitExecutionTest {
 
     @Test
     fun `wait task works with output transformation`() = runTest {
-        val yaml = $"""
+        val yaml = $$"""
             do:
               - setInitial:
                   set:
@@ -141,7 +141,7 @@ class WaitExecutionTest {
               - waitTask:
                   wait: PT0.01S
                   output:
-                    as: '${'$'}{ {result: .value * 3} }'
+                    as: '${ {result: .value * 3} }'
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -153,13 +153,13 @@ class WaitExecutionTest {
 
     @Test
     fun `wait task can be conditional`() = runTest {
-        val yaml = $"""
+        val yaml = $$"""
             do:
               - setCondition:
                   set:
                     shouldWait: true
               - conditionalWait:
-                  if: ${'$'}{ .shouldWait }
+                  if: ${ .shouldWait }
                   wait: PT0.05S
               - afterWait:
                   set:
@@ -172,13 +172,13 @@ class WaitExecutionTest {
 
     @Test
     fun `wait task is skipped when condition is false`() = runTest {
-        val yaml = $"""
+        val yaml = $$"""
             do:
               - setCondition:
                   set:
                     shouldWait: false
               - conditionalWait:
-                  if: ${'$'}{ .shouldWait }
+                  if: ${ .shouldWait }
                   wait: PT1S
               - afterWait:
                   set:
@@ -191,7 +191,7 @@ class WaitExecutionTest {
 
     @Test
     fun `wait task works in do block`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - processWithWait:
                   do:
@@ -212,20 +212,20 @@ class WaitExecutionTest {
 
     @Test
     fun `wait task works with for loop`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - loopWithWait:
                   for:
                     each: item
-                    in: ${'$'}{ [1, 2, 3] }
+                    in: ${ [1, 2, 3] }
                   do:
                     - waitInLoop:
                         wait: PT0.01S
                     - processItem:
                         set:
-                          processed: ${'$'}{ @item }
+                          processed: ${ @item }
                   output:
-                    as: ${'$'}{ . }
+                    as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -235,7 +235,7 @@ class WaitExecutionTest {
 
     @Test
     fun `wait task works in switch branches`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - setValue:
                   set:
@@ -243,7 +243,7 @@ class WaitExecutionTest {
               - switchWithWait:
                   switch:
                     - case1:
-                        when: ${'$'}{ .value > 5 }
+                        when: ${ .value > 5 }
                         then: waitBranch
               - waitBranch:
                   wait: PT0.01S
@@ -259,7 +259,7 @@ class WaitExecutionTest {
 
     @Test
     fun `workflow can chain wait with other activity tasks`() = runTest {
-        val yaml = $"""
+        val yaml = $$"""
             do:
               - initialize:
                   set:
@@ -268,12 +268,12 @@ class WaitExecutionTest {
                   wait: PT0.01S
               - transform:
                   set:
-                    value: ${'$'}{ .value * 2 }
+                    value: ${ .value * 2 }
               - waitSecond:
                   wait: PT0.01S
               - finalize:
                   set:
-                    result: ${'$'}{ .value + 5 }
+                    result: ${ .value + 5 }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject

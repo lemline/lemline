@@ -262,7 +262,7 @@ class PausableOrchestratorTest {
 
     @Test
     fun `should execute multiple non-activity steps before pausing at activity`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - step1:
                   set:
@@ -272,7 +272,7 @@ class PausableOrchestratorTest {
                     b: 2
               - step3:
                   set:
-                    c: ${'$'}{ .a + .b }
+                    c: ${ .a + .b }
               - callShell:
                   run:
                     shell:
@@ -318,7 +318,7 @@ class PausableOrchestratorTest {
 
     @Test
     fun `should capture all intermediate states at pause point`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - initialize:
                   set:
@@ -326,13 +326,13 @@ class PausableOrchestratorTest {
                     sum: 0
               - process:
                   for:
-                    in: ${'$'}{ .values }
+                    in: ${ .values }
                   do:
                     - transform:
                         set:
-                          sum: ${'$'}{ .sum + @item }
+                          sum: ${ .sum + @item }
                   output:
-                    as: ${'$'}{ . }
+                    as: ${ . }
               - callActivity:
                   run:
                     shell:

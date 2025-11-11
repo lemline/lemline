@@ -31,7 +31,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can execute simple JavaScript`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - runJsScript:
                   run:
@@ -49,7 +49,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can execute simple Python`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - runPyScript:
                   run:
@@ -67,7 +67,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can use arguments in JavaScript`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - runWithArgs:
                   run:
@@ -94,7 +94,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can use arguments in Python`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - runWithArgs:
                   run:
@@ -120,7 +120,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can use environment variables in JavaScript`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - useEnv:
                   run:
@@ -140,7 +140,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can use environment variables in Python`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - useEnv:
                   run:
@@ -161,7 +161,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can return stdout explicitly`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - returnStdout:
                   run:
@@ -180,7 +180,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can return stderr`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - returnStderr:
                   run:
@@ -199,7 +199,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can return exit code`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - returnCode:
                   run:
@@ -218,7 +218,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can return all outputs`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - returnAll:
                   run:
@@ -241,7 +241,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can use expressions in code`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - setData:
                   set:
@@ -251,7 +251,7 @@ class RunScriptExecutionTest {
                   run:
                     script:
                       language: js
-                      code: ${'$'}{ "console.log('" + .greeting + ", " + .name + "!');" }
+                      code: ${ "console.log('" + .greeting + ", " + .name + "!');" }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
@@ -262,7 +262,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can use expressions in arguments`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - setName:
                   set:
@@ -281,7 +281,7 @@ class RunScriptExecutionTest {
                         }
                         console.log('Hello, ' + name + '!');
                       arguments:
-                        "--name": ${'$'}{ .userName }
+                        "--name": ${ .userName }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
@@ -292,7 +292,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can use expressions in environment variables`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - setValue:
                   set:
@@ -304,7 +304,7 @@ class RunScriptExecutionTest {
                       code: |
                         console.log(process.env.MY_VAR || 'default');
                       environment:
-                        MY_VAR: ${'$'}{ .envValue }
+                        MY_VAR: ${ .envValue }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
@@ -315,7 +315,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can chain with other tasks`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - runScript:
                   run:
@@ -325,7 +325,7 @@ class RunScriptExecutionTest {
                         console.log('ScriptData');
               - processData:
                   set:
-                    result: ${'$'}{ . }
+                    result: ${ . }
                     hasResult: true
         """
         val rootNode = getWorkflowNode(yaml)
@@ -338,7 +338,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script output can be transformed with output as`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - runAndTransform:
                   run:
@@ -347,7 +347,7 @@ class RunScriptExecutionTest {
                       code: |
                         console.log('test output');
                   output:
-                    as: '${'$'}{ {scriptResult: .} }'
+                    as: '${ {scriptResult: .} }'
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -358,7 +358,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can execute multiple scripts in sequence`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - firstScript:
                   run:
@@ -374,7 +374,7 @@ class RunScriptExecutionTest {
                         print('Second')
               - combine:
                   set:
-                    result: ${'$'}{ . }
+                    result: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -385,7 +385,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can perform computations in JavaScript`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - compute:
                   run:
@@ -404,7 +404,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can perform computations in Python`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - compute:
                   run:
@@ -423,7 +423,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can handle multi-line output in JavaScript`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - multiLine:
                   run:
@@ -446,7 +446,7 @@ class RunScriptExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `script can handle multi-line output in Python`() = runTest {
-        val yaml = $"""
+        val yaml = """
             do:
               - multiLine:
                   run:

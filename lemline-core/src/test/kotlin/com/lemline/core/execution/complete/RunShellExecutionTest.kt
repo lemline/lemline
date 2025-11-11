@@ -84,7 +84,7 @@ class RunShellExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `shell can return stdout`() = runTest {
-        val yaml = $$"""
+        val yaml = """
             do:
               - echoStdout:
                   run:
@@ -101,7 +101,7 @@ class RunShellExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `shell can return stderr`() = runTest {
-        val yaml = $$"""
+        val yaml = """
             do:
               - echoStderr:
                   run:
@@ -120,7 +120,7 @@ class RunShellExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `shell can return exit code`() = runTest {
-        val yaml = $$"""
+        val yaml = """
             do:
               - exitCode:
                   run:
@@ -139,7 +139,7 @@ class RunShellExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `shell can return all output`() = runTest {
-        val yaml = $$"""
+        val yaml = """
             do:
               - allOutput:
                   run:
@@ -288,7 +288,7 @@ class RunShellExecutionTest {
     @Test
     @EnabledOnOs(OS.LINUX, OS.MAC)
     fun `shell can list files in directory`() = runTest {
-        val yaml = $$"""
+        val yaml = """
             do:
               - listFiles:
                   run:
@@ -307,7 +307,7 @@ class RunShellExecutionTest {
     @Test
     @EnabledOnOs(OS.WINDOWS)
     fun `shell can execute command on Windows`() = runTest {
-        val yaml = $$"""
+        val yaml = """
             do:
               - echoWin:
                   run:

@@ -47,7 +47,7 @@ class RunWorkflowExecutionTest {
         getWorkflowNode(childWorkflowYaml, namespace = "test", name = "doubler", version = "0.1.0")
 
         // Parent workflow that calls the child
-        val parentWorkflowYaml = $$"""
+        val parentWorkflowYaml = """
             do:
               - callDoubler:
                   run:
@@ -231,7 +231,7 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow output can be transformed with output as`() = runTest {
         // Child workflow
-        val childYaml = $$"""
+        val childYaml = """
             do:
               - compute:
                   set:
@@ -273,7 +273,7 @@ class RunWorkflowExecutionTest {
         getWorkflowNode(processorYaml, namespace = "test", name = "person-processor", version = "0.1.0")
 
         // Parent workflow
-        val parentYaml = $$"""
+        val parentYaml = """
             do:
               - callProcessor:
                   run:
@@ -334,7 +334,7 @@ class RunWorkflowExecutionTest {
         getWorkflowNode(level1Yaml, namespace = "test", name = "level1", version = "0.1.0")
 
         // Root workflow calls level 1
-        val rootYaml = $$"""
+        val rootYaml = """
             do:
               - callLevel1:
                   run:
@@ -356,7 +356,7 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can execute sub-workflow with default input`() = runTest {
         // Child workflow that uses input or defaults
-        val childYaml = $$"""
+        val childYaml = """
             do:
               - setDefaults:
                   set:
@@ -365,7 +365,7 @@ class RunWorkflowExecutionTest {
         getWorkflowNode(childYaml, namespace = "test", name = "defaulter", version = "0.1.0")
 
         // Parent workflow without explicit input
-        val parentYaml = $$"""
+        val parentYaml = """
             do:
               - callChild:
                   run:
@@ -384,7 +384,7 @@ class RunWorkflowExecutionTest {
     @Test
     fun `workflow can execute sub-workflow asynchronously without waiting`() = runTest {
         // Child workflow
-        val childYaml = $$"""
+        val childYaml = """
             do:
               - slowTask:
                   set:
@@ -393,7 +393,7 @@ class RunWorkflowExecutionTest {
         getWorkflowNode(childYaml, namespace = "test", name = "slow-workflow", version = "0.1.0")
 
         // Parent workflow with await: false
-        val parentYaml = $$"""
+        val parentYaml = """
             do:
               - callAsync:
                   run:

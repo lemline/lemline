@@ -137,7 +137,7 @@ CallHttpExecutionTest {
 
     @Test
     fun `http call can use input data via input transformation`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - createPost:
                   call: http
@@ -149,7 +149,7 @@ CallHttpExecutionTest {
                       body: Dynamic body content
                       userId: 42
                   input:
-                    from: ${'$'}{ . }
+                    from: ${ . }
         """
         val input = JsonObject(
             mapOf(
@@ -241,7 +241,7 @@ CallHttpExecutionTest {
 
     @Test
     fun `http call result can be transformed with output as`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - getPost:
                   call: http
@@ -249,7 +249,7 @@ CallHttpExecutionTest {
                     method: GET
                     endpoint: https://jsonplaceholder.typicode.com/posts/1
                   output:
-                    as: '${'$'}{ {postTitle: .title, postId: .id} }'
+                    as: '${ {postTitle: .title, postId: .id} }'
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
@@ -262,7 +262,7 @@ CallHttpExecutionTest {
 
     @Test
     fun `http call can be used within workflow steps`() = runTest {
-        val yaml = """
+        val yaml = $$"""
             do:
               - step1:
                   call: http
@@ -271,7 +271,7 @@ CallHttpExecutionTest {
                     endpoint: https://jsonplaceholder.typicode.com/posts/1
               - step2:
                   set:
-                    result: ${'$'}{ .title }
+                    result: ${ .title }
         """
         val rootNode = getWorkflowNode(yaml)
         val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
