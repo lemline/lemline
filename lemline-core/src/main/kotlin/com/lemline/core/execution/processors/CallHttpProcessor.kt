@@ -5,7 +5,7 @@ package com.lemline.core.execution.processors
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonPrimitive
-import com.lemline.core.activities.calls.HttpCall
+import com.lemline.core.calls.HttpCall
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME

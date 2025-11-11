@@ -396,8 +396,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
             status = status ?: type.defaultStatus,
             position = node.position,
         )
-        // Create a minimal old NodeInstance for exception
-        throw WorkflowException(null, error)
+        throw WorkflowException(error)
     }
 
     /**

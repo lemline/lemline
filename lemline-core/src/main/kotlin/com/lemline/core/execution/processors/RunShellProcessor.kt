@@ -3,7 +3,7 @@
 
 package com.lemline.core.execution.processors
 
-import com.lemline.core.activities.runs.Shell
+import com.lemline.core.runs.Shell
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.execution.context.Scope
 import com.lemline.core.execution.states.NoState

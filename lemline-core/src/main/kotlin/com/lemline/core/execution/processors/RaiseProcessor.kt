@@ -53,9 +53,9 @@ class RaiseProcessor(
             details = errorDef.detail
         )
 
-        // Throw ExecutionWorkflowException - this will be caught by ExecutionOrchestrator
+        // Throw WorkflowException - this will be caught by ExecutionOrchestrator
         // and handled by the nearest TryTask with matching catch block
-        throw WorkflowException(null, error)
+        throw WorkflowException(error)
     }
 
     private fun RaiseTaskError.getErrorDef(): io.serverlessworkflow.api.types.Error {

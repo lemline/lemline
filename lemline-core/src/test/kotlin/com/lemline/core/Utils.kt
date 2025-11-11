@@ -9,7 +9,6 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
-import com.lemline.core.processor.Processor
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
@@ -30,34 +29,6 @@ internal fun load(resourcePath: String): String {
 internal fun loadWorkflowFromYaml(resourcePath: String): Workflow {
     val yamlContent = load(resourcePath)
     return validation().read(yamlContent, WorkflowFormat.YAML)
-}
-
-@ExperimentalTime
-internal fun getWorkflowProcessor(
-    doYaml: String,
-    input: JsonElement,
-    namespace: String = "test",
-    name: String = "workflow-${doYaml.hashCode()}",
-    version: String = "0.1.0",
-    id: WorkflowId = WorkflowId.random(),
-): Processor {
-    val document =
-        """document:
-              dsl: '1.0.0'
-              namespace: $namespace
-              name: $name
-              version: $version
-        """.trimIndent()
-    val workflowYaml = document + "\n" + doYaml.trimIndent().replace("@", "$")
-    DefinitionCache.parseAndPut(workflowYaml)
-
-    return Processor.createNew(
-        namespace = WorkflowNamespace(namespace),
-        name = WorkflowName(name),
-        version = WorkflowVersion(version),
-        id = id,
-        rawInput = input,
-    )
 }
 
 /**
