@@ -169,19 +169,31 @@ catch (e: ChildWorkflowRequestedException) {
 
 **PausableOrchestrator**:
 ```kotlin
+// When child workflow requested
 catch (e: ChildWorkflowRequestedException) {
     return PausableResult.SubWorkflowNeeded(
-        nextNode = current,
+        nodePosition = current.reference,
         states = states,
-        output = input,
         childConfig = e.config
     )
 }
+
+// When runner needs to resume parent (called by runner)
+fun resumeFromChildWorkflow(
+    node: Node<*>,         // From SubWorkflowNeeded.nodePosition
+    childOutput: JsonElement,  // await=true: child's output; await=false: child's input
+    states: MutableStates     // From SubWorkflowNeeded.states
+): PausableResult {
+    // Complete task with output
+    val result = completeChildWorkflowTask(node, childOutput, states)
+    // Continue execution (may pause again or complete)
+    return run(result.nextNode, result.dataset, states)
+}
 ```
 
-Runner handles persistence:
-- **await=true**: Save parent state, emit child message, wait for completion
-- **await=false**: Emit child message, emit parent continuation immediately
+Runner handles both initiation and resumption:
+- **await=true**: Save parent state → start child → when child completes → `resumeFromChildWorkflow(node, childOutput, states)`
+- **await=false**: Start child immediately → `resumeFromChildWorkflow(node, childConfig.input, states)` (parent continues with child's input)
 
 ---
 
@@ -190,7 +202,7 @@ Runner handles persistence:
 ```kotlin
 sealed class PausableResult {
     // Workflow completed successfully
-    data class Complete(val output: JsonElement)
+    data class WorkflowCompleted(val output: JsonElement)
 
     // Activity executed, pause to persist state
     data class ActivityCompleted(
@@ -218,9 +230,8 @@ sealed class PausableResult {
 
     // Sub-workflow requested, pause to handle parent-child
     data class SubWorkflowNeeded(
-        val nextNode: Node<*>?,
+        val nodePosition: String,
         val states: States,
-        val output: JsonElement,
         val childConfig: ChildWorkflowConfig
     )
 }

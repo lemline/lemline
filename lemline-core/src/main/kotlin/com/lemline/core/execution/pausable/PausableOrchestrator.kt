@@ -52,17 +52,72 @@ import kotlinx.serialization.json.JsonElement
  * ## Example
  *
  * ```kotlin
+ * // Starting or resuming a workflow
  * val workflow = buildNodeInstance(definition)
- * when (val result = PausableOrchestrator.run(workflow, input)) {
- *     is PausableResult.Complete -> handleComplete(result.output)
+ * when (val result = PausableOrchestrator.run(workflow, input, states)) {
+ *     is PausableResult.WorkflowCompleted -> handleComplete(result.output)
  *     is PausableResult.ActivityCompleted -> persistAndContinue(result.nextNode, result.states, result.output)
  *     is PausableResult.WaitNeeded -> scheduleWait(result.nextNode, result.states, result.duration)
  *     is PausableResult.RetryNeeded -> scheduleRetry(result.nextNode, result.states, result.duration)
- *     is PausableResult.SubWorkflowNeeded -> startChild(result.nextNode, result.states, result.childConfig, result.awaitCompletion)
+ *     is PausableResult.SubWorkflowNeeded -> {
+ *         saveParentState(result.nodePosition, result.states)
+ *         startChildWorkflow(result.childConfig)
+ *         // For await=false: call resumeFromChildWorkflow(node, childConfig.input, states) immediately
+ *         // For await=true: call resumeFromChildWorkflow(node, childOutput, states) when child completes
+ *     }
+ * }
+ *
+ * // When child workflow completes
+ * fun onChildWorkflowCompleted(parentNode: Node<*>, parentStates: MutableStates, childOutput: JsonElement) {
+ *     val result = PausableOrchestrator.resumeFromChildWorkflow(parentNode, childOutput, parentStates)
+ *     // Handle result (may pause again or complete)
  * }
  * ```
  */
 object PausableOrchestrator : BaseOrchestrator() {
+
+    /**
+     * Resume parent workflow execution after child workflow completes.
+     *
+     * This method handles the resumption of a parent workflow after its child workflow
+     * has completed. It processes the child's output through the parent's task completion
+     * logic and then continues execution normally (which may hit another pause or complete).
+     *
+     * This method should be called by the runner:
+     * - **await=true**: When child completes, with child's output
+     * - **await=false**: Immediately after starting child, with child's input (from childConfig.input)
+     *
+     * @param node The node that initiated the child workflow (from SubWorkflowNeeded.nodePosition)
+     * @param childOutput For await=true: child's output. For await=false: child's input
+     * @param states The parent workflow states (from SubWorkflowNeeded.states, mutable)
+     * @return PausableResult indicating next pause point or completion
+     * @throws Exception if any unhandled error occurs during resumption
+     */
+    suspend fun resumeFromChildWorkflow(
+        node: Node<*>,
+        childOutput: JsonElement,
+        states: MutableStates,
+    ): PausableResult {
+        logger.debug { "Resuming parent workflow from child completion at node: ${node.reference}" }
+
+        // Complete the child workflow task (transforms output, updates state)
+        val completionResult = completeChildWorkflowTask(node, childOutput, states.toMap())
+
+        // Apply state updates from completion
+        states.updateWith(completionResult.stateUpdates)
+
+        // Handle any context exports
+        completionResult.newContext?.let { exported ->
+            updateRootContext(completionResult.nextNode, states, exported)
+        }
+
+        // Continue execution from the next node (may pause again or complete)
+        return run(
+            node = completionResult.nextNode ?: return PausableResult.WorkflowCompleted(completionResult.dataset),
+            dataset = completionResult.dataset,
+            states = states
+        )
+    }
 
     /**
      * Execute workflow step-by-step, pausing at boundaries.
@@ -156,7 +211,7 @@ object PausableOrchestrator : BaseOrchestrator() {
 
         // Workflow completed
         logger.debug { "Workflow completed with output: $input" }
-        return PausableResult.Complete(output = input)
+        return PausableResult.WorkflowCompleted(output = input)
     }
 
     /**

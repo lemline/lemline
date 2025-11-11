@@ -17,9 +17,13 @@ sealed class PausableResult {
     /**
      * Workflow execution completed successfully.
      *
+     * This indicates that the entire workflow has finished executing and
+     * there are no more steps to process. The runner should mark the workflow
+     * instance as complete and emit the final output.
+     *
      * @property output The final output dataset from the workflow
      */
-    data class Complete(val output: JsonElement) : PausableResult()
+    data class WorkflowCompleted(val output: JsonElement) : PausableResult()
 
     /**
      * Represents the state of an activity that has been completed,

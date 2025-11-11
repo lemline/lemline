@@ -179,7 +179,7 @@ class PausableOrchestratorTest {
         val result = PausableOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         // Should complete without pausing (no activities)
-        assertIs<PausableResult.Complete>(result)
+        assertIs<PausableResult.WorkflowCompleted>(result)
         val output = result.output as JsonObject
         assertEquals("done", output["result"]?.jsonPrimitive?.content)
     }
@@ -225,7 +225,7 @@ class PausableOrchestratorTest {
         val result = PausableOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         // Should complete all set tasks without pausing
-        assertIs<PausableResult.Complete>(result)
+        assertIs<PausableResult.WorkflowCompleted>(result)
         val output = result.output as JsonObject
         assertEquals(3, output["value"]?.jsonPrimitive?.int)
     }
@@ -345,5 +345,244 @@ class PausableOrchestratorTest {
         // All loop iterations and transformations should be in state
         assertNotNull(result.states)
         assertTrue(result.states.isNotEmpty())
+    }
+
+    // ========================================
+    // Child Workflow Resumption Tests
+    // ========================================
+
+    @Test
+    fun `should resume parent workflow after await=true child completes`() = runTest {
+        // Define the child workflow
+        val childYaml = $$"""
+            do:
+              - double:
+                  set:
+                    result: ${ .value * 2 }
+        """
+        getWorkflowNode(childYaml, namespace = "test", name = "doubler", version = "0.1.0")
+
+        // Parent workflow that calls the child with await=true
+        val parentYaml = """
+            do:
+              - callChild:
+                  run:
+                    workflow:
+                      namespace: test
+                      name: doubler
+                      version: '0.1.0'
+                      input:
+                        value: 5
+              - useChildResult:
+                  set:
+                    final: true
+        """
+        val rootNode = getWorkflowNode(parentYaml)
+
+        // First execution - should pause at sub-workflow
+        val pauseResult = PausableOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        assertIs<PausableResult.SubWorkflowNeeded>(pauseResult)
+        assertEquals("doubler", pauseResult.childConfig.name)
+        assertTrue(pauseResult.childConfig.awaitCompletion)
+
+        // Simulate child workflow execution (would be done by runner)
+        val childOutput = kotlinx.serialization.json.buildJsonObject {
+            put("result", kotlinx.serialization.json.JsonPrimitive(10))
+        }
+
+        // Resume parent with child output
+        // Navigate to the actual task node: rootNode -> do block -> callChild task
+        val doNode = rootNode.children!!.first()
+        val callChildNode = doNode.children!!.first()
+        val resumeResult = PausableOrchestrator.resumeFromChildWorkflow(
+            node = callChildNode,
+            childOutput = childOutput,
+            states = pauseResult.states.toMutableMap()
+        )
+
+        // Should complete the parent workflow
+        assertIs<PausableResult.WorkflowCompleted>(resumeResult)
+        val output = resumeResult.output as JsonObject
+        assertEquals(10, output["result"]?.jsonPrimitive?.int)
+        assertEquals(true, output["final"]?.jsonPrimitive?.content?.toBoolean())
+    }
+
+    @Test
+    fun `should resume parent workflow after await=false child starts (fire-and-forget)`() = runTest {
+        // Define the child workflow
+        val childYaml = """
+            do:
+              - process:
+                  set:
+                    processed: true
+        """
+        getWorkflowNode(childYaml, namespace = "test", name = "processor", version = "0.1.0")
+
+        // Parent workflow with await=false
+        val parentYaml = $$"""
+            do:
+              - prepareData:
+                  set:
+                    data: "test"
+              - launchChild:
+                  run:
+                    await: false
+                    workflow:
+                      namespace: test
+                      name: processor
+                      version: '0.1.0'
+                      input:
+                        value: ${ .data }
+              - continueParent:
+                  set:
+                    parentDone: true
+        """
+        val rootNode = getWorkflowNode(parentYaml)
+
+        // First execution - should pause at sub-workflow
+        val pauseResult = PausableOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        assertIs<PausableResult.SubWorkflowNeeded>(pauseResult)
+        assertEquals(false, pauseResult.childConfig.awaitCompletion)
+
+        // For await=false, parent continues immediately with the child's input
+        // (child runs independently in background, parent doesn't wait for child's output)
+        // Runner calls resumeFromChildWorkflow immediately after starting the child
+        val doNode = rootNode.children!!.first()
+        val launchChildNode = doNode.children!![1]
+        val resumeResult = PausableOrchestrator.resumeFromChildWorkflow(
+            node = launchChildNode,
+            childOutput = pauseResult.childConfig.input,  // Child's input (for await=false)
+            states = pauseResult.states.toMutableMap()
+        )
+
+        // Should complete the parent workflow
+        assertIs<PausableResult.WorkflowCompleted>(resumeResult)
+        val output = resumeResult.output as JsonObject
+        assertEquals(true, output["parentDone"]?.jsonPrimitive?.content?.toBoolean())
+        // Note: For await=false, parent continues with child's input, which is {"value": "test"}
+        assertEquals("test", output["value"]?.jsonPrimitive?.content)
+    }
+
+    @Test
+    fun `should resume parent and hit another pause after child completes`() = runTest {
+        // Define the child workflow
+        val childYaml = $$"""
+            do:
+              - increment:
+                  set:
+                    count: ${ .count + 1 }
+        """
+        getWorkflowNode(childYaml, namespace = "test", name = "incrementer", version = "0.1.0")
+
+        // Parent workflow with activity after child
+        val parentYaml = """
+            do:
+              - initialize:
+                  set:
+                    count: 0
+              - callChild:
+                  run:
+                    workflow:
+                      namespace: test
+                      name: incrementer
+                      version: '0.1.0'
+              - callHttp:
+                  call: http
+                  with:
+                    method: GET
+                    endpoint: https://jsonplaceholder.typicode.com/posts/1
+        """
+        val rootNode = getWorkflowNode(parentYaml)
+
+        // First execution - pause at sub-workflow
+        val pauseResult1 = PausableOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        assertIs<PausableResult.SubWorkflowNeeded>(pauseResult1)
+
+        // Child completes
+        val childOutput = kotlinx.serialization.json.buildJsonObject {
+            put("count", kotlinx.serialization.json.JsonPrimitive(1))
+        }
+
+        // Resume parent - should hit HTTP activity and pause again
+        // Navigate to the actual task node: rootNode -> do block -> callChild task (index 1)
+        val doNode = rootNode.children!!.first()
+        val callChildNode = doNode.children!![1]
+        val pauseResult2 = PausableOrchestrator.resumeFromChildWorkflow(
+            node = callChildNode,
+            childOutput = childOutput,
+            states = pauseResult1.states.toMutableMap()
+        )
+
+        // Should pause at HTTP activity
+        assertIs<PausableResult.ActivityCompleted>(pauseResult2)
+        val output = pauseResult2.output as JsonObject
+        assertEquals(1, output["id"]?.jsonPrimitive?.int)
+    }
+
+    @Test
+    fun `should handle nested child workflows with resumption`() = runTest {
+        // Grandchild workflow
+        val grandchildYaml = """
+            do:
+              - setValue:
+                  set:
+                    level: 3
+        """
+        getWorkflowNode(grandchildYaml, namespace = "test", name = "grandchild", version = "0.1.0")
+
+        // Child workflow that calls grandchild
+        val childYaml = """
+            do:
+              - callGrandchild:
+                  run:
+                    workflow:
+                      namespace: test
+                      name: grandchild
+                      version: '0.1.0'
+              - setLevel:
+                  set:
+                    level: 2
+        """
+        getWorkflowNode(childYaml, namespace = "test", name = "child", version = "0.1.0")
+
+        // Parent workflow
+        val parentYaml = """
+            do:
+              - callChild:
+                  run:
+                    workflow:
+                      namespace: test
+                      name: child
+                      version: '0.1.0'
+              - setLevel:
+                  set:
+                    level: 1
+        """
+        val rootNode = getWorkflowNode(parentYaml)
+
+        // Execute parent - should pause at child
+        val parentPause = PausableOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        assertIs<PausableResult.SubWorkflowNeeded>(parentPause)
+        assertEquals("child", parentPause.childConfig.name)
+
+        // Simulate child execution (which would also pause at grandchild, but we're simulating the final result)
+        val childOutput = kotlinx.serialization.json.buildJsonObject {
+            put("level", kotlinx.serialization.json.JsonPrimitive(2))
+        }
+
+        // Resume parent with child output
+        // Navigate to the actual task node: rootNode -> do block -> callChild task
+        val doNode = rootNode.children!!.first()
+        val callChildNode = doNode.children!!.first()
+        val resumeResult = PausableOrchestrator.resumeFromChildWorkflow(
+            node = callChildNode,
+            childOutput = childOutput,
+            states = parentPause.states.toMutableMap()
+        )
+
+        // Should complete parent workflow
+        assertIs<PausableResult.WorkflowCompleted>(resumeResult)
+        val output = resumeResult.output as JsonObject
+        assertEquals(1, output["level"]?.jsonPrimitive?.int)
     }
 }
