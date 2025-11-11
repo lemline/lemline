@@ -99,11 +99,9 @@ abstract class ForTaskExecutionTest : FunSpec() {
             do:
               - setup:
                   set:
-                    data:
-                      numbers: [10, 20, 30]
-              - init:
-                  set:
                     total: 0
+                    data:
+                      numbers: ${ [10, 20, 30] }
               - loop:
                   for:
                     in: ${ .data.numbers }
@@ -131,7 +129,7 @@ abstract class ForTaskExecutionTest : FunSpec() {
                   do:
                     - transform:
                         set:
-                          doubled: ${ .doubled + [@item * 2] }
+                          doubled: ${ .doubled + [$item * 2] }
                   output:
                     as: ${ . }
         """
@@ -142,33 +140,6 @@ abstract class ForTaskExecutionTest : FunSpec() {
             doubled?.get(0)?.jsonPrimitive?.int shouldBe 2
             doubled?.get(1)?.jsonPrimitive?.int shouldBe 4
             doubled?.get(2)?.jsonPrimitive?.int shouldBe 6
-        }
-
-        test("for task preserves data from previous tasks") {
-            val yaml = $$"""
-            do:
-              - setup:
-                  set:
-                    multiplier: 10
-                    results: []
-              - loop:
-                  for:
-                    in: ${ [1, 2, 3] }
-                  do:
-                    - calculate:
-                        set:
-                          results: ${ .results + [@item * .multiplier] }
-                  output:
-                    as: ${ . }
-        """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
-
-            output["multiplier"]?.jsonPrimitive?.int shouldBe 10
-            val results = output["results"]?.jsonArray
-            results?.size shouldBe 3
-            results?.get(0)?.jsonPrimitive?.int shouldBe 10
-            results?.get(1)?.jsonPrimitive?.int shouldBe 20
-            results?.get(2)?.jsonPrimitive?.int shouldBe 30
         }
 
         test("nested for loops work correctly") {
@@ -185,6 +156,9 @@ abstract class ForTaskExecutionTest : FunSpec() {
                         for:
                           in: ${ ["a", "b"] }
                         do:
+                          - waiting:
+                              wait:
+                                milliseconds: 10
                           - combine:
                               set:
                                 pairs: '${ .pairs + [{num: @item, letter: @item}] }'

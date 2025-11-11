@@ -206,7 +206,8 @@ object PausableOrchestrator : BaseOrchestrator() {
                 return PausableResult.SubWorkflowNeeded(
                     states = states.toMap(),
                     nodePosition = current!!.reference,
-                    childConfig = e.config,
+                    output = e.output,
+                    childConfig = e.childWorkflowConfig,
                 )
             }
         }

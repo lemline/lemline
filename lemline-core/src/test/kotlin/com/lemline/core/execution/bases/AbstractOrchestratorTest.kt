@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.bases
 
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.getWorkflowNode
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -175,8 +175,8 @@ abstract class AbstractOrchestratorTest : FunSpec() {
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
             // Should execute tasks before and after wait
-            assertEquals(true, output["before"]?.jsonPrimitive?.content?.toBoolean())
-            assertEquals(true, output["after"]?.jsonPrimitive?.content?.toBoolean())
+            assertNull(output["before"])
+            assertEquals(JsonPrimitive(true), output["after"])
         }
 
         // ========================================
@@ -219,6 +219,7 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                       set:
                         processed: true
             """
+
             getWorkflowNode(childYaml, namespace = "test", name = "processor", version = "0.1.0")
 
             // Parent workflow with await=false
@@ -236,15 +237,12 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                           version: '0.1.0'
                           input:
                             value: ${ .data }
-                  - continueParent:
-                      set:
-                        parentDone: true
             """
             val output = executeWorkflow(parentYaml, JsonObject(emptyMap())) as JsonObject
 
             // Parent should complete immediately without waiting for child
-            assertEquals(true, output["parentDone"]?.jsonPrimitive?.content?.toBoolean())
-            assertEquals("test", output["data"]?.jsonPrimitive?.content)
+            assertNull(output["value"])
+            assertEquals(JsonPrimitive("test"), output["data"])
         }
 
         test("should execute nested sub-workflows recursively") {
@@ -372,19 +370,18 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                   - step1:
                       set:
                         a: 1
+                        b: 2
                   - step2:
                       set:
-                        b: 2
-                  - step3:
-                      set:
+                        a: ${ .a }
                         c: ${ .a + .b }
             """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
             // Should accumulate state through execution and produce correct output
-            assertEquals(3, output["c"]?.jsonPrimitive?.int)
-            assertEquals(1, output["a"]?.jsonPrimitive?.int)
-            assertEquals(2, output["b"]?.jsonPrimitive?.int)
+            assertEquals(JsonPrimitive(1), output["a"])
+            assertNull(output["b"])
+            assertEquals(JsonPrimitive(3), output["c"])
         }
 
         test("should handle exported context correctly") {
@@ -414,7 +411,7 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                 do:
                   - initialize:
                       set:
-                        values: [10, 20, 30]
+                        values: ${ [10, 20, 30] }
                         sum: 0
                   - sumLoop:
                       for:
@@ -422,22 +419,28 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                       do:
                         - add:
                             set:
-                              sum: ${ .sum + @item }
+                              sum: ${ .sum + $item }
+                        - waiting:
+                            wait:
+                              milliseconds: 10
                       output:
                         as: ${ . }
                   - checkSuccess:
                       if: ${ .sum == 60 }
                       set:
                         status: "success"
+                        sum: ${ .sum }
+                      then: exit
                   - checkFailure:
                       if: ${ .sum != 60 }
                       set:
                         status: "failure"
+                        sum: ${ .sum }
             """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
             assertEquals("success", output["status"]?.jsonPrimitive?.content)
-            assertEquals(60, output["sum"]?.jsonPrimitive?.int)
+            assertEquals(JsonPrimitive(60), output["sum"])
         }
     }
 

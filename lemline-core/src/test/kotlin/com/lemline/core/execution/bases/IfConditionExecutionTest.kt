@@ -63,14 +63,19 @@ abstract class IfConditionExecutionTest : FunSpec() {
                   if: ${ .score > .threshold }
                   set:
                     status: ${ "high" }
+                  then: exit
               - fallback:
                   if: ${ .score <= .threshold }
                   set:
-                    status: ${ "normal" }
+                    status: ${ "low" }
         """
-            val output = executeWorkflow(yaml, JsonPrimitive(90)) as JsonObject
+            val high = executeWorkflow(yaml, JsonPrimitive(90)) as JsonObject
 
-            output["status"]?.jsonPrimitive?.content shouldBe "high"
+            high["status"]?.jsonPrimitive?.content shouldBe "high"
+
+            val low = executeWorkflow(yaml, JsonPrimitive(70)) as JsonObject
+
+            low["status"]?.jsonPrimitive?.content shouldBe "low"
         }
 
         test("if condition with string comparison") {
@@ -190,18 +195,22 @@ abstract class IfConditionExecutionTest : FunSpec() {
               - checkA:
                   if: ${ .score >= 90 }
                   set:
+                    score: .score
                     grade: ${ "A" }
               - checkB:
                   if: ${ .score >= 80 and .score < 90 }
                   set:
+                    score: .score
                     grade: ${ "B" }
               - checkC:
                   if: ${ .score >= 70 and .score < 80 }
                   set:
+                    score: .score
                     grade: ${ "C" }
               - checkF:
                   if: ${ .score < 70 }
                   set:
+                    score: .score
                     grade: ${ "F" }
         """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject

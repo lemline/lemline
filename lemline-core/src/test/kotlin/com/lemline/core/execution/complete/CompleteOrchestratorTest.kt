@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.execution.complete
 
-import com.lemline.core.execution.AbstractOrchestratorTest
+import com.lemline.core.execution.bases.AbstractOrchestratorTest
 import com.lemline.core.getWorkflowNode
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement

@@ -12,7 +12,8 @@ import kotlinx.serialization.json.JsonElement
  * with the child workflow, encapsulated within the [ChildWorkflowConfig] instance.
  */
 class ChildWorkflowRequestedException(
-    val config: ChildWorkflowConfig
+    val output: JsonElement? = null,
+    val childWorkflowConfig: ChildWorkflowConfig
 ) : RuntimeException()
 
 /**

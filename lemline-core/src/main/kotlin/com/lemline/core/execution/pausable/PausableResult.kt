@@ -76,11 +76,13 @@ sealed class PausableResult {
      *
      * @property states Represents a map containing the workflow state.
      * @property nodePosition The position of the node where the sub-workflow is required.
+     * @property output the raw output of the node where the sub-workflow is triggered. (non-null if async)
      * @property childConfig Configuration details specifying the child workflow to be started.
      */
     data class SubWorkflowNeeded(
         val states: States,
         val nodePosition: String,
+        val output: JsonElement?,
         val childConfig: ChildWorkflowConfig,
     ) : PausableResult()
 }

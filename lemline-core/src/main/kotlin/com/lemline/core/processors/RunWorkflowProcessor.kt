@@ -99,7 +99,7 @@ class RunWorkflowProcessor(
 
         // Determine the input for the sub-workflow by evaluating the 'input' expression if it exists
         val childWorkflowInput = eval(transformedInput, workflowConfig.input, scope)
-        
+
         val awaitCompletion = runConfig.isAwait
 
         val childWorkflowConfig = ChildWorkflowConfig(
@@ -112,6 +112,9 @@ class RunWorkflowProcessor(
 
         // The orchestrator will resolve the definition and handle execution appropriately
         logger.debug { "Throwing ChildWorkflowStartedException for orchestrator to handle:  $childWorkflowConfig" }
-        throw ChildWorkflowRequestedException(childWorkflowConfig)
+        throw ChildWorkflowRequestedException(
+            output = if (awaitCompletion) null else transformedInput,
+            childWorkflowConfig = childWorkflowConfig
+        )
     }
 }

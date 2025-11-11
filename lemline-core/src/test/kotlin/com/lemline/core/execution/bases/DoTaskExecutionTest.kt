@@ -30,17 +30,16 @@ abstract class DoTaskExecutionTest : FunSpec() {
                   set:
                     value: 10
               - step2:
-                  set:
-                    doubled: ${ .value * 2 }
+                  wait:
+                    milliseconds: 10
               - step3:
                   set:
-                    result: ${ .doubled + 5 }
+                    result: ${ .value + 5 }
         """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
-            output["value"]?.jsonPrimitive?.int shouldBe 10
-            output["doubled"]?.jsonPrimitive?.int shouldBe 20
-            output["result"]?.jsonPrimitive?.int shouldBe 25
+            output["value"]?.jsonPrimitive?.int shouldBe null
+            output["result"]?.jsonPrimitive?.int shouldBe 15
         }
 
         test("do task passes data between tasks") {
@@ -101,12 +100,14 @@ abstract class DoTaskExecutionTest : FunSpec() {
             do:
               - createUser:
                   set:
-                    name: ${ "Alice" }
-                    age: ${ 30 }
+                    name: Alice
+                    age: 30 
               - addMetadata:
                   set:
-                    timestamp: ${ "2025-01-01" }
-                    version: ${ 1 }
+                    name: ${ .name }
+                    age: ${ .age }
+                    timestamp: "2025-01-01" 
+                    version:  1 
               - combine:
                   set:
                     user: '${ {name: .name, age: .age} }'
@@ -160,13 +161,13 @@ abstract class DoTaskExecutionTest : FunSpec() {
             output["result"]?.jsonPrimitive?.int shouldBe 25
         }
 
-        xtest("do task can access workflow descriptor") {
+        test("do task can access workflow descriptor") {
             val yaml = $$"""
             do:
               - checkWorkflow:
                   set:
-                    hasWorkflowId: ${ @workflow.id != null }
-                    hasWorkflowInput: ${ @workflow.input != null }
+                    hasWorkflowId: ${ $workflow.id != null }
+                    hasWorkflowInput: ${ $workflow.input != null }
         """
             val output = executeWorkflow(yaml, JsonPrimitive(42)) as JsonObject
 
@@ -174,28 +175,27 @@ abstract class DoTaskExecutionTest : FunSpec() {
             output["hasWorkflowInput"]?.jsonPrimitive?.content?.toBoolean() shouldBe true
         }
 
-        test("do task preserves data through multiple transformations") {
+        test("do task do not preserves data through multiple transformations") {
             val yaml = $$"""
             do:
               - step1:
                   set:
                     base: 100
-              - step2:
-                  set:
-                    multiplied: ${ .base * 2 }
+              - wait2:
+                  wait:
+                    milliseconds: 10
               - step3:
                   set:
-                    added: ${ .multiplied + 50 }
+                    added: ${ .base + 10 }
               - step4:
                   set:
                     final: ${ .added / 2 }
         """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
-            output["base"]?.jsonPrimitive?.int shouldBe 100
-            output["multiplied"]?.jsonPrimitive?.int shouldBe 200
-            output["added"]?.jsonPrimitive?.int shouldBe 250
-            output["final"]?.jsonPrimitive?.int shouldBe 125
+            output["base"]?.jsonPrimitive?.int shouldBe null
+            output["added"]?.jsonPrimitive?.int shouldBe null
+            output["final"]?.jsonPrimitive?.int shouldBe 55
         }
 
         test("do task with output transformation") {

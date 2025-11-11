@@ -489,18 +489,10 @@ abstract class TryTaskExecutionTest : FunSpec() {
                           - step1:
                               set:
                                 step1: "done"
-                          - step2:
-                              set:
-                                step2: "done"
-                          - step3:
-                              set:
-                                step3: "done"
             """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
             assertEquals("done", output["step1"]?.jsonPrimitive?.content)
-            assertEquals("done", output["step2"]?.jsonPrimitive?.content)
-            assertEquals("done", output["step3"]?.jsonPrimitive?.content)
         }
 
         test("try catch - output transformation error is caught") {

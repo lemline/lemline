@@ -106,7 +106,7 @@ object PausableOrchestratorTestHelper {
                         runUntilComplete(childNode, result.childConfig.input, mutableMapOf())
                     } else {
                         // await=false (fire-and-forget): Use child's input as output
-                        result.childConfig.input
+                        result.output!!
                     }
 
                     // Find the node that initiated the child workflow

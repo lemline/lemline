@@ -152,7 +152,7 @@ object CompleteOrchestrator : BaseOrchestrator() {
         input: JsonElement,
         states: MutableStates
     ): StepState {
-        val childWorkflowConfig = exception.config
+        val childWorkflowConfig = exception.childWorkflowConfig
 
         // Resolve the sub-workflow definition from the cache
         val subWorkflowRootNode = resolveSubWorkflowNode(childWorkflowConfig)

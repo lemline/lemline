@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.execution.bases
 
-import com.lemline.core.getWorkflowNode
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -26,14 +26,31 @@ import kotlinx.serialization.json.jsonPrimitive
 abstract class SetTaskExecutionTest : FunSpec() {
 
     init {
+
+        test("set task overrides previous ones") {
+            val yaml = $$"""
+                do:
+                  - first:
+                      set:
+                        first: ${ "John" }
+                  - name:
+                      set:
+                        name: ${ "Alice" } 
+            """
+            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+
+            assertEquals(JsonPrimitive("Alice"), output["name"])
+            assertNull(output["first"])
+        }
+
         test("set task can create simple values") {
             val yaml = $$"""
                 do:
                   - createValues:
                       set:
-                        name: ${ "Alice" }
+                        name: Alice
                         age: 30
-                        active: ${ true }
+                        active: true 
             """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
@@ -47,8 +64,8 @@ abstract class SetTaskExecutionTest : FunSpec() {
                 do:
                   - processInput:
                       set:
-                        doubled: ${ @input * 2 }
-                        original: ${ @input }
+                        doubled: ${ $input * 2 }
+                        original: ${ $input }
             """
             val output = executeWorkflow(yaml, JsonPrimitive(21)) as JsonObject
 
@@ -92,26 +109,30 @@ abstract class SetTaskExecutionTest : FunSpec() {
         test("set task can transform arrays") {
             val yaml = $$"""
                 do:
+                  - setArray:
+                      set:
+                        numbers: ${ [1, 2, 3, 4, 5] }
                   - transformArray:
                       set:
-                        numbers: [1, 2, 3, 4, 5]
-                        doubled: '${ [.numbers[] | . * 2] }'
+                        doubled: ${ [.numbers[] | . * 2] }
             """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
             val doubled = output["doubled"]?.jsonArray
             assertEquals(5, doubled?.size)
-            assertEquals(2, doubled?.get(0)?.jsonPrimitive?.int)
-            assertEquals(4, doubled?.get(1)?.jsonPrimitive?.int)
-            assertEquals(10, doubled?.get(4)?.jsonPrimitive?.int)
+            assertEquals(JsonPrimitive(2), doubled?.get(0))
+            assertEquals(JsonPrimitive(4), doubled?.get(1))
+            assertEquals(JsonPrimitive(10), doubled?.get(4))
         }
 
         test("set task can use conditional expressions") {
             val yaml = $$"""
                 do:
-                  - checkValue:
+                  - setValue:
                       set:
                         score: 85
+                  - checkValue:
+                      set:
                         grade: ${ if .score >= 90 then "A" elif .score >= 80 then "B" elif .score >= 70 then "C" else "F" end }
             """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
@@ -153,11 +174,13 @@ abstract class SetTaskExecutionTest : FunSpec() {
         test("set task can use string concatenation") {
             val yaml = $$"""
                 do:
-                  - concatenate:
+                  - setStrings:
                       set:
                         firstName: ${ "Alice" }
-                        lastName: ${ "Smith" }
-                        fullName: ${ .firstName + " " + .lastName }
+                        lastName:  ${ "Smith" }
+                  - concatenate:
+                      set:
+                        fullName:  ${ .firstName + " " + .lastName }
             """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
@@ -171,8 +194,8 @@ abstract class SetTaskExecutionTest : FunSpec() {
                       input:
                         from: ${ . * 10 }
                       set:
-                        value: ${ @input }
-                        doubled: ${ @input * 2 }
+                        value: ${ $input }
+                        doubled: ${ $input * 2 }
                       output:
                         as: '${ {result: .doubled} }'
             """
@@ -184,10 +207,12 @@ abstract class SetTaskExecutionTest : FunSpec() {
         test("set task can perform calculations") {
             val yaml = $$"""
                 do:
-                  - calculate:
+                  - setValues:
                       set:
                         a: 10
                         b: 20
+                  - calculate:
+                      set:
                         sum: ${ .a + .b }
                         product: ${ .a * .b }
                         difference: ${ .b - .a }

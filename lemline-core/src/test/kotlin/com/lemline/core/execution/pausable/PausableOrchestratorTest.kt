@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.execution.pausable
 
-import com.lemline.core.execution.AbstractOrchestratorTest
+import com.lemline.core.execution.bases.AbstractOrchestratorTest
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
@@ -369,7 +369,7 @@ class PausableOrchestratorTest : AbstractOrchestratorTest() {
             getWorkflowNode(childYaml, namespace = "test", name = "doubler", version = "0.1.0")
 
             // Parent workflow that calls the child with await=true
-            val parentYaml = """
+            val parentYaml = $$"""
                 do:
                   - callChild:
                       run:
@@ -381,6 +381,7 @@ class PausableOrchestratorTest : AbstractOrchestratorTest() {
                             value: 5
                   - useChildResult:
                       set:
+                        result: ${ .result * 2 }
                         final: true
             """
             val rootNode = getWorkflowNode(parentYaml)
@@ -409,7 +410,7 @@ class PausableOrchestratorTest : AbstractOrchestratorTest() {
             // Should complete the parent workflow
             assertIs<PausableResult.WorkflowCompleted>(resumeResult)
             val output = resumeResult.output as JsonObject
-            assertEquals(10, output["result"]?.jsonPrimitive?.int)
+            assertEquals(20, output["result"]?.jsonPrimitive?.int)
             assertEquals(true, output["final"]?.jsonPrimitive?.content?.toBoolean())
         }
 
@@ -428,7 +429,7 @@ class PausableOrchestratorTest : AbstractOrchestratorTest() {
                 do:
                   - prepareData:
                       set:
-                        data: "test"
+                        data: test
                   - launchChild:
                       run:
                         await: false
@@ -437,9 +438,10 @@ class PausableOrchestratorTest : AbstractOrchestratorTest() {
                           name: processor
                           version: '0.1.0'
                           input:
-                            value: ${ .data }
+                            value: subInput
                   - continueParent:
                       set:
+                        value: ${ .data + .value }
                         parentDone: true
             """
             val rootNode = getWorkflowNode(parentYaml)
@@ -456,7 +458,7 @@ class PausableOrchestratorTest : AbstractOrchestratorTest() {
             val launchChildNode = doNode.children!![1]
             val resumeResult = PausableOrchestrator.resumeFromChildWorkflow(
                 node = launchChildNode,
-                childOutput = pauseResult.childConfig.input,  // Child's input (for await=false)
+                childOutput = pauseResult.output!!,  // run workflow node input
                 states = pauseResult.states.toMutableMap()
             )
 
