@@ -3,7 +3,7 @@
 
 package com.lemline.core.execution.models
 
-import com.lemline.core.execution.states.NodeState
+import com.lemline.core.states.NodeState
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.FlowDirective
 import kotlin.time.Duration

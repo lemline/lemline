@@ -3,7 +3,6 @@ package com.lemline.core.workflows
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.nodes.NodeState
 import com.lemline.core.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -69,8 +68,8 @@ class WorkflowStateTest {
         val legacyElement = kotlinx.serialization.json.buildJsonObject {
             put("p", JsonPrimitive(""))
             val innerState = kotlinx.serialization.json.buildJsonObject {
-                put(NodeState.RAW_INPUT, JsonPrimitive("hello"))
-                put(NodeState.STARTED_AT, JsonPrimitive("2024-01-01T00:00:00Z"))
+                put(SerializedNodeState.RAW_INPUT, JsonPrimitive("hello"))
+                put(SerializedNodeState.STARTED_AT, JsonPrimitive("2024-01-01T00:00:00Z"))
             }
             val states = kotlinx.serialization.json.buildJsonObject {
                 put("", innerState)

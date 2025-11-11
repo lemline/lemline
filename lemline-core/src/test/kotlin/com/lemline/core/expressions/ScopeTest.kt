@@ -2,7 +2,7 @@
 package com.lemline.core.expressions
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.RuntimeDescriptor
+import com.lemline.core.workflows.RuntimeDescriptor
 import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.expressions.scopes.WorkflowDescriptor

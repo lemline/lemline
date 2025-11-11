@@ -10,8 +10,8 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.nodes.NodeState
 import com.lemline.core.workflows.NodeStates
+import com.lemline.core.workflows.SerializedNodeState
 import com.lemline.core.workflows.WorkflowState
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
@@ -54,7 +54,7 @@ fun JsonElement.Companion.random(): JsonElement {
 
 fun NodePosition.Companion.random() = NodePosition(listOf(String.random(), String.random(), String.random()))
 
-fun NodeState.Companion.random() = NodeState(
+fun SerializedNodeState.Companion.random() = SerializedNodeState(
     attemptIndex = Random.nextInt(),
     childIndex = Random.nextInt(),
     rawInput = JsonPrimitive(String.random()),
@@ -66,9 +66,9 @@ fun NodeState.Companion.random() = NodeState(
 
 fun NodeStates.Companion.random() = NodeStates(
     mapOf(
-        NodePosition.random() to NodeState.random(),
-        NodePosition.random() to NodeState.random(),
-        NodePosition.random() to NodeState.random(),
+        NodePosition.random() to SerializedNodeState.random(),
+        NodePosition.random() to SerializedNodeState.random(),
+        NodePosition.random() to SerializedNodeState.random(),
     )
 )
 

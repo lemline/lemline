@@ -136,7 +136,7 @@ class ExportContextExecutionTest {
                     result: ${ @context.shared }
         """
         val rootNode = getWorkflowNode(yaml)
-        val states = mutableMapOf<com.lemline.core.nodes.Node<*>, com.lemline.core.execution.states.NodeState>()
+        val states = mutableMapOf<com.lemline.core.nodes.Node<*>, com.lemline.core.states.NodeState>()
 
         val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()), states) as JsonObject
 
@@ -161,7 +161,7 @@ class ExportContextExecutionTest {
                     result: ${ @context.fromNested }
         """
         val rootNode = getWorkflowNode(yaml)
-        val states = mutableMapOf<com.lemline.core.nodes.Node<*>, com.lemline.core.execution.states.NodeState>()
+        val states = mutableMapOf<com.lemline.core.nodes.Node<*>, com.lemline.core.states.NodeState>()
 
         val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()), states) as JsonObject
 
@@ -185,7 +185,7 @@ class ExportContextExecutionTest {
                     doubled: ${ @context.sum * 2 }
         """
         val rootNode = getWorkflowNode(yaml)
-        val states = mutableMapOf<com.lemline.core.nodes.Node<*>, com.lemline.core.execution.states.NodeState>()
+        val states = mutableMapOf<com.lemline.core.nodes.Node<*>, com.lemline.core.states.NodeState>()
 
         val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()), states) as JsonObject
 

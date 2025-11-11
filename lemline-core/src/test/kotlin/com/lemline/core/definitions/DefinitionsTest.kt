@@ -6,9 +6,9 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
-import com.lemline.core.utils.name
-import com.lemline.core.utils.namespace
-import com.lemline.core.utils.version
+import com.lemline.core.workflows.name
+import com.lemline.core.workflows.namespace
+import com.lemline.core.workflows.version
 import com.lemline.core.workflows.index
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe

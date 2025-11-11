@@ -2,7 +2,7 @@
 package com.lemline.core.expressions.scopes
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.RuntimeDescriptor
+import com.lemline.core.workflows.RuntimeDescriptor
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

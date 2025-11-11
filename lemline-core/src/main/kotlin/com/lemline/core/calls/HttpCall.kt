@@ -5,7 +5,7 @@ import com.charleskorn.kaml.Yaml
 import com.charleskorn.kaml.YamlConfiguration
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonElement
-import com.lemline.core.RaiseError
+import com.lemline.core.errors.RaiseError
 import com.lemline.core.errors.WorkflowErrorType.AUTHENTICATION
 import com.lemline.core.errors.WorkflowErrorType.COMMUNICATION
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION

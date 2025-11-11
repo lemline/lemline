@@ -2,7 +2,7 @@
 package com.lemline.core.calls
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.RaiseError
+import com.lemline.core.errors.RaiseError
 import com.lemline.core.errors.WorkflowErrorType
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*

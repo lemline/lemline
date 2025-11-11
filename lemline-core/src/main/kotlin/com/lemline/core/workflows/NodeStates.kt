@@ -3,7 +3,6 @@ package com.lemline.core.workflows
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.nodes.NodeState
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.Serializable
@@ -12,9 +11,9 @@ import kotlinx.serialization.json.JsonElement
 @ExperimentalTime
 @Serializable
 @JvmInline
-value class NodeStates(private val state: Map<NodePosition, NodeState>) {
+value class NodeStates(private val state: Map<NodePosition, SerializedNodeState>) {
 
-    operator fun get(key: NodePosition): NodeState? = state[key]
+    operator fun get(key: NodePosition): SerializedNodeState? = state[key]
 
     companion object {
         /**
@@ -23,7 +22,7 @@ value class NodeStates(private val state: Map<NodePosition, NodeState>) {
         fun new(rawInput: JsonElement) =
             NodeStates(
                 mapOf(
-                    NodePosition.root to NodeState(rawInput = rawInput, startedAt = Clock.System.now()),
+                    NodePosition.root to SerializedNodeState(rawInput = rawInput, startedAt = Clock.System.now()),
                 ),
             )
 
