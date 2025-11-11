@@ -9,6 +9,8 @@ import com.lemline.core.errors.WorkflowException
 import com.lemline.core.execution.context.Scope
 import com.lemline.core.execution.context.merge
 import com.lemline.core.execution.models.StepResult
+import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.RootTask
 import com.lemline.core.processors.CallHttpProcessor
 import com.lemline.core.processors.DoProcessor
 import com.lemline.core.processors.ForProcessor
@@ -28,8 +30,6 @@ import com.lemline.core.states.RootState
 import com.lemline.core.states.States
 import com.lemline.core.states.TryState
 import com.lemline.core.states.updateWith
-import com.lemline.core.nodes.Node
-import com.lemline.core.nodes.RootTask
 import io.serverlessworkflow.api.types.CallHTTP
 import io.serverlessworkflow.api.types.DoTask
 import io.serverlessworkflow.api.types.FlowDirective
@@ -44,6 +44,7 @@ import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.WaitTask
+import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -118,119 +119,133 @@ object ExecutionOrchestrator {
         dataset: JsonElement,
         states: MutableStates = mutableMapOf(),
     ): JsonElement {
-
-        // Keep track of the root node to update its context
         var current: Node<*>? = node
         var input: JsonElement = dataset
         var flowDirective: FlowDirective? = null
 
         while (current != null) {
-            try {
+            val (nextNode, nextInput, nextFlowDirective) = try {
                 logger.debug { "Executing node: ${current!!.name} with input: $input" }
-                // Execute one step - runStep is a pure function
-                with(runStep(current, input, states.toMap(), flowDirective)) {
-                    current = this.nextNode
-                    input = this.dataset
-                    flowDirective = this.flowDirective
-                    // Apply changes
-                    states.updateWith(this.stateUpdates)
-                    // Merge exported context into RootState if present
-                    this.newContext?.let { exported ->
-                        updateRootContext(current, states, exported)
-                    }
-                    // Handle delay if present (from WaitTask or retry)
-                    this.delay?.let { delayDuration ->
-                        if (delayDuration.isPositive()) {
-                            logger.debug { "Delaying execution for: $delayDuration" }
-                            kotlinx.coroutines.delay(delayDuration)
-                            logger.debug { "Delay completed" }
-                        }
-                    }
-                }
-                // ← Checkpoint: state is consistent for persistence
+                val result = runStep(current, input, states.toMap(), flowDirective)
+                processStepResult(result, states)
+
             } catch (e: WorkflowException) {
-                logger.debug { "WorkflowException caught at node: ${current?.name}, finding handler..." }
-                // handleException is also a pure function
-                with(handleException(current!!, e, states.toMap())) {
-                    // Apply error handling deltas and continue
-                    current = this.nextNode
-                    input = this.dataset
-                    flowDirective = this.flowDirective
-                    states.updateWith(this.stateUpdates)
-                    // Note: newContext not expected from error handling
-                    // Handle retry delay if present
-                    this.delay?.let { delayDuration ->
-                        if (delayDuration.isPositive()) {
-                            logger.debug { "Delaying before retry for: $delayDuration" }
-                            kotlinx.coroutines.delay(delayDuration)
-                            logger.debug { "Retry delay completed" }
-                        }
-                    }
-                }
+                processWorkflowException(e, current, states)
+
             } catch (e: ChildWorkflowStartedException) {
-                logger.debug { "ChildWorkflowStartedException caught: childId=${e.childId}, await=${e.awaitCompletion}" }
+                processChildWorkflowException(e, current, input, states)
 
-                if (e.awaitCompletion) {
-                    // Execute child inline and wait for completion
-                    logger.debug { "Executing child workflow inline: ${e.name}" }
-                    val childOutput = run(e.childNode, e.input, mutableMapOf())
-                    logger.debug { "Child workflow completed, continuing parent" }
-
-                    // Complete the RunWorkflow task with the child's output
-                    // This applies output transformation, validation, and context export
-                    val processor = getNodeProcessor(current!!)
-                    val scope = getScope(current, states.toMap())
-                    val completionResult = processor.completeTask(
-                        rawOutput = childOutput,
-                        currentFlowDirective = processor.getFlowDirective(),
-                        parentScope = scope,
-                        taskContext = null
-                    )
-
-                    // Apply the completion result
-                    current = completionResult.nextNode
-                    input = completionResult.dataset
-                    flowDirective = completionResult.flowDirective
-                    states.updateWith(completionResult.stateUpdates)
-                    completionResult.newContext?.let { exported ->
-                        updateRootContext(current, states, exported)
-                    }
-                } else {
-                    // Fire-and-forget: launch coroutine and parent continues immediately
-                    logger.debug { "Launching child workflow asynchronously (fire-and-forget): ${e.name}" }
-                    CoroutineScope(Dispatchers.IO).launch {
-                        try {
-                            run(e.childNode, e.input, mutableMapOf())
-                            logger.debug { "Async child workflow completed successfully" }
-                        } catch (ex: Exception) {
-                            logger.error(ex) { "Async child workflow failed" }
-                        }
-                    }
-
-                    // For fire-and-forget, the task completes immediately with the parent's input
-                    // (the child workflow output is discarded)
-                    val processor = getNodeProcessor(current!!)
-                    val scope = getScope(current, states.toMap())
-                    val completionResult = processor.completeTask(
-                        rawOutput = input,  // Use parent's input, not child's output
-                        currentFlowDirective = processor.getFlowDirective(),
-                        parentScope = scope,
-                        taskContext = null
-                    )
-
-                    // Apply the completion result
-                    current = completionResult.nextNode
-                    input = completionResult.dataset
-                    flowDirective = completionResult.flowDirective
-                    states.updateWith(completionResult.stateUpdates)
-                    completionResult.newContext?.let { exported ->
-                        updateRootContext(current, states, exported)
-                    }
-                }
             }
+            current = nextNode
+            input = nextInput
+            flowDirective = nextFlowDirective
+        }
+        return input
+    }
+
+    private suspend fun processStepResult(
+        result: StepResult,
+        states: MutableStates
+    ): Triple<Node<*>?, JsonElement, FlowDirective?> {
+        states.updateWith(result.stateUpdates)
+        result.newContext?.let { exported ->
+            updateRootContext(result.nextNode, states, exported)
+        }
+        result.delay?.takeIf { it.isPositive() }?.let { delayDuration ->
+            handleDelay(delayDuration, "Delaying execution for")
+        }
+        return Triple(result.nextNode, result.dataset, result.flowDirective)
+    }
+
+    private suspend fun processWorkflowException(
+        exception: WorkflowException,
+        current: Node<*>,
+        states: MutableStates
+    ): Triple<Node<*>?, JsonElement, FlowDirective?> {
+        logger.debug { "WorkflowException caught at node: ${current.name}, finding handler..." }
+        val result = handleException(current, exception, states.toMap())
+        states.updateWith(result.stateUpdates)
+        result.delay?.takeIf { it.isPositive() }?.let { delayDuration ->
+            handleDelay(delayDuration, "Delaying before retry for")
+        }
+        return Triple(result.nextNode, result.dataset, result.flowDirective)
+    }
+
+    private suspend fun processChildWorkflowException(
+        exception: ChildWorkflowStartedException,
+        current: Node<*>,
+        input: JsonElement,
+        states: MutableStates
+    ): Triple<Node<*>?, JsonElement, FlowDirective?> {
+        logger.debug { "ChildWorkflowStartedException caught: childId=${exception.childId}, await=${exception.awaitCompletion}" }
+
+        val childOutput = if (exception.awaitCompletion) {
+            executeChildWorkflowSync(exception)
+        } else {
+            executeChildWorkflowAsync(exception, input)
         }
 
-        return input
+        val completionResult = completeChildWorkflowTask(current, childOutput, states)
+        states.updateWith(completionResult.stateUpdates)
+        completionResult.newContext?.let { exported ->
+            updateRootContext(completionResult.nextNode, states, exported)
+        }
+        return Triple(completionResult.nextNode, completionResult.dataset, completionResult.flowDirective)
+    }
+
+    private suspend fun executeChildWorkflowSync(exception: ChildWorkflowStartedException): JsonElement {
+        logger.debug { "Executing child workflow inline: ${exception.name}" }
+        val output = run(exception.childNode, exception.input, mutableMapOf())
+        logger.debug { "Child workflow completed, continuing parent" }
+        return output
+    }
+
+    private suspend fun executeChildWorkflowAsync(
+        exception: ChildWorkflowStartedException,
+        parentInput: JsonElement
+    ): JsonElement {
+        logger.debug { "Launching child workflow asynchronously (fire-and-forget): ${exception.name}" }
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                run(exception.childNode, exception.input, mutableMapOf())
+            }.onSuccess {
+                logger.debug { "Async child workflow completed successfully" }
+            }.onFailure { ex ->
+                logger.error(ex) { "Async child workflow failed" }
+            }
+        }
+        return parentInput // Use current input for fire-and-forget
+    }
+
+    private suspend fun handleDelay(delayDuration: Duration, logMessage: String) {
+        logger.debug { "$logMessage: $delayDuration" }
+        kotlinx.coroutines.delay(delayDuration)
+        logger.debug { "Delay completed" }
+    }
+
+    /**
+     * Completes a child workflow task by processing the output through the current node's processor.
+     * This method handles the common task completion logic for both synchronous and asynchronous
+     * child workflow executions.
+     *
+     * @param currentNode The current node that initiated the child workflow
+     * @param childOutput The output from the child workflow execution
+     * @param states The current workflow states
+     * @return StepResult containing the next node, dataset, and state updates
+     */
+    private fun completeChildWorkflowTask(
+        currentNode: Node<*>,
+        childOutput: JsonElement,
+        states: Map<Node<*>, NodeState>
+    ): StepResult {
+        val processor = getNodeProcessor(currentNode)
+        val scope = getScope(currentNode, states)
+        return processor.completeTask(
+            rawOutput = childOutput,
+            currentFlowDirective = processor.getFlowDirective(),
+            parentScope = scope,
+            taskContext = null
+        )
     }
 
     /**
