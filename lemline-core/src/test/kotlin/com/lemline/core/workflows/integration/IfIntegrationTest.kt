@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows.integration
 
-import com.lemline.core.execution.ExecutionOrchestrator
+import com.lemline.core.execution.complete.CompleteOrchestrator
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Migrated version of IfTest using the new ExecutionOrchestrator implementation.
+ * Migrated version of IfTest using the new CompleteOrchestrator implementation.
  * Tests conditional task execution with 'if' directive.
  */
 @ExperimentalTime
@@ -34,7 +34,7 @@ class IfIntegrationTest {
                   in: ${ .in + 3}
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("in" to kotlinx.serialization.json.JsonPrimitive(0)))) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf("in" to JsonPrimitive(0)))) as JsonObject
 
         assertEquals(6, output["in"]?.jsonPrimitive?.int)
     }
@@ -55,7 +55,7 @@ class IfIntegrationTest {
                   in: ${ .in + 3}
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("in" to kotlinx.serialization.json.JsonPrimitive(0)))) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf("in" to JsonPrimitive(0)))) as JsonObject
 
         assertEquals(5, output["in"]?.jsonPrimitive?.int)
     }
@@ -76,7 +76,7 @@ class IfIntegrationTest {
                   in: ${ .in + 3}
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("in" to kotlinx.serialization.json.JsonPrimitive(0)))) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf("in" to JsonPrimitive(0)))) as JsonObject
 
         assertEquals(6, output["in"]?.jsonPrimitive?.int)
     }
@@ -98,7 +98,7 @@ class IfIntegrationTest {
                   in: ${ .in + 3}
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("in" to kotlinx.serialization.json.JsonPrimitive(0)))) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf("in" to JsonPrimitive(0)))) as JsonObject
 
         assertEquals(3, output["in"]?.jsonPrimitive?.int)
     }
@@ -119,7 +119,7 @@ class IfIntegrationTest {
                   in: ${ .in + 3}
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("in" to kotlinx.serialization.json.JsonPrimitive(0)))) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf("in" to JsonPrimitive(0)))) as JsonObject
 
         assertEquals(4, output["in"]?.jsonPrimitive?.int)
     }
@@ -140,7 +140,7 @@ class IfIntegrationTest {
                   in: ${ .in + 3}
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("in" to kotlinx.serialization.json.JsonPrimitive(0)))) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf("in" to JsonPrimitive(0)))) as JsonObject
 
         assertEquals(3, output["in"]?.jsonPrimitive?.int)
     }
@@ -168,7 +168,7 @@ class IfIntegrationTest {
                   in: ${ .in + 5}
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("in" to kotlinx.serialization.json.JsonPrimitive(0)))) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf("in" to JsonPrimitive(0)))) as JsonObject
 
         assertEquals(15, output["in"]?.jsonPrimitive?.int)
     }
@@ -197,7 +197,7 @@ class IfIntegrationTest {
                   in: ${ .in + 5}
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("in" to kotlinx.serialization.json.JsonPrimitive(0)))) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf("in" to JsonPrimitive(0)))) as JsonObject
 
         assertEquals(6, output["in"]?.jsonPrimitive?.int)
     }
@@ -226,7 +226,7 @@ class IfIntegrationTest {
                   in: ${ .in + 5}
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("in" to kotlinx.serialization.json.JsonPrimitive(0)))) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf("in" to JsonPrimitive(0)))) as JsonObject
 
         assertEquals(13, output["in"]?.jsonPrimitive?.int)
     }

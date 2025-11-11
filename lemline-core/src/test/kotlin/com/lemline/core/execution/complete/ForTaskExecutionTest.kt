@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -14,7 +13,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for ForTask execution using ExecutionOrchestrator.
+ * Integration tests for ForTask execution using CompleteOrchestrator.
  *
  * Tests iteration with loop variables (@item, @index),
  * verifying proper data accumulation and scope management.
@@ -40,7 +39,7 @@ class ForTaskExecutionTest {
                     as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(15, output["sum"]?.jsonPrimitive?.int)
     }
@@ -63,7 +62,7 @@ class ForTaskExecutionTest {
                     as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val items = output["items"]?.jsonArray
         assertEquals(3, items?.size)
@@ -92,7 +91,7 @@ class ForTaskExecutionTest {
                     as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val evens = output["evens"]?.jsonArray
         assertEquals(3, evens?.size)
@@ -123,7 +122,7 @@ class ForTaskExecutionTest {
                     as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(60, output["total"]?.jsonPrimitive?.int)
     }
@@ -146,7 +145,7 @@ class ForTaskExecutionTest {
                     as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val doubled = output["doubled"]?.jsonArray
         assertEquals(3, doubled?.size)
@@ -174,7 +173,7 @@ class ForTaskExecutionTest {
                     as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(10, output["multiplier"]?.jsonPrimitive?.int)
         val results = output["results"]?.jsonArray
@@ -208,7 +207,7 @@ class ForTaskExecutionTest {
                     as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val pairs = output["pairs"]?.jsonArray
         assertEquals(4, pairs?.size)
@@ -232,7 +231,7 @@ class ForTaskExecutionTest {
                     as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val names = output["names"]?.jsonArray
         assertEquals(2, names?.size)
@@ -258,7 +257,7 @@ class ForTaskExecutionTest {
                     as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val taskNames = output["taskNames"]?.jsonArray
         assertEquals(2, taskNames?.size)

@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows.integration
 
-import com.lemline.core.execution.ExecutionOrchestrator
+import com.lemline.core.execution.complete.CompleteOrchestrator
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.int
 import org.junit.jupiter.api.Test
 
 /**
- * Migrated version of ForTest using the new ExecutionOrchestrator implementation.
+ * Migrated version of ForTest using the new CompleteOrchestrator implementation.
  * Tests for loop iteration functionality.
  */
 @ExperimentalTime
@@ -34,9 +33,9 @@ class ForIntegrationTest {
                    as:  .counter
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(
+        val output = CompleteOrchestrator.run(
             rootNode,
-            JsonObject(mapOf("input" to kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive(1), JsonPrimitive(2), JsonPrimitive(3)))))
+            JsonObject(mapOf("input" to JsonArray(listOf(JsonPrimitive(1), JsonPrimitive(2), JsonPrimitive(3)))))
         )
 
         assertEquals(JsonPrimitive(6), output)
@@ -66,9 +65,9 @@ class ForIntegrationTest {
                    as: ${ .counter }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(
+        val output = CompleteOrchestrator.run(
             rootNode,
-            JsonObject(mapOf("input" to kotlinx.serialization.json.JsonArray(listOf(JsonPrimitive(4), JsonPrimitive(5), JsonPrimitive(6)))))
+            JsonObject(mapOf("input" to JsonArray(listOf(JsonPrimitive(4), JsonPrimitive(5), JsonPrimitive(6)))))
         )
 
         assertEquals(JsonPrimitive(3), output)

@@ -5,12 +5,12 @@ package com.lemline.core.processors
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.WorkflowError
-import com.lemline.core.execution.ExecutionOrchestrator
+import com.lemline.core.execution.complete.CompleteOrchestrator
 import com.lemline.core.execution.context.Scope
 import com.lemline.core.execution.models.StepResult
+import com.lemline.core.nodes.Node
 import com.lemline.core.states.NodeState
 import com.lemline.core.states.TryState
-import com.lemline.core.nodes.Node
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration
 import io.serverlessworkflow.api.types.ConstantBackoff
@@ -87,7 +87,7 @@ class TryProcessor(
      * This method handles both the first attempt (down) and the completion (up) of the `TryState` node.
      *
      * This method is used in "normal" execution.
-     * This is bypassed by [ExecutionOrchestrator] when this node caught an exception.
+     * This is bypassed by [CompleteOrchestrator] when this node caught an exception.
      */
     override fun getNextStepInfo(
         state: TryState,

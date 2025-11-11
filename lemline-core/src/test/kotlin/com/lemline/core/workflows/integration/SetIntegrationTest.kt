@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows.integration
 
-import com.lemline.core.execution.ExecutionOrchestrator
+import com.lemline.core.execution.complete.CompleteOrchestrator
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.int
 import org.junit.jupiter.api.Test
 
 /**
- * Migrated version of SetTest using the new ExecutionOrchestrator implementation.
+ * Migrated version of SetTest using the new CompleteOrchestrator implementation.
  * This verifies that the old test cases still work with the new execution model.
  */
 @ExperimentalTime
@@ -29,7 +29,7 @@ class SetIntegrationTest {
                   counter: 0
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
 
         // Assert the output matches our expected transformed value
         assertEquals(
@@ -47,7 +47,7 @@ class SetIntegrationTest {
                   counter:  .
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(1))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(1))
 
         // Assert the output matches our expected transformed value
         assertEquals(
@@ -65,7 +65,7 @@ class SetIntegrationTest {
                   counter: ${ . + 1 }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(1)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(1)) as JsonObject
 
         // Assert the output matches our expected transformed value
         assertEquals(2, output["counter"]?.jsonPrimitive?.int)
@@ -82,7 +82,7 @@ class SetIntegrationTest {
                     b: ${ . }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(1)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(1)) as JsonObject
 
         // Assert the output matches our expected transformed value
         val counter = output["counter"]?.jsonObject
@@ -107,7 +107,7 @@ class SetIntegrationTest {
               as: ${ .value }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         // Assert the output matches our expected transformed value
         assertEquals(
@@ -138,7 +138,7 @@ class SetIntegrationTest {
               as: ${ .value }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         // Assert the output matches our expected transformed value
         assertEquals(

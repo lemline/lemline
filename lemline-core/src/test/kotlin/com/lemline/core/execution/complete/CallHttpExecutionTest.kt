@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
@@ -15,7 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for HTTP call execution using ExecutionOrchestrator.
+ * Integration tests for HTTP call execution using CompleteOrchestrator.
  *
  * Tests HTTP calls to real external services (JSONPlaceholder API) to verify:
  * - Basic HTTP method support (GET, POST, PUT, DELETE)
@@ -25,7 +25,8 @@ import org.junit.jupiter.api.Test
  * - Response parsing
  */
 @ExperimentalTime
-class CallHttpExecutionTest {
+class
+CallHttpExecutionTest {
 
     @Test
     fun `http call can perform GET request`() = runTest {
@@ -38,7 +39,7 @@ class CallHttpExecutionTest {
                     endpoint: https://jsonplaceholder.typicode.com/posts/1
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // JSONPlaceholder returns a post object with id, title, body, userId
         assertEquals(1, output["id"]?.jsonPrimitive?.int)
@@ -60,7 +61,7 @@ class CallHttpExecutionTest {
                       postId: 1
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonArray
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonArray
 
         // Should return an array of comments for post 1
         assertTrue(output.size > 0)
@@ -85,7 +86,7 @@ class CallHttpExecutionTest {
                       userId: 1
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // JSONPlaceholder mock API returns the created post with an id
         assertTrue(output.containsKey("id"))
@@ -110,7 +111,7 @@ class CallHttpExecutionTest {
                       userId: 1
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(1, output["id"]?.jsonPrimitive?.int)
         assertEquals("Updated Title", output["title"]?.jsonPrimitive?.content)
@@ -128,7 +129,7 @@ class CallHttpExecutionTest {
                     endpoint: https://jsonplaceholder.typicode.com/posts/1
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         // JSONPlaceholder returns empty object for DELETE
         assertTrue(output is JsonObject)
@@ -150,12 +151,14 @@ class CallHttpExecutionTest {
                   input:
                     from: ${'$'}{ . }
         """
-        val input = JsonObject(mapOf(
-            "someData" to JsonPrimitive("test")
-        ))
+        val input = JsonObject(
+            mapOf(
+                "someData" to JsonPrimitive("test")
+            )
+        )
 
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, input) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, input) as JsonObject
 
         assertTrue(output.containsKey("id"))
         assertEquals("Dynamic Title", output["title"]?.jsonPrimitive?.content)
@@ -179,7 +182,7 @@ class CallHttpExecutionTest {
                     endpoint: https://jsonplaceholder.typicode.com/users/1
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // Second call should get user data
         assertTrue(output.containsKey("id"))
@@ -199,7 +202,7 @@ class CallHttpExecutionTest {
                     output: response
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // Response format includes request, statusCode, headers, and content
         assertTrue(output.containsKey("request"))
@@ -230,7 +233,7 @@ class CallHttpExecutionTest {
                       User-Agent: Lemline-Test
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // Should successfully get the post
         assertEquals(1, output["id"]?.jsonPrimitive?.int)
@@ -249,7 +252,7 @@ class CallHttpExecutionTest {
                     as: '${'$'}{ {postTitle: .title, postId: .id} }'
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // Only the transformed fields should be in output
         assertTrue(output.containsKey("postTitle"))
@@ -271,7 +274,7 @@ class CallHttpExecutionTest {
                     result: ${'$'}{ .title }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // Should have the title from the first HTTP call
         assertTrue(output.containsKey("result"))

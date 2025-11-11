@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.getWorkflowNode
@@ -15,7 +15,7 @@ import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for Workflow execution using ExecutionOrchestrator.
+ * Integration tests for Workflow execution using CompleteOrchestrator.
  *
  * Tests sub-workflow execution to verify:
  * - Basic sub-workflow invocation
@@ -60,7 +60,7 @@ class RunWorkflowExecutionTest {
         """
 
         val rootNode = getWorkflowNode(parentWorkflowYaml, namespace = "test", name = "parent", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(10, output["result"]?.jsonPrimitive?.int)
     }
@@ -94,7 +94,7 @@ class RunWorkflowExecutionTest {
         """
 
         val rootNode = getWorkflowNode(parentWorkflowYaml, namespace = "test", name = "parent", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("Hello, Alice!", output["greeting"]?.jsonPrimitive?.content)
     }
@@ -137,7 +137,7 @@ class RunWorkflowExecutionTest {
 
         // Call factorial(5)
         val rootNode = getWorkflowNode(factorialYaml, namespace = "test", name = "factorial-main", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("n" to JsonPrimitive(5)))) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf("n" to JsonPrimitive(5)))) as JsonObject
 
         // 5! = 120
         assertEquals(120, output["n"]?.jsonPrimitive?.int)
@@ -186,7 +186,7 @@ class RunWorkflowExecutionTest {
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // (3 + 7) * 2 = 20
         assertEquals(20, output["result"]?.jsonPrimitive?.int)
@@ -222,7 +222,7 @@ class RunWorkflowExecutionTest {
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(60, output["finalValue"]?.jsonPrimitive?.int)
         assertEquals(true, output["wasProcessed"]?.jsonPrimitive?.content?.toBoolean())
@@ -254,7 +254,7 @@ class RunWorkflowExecutionTest {
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(42, output["result"]?.jsonPrimitive?.int)
         assertTrue(!output.containsKey("status"))
@@ -288,7 +288,7 @@ class RunWorkflowExecutionTest {
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("John Doe", output["fullName"]?.jsonPrimitive?.content)
         assertEquals(30, output["age"]?.jsonPrimitive?.int)
@@ -347,7 +347,7 @@ class RunWorkflowExecutionTest {
         """
 
         val rootNode = getWorkflowNode(rootYaml, namespace = "test", name = "parent", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // ((5 + 3) * 2) + 1 = 17
         assertEquals(17, output["result"]?.jsonPrimitive?.int)
@@ -376,7 +376,7 @@ class RunWorkflowExecutionTest {
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(10, output["value"]?.jsonPrimitive?.int)
     }
@@ -408,7 +408,7 @@ class RunWorkflowExecutionTest {
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // Parent should have continued immediately, not waiting for child
         assertEquals(true, output["continued"]?.jsonPrimitive?.content?.toBoolean())
@@ -445,7 +445,7 @@ class RunWorkflowExecutionTest {
         """
 
         val rootNode = getWorkflowNode(parentYaml, namespace = "test", name = "parent", version = "0.1.0")
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(30, output["doubled"]?.jsonPrimitive?.int)
         assertEquals(15, output["parentValue"]?.jsonPrimitive?.int)

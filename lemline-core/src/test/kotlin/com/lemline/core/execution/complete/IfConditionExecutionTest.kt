@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for if conditions in task execution using ExecutionOrchestrator.
+ * Integration tests for if conditions in task execution using CompleteOrchestrator.
  *
  * Tests conditional task execution based on if expressions,
  * verifying proper scope access and skipping logic.
@@ -32,7 +32,7 @@ class IfConditionExecutionTest {
                     result: ${ "executed" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(75)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(75)) as JsonObject
 
         assertEquals("executed", output["result"]?.jsonPrimitive?.content)
     }
@@ -50,7 +50,7 @@ class IfConditionExecutionTest {
                     fallback: ${ "always" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(50)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(50)) as JsonObject
 
         assertNull(output["result"])
         assertEquals("always", output["fallback"]?.jsonPrimitive?.content)
@@ -74,7 +74,7 @@ class IfConditionExecutionTest {
                     status: ${ "normal" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(90)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(90)) as JsonObject
 
         assertEquals("high", output["status"]?.jsonPrimitive?.content)
     }
@@ -93,7 +93,7 @@ class IfConditionExecutionTest {
                     status: ${ "stopped" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive("active")) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive("active")) as JsonObject
 
         assertEquals("running", output["status"]?.jsonPrimitive?.content)
     }
@@ -112,7 +112,7 @@ class IfConditionExecutionTest {
                     result: ${ "passed" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("passed", output["result"]?.jsonPrimitive?.content)
     }
@@ -131,7 +131,7 @@ class IfConditionExecutionTest {
                     access: ${ "granted" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("granted", output["access"]?.jsonPrimitive?.content)
     }
@@ -150,7 +150,7 @@ class IfConditionExecutionTest {
                     exists: ${ true }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["exists"]?.jsonPrimitive?.content?.toBoolean())
     }
@@ -174,7 +174,7 @@ class IfConditionExecutionTest {
                     as: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val evens = output["evens"]?.jsonArray
         assertEquals(4, evens?.size)
@@ -194,7 +194,7 @@ class IfConditionExecutionTest {
                     matched: ${ true }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["matched"]?.jsonPrimitive?.content?.toBoolean())
     }
@@ -224,7 +224,7 @@ class IfConditionExecutionTest {
                     grade: ${ "F" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("B", output["grade"]?.jsonPrimitive?.content)
     }
@@ -245,7 +245,7 @@ class IfConditionExecutionTest {
                     authorized: ${ true }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["authorized"]?.jsonPrimitive?.content?.toBoolean())
     }
@@ -266,7 +266,7 @@ class IfConditionExecutionTest {
                     result: ${ .value }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(50)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(50)) as JsonObject
 
         // Value should remain 10 since conditionalModify was skipped
         assertEquals(10, output["result"]?.jsonPrimitive?.int)

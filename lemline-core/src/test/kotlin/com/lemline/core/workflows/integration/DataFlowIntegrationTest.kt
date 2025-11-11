@@ -1,19 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows.integration
 
-import com.lemline.core.execution.ExecutionOrchestrator
+import com.lemline.core.execution.complete.CompleteOrchestrator
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Migrated version of DataFlowTest using the new ExecutionOrchestrator implementation.
+ * Migrated version of DataFlowTest using the new CompleteOrchestrator implementation.
  * Tests input/output transformations at workflow and task levels.
  */
 @ExperimentalTime
@@ -31,7 +30,7 @@ class DataFlowIntegrationTest {
                     value: ${ .in }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["value"]?.jsonPrimitive?.content)
     }
@@ -47,7 +46,7 @@ class DataFlowIntegrationTest {
                     value: ${ .in }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive("foo")) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive("foo")) as JsonObject
 
         assertEquals("foo", output["value"]?.jsonPrimitive?.content)
     }
@@ -64,7 +63,7 @@ class DataFlowIntegrationTest {
                     value: ${ .in }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive("foo")) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive("foo")) as JsonObject
 
         assertEquals("foo", output["value"]?.jsonPrimitive?.content)
     }
@@ -81,7 +80,7 @@ class DataFlowIntegrationTest {
               as: "${ {out: .value} }"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }
@@ -98,7 +97,7 @@ class DataFlowIntegrationTest {
               as: "{out: .value}"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }
@@ -116,7 +115,7 @@ class DataFlowIntegrationTest {
                 out: .value
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }
@@ -135,7 +134,7 @@ class DataFlowIntegrationTest {
               as: "${ {out: .value} }"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }
@@ -152,7 +151,7 @@ class DataFlowIntegrationTest {
                     value: "${ .in }"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["value"]?.jsonPrimitive?.content)
     }
@@ -169,7 +168,7 @@ class DataFlowIntegrationTest {
                     value: "${ .in }"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["value"]?.jsonPrimitive?.content)
     }
@@ -187,7 +186,7 @@ class DataFlowIntegrationTest {
                     value: "${ .in }"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["value"]?.jsonPrimitive?.content)
     }
@@ -204,7 +203,7 @@ class DataFlowIntegrationTest {
                     as: "${ {out: .value} }"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }
@@ -221,7 +220,7 @@ class DataFlowIntegrationTest {
                     as: "{out: .value}"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }
@@ -239,7 +238,7 @@ class DataFlowIntegrationTest {
                       out: .value
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }
@@ -258,7 +257,7 @@ class DataFlowIntegrationTest {
                     as: "${ {out: .value} }"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }
@@ -284,7 +283,7 @@ class DataFlowIntegrationTest {
                     as: "${ {out2: .value} }"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out2"]?.jsonPrimitive?.content)
     }
@@ -314,7 +313,7 @@ class DataFlowIntegrationTest {
               as: "${ {out: .out2} }"
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }
@@ -344,7 +343,7 @@ class DataFlowIntegrationTest {
               as: {out: .out2}
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }
@@ -379,7 +378,7 @@ class DataFlowIntegrationTest {
                 out: .out2
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(str)) as JsonObject
 
         assertEquals(str, output["out"]?.jsonPrimitive?.content)
     }

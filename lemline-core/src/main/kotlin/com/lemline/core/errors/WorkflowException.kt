@@ -7,7 +7,7 @@ import kotlin.time.ExperimentalTime
  * Internal Exception thrown during the execution of a workflow.
  *
  * This exception is used to propagate errors that occur during workflow execution.
- * In the new execution model, it's caught by ExecutionOrchestrator which finds
+ * In the new execution model, it's caught by CompleteOrchestrator which finds
  * the appropriate TryTask handler.
  *
  * @property error The workflow error associated with this exception.

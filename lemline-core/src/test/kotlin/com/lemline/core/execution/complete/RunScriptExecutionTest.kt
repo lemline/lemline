@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
@@ -9,14 +9,13 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
 
 /**
- * Integration tests for Script execution using ExecutionOrchestrator.
+ * Integration tests for Script execution using CompleteOrchestrator.
  *
  * Tests script execution to verify:
  * - JavaScript and Python script execution
@@ -42,7 +41,7 @@ class RunScriptExecutionTest {
                         console.log('Hello from JavaScript');
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("Hello from JavaScript", (output as JsonPrimitive).content)
     }
@@ -60,7 +59,7 @@ class RunScriptExecutionTest {
                         print('Hello from Python')
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("Hello from Python", (output as JsonPrimitive).content)
     }
@@ -87,7 +86,7 @@ class RunScriptExecutionTest {
                         "--name": Alice
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("Hello, Alice!", (output as JsonPrimitive).content)
     }
@@ -113,7 +112,7 @@ class RunScriptExecutionTest {
                         "--name": Bob
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("Hello, Bob!", (output as JsonPrimitive).content)
     }
@@ -133,7 +132,7 @@ class RunScriptExecutionTest {
                         MY_VAR: TestValue
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("TestValue", (output as JsonPrimitive).content)
     }
@@ -154,7 +153,7 @@ class RunScriptExecutionTest {
                         MY_VAR: PythonValue
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("PythonValue", (output as JsonPrimitive).content)
     }
@@ -173,7 +172,7 @@ class RunScriptExecutionTest {
                     return: stdout
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("This is stdout", (output as JsonPrimitive).content)
     }
@@ -192,7 +191,7 @@ class RunScriptExecutionTest {
                     return: stderr
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("This is stderr", (output as JsonPrimitive).content)
     }
@@ -211,7 +210,7 @@ class RunScriptExecutionTest {
                     return: code
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals(42, (output as JsonPrimitive).int)
     }
@@ -232,7 +231,7 @@ class RunScriptExecutionTest {
                     return: all
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("stdout message", output["stdout"]?.jsonPrimitive?.content)
         assertEquals("stderr message", output["stderr"]?.jsonPrimitive?.content)
@@ -255,7 +254,7 @@ class RunScriptExecutionTest {
                       code: ${'$'}{ "console.log('" + .greeting + ", " + .name + "!');" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("Hello, Charlie!", (output as JsonPrimitive).content)
     }
@@ -285,7 +284,7 @@ class RunScriptExecutionTest {
                         "--name": ${'$'}{ .userName }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("Hello, Diana!", (output as JsonPrimitive).content)
     }
@@ -308,7 +307,7 @@ class RunScriptExecutionTest {
                         MY_VAR: ${'$'}{ .envValue }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("FromContext", (output as JsonPrimitive).content)
     }
@@ -330,7 +329,7 @@ class RunScriptExecutionTest {
                     hasResult: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("ScriptData", output["result"]?.jsonPrimitive?.content)
         assertEquals(true, output["hasResult"]?.jsonPrimitive?.content?.toBoolean())
@@ -351,7 +350,7 @@ class RunScriptExecutionTest {
                     as: '${'$'}{ {scriptResult: .} }'
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("test output", output["scriptResult"]?.jsonPrimitive?.content)
     }
@@ -378,7 +377,7 @@ class RunScriptExecutionTest {
                     result: ${'$'}{ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("Second", output["result"]?.jsonPrimitive?.content)
     }
@@ -397,7 +396,7 @@ class RunScriptExecutionTest {
                         console.log(result);
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("4", (output as JsonPrimitive).content)
     }
@@ -416,7 +415,7 @@ class RunScriptExecutionTest {
                         print(result)
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("21", (output as JsonPrimitive).content)
     }
@@ -436,7 +435,7 @@ class RunScriptExecutionTest {
                         console.log('Line 3');
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         val result = (output as JsonPrimitive).content
         assertTrue(result.contains("Line 1"))
@@ -459,7 +458,7 @@ class RunScriptExecutionTest {
                         print('Line 3')
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         val result = (output as JsonPrimitive).content
         assertTrue(result.contains("Line 1"))

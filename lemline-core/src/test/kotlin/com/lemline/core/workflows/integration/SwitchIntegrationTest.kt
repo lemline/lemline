@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows.integration
 
-import com.lemline.core.execution.ExecutionOrchestrator
+import com.lemline.core.execution.complete.CompleteOrchestrator
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Migrated version of SwitchTest using the new ExecutionOrchestrator implementation.
+ * Migrated version of SwitchTest using the new CompleteOrchestrator implementation.
  * Tests switch task with conditional branching.
  */
 @ExperimentalTime
@@ -48,17 +48,17 @@ class SwitchIntegrationTest {
 
         // Test "high" case
         val highNode = getWorkflowNode(doYaml)
-        val highOutput = ExecutionOrchestrator.run(highNode, JsonPrimitive("high"))
+        val highOutput = CompleteOrchestrator.run(highNode, JsonPrimitive("high"))
         assertEquals(JsonPrimitive("high1"), highOutput)
 
         // Test "low" case
         val lowNode = getWorkflowNode(doYaml)
-        val lowOutput = ExecutionOrchestrator.run(lowNode, JsonPrimitive("low"))
+        val lowOutput = CompleteOrchestrator.run(lowNode, JsonPrimitive("low"))
         assertEquals(JsonPrimitive("low2"), lowOutput)
 
         // Test "none" case (should match default "other")
         val noneNode = getWorkflowNode(doYaml)
-        val noneOutput = ExecutionOrchestrator.run(noneNode, JsonPrimitive("none"))
+        val noneOutput = CompleteOrchestrator.run(noneNode, JsonPrimitive("none"))
         assertEquals(JsonPrimitive("none3"), noneOutput)
     }
 
@@ -94,17 +94,17 @@ class SwitchIntegrationTest {
 
         // Test "high" case (continue - should go to first task)
         val highNode = getWorkflowNode(doYaml)
-        val highOutput = ExecutionOrchestrator.run(highNode, JsonPrimitive("high"))
+        val highOutput = CompleteOrchestrator.run(highNode, JsonPrimitive("high"))
         assertEquals(JsonPrimitive("high1"), highOutput)
 
         // Test "low" case (exit - should return current value)
         val lowNode = getWorkflowNode(doYaml)
-        val lowOutput = ExecutionOrchestrator.run(lowNode, JsonPrimitive("low"))
+        val lowOutput = CompleteOrchestrator.run(lowNode, JsonPrimitive("low"))
         assertEquals(JsonPrimitive("low"), lowOutput)
 
         // Test "none" case (end - should return current value)
         val noneNode = getWorkflowNode(doYaml)
-        val noneOutput = ExecutionOrchestrator.run(noneNode, JsonPrimitive("none"))
+        val noneOutput = CompleteOrchestrator.run(noneNode, JsonPrimitive("none"))
         assertEquals(JsonPrimitive("none"), noneOutput)
     }
 

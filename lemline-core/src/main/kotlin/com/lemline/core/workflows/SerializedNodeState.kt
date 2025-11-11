@@ -15,7 +15,7 @@ import kotlinx.serialization.json.JsonObject
  * This is used by the workflow state serialization system.
  *
  * Note: This is part of the legacy workflow state persistence model and will be
- * replaced when the runner migration to ExecutionOrchestrator is complete.
+ * replaced when the runner migration to CompleteOrchestrator is complete.
  */
 @ExperimentalTime
 @Serializable

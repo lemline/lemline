@@ -1,19 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for Wait task execution using ExecutionOrchestrator.
+ * Integration tests for Wait task execution using CompleteOrchestrator.
  *
  * Tests wait functionality to verify:
  * - Basic wait with fixed duration
@@ -37,7 +35,7 @@ class WaitExecutionTest {
                     completed: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
         assertEquals(true, output["completed"]?.jsonPrimitive?.content?.toBoolean())
     }
 
@@ -52,7 +50,7 @@ class WaitExecutionTest {
                     completed: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
         assertEquals(true, output["completed"]?.jsonPrimitive?.content?.toBoolean())
     }
 
@@ -67,7 +65,7 @@ class WaitExecutionTest {
                     completed: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
         assertEquals(true, output["completed"]?.jsonPrimitive?.content?.toBoolean())
     }
 
@@ -84,7 +82,7 @@ class WaitExecutionTest {
                     completed: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
         assertEquals(true, output["completed"]?.jsonPrimitive?.content?.toBoolean())
     }
 
@@ -105,7 +103,7 @@ class WaitExecutionTest {
                     originalCount: ${'$'}{ .count }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["verified"]?.jsonPrimitive?.content?.toBoolean())
         assertEquals("Hello", output["originalMessage"]?.jsonPrimitive?.content)
@@ -128,7 +126,7 @@ class WaitExecutionTest {
                     finalValue: ${'$'}{ .doubled }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(200, output["finalValue"]?.jsonPrimitive?.content?.toInt())
     }
@@ -146,7 +144,7 @@ class WaitExecutionTest {
                     as: '${'$'}{ {result: .value * 3} }'
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(150, output["result"]?.jsonPrimitive?.content?.toInt())
         // Original value should not be in output after transformation
@@ -168,7 +166,7 @@ class WaitExecutionTest {
                     completed: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
         assertEquals(true, output["completed"]?.jsonPrimitive?.content?.toBoolean())
     }
 
@@ -187,7 +185,7 @@ class WaitExecutionTest {
                     completed: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
         assertEquals(true, output["completed"]?.jsonPrimitive?.content?.toBoolean())
     }
 
@@ -207,7 +205,7 @@ class WaitExecutionTest {
                           step: 2
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(2, output["step"]?.jsonPrimitive?.content?.toInt())
     }
@@ -230,7 +228,7 @@ class WaitExecutionTest {
                     as: ${'$'}{ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
         // The last iteration (item=3) should be in the output
         assertEquals(3, output["processed"]?.jsonPrimitive?.int)
     }
@@ -254,7 +252,7 @@ class WaitExecutionTest {
                     completed: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["completed"]?.jsonPrimitive?.content?.toBoolean())
     }
@@ -278,7 +276,7 @@ class WaitExecutionTest {
                     result: ${'$'}{ .value + 5 }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // (10 * 2) + 5 = 25
         assertEquals(25, output["result"]?.jsonPrimitive?.content?.toInt())

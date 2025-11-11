@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows.integration
 
-import com.lemline.core.execution.ExecutionOrchestrator
+import com.lemline.core.execution.complete.CompleteOrchestrator
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.jupiter.api.Test
 
 /**
- * Migrated version of FlowDirectiveTest using the new ExecutionOrchestrator implementation.
+ * Migrated version of FlowDirectiveTest using the new CompleteOrchestrator implementation.
  * Tests flow control directives: continue, exit, end, and named goto.
  */
 @ExperimentalTime
@@ -34,7 +35,7 @@ class FlowDirectiveIntegrationTest {
               as: ${ .value }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         assertEquals(JsonPrimitive("123"), output)
     }
@@ -62,7 +63,7 @@ class FlowDirectiveIntegrationTest {
               as: ${ .value }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         assertEquals(JsonPrimitive("12a2b3"), output)
     }
@@ -85,9 +86,9 @@ class FlowDirectiveIntegrationTest {
               as: ${ .value }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
-        assertEquals(JsonPrimitive("12"), output)
+        assertEquals(buildJsonObject { put("value", JsonPrimitive("12")) }, output)
     }
 
     @Test
@@ -108,7 +109,7 @@ class FlowDirectiveIntegrationTest {
                     value: ${ .value + "3" }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         assertEquals(JsonPrimitive("12"), output)
     }
@@ -136,14 +137,14 @@ class FlowDirectiveIntegrationTest {
               as: ${ .value }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         // BUG: END directive not properly propagating from nested do block
         // Expected: "12a" (END should stop workflow from secondA)
         // Actual: "12a3" (incorrectly continues to third task)
         // The END directive should recursively propagate to parent and terminate workflow
         // See NodeProcessor.continueToEnd() - it returns END flowDirective to parent
-        assertEquals(JsonPrimitive("12a"), output)
+        assertEquals(buildJsonObject { put("value", JsonPrimitive("12a")) }, output)
     }
 
     @Test
@@ -164,7 +165,7 @@ class FlowDirectiveIntegrationTest {
               as: ${ .value }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         assertEquals(JsonPrimitive("12"), output)
     }
@@ -187,7 +188,7 @@ class FlowDirectiveIntegrationTest {
                     value: ${ .value + "3" }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         assertEquals(JsonPrimitive("12"), output)
     }
@@ -215,7 +216,7 @@ class FlowDirectiveIntegrationTest {
               as: ${ .value }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         assertEquals(JsonPrimitive("12a3"), output)
     }
@@ -238,7 +239,7 @@ class FlowDirectiveIntegrationTest {
               as: ${ .value }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         assertEquals(JsonPrimitive("13"), output)
     }
@@ -269,7 +270,7 @@ class FlowDirectiveIntegrationTest {
               as: ${ .value }
         """
         val rootNode = getWorkflowNode(doYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(""))
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(""))
 
         assertEquals(JsonPrimitive("12a2c3"), output)
     }

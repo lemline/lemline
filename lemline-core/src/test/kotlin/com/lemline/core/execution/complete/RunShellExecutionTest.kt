@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
@@ -9,14 +9,13 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledOnOs
 import org.junit.jupiter.api.condition.OS
 
 /**
- * Integration tests for Shell execution using ExecutionOrchestrator.
+ * Integration tests for Shell execution using CompleteOrchestrator.
  *
  * Tests shell command execution to verify:
  * - Basic command execution
@@ -39,7 +38,7 @@ class RunShellExecutionTest {
                       command: echo Hello World
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("Hello World", (output as JsonPrimitive).content)
     }
@@ -57,7 +56,7 @@ class RunShellExecutionTest {
                         "Hello": World
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertTrue((output as JsonPrimitive).content.contains("Hello World"))
     }
@@ -77,7 +76,7 @@ class RunShellExecutionTest {
                         MY_VAR: TestValue
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("TestValue", (output as JsonPrimitive).content)
     }
@@ -94,7 +93,7 @@ class RunShellExecutionTest {
                     return: stdout
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("Testing stdout", (output as JsonPrimitive).content)
     }
@@ -113,7 +112,7 @@ class RunShellExecutionTest {
                     return: stderr
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("Error message", (output as JsonPrimitive).content)
     }
@@ -132,7 +131,7 @@ class RunShellExecutionTest {
                     return: code
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals(42, (output as JsonPrimitive).int)
     }
@@ -151,7 +150,7 @@ class RunShellExecutionTest {
                     return: all
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("stdout", output["stdout"]?.jsonPrimitive?.content)
         assertEquals("stderr", output["stderr"]?.jsonPrimitive?.content)
@@ -173,7 +172,7 @@ class RunShellExecutionTest {
                       command: ${ "echo " + .greeting + " " + .name }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("Hello Alice", (output as JsonPrimitive).content)
     }
@@ -194,7 +193,7 @@ class RunShellExecutionTest {
                         "Hello": ${ .name }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertTrue((output as JsonPrimitive).content.contains("Hello World"))
     }
@@ -217,7 +216,7 @@ class RunShellExecutionTest {
                         MY_VAR: ${'$'}{ .varValue }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertEquals("FromWorkflow", (output as JsonPrimitive).content)
     }
@@ -237,7 +236,7 @@ class RunShellExecutionTest {
                     hasData: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // Should have both data and hasData
         assertEquals("TestData", output["data"]?.jsonPrimitive?.content)
@@ -257,7 +256,7 @@ class RunShellExecutionTest {
                     as: '${ {result: .} }'
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("test output", output["result"]?.jsonPrimitive?.content)
     }
@@ -280,7 +279,7 @@ class RunShellExecutionTest {
                     result: ${ . }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         // Last shell output should be "Second"
         assertEquals("Second", output["result"]?.jsonPrimitive?.content)
@@ -299,7 +298,7 @@ class RunShellExecutionTest {
                         "": /tmp
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         // Should return some output (directory listing)
         assertTrue((output as JsonPrimitive).content.isNotEmpty())
@@ -318,7 +317,7 @@ class RunShellExecutionTest {
                         "/c": echo Hello Windows
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
 
         assertTrue((output as JsonPrimitive).content.contains("Hello Windows"))
     }

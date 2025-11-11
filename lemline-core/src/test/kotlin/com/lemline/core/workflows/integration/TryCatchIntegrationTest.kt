@@ -2,24 +2,23 @@
 package com.lemline.core.workflows.integration
 
 import com.lemline.core.errors.WorkflowException
-import com.lemline.core.execution.ExecutionOrchestrator
+import com.lemline.core.execution.complete.CompleteOrchestrator
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
 /**
- * Migrated version of TryCatchTest using the new ExecutionOrchestrator implementation.
+ * Migrated version of TryCatchTest using the new CompleteOrchestrator implementation.
  * Tests try/catch error handling functionality.
  *
  * NOTE: Retry-related tests from the old TryCatchTest are not included here because
  * they require stateful callbacks (onTaskRetried) which don't exist in the pure functional
- * ExecutionOrchestrator model. Retry logic is now handled at the runner level
+ * CompleteOrchestrator model. Retry logic is now handled at the runner level
  * (StepByStepRunner), not in the core execution model.
  *
  * Tests that ARE included:
@@ -57,7 +56,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -83,7 +82,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -111,7 +110,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
         }
     }
 
@@ -136,7 +135,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -164,7 +163,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
         }
     }
 
@@ -187,7 +186,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -213,7 +212,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
         }
     }
 
@@ -237,7 +236,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -264,7 +263,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
         }
     }
 
@@ -287,7 +286,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -313,7 +312,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
         }
     }
 
@@ -348,7 +347,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("firstName" to JsonPrimitive("Gilles"))))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf("firstName" to JsonPrimitive("Gilles"))))
         }
     }
 
@@ -381,7 +380,8 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf("firstName" to JsonPrimitive("Gilles")))) as JsonObject
+        val output =
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf("firstName" to JsonPrimitive("Gilles")))) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -417,7 +417,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
         }
     }
 
@@ -450,7 +450,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -478,7 +478,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
         }
     }
 
@@ -503,7 +503,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -529,7 +529,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
         }
     }
 
@@ -552,7 +552,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -580,7 +580,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
         }
     }
 
@@ -605,7 +605,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }
@@ -633,7 +633,7 @@ class TryCatchIntegrationTest {
         val rootNode = getWorkflowNode(workflowYaml)
 
         assertThrows<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+            CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
         }
     }
 
@@ -658,7 +658,7 @@ class TryCatchIntegrationTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(workflowYaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         assertEquals(JsonPrimitive(true), output["caught"])
     }

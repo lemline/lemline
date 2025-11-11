@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 @file:OptIn(ExperimentalTime::class)
 
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
@@ -35,7 +35,7 @@ class ExportContextExecutionTest {
         """
         val rootNode = getWorkflowNode(yaml)
 
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()))
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf()))
 
         // Verify output
         output as JsonObject
@@ -58,7 +58,7 @@ class ExportContextExecutionTest {
         """
         val rootNode = getWorkflowNode(yaml)
 
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         // Verify output
         assertEquals(42, output["number"]?.jsonPrimitive?.int)
@@ -80,7 +80,7 @@ class ExportContextExecutionTest {
                     fromContext: ${ @context.onlyFoo }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         // Verify output - should only have foo in context
         assertEquals(42, output["fromContext"]?.jsonPrimitive?.int)
@@ -109,7 +109,7 @@ class ExportContextExecutionTest {
         """
         val rootNode = getWorkflowNode(yaml)
 
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf())) as JsonObject
 
         // Verify output - both values should be preserved in context
         assertEquals(30, output["sum"]?.jsonPrimitive?.int)
@@ -138,7 +138,7 @@ class ExportContextExecutionTest {
         val rootNode = getWorkflowNode(yaml)
         val states = mutableMapOf<com.lemline.core.nodes.Node<*>, com.lemline.core.states.NodeState>()
 
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()), states) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf()), states) as JsonObject
 
         // Should have the second value (20), not the first
         assertEquals(20, output["result"]?.jsonPrimitive?.int)
@@ -163,7 +163,7 @@ class ExportContextExecutionTest {
         val rootNode = getWorkflowNode(yaml)
         val states = mutableMapOf<com.lemline.core.nodes.Node<*>, com.lemline.core.states.NodeState>()
 
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()), states) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf()), states) as JsonObject
 
         // Verify nested task could export to context
         assertEquals("value", output["result"]?.jsonPrimitive?.content)
@@ -187,7 +187,7 @@ class ExportContextExecutionTest {
         val rootNode = getWorkflowNode(yaml)
         val states = mutableMapOf<com.lemline.core.nodes.Node<*>, com.lemline.core.states.NodeState>()
 
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(mapOf()), states) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(mapOf()), states) as JsonObject
 
         // Verify transformation was applied before export
         assertEquals(60, output["doubled"]?.jsonPrimitive?.int)

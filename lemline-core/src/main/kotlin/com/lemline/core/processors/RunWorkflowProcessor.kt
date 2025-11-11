@@ -6,12 +6,12 @@ package com.lemline.core.processors
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.errors.ChildWorkflowStartedException
+import com.lemline.core.errors.ChildWorkflowConfig
+import com.lemline.core.errors.ChildWorkflowRequestedException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.execution.context.Scope
-import com.lemline.core.states.NoState
 import com.lemline.core.nodes.Node
+import com.lemline.core.states.NoState
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunWorkflow
 import kotlin.time.ExperimentalTime
@@ -66,13 +66,14 @@ class RunWorkflowProcessor(
      * Execute sub-workflow action.
      *
      * This method transforms the input and throws ChildWorkflowStartedException to signal
-     * that a child workflow should be started. The ExecutionOrchestrator catches this
-     * exception and handles it based on its type (CompleteOrchestrator vs PausableOrchestrator).
+     * that a child workflow should be started. The orchestrator catches this exception,
+     * resolves the workflow definition from the cache, and handles execution appropriately
+     * (CompleteOrchestrator vs PausableOrchestrator).
      *
      * @param transformedInput Transformed input from parent
      * @param scope Expression evaluation scope
      * @return This method always throws ChildWorkflowStartedException
-     * @throws ChildWorkflowStartedException Always thrown to signal child workflow initiation
+     * @throws ChildWorkflowRequestedException Always thrown to signal child workflow initiation
      */
     override suspend fun execute(
         transformedInput: JsonElement,
@@ -96,41 +97,21 @@ class RunWorkflowProcessor(
         val subWorkflowName = WorkflowName(workflowConfig.name)
         val subWorkflowVersion = WorkflowVersion(workflowConfig.version)
 
-        logger.debug { "Sub-workflow: namespace=$subWorkflowNamespace, name=$subWorkflowName, version=$subWorkflowVersion" }
-
-        // Get the workflow definition from cache
-        val subWorkflow = DefinitionCache.getOrNull(subWorkflowNamespace, subWorkflowName, subWorkflowVersion)
-            ?: raiseError(
-                WorkflowErrorType.CONFIGURATION,
-                "Sub-workflow not found: namespace=$subWorkflowNamespace, name=$subWorkflowName, version=$subWorkflowVersion"
-            )
-
-        // Get the root node of the sub-workflow
-        val subWorkflowRootNode = DefinitionCache.getRootNode(subWorkflow)
-
         // Determine the input for the sub-workflow by evaluating the 'input' expression if it exists
         val childWorkflowInput = eval(transformedInput, workflowConfig.input, scope)
-
-        logger.debug { "Sub-workflow input: $childWorkflowInput" }
-
+        
         val awaitCompletion = runConfig.isAwait
-        logger.debug { "Await sub-workflow completion: $awaitCompletion" }
 
-        // Generate unique ID for child workflow instance
-        val childId = java.util.UUID.randomUUID()
-
-        logger.debug { "Throwing ChildWorkflowStartedException for orchestrator to handle: childId=$childId, await=$awaitCompletion" }
-
-        // ALWAYS throw exception (for both await=true and await=false)
-        // The orchestrator will handle it appropriately based on its type
-        throw ChildWorkflowStartedException(
-            childId = childId,
+        val childWorkflowConfig = ChildWorkflowConfig(
             namespace = subWorkflowNamespace.toString(),
             name = subWorkflowName.toString(),
             version = subWorkflowVersion.toString(),
             input = childWorkflowInput,
-            childNode = subWorkflowRootNode,
             awaitCompletion = awaitCompletion
         )
+
+        // The orchestrator will resolve the definition and handle execution appropriately
+        logger.debug { "Throwing ChildWorkflowStartedException for orchestrator to handle:  $childWorkflowConfig" }
+        throw ChildWorkflowRequestedException(childWorkflowConfig)
     }
 }

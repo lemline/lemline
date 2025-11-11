@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
@@ -15,7 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for DoTask execution with complete workflows using ExecutionOrchestrator.
+ * Integration tests for DoTask execution with complete workflows using CompleteOrchestrator.
  *
  * Tests the sequential execution of tasks within a do block,
  * verifying proper data flow and scope management.
@@ -38,7 +38,7 @@ class DoTaskExecutionTest {
                     result: ${ .doubled + 5 }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(10, output["value"]?.jsonPrimitive?.int)
         assertEquals(20, output["doubled"]?.jsonPrimitive?.int)
@@ -63,7 +63,7 @@ class DoTaskExecutionTest {
                     counter: ${ .counter + 1 }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(2, output["counter"]?.jsonPrimitive?.int)
         val items = output["items"] as JsonArray
@@ -82,7 +82,7 @@ class DoTaskExecutionTest {
                     taskRef: ${ @task.reference }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(42)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(42)) as JsonObject
 
         assertEquals("taskWithMetadata", output["taskName"]?.jsonPrimitive?.content)
         assertEquals("/do/0/taskWithMetadata", output["taskRef"]?.jsonPrimitive?.content)
@@ -99,7 +99,7 @@ class DoTaskExecutionTest {
                     result: ${ @input }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(5)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(5)) as JsonObject
 
         assertEquals(50, output["result"]?.jsonPrimitive?.int)
     }
@@ -122,7 +122,7 @@ class DoTaskExecutionTest {
                     metadata: '${ {timestamp: .timestamp, version: .version} }'
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val user = output["user"]?.jsonObject
         assertNotNull(user)
@@ -147,7 +147,7 @@ class DoTaskExecutionTest {
                     grade: ${ if .score >= 90 then "A" elif .score >= 80 then "B" else "C" end }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("B", output["grade"]?.jsonPrimitive?.content)
     }
@@ -169,13 +169,13 @@ class DoTaskExecutionTest {
                     result: ${ .doubled + 5 }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(25, output["result"]?.jsonPrimitive?.int)
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("\$workflow scope variable not yet implemented in ExecutionOrchestrator")
+    @org.junit.jupiter.api.Disabled("\$workflow scope variable not yet implemented in CompleteOrchestrator")
     fun `do task can access workflow descriptor`() = runTest {
         val yaml = $$"""
             do:
@@ -185,7 +185,7 @@ class DoTaskExecutionTest {
                     hasWorkflowInput: ${ @workflow.input != null }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(42)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(42)) as JsonObject
 
         assertEquals(true, output["hasWorkflowId"]?.jsonPrimitive?.content?.toBoolean())
         assertEquals(true, output["hasWorkflowInput"]?.jsonPrimitive?.content?.toBoolean())
@@ -209,7 +209,7 @@ class DoTaskExecutionTest {
                     final: ${ .added / 2 }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(100, output["base"]?.jsonPrimitive?.int)
         assertEquals(200, output["multiplied"]?.jsonPrimitive?.int)
@@ -229,7 +229,7 @@ class DoTaskExecutionTest {
                     as: '${ {result: .value, label: .name} }'
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(42, output["result"]?.jsonPrimitive?.int)
         assertEquals("test", output["label"]?.jsonPrimitive?.content)

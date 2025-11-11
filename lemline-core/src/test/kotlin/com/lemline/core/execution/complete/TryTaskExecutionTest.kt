@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.getWorkflowNode
@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for TryTask execution using ExecutionOrchestrator.
+ * Integration tests for TryTask execution using CompleteOrchestrator.
  *
  * Tests error handling with try/catch blocks, retry logic, and error filtering.
  */
@@ -40,7 +40,7 @@ class TryTaskExecutionTest {
                             errorHandled: "yes"
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
         assertEquals("yes", output["errorHandled"]?.jsonPrimitive?.content)
@@ -69,7 +69,7 @@ class TryTaskExecutionTest {
         val rootNode = getWorkflowNode(yaml)
 
         assertFailsWith<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+            CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
         }
     }
 
@@ -94,7 +94,7 @@ class TryTaskExecutionTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
     }
@@ -122,7 +122,7 @@ class TryTaskExecutionTest {
         val rootNode = getWorkflowNode(yaml)
 
         assertFailsWith<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+            CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
         }
     }
 
@@ -147,7 +147,7 @@ class TryTaskExecutionTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
     }
@@ -175,7 +175,7 @@ class TryTaskExecutionTest {
         val rootNode = getWorkflowNode(yaml)
 
         assertFailsWith<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+            CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
         }
     }
 
@@ -198,7 +198,7 @@ class TryTaskExecutionTest {
                             errorStatus: ${ $error.status }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(
             "https://serverlessworkflow.io/spec/1.0.0/errors/runtime",
@@ -227,7 +227,7 @@ class TryTaskExecutionTest {
                             issueStatus: ${ $issue.status }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(
             "https://serverlessworkflow.io/spec/1.0.0/errors/runtime",
@@ -255,7 +255,7 @@ class TryTaskExecutionTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
     }
@@ -281,7 +281,7 @@ class TryTaskExecutionTest {
         val rootNode = getWorkflowNode(yaml)
 
         assertFailsWith<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+            CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
         }
     }
 
@@ -306,7 +306,7 @@ class TryTaskExecutionTest {
         val rootNode = getWorkflowNode(yaml)
 
         assertFailsWith<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+            CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
         }
     }
 
@@ -329,7 +329,7 @@ class TryTaskExecutionTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
     }
@@ -353,7 +353,7 @@ class TryTaskExecutionTest {
                     final: ${ .success }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["final"]?.jsonPrimitive?.boolean)
         assertEquals(null, output["caught"])  // Should not have entered catch
@@ -380,7 +380,7 @@ class TryTaskExecutionTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
     }
@@ -414,7 +414,7 @@ class TryTaskExecutionTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
     }
@@ -441,7 +441,7 @@ class TryTaskExecutionTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
     }
@@ -472,7 +472,7 @@ class TryTaskExecutionTest {
                             hasStep: ${ .step // "none" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
         // The catch block should NOT have access to step1/step2 data
@@ -505,7 +505,7 @@ class TryTaskExecutionTest {
                             receivedValue: ${ .initialValue }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(42, output["receivedValue"]?.jsonPrimitive?.int)
     }
@@ -534,7 +534,7 @@ class TryTaskExecutionTest {
                             step3: "done"
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("done", output["step1"]?.jsonPrimitive?.content)
         assertEquals("done", output["step2"]?.jsonPrimitive?.content)
@@ -562,7 +562,7 @@ class TryTaskExecutionTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
     }
@@ -589,7 +589,7 @@ class TryTaskExecutionTest {
                             caught: true
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(true, output["caught"]?.jsonPrimitive?.boolean)
     }
@@ -618,7 +618,7 @@ class TryTaskExecutionTest {
         val rootNode = getWorkflowNode(yaml)
 
         assertFailsWith<WorkflowException> {
-            ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap()))
+            CompleteOrchestrator.run(rootNode, JsonObject(emptyMap()))
         }
     }
 }

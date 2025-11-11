@@ -53,7 +53,7 @@ class RaiseProcessor(
             details = errorDef.detail
         )
 
-        // Throw WorkflowException - this will be caught by ExecutionOrchestrator
+        // Throw WorkflowException - this will be caught by CompleteOrchestrator
         // and handled by the nearest TryTask with matching catch block
         throw WorkflowException(error)
     }

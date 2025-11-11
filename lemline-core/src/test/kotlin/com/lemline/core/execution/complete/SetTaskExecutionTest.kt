@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
@@ -15,7 +15,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for SetTask execution using ExecutionOrchestrator.
+ * Integration tests for SetTask execution using CompleteOrchestrator.
  *
  * Tests the evaluation of set expressions and data manipulation,
  * verifying proper scope access and data transformations.
@@ -34,7 +34,7 @@ class SetTaskExecutionTest {
                     active: ${ true }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("Alice", output["name"]?.jsonPrimitive?.content)
         assertEquals(30, output["age"]?.jsonPrimitive?.int)
@@ -51,7 +51,7 @@ class SetTaskExecutionTest {
                     original: ${ @input }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(21)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(21)) as JsonObject
 
         assertEquals(42, output["doubled"]?.jsonPrimitive?.int)
         assertEquals(21, output["original"]?.jsonPrimitive?.int)
@@ -69,7 +69,7 @@ class SetTaskExecutionTest {
                     result: ${ .value + 5 }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(15, output["result"]?.jsonPrimitive?.int)
     }
@@ -85,7 +85,7 @@ class SetTaskExecutionTest {
                     combined: '${ {name: "Bob", age: 25} + {created: "2025-01-01", version: 1} }'
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val combined = output["combined"]?.jsonObject
         assertEquals("Bob", combined?.get("name")?.jsonPrimitive?.content)
@@ -104,7 +104,7 @@ class SetTaskExecutionTest {
                     doubled: '${ [.numbers[] | . * 2] }'
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val doubled = output["doubled"]?.jsonArray
         assertEquals(5, doubled?.size)
@@ -123,7 +123,7 @@ class SetTaskExecutionTest {
                     grade: ${ if .score >= 90 then "A" elif .score >= 80 then "B" elif .score >= 70 then "C" else "F" end }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("B", output["grade"]?.jsonPrimitive?.content)
     }
@@ -137,7 +137,7 @@ class SetTaskExecutionTest {
                     person: '${ {name: "Alice", contact: {email: "alice@example.com", phone: "555-1234"}, age: 30} }'
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         val person = output["person"]?.jsonObject
         assertEquals("Alice", person?.get("name")?.jsonPrimitive?.content)
@@ -157,7 +157,7 @@ class SetTaskExecutionTest {
                     taskRef: ${ @task.reference }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("myTask", output["taskName"]?.jsonPrimitive?.content)
         assertEquals("/do/0/myTask", output["taskRef"]?.jsonPrimitive?.content)
@@ -174,7 +174,7 @@ class SetTaskExecutionTest {
                     fullName: ${ .firstName + " " + .lastName }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("Alice Smith", output["fullName"]?.jsonPrimitive?.content)
     }
@@ -193,7 +193,7 @@ class SetTaskExecutionTest {
                     as: '${ {result: .doubled} }'
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(5)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(5)) as JsonObject
 
         assertEquals(100, output["result"]?.jsonPrimitive?.int)
     }
@@ -212,7 +212,7 @@ class SetTaskExecutionTest {
                     quotient: ${ .b / .a }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(30, output["sum"]?.jsonPrimitive?.int)
         assertEquals(200, output["product"]?.jsonPrimitive?.int)

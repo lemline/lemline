@@ -15,11 +15,11 @@ import com.lemline.core.execution.context.Scope
 import com.lemline.core.execution.context.TaskContext
 import com.lemline.core.execution.context.merge
 import com.lemline.core.execution.models.StepResult
-import com.lemline.core.states.NodeState
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.schemas.SchemaValidator
+import com.lemline.core.states.NodeState
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
@@ -132,23 +132,20 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         flowDirective: FlowDirective?,
         datasetFromChild: JsonElement,
         parentScope: Scope
-    ): StepResult {
-
-        return when (val directive = flowDirective?.get()) {
-            is FlowDirectiveEnum -> when (directive) {
-                // END: Workflow complete - recursive unwinding
-                FlowDirectiveEnum.END -> continueToEnd(datasetFromChild)
-                // EXIT: exit current node
-                FlowDirectiveEnum.EXIT -> continueToParent(datasetFromChild, getFlowDirective(), parentScope, null)
-                // CONTINUE: continue
-                FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild, parentScope, null)
-            }
-
-            // Goto named sibling or null
-            is String, null -> continueTo(state, datasetFromChild, parentScope, null, directive)
-
-            else -> throw IllegalArgumentException("Unknown flow directive: $directive")
+    ): StepResult = when (val directive = flowDirective?.get()) {
+        is FlowDirectiveEnum -> when (directive) {
+            // END: Workflow complete - recursive unwinding
+            FlowDirectiveEnum.END -> continueToEnd(datasetFromChild)
+            // EXIT: exit current node
+            FlowDirectiveEnum.EXIT -> continueToParent(datasetFromChild, getFlowDirective(), parentScope, null)
+            // CONTINUE: continue
+            FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild, parentScope, null)
         }
+
+        // Goto named sibling or null
+        is String, null -> continueTo(state, datasetFromChild, parentScope, null, directive)
+
+        else -> throw IllegalArgumentException("Unknown flow directive: $directive")
     }
 
     // ========================================
@@ -256,7 +253,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         nextNode = node.parent,
         dataset = dataset,
         stateUpdates = mapOf(node to null), // clear the state of the current node
-        flowDirective = FlowDirective().withFlowDirectiveEnum(FlowDirectiveEnum.END)  // Pass END up the chain
+        flowDirective = FlowDirective().apply { setFlowDirectiveEnum(FlowDirectiveEnum.END) } // Pass END up the chain
     )
 
     // ========================================

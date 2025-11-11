@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution
+package com.lemline.core.execution.complete
 
 import com.lemline.core.getWorkflowNode
 import kotlin.test.assertEquals
@@ -12,7 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Test
 
 /**
- * Integration tests for SwitchTask execution using ExecutionOrchestrator.
+ * Integration tests for SwitchTask execution using CompleteOrchestrator.
  *
  * Tests conditional branching based on when conditions,
  * verifying proper scope access and control flow.
@@ -47,7 +47,7 @@ class SwitchTaskExecutionTest {
                     category: ${ "low" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(75)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(75)) as JsonObject
 
         assertEquals("medium", output["category"]?.jsonPrimitive?.content)
     }
@@ -79,7 +79,7 @@ class SwitchTaskExecutionTest {
                     result: ${ "default" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(50)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(50)) as JsonObject
 
         assertEquals("default", output["result"]?.jsonPrimitive?.content)
     }
@@ -107,7 +107,7 @@ class SwitchTaskExecutionTest {
                     status: ${ "below" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(80)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(80)) as JsonObject
 
         assertEquals("above", output["status"]?.jsonPrimitive?.content)
     }
@@ -144,7 +144,7 @@ class SwitchTaskExecutionTest {
                     access: ${ "basic" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals("full", output["access"]?.jsonPrimitive?.content)
     }
@@ -176,7 +176,7 @@ class SwitchTaskExecutionTest {
                     status: ${ "unknown" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive("active")) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive("active")) as JsonObject
 
         assertEquals("running", output["status"]?.jsonPrimitive?.content)
     }
@@ -215,7 +215,7 @@ class SwitchTaskExecutionTest {
                     grade: ${ "F" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(85)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(85)) as JsonObject
 
         assertEquals("B", output["grade"]?.jsonPrimitive?.content)
     }
@@ -240,7 +240,7 @@ class SwitchTaskExecutionTest {
                     matched: ${ false }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(0)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(0)) as JsonObject
 
         assertEquals(true, output["matched"]?.jsonPrimitive?.content?.toBoolean())
     }
@@ -269,7 +269,7 @@ class SwitchTaskExecutionTest {
                     result: ${ 0 }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonObject(emptyMap())) as JsonObject
 
         assertEquals(42, output["result"]?.jsonPrimitive?.int)
     }
@@ -305,7 +305,7 @@ class SwitchTaskExecutionTest {
                     level: ${ "low" }
         """
         val rootNode = getWorkflowNode(yaml)
-        val output = ExecutionOrchestrator.run(rootNode, JsonPrimitive(90)) as JsonObject
+        val output = CompleteOrchestrator.run(rootNode, JsonPrimitive(90)) as JsonObject
 
         assertEquals("very high", output["level"]?.jsonPrimitive?.content)
     }

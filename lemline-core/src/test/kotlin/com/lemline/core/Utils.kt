@@ -32,13 +32,13 @@ internal fun loadWorkflowFromYaml(resourcePath: String): Workflow {
 }
 
 /**
- * Helper function to get workflow node for testing ExecutionOrchestrator.
+ * Helper function to get workflow node for testing CompleteOrchestrator.
  *
  * @param doYaml The workflow do section in YAML format (will have @ replaced with $)
  * @param namespace Optional namespace
  * @param name Optional workflow name
  * @param version Optional workflow version
- * @return Root Node for use with ExecutionOrchestrator.run()
+ * @return Root Node for use with CompleteOrchestrator.run()
  */
 internal fun getWorkflowNode(
     doYaml: String,
