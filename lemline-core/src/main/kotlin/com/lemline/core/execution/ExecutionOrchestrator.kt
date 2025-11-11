@@ -16,6 +16,7 @@ import com.lemline.core.execution.processors.RaiseProcessor
 import com.lemline.core.execution.processors.RootProcessor
 import com.lemline.core.execution.processors.RunScriptProcessor
 import com.lemline.core.execution.processors.RunShellProcessor
+import com.lemline.core.execution.processors.RunWorkflowProcessor
 import com.lemline.core.execution.processors.SetProcessor
 import com.lemline.core.execution.processors.SwitchProcessor
 import com.lemline.core.execution.processors.TryProcessor
@@ -35,6 +36,7 @@ import io.serverlessworkflow.api.types.RaiseTask
 import io.serverlessworkflow.api.types.RunScript
 import io.serverlessworkflow.api.types.RunShell
 import io.serverlessworkflow.api.types.RunTask
+import io.serverlessworkflow.api.types.RunWorkflow
 import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
@@ -239,6 +241,7 @@ object ExecutionOrchestrator {
                 when (runTask.task.run.get()) {
                     is RunShell -> RunShellProcessor(runTask)
                     is RunScript -> RunScriptProcessor(runTask)
+                    is RunWorkflow -> RunWorkflowProcessor(runTask)
                     else -> throw IllegalArgumentException("Unknown run task type: ${runTask.task.run.get()?.javaClass?.simpleName}")
                 }
             }

@@ -4,6 +4,7 @@
 package com.lemline.core.execution.processors
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.json.LemlineJson.toJsonElement
 import com.lemline.common.logger.logger
 import com.lemline.core.errors.WorkflowError
 import com.lemline.core.errors.WorkflowErrorType
@@ -25,6 +26,7 @@ import io.serverlessworkflow.api.types.FlowDirectiveEnum
 import io.serverlessworkflow.api.types.InputFrom
 import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.api.types.SchemaUnion
+import io.serverlessworkflow.api.types.SubflowInput
 import io.serverlessworkflow.api.types.TaskBase
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -356,6 +358,9 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     private fun eval(data: JsonElement, exportAs: ExportAs?, scope: JsonObject) =
         exportAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
+
+    internal fun eval(data: JsonElement, subFlowInput: SubflowInput?, scope: JsonObject) =
+        subFlowInput?.let { eval(data, it.additionalProperties.toJsonElement(), scope, false) } ?: data
 
     private fun eval(data: JsonElement, expr: String, scope: JsonObject) = try {
         JQExpression.eval(data, JsonPrimitive(expr), scope, false)
