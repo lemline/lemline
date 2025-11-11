@@ -9,7 +9,6 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.utils.toDuration
 import io.serverlessworkflow.api.types.WaitTask
 import kotlin.time.ExperimentalTime
-import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -46,37 +45,41 @@ class WaitProcessor(
     override fun createState(transformedInput: JsonElement, scope: Scope): NoState = NoState()
 
     /**
-     * Execute wait action by delaying for the specified duration.
+     * Execute wait action - returns input unchanged.
      *
-     * The wait duration is evaluated and converted to a Kotlin Duration, then
-     * the coroutine is suspended for that period using kotlinx.coroutines.delay().
+     * The wait duration is NOT executed here - it's returned in the StepResult
+     * so the orchestrator can decide whether to actually delay or not.
      *
      * @param transformedInput Transformed input from parent
      * @param scope Expression evaluation scope
-     * @return The input unchanged after the delay
+     * @return The input unchanged (delay handled by orchestrator)
      */
     override suspend fun execute(
         transformedInput: JsonElement,
         scope: Scope,
     ): JsonElement {
-        logger.debug { "Executing wait task: ${node.name}" }
+        logger.debug { "Wait task prepared: ${node.name} (delay handled by orchestrator)" }
+        // Just return input - no actual delay here
+        return transformedInput
+    }
 
-        // Get the wait duration from the task definition using the toDuration extension
-        val waitDuration = try {
-            node.task.wait.toDuration()
+    /**
+     * Get the delay duration for this wait task.
+     *
+     * This ensures the orchestrator receives the delay duration and can
+     * decide whether to execute it (CompleteOrchestrator) or pause (PausableOrchestrator).
+     *
+     * @return Duration to wait, parsed from the task's wait property
+     * @throws IllegalArgumentException if the wait duration is invalid
+     */
+    override fun getDelay(): kotlin.time.Duration? {
+        return try {
+            val duration = node.task.wait.toDuration()
+            logger.debug { "Wait task delay: $duration for task: ${node.name}" }
+            duration
         } catch (e: Exception) {
             logger.error(e) { "Failed to parse wait duration: ${node.task.wait}" }
             throw IllegalArgumentException("Invalid wait duration: ${node.task.wait}. Expected ISO 8601 duration (e.g., 'PT5S')")
         }
-
-        logger.debug { "Waiting for duration: $waitDuration" }
-
-        // Suspend execution for the specified duration
-        delay(waitDuration)
-
-        logger.debug { "Wait completed for task: ${node.name}" }
-
-        // Return the input unchanged
-        return transformedInput
     }
 }

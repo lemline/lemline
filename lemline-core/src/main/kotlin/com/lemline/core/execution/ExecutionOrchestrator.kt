@@ -134,6 +134,14 @@ object ExecutionOrchestrator {
                     this.newContext?.let { exported ->
                         updateRootContext(current, states, exported)
                     }
+                    // Handle delay if present (from WaitTask or retry)
+                    this.delay?.let { delayDuration ->
+                        if (delayDuration.isPositive()) {
+                            logger.debug { "Delaying execution for: $delayDuration" }
+                            kotlinx.coroutines.delay(delayDuration)
+                            logger.debug { "Delay completed" }
+                        }
+                    }
                 }
                 // ← Checkpoint: state is consistent for persistence
             } catch (e: WorkflowException) {
@@ -146,6 +154,14 @@ object ExecutionOrchestrator {
                     flowDirective = this.flowDirective
                     states.updateWith(this.stateUpdates)
                     // Note: newContext not expected from error handling
+                    // Handle retry delay if present
+                    this.delay?.let { delayDuration ->
+                        if (delayDuration.isPositive()) {
+                            logger.debug { "Delaying before retry for: $delayDuration" }
+                            kotlinx.coroutines.delay(delayDuration)
+                            logger.debug { "Retry delay completed" }
+                        }
+                    }
                 }
             }
         }

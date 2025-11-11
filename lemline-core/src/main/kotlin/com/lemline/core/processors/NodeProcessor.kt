@@ -29,6 +29,7 @@ import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.api.types.SubflowInput
 import io.serverlessworkflow.api.types.TaskBase
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -60,6 +61,13 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         transformedInput: JsonElement,
         scope: Scope,
     ): JsonElement = transformedInput
+
+    /**
+     * Get delay duration for this task (if any).
+     * Override in tasks that require delays (e.g., WaitTask).
+     * @return Duration to delay, or null if no delay needed
+     */
+    open fun getDelay(): Duration? = null
 
     /**
      * Determine:
@@ -214,7 +222,8 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
             transformedOutput,
             mapOf(node to null),
             currentFlowDirective,
-            exportedContext
+            exportedContext,
+            delay = getDelay()
         )
     }
 
