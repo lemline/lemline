@@ -7,19 +7,15 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.errors.ChildWorkflowStartedException
 import com.lemline.core.errors.WorkflowErrorType
-import com.lemline.core.execution.ExecutionOrchestrator
 import com.lemline.core.execution.context.Scope
 import com.lemline.core.states.NoState
 import com.lemline.core.nodes.Node
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunWorkflow
 import kotlin.time.ExperimentalTime
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Node processor for RunTask with Workflow configuration - pure functional model.
@@ -69,17 +65,20 @@ class RunWorkflowProcessor(
     /**
      * Execute sub-workflow action.
      *
-     * Executes a sub-workflow with the configured parameters and returns the result.
+     * This method transforms the input and throws ChildWorkflowStartedException to signal
+     * that a child workflow should be started. The ExecutionOrchestrator catches this
+     * exception and handles it based on its type (CompleteOrchestrator vs PausableOrchestrator).
      *
      * @param transformedInput Transformed input from parent
      * @param scope Expression evaluation scope
-     * @return Sub-workflow execution result as JsonElement
+     * @return This method always throws ChildWorkflowStartedException
+     * @throws ChildWorkflowStartedException Always thrown to signal child workflow initiation
      */
     override suspend fun execute(
         transformedInput: JsonElement,
         scope: Scope,
     ): JsonElement {
-        logger.debug { "Executing run workflow: ${node.name}" }
+        logger.debug { "Preparing sub-workflow: ${node.name}" }
 
         // Extract workflow configuration
         val runConfig = node.task.run.get()
@@ -117,33 +116,21 @@ class RunWorkflowProcessor(
         val awaitCompletion = runConfig.isAwait
         logger.debug { "Await sub-workflow completion: $awaitCompletion" }
 
-        if (!awaitCompletion) {
-            // For non-awaiting execution, launch the workflow asynchronously and return immediately
-            // Note: In production (lemline-runner), this is handled via the outbox pattern with
-            // proper persistence and parent-child relationship tracking
-            logger.debug { "Launching sub-workflow asynchronously (fire-and-forget)" }
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    ExecutionOrchestrator.run(subWorkflowRootNode, childWorkflowInput)
-                    logger.debug { "Async sub-workflow execution completed successfully" }
-                } catch (e: Exception) {
-                    logger.error(e) { "Async sub-workflow execution failed" }
-                }
-            }
-            return transformedInput
-        }
+        // Generate unique ID for child workflow instance
+        val childId = java.util.UUID.randomUUID()
 
-        // For awaiting execution, run the sub-workflow and return its result
-        logger.debug { "Starting sub-workflow execution and awaiting completion" }
+        logger.debug { "Throwing ChildWorkflowStartedException for orchestrator to handle: childId=$childId, await=$awaitCompletion" }
 
-        return try {
-            val subWorkflowResult = ExecutionOrchestrator.run(subWorkflowRootNode, childWorkflowInput)
-            logger.debug { "Sub-workflow execution completed successfully" }
-            subWorkflowResult
-        } catch (e: Exception) {
-            logger.error(e) { "Sub-workflow execution failed" }
-            val errorMsg = "Sub-workflow execution failed: ${e.message}"
-            raiseError(WorkflowErrorType.RUNTIME, errorMsg, e.stackTraceToString())
-        }
+        // ALWAYS throw exception (for both await=true and await=false)
+        // The orchestrator will handle it appropriately based on its type
+        throw ChildWorkflowStartedException(
+            childId = childId,
+            namespace = subWorkflowNamespace.toString(),
+            name = subWorkflowName.toString(),
+            version = subWorkflowVersion.toString(),
+            input = childWorkflowInput,
+            childNode = subWorkflowRootNode,
+            awaitCompletion = awaitCompletion
+        )
     }
 }

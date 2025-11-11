@@ -4,6 +4,7 @@
 package com.lemline.core.execution
 
 import com.lemline.common.logger.logger
+import com.lemline.core.errors.ChildWorkflowStartedException
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.execution.context.Scope
 import com.lemline.core.execution.context.merge
@@ -44,6 +45,9 @@ import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.WaitTask
 import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -161,6 +165,66 @@ object ExecutionOrchestrator {
                             kotlinx.coroutines.delay(delayDuration)
                             logger.debug { "Retry delay completed" }
                         }
+                    }
+                }
+            } catch (e: ChildWorkflowStartedException) {
+                logger.debug { "ChildWorkflowStartedException caught: childId=${e.childId}, await=${e.awaitCompletion}" }
+
+                if (e.awaitCompletion) {
+                    // Execute child inline and wait for completion
+                    logger.debug { "Executing child workflow inline: ${e.name}" }
+                    val childOutput = run(e.childNode, e.input, mutableMapOf())
+                    logger.debug { "Child workflow completed, continuing parent" }
+
+                    // Complete the RunWorkflow task with the child's output
+                    // This applies output transformation, validation, and context export
+                    val processor = getNodeProcessor(current!!)
+                    val scope = getScope(current, states.toMap())
+                    val completionResult = processor.completeTask(
+                        rawOutput = childOutput,
+                        currentFlowDirective = processor.getFlowDirective(),
+                        parentScope = scope,
+                        taskContext = null
+                    )
+
+                    // Apply the completion result
+                    current = completionResult.nextNode
+                    input = completionResult.dataset
+                    flowDirective = completionResult.flowDirective
+                    states.updateWith(completionResult.stateUpdates)
+                    completionResult.newContext?.let { exported ->
+                        updateRootContext(current, states, exported)
+                    }
+                } else {
+                    // Fire-and-forget: launch coroutine and parent continues immediately
+                    logger.debug { "Launching child workflow asynchronously (fire-and-forget): ${e.name}" }
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            run(e.childNode, e.input, mutableMapOf())
+                            logger.debug { "Async child workflow completed successfully" }
+                        } catch (ex: Exception) {
+                            logger.error(ex) { "Async child workflow failed" }
+                        }
+                    }
+
+                    // For fire-and-forget, the task completes immediately with the parent's input
+                    // (the child workflow output is discarded)
+                    val processor = getNodeProcessor(current!!)
+                    val scope = getScope(current, states.toMap())
+                    val completionResult = processor.completeTask(
+                        rawOutput = input,  // Use parent's input, not child's output
+                        currentFlowDirective = processor.getFlowDirective(),
+                        parentScope = scope,
+                        taskContext = null
+                    )
+
+                    // Apply the completion result
+                    current = completionResult.nextNode
+                    input = completionResult.dataset
+                    flowDirective = completionResult.flowDirective
+                    states.updateWith(completionResult.stateUpdates)
+                    completionResult.newContext?.let { exported ->
+                        updateRootContext(current, states, exported)
                     }
                 }
             }

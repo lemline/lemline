@@ -205,6 +205,27 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // Update context with raw output
         context = context?.copy(rawOutput = rawOutput)
 
+        // Complete the task with the raw output
+        return completeTask(rawOutput, currentFlowDirective, parentScope, context)
+    }
+
+    /**
+     * Complete a task with the given raw output.
+     * Applies output transformation, validation, and context export.
+     * This is separated from continueToParent to allow the orchestrator to
+     * complete tasks that were executed externally (e.g., child workflows).
+     */
+    internal fun completeTask(
+        rawOutput: JsonElement,
+        currentFlowDirective: FlowDirective?,
+        parentScope: Scope,
+        taskContext: TaskContext?
+    ): StepResult {
+        var context = taskContext
+
+        // Update context with raw output
+        context = context?.copy(rawOutput = rawOutput)
+
         // Apply output transformation (throws ExpressionException)
         val transformedOutput = transformOutput(rawOutput, mergeScope(parentScope, context))
 
