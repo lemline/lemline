@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.execution.complete
+package com.lemline.core.execution.pausable
 
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.execution.bases.SetTaskExecutionTest
@@ -8,13 +8,13 @@ import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
 /**
- * SetTask execution tests using CompleteOrchestrator.
+ * SetTask execution tests using PausableOrchestrator.
  *
- * Runs the base SetTask test suite with CompleteOrchestrator, which executes
- * workflows to completion without pausing.
+ * Runs the base SetTask test suite with PausableOrchestrator, which executes
+ * workflows with pause/resume capability.
  */
 @ExperimentalTime
-internal class CompleteSetTaskExecutionTest : SetTaskExecutionTest() {
+internal class PausableSetTaskExecutionTest : SetTaskExecutionTest() {
 
     init {
         afterEach {
@@ -30,6 +30,6 @@ internal class CompleteSetTaskExecutionTest : SetTaskExecutionTest() {
         version: String
     ): JsonElement {
         val rootNode = getWorkflowNode(yaml, namespace, name, version)
-        return CompleteOrchestrator.run(rootNode, input)
+        return PausableOrchestratorTestHelper.runUntilComplete(rootNode, input)
     }
 }

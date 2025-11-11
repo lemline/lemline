@@ -35,34 +35,38 @@ sealed class PausableResult {
      * @property output A JSON element encapsulating the task output.
      */
     data class ActivityCompleted(
-        val nextNodePosition: String?,
+        val nextNodePosition: String,
         val states: States,
         val output: JsonElement
     ) : PausableResult()
 
     /**
-     * Represents a result that indicates a wait is required before proceeding.
+     * Represents a result that indicates a wait is needed during processing.
      *
-     * @property nextNodePosition Specifies the position of the next node
-     * @property states Represents a map containing the workflow state.
-     * @property duration The duration for which the wait is required.
+     * @property states The states after the wait.
+     * @property nextNodePosition Specifies the position of the next node after the wait.
+     * @property nextInput Contains the output data or context generated before the wait state is triggered.
+     * @property duration Defines the duration for which the wait is required.
      */
     data class WaitNeeded(
-        val nextNodePosition: String?,
         val states: States,
+        val nextNodePosition: String,
+        val nextInput: JsonElement,
         val duration: Duration
     ) : PausableResult()
 
     /**
-     * Represents a result that indicates a retry operation is needed.
+     * Represents a state where a retry is required for a specific node in the system.
      *
-     * @property nodePosition The position of the node where the retry is required.
-     * @property states Represents a map containing the workflow state.
-     * @property duration The duration period after which a retry might be attempted.
+     * @property states The states at retry.
+     * @property nodePosition The identifier of the node associated with the retry situation.
+     * @property input The input data causing the retry condition.
+     * @property duration The time duration to wait before retrying.
      */
     data class RetryNeeded(
-        val nodePosition: String,
         val states: States,
+        val nodePosition: String,
+        val input: JsonElement,
         val duration: Duration
     ) : PausableResult()
 
@@ -70,13 +74,13 @@ sealed class PausableResult {
     /**
      * Represents a result state where a sub-workflow needs to be initiated.
      *
-     * @property nodePosition The position of the node where the sub-workflow is required.
      * @property states Represents a map containing the workflow state.
+     * @property nodePosition The position of the node where the sub-workflow is required.
      * @property childConfig Configuration details specifying the child workflow to be started.
      */
     data class SubWorkflowNeeded(
-        val nodePosition: String,
         val states: States,
+        val nodePosition: String,
         val childConfig: ChildWorkflowConfig,
     ) : PausableResult()
 }

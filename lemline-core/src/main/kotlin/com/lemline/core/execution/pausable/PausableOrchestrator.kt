@@ -158,7 +158,7 @@ object PausableOrchestrator : BaseOrchestrator() {
                 if (isActivityNode(current)) {
                     logger.debug { "Activity completed, pausing execution" }
                     return PausableResult.ActivityCompleted(
-                        nextNodePosition = result.nextNode?.reference,
+                        nextNodePosition = result.nextNode!!.reference,
                         states = states.toMap(),
                         output = result.dataset
                     )
@@ -168,8 +168,9 @@ object PausableOrchestrator : BaseOrchestrator() {
                 result.delay?.takeIf { it.isPositive() }?.let { delayDuration ->
                     logger.debug { "Wait needed: $delayDuration, pausing execution" }
                     return PausableResult.WaitNeeded(
-                        nextNodePosition = result.nextNode?.reference,
                         states = states.toMap(),
+                        nextNodePosition = result.nextNode!!.reference,
+                        nextInput = result.dataset,
                         duration = delayDuration
                     )
                 }
@@ -188,8 +189,9 @@ object PausableOrchestrator : BaseOrchestrator() {
                 result.delay?.takeIf { it.isPositive() }?.let { delayDuration ->
                     logger.debug { "Retry needed: $delayDuration, pausing execution" }
                     return PausableResult.RetryNeeded(
-                        nodePosition = result.nextNode!!.reference,
                         states = states.toMap(),
+                        nodePosition = result.nextNode!!.reference,
+                        input = result.dataset,
                         duration = delayDuration
                     )
                 }
@@ -202,8 +204,8 @@ object PausableOrchestrator : BaseOrchestrator() {
 
                 // Sub-workflow needs to be started
                 return PausableResult.SubWorkflowNeeded(
-                    nodePosition = current!!.reference,
                     states = states.toMap(),
+                    nodePosition = current!!.reference,
                     childConfig = e.config,
                 )
             }
