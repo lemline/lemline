@@ -3,7 +3,7 @@ package com.lemline.core.execution.complete
 
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.execution.bases.SetTaskExecutionTest
-import com.lemline.core.getWorkflowNode
+import com.lemline.core.execution.executeContinuousWorkflow
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
@@ -28,8 +28,5 @@ internal class CompleteSetTaskExecutionTest : SetTaskExecutionTest() {
         namespace: String,
         name: String,
         version: String
-    ): JsonElement {
-        val rootNode = getWorkflowNode(yaml, namespace, name, version)
-        return CompleteOrchestrator.run(rootNode, input)
-    }
+    ): JsonElement = executeContinuousWorkflow(yaml, input, namespace, name, version)
 }

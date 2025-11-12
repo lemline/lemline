@@ -17,7 +17,7 @@ import kotlinx.serialization.json.buildJsonObject
 @ExperimentalTime
 data class ForState(
     override val startedAt: Instant = Clock.System.now(),
-    val collection: List<JsonElement>? = null,
+    val collection: List<JsonElement>,
     val index: Int = -1
 ) : NodeState() {
 
@@ -30,8 +30,8 @@ data class ForState(
     override val scope: Scope
         get() = buildJsonObject {
             // Add iteration variables with current values
-            if (index >= 0 && index < (collection?.size ?: 0)) {
-                put(forEach, collection!![index])
+            if (index >= 0 && index < collection.size) {
+                put(forEach, collection[index])
                 put(forAt, JsonPrimitive(index))
             }
         }

@@ -18,30 +18,27 @@ data class WorkflowState(
     @SerialName("p") val currentPosition: NodePosition,
 
     /**
+     * The current data
+     */
+    @SerialName("d") val currentData: JsonElement,
+
+    /**
      * A map of the current states (per position)
      */
-    @SerialName("s") val currentStates: NodeStates
+    @SerialName("s") val currentStates: PositionStates
 
 ) : JsonSerializable {
 
-    /**
-     * Sets the output of the current task.
-     */
-    fun setCurrentTaskOutput(output: JsonElement) {
-        currentStates[currentPosition]!!.rawOutput = output
-    }
 
+    /**
+     * Converts this `WorkflowState` object into its JSON string representation.
+     */
     override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
+    /**
+     * Method for deserializing a `WorkflowState` object from a JSON string.
+     */
     companion object {
-        /**
-         * Creates a new object describing a new instance
-         */
-        fun new(input: JsonElement) = WorkflowState(
-            currentPosition = NodePosition.root,
-            currentStates = NodeStates.new(input)
-        )
-
         fun fromJsonString(json: String): WorkflowState = LemlineJson.decodeFromString(json)
     }
 }

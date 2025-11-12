@@ -4,10 +4,10 @@
 package com.lemline.core.processors
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.errors.WorkflowError
-import com.lemline.core.execution.complete.CompleteOrchestrator
+import com.lemline.core.errors.InternalWorkflowException
+import com.lemline.core.execution.StepResult
+import com.lemline.core.execution.WorkflowOrchestrator
 import com.lemline.core.execution.context.Scope
-import com.lemline.core.execution.models.StepResult
 import com.lemline.core.nodes.Node
 import com.lemline.core.states.NodeState
 import com.lemline.core.states.TryState
@@ -87,7 +87,7 @@ class TryProcessor(
      * This method handles both the first attempt (down) and the completion (up) of the `TryState` node.
      *
      * This method is used in "normal" execution.
-     * This is bypassed by [CompleteOrchestrator] when this node caught an exception.
+     * This is bypassed by [WorkflowOrchestrator] when this node caught an exception.
      */
     override fun getNextStepInfo(
         state: TryState,
@@ -98,7 +98,7 @@ class TryProcessor(
         // first attempt
         true -> NextStepInfo(
             updatedCurrentState = state.newAttemptState(),
-            nextNode = getTryNode(),
+            nextNode = getDoTry(),
             flowDirective = null
         )
         // completed, go to parent
@@ -113,7 +113,7 @@ class TryProcessor(
      * Determines whether the current `TryTask` is catching a specified error based on its state,
      * configuration, and evaluation of filters.
      */
-    internal fun isCatching(error: WorkflowError, state: TryState, scope: Scope): Boolean {
+    internal fun isCatching(error: InternalWorkflowException.Error, state: TryState, scope: Scope): Boolean {
         // running catch = true means we are running the catch block
         if (state.runningCatch) return false
 
@@ -160,7 +160,7 @@ class TryProcessor(
      */
     internal fun handleError(
         failingNode: Node<*>,
-        error: WorkflowError,
+        error: InternalWorkflowException.Error,
         state: TryState,
         scope: Scope
     ): StepResult {
@@ -170,15 +170,15 @@ class TryProcessor(
         return when {
             // Retry if attempts remain
             shouldRetry -> StepResult(
-                nextNode = getTryNode(),  // Re-enter try body
-                dataset = state.transformedInput,  // Original input
+                nextNode = getDoTry(),  // Re-enter try body
+                rawInput = state.transformedInput,  // Original input
                 stateUpdates = updatesToCleanState(failingNode, state.newAttemptState(error)),
                 delay = retryPolicy!!.getRetryDelay(state.attemptIndex)
             )
             // Otherwise, enter the catch block
             else -> StepResult(
                 nextNode = getCatchNode(),  // Re-enter try body
-                dataset = state.transformedInput,  // Original input
+                rawInput = state.transformedInput,  // Original input
                 stateUpdates = updatesToCleanState(failingNode, state.toCatchState(error)),
             )
         }
@@ -207,7 +207,7 @@ class TryProcessor(
     /**
      * Retrieves the "try" child node from the current node's children.
      */
-    private fun getTryNode(): Node<*> = node.children?.getOrNull(0)
+    private fun getDoTry(): Node<*> = node.children?.getOrNull(0)
         ?: throw IllegalStateException("No try child found in TryTask ${node.reference}")
 
     /**

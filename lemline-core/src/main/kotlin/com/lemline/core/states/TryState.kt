@@ -3,7 +3,7 @@
 
 package com.lemline.core.states
 
-import com.lemline.core.errors.WorkflowError
+import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.execution.context.Scope
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
@@ -48,21 +48,21 @@ data class TryState(
     val transformedInput: JsonElement,
     val attemptIndex: Int,
     val runningCatch: Boolean,
-    val lastError: WorkflowError? = null,
+    val lastError: InternalWorkflowException.Error? = null,
     @Transient
     val errorAs: String = "error"
 ) : NodeState() {
 
-    fun newAttemptState(error: WorkflowError? = null): TryState = TryState(
+    fun newAttemptState(error: InternalWorkflowException.Error? = null): TryState = TryState(
         startedAt = startedAt,
         transformedInput = transformedInput,
         attemptIndex = attemptIndex + 1,
         runningCatch = false,
-        lastError = lastError,
+        lastError = error,
         errorAs = errorAs
     )
 
-    fun toCatchState(error: WorkflowError): TryState = TryState(
+    fun toCatchState(error: InternalWorkflowException.Error): TryState = TryState(
         startedAt = startedAt,
         transformedInput = transformedInput,
         attemptIndex = attemptIndex,

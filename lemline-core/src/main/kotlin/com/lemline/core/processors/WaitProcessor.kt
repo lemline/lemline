@@ -3,11 +3,13 @@
 
 package com.lemline.core.processors
 
+import com.lemline.core.errors.WaitWorkflowException
 import com.lemline.core.execution.context.Scope
-import com.lemline.core.states.NoState
 import com.lemline.core.nodes.Node
+import com.lemline.core.states.NoState
 import com.lemline.core.utils.toDuration
 import io.serverlessworkflow.api.types.WaitTask
+import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
@@ -58,7 +60,13 @@ class WaitProcessor(
         transformedInput: JsonElement,
         scope: Scope,
     ): JsonElement {
-        logger.debug { "Wait task prepared: ${node.name} (delay handled by orchestrator)" }
+        getDelay()?.let {
+            val config = WaitWorkflowException.Config(duration = it)
+            logger.debug { "Throwing WaitException for orchestrator to handle: $config" }
+            throw WaitWorkflowException(transformedInput, config)
+        }
+
+        logger.debug { "Wait skipped (duration <= 0) for task: ${node.name}" }
         // Just return input - no actual delay here
         return transformedInput
     }
@@ -72,11 +80,11 @@ class WaitProcessor(
      * @return Duration to wait, parsed from the task's wait property
      * @throws IllegalArgumentException if the wait duration is invalid
      */
-    override fun getDelay(): kotlin.time.Duration? {
+    fun getDelay(): Duration? {
         return try {
             val duration = node.task.wait.toDuration()
             logger.debug { "Wait task delay: $duration for task: ${node.name}" }
-            duration
+            if (duration > Duration.ZERO) duration else null
         } catch (e: Exception) {
             logger.error(e) { "Failed to parse wait duration: ${node.task.wait}" }
             throw IllegalArgumentException("Invalid wait duration: ${node.task.wait}. Expected ISO 8601 duration (e.g., 'PT5S')")

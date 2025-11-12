@@ -16,7 +16,7 @@ import kotlinx.serialization.Serializable
  *
  * @see <a href="https://github.com/serverlessworkflow/specification/blob/main/dsl.md#runtime-descriptor">Runtime Descriptor</a>
  */
-@Suppress("MemberVisibilityCanBePrivate", "MayBeConstant")
+@Suppress("MayBeConstant")
 @Serializable
 object RuntimeDescriptor {
     val name = "lemline"

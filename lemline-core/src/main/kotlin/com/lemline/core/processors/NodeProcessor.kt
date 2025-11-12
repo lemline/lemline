@@ -1,20 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.processors
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonElement
 import com.lemline.common.logger.logger
-import com.lemline.core.errors.WorkflowError
+import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
-import com.lemline.core.errors.WorkflowException
+import com.lemline.core.execution.StepResult
 import com.lemline.core.execution.context.Scope
 import com.lemline.core.execution.context.TaskContext
 import com.lemline.core.execution.context.merge
-import com.lemline.core.execution.models.StepResult
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
@@ -29,7 +26,6 @@ import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.api.types.SubflowInput
 import io.serverlessworkflow.api.types.TaskBase
 import kotlin.time.Clock
-import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -38,7 +34,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
 
-@ExperimentalTime
 abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     val node: Node<T>
 ) {
@@ -63,13 +58,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     ): JsonElement = transformedInput
 
     /**
-     * Get delay duration for this task (if any).
-     * Override in tasks that require delays (e.g., WaitTask).
-     * @return Duration to delay, or null if no delay needed
-     */
-    open fun getDelay(): Duration? = null
-
-    /**
      * Determine:
      * - the updated state after the current node
      * - the next node (parent or child)
@@ -89,6 +77,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // Entering a Node for the first time
     // ========================================
 
+    @ExperimentalTime
     suspend fun enterFromParent(rawInput: JsonElement, parentScope: Scope): StepResult {
         // Create execution context
         val now = Clock.System.now()
@@ -99,7 +88,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // if this node is conditional, check if it should be executed, if not return to parent
         if (!checkIf(rawInput, mergeScope(parentScope, context))) return StepResult(
             nextNode = node.parent,
-            dataset = rawInput,
+            rawInput = rawInput,
             stateUpdates = emptyMap(),
             flowDirective = null  // Continue to next sibling
         )
@@ -128,6 +117,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // ========================================
 
     // here we process the current node, knowing that we come from a child node that output dataset and flow directive
+    @ExperimentalTime
     suspend fun enterFromChild(
         state: S,
         flowDirective: FlowDirective?,
@@ -152,7 +142,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // ========================================
     // CONTINUE
     // ========================================
-
+    @ExperimentalTime
     suspend fun continueTo(
         state: S,
         transformedInput: JsonElement,
@@ -188,7 +178,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // ========================================
     // EXIT
     // ========================================
-
+    @ExperimentalTime
     internal suspend fun continueToParent(
         dataset: JsonElement,
         currentFlowDirective: FlowDirective?,
@@ -196,12 +186,12 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         taskContext: TaskContext?
     ): StepResult {
         // create a mutable local task context
-        var context = taskContext
+        val context = taskContext
 
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
         val rawOutput = execute(dataset, mergeScope(parentScope, context))
-        
+
         // Complete the task with the raw output
         return completeTask(rawOutput, currentFlowDirective, parentScope, context)
     }
@@ -212,6 +202,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * This is separated from continueToParent to allow the orchestrator to
      * complete tasks that were executed externally (e.g., child workflows).
      */
+    @ExperimentalTime
     internal fun completeTask(
         rawOutput: JsonElement,
         currentFlowDirective: FlowDirective?,
@@ -241,7 +232,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
             mapOf(node to null),
             currentFlowDirective,
             exportedContext,
-            delay = getDelay()
         )
     }
 
@@ -251,7 +241,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     internal fun continueToEnd(dataset: JsonElement) = StepResult(
         nextNode = node.parent,
-        dataset = dataset,
+        rawInput = dataset,
         stateUpdates = mapOf(node to null), // clear the state of the current node
         flowDirective = FlowDirective().apply { setFlowDirectiveEnum(FlowDirectiveEnum.END) } // Pass END up the chain
     )
@@ -260,6 +250,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // Scope Method
     // ========================================
 
+    @ExperimentalTime
     private fun mergeScope(parentScope: Scope, taskContext: TaskContext?) =
         parentScope.merge(taskContext?.toScope(node))
 
@@ -416,14 +407,14 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         details: String? = null,
         status: Int? = null,
     ): Nothing {
-        val error = WorkflowError(
+        val error = InternalWorkflowException.Error(
             errorType = type,
             title = title ?: "Unknown Error",
             details = details,
             status = status ?: type.defaultStatus,
             position = node.position,
         )
-        throw WorkflowException(error)
+        throw InternalWorkflowException(error)
     }
 
     /**

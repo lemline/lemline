@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.execution.bases
 
-import com.lemline.core.errors.WorkflowException
+import com.lemline.core.errors.InternalWorkflowException
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -64,7 +64,7 @@ abstract class TryTaskExecutionTest : FunSpec() {
                                 caught: true
             """
 
-            assertFailsWith<WorkflowException> {
+            assertFailsWith<InternalWorkflowException> {
                 executeWorkflow(yaml, JsonObject(emptyMap()))
             }
         }
@@ -113,7 +113,7 @@ abstract class TryTaskExecutionTest : FunSpec() {
                                 caught: true
             """
 
-            assertFailsWith<WorkflowException> {
+            assertFailsWith<InternalWorkflowException> {
                 executeWorkflow(yaml, JsonObject(emptyMap()))
             }
         }
@@ -162,7 +162,7 @@ abstract class TryTaskExecutionTest : FunSpec() {
                                 caught: true
             """
 
-            assertFailsWith<WorkflowException> {
+            assertFailsWith<InternalWorkflowException> {
                 executeWorkflow(yaml, JsonObject(emptyMap()))
             }
         }
@@ -260,7 +260,7 @@ abstract class TryTaskExecutionTest : FunSpec() {
                                 caught: true
             """
 
-            assertFailsWith<WorkflowException> {
+            assertFailsWith<InternalWorkflowException> {
                 executeWorkflow(yaml, JsonObject(emptyMap()))
             }
         }
@@ -283,7 +283,7 @@ abstract class TryTaskExecutionTest : FunSpec() {
                                 caught: true
             """
 
-            assertFailsWith<WorkflowException> {
+            assertFailsWith<InternalWorkflowException> {
                 executeWorkflow(yaml, JsonObject(emptyMap()))
             }
         }
@@ -565,7 +565,7 @@ abstract class TryTaskExecutionTest : FunSpec() {
                                 caught: true
             """
 
-            assertFailsWith<WorkflowException> {
+            assertFailsWith<InternalWorkflowException> {
                 executeWorkflow(yaml, JsonObject(emptyMap()))
             }
         }

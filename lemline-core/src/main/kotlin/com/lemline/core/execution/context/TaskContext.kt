@@ -7,7 +7,11 @@ import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 
 /**
  * Immutable execution context for a single step.
@@ -76,13 +80,10 @@ data class TaskContext(
      * @param node The current node being executed
      * @return Scope object as JsonObject for merging with parent scope
      */
-    fun toScope(node: Node<*>): Scope {
-        val scope = com.lemline.core.expressions.scopes.Scope(
-            task = toTaskDescriptor(node),
-            input = transformedInput,  // Use transformed input, not raw input
-            output = rawOutput  // Use raw output for output transformations
-        ).toJsonObject()
-        
-        return scope
-    }
+    fun toScope(node: Node<*>): Scope =
+        buildJsonObject {
+            put("task", Json.encodeToJsonElement(toTaskDescriptor(node)))
+            put("input", transformedInput ?: JsonNull)
+            put("output", rawOutput ?: JsonNull)
+        }
 }

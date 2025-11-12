@@ -6,8 +6,7 @@ package com.lemline.core.processors
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.errors.ChildWorkflowConfig
-import com.lemline.core.errors.ChildWorkflowRequestedException
+import com.lemline.core.errors.ChildWorkflowException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.execution.context.Scope
 import com.lemline.core.nodes.Node
@@ -73,7 +72,7 @@ class RunWorkflowProcessor(
      * @param transformedInput Transformed input from parent
      * @param scope Expression evaluation scope
      * @return This method always throws ChildWorkflowStartedException
-     * @throws ChildWorkflowRequestedException Always thrown to signal child workflow initiation
+     * @throws ChildWorkflowException Always thrown to signal child workflow initiation
      */
     override suspend fun execute(
         transformedInput: JsonElement,
@@ -102,19 +101,19 @@ class RunWorkflowProcessor(
 
         val awaitCompletion = runConfig.isAwait
 
-        val childWorkflowConfig = ChildWorkflowConfig(
+        val childWorkflowConfig = ChildWorkflowException.Config(
             namespace = subWorkflowNamespace.toString(),
             name = subWorkflowName.toString(),
             version = subWorkflowVersion.toString(),
-            input = childWorkflowInput,
+            rawInput = childWorkflowInput,
             awaitCompletion = awaitCompletion
         )
 
         // The orchestrator will resolve the definition and handle execution appropriately
         logger.debug { "Throwing ChildWorkflowStartedException for orchestrator to handle:  $childWorkflowConfig" }
-        throw ChildWorkflowRequestedException(
-            output = if (awaitCompletion) null else transformedInput,
-            childWorkflowConfig = childWorkflowConfig
+        throw ChildWorkflowException(
+            transformedInput = if (awaitCompletion) null else transformedInput,
+            config = childWorkflowConfig
         )
     }
 }
