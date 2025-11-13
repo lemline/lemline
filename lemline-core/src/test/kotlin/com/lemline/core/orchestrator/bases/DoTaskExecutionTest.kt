@@ -72,8 +72,8 @@ abstract class DoTaskExecutionTest : FunSpec() {
             do:
               - taskWithMetadata:
                   set:
-                    taskName: ${ @task.name }
-                    taskRef: ${ @task.reference }
+                    taskName: ${ $task.name }
+                    taskRef: ${ $task.reference }
         """
             val output = executeWorkflow(yaml, JsonPrimitive(42)) as JsonObject
 
@@ -88,7 +88,7 @@ abstract class DoTaskExecutionTest : FunSpec() {
                   input:
                     from: ${ . * 10 }
                   set:
-                    result: ${ @input }
+                    result: ${ $input }
         """
             val output = executeWorkflow(yaml, JsonPrimitive(5)) as JsonObject
 

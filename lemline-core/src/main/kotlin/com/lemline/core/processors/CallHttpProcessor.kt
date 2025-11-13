@@ -5,12 +5,12 @@ package com.lemline.core.processors
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonPrimitive
-import com.lemline.core.calls.HttpCall
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.NoState
+import com.lemline.core.tasks.calls.HttpCall
 import io.ktor.http.*
 import io.serverlessworkflow.api.types.AuthenticationPolicy
 import io.serverlessworkflow.api.types.AuthenticationPolicyReference

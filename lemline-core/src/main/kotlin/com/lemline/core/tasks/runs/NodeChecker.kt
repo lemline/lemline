@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.runs
+package com.lemline.core.tasks.runs
 
 import com.lemline.common.logger.logger
 
@@ -39,8 +39,7 @@ internal object NodeChecker {
         if (foundExec == null || version == null) return null
         // Node.js version format: v22.1.0
         val versionPattern = Regex("v(\\d+)\\.(\\d+)\\.(\\d+)")
-        val match = versionPattern.matchEntire(version)
-        when (match) {
+        when (val match = versionPattern.matchEntire(version)) {
             null -> logger.warn { "Node.js version '$version' does not match expected format. Cannot verify ES2024 compatibility." }
 
             else -> {

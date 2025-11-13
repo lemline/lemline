@@ -162,8 +162,8 @@ abstract class SetTaskExecutionTest : FunSpec() {
                 do:
                   - myTask:
                       set:
-                        taskName: ${ @task.name }
-                        taskRef: ${ @task.reference }
+                        taskName: ${ $task.name }
+                        taskRef: ${ $task.reference }
             """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 

@@ -110,6 +110,62 @@ object WorkflowOrchestrator {
     private val logger = logger()
 
     /**
+     * Initiates the execution of a workflow by retrieving its root node and starting
+     * the processing task based on the provided input and execution mode.
+     *
+     * @param namespace The namespace of the workflow to execute.
+     * @param name The name of the workflow to execute.
+     * @param version The version of the workflow to execute.
+     * @param input The input data in the form of a `JsonElement` to begin the workflow.
+     * @param executionMode Determines the execution mode (e.g., CONTINUOUS, TASK_BY_TASK, etc.).
+     * @return A `WorkflowResult` which represents the state or result of the workflow execution,
+     * including completion, failure, or next task to process.
+     */
+    suspend fun start(
+        namespace: String,
+        name: String,
+        version: String,
+        input: JsonElement,
+        executionMode: ExecutionMode
+    ): WorkflowResult {
+        val rootNode = getRootNodeFromWorkflow(namespace, name, version)
+
+        return resumeFromTask(
+            states = mutableMapOf(),
+            nextNode = rootNode,
+            nextRawInput = input,
+            nextFlowDirective = null,
+            executionMode = executionMode
+        )
+    }
+
+    /**
+     * Retrieves the root node of a workflow based on the provided namespace, name, and version.
+     *
+     * @param namespace The namespace of the workflow.
+     * @param name The name of the workflow.
+     * @param version The version of the workflow.
+     * @return The root node of the workflow as a `Node` object.
+     * @throws IllegalStateException if the workflow cannot be found.
+     */
+    internal fun getRootNodeFromWorkflow(
+        namespace: String,
+        name: String,
+        version: String,
+    ): Node<*> {
+        val namespace = WorkflowNamespace(namespace)
+        val name = WorkflowName(name)
+        val version = WorkflowVersion(version)
+
+        val definition = DefinitionCache.getOrNull(namespace, name, version)
+            ?: throw IllegalStateException(
+                "Workflow not found: namespace=$namespace, name=$name, version=$version"
+            )
+
+        return DefinitionCache.getRootNode(definition)
+    }
+
+    /**
      * Execute workflow from input to completion with external state management.
      *
      * This is the main entry point for workflow execution. It runs the execution

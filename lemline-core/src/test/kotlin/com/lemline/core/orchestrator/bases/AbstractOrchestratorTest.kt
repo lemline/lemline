@@ -91,7 +91,7 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                       do:
                         - addNumber:
                             set:
-                              sum: ${ .sum + @item }
+                              sum: ${ .sum + $item }
                       output:
                         as: ${ . }
             """
@@ -326,7 +326,7 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                       do:
                         - add:
                             set:
-                              sum: ${ .sum + @item }
+                              sum: ${ .sum + $item }
                       output:
                         as: ${ . }
             """

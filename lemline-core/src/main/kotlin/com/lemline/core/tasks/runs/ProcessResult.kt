@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.runs
+package com.lemline.core.tasks.runs
 
 import io.serverlessworkflow.api.types.RunTaskConfiguration
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType.ALL

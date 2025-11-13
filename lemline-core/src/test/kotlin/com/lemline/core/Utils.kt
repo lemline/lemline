@@ -2,18 +2,12 @@
 package com.lemline.core
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.common.values.WorkflowId
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 inline fun <reified T> JsonObject.set(key: String, value: T) =
@@ -52,18 +46,8 @@ internal fun getWorkflowNode(
               namespace: $namespace
               name: $name
               version: $version
-        """.trimIndent()
-    // Replace @ with $ only for workflow scope variables
-    val processedYaml = doYaml.trimIndent()
-        .replace("@item", $$"$item")
-        .replace("@index", $$"$index")
-        .replace("@task", $$"$task")
-        .replace("@workflow", $$"$workflow")
-        .replace("@input", $$"$input")
-        .replace("@output", $$"$output")
-        .replace("@context", $$"$context")
-        .replace("@runtime", $$"$runtime")
-    val workflowYaml = document + "\n" + processedYaml
+        """
+    val workflowYaml = document.trimIndent() + "\n" + doYaml.trimIndent()
     val workflow = DefinitionCache.parseAndPut(workflowYaml)
 
     return DefinitionCache.getRootNode(workflow)

@@ -25,10 +25,10 @@ abstract class SwitchTaskExecutionTest : FunSpec() {
               - route:
                   switch:
                     - highCase:
-                        when: ${ @input > 100 }
+                        when: ${ $input > 100 }
                         then: highTask
                     - mediumCase:
-                        when: ${ @input > 50 }
+                        when: ${ $input > 50 }
                         then: mediumTask
                     - lowCase:
                         then: lowTask
@@ -55,10 +55,10 @@ abstract class SwitchTaskExecutionTest : FunSpec() {
               - route:
                   switch:
                     - case1:
-                        when: ${ @input > 100 }
+                        when: ${ $input > 100 }
                         then: task1
                     - case2:
-                        when: ${ @input < 10 }
+                        when: ${ $input < 10 }
                         then: task2
                     - defaultCase:
                         then: defaultTask
@@ -88,7 +88,7 @@ abstract class SwitchTaskExecutionTest : FunSpec() {
               - route:
                   switch:
                     - aboveThreshold:
-                        when: ${ @input > .threshold }
+                        when: ${ $input > .threshold }
                         then: highTask
                     - belowThreshold:
                         then: lowTask
@@ -146,10 +146,10 @@ abstract class SwitchTaskExecutionTest : FunSpec() {
               - route:
                   switch:
                     - active:
-                        when: ${ @input == "active" }
+                        when: ${ $input == "active" }
                         then: activeTask
                     - inactive:
-                        when: ${ @input == "inactive" }
+                        when: ${ $input == "inactive" }
                         then: inactiveTask
                     - default:
                         then: unknownTask
@@ -176,13 +176,13 @@ abstract class SwitchTaskExecutionTest : FunSpec() {
               - gradeScore:
                   switch:
                     - gradeA:
-                        when: ${ @input >= 90 }
+                        when: ${ $input >= 90 }
                         then: setA
                     - gradeB:
-                        when: ${ @input >= 80 and @input < 90 }
+                        when: ${ $input >= 80 and $input < 90 }
                         then: setB
                     - gradeC:
-                        when: ${ @input >= 70 and @input < 80 }
+                        when: ${ $input >= 70 and $input < 80 }
                         then: setC
                     - gradeF:
                         then: setF
@@ -213,7 +213,7 @@ abstract class SwitchTaskExecutionTest : FunSpec() {
               - router:
                   switch:
                     - checkName:
-                        when: ${ @task.name == "router" }
+                        when: ${ $task.name == "router" }
                         then: correctTask
                     - default:
                         then: wrongTask
@@ -263,14 +263,14 @@ abstract class SwitchTaskExecutionTest : FunSpec() {
               - outerSwitch:
                   switch:
                     - case1:
-                        when: ${ @input > 50 }
+                        when: ${ $input > 50 }
                         then: innerSwitch
                     - default:
                         then: lowTask
               - innerSwitch:
                   switch:
                     - veryHigh:
-                        when: ${ @input > 80 }
+                        when: ${ $input > 80 }
                         then: veryHighTask
                     - high:
                         then: highTask

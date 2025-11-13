@@ -157,9 +157,9 @@ abstract class IfConditionExecutionTest : FunSpec() {
                     in: ${ [1, 2, 3, 4, 5, 6, 7, 8] }
                   do:
                     - checkEven:
-                        if: ${ @item % 2 == 0 }
+                        if: ${ $item % 2 == 0 }
                         set:
-                          evens: ${ .evens + [@item] }
+                          evens: ${ .evens + [$item] }
                   output:
                     as: ${ . }
         """
@@ -177,7 +177,7 @@ abstract class IfConditionExecutionTest : FunSpec() {
             val yaml = $$"""
             do:
               - myTask:
-                  if: ${ @task.name == "myTask" }
+                  if: ${ $task.name == "myTask" }
                   set:
                     matched: ${ true }
         """

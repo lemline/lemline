@@ -202,7 +202,7 @@ abstract class WaitExecutionTest : FunSpec() {
                             wait: PT0.01S
                         - processItem:
                             set:
-                              processed: ${ @item }
+                              processed: ${ $item }
                       output:
                         as: ${ . }
             """

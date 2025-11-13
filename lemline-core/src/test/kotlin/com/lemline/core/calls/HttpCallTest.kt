@@ -4,6 +4,7 @@ package com.lemline.core.calls
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.RaiseError
 import com.lemline.core.errors.WorkflowErrorType
+import com.lemline.core.tasks.calls.HttpCall
 import io.ktor.client.*
 import io.ktor.client.engine.mock.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -158,7 +159,7 @@ class HttpCallTest {
     @Test
     fun `test with query parameters`() = runTest {
         val jsonResponse = buildJsonObject { put("result", "success") }
-        val httpCall = createHttpCallWithMockEngine() { request ->
+        val httpCall = createHttpCallWithMockEngine { request ->
             assertEquals(HttpMethod.Get, request.method)
             assertEquals("test", request.url.parameters["q"])
             assertEquals("1", request.url.parameters["page"])
@@ -184,7 +185,7 @@ class HttpCallTest {
     fun `test with raw output format`() = runTest {
         val responseText = """{"result":"success"}"""
         val base64Response = Base64.getEncoder().encodeToString(responseText.toByteArray())
-        val httpCall = createHttpCallWithMockEngine() { _ ->
+        val httpCall = createHttpCallWithMockEngine { _ ->
             respond(
                 content = responseText,
                 status = HttpStatusCode.OK,
@@ -206,7 +207,7 @@ class HttpCallTest {
     @Test
     fun `test with response output format`() = runTest {
         val jsonResponse = buildJsonObject { put("result", "success") }
-        val httpCall = createHttpCallWithMockEngine() { request ->
+        val httpCall = createHttpCallWithMockEngine { request ->
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.OK,
@@ -246,7 +247,7 @@ class HttpCallTest {
 
     @Test
     fun `test with HTTP error response`() = runTest {
-        val httpCall = createHttpCallWithMockEngine() { request ->
+        val httpCall = createHttpCallWithMockEngine { request ->
             respond(
                 content = "Not Found",
                 status = HttpStatusCode.NotFound,
@@ -269,7 +270,7 @@ class HttpCallTest {
 
     @Test
     fun `test with redirect parameter false and redirection status code`() = runTest {
-        val httpCall = createHttpCallWithMockEngine() { _ ->
+        val httpCall = createHttpCallWithMockEngine { _ ->
             respond(
                 content = "",
                 status = HttpStatusCode.Found,
@@ -294,7 +295,7 @@ class HttpCallTest {
     fun `test actual redirect following with redirect parameter true`() = runTest {
         val finalJsonResponse = buildJsonObject { put("result", "redirected successfully") }
         var requestCount = 0
-        val httpCall = createHttpCallWithMockEngine() { request ->
+        val httpCall = createHttpCallWithMockEngine { request ->
             requestCount++
             if (requestCount == 1) {
                 respond(
@@ -333,7 +334,7 @@ class HttpCallTest {
         val encodedCredentials = Base64.getEncoder().encodeToString(credentials.toByteArray(Charsets.UTF_8))
         val expectedAuthHeader = "Basic $encodedCredentials"
         var receivedAuthHeader: String? = null
-        val httpCall = createHttpCallWithMockEngine() { request ->
+        val httpCall = createHttpCallWithMockEngine { request ->
             receivedAuthHeader = request.headers[HttpHeaders.Authorization]
             respond(
                 content = buildJsonObject { put("result", "success") }.toString(),
@@ -357,7 +358,7 @@ class HttpCallTest {
     @Test
     fun `test with basic authentication policy`() = runTest {
         val jsonResponse = buildJsonObject { put("result", "success") }
-        val httpCall = createHttpCallWithMockEngine() { request ->
+        val httpCall = createHttpCallWithMockEngine { request ->
             respond(
                 content = jsonResponse.toString(),
                 status = HttpStatusCode.OK,
@@ -392,7 +393,7 @@ class HttpCallTest {
         val encodedCredentials = Base64.getEncoder().encodeToString(credentials.toByteArray(Charsets.UTF_8))
         val expectedAuthHeader = "Basic $encodedCredentials"
         var receivedAuthHeader: String? = null
-        val httpCall = createHttpCallWithMockEngine() { request ->
+        val httpCall = createHttpCallWithMockEngine { request ->
             receivedAuthHeader = request.headers[HttpHeaders.Authorization]
             respond(
                 content = buildJsonObject { put("result", "success") }.toString(),
@@ -424,7 +425,7 @@ class HttpCallTest {
                 bearerAuthenticationProperties = bearerAuthProperties
             }
         }
-        val httpCall = createHttpCallWithMockEngine() { request ->
+        val httpCall = createHttpCallWithMockEngine { request ->
             val authHeader = request.headers[HttpHeaders.Authorization]
             assertEquals("Bearer my-jwt-token", authHeader)
             respond(
@@ -456,7 +457,7 @@ class HttpCallTest {
                 bearerAuthenticationProperties = bearerAuthProperties
             }
         }
-        val httpCall = createHttpCallWithMockEngine() { request ->
+        val httpCall = createHttpCallWithMockEngine { request ->
             val authHeader = request.headers[HttpHeaders.Authorization]
             assertEquals("Bearer oauth2-access-token", authHeader)
             respond(

@@ -20,7 +20,7 @@ class ForIntegrationTest {
 //                 do:
 //                   - accumulate:
 //                       set:
-//                         counter: ${ .counter + @item }
+//                         counter: ${ .counter + $item }
 //                 output:
 //                   as:  .counter
 //        """
@@ -33,8 +33,8 @@ class ForIntegrationTest {
 //        assertEquals(JsonPrimitive(6), output)
 //    }
 //
-//    // NOTE: Test for "while" condition with @index removed because the new implementation
-//    // doesn't yet support @index in the while condition scope. This is a known limitation
+//    // NOTE: Test for "while" condition with $index removed because the new implementation
+//    // doesn't yet support $index in the while condition scope. This is a known limitation
 //    // that needs to be addressed in the ForProcessor implementation.
 //    // See: ForProcessor.evalWhile() - scope doesn't include iteration variables
 //
@@ -52,7 +52,7 @@ class ForIntegrationTest {
 //                 do:
 //                   - accumulate:
 //                       set:
-//                         counter: ${ .counter + @index }
+//                         counter: ${ .counter + $index }
 //                 output:
 //                   as: ${ .counter }
 //        """

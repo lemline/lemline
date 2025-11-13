@@ -14,7 +14,7 @@ import kotlinx.serialization.json.jsonPrimitive
 /**
  * Base tests for ForTask execution.
  *
- * Tests iteration with loop variables (@item, @index),
+ * Tests iteration with loop variables ($item, $index),
  * verifying proper data accumulation and scope management.
  */
 @ExperimentalTime
@@ -33,7 +33,7 @@ abstract class ForTaskExecutionTest : FunSpec() {
                   do:
                     - add:
                         set:
-                          sum: ${ .sum + @item }
+                          sum: ${ .sum + $item }
                   output:
                     as: ${ . }
         """
@@ -54,7 +54,7 @@ abstract class ForTaskExecutionTest : FunSpec() {
                   do:
                     - collect:
                         set:
-                          items: '${ .items + [{value: @item, index: @index}] }'
+                          items: '${ .items + [{value: $item, index: $index}] }'
                   output:
                     as: ${ . }
         """
@@ -79,9 +79,9 @@ abstract class ForTaskExecutionTest : FunSpec() {
                     in: ${ [1, 2, 3, 4, 5, 6] }
                   do:
                     - addEven:
-                        if: ${ @item % 2 == 0 }
+                        if: ${ $item % 2 == 0 }
                         set:
-                          evens: ${ .evens + [@item] }
+                          evens: ${ .evens + [$item] }
                   output:
                     as: ${ . }
         """
@@ -108,7 +108,7 @@ abstract class ForTaskExecutionTest : FunSpec() {
                   do:
                     - add:
                         set:
-                          total: ${ .total + @item }
+                          total: ${ .total + $item }
                   output:
                     as: ${ . }
         """
@@ -161,7 +161,7 @@ abstract class ForTaskExecutionTest : FunSpec() {
                                 milliseconds: 10
                           - combine:
                               set:
-                                pairs: '${ .pairs + [{num: @item, letter: @item}] }'
+                                pairs: '${ .pairs + [{num: $item, letter: $item}] }'
                         output:
                           as: ${ . }
                   output:
@@ -185,7 +185,7 @@ abstract class ForTaskExecutionTest : FunSpec() {
                   do:
                     - extract:
                         set:
-                          names: ${ .names + [@item.name] }
+                          names: ${ .names + [$item.name] }
                   output:
                     as: ${ . }
         """
@@ -209,7 +209,7 @@ abstract class ForTaskExecutionTest : FunSpec() {
                   do:
                     - capture:
                         set:
-                          taskNames: ${ .taskNames + [@task.name] }
+                          taskNames: ${ .taskNames + [$task.name] }
                   output:
                     as: ${ . }
         """

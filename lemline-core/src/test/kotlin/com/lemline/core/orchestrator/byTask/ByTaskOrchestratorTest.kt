@@ -367,7 +367,7 @@ class ByTaskOrchestratorTest : AbstractOrchestratorTest() {
 //                      do:
 //                        - transform:
 //                            set:
-//                              sum: ${ .sum + @item }
+//                              sum: ${ .sum + $item }
 //                      output:
 //                        as: ${ . }
 //                  - callActivity:

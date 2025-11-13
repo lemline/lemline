@@ -6,8 +6,8 @@ package com.lemline.core.processors
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.runs.Script
 import com.lemline.core.states.NoState
+import com.lemline.core.tasks.runs.Script
 import io.serverlessworkflow.api.types.ExternalScript
 import io.serverlessworkflow.api.types.InlineScript
 import io.serverlessworkflow.api.types.RunScript

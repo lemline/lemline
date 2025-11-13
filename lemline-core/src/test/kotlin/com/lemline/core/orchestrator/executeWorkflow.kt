@@ -2,11 +2,6 @@
 
 package com.lemline.core.orchestrator
 
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.errors.ChildWorkflowException
 import com.lemline.core.getWorkflowNode
 import com.lemline.core.nodes.Node
 import kotlin.time.ExperimentalTime
@@ -131,7 +126,11 @@ private suspend fun runUntilComplete(
 
             is WorkflowResult.ExecuteRunWorkflow -> {
                 // Execute child workflow recursively
-                val childNode = resolveChildWorkflow(result.childConfig)
+                val childNode = WorkflowOrchestrator.getRootNodeFromWorkflow(
+                    result.childConfig.namespace,
+                    result.childConfig.name,
+                    result.childConfig.version
+                )
                 val childOutput = if (result.childConfig.awaitCompletion) {
                     // await=true: Execute child and wait for output
                     runUntilComplete(
@@ -154,20 +153,4 @@ private suspend fun runUntilComplete(
             }
         }
     }
-}
-
-/**
- * Resolve a child workflow definition from the cache.
- */
-private fun resolveChildWorkflow(config: ChildWorkflowException.Config): Node<*> {
-    val namespace = WorkflowNamespace(config.namespace)
-    val name = WorkflowName(config.name)
-    val version = WorkflowVersion(config.version)
-
-    val definition = DefinitionCache.getOrNull(namespace, name, version)
-        ?: throw IllegalStateException(
-            "Child workflow not found: namespace=$namespace, name=$name, version=$version"
-        )
-
-    return DefinitionCache.getRootNode(definition)
 }
