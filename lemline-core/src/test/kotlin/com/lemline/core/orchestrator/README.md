@@ -1,81 +1,139 @@
-# Execution Tests
+# Orchestrator Tests
 
-This directory contains tests for workflow execution orchestrators, organized into two distinct test suites:
+This directory contains tests for the unified **WorkflowOrchestrator** with different execution modes.
 
 ## 📁 Directory Structure
 
 ```
-execution/
-├── complete/          # Tests for CompleteOrchestrator
-│   ├── README.md
-│   ├── CompleteOrchestratorTest.kt
+orchestrator/
+├── bases/             # Shared base classes for all test suites
+│   ├── AbstractExecutionTest.kt
+│   ├── AbstractOrchestratorTest.kt
 │   ├── CallHttpExecutionTest.kt
-│   ├── RunShellExecutionTest.kt
-│   ├── RunScriptExecutionTest.kt
-│   ├── RunWorkflowExecutionTest.kt
-│   ├── WaitExecutionTest.kt
 │   ├── DoTaskExecutionTest.kt
-│   ├── SetTaskExecutionTest.kt
+│   ├── ExportContextExecutionTest.kt
 │   ├── ForTaskExecutionTest.kt
-│   ├── SwitchTaskExecutionTest.kt
 │   ├── IfConditionExecutionTest.kt
+│   ├── RunScriptExecutionTest.kt
+│   ├── RunShellExecutionTest.kt
+│   ├── RunWorkflowExecutionTest.kt
+│   ├── SetTaskExecutionTest.kt
+│   ├── SwitchTaskExecutionTest.kt
 │   ├── TryTaskExecutionTest.kt
-│   └── ExportContextExecutionTest.kt
+│   └── WaitExecutionTest.kt
 │
-└── pausable/          # Tests for PausableOrchestrator
-    ├── README.md
-    └── PausableOrchestratorTest.kt
+├── continuous/        # Tests for ExecutionMode.CONTINUOUS
+│   ├── ContinuousOrchestratorTest.kt
+│   ├── ContinuousCallHttpExecutionTest.kt
+│   ├── ContinuousRunShellExecutionTest.kt
+│   ├── ContinuousRunScriptExecutionTest.kt
+│   ├── ContinuousRunWorkflowExecutionTest.kt
+│   ├── ContinuousWaitExecutionTest.kt
+│   ├── ContinuousDoTaskExecutionTest.kt
+│   ├── ContinuousSetTaskExecutionTest.kt
+│   ├── ContinuousForTaskExecutionTest.kt
+│   ├── ContinuousSwitchTaskExecutionTest.kt
+│   ├── ContinuousIfConditionExecutionTest.kt
+│   ├── ContinuousTryTaskExecutionTest.kt
+│   └── ContinuousExportContextExecutionTest.kt
+│
+├── byActivity/        # Tests for ExecutionMode.BY_ACTIVITY
+│   ├── ByActivityOrchestratorTest.kt
+│   ├── ByActivityCallHttpExecutionTest.kt
+│   ├── ByActivityRunShellExecutionTest.kt
+│   ├── ByActivityRunScriptExecutionTest.kt
+│   ├── ByActivityRunWorkflowExecutionTest.kt
+│   ├── ByActivityWaitExecutionTest.kt
+│   ├── ByActivityDoTaskExecutionTest.kt
+│   ├── ByActivitySetTaskExecutionTest.kt
+│   ├── ByActivityForTaskExecutionTest.kt
+│   ├── ByActivitySwitchTaskExecutionTest.kt
+│   ├── ByActivityIfConditionExecutionTest.kt
+│   ├── ByActivityTryTaskExecutionTest.kt
+│   └── ByActivityExportContextExecutionTest.kt
+│
+└── byTask/            # Tests for ExecutionMode.BY_TASK
+    ├── ByTaskOrchestratorTest.kt
+    ├── ByTaskCallHttpExecutionTest.kt
+    ├── ByTaskRunShellExecutionTest.kt
+    ├── ByTaskRunScriptExecutionTest.kt
+    ├── ByTaskRunWorkflowExecutionTest.kt
+    ├── ByTaskWaitExecutionTest.kt
+    ├── ByTaskDoTaskExecutionTest.kt
+    ├── ByTaskSetTaskExecutionTest.kt
+    ├── ByTaskForTaskExecutionTest.kt
+    ├── ByTaskSwitchTaskExecutionTest.kt
+    ├── ByTaskIfConditionExecutionTest.kt
+    ├── ByTaskTryTaskExecutionTest.kt
+    └── ByTaskExportContextExecutionTest.kt
 ```
 
 ## 🎯 Purpose
 
-### Complete Orchestrator Tests (`complete/`)
+All tests use the unified **WorkflowOrchestrator** with different **ExecutionMode** settings:
 
-Tests for **CompleteOrchestrator** which executes workflows from start to finish:
+### Continuous Mode Tests (`continuous/`)
+
+Tests for **ExecutionMode.CONTINUOUS** which executes workflows from start to finish:
 
 - Activities execute fully (real HTTP calls, shell commands, scripts)
 - Delays actually wait using coroutines
 - Sub-workflows execute inline recursively
-- Returns final workflow output
+- Returns final workflow output in `WorkflowResult.Completed`
 
-### Pausable Orchestrator Tests (`pausable/`)
+### By Activity Mode Tests (`byActivity/`)
 
-Tests for **PausableOrchestrator** which pauses at specific boundaries:
+Tests for **ExecutionMode.BY_ACTIVITY** which pauses at activity boundaries:
 
 - Pauses after activities complete
 - Pauses when delays are needed (instead of waiting)
-- Pauses before sub-workflows
-- Returns `PausableResult` indicating pause reason
+- Pauses before sub-workflows start
+- Returns `WorkflowResult.Paused` with pause reason
+
+### By Task Mode Tests (`byTask/`)
+
+Tests for **ExecutionMode.BY_TASK** which pauses at every task step:
+
+- Pauses after each individual task completes
+- Provides finest-grained control over workflow execution
+- Useful for debugging and step-by-step execution
+- Returns `WorkflowResult.Paused` with current position
 
 ## 🚀 Running Tests
 
 ```bash
-# Run all execution tests
+# Run all orchestrator tests
 ./gradlew :lemline-core:test --tests "com.lemline.core.orchestrator.*"
 
-# Run only complete orchestrator tests
+# Run only continuous mode tests
 ./gradlew :lemline-core:test --tests "com.lemline.core.orchestrator.continuous.*"
 
-# Run only pausable orchestrator tests
+# Run only by-activity mode tests
 ./gradlew :lemline-core:test --tests "com.lemline.core.orchestrator.byActivity.*"
 
+# Run only by-task mode tests
+./gradlew :lemline-core:test --tests "com.lemline.core.orchestrator.byTask.*"
+
 # Run specific test file
-./gradlew :lemline-core:test --tests "com.lemline.core.orchestrator.continuous.CallHttpExecutionTest"
+./gradlew :lemline-core:test --tests "com.lemline.core.orchestrator.continuous.ContinuousCallHttpExecutionTest"
 ```
 
 ## 📊 Key Differences
 
-| Aspect          | CompleteOrchestrator | PausableOrchestrator  |
-|-----------------|----------------------|-----------------------|
-| **Location**    | `complete/`          | `pausable/`           |
-| **Return Type** | `JsonElement`        | `PausableResult`      |
-| **Execution**   | Runs to completion   | Pauses at boundaries  |
-| **Use Case**    | Synchronous testing  | Distributed execution |
-| **Test Count**  | ~100+ tests          | ~13 tests             |
+| Aspect              | CONTINUOUS           | BY_ACTIVITY           | BY_TASK               |
+|---------------------|----------------------|-----------------------|-----------------------|
+| **Location**        | `continuous/`        | `byActivity/`         | `byTask/`             |
+| **Execution Mode**  | `CONTINUOUS`         | `BY_ACTIVITY`         | `BY_TASK`             |
+| **Return Type**     | `WorkflowResult.Completed` | `WorkflowResult.Paused` | `WorkflowResult.Paused` |
+| **Pauses**          | Never                | At activity boundaries | After every task      |
+| **Granularity**     | Full workflow        | Activity-level        | Task-level            |
+| **Use Case**        | Complete execution   | Distributed activities| Step-by-step debugging|
+| **Test Count**      | ~13 test files       | ~13 test files        | ~13 test files        |
 
 ## 📝 Notes
 
-- Tests are isolated by folder to avoid confusion
-- Each folder has its own README with specific details
-- All tests use proper package declarations matching their location
+- All tests use the unified **WorkflowOrchestrator** with different `ExecutionMode` configurations
+- The `bases/` folder contains abstract base classes shared across all test suites
+- Tests are isolated by execution mode to clearly demonstrate different behaviors
+- Each test suite validates the same workflow features but with different pause semantics
 - Tests can be run independently or together
