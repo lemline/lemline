@@ -3,11 +3,11 @@
 
 package com.lemline.core.processors
 
-import com.lemline.core.runs.Shell
 import com.lemline.core.errors.WorkflowErrorType
-import com.lemline.core.execution.context.Scope
-import com.lemline.core.states.NoState
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.runs.Shell
+import com.lemline.core.states.NoState
 import io.serverlessworkflow.api.types.RunShell
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
@@ -157,8 +157,7 @@ class RunShellProcessor(
         name: String,
         scope: Scope
     ): String {
-        val result = eval(data, JsonPrimitive(expression), scope, false)
-        return when (result) {
+        return when (val result = eval(data, JsonPrimitive(expression), scope, false)) {
             is JsonPrimitive -> result.content
             else -> raiseError(
                 WorkflowErrorType.EXPRESSION,

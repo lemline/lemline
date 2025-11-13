@@ -8,8 +8,8 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.ChildWorkflowException
 import com.lemline.core.errors.WorkflowErrorType
-import com.lemline.core.execution.context.Scope
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.NoState
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunWorkflow

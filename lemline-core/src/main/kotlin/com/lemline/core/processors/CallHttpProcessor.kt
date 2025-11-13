@@ -6,12 +6,11 @@ package com.lemline.core.processors
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonPrimitive
 import com.lemline.core.calls.HttpCall
-import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
-import com.lemline.core.execution.context.Scope
-import com.lemline.core.states.NoState
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.states.NoState
 import io.ktor.http.*
 import io.serverlessworkflow.api.types.AuthenticationPolicy
 import io.serverlessworkflow.api.types.AuthenticationPolicyReference
@@ -205,12 +204,12 @@ class CallHttpProcessor(
     ): String = when (ExpressionUtils.isExpr(expression)) {
         true -> {
             val trimmed = ExpressionUtils.trimExpr(expression)
-            val result = eval(data, JsonPrimitive(trimmed), scope, false)
-            when (result) {
+            when (val result = eval(data, JsonPrimitive(trimmed), scope, false)) {
                 is JsonPrimitive -> result.content
                 else -> raiseError(RUNTIME, "URL expression must evaluate to a string, but got: $result")
             }
         }
+
         false -> expression
     }
 

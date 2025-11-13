@@ -4,7 +4,7 @@
 package com.lemline.core.states
 
 import com.lemline.core.errors.InternalWorkflowException
-import com.lemline.core.execution.context.Scope
+import com.lemline.core.orchestrator.context.Scope
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient

@@ -3,8 +3,8 @@
 
 package com.lemline.core.processors
 
-import com.lemline.core.execution.context.Scope
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.ForState
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Clock

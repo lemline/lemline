@@ -5,10 +5,10 @@ package com.lemline.core.processors
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.InternalWorkflowException
-import com.lemline.core.execution.StepResult
-import com.lemline.core.execution.WorkflowOrchestrator
-import com.lemline.core.execution.context.Scope
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.StepResult
+import com.lemline.core.orchestrator.WorkflowOrchestrator
+import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.NodeState
 import com.lemline.core.states.TryState
 import com.lemline.core.utils.toDuration

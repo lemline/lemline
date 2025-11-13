@@ -5,8 +5,8 @@ package com.lemline.core.processors
 
 import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
-import com.lemline.core.execution.context.Scope
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.NoState
 import io.serverlessworkflow.api.types.RaiseTask
 import io.serverlessworkflow.api.types.RaiseTaskError

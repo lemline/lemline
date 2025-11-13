@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
-import com.lemline.core.execution.context.Scope
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.context.Scope
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime

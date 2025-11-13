@@ -3,11 +3,11 @@
 
 package com.lemline.core.processors
 
-import com.lemline.core.runs.Script
 import com.lemline.core.errors.WorkflowErrorType
-import com.lemline.core.execution.context.Scope
-import com.lemline.core.states.NoState
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.runs.Script
+import com.lemline.core.states.NoState
 import io.serverlessworkflow.api.types.ExternalScript
 import io.serverlessworkflow.api.types.InlineScript
 import io.serverlessworkflow.api.types.RunScript
@@ -108,6 +108,7 @@ class RunScriptProcessor(
                 // Evaluate code expression
                 evaluateString(transformedInput, scriptConfig.code, "script.code", scope)
             }
+
             is ExternalScript -> {
                 // For external scripts, resolve the URI from the source endpoint
                 val endpoint = scriptConfig.source.endpoint
@@ -133,6 +134,7 @@ class RunScriptProcessor(
                     )
                 }
             }
+
             else -> {
                 raiseError(
                     WorkflowErrorType.RUNTIME,
@@ -217,8 +219,7 @@ class RunScriptProcessor(
         name: String,
         scope: Scope
     ): String {
-        val result = eval(data, JsonPrimitive(expression), scope, false)
-        return when (result) {
+        return when (val result = eval(data, JsonPrimitive(expression), scope, false)) {
             is JsonPrimitive -> result.content
             else -> raiseError(
                 WorkflowErrorType.EXPRESSION,
@@ -241,6 +242,7 @@ class RunScriptProcessor(
                 val uri = endpoint.get() as String
                 evaluateString(data, uri, "endpoint", scope)
             }
+
             else -> raiseError(
                 WorkflowErrorType.RUNTIME,
                 "Unsupported endpoint type for script source: ${endpoint.get()?.javaClass?.simpleName}"

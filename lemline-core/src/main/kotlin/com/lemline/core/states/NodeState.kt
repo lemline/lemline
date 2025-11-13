@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
-import com.lemline.core.execution.context.Scope
+import com.lemline.core.orchestrator.context.Scope
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable

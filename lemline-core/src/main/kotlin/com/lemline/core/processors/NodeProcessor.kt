@@ -8,13 +8,13 @@ import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
-import com.lemline.core.execution.StepResult
-import com.lemline.core.execution.context.Scope
-import com.lemline.core.execution.context.TaskContext
-import com.lemline.core.execution.context.merge
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.orchestrator.StepResult
+import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.orchestrator.context.TaskContext
+import com.lemline.core.orchestrator.context.merge
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.NodeState
 import io.serverlessworkflow.api.types.ExportAs
