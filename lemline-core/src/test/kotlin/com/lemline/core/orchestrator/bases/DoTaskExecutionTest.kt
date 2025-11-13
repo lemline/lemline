@@ -101,13 +101,13 @@ abstract class DoTaskExecutionTest : FunSpec() {
               - createUser:
                   set:
                     name: Alice
-                    age: 30 
+                    age: 30
               - addMetadata:
                   set:
                     name: ${ .name }
                     age: ${ .age }
-                    timestamp: "2025-01-01" 
-                    version:  1 
+                    timestamp: "2025-01-01"
+                    version:  1
               - combine:
                   set:
                     user: '${ {name: .name, age: .age} }'

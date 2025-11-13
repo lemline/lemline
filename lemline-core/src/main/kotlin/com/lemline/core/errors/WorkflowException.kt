@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.errors
 
 import com.lemline.common.json.LemlineJson
@@ -129,4 +130,3 @@ class WaitWorkflowException(
         val duration: Duration,
     )
 }
-

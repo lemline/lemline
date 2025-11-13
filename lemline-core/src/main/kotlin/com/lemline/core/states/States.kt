@@ -34,7 +34,7 @@ internal fun MutableStates.updateWith(
  */
 internal fun MutableStates.replaceContext(context: JsonObject?) {
     if (context == null) return
-    
+
     val rootNode = keys.first { it.parent == null }
 
     // Get the current root state (must exist, as root is always entered first)

@@ -35,7 +35,7 @@ abstract class SetTaskExecutionTest : FunSpec() {
                         first: ${ "John" }
                   - name:
                       set:
-                        name: ${ "Alice" } 
+                        name: ${ "Alice" }
             """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
@@ -50,7 +50,7 @@ abstract class SetTaskExecutionTest : FunSpec() {
                       set:
                         name: Alice
                         age: 30
-                        active: true 
+                        active: true
             """
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
