@@ -141,10 +141,10 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
 
 private fun RootTask.parseChildren(parent: Node<*>?): List<Node<*>> = listOf(
     Node(
-        NodePosition.root.addToken(DO),
-        DoTask(`do`),
-        "$DO",
-        parent,
+        position = NodePosition.root.addToken(DO),
+        task = DoTask(`do`),
+        name = "$DO",
+        parent = parent,
     ),
 )
 
@@ -156,37 +156,38 @@ private fun DoTask.parseChildren(position: NodePosition, parent: Node<*>?): List
         }
 
         Node(
-            childPosition,
-            child,
-            taskItem.name,
-            parent,
+            position = childPosition,
+            task = child,
+            name = taskItem.name,
+            parent = parent,
         )
     }
 
 private fun ForTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>> = listOf(
     Node(
-        position.addToken(DO),
-        DoTask(`do`),
-        "$DO",
-        parent,
+        position = position.addToken(DO),
+        task = DoTask(`do`),
+        name = "$DO",
+        parent = parent,
     ),
 )
 
-private fun TryTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>> = mutableListOf(
-    Node(
-        position.addToken(TRY),
-        DoTask(`try`),
-        "$TRY",
-        parent,
-    ),
-).also { list ->
+private fun TryTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>> = buildList {
+    add(
+        Node(
+            position = position.addToken(TRY),
+            task = DoTask(`try`),
+            name = "$TRY",
+            parent = parent,
+        )
+    )
     `catch`.`do`?.let {
-        list.add(
+        add(
             Node(
-                position.addToken(CATCH).addToken(DO),
-                DoTask(it),
-                "$CATCH.$DO",
-                parent,
+                position = position.addToken(CATCH).addToken(DO),
+                task = DoTask(it),
+                name = "$CATCH.$DO",
+                parent = parent,
             ),
         )
     }
@@ -195,20 +196,20 @@ private fun TryTask.parseChildren(position: NodePosition, parent: Node<*>?): Lis
 private fun ForkTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>>? =
     fork.branches?.mapIndexed { index, taskItem ->
         Node(
-            position.addToken(FORK).addToken(BRANCHES).addIndex(index).addName(taskItem.name),
-            taskItem.toTask(),
-            taskItem.name,
-            parent,
+            position = position.addToken(FORK).addToken(BRANCHES).addIndex(index).addName(taskItem.name),
+            task = taskItem.toTask(),
+            name = taskItem.name,
+            parent = parent,
         )
     }
 
 private fun ListenTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>>? = foreach?.`do`?.let {
     listOf(
         Node(
-            position.addToken(FOREACH).addToken(DO),
-            DoTask(it),
-            "$FOREACH.$DO",
-            parent,
+            position = position.addToken(FOREACH).addToken(DO),
+            task = DoTask(it),
+            name = "$FOREACH.$DO",
+            parent = parent,
         ),
     )
 }
@@ -217,10 +218,10 @@ private fun CallAsyncAPI.parseChildren(position: NodePosition, parent: Node<*>?)
     with.subscription?.foreach?.`do`?.let {
         listOf(
             Node(
-                position.addToken(WITH).addToken(SUBSCRIPTION).addToken(FOREACH).addToken(DO),
-                DoTask(it),
-                "$WITH.$SUBSCRIPTION.$FOREACH.$DO",
-                parent,
+                position = position.addToken(WITH).addToken(SUBSCRIPTION).addToken(FOREACH).addToken(DO),
+                task = DoTask(it),
+                name = "$WITH.$SUBSCRIPTION.$FOREACH.$DO",
+                parent = parent,
             ),
         )
     }

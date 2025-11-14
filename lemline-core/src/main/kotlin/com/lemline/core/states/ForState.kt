@@ -36,9 +36,16 @@ data class ForState(
             }
         }
 
-    fun from(node: Node<ForTask>): ForState {
-        forEach = node.task.`for`.each ?: "item"
-        forAt = node.task.`for`.at ?: "index"
-        return this
+    companion object {
+        fun from(
+            node: Node<ForTask>,
+            startedAt: Instant,
+            collection: List<JsonElement>,
+            index: Int
+        ) = ForState(startedAt, collection, index).apply {
+            forEach = node.task.`for`.each ?: "item"
+            forAt = node.task.`for`.at ?: "index"
+            return this
+        }
     }
 }

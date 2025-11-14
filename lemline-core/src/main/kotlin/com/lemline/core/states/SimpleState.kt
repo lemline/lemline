@@ -9,6 +9,6 @@ import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class NoState(
+data class SimpleState(
     override val startedAt: Instant = Clock.System.now(),
 ) : NodeState()

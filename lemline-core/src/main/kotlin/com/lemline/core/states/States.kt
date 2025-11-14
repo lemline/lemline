@@ -1,53 +1,67 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.Node
-import com.lemline.core.workflows.PositionStates
+import com.lemline.core.nodes.NodeNavigator.findNodeByReference
+import com.lemline.core.nodes.NodePosition
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 
-typealias States = Map<Node<*>, NodeState>
-
-typealias MutableStates = MutableMap<Node<*>, NodeState>
+typealias States = Map<NodePosition, NodeState>
 
 /**
- * Applies a set of state updates to the current `States` map.
- * Updates the state of nodes based on the given map of updates - either inserting, updating, or removing the state for a node.
+ * Applies a set of state updates to the current `States` map and optionally replaces the root context.
+ * Returns a new States map with the updates applied.
  *
  * @param stateUpdates A map where the key is a node and the value is the desired state.
  *                     If the state is null, the corresponding node's state is removed.
+ * @param newContext Optional new context to replace the root node's context with.
+ * @return A new States map with the updates applied.
  */
-internal fun MutableStates.updateWith(
-    stateUpdates: Map<Node<*>, NodeState?>
-) {
+internal fun States.updateWith(
+    stateUpdates: Map<NodePosition, NodeState?>,
+    newContext: JsonObject?
+): States {
+    val updatedStates = this.toMutableMap()
+
+    // Apply state updates
     for ((node, state) in stateUpdates) {
         if (state == null) {
-            remove(node)  // Delete state
+            updatedStates.remove(node)  // Delete state
         } else {
-            this[node] = state  // Update or insert state
+            updatedStates[node] = state  // Update or insert state
         }
     }
-}
 
-/**
- * Replace the context of the root node in the current state tree by a new context.
- */
-internal fun MutableStates.replaceContext(context: JsonObject?) {
-    if (context == null) return
+    // Replace context if needed
+    if (newContext != null) {
+        val rootNode = NodePosition.root
 
-    val rootNode = keys.first { it.parent == null }
-
-    // Get the current root state (must exist, as root is always entered first)
-    when (val rootState = this[rootNode]) {
-        null -> throw IllegalStateException("RootState not found for node '${rootNode.name}' - workflow not properly initialized")
-        is RootState -> {
-            // Replace context with new context (as per Serverless Workflow spec)
-            this[rootNode] = rootState.copyWithContext(context)
+        when (val rootState = updatedStates[rootNode]) {
+            is RootState -> updatedStates[rootNode] = rootState.copyWithContext(newContext)
+            else -> throw IllegalStateException("State of root node $rootNode should be a ${RootState::class.simpleName}, instead is $rootState")
         }
-
-        else -> throw IllegalStateException("State of root node ${rootNode.reference}, not a RootState: $rootState")
     }
+
+    return updatedStates
 }
 
 @ExperimentalTime
-fun States.toPositionStates() = PositionStates(mapKeys { it.key.position })
+@Serializable
+@JvmInline
+value class PositionStates(private val states: Map<NodePosition, NodeState>) {
+
+    operator fun get(key: NodePosition): NodeState? = states[key]
+
+    companion object Companion {
+        fun fromJsonString(jsonString: String) = LemlineJson.decodeFromString<PositionStates>(jsonString)
+    }
+
+    fun toJsonString() = LemlineJson.encodeToString(states)
+
+
+    fun toNodeStates(rootNode: Node<*>) =
+        states.mapKeys { findNodeByReference(it.key.toString(), rootNode) }.toMutableMap()
+}

@@ -21,5 +21,5 @@ internal class ContinuousCallHttpExecutionTest : CallHttpExecutionTest() {
         namespace: String,
         name: String,
         version: String
-    ): JsonElement = executeContinuousWorkflow(yaml, input, namespace, name, version)
+    ): JsonElement = executeContinuousWorkflow(yaml, namespace, name, version, input)
 }

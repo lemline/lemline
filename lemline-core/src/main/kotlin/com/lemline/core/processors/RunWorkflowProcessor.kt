@@ -10,7 +10,7 @@ import com.lemline.core.errors.ChildWorkflowException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.NoState
+import com.lemline.core.states.SimpleState
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunWorkflow
 import kotlin.time.ExperimentalTime
@@ -57,9 +57,9 @@ import kotlinx.serialization.json.JsonElement
  */
 class RunWorkflowProcessor(
     node: Node<RunTask>,
-) : NodeProcessor<RunTask, NoState>(node) {
+) : NodeProcessor<RunTask, SimpleState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): NoState = NoState()
+    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleState = SimpleState()
 
     /**
      * Execute sub-workflow action.
@@ -105,8 +105,8 @@ class RunWorkflowProcessor(
             namespace = subWorkflowNamespace.toString(),
             name = subWorkflowName.toString(),
             version = subWorkflowVersion.toString(),
-            rawInput = childWorkflowInput,
-            awaitCompletion = awaitCompletion
+            input = childWorkflowInput,
+            sync = awaitCompletion
         )
 
         // The orchestrator will resolve the definition and handle execution appropriately

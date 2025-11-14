@@ -75,7 +75,7 @@ open class InternalWorkflowException(
  * with the child workflow, encapsulated within the [Config] instance.
  */
 class ChildWorkflowException(
-    val transformedInput: JsonElement? = null,
+    val transformedInput: JsonElement?,
     val config: Config
 ) : WorkflowException() {
 
@@ -88,16 +88,16 @@ class ChildWorkflowException(
      * @property namespace The namespace of the child workflow, used to scope workflows within an environment.
      * @property name The name of the child workflow to be executed.
      * @property version The version of the child workflow.
-     * @property rawInput The input provided to the child workflow.
-     * @property awaitCompletion Indicates whether the parent workflow should wait for the child workflow to complete.
+     * @property input The input provided to the child workflow.
+     * @property sync Indicates whether the parent workflow should wait for the child workflow to complete.
      */
     @Serializable
     data class Config(
         val namespace: String,
         val name: String,
         val version: String,
-        val rawInput: JsonElement,
-        val awaitCompletion: Boolean
+        val input: JsonElement,
+        val sync: Boolean
     )
 }
 

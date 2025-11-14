@@ -6,7 +6,7 @@ package com.lemline.core.processors
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.NoState
+import com.lemline.core.states.SimpleState
 import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SetTaskConfiguration
 import kotlin.time.ExperimentalTime
@@ -49,9 +49,9 @@ import kotlinx.serialization.json.JsonElement
  */
 class SetProcessor(
     node: Node<SetTask>,
-) : NodeProcessor<SetTask, NoState>(node) {
+) : NodeProcessor<SetTask, SimpleState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): NoState = NoState()
+    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleState = SimpleState()
 
     /**
      * Execute SetTask action.

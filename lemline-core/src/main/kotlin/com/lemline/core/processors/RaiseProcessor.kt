@@ -7,7 +7,7 @@ import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.NoState
+import com.lemline.core.states.SimpleState
 import io.serverlessworkflow.api.types.RaiseTask
 import io.serverlessworkflow.api.types.RaiseTaskError
 import kotlin.time.Clock
@@ -34,9 +34,9 @@ import kotlinx.serialization.json.JsonElement
  */
 class RaiseProcessor(
     node: Node<RaiseTask>
-) : NodeProcessor<RaiseTask, NoState>(node) {
+) : NodeProcessor<RaiseTask, SimpleState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): NoState = NoState(
+    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleState = SimpleState(
         startedAt = Clock.System.now()
     )
 

@@ -17,7 +17,7 @@ enum class ExecutionMode {
         ACTIVITY_BY_ACTIVITY -> node.isActivity
     }
 
-    internal fun stopIfAsync() = when (this) {
+    internal fun isAsync() = when (this) {
         CONTINUOUS -> false
         TASK_BY_TASK -> true
         ACTIVITY_BY_ACTIVITY -> true

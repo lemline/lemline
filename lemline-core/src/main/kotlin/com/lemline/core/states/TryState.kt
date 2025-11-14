@@ -53,22 +53,15 @@ data class TryState(
     val errorAs: String = "error"
 ) : NodeState() {
 
-    fun newAttemptState(error: InternalWorkflowException.Error? = null): TryState = TryState(
-        startedAt = startedAt,
-        transformedInput = transformedInput,
+    fun newAttemptState(error: InternalWorkflowException.Error? = null): TryState = copy(
         attemptIndex = attemptIndex + 1,
         runningCatch = false,
-        lastError = error,
-        errorAs = errorAs
+        lastError = error
     )
 
-    fun toCatchState(error: InternalWorkflowException.Error): TryState = TryState(
-        startedAt = startedAt,
-        transformedInput = transformedInput,
-        attemptIndex = attemptIndex,
-        runningCatch = true, // <= flag used to avoid catching an exception from the catch block
-        lastError = error,
-        errorAs = errorAs
+    fun toCatchState(error: InternalWorkflowException.Error): TryState = copy(
+        runningCatch = true,
+        lastError = error
     )
 
     /**

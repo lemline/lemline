@@ -6,7 +6,7 @@ package com.lemline.core.processors
 import com.lemline.core.errors.WaitWorkflowException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.NoState
+import com.lemline.core.states.SimpleState
 import com.lemline.core.utils.toDuration
 import io.serverlessworkflow.api.types.WaitTask
 import kotlin.time.Duration
@@ -42,9 +42,9 @@ import kotlinx.serialization.json.JsonElement
  */
 class WaitProcessor(
     node: Node<WaitTask>,
-) : NodeProcessor<WaitTask, NoState>(node) {
+) : NodeProcessor<WaitTask, SimpleState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): NoState = NoState()
+    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleState = SimpleState()
 
     /**
      * Execute wait action - returns input unchanged.

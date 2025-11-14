@@ -22,5 +22,5 @@ internal class ByActivitySetTaskExecutionTest : SetTaskExecutionTest() {
         namespace: String,
         name: String,
         version: String
-    ): JsonElement = executeActivityByActivityWorkflow(yaml, input, namespace, name, version)
+    ): JsonElement = executeActivityByActivityWorkflow(yaml, namespace, name, version, input)
 }

@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.workflows
 
+import com.lemline.core.orchestrator.WorkflowState
 import com.lemline.core.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.JsonObject
 
 @ExperimentalTime
 class WorkflowStateTest {
@@ -34,7 +35,7 @@ class WorkflowStateTest {
 
         // When
         val serialized = workflowState.toJsonString()
-        val jsonElement = Json.parseToJsonElement(serialized).jsonObject
+        val jsonElement = Json.parseToJsonElement(serialized) as JsonObject
 
         // Then - Verify shortened names are used
         assertEquals("p", jsonElement.keys.find { it == "p" }, "Should use 'p' for currentPosition")

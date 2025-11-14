@@ -21,5 +21,5 @@ internal class ByTaskForTaskExecutionTest : ForTaskExecutionTest() {
         namespace: String,
         name: String,
         version: String
-    ): JsonElement = executeTaskByTaskWorkflow(yaml, input, namespace, name, version)
+    ): JsonElement = executeTaskByTaskWorkflow(yaml, namespace, name, version, input)
 }

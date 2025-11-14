@@ -6,7 +6,7 @@ package com.lemline.core.processors
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.NoState
+import com.lemline.core.states.SimpleState
 import com.lemline.core.tasks.runs.Shell
 import io.serverlessworkflow.api.types.RunShell
 import io.serverlessworkflow.api.types.RunTask
@@ -56,9 +56,9 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class RunShellProcessor(
     node: Node<RunTask>,
-) : NodeProcessor<RunTask, NoState>(node) {
+) : NodeProcessor<RunTask, SimpleState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): NoState = NoState()
+    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleState = SimpleState()
 
     /**
      * Execute shell command action.

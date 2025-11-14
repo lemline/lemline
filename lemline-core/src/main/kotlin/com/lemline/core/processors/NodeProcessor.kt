@@ -171,7 +171,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     ) = StepResult(
         childNode,
         childRawInput,
-        mapOf(node to updatedState),
+        mapOf(node.position to updatedState),
         null
     )
 
@@ -229,7 +229,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         return StepResult(
             node.parent,
             transformedOutput,
-            mapOf(node to null),
+            mapOf(node.position to null),
             currentFlowDirective,
             exportedContext,
         )
@@ -242,7 +242,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     internal fun continueToEnd(dataset: JsonElement) = StepResult(
         nextNode = node.parent,
         rawInput = dataset,
-        stateUpdates = mapOf(node to null), // clear the state of the current node
+        stateUpdates = mapOf(node.position to null), // clear the state of the current node
         flowDirective = FlowDirective().apply { setFlowDirectiveEnum(FlowDirectiveEnum.END) } // Pass END up the chain
     )
 

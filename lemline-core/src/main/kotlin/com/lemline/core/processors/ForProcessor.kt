@@ -57,19 +57,18 @@ class ForProcessor(
     node: Node<ForTask>
 ) : NodeProcessor<ForTask, ForState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): ForState {
-        return ForState(
-            startedAt = Clock.System.now(),
-            collection = evalForIn(transformedInput, scope),
-            index = -1
-        ).from(node)
-    }
+    override fun createState(transformedInput: JsonElement, scope: Scope) = ForState.from(
+        node,
+        startedAt = Clock.System.now(),
+        collection = evalForIn(transformedInput, scope),
+        index = -1
+    )
 
     override fun getNextStepInfo(
         state: ForState,
         dataset: JsonElement,
         scope: Scope,
-        transformedInput: String?,
+        namedNode: String?,
     ): NextStepInfo {
         // get an updated state for the current node
         val updatedState = getNextState(state)
@@ -91,14 +90,15 @@ class ForProcessor(
     }
 
     // Update the state without copying the collection
-    private fun getNextState(state: ForState): ForState = ForState(
+    private fun getNextState(state: ForState): ForState = ForState.from(
+        node = node,
         startedAt = state.startedAt,
         collection = state.collection,
         index = state.index + 1
-    ).from(node)
+    )
 
     private fun shouldContinue(updatedState: ForState, transformedInput: JsonElement, scope: Scope) =
-        updatedState.index < updatedState.collection!!.size &&
+        updatedState.index < updatedState.collection.size &&
             evalWhile(transformedInput, scope)
 
     private fun evalWhile(dataset: JsonElement, scope: Scope): Boolean {

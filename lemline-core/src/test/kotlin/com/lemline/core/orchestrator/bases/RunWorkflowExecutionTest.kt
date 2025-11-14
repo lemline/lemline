@@ -2,6 +2,7 @@
 package com.lemline.core.orchestrator.bases
 
 import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.getWorkflowNode
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -41,7 +42,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
             """
 
             // Register the child workflow in the cache
-            com.lemline.core.getWorkflowNode(childWorkflowYaml, namespace = "test", name = "doubler", version = "0.1.0")
+            getWorkflowNode(childWorkflowYaml, namespace = "test", name = "doubler", version = "0.1.0")
 
             // Parent workflow that calls the child
             val parentWorkflowYaml = """
@@ -76,7 +77,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                         greeting: ${ "Hello, " + .name + "!" }
             """
 
-            com.lemline.core.getWorkflowNode(childWorkflowYaml, namespace = "test", name = "greeter", version = "0.1.0")
+            getWorkflowNode(childWorkflowYaml, namespace = "test", name = "greeter", version = "0.1.0")
 
             // Parent workflow
             val parentWorkflowYaml = $$"""
@@ -138,7 +139,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                             then: end
             """
 
-            com.lemline.core.getWorkflowNode(factorialYaml, namespace = "test", name = "factorial", version = "0.1.0")
+            getWorkflowNode(factorialYaml, namespace = "test", name = "factorial", version = "0.1.0")
 
             // Call factorial(5)
             val output = executeWorkflow(
@@ -161,7 +162,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                       set:
                         result: ${ .a + .b }
             """
-            com.lemline.core.getWorkflowNode(adderYaml, namespace = "test", name = "adder", version = "0.1.0")
+            getWorkflowNode(adderYaml, namespace = "test", name = "adder", version = "0.1.0")
 
             // Second child workflow
             val multiplierYaml = $$"""
@@ -170,7 +171,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                       set:
                         result: ${ .value * 2 }
             """
-            com.lemline.core.getWorkflowNode(multiplierYaml, namespace = "test", name = "multiplier", version = "0.1.0")
+            getWorkflowNode(multiplierYaml, namespace = "test", name = "multiplier", version = "0.1.0")
 
             // Parent workflow calling both
             val parentYaml = $$"""
@@ -215,7 +216,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                         processed: true
                         value: ${ .input * 10 }
             """
-            com.lemline.core.getWorkflowNode(processorYaml, namespace = "test", name = "processor", version = "0.1.0")
+            getWorkflowNode(processorYaml, namespace = "test", name = "processor", version = "0.1.0")
 
             // Parent workflow
             val parentYaml = $$"""
@@ -255,7 +256,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                         value: 42
                         status: success
             """
-            com.lemline.core.getWorkflowNode(childYaml, namespace = "test", name = "child", version = "0.1.0")
+            getWorkflowNode(childYaml, namespace = "test", name = "child", version = "0.1.0")
 
             // Parent workflow with output transformation
             val parentYaml = $$"""
@@ -291,7 +292,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                         fullName: ${ .firstName + " " + .lastName }
                         age: ${ .age }
             """
-            com.lemline.core.getWorkflowNode(
+            getWorkflowNode(
                 processorYaml,
                 namespace = "test",
                 name = "person-processor",
@@ -333,7 +334,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                       set:
                         result: ${ .value + 1 }
             """
-            com.lemline.core.getWorkflowNode(level3Yaml, namespace = "test", name = "level3", version = "0.1.0")
+            getWorkflowNode(level3Yaml, namespace = "test", name = "level3", version = "0.1.0")
 
             // Level 2 workflow calls level 3
             val level2Yaml = $$"""
@@ -347,7 +348,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                           input:
                             value: ${ .value * 2 }
             """
-            com.lemline.core.getWorkflowNode(level2Yaml, namespace = "test", name = "level2", version = "0.1.0")
+            getWorkflowNode(level2Yaml, namespace = "test", name = "level2", version = "0.1.0")
 
             // Level 1 workflow calls level 2
             val level1Yaml = $$"""
@@ -361,7 +362,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                           input:
                             value: ${ .value + 3 }
             """
-            com.lemline.core.getWorkflowNode(level1Yaml, namespace = "test", name = "level1", version = "0.1.0")
+            getWorkflowNode(level1Yaml, namespace = "test", name = "level1", version = "0.1.0")
 
             // Root workflow calls level 1
             val rootYaml = """
@@ -396,7 +397,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                       set:
                         value: 10
             """
-            com.lemline.core.getWorkflowNode(childYaml, namespace = "test", name = "defaulter", version = "0.1.0")
+            getWorkflowNode(childYaml, namespace = "test", name = "defaulter", version = "0.1.0")
 
             // Parent workflow without explicit input
             val parentYaml = """
@@ -428,7 +429,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                       set:
                         completed: true
             """
-            com.lemline.core.getWorkflowNode(childYaml, namespace = "test", name = "slow-workflow", version = "0.1.0")
+            getWorkflowNode(childYaml, namespace = "test", name = "slow-workflow", version = "0.1.0")
 
             // Parent workflow with await: false
             val parentYaml = """
@@ -468,7 +469,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                         doubled: ${ .original * 2 }
                         parentValue: ${ .original }
             """
-            com.lemline.core.getWorkflowNode(childYaml, namespace = "test", name = "context-user", version = "0.1.0")
+            getWorkflowNode(childYaml, namespace = "test", name = "context-user", version = "0.1.0")
 
             // Parent workflow that passes context
             val parentYaml = $$"""

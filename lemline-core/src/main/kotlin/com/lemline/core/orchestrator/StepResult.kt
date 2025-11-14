@@ -2,6 +2,7 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.NodeState
 import io.serverlessworkflow.api.types.FlowDirective
 import kotlin.time.Duration
@@ -28,7 +29,7 @@ import kotlinx.serialization.json.JsonObject
 data class StepResult(
     val nextNode: Node<*>?,
     val rawInput: JsonElement,
-    val stateUpdates: Map<Node<*>, NodeState?>,
+    val stateUpdates: Map<NodePosition, NodeState?>,
     val flowDirective: FlowDirective? = null,
     val newContext: JsonObject? = null,
     val delay: Duration? = null

@@ -6,6 +6,7 @@ package com.lemline.core.processors
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.NodePosition
 import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.orchestrator.WorkflowOrchestrator
 import com.lemline.core.orchestrator.context.Scope
@@ -223,17 +224,17 @@ class TryProcessor(
     private fun updatesToCleanState(
         failingNode: Node<*>,
         updatedState: TryState,
-    ): Map<Node<*>, NodeState?> {
+    ): Map<NodePosition, NodeState?> {
         var previous = failingNode
         return buildMap {
             // Clean state of all nodes up to the try node
             do {
-                put(previous, null)
+                put(previous.position, null)
                 previous = previous.parent
                     ?: throw IllegalStateException("Current try node ${node.reference} not found on path of node ${failingNode.name}")
             } while (previous != node)
             // add the updated state of the Try node
-            put(node, updatedState)
+            put(node.position, updatedState)
         }
     }
 

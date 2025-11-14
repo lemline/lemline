@@ -21,5 +21,5 @@ internal class ByActivityIfConditionExecutionTest : IfConditionExecutionTest() {
         namespace: String,
         name: String,
         version: String
-    ): JsonElement = executeActivityByActivityWorkflow(yaml, input, namespace, name, version)
+    ): JsonElement = executeActivityByActivityWorkflow(yaml, namespace, name, version, input)
 }

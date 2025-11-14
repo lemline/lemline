@@ -2,7 +2,6 @@
 package com.lemline.core.definitions
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -21,6 +20,7 @@ object DefinitionCache {
 
     private val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
     private val rootNodesCache = ConcurrentHashMap<WorkflowIndex, Node<RootTask>>()
+    private val nodesMapCache = ConcurrentHashMap<WorkflowIndex, Map<NodePosition, Node<*>>>()
 
     private val jsonMapper = LemlineJson.jacksonMapper
     private val yamlMapper = LemlineJson.yamlMapper
@@ -60,9 +60,11 @@ object DefinitionCache {
      */
     @JvmStatic
     fun parseAndPut(definition: String): Workflow =
-        WorkflowReader.validation().read(definition, WorkflowFormat.YAML).also {
-            workflowCache[it.index] = it
-            rootNodesCache[it.index] = getRootNode(it)
+        WorkflowReader.validation().read(definition, WorkflowFormat.YAML).also { workflow ->
+            workflowCache[workflow.index] = workflow
+            rootNodesCache[workflow.index] = getRootNode(workflow).also {
+                nodesMapCache[workflow.index] = getNodeMap(it)
+            }
         }
 
     /**
@@ -78,39 +80,87 @@ object DefinitionCache {
      * @throws IllegalStateException if the workflow is not found.
      */
     @JvmStatic
-    fun getOrNull(namespace: WorkflowNamespace, name: WorkflowName, version: WorkflowVersion): Workflow? =
-        workflowCache[WorkflowIndex(namespace, name, version)]
+    fun getWorkflowFromCache(
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion
+    ): Workflow? = workflowCache[WorkflowIndex(namespace, name, version)]
 
+    /**
+     * Retrieves a map of nodes corresponding to a specific workflow, identified by namespace, name, and version.
+     *
+     * @param namespace The namespace of the workflow.
+     * @param name The name of the workflow.
+     * @param version The version of the workflow.
+     * @return A map where the keys are node positions and the values are the corresponding nodes, or null if no such map exists.
+     */
     @JvmStatic
-    fun getOrNull(workflowInfo: WorkflowInfo): Workflow? = getOrNull(
-        workflowInfo.workflowNamespace,
-        workflowInfo.workflowName,
-        workflowInfo.workflowVersion
-    )
+    fun getNodesMapFromCache(
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion
+    ): Map<NodePosition, Node<*>>? = nodesMapCache[WorkflowIndex(namespace, name, version)]
+
+
+    /**
+     * Retrieves the root node of a workflow from the cache using the specified namespace, name, and version.
+     *
+     * @param namespace The namespace of the workflow.
+     * @param name The name of the workflow.
+     * @param version The version of the workflow.
+     * @return The root node of the workflow, or null if not found in the cache.
+     */
+    @JvmStatic
+    fun getRootNodeFromCache(
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion
+    ): Node<RootTask>? = rootNodesCache[WorkflowIndex(namespace, name, version)]
 
     /**
      * Retrieves the root node of the given workflow.
      * The root node is the Node<RootTask> at the root level of the workflow.
-     *
-     * @param workflow The workflow containing the root node.
-     * @return The root node of the workflow.
      */
-    @JvmStatic
-    fun getRootNode(workflow: Workflow): Node<RootTask> = rootNodesCache.getOrPut(workflow.index) {
+    internal fun getRootNode(workflow: Workflow): Node<RootTask> = rootNodesCache.getOrPut(workflow.index) {
         Node(
             position = NodePosition.root,
             task = RootTask(workflow.document, workflow.`do`, workflow.use).also {
                 it.output = workflow.output
                 it.input = workflow.input
             },
-            name = "workflow",
+            name = NodePosition.root.toString(),
             parent = null,
         )
+    }
+
+    /**
+     * Constructs a map of all nodes in a hierarchical tree starting from the given root node.
+     * Each node is mapped to its position in the workflow.
+     */
+    private fun getNodeMap(nodeRoot: Node<RootTask>): Map<NodePosition, Node<*>> {
+
+        val map = mutableMapOf<NodePosition, Node<*>>()
+
+        fun addNodeAndChildren(node: Node<*>) {
+            // Add the current node to the map
+            map[node.position] = node
+
+            // Recursively add all children
+            node.children?.forEach { child ->
+                addNodeAndChildren(child)
+            }
+        }
+
+        // Start the recursive traversal from the root
+        addNodeAndChildren(nodeRoot)
+
+        return map
     }
 
     @TestOnly
     fun clear() {
         workflowCache.clear()
         rootNodesCache.clear()
+        nodesMapCache.clear()
     }
 }
