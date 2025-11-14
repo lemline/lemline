@@ -189,9 +189,9 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
             // Should pause before starting sub-workflow
             assertIs<WorkflowState.RunningChildWorkflow>(result)
-            assertEquals("childWorkflow", result.childConfig.name)
-            assertEquals("test", result.childConfig.namespace)
-            assertEquals("0.1.0", result.childConfig.version)
+            assertEquals("childWorkflow", result.childConfig.name.toString())
+            assertEquals("test", result.childConfig.namespace.toString())
+            assertEquals("0.1.0", result.childConfig.version.toString())
             assertTrue(result.childConfig.sync) // default is await=true
         }
 
@@ -439,7 +439,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 executionMode = executionMode
             )
             assertIs<WorkflowState.RunningChildWorkflow>(pauseResult)
-            assertEquals("doubler", pauseResult.childConfig.name)
+            assertEquals("doubler", pauseResult.childConfig.name.toString())
             assertTrue(pauseResult.childConfig.sync)
 
             // Simulate child workflow execution (would be done by runner)
@@ -633,7 +633,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 executionMode = executionMode
             )
             assertIs<WorkflowState.RunningChildWorkflow>(parentPause)
-            assertEquals("child", parentPause.childConfig.name)
+            assertEquals("child", parentPause.childConfig.name.toString())
 
             // Simulate child execution (which would also pause at grandchild, but we're simulating the final result)
             val childOutput = kotlinx.serialization.json.buildJsonObject {

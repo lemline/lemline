@@ -2,6 +2,9 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.errors.ChildWorkflowException
 import com.lemline.core.errors.InternalWorkflowException
@@ -123,9 +126,9 @@ object WorkflowOrchestrator {
      */
     @JvmStatic
     suspend fun start(
-        namespace: String,
-        name: String,
-        version: String,
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion,
         input: JsonElement,
         executionMode: ExecutionMode
     ): WorkflowState {
@@ -147,9 +150,9 @@ object WorkflowOrchestrator {
 
     @JvmStatic
     suspend fun resume(
-        namespace: String,
-        name: String,
-        version: String,
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion,
         state: WorkflowState,
         executionMode: ExecutionMode
     ): WorkflowState {

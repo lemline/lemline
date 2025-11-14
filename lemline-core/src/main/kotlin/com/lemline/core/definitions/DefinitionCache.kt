@@ -76,11 +76,11 @@ object DefinitionCache {
      */
     @JvmStatic
     fun getWorkflow(
-        namespace: String,
-        name: String,
-        version: String
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion
     ): Workflow? =
-        workflowCache[WorkflowIndex(WorkflowNamespace(namespace), WorkflowName(name), WorkflowVersion(version))]
+        workflowCache[WorkflowIndex(namespace, name, version)]
 
     /**
      * Retrieves a map of node positions to their corresponding nodes for a given workflow.

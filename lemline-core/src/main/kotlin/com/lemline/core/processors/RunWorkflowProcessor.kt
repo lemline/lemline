@@ -102,9 +102,9 @@ class RunWorkflowProcessor(
         val awaitCompletion = runConfig.isAwait
 
         val childWorkflowConfig = ChildWorkflowException.Config(
-            namespace = subWorkflowNamespace.toString(),
-            name = subWorkflowName.toString(),
-            version = subWorkflowVersion.toString(),
+            namespace = subWorkflowNamespace,
+            name = subWorkflowName,
+            version = subWorkflowVersion,
             input = childWorkflowInput,
             sync = awaitCompletion
         )

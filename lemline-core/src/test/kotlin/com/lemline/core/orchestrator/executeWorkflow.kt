@@ -3,6 +3,9 @@
 
 package com.lemline.core.orchestrator
 
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.getWorkflowNode
 import com.lemline.core.states.WorkflowState
 import kotlin.time.ExperimentalTime
@@ -16,7 +19,13 @@ internal suspend fun executeContinuousWorkflow(
     input: JsonElement
 ): JsonElement {
     getWorkflowNode(yaml, namespace, name, version)
-    return runUntilComplete(namespace, name, version, input, ExecutionMode.CONTINUOUS)
+    return runUntilComplete(
+        namespace = WorkflowNamespace(namespace),
+        name = WorkflowName(name),
+        version = WorkflowVersion(version),
+        input = input,
+        executionMode = ExecutionMode.CONTINUOUS
+    )
 }
 
 
@@ -28,7 +37,13 @@ internal suspend fun executeTaskByTaskWorkflow(
     input: JsonElement
 ): JsonElement {
     getWorkflowNode(yaml, namespace, name, version)
-    return runUntilComplete(namespace, name, version, input, ExecutionMode.TASK_BY_TASK)
+    return runUntilComplete(
+        namespace = WorkflowNamespace(namespace),
+        name = WorkflowName(name),
+        version = WorkflowVersion(version),
+        input = input,
+        executionMode = ExecutionMode.TASK_BY_TASK
+    )
 }
 
 internal suspend fun executeActivityByActivityWorkflow(
@@ -39,14 +54,20 @@ internal suspend fun executeActivityByActivityWorkflow(
     input: JsonElement
 ): JsonElement {
     getWorkflowNode(yaml, namespace, name, version)
-    return runUntilComplete(namespace, name, version, input, ExecutionMode.ACTIVITY_BY_ACTIVITY)
+    return runUntilComplete(
+        namespace = WorkflowNamespace(namespace),
+        name = WorkflowName(name),
+        version = WorkflowVersion(version),
+        input = input,
+        executionMode = ExecutionMode.ACTIVITY_BY_ACTIVITY
+    )
 }
 
 // Public entry point
 internal suspend fun runUntilComplete(
-    namespace: String,
-    name: String,
-    version: String,
+    namespace: WorkflowNamespace,
+    name: WorkflowName,
+    version: WorkflowVersion,
     input: JsonElement,
     executionMode: ExecutionMode
 ): JsonElement {
@@ -68,9 +89,9 @@ internal suspend fun runUntilComplete(
 
 // Stateless, reusable helper
 internal tailrec suspend fun runWorkflowStep(
-    namespace: String,
-    name: String,
-    version: String,
+    namespace: WorkflowNamespace,
+    name: WorkflowName,
+    version: WorkflowVersion,
     executionMode: ExecutionMode,
     state: WorkflowState,
 ): JsonElement = when (state) {

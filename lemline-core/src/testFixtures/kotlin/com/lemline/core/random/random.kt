@@ -144,9 +144,9 @@ fun randomFlowDirective(): FlowDirective = when (Random.nextInt(4)) {
 }
 
 fun ChildWorkflowException.Config.Companion.random() = ChildWorkflowException.Config(
-    namespace = String.random(),
-    name = String.random(),
-    version = String.random(),
+    namespace = WorkflowNamespace.random(),
+    name = WorkflowName.random(),
+    version = WorkflowVersion.random(),
     input = JsonElement.random(),
     sync = Random.nextBoolean()
 )

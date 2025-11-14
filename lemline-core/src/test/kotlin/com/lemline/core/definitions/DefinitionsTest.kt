@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.definitions
 
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.common.values.index
 import com.lemline.common.values.name
 import com.lemline.common.values.namespace
@@ -118,9 +121,9 @@ class DefinitionsTest {
 
         // Verify the workflow is in the cache
         val cachedWorkflow = DefinitionCache.getWorkflow(
-            namespace = workflow.document.namespace,
-            name = workflow.document.name,
-            version = workflow.document.version
+            namespace = workflow.namespace,
+            name = workflow.name,
+            version = workflow.version
         )
         cachedWorkflow shouldNotBe null
         cachedWorkflow?.document?.name shouldBe workflow.document.name
@@ -155,12 +158,11 @@ class DefinitionsTest {
     @Test
     fun `getOrNull should return null for non-existent workflow`() {
         // When
-        val result =
-            DefinitionCache.getWorkflow(
-                namespace = "test",
-                name = "non-existent",
-                version = "1.0.0"
-            )
+        val result = DefinitionCache.getWorkflow(
+            namespace = WorkflowNamespace("test"),
+            name = WorkflowName("non-existent"),
+            version = WorkflowVersion("1.0.0")
+        )
 
         // Then
         result shouldBe null
@@ -173,9 +175,9 @@ class DefinitionsTest {
 
         // When
         val result = DefinitionCache.getWorkflow(
-            namespace = workflow.document.namespace,
-            name = workflow.document.name,
-            version = workflow.document.version
+            namespace = workflow.namespace,
+            name = workflow.name,
+            version = workflow.version
         )
 
         // Then
@@ -226,9 +228,9 @@ class DefinitionsTest {
 
         // Verify the index is used correctly for caching
         val cachedWorkflow = DefinitionCache.getWorkflow(
-            namespace = workflow.document.namespace,
-            name = workflow.document.name,
-            version = workflow.document.version
+            namespace = workflow.namespace,
+            name = workflow.name,
+            version = workflow.version
         )
         cachedWorkflow shouldBe workflow
     }
@@ -292,9 +294,9 @@ class DefinitionsTest {
         // Verify all workflows were cached correctly
         results.forEach { workflow ->
             val cachedWorkflow = DefinitionCache.getWorkflow(
-                namespace = workflow.document.namespace,
-                name = workflow.document.name,
-                version = workflow.document.version
+                namespace = workflow.namespace,
+                name = workflow.name,
+                version = workflow.version
             )
 
             // Should be in cache

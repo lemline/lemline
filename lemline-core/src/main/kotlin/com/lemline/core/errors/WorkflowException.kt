@@ -2,6 +2,9 @@
 package com.lemline.core.errors
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import kotlin.time.Duration
 import kotlinx.serialization.Serializable
@@ -93,9 +96,9 @@ class ChildWorkflowException(
      */
     @Serializable
     data class Config(
-        val namespace: String,
-        val name: String,
-        val version: String,
+        val namespace: WorkflowNamespace,
+        val name: WorkflowName,
+        val version: WorkflowVersion,
         val input: JsonElement,
         val sync: Boolean
     )
