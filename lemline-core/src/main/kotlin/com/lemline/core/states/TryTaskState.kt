@@ -43,7 +43,7 @@ import kotlinx.serialization.json.encodeToJsonElement
  * @property lastError Last caught error object (for context)
  */
 @Serializable
-data class TryState(
+data class TryTaskState(
     override val startedAt: Instant,
     val transformedInput: JsonElement,
     val attemptIndex: Int,
@@ -51,15 +51,15 @@ data class TryState(
     val lastError: InternalWorkflowException.Error? = null,
     @Transient
     val errorAs: String = "error"
-) : NodeState() {
+) : TaskState() {
 
-    fun newAttemptState(error: InternalWorkflowException.Error? = null): TryState = copy(
+    fun newAttemptState(error: InternalWorkflowException.Error? = null): TryTaskState = copy(
         attemptIndex = attemptIndex + 1,
         runningCatch = false,
         lastError = error
     )
 
-    fun toCatchState(error: InternalWorkflowException.Error): TryState = copy(
+    fun toCatchState(error: InternalWorkflowException.Error): TryTaskState = copy(
         runningCatch = true,
         lastError = error
     )

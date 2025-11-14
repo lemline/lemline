@@ -10,8 +10,8 @@ import com.lemline.core.nodes.NodePosition
 import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.orchestrator.WorkflowOrchestrator
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.NodeState
-import com.lemline.core.states.TryState
+import com.lemline.core.states.TaskState
+import com.lemline.core.states.TryTaskState
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration
 import io.serverlessworkflow.api.types.ConstantBackoff
@@ -70,12 +70,12 @@ import kotlinx.serialization.json.buildJsonObject
  */
 class TryProcessor(
     node: Node<TryTask>
-) : NodeProcessor<TryTask, TryState>(node) {
+) : NodeProcessor<TryTask, TryTaskState>(node) {
 
     /**
      * This state is initialized when entering the TryTask node for the first time
      */
-    override fun createState(transformedInput: JsonElement, scope: Scope): TryState = TryState(
+    override fun createState(transformedInput: JsonElement, scope: Scope): TryTaskState = TryTaskState(
         startedAt = Clock.System.now(),
         transformedInput = transformedInput,  // Store for retries/catch
         attemptIndex = -1,
@@ -91,7 +91,7 @@ class TryProcessor(
      * This is bypassed by [WorkflowOrchestrator] when this node caught an exception.
      */
     override fun getNextStepInfo(
-        state: TryState,
+        state: TryTaskState,
         dataset: JsonElement,
         scope: Scope,
         namedNode: String?,
@@ -114,7 +114,7 @@ class TryProcessor(
      * Determines whether the current `TryTask` is catching a specified error based on its state,
      * configuration, and evaluation of filters.
      */
-    internal fun isCatching(error: InternalWorkflowException.Error, state: TryState, scope: Scope): Boolean {
+    internal fun isCatching(error: InternalWorkflowException.Error, state: TryTaskState, scope: Scope): Boolean {
         // running catch = true means we are running the catch block
         if (state.runningCatch) return false
 
@@ -162,7 +162,7 @@ class TryProcessor(
     internal fun handleError(
         failingNode: Node<*>,
         error: InternalWorkflowException.Error,
-        state: TryState,
+        state: TryTaskState,
         scope: Scope
     ): StepResult {
         // Check if we should retry
@@ -223,8 +223,8 @@ class TryProcessor(
      */
     private fun updatesToCleanState(
         failingNode: Node<*>,
-        updatedState: TryState,
-    ): Map<NodePosition, NodeState?> {
+        updatedState: TryTaskState,
+    ): Map<NodePosition, TaskState?> {
         var previous = failingNode
         return buildMap {
             // Clean state of all nodes up to the try node
@@ -241,7 +241,7 @@ class TryProcessor(
     /**
      * Check if should retry based on retry configuration and current attempt count.
      */
-    private fun shouldRetry(state: TryState, scope: Scope): Boolean {
+    private fun shouldRetry(state: TryTaskState, scope: Scope): Boolean {
         // get catch directive
         val retryConfig = retryPolicy ?: return false
         val retryLimit = retryConfig.limit?.attempt?.count ?: 1

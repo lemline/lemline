@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.workflows
+package com.lemline.common.values
 
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
 import io.serverlessworkflow.api.types.Workflow
-
 
 /**
  * Uniquely identifying a workflow by its namespace, name and version.

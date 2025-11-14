@@ -4,6 +4,7 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.core.getWorkflowNode
+import com.lemline.core.states.WorkflowState
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 

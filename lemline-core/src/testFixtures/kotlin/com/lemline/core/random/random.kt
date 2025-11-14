@@ -12,14 +12,13 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.ChildWorkflowException
 import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.orchestrator.WorkflowState
-import com.lemline.core.states.DoState
-import com.lemline.core.states.ForState
-import com.lemline.core.states.NodeState
-import com.lemline.core.states.PositionStates
+import com.lemline.core.states.DoTaskState
+import com.lemline.core.states.ForTaskState
 import com.lemline.core.states.RootState
-import com.lemline.core.states.SimpleState
-import com.lemline.core.states.TryState
+import com.lemline.core.states.SimpleTaskState
+import com.lemline.core.states.TaskState
+import com.lemline.core.states.TryTaskState
+import com.lemline.core.states.WorkflowState
 import com.lemline.core.workflows.FlowDirective
 import com.lemline.core.workflows.FlowDirectiveEnum
 import com.lemline.core.workflows.FlowDirectiveGoto
@@ -64,14 +63,6 @@ fun JsonElement.Companion.nullableRandom(): JsonElement {
 
 fun NodePosition.Companion.random() = NodePosition(listOf(String.random(), String.random(), String.random()))
 
-fun PositionStates.Companion.random() = PositionStates(
-    mapOf(
-        NodePosition.random() to NodeState.random(),
-        NodePosition.random() to NodeState.random(),
-        NodePosition.random() to NodeState.random(),
-    )
-)
-
 fun WorkflowInfo.Companion.random() = WorkflowInfo(
     workflowId = WorkflowId.random(),
     workflowNamespace = WorkflowNamespace.random(),
@@ -79,20 +70,20 @@ fun WorkflowInfo.Companion.random() = WorkflowInfo(
     workflowVersion = WorkflowVersion.random(),
 )
 
-fun NodeState.Companion.random() = when (Random.nextInt(5)) {
-    0 -> DoState.random()
-    1 -> ForState.random()
-    2 -> SimpleState.random()
-    3 -> TryState.random()
+fun TaskState.Companion.random() = when (Random.nextInt(5)) {
+    0 -> DoTaskState.random()
+    1 -> ForTaskState.random()
+    2 -> SimpleTaskState.random()
+    3 -> TryTaskState.random()
     else -> RootState.random()
 }
 
-fun DoState.Companion.random() = DoState(
+fun DoTaskState.Companion.random() = DoTaskState(
     startedAt = Instant.random(),
     index = Random.nextInt(),
 )
 
-fun ForState.Companion.random() = ForState(
+fun ForTaskState.Companion.random() = ForTaskState(
     startedAt = Instant.random(),
     collection = listOf(JsonElement.random()),
     index = Random.nextInt(),
@@ -101,11 +92,11 @@ fun ForState.Companion.random() = ForState(
     forAt = String.random()
 }
 
-fun SimpleState.Companion.random() = SimpleState(
+fun SimpleTaskState.Companion.random() = SimpleTaskState(
     startedAt = Instant.random(),
 )
 
-fun TryState.Companion.random() = TryState(
+fun TryTaskState.Companion.random() = TryTaskState(
     startedAt = Instant.random(),
     transformedInput = JsonElement.random(),
     attemptIndex = Random.nextInt(0, 10),
@@ -171,7 +162,7 @@ fun WorkflowState.Companion.random(): WorkflowState {
     }
 }
 
-fun randomStates() = mapOf(NodePosition.random() to NodeState.random())
+fun randomStates() = mapOf(NodePosition.random() to TaskState.random())
 
 fun WorkflowState.Completed.Companion.random() = WorkflowState.Completed(
     output = JsonElement.random()
@@ -179,7 +170,7 @@ fun WorkflowState.Completed.Companion.random() = WorkflowState.Completed(
 
 fun WorkflowState.Failed.Companion.random() =
     WorkflowState.Failed(
-        states = randomStates(),
+        taskStates = randomStates(),
         nodePosition = NodePosition.random(),
         rawInput = when (Random.nextBoolean()) {
             true -> JsonElement.random()
@@ -198,7 +189,7 @@ fun WorkflowState.Failed.Companion.random() =
 
 fun WorkflowState.ReadyForNextTask.Companion.random() =
     WorkflowState.ReadyForNextTask(
-        states = randomStates(),
+        taskStates = randomStates(),
         nextNodePosition = NodePosition.random(),
         nextRawInput = JsonElement.random(),
         nextFlowDirective = when (Random.nextBoolean()) {
@@ -209,7 +200,7 @@ fun WorkflowState.ReadyForNextTask.Companion.random() =
 
 fun WorkflowState.Waiting.Companion.random() =
     WorkflowState.Waiting(
-        states = randomStates(),
+        taskStates = randomStates(),
         nodePosition = NodePosition.random(),
         rawOutput = JsonElement.random(),
         duration = Random.nextLong(100, 10000).milliseconds
@@ -217,7 +208,7 @@ fun WorkflowState.Waiting.Companion.random() =
 
 fun WorkflowState.WaitingToRetry.Companion.random() =
     WorkflowState.WaitingToRetry(
-        states = randomStates(),
+        taskStates = randomStates(),
         nodePosition = NodePosition.random(),
         rawInput = JsonElement.random(),
         flowDirective = when (Random.nextBoolean()) {
@@ -229,7 +220,7 @@ fun WorkflowState.WaitingToRetry.Companion.random() =
 
 fun WorkflowState.RunningChildWorkflow.Companion.random() =
     WorkflowState.RunningChildWorkflow(
-        states = randomStates(),
+        taskStates = randomStates(),
         nodePosition = NodePosition.random(),
         rawOutput = when (Random.nextBoolean()) {
             true -> JsonElement.random()

@@ -15,11 +15,11 @@ import kotlinx.serialization.json.buildJsonObject
 
 @Serializable
 @ExperimentalTime
-data class ForState(
+data class ForTaskState(
     override val startedAt: Instant = Clock.System.now(),
     val collection: List<JsonElement>,
     val index: Int = -1
-) : NodeState() {
+) : TaskState() {
 
     @Transient
     lateinit var forEach: String
@@ -36,13 +36,13 @@ data class ForState(
             }
         }
 
-    companion object {
+    companion object Companion {
         fun from(
             node: Node<ForTask>,
             startedAt: Instant,
             collection: List<JsonElement>,
             index: Int
-        ) = ForState(startedAt, collection, index).apply {
+        ) = ForTaskState(startedAt, collection, index).apply {
             forEach = node.task.`for`.each ?: "item"
             forAt = node.task.`for`.at ?: "index"
             return this

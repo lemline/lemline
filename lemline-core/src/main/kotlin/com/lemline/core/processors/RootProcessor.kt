@@ -3,11 +3,11 @@
 
 package com.lemline.core.processors
 
+import com.lemline.common.values.IDV7
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.RootState
-import java.util.*
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -49,7 +49,7 @@ class RootProcessor(
 
     override fun createState(transformedInput: JsonElement, scope: Scope): RootState = RootState(
         startedAt = Clock.System.now(),
-        id = UUID.randomUUID().toString(),
+        id = IDV7.random().toString(),
         input = transformedInput,
         hasRun = false,
     )

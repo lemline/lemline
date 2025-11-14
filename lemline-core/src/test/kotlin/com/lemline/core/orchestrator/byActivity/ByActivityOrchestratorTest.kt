@@ -6,10 +6,10 @@ import com.lemline.core.getWorkflowNode
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.orchestrator.ExecutionMode
 import com.lemline.core.orchestrator.WorkflowOrchestrator
-import com.lemline.core.orchestrator.WorkflowState
 import com.lemline.core.orchestrator.bases.AbstractOrchestratorTest
 import com.lemline.core.orchestrator.executeActivityByActivityWorkflow
-import com.lemline.core.states.NodeState
+import com.lemline.core.states.TaskState
+import com.lemline.core.states.WorkflowState
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -303,7 +303,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             assertIs<WorkflowState.ReadyForNextTask>(result)
 
             // States should contain the completed steps
-            assertTrue(result.states.isNotEmpty())
+            assertTrue(result.taskStates.isNotEmpty())
         }
 
         test("should execute multiple non-activity steps before pausing at activity") {
@@ -352,11 +352,11 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                         endpoint: https://jsonplaceholder.typicode.com/posts/1
             """
             val rootNode = getWorkflowNode(yaml)
-            val states = mutableMapOf<NodePosition, NodeState>()
+            val states = mutableMapOf<NodePosition, TaskState>()
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
-                states = states,
+                taskStates = states,
                 executionMode = executionMode
             )
 
@@ -364,7 +364,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             assertIs<WorkflowState.ReadyForNextTask>(result)
 
             // States should be not empty and contain the completed steps
-            assertTrue(result.states.isNotEmpty())
+            assertTrue(result.taskStates.isNotEmpty())
         }
 
         test("should capture all intermediate states at pause point") {
@@ -396,8 +396,8 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
             assertIs<WorkflowState.ReadyForNextTask>(result)
             // All loop iterations and transformations should be in state
-            assertNotNull(result.states)
-            assertTrue(result.states.isNotEmpty())
+            assertNotNull(result.taskStates)
+            assertTrue(result.taskStates.isNotEmpty())
         }
 
         // ========================================
@@ -454,7 +454,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             val resumeResult = WorkflowOrchestrator.resumeFromInterruptedTask(
                 node = callChildNode,
                 rawOutput = childOutput,
-                states = pauseResult.states.toMutableMap(),
+                taskStates = pauseResult.taskStates.toMutableMap(),
                 executionMode = executionMode
             )
 
@@ -514,7 +514,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             val resumeResult = WorkflowOrchestrator.resumeFromInterruptedTask(
                 node = launchChildNode,
                 rawOutput = pauseResult.rawOutput!!,  // run workflow node input
-                states = pauseResult.states.toMutableMap(),
+                taskStates = pauseResult.taskStates.toMutableMap(),
                 executionMode = executionMode
             )
 
@@ -576,7 +576,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             val pauseResult2 = WorkflowOrchestrator.resumeFromInterruptedTask(
                 node = callChildNode,
                 rawOutput = childOutput,
-                states = pauseResult1.states.toMutableMap(),
+                taskStates = pauseResult1.taskStates.toMutableMap(),
                 executionMode = executionMode
             )
 
@@ -647,7 +647,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             val resumeResult = WorkflowOrchestrator.resumeFromInterruptedTask(
                 node = callChildNode,
                 rawOutput = childOutput,
-                states = parentPause.states.toMutableMap(),
+                taskStates = parentPause.taskStates.toMutableMap(),
                 executionMode = executionMode
             )
 

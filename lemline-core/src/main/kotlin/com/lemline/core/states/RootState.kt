@@ -25,7 +25,7 @@ data class RootState(
     val input: JsonElement,
     val context: Scope = buildJsonObject {},
     val hasRun: Boolean,
-) : NodeState() {
+) : TaskState() {
 
     @Transient
     lateinit var secrets: Map<String, String>

@@ -10,7 +10,7 @@ import com.lemline.core.errors.ChildWorkflowException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.SimpleState
+import com.lemline.core.states.SimpleTaskState
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunWorkflow
 import kotlin.time.ExperimentalTime
@@ -57,9 +57,9 @@ import kotlinx.serialization.json.JsonElement
  */
 class RunWorkflowProcessor(
     node: Node<RunTask>,
-) : NodeProcessor<RunTask, SimpleState>(node) {
+) : NodeProcessor<RunTask, SimpleTaskState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleState = SimpleState()
+    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleTaskState = SimpleTaskState()
 
     /**
      * Execute sub-workflow action.

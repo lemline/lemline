@@ -9,7 +9,7 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
-sealed class NodeState {
+sealed class TaskState {
     /**
      * When the node started execution.
      * Common to all state types.

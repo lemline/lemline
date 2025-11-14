@@ -1,7 +1,5 @@
-// SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.workflows
+package com.lemline.core.states
 
-import com.lemline.core.orchestrator.WorkflowState
 import com.lemline.core.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals

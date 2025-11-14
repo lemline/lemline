@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.ForState
+import com.lemline.core.states.ForTaskState
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -55,9 +55,9 @@ import kotlinx.serialization.json.JsonElement
  */
 class ForProcessor(
     node: Node<ForTask>
-) : NodeProcessor<ForTask, ForState>(node) {
+) : NodeProcessor<ForTask, ForTaskState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = ForState.from(
+    override fun createState(transformedInput: JsonElement, scope: Scope) = ForTaskState.from(
         node,
         startedAt = Clock.System.now(),
         collection = evalForIn(transformedInput, scope),
@@ -65,7 +65,7 @@ class ForProcessor(
     )
 
     override fun getNextStepInfo(
-        state: ForState,
+        state: ForTaskState,
         dataset: JsonElement,
         scope: Scope,
         namedNode: String?,
@@ -90,14 +90,14 @@ class ForProcessor(
     }
 
     // At each iteration, we remove the first item from the collection and increment the index
-    private fun getNextState(state: ForState): ForState = ForState.from(
+    private fun getNextState(state: ForTaskState): ForTaskState = ForTaskState.from(
         node = node,
         startedAt = state.startedAt,
         collection = if (state.index >= 0) state.collection.drop(1) else state.collection,
         index = state.index + 1
     )
 
-    private fun shouldContinue(updatedState: ForState, transformedInput: JsonElement, scope: Scope) =
+    private fun shouldContinue(updatedState: ForTaskState, transformedInput: JsonElement, scope: Scope) =
         updatedState.collection.isNotEmpty() && evalWhile(transformedInput, scope)
 
     private fun evalWhile(dataset: JsonElement, scope: Scope): Boolean {

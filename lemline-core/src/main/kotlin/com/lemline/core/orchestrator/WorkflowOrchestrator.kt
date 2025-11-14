@@ -24,9 +24,10 @@ import com.lemline.core.processors.SetProcessor
 import com.lemline.core.processors.SwitchProcessor
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.processors.WaitProcessor
-import com.lemline.core.states.NodeState
-import com.lemline.core.states.States
-import com.lemline.core.states.TryState
+import com.lemline.core.states.TaskState
+import com.lemline.core.states.TaskStates
+import com.lemline.core.states.TryTaskState
+import com.lemline.core.states.WorkflowState
 import com.lemline.core.states.updateWith
 import com.lemline.core.workflows.toJava
 import com.lemline.core.workflows.toKotlin
@@ -136,7 +137,7 @@ object WorkflowOrchestrator {
         val rootNode = DefinitionCache.getRootNode(workflow)
 
         return resumeFromTask(
-            states = mutableMapOf(),
+            taskStates = mutableMapOf(),
             node = rootNode,
             rawInput = input,
             flowDirective = null,
@@ -157,16 +158,31 @@ object WorkflowOrchestrator {
             ?: throw IllegalStateException("Workflow definition not found: $namespace/$name/$version")
 
         val nodesMap = DefinitionCache.getNodesMap(workflow)
-            ?: throw IllegalStateException("Nodes not found for workflow: $namespace/$name/$version")
 
         fun NodePosition.node(): Node<*> = nodesMap[this]
             ?: throw IllegalStateException("Node not found at position $this in workflow: $namespace/$name/$version")
 
         return when (state) {
+            is WorkflowState.Starting -> {
+                val workflow = DefinitionCache.getWorkflow(namespace, name, version)
+                    ?: throw IllegalStateException("Workflow definition not found: $namespace/$name/$version")
+
+
+                val rootNode = DefinitionCache.getRootNode(workflow)
+
+                resumeFromTask(
+                    taskStates = mutableMapOf(),
+                    node = rootNode,
+                    rawInput = state.input,
+                    flowDirective = null,
+                    executionMode = executionMode
+                )
+            }
+
             is WorkflowState.Completed -> state
             is WorkflowState.Failed -> when {
                 state.rawInput != null -> resumeFromTask(
-                    states = state.states,
+                    taskStates = state.taskStates,
                     node = state.nodePosition.node(),
                     rawInput = state.rawInput,
                     flowDirective = state.flowDirective?.toJava(),
@@ -174,7 +190,7 @@ object WorkflowOrchestrator {
                 )
 
                 state.rawOutput != null -> resumeFromInterruptedTask(
-                    states = state.states,
+                    taskStates = state.taskStates,
                     node = state.nodePosition.node(),
                     rawOutput = state.rawOutput,
                     executionMode = executionMode
@@ -184,7 +200,7 @@ object WorkflowOrchestrator {
             }
 
             is WorkflowState.ReadyForNextTask -> resumeFromTask(
-                states = state.states,
+                taskStates = state.taskStates,
                 node = state.nextNodePosition.node(),
                 rawInput = state.nextRawInput,
                 flowDirective = state.nextFlowDirective?.toJava(),
@@ -192,7 +208,7 @@ object WorkflowOrchestrator {
             )
 
             is WorkflowState.WaitingToRetry -> resumeFromTask(
-                states = state.states,
+                taskStates = state.taskStates,
                 node = state.nodePosition.node(),
                 rawInput = state.rawInput,
                 flowDirective = state.flowDirective?.toJava(),
@@ -200,14 +216,14 @@ object WorkflowOrchestrator {
             )
 
             is WorkflowState.Waiting -> resumeFromInterruptedTask(
-                states = state.states,
+                taskStates = state.taskStates,
                 node = state.nodePosition.node(),
                 rawOutput = state.rawOutput,
                 executionMode = executionMode
             )
 
             is WorkflowState.RunningChildWorkflow -> resumeFromInterruptedTask(
-                states = state.states,
+                taskStates = state.taskStates,
                 node = state.nodePosition.node(),
                 rawOutput = state.rawOutput ?: throw IllegalStateException("rawOutput is required for running $state"),
                 executionMode = executionMode
@@ -227,52 +243,52 @@ object WorkflowOrchestrator {
      * @throws Exception if any error occurs during execution
      */
     internal suspend fun resumeFromTask(
-        states: States = mapOf(),
+        taskStates: TaskStates = mapOf(),
         node: Node<*>,
         rawInput: JsonElement,
         flowDirective: FlowDirective? = null,
         executionMode: ExecutionMode
     ): WorkflowState {
-        logger.debug { "resumeFromTask node=${node.reference}, input=$rawInput, flow=$flowDirective, states=$states" }
+        logger.debug { "resumeFromTask node=${node.reference}, input=$rawInput, flow=$flowDirective, states=$taskStates" }
 
         try {
             val result = try {
-                tryCatch(node, states) {
-                    runStep(node, rawInput, states.toMap(), flowDirective)
+                tryCatch(node, taskStates) {
+                    runStep(node, rawInput, taskStates.toMap(), flowDirective)
                 }
             } catch (e: ChildWorkflowException) {
                 // Sub-workflow needs to be started
                 if (executionMode.isAsync()) return WorkflowState.RunningChildWorkflow(
-                    states = states.toMap(),
+                    taskStates = taskStates.toMap(),
                     nodePosition = node.position,
                     rawOutput = e.transformedInput,
                     childConfig = e.config,
                 )
                 // run the child workflow
-                tryCatch(node, states) {
-                    processChildWorkflowException(e, node, states.toMap(), executionMode)
+                tryCatch(node, taskStates) {
+                    processChildWorkflowException(e, node, taskStates.toMap(), executionMode)
                 }
             } catch (e: WaitWorkflowException) {
                 if (executionMode.isAsync()) return WorkflowState.Waiting(
-                    states = states.toMap(),
+                    taskStates = taskStates.toMap(),
                     nodePosition = node.position,
                     rawOutput = e.transformedInput,
                     duration = e.config.duration,
                 )
                 // run the wait
-                tryCatch(node, states) {
-                    processWaitException(e, node, states.toMap())
+                tryCatch(node, taskStates) {
+                    processWaitException(e, node, taskStates.toMap())
                 }
             }
 
             // Create new states map with updated state updates and context exports
-            val newStates = states.updateWith(result.stateUpdates, result.newContext)
+            val newStates = taskStates.updateWith(result.stateUpdates, result.newContext)
 
             when (val delay = result.delay) {
                 // Task completed
                 null -> if (executionMode.stopAfterTaskCompletion(node) && result.nextNode != null)
                     return WorkflowState.ReadyForNextTask(
-                        states = newStates,
+                        taskStates = newStates,
                         nextNodePosition = result.nextNode.position,
                         nextRawInput = result.rawInput,
                         nextFlowDirective = result.flowDirective?.toKotlin(),
@@ -280,7 +296,7 @@ object WorkflowOrchestrator {
                 // Task retried
                 else -> {
                     if (executionMode.isAsync()) return WorkflowState.WaitingToRetry(
-                        states = newStates,
+                        taskStates = newStates,
                         nodePosition = result.nextNode!!.position,
                         rawInput = result.rawInput,
                         flowDirective = result.flowDirective?.toKotlin(),
@@ -307,7 +323,7 @@ object WorkflowOrchestrator {
 
         } catch (e: Exception) {
             return WorkflowState.Failed(
-                states = states.toMap(),
+                taskStates = taskStates.toMap(),
                 nodePosition = node.position,
                 rawInput = rawInput,
                 rawOutput = null,
@@ -320,23 +336,23 @@ object WorkflowOrchestrator {
     suspend fun resumeFromInterruptedTask(
         node: Node<*>,
         rawOutput: JsonElement,
-        states: States,
+        taskStates: TaskStates,
         executionMode: ExecutionMode
     ): WorkflowState = run {
-        logger.debug { "resumeFromInterruptedTask In: node=${node.reference}, output=$rawOutput, states=$states" }
+        logger.debug { "resumeFromInterruptedTask In: node=${node.reference}, output=$rawOutput, states=$taskStates" }
 
         try {
             // Complete the interrupted task (transforms output, updates state)
-            val result = tryCatch(node, states) {
-                completeInterruptedTask(node, rawOutput, states)
+            val result = tryCatch(node, taskStates) {
+                completeInterruptedTask(node, rawOutput, taskStates)
             }
 
             // Create new states map with updated state updates and context exports
-            val newStates = states.updateWith(result.stateUpdates, result.newContext)
+            val newStates = taskStates.updateWith(result.stateUpdates, result.newContext)
 
             // Continue execution from the next node (may pause again or complete)
             return@run resumeFromTask(
-                states = newStates,
+                taskStates = newStates,
                 node = result.nextNode ?: return WorkflowState.Completed(result.rawInput),
                 rawInput = result.rawInput,
                 flowDirective = result.flowDirective,
@@ -344,7 +360,7 @@ object WorkflowOrchestrator {
             )
         } catch (e: Exception) {
             return@run WorkflowState.Failed(
-                states = states,
+                taskStates = taskStates,
                 nodePosition = node.position,
                 rawInput = null,
                 rawOutput = rawOutput,
@@ -363,23 +379,23 @@ object WorkflowOrchestrator {
      */
     suspend fun tryCatch(
         current: Node<*>,
-        states: States,
+        taskStates: TaskStates,
         block: suspend () -> StepResult
     ): StepResult = try {
         block()
     } catch (e: InternalWorkflowException) {
-        processInternalWorkflowException(e, current, states)
+        processInternalWorkflowException(e, current, taskStates)
     }
 
     private suspend fun processWaitException(
         exception: WaitWorkflowException,
         current: Node<*>,
-        states: States
+        taskStates: TaskStates
     ): StepResult {
         // waiting
         executeDelay(exception.config.duration, "Waiting at node: ${current.name} for")
         // complete the wait task
-        return completeInterruptedTask(current, exception.transformedInput, states)
+        return completeInterruptedTask(current, exception.transformedInput, taskStates)
     }
 
     /**
@@ -388,7 +404,7 @@ object WorkflowOrchestrator {
     private suspend fun processChildWorkflowException(
         exception: ChildWorkflowException,
         current: Node<*>,
-        states: States,
+        taskStates: TaskStates,
         mode: ExecutionMode
     ): StepResult {
         val config = exception.config
@@ -401,7 +417,7 @@ object WorkflowOrchestrator {
             executeChildWorkflowAsync(exception, subRootNode, mode)
         }
         // complete the child workflow task
-        return completeInterruptedTask(current, childOutput, states)
+        return completeInterruptedTask(current, childOutput, taskStates)
     }
 
     /**
@@ -492,7 +508,7 @@ object WorkflowOrchestrator {
      *
      * @param node Current node to execute
      * @param dataset Dataset to process
-     * @param states Current states map
+     * @param taskStates Current states map
      * @param flowDirective Navigation instruction (null on first entry)
      * @return StepResult with: next node, dataset, deltaStates, and flow directive
      */
@@ -500,11 +516,11 @@ object WorkflowOrchestrator {
     suspend fun runStep(
         node: Node<*>,
         dataset: JsonElement,
-        states: States,
+        taskStates: TaskStates,
         flowDirective: FlowDirective?,
     ): StepResult {
-        val state = states[node.position]
-        val scope = getScope(node, states)
+        val state = taskStates[node.position]
+        val scope = getScope(node, taskStates)
         val processor = getNodeProcessor(node)
 
         return if (state == null) {
@@ -529,7 +545,7 @@ object WorkflowOrchestrator {
     @Suppress("UNCHECKED_CAST")
     private fun <T : TaskBase> getNodeProcessor(
         node: Node<T>
-    ): NodeProcessor<T, NodeState> {
+    ): NodeProcessor<T, TaskState> {
         return when (node.task) {
             is RootTask -> RootProcessor(node as Node<RootTask>)
             is DoTask -> DoProcessor(node as Node<DoTask>)
@@ -552,17 +568,17 @@ object WorkflowOrchestrator {
             }
 
             else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
-        } as NodeProcessor<T, NodeState>
+        } as NodeProcessor<T, TaskState>
     }
 
     /**
      * Retrieves the `Scope` associated with the given node by combining its own expression arguments
      * with those of its parent nodes in the tree, if present.
      */
-    private fun getScope(current: Node<*>, states: States): Scope =
-        (states[current.position]?.scope ?: buildJsonObject { })
+    private fun getScope(current: Node<*>, taskStates: TaskStates): Scope =
+        (taskStates[current.position]?.scope ?: buildJsonObject { })
             // Recursively merge with parent scope
-            .merge(current.parent?.let { getScope(it, states) })
+            .merge(current.parent?.let { getScope(it, taskStates) })
 
     /**
      * Handle exception by finding a TryTask and returning the appropriate state transition.
@@ -570,7 +586,7 @@ object WorkflowOrchestrator {
     private fun processInternalWorkflowException(
         exception: InternalWorkflowException,
         failingNode: Node<*>,
-        states: States,
+        taskStates: TaskStates,
     ): StepResult {
         // Find the nearest TryTask that can handle this error
         var tryNode: Node<*>? = failingNode
@@ -580,17 +596,17 @@ object WorkflowOrchestrator {
                 @Suppress("UNCHECKED_CAST")
                 tryNode as Node<TryTask>
                 // current scope of the try node
-                val tryScope = getScope(tryNode, states)
+                val tryScope = getScope(tryNode, taskStates)
                 // current state of the try node
-                val tryState = states[tryNode.position] as TryState
+                val tryTaskState = taskStates[tryNode.position] as TryTaskState
                 // build a processor for the try node
                 val processor = getNodeProcessor(tryNode) as TryProcessor
                 // check that this node actually can handle this error
-                if (processor.isCatching(exception.error, tryState, tryScope)) {
+                if (processor.isCatching(exception.error, tryTaskState, tryScope)) {
                     return processor.handleError(
                         failingNode = failingNode,
                         error = exception.error,
-                        state = tryState,
+                        state = tryTaskState,
                         scope = tryScope
                     )
                 }
@@ -606,16 +622,16 @@ object WorkflowOrchestrator {
      *
      * @param node The current node that was interrupted
      * @param rawOutput The output from the interrupted task
-     * @param states The current workflow states
+     * @param taskStates The current workflow states
      * @return StepResult containing the next node, dataset, and state updates
      */
     private fun completeInterruptedTask(
         node: Node<*>,
         rawOutput: JsonElement,
-        states: States
+        taskStates: TaskStates
     ): StepResult {
         val processor = getNodeProcessor(node)
-        val scope = getScope(node, states)
+        val scope = getScope(node, taskStates)
 
         return processor.completeTask(
             rawOutput = rawOutput,
