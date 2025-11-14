@@ -50,5 +50,5 @@ internal fun getWorkflowNode(
     val workflowYaml = document.trimIndent() + "\n" + doYaml.trimIndent()
     val workflow = DefinitionCache.parseAndPut(workflowYaml)
 
-    return DefinitionCache.getRootNode(workflow)
+    return DefinitionCache.getRootNode(workflow)!!
 }

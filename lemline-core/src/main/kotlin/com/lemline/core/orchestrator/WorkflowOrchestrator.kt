@@ -2,9 +2,6 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.logger.logger
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.errors.ChildWorkflowException
 import com.lemline.core.errors.InternalWorkflowException
@@ -132,13 +129,11 @@ object WorkflowOrchestrator {
         executionMode: ExecutionMode
     ): WorkflowState {
 
-        val rootNode = DefinitionCache.getRootNodeFromCache(
-            namespace = WorkflowNamespace(namespace),
-            name = WorkflowName(name),
-            version = WorkflowVersion(version)
-        ) ?: throw IllegalStateException(
-            "RootNode not found for workflow: $namespace/$name/$version"
-        )
+        val workflow = DefinitionCache.getWorkflow(namespace, name, version)
+            ?: throw IllegalStateException("Workflow definition not found: $namespace/$name/$version")
+
+
+        val rootNode = DefinitionCache.getRootNode(workflow)
 
         return resumeFromTask(
             states = mutableMapOf(),
@@ -158,15 +153,14 @@ object WorkflowOrchestrator {
         executionMode: ExecutionMode
     ): WorkflowState {
 
-        val nodesMap = DefinitionCache.getNodesMapFromCache(
-            namespace = WorkflowNamespace(namespace),
-            name = WorkflowName(name),
-            version = WorkflowVersion(version)
-        )
+        val workflow = DefinitionCache.getWorkflow(namespace, name, version)
+            ?: throw IllegalStateException("Workflow definition not found: $namespace/$name/$version")
 
-        fun NodePosition.node(): Node<*> = nodesMap?.get(this) ?: throw IllegalStateException(
-            "Node not found at position $this in workflow: $namespace/$name/$version"
-        )
+        val nodesMap = DefinitionCache.getNodesMap(workflow)
+            ?: throw IllegalStateException("Nodes not found for workflow: $namespace/$name/$version")
+
+        fun NodePosition.node(): Node<*> = nodesMap[this]
+            ?: throw IllegalStateException("Node not found at position $this in workflow: $namespace/$name/$version")
 
         return when (state) {
             is WorkflowState.Completed -> state
@@ -413,19 +407,19 @@ object WorkflowOrchestrator {
     /**
      * Resolves the root node of a sub-workflow from the definition cache.
      */
-    private fun resolveSubWorkflowRootNode(exception: ChildWorkflowException.Config): Node<*> {
-        val namespace = WorkflowNamespace(exception.namespace)
-        val name = WorkflowName(exception.name)
-        val version = WorkflowVersion(exception.version)
+    private fun resolveSubWorkflowRootNode(config: ChildWorkflowException.Config): Node<*> {
+        val childWorkflowName by lazy {
+            "(namespace=${config.namespace}, name=${config.name}, version=${config.version})"
+        }
 
-        logger.debug { "Resolving sub-workflow: namespace=$namespace, name=$name, version=$version" }
-
-        val subWorkflow = DefinitionCache.getWorkflowFromCache(namespace, name, version)
-            ?: throw IllegalStateException(
-                "Sub-workflow not found: namespace=$namespace, name=$name, version=$version"
-            )
-
-        return DefinitionCache.getRootNode(subWorkflow)
+        val childWorkflow = DefinitionCache.getWorkflow(
+            namespace = config.namespace,
+            name = config.name,
+            version = config.version
+        ) ?: throw IllegalStateException(
+            "Workflow definition not found for sub-workflow: $childWorkflowName"
+        )
+        return DefinitionCache.getRootNode(childWorkflow)
     }
 
     /**

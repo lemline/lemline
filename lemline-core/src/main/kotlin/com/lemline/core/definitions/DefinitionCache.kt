@@ -2,14 +2,14 @@
 package com.lemline.core.definitions
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.WorkflowIndex
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.common.values.index
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.RootTask
-import com.lemline.core.workflows.WorkflowIndex
-import com.lemline.core.workflows.index
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader
 import io.serverlessworkflow.api.types.Workflow
@@ -19,21 +19,19 @@ import org.jetbrains.annotations.TestOnly
 object DefinitionCache {
 
     private val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
-    private val rootNodesCache = ConcurrentHashMap<WorkflowIndex, Node<RootTask>>()
     private val nodesMapCache = ConcurrentHashMap<WorkflowIndex, Map<NodePosition, Node<*>>>()
 
     private val jsonMapper = LemlineJson.jacksonMapper
     private val yamlMapper = LemlineJson.yamlMapper
 
     /**
-     * Parses a workflow definition string into a `Workflow` object.
+     * Parses a workflow definition provided as a string. The method attempts to parse the definition
+     * first as YAML. If YAML parsing fails, it falls back to parsing as JSON.
+     * The method returns a Workflow object if parsing is successful.
      *
-     * This method detects the format of the provided workflow definition (JSON or YAML)
-     * by actually attempting to decode the string as YAML first.
-     *
-     * @param definition The workflow definition as a string.
-     * @return The parsed `Workflow` object.
-     * @throws Exception if the workflow definition cannot be parsed.
+     * @param definition The workflow definition provided as a string. This can be a YAML or JSON formatted string.
+     * @return The parsed Workflow object.
+     * @throws Exception If both YAML and JSON parsing fail, an exception is thrown.
      */
     @JvmStatic
     fun parse(definition: String): Workflow {
@@ -48,96 +46,99 @@ object DefinitionCache {
         return jsonMapper.treeToValue(jsonNode, Workflow::class.java)
     }
 
+
     /**
-     * Adds a workflow definition to the cache.
+     * Parses the given workflow definition string in either YAML or JSON format,
+     * validates it, and adds it to the cache. If the definition is successfully parsed,
+     * it is cached along with its root node and nodes map for efficient retrieval.
      *
-     * This method parses the provided workflow definition in YAML format, validates it,
-     * and stores it in the workflow cache. It also parses and caches the workflow's nodes.
-     *
-     * @param definition The YAML string representing the workflow definition.
+     * @param definition The workflow definition as a string, expected to be in YAML or JSON format.
      * @return The parsed and validated Workflow object.
-     * @throws IllegalStateException if the workflow definition is invalid.
      */
     @JvmStatic
     fun parseAndPut(definition: String): Workflow =
-        WorkflowReader.validation().read(definition, WorkflowFormat.YAML).also { workflow ->
+        try {
+            WorkflowReader.validation().read(definition, WorkflowFormat.YAML)
+        } catch (_: Exception) {
+            WorkflowReader.validation().read(definition, WorkflowFormat.JSON)
+        }.also { workflow ->
             workflowCache[workflow.index] = workflow
-            rootNodesCache[workflow.index] = getRootNode(workflow).also {
-                nodesMapCache[workflow.index] = getNodeMap(it)
-            }
+            nodesMapCache[workflow.index] = getNodesMap(createRootNode(workflow))
         }
 
     /**
-     * Retrieves a workflow definition by its name and version.
+     * Retrieves a workflow from the workflow cache, uniquely identified by its namespace, name, and version.
      *
-     * This method uses the `getOrPut` function to either fetch the workflow from the cache
-     * or execute the provided factory function to handle the case where the workflow is not found.
-     * If the workflow is not found, an error is thrown.
-     *
-     * @param name The name of the workflow.
-     * @param version The version of the workflow.
-     * @return The workflow definition.
-     * @throws IllegalStateException if the workflow is not found.
+     * @param namespace The namespace of the workflow to retrieve.
+     * @param name The name of the workflow to retrieve.
+     * @param version The version of the workflow to retrieve.
+     * @return The corresponding Workflow object if found in the cache, or null if not found.
      */
     @JvmStatic
-    fun getWorkflowFromCache(
-        namespace: WorkflowNamespace,
-        name: WorkflowName,
-        version: WorkflowVersion
-    ): Workflow? = workflowCache[WorkflowIndex(namespace, name, version)]
+    fun getWorkflow(
+        namespace: String,
+        name: String,
+        version: String
+    ): Workflow? =
+        workflowCache[WorkflowIndex(WorkflowNamespace(namespace), WorkflowName(name), WorkflowVersion(version))]
 
     /**
-     * Retrieves a map of nodes corresponding to a specific workflow, identified by namespace, name, and version.
+     * Retrieves a map of node positions to their corresponding nodes for a given workflow.
      *
-     * @param namespace The namespace of the workflow.
-     * @param name The name of the workflow.
-     * @param version The version of the workflow.
-     * @return A map where the keys are node positions and the values are the corresponding nodes, or null if no such map exists.
+     * @param workflow The workflow whose nodes map is to be retrieved.
+     * @return A map where the keys are instances of NodePosition representing the positions of nodes,
+     *         and the values are the corresponding Node objects.
+     * @throws IllegalStateException if the workflow is not found in the cache.
      */
     @JvmStatic
-    fun getNodesMapFromCache(
-        namespace: WorkflowNamespace,
-        name: WorkflowName,
-        version: WorkflowVersion
-    ): Map<NodePosition, Node<*>>? = nodesMapCache[WorkflowIndex(namespace, name, version)]
+    fun getNodesMap(
+        workflow: Workflow
+    ): Map<NodePosition, Node<*>> = nodesMapCache[workflow.index]
+        ?: throw IllegalStateException("Workflow not found in cache for ${workflow.index}")
 
 
     /**
-     * Retrieves the root node of a workflow from the cache using the specified namespace, name, and version.
+     * Retrieves the root node of the given workflow. The root node represents
+     * the entry point of the workflow's task hierarchy.
      *
-     * @param namespace The namespace of the workflow.
-     * @param name The name of the workflow.
-     * @param version The version of the workflow.
-     * @return The root node of the workflow, or null if not found in the cache.
+     * @param workflow The workflow whose root node is to be retrieved.
+     * @return The root node of the workflow, represented as a `Node<RootTask>`.
+     * @throws IllegalStateException If the nodes map for the workflow is not found in the cache
+     * or if the root node is not found in the nodes map.
      */
     @JvmStatic
-    fun getRootNodeFromCache(
-        namespace: WorkflowNamespace,
-        name: WorkflowName,
-        version: WorkflowVersion
-    ): Node<RootTask>? = rootNodesCache[WorkflowIndex(namespace, name, version)]
+    fun getRootNode(
+        workflow: Workflow
+    ): Node<RootTask> {
+        val nodesMap = nodesMapCache[workflow.index]
+            ?: throw IllegalStateException("Nodes map not found in cache for ${workflow.index}")
+
+        val rootNode = nodesMap[NodePosition.root]
+            ?: throw IllegalStateException("Root node not found in nodes for ${workflow.index}")
+
+        @Suppress("UNCHECKED_CAST")
+        return rootNode as Node<RootTask>
+    }
 
     /**
      * Retrieves the root node of the given workflow.
      * The root node is the Node<RootTask> at the root level of the workflow.
      */
-    internal fun getRootNode(workflow: Workflow): Node<RootTask> = rootNodesCache.getOrPut(workflow.index) {
-        Node(
-            position = NodePosition.root,
-            task = RootTask(workflow.document, workflow.`do`, workflow.use).also {
-                it.output = workflow.output
-                it.input = workflow.input
-            },
-            name = NodePosition.root.toString(),
-            parent = null,
-        )
-    }
+    private fun createRootNode(workflow: Workflow): Node<RootTask> = Node(
+        position = NodePosition.root,
+        task = RootTask(workflow.document, workflow.`do`, workflow.use).also {
+            it.output = workflow.output
+            it.input = workflow.input
+        },
+        name = NodePosition.root.toString(),
+        parent = null,
+    )
 
     /**
      * Constructs a map of all nodes in a hierarchical tree starting from the given root node.
      * Each node is mapped to its position in the workflow.
      */
-    private fun getNodeMap(nodeRoot: Node<RootTask>): Map<NodePosition, Node<*>> {
+    private fun getNodesMap(nodeRoot: Node<RootTask>): Map<NodePosition, Node<*>> {
 
         val map = mutableMapOf<NodePosition, Node<*>>()
 
@@ -160,7 +161,6 @@ object DefinitionCache {
     @TestOnly
     fun clear() {
         workflowCache.clear()
-        rootNodesCache.clear()
         nodesMapCache.clear()
     }
 }

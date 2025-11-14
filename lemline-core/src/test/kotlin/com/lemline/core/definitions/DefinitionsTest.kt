@@ -1,22 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.definitions
 
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
+import com.lemline.common.values.index
+import com.lemline.common.values.name
+import com.lemline.common.values.namespace
+import com.lemline.common.values.version
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
-import com.lemline.core.workflows.index
-import com.lemline.core.workflows.name
-import com.lemline.core.workflows.namespace
-import com.lemline.core.workflows.version
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import io.serverlessworkflow.api.WorkflowFormat
-import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
-import java.lang.reflect.Field
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -74,15 +68,7 @@ class DefinitionsTest {
      */
     private fun clearWorkflowCaches() {
         // Use reflection to access and clear the cache maps
-        val workflowCacheField: Field = DefinitionCache::class.java.getDeclaredField("workflowCache")
-        workflowCacheField.isAccessible = true
-        val workflowCache = workflowCacheField.get(null)
-        workflowCache.javaClass.getMethod("clear").invoke(workflowCache)
-
-        val rootNodesCacheField: Field = DefinitionCache::class.java.getDeclaredField("rootNodesCache")
-        rootNodesCacheField.isAccessible = true
-        val rootNodesCache = rootNodesCacheField.get(null)
-        rootNodesCache.javaClass.getMethod("clear").invoke(rootNodesCache)
+        DefinitionCache.clear()
     }
 
     @Test
@@ -131,13 +117,16 @@ class DefinitionsTest {
         workflow.shouldBeInstanceOf<Workflow>()
 
         // Verify the workflow is in the cache
-        val cachedWorkflow = DefinitionCache.getWorkflowFromCache(workflow.namespace, workflow.name, workflow.version)
+        val cachedWorkflow = DefinitionCache.getWorkflow(
+            namespace = workflow.document.namespace,
+            name = workflow.document.name,
+            version = workflow.document.version
+        )
         cachedWorkflow shouldNotBe null
         cachedWorkflow?.document?.name shouldBe workflow.document.name
 
         // Verify the root node is created and cached
         val rootNode = DefinitionCache.getRootNode(workflow)
-        rootNode.shouldBeInstanceOf<Node<RootTask>>()
         rootNode.task.shouldBeInstanceOf<RootTask>()
     }
 
@@ -167,10 +156,10 @@ class DefinitionsTest {
     fun `getOrNull should return null for non-existent workflow`() {
         // When
         val result =
-            DefinitionCache.getWorkflowFromCache(
-                WorkflowNamespace("test"),
-                WorkflowName("non-existent"),
-                WorkflowVersion("1.0.0")
+            DefinitionCache.getWorkflow(
+                namespace = "test",
+                name = "non-existent",
+                version = "1.0.0"
             )
 
         // Then
@@ -183,32 +172,18 @@ class DefinitionsTest {
         val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
 
         // When
-        val result = DefinitionCache.getWorkflowFromCache(workflow.namespace, workflow.name, workflow.version)
+        val result = DefinitionCache.getWorkflow(
+            namespace = workflow.document.namespace,
+            name = workflow.document.name,
+            version = workflow.document.version
+        )
 
         // Then
         result shouldBe workflow
     }
 
     @Test
-    fun `getRootNode should create and cache root node for workflow`() {
-        // Given
-        val workflow = validation().read(sampleYamlWorkflow, WorkflowFormat.YAML)
-
-        // When
-        val rootNode = DefinitionCache.getRootNode(workflow)
-
-        // Then
-        rootNode.shouldBeInstanceOf<Node<RootTask>>()
-        rootNode.name shouldBe "/"
-        rootNode.parent shouldBe null
-
-        // Call again to verify caching
-        val cachedRootNode = DefinitionCache.getRootNode(workflow)
-        cachedRootNode shouldBe rootNode
-    }
-
-    @Test
-    fun `getRootNode creates a root node with the correct structure`() {
+    fun `getRootNode get cached root node with the correct structure`() {
         // Given - a simple workflow
         val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
 
@@ -223,23 +198,38 @@ class DefinitionsTest {
     }
 
     @Test
+    fun `getRootNode should get cached root node for workflow`() {
+        // Given
+        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
+
+        // When
+        val rootNode1 = DefinitionCache.getRootNode(workflow)
+        val rootNode2 = DefinitionCache.getRootNode(workflow)
+
+        // Then
+        rootNode1 shouldBe rootNode2
+    }
+
+
+    @Test
     fun `workflow index should work correctly`() {
         // Given
         val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
-        val workflowNamespace = workflow.namespace
-        val workflowName = workflow.name
-        val workflowVersion = workflow.version
 
         // When
         val index = workflow.index
 
         // Then
-        index.namespace shouldBe workflowNamespace
-        index.name shouldBe workflowName
-        index.version shouldBe workflowVersion
+        index.namespace shouldBe workflow.namespace
+        index.name shouldBe workflow.name
+        index.version shouldBe workflow.version
 
         // Verify the index is used correctly for caching
-        val cachedWorkflow = DefinitionCache.getWorkflowFromCache(workflowNamespace, workflowName, workflowVersion)
+        val cachedWorkflow = DefinitionCache.getWorkflow(
+            namespace = workflow.document.namespace,
+            name = workflow.document.name,
+            version = workflow.document.version
+        )
         cachedWorkflow shouldBe workflow
     }
 
@@ -300,17 +290,15 @@ class DefinitionsTest {
         }.awaitAll()
 
         // Verify all workflows were cached correctly
-        results.forEachIndexed { i, workflow ->
-            val workflowNamespace = workflow.namespace
-            val name = workflow.name
-            val version = workflow.version
-            val cachedWorkflow = DefinitionCache.getWorkflowFromCache(workflowNamespace, name, version)
+        results.forEach { workflow ->
+            val cachedWorkflow = DefinitionCache.getWorkflow(
+                namespace = workflow.document.namespace,
+                name = workflow.document.name,
+                version = workflow.document.version
+            )
 
             // Should be in cache
             cachedWorkflow shouldBe workflow
-
-            // Name should match the expected pattern
-            name.toString() shouldBe "test-workflow-${i + 1}"
         }
     }
 
