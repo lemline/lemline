@@ -29,9 +29,9 @@ data class ForState(
 
     override val scope: Scope
         get() = buildJsonObject {
-            // Add iteration variables with current values
-            if (index >= 0 && index < collection.size) {
-                put(forEach, collection[index])
+            // the first element of the collection is removed at each iteration
+            if (collection.isNotEmpty()) {
+                put(forEach, collection[0])
                 put(forAt, JsonPrimitive(index))
             }
         }

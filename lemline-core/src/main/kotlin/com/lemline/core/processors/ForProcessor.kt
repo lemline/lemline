@@ -76,30 +76,29 @@ class ForProcessor(
         // Check if we should continue looping (while condition and collection bounds)
         return when (shouldContinue(updatedState, dataset, scope)) {
             false -> NextStepInfo(
-                updatedCurrentState = null,
+                updatedState = null,
                 nextNode = node.parent,
                 flowDirective = getFlowDirective()
             )
 
             true -> NextStepInfo(
-                updatedCurrentState = updatedState,
+                updatedState = updatedState,
                 nextNode = getDoNode(),
                 flowDirective = null
             )
         }
     }
 
-    // Update the state without copying the collection
+    // At each iteration, we remove the first item from the collection and increment the index
     private fun getNextState(state: ForState): ForState = ForState.from(
         node = node,
         startedAt = state.startedAt,
-        collection = state.collection,
+        collection = if (state.index >= 0) state.collection.drop(1) else state.collection,
         index = state.index + 1
     )
 
     private fun shouldContinue(updatedState: ForState, transformedInput: JsonElement, scope: Scope) =
-        updatedState.index < updatedState.collection.size &&
-            evalWhile(transformedInput, scope)
+        updatedState.collection.isNotEmpty() && evalWhile(transformedInput, scope)
 
     private fun evalWhile(dataset: JsonElement, scope: Scope): Boolean {
         val whileCondition = node.task.`while` ?: return true

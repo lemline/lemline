@@ -60,13 +60,13 @@ class DoProcessor(
         val updatedState = state.copy(index = nextIndex)
         return when (nextIndex >= (node.children?.size ?: 0)) {
             true -> NextStepInfo(
-                updatedCurrentState = null,
+                updatedState = null,
                 nextNode = node.parent,
                 flowDirective = getFlowDirective()
             )
 
             false -> NextStepInfo(
-                updatedCurrentState = updatedState,
+                updatedState = updatedState,
                 nextNode = getChildByIndex(nextIndex),
                 flowDirective = null
             )

@@ -98,13 +98,13 @@ class TryProcessor(
     ) = when (state.attemptIndex < 0) {
         // first attempt
         true -> NextStepInfo(
-            updatedCurrentState = state.newAttemptState(),
+            updatedState = state.newAttemptState(),
             nextNode = getDoTry(),
             flowDirective = null
         )
         // completed, go to parent
         false -> NextStepInfo(
-            updatedCurrentState = null,
+            updatedState = null,
             nextNode = node.parent,
             flowDirective = getFlowDirective()
         )

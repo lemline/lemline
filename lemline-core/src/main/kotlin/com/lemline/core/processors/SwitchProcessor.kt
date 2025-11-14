@@ -94,7 +94,7 @@ class SwitchProcessor(
         }
 
         return NextStepInfo(
-            updatedCurrentState = null,
+            updatedState = null,
             nextNode = node.parent,
             flowDirective = directive
         )

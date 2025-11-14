@@ -61,7 +61,7 @@ class RootProcessor(
         namedNode: String?,
     ): NextStepInfo = when (state.hasRun) {
         true -> NextStepInfo(
-            updatedCurrentState = null,
+            updatedState = null,
             nextNode = null,
             flowDirective = null
         )
@@ -69,7 +69,7 @@ class RootProcessor(
         false -> {
             val updatedState = state.copy(hasRun = true)
             NextStepInfo(
-                updatedCurrentState = updatedState,
+                updatedState = updatedState,
                 nextNode = getDoNode(),
                 flowDirective = null
             )

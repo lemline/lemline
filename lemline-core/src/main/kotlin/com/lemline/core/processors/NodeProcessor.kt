@@ -439,7 +439,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
  * - A `FlowDirective?`: Directives influencing the parent execution flow (if any)
  */
 data class NextStepInfo(
-    val updatedCurrentState: NodeState?,
+    val updatedState: NodeState?,
     val nextNode: Node<*>?,
     val flowDirective: FlowDirective?
 )
