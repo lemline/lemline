@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.failures
 
-import com.lemline.core.errors.WorkflowException
+import com.lemline.core.errors.InternalWorkflowException
 import java.io.IOException
 import java.sql.SQLException
 import kotlin.time.ExperimentalTime
@@ -14,6 +14,7 @@ object FailureReasons {
     const val DEFINITION_MISSING = "definition_missing"
     const val SECRETS_RETRIEVAL_FAILURE = "secrets_retrieval_failure"
     const val WORKFLOW_INIT_FAILURE = "workflow_init_failure"
+    const val WORKFLOW_EXECUTION_FAILURE = "workflow_execution_failure"
     const val MESSAGE_EMISSION_FAILURE = "message_emission_failure"
     const val DATABASE_FAILURE = "database_failure"
     const val IO_FAILURE = "io_failure"
@@ -27,7 +28,7 @@ object FailureReasons {
      */
     fun getFailureReason(e: Throwable): String = when (e) {
         // Domain-specific errors from the workflow engine
-        is WorkflowException -> e.error.type.lowercase()
+        is InternalWorkflowException -> e.error.type.lowercase()
 
         // --- Database & Persistence Errors ---
         is SQLException -> DATABASE_FAILURE

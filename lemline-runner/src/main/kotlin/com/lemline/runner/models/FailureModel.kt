@@ -3,7 +3,7 @@ package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.states.WorkflowState
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.instances.InstanceMessage

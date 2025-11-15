@@ -2,6 +2,7 @@
 package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
+import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.errors.WorkflowException
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
@@ -90,15 +91,16 @@ data class RetryOutboxModel(
             instanceMessage = instance,
             errorReason = reason,
             errorClass = when (error) {
-                is WorkflowException -> error.error.type
+                is InternalWorkflowException -> error.error.type
+                is WorkflowException -> error::class.simpleName ?: "WorkflowException"
                 else -> error::class.qualifiedName!!
             },
             errorMessage = when (error) {
-                is WorkflowException -> error.error.title
+                is InternalWorkflowException -> error.error.title
                 else -> error.message
             },
             errorStackTrace = when (error) {
-                is WorkflowException -> error.error.toJsonPrettyString()
+                is InternalWorkflowException -> error.error.toJsonPrettyString()
                 else -> error.stackTraceToString()
             },
             outboxScheduledFor = outboxScheduledFor,

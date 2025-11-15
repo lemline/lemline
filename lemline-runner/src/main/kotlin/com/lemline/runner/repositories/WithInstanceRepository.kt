@@ -7,9 +7,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.nodes.NodePosition
-import com.lemline.core.workflows.NodeStates
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.InstanceModel
 import java.sql.Connection
@@ -77,10 +75,10 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
                 stmt.setString(idx, entity.workflowVersion?.toString())
             },
             WORKFLOW_POSITION_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.workflowState?.currentPosition?.toString())
+                stmt.setString(idx, entity.workflowState?.nodePosition?.toString())
             },
             WORKFLOW_STATE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                stmt.setString(idx, entity.workflowState?.currentStates?.toJsonString())
+                stmt.setString(idx, entity.workflowState?.toJsonString())
             },
             PARENT_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 setIDV7(stmt, idx, entity.parentId)
@@ -97,10 +95,7 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
                 workflowName = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
                 workflowVersion = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
             ),
-            workflowState = WorkflowState(
-                currentPosition = NodePosition.from(getString(WORKFLOW_POSITION_COLUMN)),
-                currentStates = NodeStates.fromJsonString(getString(WORKFLOW_STATE_COLUMN)),
-            ),
+            workflowState = WorkflowState.fromJsonString(getString(WORKFLOW_STATE_COLUMN)),
             parentId = getIDV7(this, PARENT_ID_COLUMN),
         )
     }

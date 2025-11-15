@@ -5,7 +5,7 @@ import com.lemline.common.json.JsonSerializable
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WithOptionalWorkflowInfo
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.states.WorkflowState
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable

@@ -4,14 +4,12 @@ package com.lemline.runner.models
 import com.lemline.common.values.IDV7
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
-import kotlinx.serialization.json.JsonElement
 
 @ExperimentalSerializationApi
 @ExperimentalTime
@@ -22,7 +20,7 @@ data class ParentOutboxModel(
     override val id: IDV7,
 
     @SerialName("i")
-    override val instanceMessage: InstanceMessage,
+    override var instanceMessage: InstanceMessage,
 
     @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
@@ -45,18 +43,6 @@ data class ParentOutboxModel(
 
     @Transient
     override var outboxErrorStackTrace: String? = null
-
-    /**
-     * Completes the instance's state by setting the output at the current position.
-     * Set also outboxScheduledFor as now to restart this workflow.
-     */
-    fun completeWith(output: JsonElement) {
-        // Update the workflow state with the output
-        instanceMessage.workflowState.setCurrentTaskOutput(output)
-        // Update the status and scheduled time as we are restarting this workflow
-        outBoxStatus = OutBoxStatus.SENT
-        outboxScheduledFor = Clock.System.now()
-    }
 
     // Needed by tests
     companion object

@@ -293,8 +293,8 @@ internal abstract class WorkflowConsumerTest {
             msg.instanceMessages.isEmpty() shouldBe true
             msg.instanceModels.size shouldBe 1
             val retry = msg.instanceModels[0] as RetryOutboxModel
-            retry.instanceMessage.workflowState.currentPosition.toString() shouldBe "/do/3/retryCase"
-            retry.errorReason shouldBe "https://serverlessworkflow.io/errors/not-implemented"
+            retry.instanceMessage.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
+            retry.errorReason shouldBe "Task retry"
             retry.outBoxStatus shouldBe OutBoxStatus.PENDING
             retry.outboxScheduledFor shouldNotBe null
         }
@@ -339,7 +339,7 @@ internal abstract class WorkflowConsumerTest {
             msg.instanceMessages.isEmpty() shouldBe true
             msg.instanceModels.size shouldBe 1
             val retry = msg.instanceModels[0] as WaitOutboxModel
-            retry.instanceMessage.workflowState.currentPosition.toString() shouldBe "/do/2/waitCase"
+            retry.instanceMessage.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
             retry.outBoxStatus shouldBe OutBoxStatus.PENDING
             retry.outboxScheduledFor shouldNotBe null
         }

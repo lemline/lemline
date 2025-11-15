@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.secrets
 
-import com.lemline.core.workflows.WorkflowIndex
-import com.lemline.core.workflows.index
 import com.lemline.runner.system.System
 import io.serverlessworkflow.api.types.Workflow
 import java.util.concurrent.ConcurrentHashMap
@@ -13,7 +11,7 @@ import kotlinx.serialization.json.JsonPrimitive
 
 object Secrets {
 
-    private val secretsCache = ConcurrentHashMap<WorkflowIndex, Map<String, JsonElement>>()
+    private val secretsCache = ConcurrentHashMap<String, Map<String, JsonElement>>()
 
     /**
      * Gets the secrets values from environment variables based on the workflow's secrets configuration.
@@ -23,7 +21,7 @@ object Secrets {
      * @return A map of secret names to their JsonNode values from environment variables
      * @throws IllegalStateException if a required secret is not found in environment variables
      */
-    fun getForWorkflow(workflow: Workflow): Map<String, JsonElement> = secretsCache.getOrPut(workflow.index) {
+    fun getForWorkflow(workflow: Workflow): Map<String, JsonElement> = secretsCache.getOrPut(getWorkflowKey(workflow)) {
         workflow.use?.secrets?.associateWith { secretName ->
             val value = System.getEnv(secretName)
                 ?: error("Required secret '$secretName' not found in environment variables")
@@ -33,6 +31,13 @@ object Secrets {
                 JsonPrimitive(value)
             }
         } ?: emptyMap()
+    }
+
+    private fun getWorkflowKey(workflow: Workflow): String {
+        val ns = workflow.document.namespace ?: "default"
+        val name = workflow.document.name
+        val version = workflow.document.version
+        return "$ns:$name:$version"
     }
 
     fun error(message: String): Nothing = throw IllegalStateException(message)

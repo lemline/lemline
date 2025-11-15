@@ -94,14 +94,26 @@ internal class DatabaseMessageHandler(
         parentId?.let { parentId ->
             // if there is an error when retrieving the parent, the MessageConsumer will mark the message as failed
             parentRepository.findById(parentId)?.let { parent ->
-                // updates the parent with the output at the current position
-                parent.completeWith(output!!)
-                // restarting the parent workflow
-                instanceEmitter.send(parent.instanceMessage)
-                // set parent status as SENT (allowing table cleaning by the outbox)
-                parentRepository.update(parent)
+                // Update the parent's workflow state with child's output
+                val currentState = parent.instanceMessage.workflowState
+                if (currentState !is com.lemline.core.states.WorkflowState.RunningChildWorkflow) {
+                    error("CRITICAL - Parent workflow ${parent.workflowId} is in unexpected state $currentState (expected RunningChildWorkflow) when child $workflowId completed")
+                }
+
+                val updatedParent = parent.copy(
+                    instanceMessage = parent.instanceMessage.copy(
+                        workflowState = currentState.copy(rawOutput = output!!)
+                    ),
+                    outBoxStatus = com.lemline.runner.outbox.OutBoxStatus.SENT,
+                    outboxScheduledFor = kotlin.time.Clock.System.now()
+                )
+
+                // Restart the parent workflow
+                instanceEmitter.send(updatedParent.instanceMessage)
+                // Set parent status as SENT (allowing table cleaning by the outbox)
+                parentRepository.update(updatedParent)
                 logger.debug {
-                    "Parent workflow ${parent.workflowId} (${parent.workflowName} of workflow $workflowId (${workflowName}), set up to restart at position ${parent.workflowState.currentPosition} with output $output"
+                    "Parent workflow ${updatedParent.workflowId} (${updatedParent.workflowName} of workflow $workflowId (${workflowName}), set up to restart at position ${updatedParent.workflowState.nodePosition} with output $output"
                 }
             }
                 ?: error("CRITICAL - Unable to find parent $parentId of workflow $workflowId ($workflowName) in $PARENT_TABLE table. The parent workflow will not be restarted.")
@@ -109,7 +121,7 @@ internal class DatabaseMessageHandler(
 
         // Case of workflow completion with scheduled after
         if (isScheduledAfter) {
-            scheduleRepository.findByWorkflowId(workflowId!!)?.let { schedule ->
+            scheduleRepository.findByWorkflowId(workflowId)?.let { schedule ->
                 // updates the scheduled execution instant from the after property.
                 schedule.scheduleAfterCompletion()
                 scheduleRepository.update(schedule)

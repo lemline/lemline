@@ -30,7 +30,7 @@ class Definitions() {
 
         if (workflowVersion == null) return get(workflowNamespace, workflowName)
 
-        return DefinitionCache.getOrNull(workflowNamespace, workflowName, workflowVersion)
+        return DefinitionCache.getWorkflow(workflowNamespace, workflowName, workflowVersion)
             ?: definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion)
                 ?.parseAndPut()
     }

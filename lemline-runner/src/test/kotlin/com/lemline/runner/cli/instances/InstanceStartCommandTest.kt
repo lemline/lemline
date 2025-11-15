@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.nodes.NodePosition
+import com.lemline.core.states.WorkflowState
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.messaging.database.DatabaseMessageEmitter
 import com.lemline.runner.messaging.instances.InstanceMessage
@@ -213,7 +214,7 @@ class InstanceStartCommandTest {
             put("number", 123)
         }
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe expectedJson
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
     }
 
     @Test
@@ -239,7 +240,7 @@ class InstanceStartCommandTest {
             })
         }
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe expectedJson
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
     }
 
     @Test
@@ -263,7 +264,7 @@ class InstanceStartCommandTest {
             put("number", 123)
         }
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe expectedJson
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
     }
 
     @Test
@@ -286,7 +287,7 @@ class InstanceStartCommandTest {
             put("number", 123)
         }
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe expectedJson
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
     }
 
     @Test
@@ -311,7 +312,7 @@ class InstanceStartCommandTest {
             add(JsonPrimitive("four"))
         }
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe expectedJson
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
     }
 
     @Test
@@ -339,7 +340,7 @@ class InstanceStartCommandTest {
             })
         }
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe expectedJson
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
     }
 
 
@@ -350,7 +351,7 @@ class InstanceStartCommandTest {
             executeCommandAndVerify(workflowNamespace.toString(), workflowName.toString(), workflowVersion.toString())
 
         // Get the raw input as a JsonElement
-        val rawInput = sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput
+        val rawInput = (sentMessage.workflowState as WorkflowState.Starting).input
 
         // When no input is provided, the command should use an empty JSON object
         rawInput shouldBe JsonObject(emptyMap())
@@ -371,7 +372,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive("just a string")
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive("just a string")
     }
 
     @Test
@@ -389,7 +390,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive(42)
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive(42)
     }
 
     @Test
@@ -407,7 +408,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive("42")
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive("42")
     }
 
     @Test
@@ -425,7 +426,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive("42")
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive("42")
     }
 
     @Test
@@ -443,7 +444,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive(true)
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive(true)
     }
 
     @Test
@@ -461,7 +462,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        sentMessage.workflowState.currentStates[NodePosition.root]?.rawInput shouldBe JsonPrimitive("true")
+        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive("true")
     }
 
     @Test
