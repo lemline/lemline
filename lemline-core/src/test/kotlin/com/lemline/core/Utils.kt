@@ -34,12 +34,23 @@ internal fun loadWorkflowFromYaml(resourcePath: String): Workflow {
  * @param version Optional workflow version
  * @return Root Node for use with CompleteOrchestrator.run()
  */
-internal fun getWorkflowNode(
+internal fun getRootNodeOfWorkflowToTest(
     doYaml: String,
     namespace: String = "test",
     name: String = "workflow-${doYaml.hashCode()}",
     version: String = "0.1.0",
 ): Node<RootTask> {
+    val workflow = getWorkflowToTest(doYaml, namespace, name, version)
+
+    return DefinitionCache.getRootNode(workflow)
+}
+
+internal fun getWorkflowToTest(
+    doYaml: String,
+    namespace: String = "test",
+    name: String = "workflow-${doYaml.hashCode()}",
+    version: String = "0.1.0",
+): Workflow {
     val document =
         """document:
               dsl: '1.0.0'
@@ -48,7 +59,5 @@ internal fun getWorkflowNode(
               version: $version
         """
     val workflowYaml = document.trimIndent() + "\n" + doYaml.trimIndent()
-    val workflow = DefinitionCache.parseAndPut(workflowYaml)
-
-    return DefinitionCache.getRootNode(workflow)!!
+    return DefinitionCache.parseAndPut(workflowYaml)
 }

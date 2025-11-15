@@ -2,9 +2,9 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.logger.logger
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
+import com.lemline.common.values.name
+import com.lemline.common.values.namespace
+import com.lemline.common.values.version
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.errors.ChildWorkflowException
 import com.lemline.core.errors.InternalWorkflowException
@@ -48,8 +48,11 @@ import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.WaitTask
+import io.serverlessworkflow.api.types.Workflow
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -113,64 +116,26 @@ object WorkflowOrchestrator {
     private val logger = logger()
 
     /**
-     * Initiates the execution of a workflow by retrieving its root node and starting
-     * the processing task based on the provided input and execution mode.
+     * Resumes the execution of a workflow from a given state, continuing the execution based
+     * on the current workflow state and execution mode provided.
      *
-     * @param namespace The namespace of the workflow to execute.
-     * @param name The name of the workflow to execute.
-     * @param version The version of the workflow to execute.
-     * @param input The input data in the form of a `JsonElement` to begin the workflow.
-     * @param executionMode Determines the execution mode (e.g., CONTINUOUS, TASK_BY_TASK, etc.).
-     * @return A `WorkflowResult` which represents the state or result of the workflow execution,
-     * including completion, failure, or next task to process.
+     * @param workflow The workflow object representing the structure and logic of the process.
+     * @param state The current state of the workflow that determines how execution should proceed.
+     * @param executionMode The mode of execution to follow during the workflow process.
+     * @return The new state of the workflow after resuming its execution.
      */
-    @JvmStatic
-    suspend fun start(
-        namespace: WorkflowNamespace,
-        name: WorkflowName,
-        version: WorkflowVersion,
-        input: JsonElement,
-        executionMode: ExecutionMode
-    ): WorkflowState {
-
-        val workflow = DefinitionCache.getWorkflow(namespace, name, version)
-            ?: throw IllegalStateException("Workflow definition not found: $namespace/$name/$version")
-
-
-        val rootNode = DefinitionCache.getRootNode(workflow)
-
-        return resumeFromTask(
-            taskStates = mutableMapOf(),
-            node = rootNode,
-            rawInput = input,
-            flowDirective = null,
-            executionMode = executionMode
-        )
-    }
-
-    @JvmStatic
     suspend fun resume(
-        namespace: WorkflowNamespace,
-        name: WorkflowName,
-        version: WorkflowVersion,
+        workflow: Workflow,
         state: WorkflowState,
         executionMode: ExecutionMode
     ): WorkflowState {
-
-        val workflow = DefinitionCache.getWorkflow(namespace, name, version)
-            ?: throw IllegalStateException("Workflow definition not found: $namespace/$name/$version")
-
         val nodesMap = DefinitionCache.getNodesMap(workflow)
 
         fun NodePosition.node(): Node<*> = nodesMap[this]
-            ?: throw IllegalStateException("Node not found at position $this in workflow: $namespace/$name/$version")
+            ?: throw IllegalStateException("Node not found at position $this in workflow: ${workflow.namespace}/${workflow.name}/${workflow.version}")
 
         return when (state) {
             is WorkflowState.Starting -> {
-                val workflow = DefinitionCache.getWorkflow(namespace, name, version)
-                    ?: throw IllegalStateException("Workflow definition not found: $namespace/$name/$version")
-
-
                 val rootNode = DefinitionCache.getRootNode(workflow)
 
                 resumeFromTask(
@@ -204,13 +169,13 @@ object WorkflowOrchestrator {
 
             is WorkflowState.ReadyForNextTask -> resumeFromTask(
                 taskStates = state.taskStates,
-                node = state.nextNodePosition.node(),
-                rawInput = state.nextRawInput,
-                flowDirective = state.nextFlowDirective?.toJava(),
+                node = state.nodePosition.node(),
+                rawInput = state.rawInput,
+                flowDirective = state.flowDirective?.toJava(),
                 executionMode = executionMode
             )
 
-            is WorkflowState.WaitingToRetry -> resumeFromTask(
+            is WorkflowState.Retrying -> resumeFromTask(
                 taskStates = state.taskStates,
                 node = state.nodePosition.node(),
                 rawInput = state.rawInput,
@@ -276,7 +241,7 @@ object WorkflowOrchestrator {
                     taskStates = taskStates.toMap(),
                     nodePosition = node.position,
                     rawOutput = e.transformedInput,
-                    duration = e.config.duration,
+                    waitUntil = e.config.waitUntil,
                 )
                 // run the wait
                 tryCatch(node, taskStates) {
@@ -287,26 +252,26 @@ object WorkflowOrchestrator {
             // Create new states map with updated state updates and context exports
             val newStates = taskStates.updateWith(result.stateUpdates, result.newContext)
 
-            when (val delay = result.delay) {
+            when (val retryAt = result.retryAt) {
                 // Task completed
                 null -> if (executionMode.stopAfterTaskCompletion(node) && result.nextNode != null)
                     return WorkflowState.ReadyForNextTask(
                         taskStates = newStates,
-                        nextNodePosition = result.nextNode.position,
-                        nextRawInput = result.rawInput,
-                        nextFlowDirective = result.flowDirective?.toKotlin(),
+                        nodePosition = result.nextNode.position,
+                        rawInput = result.rawInput,
+                        flowDirective = result.flowDirective?.toKotlin(),
                     )
                 // Task retried
                 else -> {
-                    if (executionMode.isAsync()) return WorkflowState.WaitingToRetry(
+                    if (executionMode.isAsync()) return WorkflowState.Retrying(
                         taskStates = newStates,
                         nodePosition = result.nextNode!!.position,
                         rawInput = result.rawInput,
                         flowDirective = result.flowDirective?.toKotlin(),
-                        duration = delay
+                        retryAt = retryAt
                     )
                     // wait before retry
-                    executeDelay(delay, "Retrying at node: ${node.name} after")
+                    executeDelay(retryAt, "Retrying at node: ${node.name} after")
                 }
             }
 
@@ -336,7 +301,7 @@ object WorkflowOrchestrator {
         }
     }
 
-    suspend fun resumeFromInterruptedTask(
+    internal suspend fun resumeFromInterruptedTask(
         node: Node<*>,
         rawOutput: JsonElement,
         taskStates: TaskStates,
@@ -396,7 +361,7 @@ object WorkflowOrchestrator {
         taskStates: TaskStates
     ): StepResult {
         // waiting
-        executeDelay(exception.config.duration, "Waiting at node: ${current.name} for")
+        executeDelay(exception.config.waitUntil, "Waiting at node: ${current.name} for")
         // complete the wait task
         return completeInterruptedTask(current, exception.transformedInput, taskStates)
     }
@@ -497,9 +462,10 @@ object WorkflowOrchestrator {
     /**
      * Handles a delay operation
      */
-    suspend fun executeDelay(delayDuration: Duration, logMessage: String) {
+    suspend fun executeDelay(waitUntil: Instant, logMessage: String) {
+        val delayDuration = waitUntil - Clock.System.now()
         logger.debug { "$logMessage: $delayDuration" }
-        delay(delayDuration)
+        if (delayDuration > Duration.ZERO) delay(delayDuration)
         logger.debug { "Delay completed" }
     }
 

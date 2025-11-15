@@ -174,7 +174,7 @@ class TryProcessor(
                 nextNode = getDoTry(),  // Re-enter try body
                 rawInput = state.transformedInput,  // Original input
                 stateUpdates = updatesToCleanState(failingNode, state.newAttemptState(error)),
-                delay = retryPolicy!!.getRetryDelay(state.attemptIndex)
+                retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(state.attemptIndex)
             )
             // Otherwise, enter the catch block
             else -> StepResult(

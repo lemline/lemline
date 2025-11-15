@@ -34,6 +34,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
 
+@ExperimentalTime
 abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     val node: Node<T>
 ) {
@@ -76,8 +77,6 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // ========================================
     // Entering a Node for the first time
     // ========================================
-
-    @ExperimentalTime
     suspend fun enterFromParent(rawInput: JsonElement, parentScope: Scope): StepResult {
         // Create execution context
         val now = Clock.System.now()
@@ -117,7 +116,6 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // ========================================
 
     // here we process the current node, knowing that we come from a child node that output dataset and flow directive
-    @ExperimentalTime
     suspend fun enterFromChild(
         state: S,
         flowDirective: FlowDirective?,
@@ -142,7 +140,6 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // ========================================
     // CONTINUE
     // ========================================
-    @ExperimentalTime
     suspend fun continueTo(
         state: S,
         transformedInput: JsonElement,
@@ -178,7 +175,6 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // ========================================
     // EXIT
     // ========================================
-    @ExperimentalTime
     internal suspend fun continueToParent(
         dataset: JsonElement,
         currentFlowDirective: FlowDirective?,
@@ -202,7 +198,6 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
      * This is separated from continueToParent to allow the orchestrator to
      * complete tasks that were executed externally (e.g., child workflows).
      */
-    @ExperimentalTime
     internal fun completeTask(
         rawOutput: JsonElement,
         currentFlowDirective: FlowDirective?,
@@ -250,7 +245,6 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // Scope Method
     // ========================================
 
-    @ExperimentalTime
     private fun mergeScope(parentScope: Scope, taskContext: TaskContext?) =
         parentScope.merge(taskContext?.toScope(node))
 

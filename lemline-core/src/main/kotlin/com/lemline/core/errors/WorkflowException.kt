@@ -6,7 +6,9 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
-import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -63,6 +65,13 @@ open class InternalWorkflowException(
 
         companion object Companion {
             private const val URI_BASE = "https://serverlessworkflow.io/spec/1.0.0/errors"
+
+            fun fromUnexpectedException(e: Exception, position: NodePosition) = Error(
+                errorType = WorkflowErrorType.RUNTIME,
+                position = position,
+                title = e.message,
+                details = e.stackTraceToString(),
+            )
         }
     }
 
@@ -114,22 +123,24 @@ class ChildWorkflowException(
  *
  * @property config The configuration specifying the details of the wait, including the delay duration.
  */
+@ExperimentalTime
 class WaitWorkflowException(
     val transformedInput: JsonElement,
     val config: Config
 ) : WorkflowException() {
 
     /**
-     * Configuration for specifying a delay during workflow execution.
+     * Configuration for specifying the wait duration in a workflow task.
      *
-     * This data class represents the configuration details related to wait actions in
-     * workflows. The wait action is executed with a specified delay, represented by the
-     * [Duration] value.
+     * This configuration is used to indicate a target timestamp until which
+     * a delay or pause is requested during a workflow's execution. It is typically
+     * used in conjunction with orchestrators to manage timed pauses or schedule
+     * task execution at a specific time.
      *
-     * @property duration The amount of time to delay the workflow execution.
+     * @property waitUntil The timestamp indicating when the wait should end.
      */
     @Serializable
     data class Config(
-        val duration: Duration,
+        @Contextual val waitUntil: Instant
     )
 }

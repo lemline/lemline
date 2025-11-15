@@ -38,7 +38,7 @@ class WorkflowStateTest {
             WorkflowState.Failed.random(),
             WorkflowState.ReadyForNextTask.random(),
             WorkflowState.Waiting.random(),
-            WorkflowState.WaitingToRetry.random(),
+            WorkflowState.Retrying.random(),
             WorkflowState.RunningChildWorkflow.random()
         )
 

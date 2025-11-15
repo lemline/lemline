@@ -5,32 +5,35 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.TaskState
 import io.serverlessworkflow.api.types.FlowDirective
-import kotlin.time.Duration
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 /**
- * Result of a single execution step in the pure functional model.
+ * Represents the result of a single step or execution attempt of a node in a workflow.
  *
- * This represents the complete state after executing one step of the workflow:
- * - Which node to execute next (or null if workflow complete)
- * - The dataset to pass to the next node
- * - Delta states (explicit state changes to apply)
- * - The flow directive indicating navigation intent
- * - The exported context (from export.as directive)
- * - The duration before a retry (if any)
+ * This class encapsulates information about the outcome of processing a task node,
+ * including the next node to execute, the raw input the node processed, updates
+ * to the workflow's state, and directives that dictate further flow transitions.
  *
- * @property nextNode The next node to execute (null if workflow complete)
- * @property rawInput The dataset to pass to the next node
- * @property stateUpdates State changes to apply (position -> state or null for deletion)
- * @property flowDirective The navigation instruction for the next step (from SDK)
- * @property newContext The context exported by this task (from export.as directive, null if no export)
+ * @property nextNode The next node in the workflow to process. Null if there is no next node.
+ * @property rawInput The raw JSON input provided for execution of the current node.
+ * @property stateUpdates A map containing updates to the state of nodes in the workflow,
+ * keyed by their positions, where the value is the new `TaskState` or null if no updates are needed.
+ * @property flowDirective An optional directive providing instructions for controlling the
+ * next steps in the workflow's execution, such as retry or skip.
+ * @property newContext Optional JSON object representing updated workflow context.
+ * Can include new or modified variables based on the currently executed node.
+ * @property retryAt An optional timestamp indicating when the current task should be retried.
+ * Null if no retry is necessary or applicable.
  */
+@ExperimentalTime
 data class StepResult(
     val nextNode: Node<*>?,
     val rawInput: JsonElement,
     val stateUpdates: Map<NodePosition, TaskState?>,
     val flowDirective: FlowDirective? = null,
     val newContext: JsonObject? = null,
-    val delay: Duration? = null
+    val retryAt: Instant? = null
 )

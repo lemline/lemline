@@ -9,6 +9,7 @@ import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.SimpleTaskState
 import com.lemline.core.utils.toDuration
 import io.serverlessworkflow.api.types.WaitTask
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -61,7 +62,7 @@ class WaitProcessor(
         scope: Scope,
     ): JsonElement {
         getDelay()?.let {
-            val config = WaitWorkflowException.Config(duration = it)
+            val config = WaitWorkflowException.Config(waitUntil = Clock.System.now() + it)
             logger.debug { "Throwing WaitException for orchestrator to handle: $config" }
             throw WaitWorkflowException(transformedInput, config)
         }

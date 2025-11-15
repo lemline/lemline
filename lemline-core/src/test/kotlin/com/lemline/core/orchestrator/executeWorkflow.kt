@@ -3,11 +3,11 @@
 
 package com.lemline.core.orchestrator
 
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.getWorkflowNode
+import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.getWorkflowToTest
 import com.lemline.core.states.WorkflowState
+import io.serverlessworkflow.api.types.Workflow
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
@@ -18,11 +18,9 @@ internal suspend fun executeContinuousWorkflow(
     version: String,
     input: JsonElement
 ): JsonElement {
-    getWorkflowNode(yaml, namespace, name, version)
+    val workflow = getWorkflowToTest(yaml, namespace, name, version)
     return runUntilComplete(
-        namespace = WorkflowNamespace(namespace),
-        name = WorkflowName(name),
-        version = WorkflowVersion(version),
+        workflow = workflow,
         input = input,
         executionMode = ExecutionMode.CONTINUOUS
     )
@@ -36,11 +34,9 @@ internal suspend fun executeTaskByTaskWorkflow(
     version: String,
     input: JsonElement
 ): JsonElement {
-    getWorkflowNode(yaml, namespace, name, version)
+    val workflow = getWorkflowToTest(yaml, namespace, name, version)
     return runUntilComplete(
-        namespace = WorkflowNamespace(namespace),
-        name = WorkflowName(name),
-        version = WorkflowVersion(version),
+        workflow = workflow,
         input = input,
         executionMode = ExecutionMode.TASK_BY_TASK
     )
@@ -53,47 +49,38 @@ internal suspend fun executeActivityByActivityWorkflow(
     version: String,
     input: JsonElement
 ): JsonElement {
-    getWorkflowNode(yaml, namespace, name, version)
+    val workflow = getWorkflowToTest(yaml, namespace, name, version)
     return runUntilComplete(
-        namespace = WorkflowNamespace(namespace),
-        name = WorkflowName(name),
-        version = WorkflowVersion(version),
+        workflow = workflow,
         input = input,
         executionMode = ExecutionMode.ACTIVITY_BY_ACTIVITY
     )
 }
 
 // Public entry point
-internal suspend fun runUntilComplete(
-    namespace: WorkflowNamespace,
-    name: WorkflowName,
-    version: WorkflowVersion,
+private suspend fun runUntilComplete(
+    workflow: Workflow,
     input: JsonElement,
     executionMode: ExecutionMode
 ): JsonElement {
-    val initial = WorkflowOrchestrator.start(
-        namespace = namespace,
-        name = name,
-        version = version,
+
+    val state = WorkflowState.Starting(
         input = input,
-        executionMode = executionMode
+        startedAt = Clock.System.now()
     )
+
     return runWorkflowStep(
-        namespace = namespace,
-        name = name,
-        version = version,
+        workflow = workflow,
+        state = state,
         executionMode = executionMode,
-        state = initial,
     )
 }
 
 // Stateless, reusable helper
-internal tailrec suspend fun runWorkflowStep(
-    namespace: WorkflowNamespace,
-    name: WorkflowName,
-    version: WorkflowVersion,
-    executionMode: ExecutionMode,
+private tailrec suspend fun runWorkflowStep(
+    workflow: Workflow,
     state: WorkflowState,
+    executionMode: ExecutionMode,
 ): JsonElement = when (state) {
     is WorkflowState.Completed ->
         state.output
@@ -104,10 +91,14 @@ internal tailrec suspend fun runWorkflowStep(
     is WorkflowState.RunningChildWorkflow -> {
         val enrichedState =
             if (state.childConfig.sync) {
-                val rawOutput = runUntilComplete(
+                val childWorkflow = DefinitionCache.getWorkflow(
                     namespace = state.childConfig.namespace,
                     name = state.childConfig.name,
-                    version = state.childConfig.version,
+                    version = state.childConfig.version
+                )
+                    ?: throw IllegalStateException("Child workflow not found: ${state.childConfig.namespace}/${state.childConfig.name}/${state.childConfig.version}")
+                val rawOutput = runUntilComplete(
+                    workflow = childWorkflow,
                     input = state.childConfig.input,
                     executionMode = ExecutionMode.CONTINUOUS
                 )
@@ -118,23 +109,19 @@ internal tailrec suspend fun runWorkflowStep(
             }
 
         val next = WorkflowOrchestrator.resume(
-            namespace = namespace,
-            name = name,
-            version = version,
+            workflow = workflow,
             state = enrichedState,
             executionMode = executionMode
         )
-        runWorkflowStep(namespace, name, version, executionMode, next)
+        runWorkflowStep(workflow, next, executionMode)
     }
 
     else -> {
         val next = WorkflowOrchestrator.resume(
-            namespace = namespace,
-            name = name,
-            version = version,
+            workflow = workflow,
             state = state,
             executionMode = executionMode
         )
-        runWorkflowStep(namespace, name, version, executionMode, next)
+        runWorkflowStep(workflow, next, executionMode)
     }
 }

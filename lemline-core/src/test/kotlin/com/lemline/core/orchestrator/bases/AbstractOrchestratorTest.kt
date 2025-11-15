@@ -2,7 +2,7 @@
 package com.lemline.core.orchestrator.bases
 
 import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.getWorkflowNode
+import com.lemline.core.getWorkflowToTest
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -192,7 +192,7 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                       set:
                         result: ${ .value * 2 }
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "doubler", version = "0.1.0")
+            getWorkflowToTest(childYaml, namespace = "test", name = "doubler", version = "0.1.0")
 
             // Parent workflow
             val parentYaml = """
@@ -221,7 +221,7 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                         processed: true
             """
 
-            getWorkflowNode(childYaml, namespace = "test", name = "processor", version = "0.1.0")
+            getWorkflowToTest(childYaml, namespace = "test", name = "processor", version = "0.1.0")
 
             // Parent workflow with await=false
             val parentYaml = $$"""
@@ -254,7 +254,7 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                       set:
                         level: 3
             """
-            getWorkflowNode(grandchildYaml, namespace = "test", name = "grandchild", version = "0.1.0")
+            getWorkflowToTest(grandchildYaml, namespace = "test", name = "grandchild", version = "0.1.0")
 
             // Child workflow that calls grandchild
             val childYaml = """
@@ -269,7 +269,7 @@ abstract class AbstractOrchestratorTest : FunSpec() {
                       set:
                         level: 2
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "child", version = "0.1.0")
+            getWorkflowToTest(childYaml, namespace = "test", name = "child", version = "0.1.0")
 
             // Parent workflow
             val parentYaml = """

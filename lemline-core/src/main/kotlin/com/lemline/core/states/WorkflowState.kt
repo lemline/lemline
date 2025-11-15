@@ -1,12 +1,13 @@
 package com.lemline.core.states
 
 import com.lemline.core.errors.ChildWorkflowException
+import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.FlowDirective
-import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
@@ -22,11 +23,33 @@ import kotlinx.serialization.json.JsonElement
 @Serializable
 sealed class WorkflowState {
     abstract val taskStates: TaskStates
+    abstract val nodePosition: NodePosition
 
     fun toJsonString(): String = LemlineJson.encodeToString(this)
 
     companion object {
         fun fromJsonString(jsonString: String): WorkflowState = LemlineJson.decodeFromString(jsonString)
+    }
+
+    /**
+     * Represents the initial state of a workflow, capturing the start time and input data.
+     *
+     * @property startedAt The timestamp representing when the state began.
+     * @property input The JSON input data associated with the state.
+     */
+    @ExperimentalTime
+    @Serializable
+    data class Starting(
+        val startedAt: Instant,
+        val input: JsonElement,
+    ) : WorkflowState() {
+        override val taskStates: TaskStates = mutableMapOf()
+        override val nodePosition: NodePosition = NodePosition.root
+
+        override fun toString() = "Starting(" +
+            "startedAt=$startedAt" +
+            ", input=$input" +
+            ")"
     }
 
     /**
@@ -43,29 +66,10 @@ sealed class WorkflowState {
         val output: JsonElement
     ) : WorkflowState() {
         override val taskStates: TaskStates = emptyMap()
+        override val nodePosition: NodePosition = NodePosition.root
 
         override fun toString() = "Completed(" +
             "output=$output" +
-            ")"
-    }
-
-    /**
-     * Represents the initial state of a workflow, capturing the start time and input data.
-     *
-     * @property startedAt The timestamp representing when the state began.
-     * @property input The JSON input data associated with the state.
-     */
-    @ExperimentalTime
-    @Serializable
-    data class Starting(
-        val startedAt: Instant,
-        val input: JsonElement,
-    ) : WorkflowState() {
-        override val taskStates: TaskStates = mutableMapOf()
-
-        override fun toString() = "Starting(" +
-            "startedAt=$startedAt" +
-            ", input=$input" +
             ")"
     }
 
@@ -80,26 +84,42 @@ sealed class WorkflowState {
      * @property rawInput The raw input data at the point of failure, if available.
      * @property rawOutput The raw output data at the point of failure, if available.
      * @property exception The exception that caused the workflow to fail.
+     * @property error The serialized exception that caused the workflow to fail.
      */
     @Serializable
     data class Failed(
         override val taskStates: TaskStates,
-        val nodePosition: NodePosition,
+        override val nodePosition: NodePosition,
         val rawInput: JsonElement?,
         val rawOutput: JsonElement?,
         val flowDirective: FlowDirective?,
-        @Transient val exception: Exception? = null
+        @Transient val exception: Exception? = null,
+        val error: InternalWorkflowException.Error
     ) : WorkflowState() {
 
-        // This is used to debug only
-        val stackTrace: String? = exception?.stackTraceToString()
+        constructor(
+            taskStates: TaskStates,
+            nodePosition: NodePosition,
+            rawInput: JsonElement?,
+            rawOutput: JsonElement?,
+            flowDirective: FlowDirective?,
+            exception: Exception
+        ) : this(
+            taskStates = taskStates,
+            nodePosition = nodePosition,
+            rawInput = rawInput,
+            rawOutput = rawOutput,
+            flowDirective = flowDirective,
+            exception = exception,
+            error = InternalWorkflowException.Error.fromUnexpectedException(exception, nodePosition)
+        )
 
         override fun toString() = "Failed(" +
-            "node=$nodePosition" +
+            "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", rawOutput=$rawOutput" +
             ", flowDirective=$flowDirective" +
-            ", exception=$exception" +
+            ", error=$error" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
@@ -110,21 +130,21 @@ sealed class WorkflowState {
      * the states involved, and the generated output.
      *
      * @property taskStates Represents a map containing workflow state.
-     * @property nextNodePosition The position of the next node
-     * @property nextRawInput The input of the next node
-     * @property nextFlowDirective The flow directive to be applied to the next node
+     * @property nodePosition The position of the next node
+     * @property rawInput The input of the next node
+     * @property flowDirective The flow directive to be applied to the next node
      */
     @Serializable
     data class ReadyForNextTask(
         override val taskStates: TaskStates,
-        val nextNodePosition: NodePosition,
-        val nextRawInput: JsonElement,
-        val nextFlowDirective: FlowDirective?
+        override val nodePosition: NodePosition,
+        val rawInput: JsonElement,
+        val flowDirective: FlowDirective?
     ) : WorkflowState() {
         override fun toString() = "ReadyForNextTask(" +
-            "nextNode=$nextNodePosition" +
-            ", nextRawInput=$nextRawInput" +
-            ", nextFlowDirective=$nextFlowDirective" +
+            "nodePosition=$nodePosition" +
+            ", rawInput=$rawInput" +
+            ", flowDirective=$flowDirective" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
@@ -135,19 +155,20 @@ sealed class WorkflowState {
      * @property taskStates The states after the wait.
      * @property nodePosition Specifies the position of the wait task.
      * @property rawOutput Contains transformed input == raw output in the wait task.
-     * @property duration Defines the duration for which the wait is required.
+     * @property waitUntil Defines the duration for which the wait is required.
      */
     @Serializable
+    @ExperimentalTime
     data class Waiting(
         override val taskStates: TaskStates,
-        val nodePosition: NodePosition,
+        override val nodePosition: NodePosition,
         val rawOutput: JsonElement,
-        val duration: Duration
+        @Contextual val waitUntil: Instant
     ) : WorkflowState() {
         override fun toString() = "Waiting(" +
-            "node=$nodePosition" +
+            "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
-            ", duration=$duration" +
+            ", waitUntil=$waitUntil" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
@@ -158,21 +179,22 @@ sealed class WorkflowState {
      * @property taskStates The states at retry.
      * @property nodePosition Specifies the position of the task to retry.
      * @property rawInput The raw input of the task to retry.
-     * @property duration The time duration to wait before retrying.
+     * @property retryAt The time duration to wait before retrying.
      */
     @Serializable
-    data class WaitingToRetry(
+    @ExperimentalTime
+    data class Retrying(
         override val taskStates: TaskStates,
-        val nodePosition: NodePosition,
+        override val nodePosition: NodePosition,
         val rawInput: JsonElement,
         val flowDirective: FlowDirective?,
-        val duration: Duration
+        val retryAt: Instant
     ) : WorkflowState() {
         override fun toString() = "WaitingToRetry(" +
-            "node=$nodePosition" +
+            "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
-            ", duration=$duration" +
+            ", retryAt=$retryAt" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
@@ -189,12 +211,12 @@ sealed class WorkflowState {
     @Serializable
     data class RunningChildWorkflow(
         override val taskStates: TaskStates,
-        val nodePosition: NodePosition,
+        override val nodePosition: NodePosition,
         val rawOutput: JsonElement?,
         val childConfig: ChildWorkflowException.Config,
     ) : WorkflowState() {
         override fun toString() = "RunningChildWorkflow(" +
-            "node=$nodePosition" +
+            "nodePosition=$nodePosition" +
             ", transformedInput=$rawOutput" +
             ", childConfig=$childConfig" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +

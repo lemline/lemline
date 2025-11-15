@@ -2,7 +2,8 @@
 package com.lemline.core.orchestrator.byActivity
 
 import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.getWorkflowNode
+import com.lemline.core.getRootNodeOfWorkflowToTest
+import com.lemline.core.getWorkflowToTest
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.orchestrator.ExecutionMode
 import com.lemline.core.orchestrator.WorkflowOrchestrator
@@ -14,7 +15,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -77,7 +78,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                         method: GET
                         endpoint: https://jsonplaceholder.typicode.com/posts/1
             """
-            val rootNode = getWorkflowNode(yaml)
+            val rootNode = getRootNodeOfWorkflowToTest(yaml)
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -88,7 +89,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             assertIs<WorkflowState.ReadyForNextTask>(result)
 
             // Output should contain the HTTP response
-            val output = result.nextRawInput as JsonObject
+            val output = result.rawInput as JsonObject
             assertEquals(1, output["id"]?.jsonPrimitive?.content?.toInt())
             assertTrue(output.containsKey("title"))
         }
@@ -101,7 +102,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                         shell:
                           command: echo "Hello World"
             """
-            val rootNode = getWorkflowNode(yaml)
+            val rootNode = getRootNodeOfWorkflowToTest(yaml)
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -112,7 +113,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             assertIs<WorkflowState.ReadyForNextTask>(result)
 
             // Output should be JsonPrimitive with shell stdout
-            val output = result.nextRawInput as kotlinx.serialization.json.JsonPrimitive
+            val output = result.rawInput as kotlinx.serialization.json.JsonPrimitive
             assertTrue(output.content.contains("Hello World"))
         }
 
@@ -127,7 +128,8 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       wait:
                         seconds: 5
             """
-            val rootNode = getWorkflowNode(yaml)
+            val rootNode = getRootNodeOfWorkflowToTest(yaml)
+            val now = Clock.System.now()
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -136,7 +138,8 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
 
             // Should pause instead of waiting
             assertIs<WorkflowState.Waiting>(result)
-            assertEquals(5.seconds, result.duration)
+            assertTrue { result.waitUntil - now < 6.seconds }
+            assertTrue { result.waitUntil - now > 5.seconds }
         }
 
         test("should pause for millisecond delays") {
@@ -144,9 +147,10 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 do:
                   - shortWait:
                       wait:
-                        milliseconds: 100
+                        milliseconds: 5000
             """
-            val rootNode = getWorkflowNode(yaml)
+            val rootNode = getRootNodeOfWorkflowToTest(yaml)
+            val now = Clock.System.now()
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -154,7 +158,8 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
 
             assertIs<WorkflowState.Waiting>(result)
-            assertEquals(100.milliseconds, result.duration)
+            assertTrue { result.waitUntil - now < 6.seconds }
+            assertTrue { result.waitUntil - now > 5.seconds }
         }
 
         // ========================================
@@ -169,7 +174,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         result: "child completed"
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "childWorkflow", version = "0.1.0")
+            getWorkflowToTest(childYaml, namespace = "test", name = "childWorkflow", version = "0.1.0")
 
             // Parent workflow that calls the child
             val parentYaml = """
@@ -181,7 +186,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                           namespace: test
                           version: '0.1.0'
             """
-            val rootNode = getWorkflowNode(parentYaml)
+            val rootNode = getRootNodeOfWorkflowToTest(parentYaml)
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -203,7 +208,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         done: true
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "asyncChild", version = "0.1.0")
+            getRootNodeOfWorkflowToTest(childYaml, namespace = "test", name = "asyncChild", version = "0.1.0")
 
             // Parent with await=false
             val parentYaml = """
@@ -216,7 +221,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                           namespace: test
                           version: '0.1.0'
             """
-            val rootNode = getWorkflowNode(parentYaml)
+            val rootNode = getRootNodeOfWorkflowToTest(parentYaml)
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -237,7 +242,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         result: "done"
             """
-            val rootNode = getWorkflowNode(yaml)
+            val rootNode = getRootNodeOfWorkflowToTest(yaml)
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -262,7 +267,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         value: 3
             """
-            val rootNode = getWorkflowNode(yaml)
+            val rootNode = getRootNodeOfWorkflowToTest(yaml)
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -293,7 +298,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         done: true
             """
-            val rootNode = getWorkflowNode(yaml)
+            val rootNode = getRootNodeOfWorkflowToTest(yaml)
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -323,7 +328,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                         shell:
                           command: echo "done"
             """
-            val rootNode = getWorkflowNode(yaml)
+            val rootNode = getRootNodeOfWorkflowToTest(yaml)
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -331,7 +336,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
             // Should execute all set tasks, then pause after shell command
             assertIs<WorkflowState.ReadyForNextTask>(result)
-            val output = result.nextRawInput as kotlinx.serialization.json.JsonPrimitive
+            val output = result.rawInput as kotlinx.serialization.json.JsonPrimitive
             assertTrue(output.content.contains("done"))
         }
 
@@ -351,7 +356,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                         method: GET
                         endpoint: https://jsonplaceholder.typicode.com/posts/1
             """
-            val rootNode = getWorkflowNode(yaml)
+            val rootNode = getRootNodeOfWorkflowToTest(yaml)
             val states = mutableMapOf<NodePosition, TaskState>()
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
@@ -388,7 +393,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                         shell:
                           command: echo "processed"
             """
-            val rootNode = getWorkflowNode(yaml)
+            val rootNode = getRootNodeOfWorkflowToTest(yaml)
             val result = WorkflowOrchestrator.resumeFromTask(
                 node = rootNode,
                 rawInput = JsonObject(emptyMap()),
@@ -412,7 +417,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         result: ${ .value * 2 }
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "doubler", version = "0.1.0")
+            getRootNodeOfWorkflowToTest(childYaml, namespace = "test", name = "doubler", version = "0.1.0")
 
             // Parent workflow that calls the child with await=true
             val parentYaml = $$"""
@@ -430,7 +435,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                         result: ${ .result * 2 }
                         final: true
             """
-            val rootNode = getWorkflowNode(parentYaml)
+            val rootNode = getRootNodeOfWorkflowToTest(parentYaml)
 
             // First execution - should pause at sub-workflow
             val pauseResult = WorkflowOrchestrator.resumeFromTask(
@@ -473,7 +478,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         processed: true
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "processor", version = "0.1.0")
+            getRootNodeOfWorkflowToTest(childYaml, namespace = "test", name = "processor", version = "0.1.0")
 
             // Parent workflow with await=false
             val parentYaml = $$"""
@@ -495,7 +500,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                         value: ${ .data + .value }
                         parentDone: true
             """
-            val rootNode = getWorkflowNode(parentYaml)
+            val rootNode = getRootNodeOfWorkflowToTest(parentYaml)
 
             // First execution - should pause at sub-workflow
             val pauseResult = WorkflowOrchestrator.resumeFromTask(
@@ -534,7 +539,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         count: ${ .count + 1 }
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "incrementer", version = "0.1.0")
+            getRootNodeOfWorkflowToTest(childYaml, namespace = "test", name = "incrementer", version = "0.1.0")
 
             // Parent workflow with activity after child
             val parentYaml = """
@@ -554,7 +559,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                         method: GET
                         endpoint: https://jsonplaceholder.typicode.com/posts/1
             """
-            val rootNode = getWorkflowNode(parentYaml)
+            val rootNode = getRootNodeOfWorkflowToTest(parentYaml)
 
             // First execution - pause at sub-workflow
             val pauseResult1 = WorkflowOrchestrator.resumeFromTask(
@@ -582,7 +587,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
 
             // Should pause at HTTP activity
             assertIs<WorkflowState.ReadyForNextTask>(pauseResult2)
-            val output = pauseResult2.nextRawInput as JsonObject
+            val output = pauseResult2.rawInput as JsonObject
             assertEquals(1, output["id"]?.jsonPrimitive?.int)
         }
 
@@ -594,7 +599,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         level: 3
             """
-            getWorkflowNode(grandchildYaml, namespace = "test", name = "grandchild", version = "0.1.0")
+            getRootNodeOfWorkflowToTest(grandchildYaml, namespace = "test", name = "grandchild", version = "0.1.0")
 
             // Child workflow that calls grandchild
             val childYaml = """
@@ -609,7 +614,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         level: 2
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "child", version = "0.1.0")
+            getRootNodeOfWorkflowToTest(childYaml, namespace = "test", name = "child", version = "0.1.0")
 
             // Parent workflow
             val parentYaml = """
@@ -624,7 +629,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                       set:
                         level: 1
             """
-            val rootNode = getWorkflowNode(parentYaml)
+            val rootNode = getRootNodeOfWorkflowToTest(parentYaml)
 
             // Execute parent - should pause at child
             val parentPause = WorkflowOrchestrator.resumeFromTask(

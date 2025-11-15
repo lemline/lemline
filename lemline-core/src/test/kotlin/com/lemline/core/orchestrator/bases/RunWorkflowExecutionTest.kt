@@ -2,7 +2,7 @@
 package com.lemline.core.orchestrator.bases
 
 import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.getWorkflowNode
+import com.lemline.core.getWorkflowToTest
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -10,6 +10,7 @@ import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -42,7 +43,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
             """
 
             // Register the child workflow in the cache
-            getWorkflowNode(childWorkflowYaml, namespace = "test", name = "doubler", version = "0.1.0")
+            getWorkflowToTest(childWorkflowYaml, namespace = "test", name = "doubler", version = "0.1.0")
 
             // Parent workflow that calls the child
             val parentWorkflowYaml = """
@@ -59,7 +60,6 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             val output = executeWorkflow(
                 parentWorkflowYaml,
-                JsonObject(emptyMap()),
                 namespace = "test",
                 name = "parent",
                 version = "0.1.0"
@@ -77,7 +77,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                         greeting: ${ "Hello, " + .name + "!" }
             """
 
-            getWorkflowNode(childWorkflowYaml, namespace = "test", name = "greeter", version = "0.1.0")
+            getWorkflowToTest(childWorkflowYaml, namespace = "test", name = "greeter", version = "0.1.0")
 
             // Parent workflow
             val parentWorkflowYaml = $$"""
@@ -97,7 +97,6 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             val output = executeWorkflow(
                 parentWorkflowYaml,
-                JsonObject(emptyMap()),
                 namespace = "test",
                 name = "parent",
                 version = "0.1.0"
@@ -139,7 +138,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                             then: end
             """
 
-            getWorkflowNode(factorialYaml, namespace = "test", name = "factorial", version = "0.1.0")
+            getWorkflowToTest(factorialYaml, namespace = "test", name = "factorial", version = "0.1.0")
 
             // Call factorial(5)
             val output = executeWorkflow(
@@ -162,7 +161,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                       set:
                         result: ${ .a + .b }
             """
-            getWorkflowNode(adderYaml, namespace = "test", name = "adder", version = "0.1.0")
+            getWorkflowToTest(adderYaml, namespace = "test", name = "adder", version = "0.1.0")
 
             // Second child workflow
             val multiplierYaml = $$"""
@@ -171,7 +170,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                       set:
                         result: ${ .value * 2 }
             """
-            getWorkflowNode(multiplierYaml, namespace = "test", name = "multiplier", version = "0.1.0")
+            getWorkflowToTest(multiplierYaml, namespace = "test", name = "multiplier", version = "0.1.0")
 
             // Parent workflow calling both
             val parentYaml = $$"""
@@ -197,7 +196,6 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             val output = executeWorkflow(
                 parentYaml,
-                JsonObject(emptyMap()),
                 namespace = "test",
                 name = "parent",
                 version = "0.1.0"
@@ -216,7 +214,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                         processed: true
                         value: ${ .input * 10 }
             """
-            getWorkflowNode(processorYaml, namespace = "test", name = "processor", version = "0.1.0")
+            getWorkflowToTest(processorYaml, namespace = "test", name = "processor", version = "0.1.0")
 
             // Parent workflow
             val parentYaml = $$"""
@@ -237,7 +235,6 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             val output = executeWorkflow(
                 parentYaml,
-                JsonObject(emptyMap()),
                 namespace = "test",
                 name = "parent",
                 version = "0.1.0"
@@ -256,7 +253,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                         value: 42
                         status: success
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "child", version = "0.1.0")
+            getWorkflowToTest(childYaml, namespace = "test", name = "child", version = "0.1.0")
 
             // Parent workflow with output transformation
             val parentYaml = $$"""
@@ -273,7 +270,6 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             val output = executeWorkflow(
                 parentYaml,
-                JsonObject(emptyMap()),
                 namespace = "test",
                 name = "parent",
                 version = "0.1.0"
@@ -292,7 +288,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                         fullName: ${ .firstName + " " + .lastName }
                         age: ${ .age }
             """
-            getWorkflowNode(
+            getWorkflowToTest(
                 processorYaml,
                 namespace = "test",
                 name = "person-processor",
@@ -316,7 +312,6 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             val output = executeWorkflow(
                 parentYaml,
-                JsonObject(emptyMap()),
                 namespace = "test",
                 name = "parent",
                 version = "0.1.0"
@@ -334,7 +329,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                       set:
                         result: ${ .value + 1 }
             """
-            getWorkflowNode(level3Yaml, namespace = "test", name = "level3", version = "0.1.0")
+            getWorkflowToTest(level3Yaml, namespace = "test", name = "level3", version = "0.1.0")
 
             // Level 2 workflow calls level 3
             val level2Yaml = $$"""
@@ -348,7 +343,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                           input:
                             value: ${ .value * 2 }
             """
-            getWorkflowNode(level2Yaml, namespace = "test", name = "level2", version = "0.1.0")
+            getWorkflowToTest(level2Yaml, namespace = "test", name = "level2", version = "0.1.0")
 
             // Level 1 workflow calls level 2
             val level1Yaml = $$"""
@@ -362,7 +357,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                           input:
                             value: ${ .value + 3 }
             """
-            getWorkflowNode(level1Yaml, namespace = "test", name = "level1", version = "0.1.0")
+            getWorkflowToTest(level1Yaml, namespace = "test", name = "level1", version = "0.1.0")
 
             // Root workflow calls level 1
             val rootYaml = """
@@ -379,7 +374,6 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             val output = executeWorkflow(
                 rootYaml,
-                JsonObject(emptyMap()),
                 namespace = "test",
                 name = "parent",
                 version = "0.1.0"
@@ -397,7 +391,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                       set:
                         value: 10
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "defaulter", version = "0.1.0")
+            getWorkflowToTest(childYaml, namespace = "test", name = "defaulter", version = "0.1.0")
 
             // Parent workflow without explicit input
             val parentYaml = """
@@ -412,7 +406,6 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             val output = executeWorkflow(
                 parentYaml,
-                JsonObject(emptyMap()),
                 namespace = "test",
                 name = "parent",
                 version = "0.1.0"
@@ -429,7 +422,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                       set:
                         completed: true
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "slow-workflow", version = "0.1.0")
+            getWorkflowToTest(childYaml, namespace = "test", name = "slow-workflow", version = "0.1.0")
 
             // Parent workflow with await: false
             val parentYaml = """
@@ -448,7 +441,6 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             val output = executeWorkflow(
                 parentYaml,
-                JsonObject(emptyMap()),
                 namespace = "test",
                 name = "parent",
                 version = "0.1.0"
@@ -469,7 +461,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
                         doubled: ${ .original * 2 }
                         parentValue: ${ .original }
             """
-            getWorkflowNode(childYaml, namespace = "test", name = "context-user", version = "0.1.0")
+            getWorkflowToTest(childYaml, namespace = "test", name = "context-user", version = "0.1.0")
 
             // Parent workflow that passes context
             val parentYaml = $$"""
@@ -489,7 +481,6 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             val output = executeWorkflow(
                 parentYaml,
-                JsonObject(emptyMap()),
                 namespace = "test",
                 name = "parent",
                 version = "0.1.0"
@@ -502,7 +493,7 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
     protected abstract suspend fun executeWorkflow(
         yaml: String,
-        input: JsonElement,
+        input: JsonElement = buildJsonObject { },
         namespace: String = "default",
         name: String = "test",
         version: String = "0.1.0"

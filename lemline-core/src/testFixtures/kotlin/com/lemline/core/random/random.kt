@@ -23,6 +23,7 @@ import com.lemline.core.workflows.FlowDirective
 import com.lemline.core.workflows.FlowDirectiveEnum
 import com.lemline.core.workflows.FlowDirectiveGoto
 import kotlin.random.Random
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -157,7 +158,7 @@ fun WorkflowState.Companion.random(): WorkflowState {
         1 -> WorkflowState.Failed.random()
         2 -> WorkflowState.ReadyForNextTask.random()
         3 -> WorkflowState.Waiting.random()
-        4 -> WorkflowState.WaitingToRetry.random()
+        4 -> WorkflowState.Retrying.random()
         else -> WorkflowState.RunningChildWorkflow.random()
     }
 }
@@ -184,15 +185,15 @@ fun WorkflowState.Failed.Companion.random() =
             true -> randomFlowDirective()
             false -> null
         },
-        exception = null
+        error = InternalWorkflowException.Error.random()
     )
 
 fun WorkflowState.ReadyForNextTask.Companion.random() =
     WorkflowState.ReadyForNextTask(
         taskStates = randomStates(),
-        nextNodePosition = NodePosition.random(),
-        nextRawInput = JsonElement.random(),
-        nextFlowDirective = when (Random.nextBoolean()) {
+        nodePosition = NodePosition.random(),
+        rawInput = JsonElement.random(),
+        flowDirective = when (Random.nextBoolean()) {
             true -> randomFlowDirective()
             false -> null
         }
@@ -203,11 +204,11 @@ fun WorkflowState.Waiting.Companion.random() =
         taskStates = randomStates(),
         nodePosition = NodePosition.random(),
         rawOutput = JsonElement.random(),
-        duration = Random.nextLong(100, 10000).milliseconds
+        waitUntil = Clock.System.now() + Random.nextLong(100, 10000).milliseconds
     )
 
-fun WorkflowState.WaitingToRetry.Companion.random() =
-    WorkflowState.WaitingToRetry(
+fun WorkflowState.Retrying.Companion.random() =
+    WorkflowState.Retrying(
         taskStates = randomStates(),
         nodePosition = NodePosition.random(),
         rawInput = JsonElement.random(),
@@ -215,7 +216,7 @@ fun WorkflowState.WaitingToRetry.Companion.random() =
             true -> randomFlowDirective()
             false -> null
         },
-        duration = Random.nextLong(100, 10000).milliseconds
+        retryAt = Clock.System.now() + Random.nextLong(100, 10000).milliseconds
     )
 
 fun WorkflowState.RunningChildWorkflow.Companion.random() =
