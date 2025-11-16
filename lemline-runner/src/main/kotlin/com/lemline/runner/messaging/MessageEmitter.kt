@@ -8,6 +8,10 @@ import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.inject.Inject
 import org.eclipse.microprofile.reactive.messaging.Message
 
+/**
+ * Base class for message emitters.
+ * Generic type T must be JsonSerializable to support toJsonString() method.
+ */
 internal abstract class MessageEmitter<T : JsonSerializable> {
 
     protected abstract val emitter: MutinyEmitter<String>

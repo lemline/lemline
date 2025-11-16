@@ -55,4 +55,63 @@ The `MessageHandler` does not assume that communication with the message broker 
 
 ## Implementation
 
-This interface is intended to be implemented by classes that handle specific types of messages. For example, `InstanceMessageHandler` is a concrete implementation that provides the logic for handling messages related to workflow instances, defining how to `deserialize` them, how to `handle` them by calling the `StepByStepRunner`, and how to `emit` the resulting state.
+This interface is intended to be implemented by classes that handle specific types of messages. For example, `InstanceMessageHandler` is a concrete implementation that provides the logic for handling messages related to workflow instances, defining how to `deserialize` them, how to `handle` them by calling the `WorkflowOrchestrator`, and how to `emit` the resulting state.
+
+## DatabaseMessage Architecture
+
+The `DatabaseMessage` sealed class represents all messages sent to the database channel for persistence operations. It uses a sealed class hierarchy for type-safe, exhaustive pattern matching.
+
+### Message Types
+
+1. **WorkflowPersistence**: Regular workflow states requiring persistence
+   - `Waiting`: Workflow paused until a specific time
+   - `Retrying`: Workflow will retry a failed task
+   - `RunningChildWorkflow`: Parent workflow paused while child executes
+   - `Completed`: Workflow finished (persisted only if has parent or scheduled)
+   - `Failed`: Workflow terminated with error
+
+2. **InfrastructureFailure**: Runner infrastructure errors with InstanceMessage context
+   - Has `retryable` flag to distinguish transient vs permanent errors
+   - retryable=true → RetryOutbox (e.g., DB connection failure)
+   - retryable=false → FailureModel (e.g., missing definition)
+
+3. **DeserializationFailure**: Message parsing failures without InstanceMessage
+   - Only contains raw payload and error details
+   - Always saved to FailureModel for manual inspection
+
+4. **IngestionMessage** (deprecated): Legacy message type for backward compatibility
+5. **CompletedMessage** (deprecated): Legacy message type for backward compatibility
+
+### Message Flow
+
+```
+InstanceMessageHandler                DatabaseMessageHandler
+        |                                     |
+        | WorkflowState pattern match         |
+        |                                     |
+        +--Waiting---------------------------->WaitOutbox
+        |                                     |
+        +--Retrying--------------------------->RetryOutbox
+        |                                     |
+        +--RunningChildWorkflow--------------->ParentOutbox + child creation
+        |                                     |
+        +--Completed-------------------------->Parent completion or schedule
+        |                                     |
+        +--Failed----------------------------->FailureModel
+        |                                     |
+        | Infrastructure errors               |
+        +--InfrastructureFailure-------------->RetryOutbox or FailureModel
+        |                                     |
+        | Deserialization errors              |
+        +--DeserializationFailure------------->FailureModel
+```
+
+### Design Rationale
+
+The separation into distinct message types enables:
+
+- **Exhaustive pattern matching**: Compiler ensures all cases are handled
+- **Type safety**: Each variant has appropriate fields for its use case
+- **Clear error semantics**: Explicit distinction between retryable and permanent failures
+- **Non-blocking workflow channel**: Database persistence doesn't block workflow execution
+- **Graceful degradation**: System continues processing workflows even when database is slow/unavailable
