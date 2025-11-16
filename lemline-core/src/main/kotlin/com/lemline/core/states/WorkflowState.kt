@@ -223,4 +223,77 @@ sealed class WorkflowState {
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
+
+    /**
+     * Represents a workflow paused during fork execution.
+     *
+     * This state is returned when ExecutionMode.Async encounters a fork task.
+     * The runner is responsible for:
+     * - Scheduling branch executions (potentially in parallel)
+     * - Tracking branch completion
+     * - Resuming the fork task when appropriate
+     *
+     * Similar to RunningChildWorkflow pattern.
+     *
+     * @property taskStates Current workflow state
+     * @property nodePosition Position of the fork task node
+     * @property rawInput Input to pass to all branches
+     * @property forkConfig Fork execution configuration and progress tracking
+     */
+    @Serializable
+    data class RunningFork(
+        override val taskStates: TaskStates,
+        override val nodePosition: NodePosition,
+        val rawInput: JsonElement,
+        val forkConfig: ForkConfig
+    ) : WorkflowState() {
+        override fun toString() = "RunningFork(" +
+            "nodePosition=$nodePosition" +
+            ", compete=${forkConfig.compete}" +
+            ", branches=${forkConfig.branches.size}" +
+            ", completed=${forkConfig.completedBranches.size}" +
+            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+    }
+}
+
+/**
+ * Configuration for fork execution, tracking branch progress.
+ *
+ * @property compete Whether branches race for first completion
+ * @property branches List of branches to execute
+ * @property completedBranches Map of branch index to output (tracks completion and stores results)
+ */
+@Serializable
+data class ForkConfig(
+    val compete: Boolean,
+    val branches: List<BranchExecution>,
+    val completedBranches: Map<Int, JsonElement> = emptyMap()
+)
+
+/**
+ * Execution state for a single branch.
+ *
+ * @property index Branch index in declaration order
+ * @property name Branch name
+ * @property nodePosition Position of branch root in workflow tree
+ * @property status Current execution status
+ */
+@Serializable
+data class BranchExecution(
+    val index: Int,
+    val name: String,
+    val nodePosition: NodePosition,
+    val status: BranchStatus
+)
+
+/**
+ * Status of a branch execution.
+ */
+@Serializable
+enum class BranchStatus {
+    PENDING,    // Not yet started
+    RUNNING,    // Currently executing
+    COMPLETED,  // Successfully finished
+    FAULTED     // Failed with error
 }

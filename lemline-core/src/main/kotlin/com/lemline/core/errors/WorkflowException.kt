@@ -144,3 +144,45 @@ class WaitWorkflowException(
         @Contextual val waitUntil: Instant
     )
 }
+
+/**
+ * Exception indicating that fork branches should be executed.
+ *
+ * This exception is thrown when a fork task needs to execute its branches.
+ * The orchestrator catches this and either:
+ * - ExecutionMode.Complete: Executes branches in parallel using coroutines
+ * - ExecutionMode.Async: Returns WorkflowState.RunningFork for runner to schedule
+ *
+ * Similar to ChildWorkflowException pattern.
+ */
+class ForkException(
+    val transformedInput: JsonElement,
+    val config: Config
+) : WorkflowException() {
+
+    /**
+     * Configuration for fork branch execution.
+     *
+     * @property compete Whether branches race (true) or all must complete (false)
+     * @property branches List of branch information for execution
+     */
+    @Serializable
+    data class Config(
+        val compete: Boolean,
+        val branches: List<BranchInfo>
+    )
+
+    /**
+     * Information about a single branch to execute.
+     *
+     * @property index Branch index (for ordering results)
+     * @property name Branch name (from TaskItem)
+     * @property nodePosition Position in workflow tree of branch root node
+     */
+    @Serializable
+    data class BranchInfo(
+        val index: Int,
+        val name: String,
+        val nodePosition: NodePosition
+    )
+}
