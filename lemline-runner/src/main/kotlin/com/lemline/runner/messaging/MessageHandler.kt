@@ -24,13 +24,23 @@ import org.apache.kafka.common.errors.RetriableException
 import org.eclipse.microprofile.reactive.messaging.Message
 
 @ExperimentalTime
-internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
+internal interface MessageHandler<T> {
 
     suspend fun Message<String>.deserialize(): T
 
     suspend fun T.handle(): T?
 
-    suspend fun T.emit()
+    /**
+     * Serializes the message to a JSON string payload.
+     * Can throw CompensationException for corruption/serialization errors.
+     */
+    suspend fun T.serialize(): String
+
+    /**
+     * Emits the serialized payload to the message broker.
+     * This is called with retry logic, so just perform the send operation.
+     */
+    suspend fun emit(payload: String)
 
     val logger: Logger
 
@@ -42,6 +52,7 @@ internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
 
     suspend fun handleMessage(message: Message<String>) {
         var next: T? = null
+        var nextPayload: String? = null
         var workflowInfo: WorkflowInfo? = null
 
         // --- Deserialization ---
@@ -51,7 +62,7 @@ internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
                 try {
                     message.deserialize().also {
                         // deserialisation succeeded
-                        workflowInfo = it.workflowInfo
+                        workflowInfo = (it as? WithOptionalWorkflowInfo)?.workflowInfo
                         metrics.deserializationCompleted(workflowInfo)
                     }
                 } catch (e: Exception) {
@@ -61,11 +72,11 @@ internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
             }
         }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles (neg)ack if block fails
 
-        // --- Processing ---
+        // --- Processing & Serialization ---
         message.tryWithCompensation(workflowInfo) {
             // We log here to get context
             logger.debug { "Deserialized ${message.toLogString()}: $msg" }
-            // Process et get next message
+            // Process and get next message
             next = metrics.recordProcessingDuration(workflowInfo) {
                 try {
                     msg.handle().also {
@@ -78,9 +89,21 @@ internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
                     throw e
                 }
             }
-            // Serialize and emit the next message if any
-            next?.emit()
+            // Serialize next message if any (can throw CompensationException for corruption)
+            nextPayload = next?.serialize()
         }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles (neg)ack if block fails
+
+        // --- Emission (with retry, outside compensation) ---
+        nextPayload?.let { payload ->
+            retry(
+                label = "Emit message",
+                maxAttempts = 6,
+                totalBudgetMs = 6_000,
+                singleAttemptTimeoutMs = 1_000
+            ) {
+                emit(payload)
+            }
+        }
 
         onCompleteTest(message, next)
         // Success Path
