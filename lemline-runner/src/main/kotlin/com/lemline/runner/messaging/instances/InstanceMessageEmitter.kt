@@ -13,7 +13,9 @@ internal const val WORKFLOWS_OUT_CHANNEL = "workflows-out"
 @ExperimentalTime
 @Startup
 @ApplicationScoped
-internal class InstanceMessageEmitter : MessageEmitter<InstanceMessage>() {
+internal class InstanceMessageEmitter(
+    override val metrics: InstanceMessageSubscriberMetrics
+) : MessageEmitter<InstanceMessage>() {
 
     @Channel(WORKFLOWS_OUT_CHANNEL)
     override lateinit var emitter: MutinyEmitter<String>

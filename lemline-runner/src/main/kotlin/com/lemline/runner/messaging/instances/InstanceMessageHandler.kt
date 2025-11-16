@@ -9,7 +9,6 @@ import com.lemline.core.states.WorkflowState
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.ILLEGAL_STATE_FAILURE
-import com.lemline.runner.failures.FailureReasons.MESSAGE_EMISSION_FAILURE
 import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.WORKFLOW_EXECUTION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
@@ -70,31 +69,32 @@ internal class InstanceMessageHandler(
             databaseEmitter.send(
                 createDeserializationFailure(
                     payload = payload,
-                    error = e
+                    exception = e
                 )
             )
         }
     }
 
     // ========================================
-    // Serialization & Emission
+    // Serialization
     // ========================================
 
     /**
      * Serializes the InstanceMessage to a JSON string.
      * Can throw CompensationException for serialization errors (corrupted state).
      */
-    override suspend fun InstanceMessage.serialize(): String {
+    override suspend fun serialize(current: InstanceMessage, next: InstanceMessage): String {
         return try {
-            this.toJsonString()
+            next.toJsonString()
         } catch (e: Exception) {
-            logger.error(e) { "Failed to serialize message" }
+            logger.error(e) { "Failed to serialize message: $next" }
 
-            // Send infrastructure failure to database channel (not retryable - corrupted state)
+            // Send error to the database channel (not retryable - logic error).
+            // We cannot serialize the next message
             throw CompensationException(SERIALIZATION_FAILURE) {
                 databaseEmitter.send(
-                    toInfrastructureFailure(
-                        error = e,
+                    current.toInfrastructureFailure(
+                        exception = e,
                         reason = SERIALIZATION_FAILURE,
                         retryable = false
                     )
@@ -103,9 +103,13 @@ internal class InstanceMessageHandler(
         }
     }
 
+    // ========================================
+    //  Emission
+    // ========================================
+
     /**
      * Emits the serialized payload to the instance message broker.
-     * Called with retry logic by MessageHandler, so just perform the send.
+     * MessageEmitter.send() handles retries internally.
      */
     override suspend fun emit(payload: String) {
         instanceEmitter.send(payload)
@@ -120,11 +124,11 @@ internal class InstanceMessageHandler(
      *
      * This function is designed to throw only DelegatedException with additional actions
      */
-    override suspend fun InstanceMessage.handle(): InstanceMessage? {
+    override suspend fun handle(current: InstanceMessage): InstanceMessage? {
         // --- Get Workflow Definition ---
-        val workflow = findWorkflowDefinition()
+        val workflow = current.findWorkflowDefinition()
         // --- Execute step using WorkflowOrchestrator ---
-        return executeStep(workflow)
+        return current.executeStep(workflow)
     }
 
     /**
@@ -160,7 +164,7 @@ internal class InstanceMessageHandler(
             throw CompensationException(reason) {
                 databaseEmitter.send(
                     toInfrastructureFailure(
-                        error = e,
+                        exception = e,
                         reason = reason,
                         retryable = true
                     )
@@ -179,7 +183,7 @@ internal class InstanceMessageHandler(
         throw CompensationException(DEFINITION_MISSING) {
             databaseEmitter.send(
                 toInfrastructureFailure(
-                    error = error,
+                    exception = error,
                     reason = DEFINITION_MISSING,
                     retryable = false
                 )
@@ -212,7 +216,7 @@ internal class InstanceMessageHandler(
         throw CompensationException(WORKFLOW_EXECUTION_FAILURE) {
             databaseEmitter.send(
                 toInfrastructureFailure(
-                    error = e,
+                    exception = e,
                     reason = WORKFLOW_EXECUTION_FAILURE,
                     retryable = false
                 )
@@ -298,7 +302,7 @@ internal class InstanceMessageHandler(
                 logger.error { "Unexpected Starting state when resuming workflow" }
                 databaseEmitter.send(
                     toInfrastructureFailure(
-                        error = IllegalStateException("Received Starting state during resume"),
+                        exception = IllegalStateException("Received Starting state during resume"),
                         reason = ILLEGAL_STATE_FAILURE,
                         retryable = false
                     )

@@ -52,10 +52,6 @@ internal class DatabaseMessageHandler(
 
     override var logger = logger()
 
-    val maxAttempts: Int = 6
-    val totalBudgetMs: Long = 50_000
-    val singleAttemptTimeoutMs: Long = 10_000
-
     @TestOnly
     override var onCompleteTest = { _: Message<String>, _: DatabaseMessage? -> }
 
@@ -95,7 +91,7 @@ internal class DatabaseMessageHandler(
     /**
      * DatabaseMessage does not need serialization as it doesn't chain to other messages.
      */
-    override suspend fun DatabaseMessage.serialize(): String {
+    override suspend fun serialize(current: DatabaseMessage, next: DatabaseMessage): String {
         error("DatabaseMessage should not be serialized - it doesn't chain to other messages")
     }
 
@@ -112,27 +108,22 @@ internal class DatabaseMessageHandler(
 
     /**
      * Handles the DatabaseMessage sealed class.
+     * Database operations should fail fast - if they fail, the message will be NACKed
+     * and redelivered by the broker.
      */
     @Throws(CompensationException::class)
-    override suspend fun DatabaseMessage.handle(): DatabaseMessage? {
-        retry(
-            label = "${this::class.simpleName}",
-            maxAttempts = maxAttempts,
-            totalBudgetMs = totalBudgetMs,
-            singleAttemptTimeoutMs = singleAttemptTimeoutMs
-        ) {
-            when (this) {
-                is DatabaseMessage.WorkflowPersistence -> {
-                    handleWorkflowPersistence(this.instance)
-                }
+    override suspend fun handle(current: DatabaseMessage): DatabaseMessage? {
+        when (current) {
+            is DatabaseMessage.WorkflowPersistence -> {
+                handleWorkflowPersistence(current.instance)
+            }
 
-                is DatabaseMessage.InfrastructureFailure -> {
-                    handleInfrastructureFailure(this)
-                }
+            is DatabaseMessage.InfrastructureFailure -> {
+                handleInfrastructureFailure(current)
+            }
 
-                is DatabaseMessage.DeserializationFailure -> {
-                    handleDeserializationFailure(this)
-                }
+            is DatabaseMessage.DeserializationFailure -> {
+                handleDeserializationFailure(current)
             }
         }
         return null

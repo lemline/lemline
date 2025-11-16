@@ -2,31 +2,52 @@
 package com.lemline.runner.messaging
 
 import com.lemline.common.json.JsonSerializable
+import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WithOptionalWorkflowInfo
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.inject.Inject
+import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Message
 
 /**
  * Base class for message emitters.
  * Generic type T must be JsonSerializable to support toJsonString() method.
  */
+@ExperimentalTime
 internal abstract class MessageEmitter<T : JsonSerializable> {
 
     protected abstract val emitter: MutinyEmitter<String>
 
+    protected abstract val metrics: MessageSubscriberMetrics
+
     @Inject
     private lateinit var messageMetaData: MessageMetaData
 
+    private val logger = logger()
+
+    // Retrieve workflowInfo if present
+    private val T?.workflowInfo get() = (this as? WithOptionalWorkflowInfo)?.workflowInfo
+
     suspend fun send(payload: String) {
         val md = MetaData(messageId = IDV7.random())
-        emit(payload, md)
+        retry(
+            logger = logger,
+            label = "Emit message",
+            maxAttempts = 6,
+            totalBudgetMs = 6_000,
+            singleAttemptTimeoutMs = 1_000
+        ) {
+            emit(payload, md)
+        }
     }
 
     suspend fun send(msg: T) {
-        val md = MetaData(messageId = IDV7.random())
-        emit(msg.toJsonString(), md)
+        val payload = metrics.recordSerializationDuration(msg.workflowInfo) {
+            msg.toJsonString()
+        }
+        send(payload)
     }
 
     private suspend fun emit(payload: String, metadata: MetaData) {
@@ -35,6 +56,4 @@ internal abstract class MessageEmitter<T : JsonSerializable> {
 
         emitter.sendMessage(msg).awaitSuspending()
     }
-
-
 }

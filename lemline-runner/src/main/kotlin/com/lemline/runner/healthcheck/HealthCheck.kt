@@ -22,10 +22,10 @@ object RetryReadiness : HealthCheck {
 
 @Liveness
 object FatalAckLiveness : HealthCheck {
-    val livenessDownOnFatal = AtomicBoolean(false)
+    val livenessDownOnFailure = AtomicBoolean(false)
 
     override fun call(): HealthCheckResponse =
-        if (livenessDownOnFatal.get())
+        if (livenessDownOnFailure.get())
             HealthCheckResponse.down("orders-liveness")
         else
             HealthCheckResponse.up("orders-liveness")

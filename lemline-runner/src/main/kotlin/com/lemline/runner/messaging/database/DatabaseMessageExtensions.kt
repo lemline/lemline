@@ -9,7 +9,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 /**
  * Creates an InfrastructureFailure message from an exception.
  *
- * @param error The exception that caused the failure
+ * @param exception The exception that caused the failure
  * @param reason A low-cardinality failure reason for metrics (see FailureReasons)
  * @param retryable true if the error is transient and should be retried (e.g., DB down, broker unavailable),
  *                  false if the error is permanent (e.g., malformed data, logic error)
@@ -17,14 +17,14 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalTime
 @ExperimentalSerializationApi
 fun InstanceMessage.toInfrastructureFailure(
-    error: Throwable,
-    reason: String = getFailureReason(error),
+    exception: Exception,
+    reason: String = getFailureReason(exception),
     retryable: Boolean
 ): DatabaseMessage.InfrastructureFailure = DatabaseMessage.InfrastructureFailure(
     instance = this,
-    errorClass = error::class.qualifiedName ?: "Unknown",
-    errorMessage = error.message,
-    errorStackTrace = error.stackTraceToString(),
+    errorClass = exception::class.qualifiedName ?: "Unknown",
+    errorMessage = exception.message,
+    errorStackTrace = exception.stackTraceToString(),
     reason = reason,
     retryable = retryable
 )
@@ -42,10 +42,10 @@ fun InstanceMessage.toInfrastructureFailure(
 @ExperimentalSerializationApi
 fun createDeserializationFailure(
     payload: String,
-    error: Throwable
+    exception: Exception
 ): DatabaseMessage.DeserializationFailure = DatabaseMessage.DeserializationFailure(
     payload = payload,
-    errorClass = error::class.qualifiedName ?: "Unknown",
-    errorMessage = error.message,
-    errorStackTrace = error.stackTraceToString()
+    errorClass = exception::class.qualifiedName ?: "Unknown",
+    errorMessage = exception.message,
+    errorStackTrace = exception.stackTraceToString()
 )
