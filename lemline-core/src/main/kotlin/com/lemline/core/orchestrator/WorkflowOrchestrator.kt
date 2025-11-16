@@ -586,126 +586,126 @@ object WorkflowOrchestrator {
         executionMode: ExecutionMode,
         nodesMap: Map<NodePosition, Node<*>>
     ): ForkBranchResults {
-        if (exception.config.compete) {
-            // Compete mode: Race branches, first to complete wins
-            val results = coroutineScope {
-                exception.config.branches.map { branch ->
-                    async {
-                        val branchNode = nodesMap[branch.nodePosition]
-                            ?: throw IllegalStateException("Branch node not found at ${branch.nodePosition}")
-
-                        logger.debug { "Executing branch: ${branch.name}" }
-
-                        // Execute branch
-                        val result = resumeFromTask(
-                            taskStates = taskStates,
-                            node = branchNode,
-                            rawInput = exception.transformedInput,
-                            flowDirective = null,
-                            executionMode = executionMode
-                        )
-
-                        // Extract output based on state type
-                        val output = when (result) {
-                            is WorkflowState.ReadyForNextTask -> {
-                                logger.debug { "Branch ${branch.name} completed, stopped at fork" }
-                                result.rawInput
-                            }
-
-                            is WorkflowState.Completed -> {
-                                logger.debug { "Branch ${branch.name} completed entirely" }
-                                result.output
-                            }
-
-                            is WorkflowState.Failed -> {
-                                logger.error { "Branch ${branch.name} failed: ${result.error}" }
-                                throw result.exception ?: InternalWorkflowException(result.error)
-                            }
-
-                            else -> {
-                                throw IllegalStateException(
-                                    "Branch execution returned unexpected state: ${result::class.simpleName} " +
-                                        "for branch ${branch.name}"
-                                )
-                            }
-                        }
-
-                        branch.index to output
-                    }
-                }
-            }
-
-            // Wait for first to complete
-            val (index, output) = select {
-                results.forEach { deferred ->
-                    deferred.onAwait { it }
-                }
-            }
-
-            logger.debug { "Fork compete winner: index=$index" }
-
-            return ForkBranchResults(
-                outputs = mapOf(index to output),
-                compete = true,
-                assembledOutput = output  // Single value
-            )
+        return if (exception.config.compete) {
+            executeForkBranchesCompete(exception, taskStates, executionMode, nodesMap)
         } else {
-            // Cooperative mode: Wait for all branches
-            val outputs = coroutineScope {
-                exception.config.branches.map { branch ->
-                    async {
-                        val branchNode = nodesMap[branch.nodePosition]
-                            ?: throw IllegalStateException("Branch node not found at ${branch.nodePosition}")
+            executeForkBranchesCooperative(exception, taskStates, executionMode, nodesMap)
+        }
+    }
 
-                        logger.debug { "Executing branch: ${branch.name}" }
+    /**
+     * Execute fork branches in compete mode (race for first completion).
+     */
+    private suspend fun executeForkBranchesCompete(
+        exception: ForkException,
+        taskStates: TaskStates,
+        executionMode: ExecutionMode,
+        nodesMap: Map<NodePosition, Node<*>>
+    ): ForkBranchResults {
+        val results = coroutineScope {
+            exception.config.branches.map { branch ->
+                async {
+                    val output = executeSingleBranch(branch, taskStates, exception.transformedInput, executionMode, nodesMap)
+                    branch.index to output
+                }
+            }
+        }
 
-                        // Execute branch
-                        val result = resumeFromTask(
-                            taskStates = taskStates,
-                            node = branchNode,
-                            rawInput = exception.transformedInput,
-                            flowDirective = null,
-                            executionMode = executionMode
-                        )
+        // Wait for first to complete
+        val (index, output) = select {
+            results.forEach { deferred ->
+                deferred.onAwait { it }
+            }
+        }
 
-                        // Extract output based on state type
-                        when (result) {
-                            is WorkflowState.ReadyForNextTask -> {
-                                logger.debug { "Branch ${branch.name} completed, stopped at fork" }
-                                result.rawInput
-                            }
+        logger.debug { "Fork compete winner: index=$index" }
 
-                            is WorkflowState.Completed -> {
-                                logger.debug { "Branch ${branch.name} completed entirely" }
-                                result.output
-                            }
+        return ForkBranchResults(
+            outputs = mapOf(index to output),
+            compete = true,
+            assembledOutput = output
+        )
+    }
 
-                            is WorkflowState.Failed -> {
-                                logger.error { "Branch ${branch.name} failed: ${result.error}" }
-                                throw result.exception ?: InternalWorkflowException(result.error)
-                            }
+    /**
+     * Execute fork branches in cooperative mode (wait for all).
+     */
+    private suspend fun executeForkBranchesCooperative(
+        exception: ForkException,
+        taskStates: TaskStates,
+        executionMode: ExecutionMode,
+        nodesMap: Map<NodePosition, Node<*>>
+    ): ForkBranchResults {
+        val outputs = coroutineScope {
+            exception.config.branches.map { branch ->
+                async {
+                    executeSingleBranch(branch, taskStates, exception.transformedInput, executionMode, nodesMap)
+                }
+            }.awaitAll()
+        }
 
-                            else -> {
-                                throw IllegalStateException(
-                                    "Branch execution returned unexpected state: ${result::class.simpleName} " +
-                                        "for branch ${branch.name}"
-                                )
-                            }
-                        }
-                    }
-                }.awaitAll()
+        logger.debug { "Fork cooperative: all ${outputs.size} branches completed" }
+
+        val outputMap = outputs.withIndex().associate { (index, output) -> index to output }
+
+        return ForkBranchResults(
+            outputs = outputMap,
+            compete = false,
+            assembledOutput = JsonArray(outputs)
+        )
+    }
+
+    /**
+     * Execute a single fork branch.
+     */
+    private suspend fun executeSingleBranch(
+        branch: ForkException.BranchInfo,
+        taskStates: TaskStates,
+        branchInput: JsonElement,
+        executionMode: ExecutionMode,
+        nodesMap: Map<NodePosition, Node<*>>
+    ): JsonElement {
+        val branchNode = nodesMap[branch.nodePosition]
+            ?: throw IllegalStateException("Branch node not found at ${branch.nodePosition}")
+
+        logger.debug { "Executing branch: ${branch.name}" }
+
+        val result = resumeFromTask(
+            taskStates = taskStates,
+            node = branchNode,
+            rawInput = branchInput,
+            flowDirective = null,
+            executionMode = executionMode
+        )
+
+        return extractBranchOutput(result, branch.name)
+    }
+
+    /**
+     * Extract output from a completed branch based on its final state.
+     */
+    private fun extractBranchOutput(result: WorkflowState, branchName: String): JsonElement {
+        return when (result) {
+            is WorkflowState.ReadyForNextTask -> {
+                logger.debug { "Branch $branchName completed, stopped at fork" }
+                result.rawInput
             }
 
-            logger.debug { "Fork cooperative: all ${outputs.size} branches completed" }
+            is WorkflowState.Completed -> {
+                logger.debug { "Branch $branchName completed entirely" }
+                result.output
+            }
 
-            // Create output map
-            val outputMap = outputs.withIndex().associate { (index, output) -> index to output }
+            is WorkflowState.Failed -> {
+                logger.error { "Branch $branchName failed: ${result.error}" }
+                throw result.exception ?: InternalWorkflowException(result.error)
+            }
 
-            return ForkBranchResults(
-                outputs = outputMap,
-                compete = false,
-                assembledOutput = JsonArray(outputs)  // Array of all outputs
-            )
+            else -> {
+                throw IllegalStateException(
+                    "Branch execution returned unexpected state: ${result::class.simpleName} for branch $branchName"
+                )
+            }
         }
     }
 

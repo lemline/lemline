@@ -26,7 +26,6 @@ internal suspend fun executeContinuousWorkflow(
     )
 }
 
-
 internal suspend fun executeTaskByTaskWorkflow(
     yaml: String,
     namespace: String,
