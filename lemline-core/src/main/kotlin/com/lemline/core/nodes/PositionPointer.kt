@@ -32,6 +32,6 @@ value class PositionPointer(private val path: String) {
     )
 
     companion object {
-        val root = PositionPointer("")
+        val root = PositionPointer("/")
     }
 }

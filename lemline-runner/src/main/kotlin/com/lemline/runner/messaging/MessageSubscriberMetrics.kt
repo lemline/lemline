@@ -30,6 +30,10 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
     protected val METRIC_DESERIALIZATION_FAILED_TOTAL = "$METRIC_PREFIX.deserialization.failed.total"
     protected val METRIC_DESERIALIZATION_DURATION = "$METRIC_PREFIX.deserialization.duration"
 
+    protected val METRIC_SERIALIZATION_COMPLETED_TOTAL = "$METRIC_PREFIX.serialization.completed.total"
+    protected val METRIC_SERIALIZATION_FAILED_TOTAL = "$METRIC_PREFIX.serialization.failed.total"
+    protected val METRIC_SERIALIZATION_DURATION = "$METRIC_PREFIX.serialization.duration"
+
     protected val METRIC_PROCESSING_COMPLETED_TOTAL = "$METRIC_PREFIX.processing.completed.total"
     protected val METRIC_PROCESSING_FAILED_TOTAL = "$METRIC_PREFIX.processing.failed.total"
     protected val METRIC_PROCESSING_DURATION = "$METRIC_PREFIX.processing.duration"
@@ -77,6 +81,26 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
         METRIC_DESERIALIZATION_FAILED_TOTAL,
         TAG_REASON, getFailureReason(e),
     ).increment()
+
+    /**
+     * Increments the counter for failed serialization.
+     */
+    fun serializationFailed(workflowInfo: WorkflowInfo?, e: Exception) = registry.counter(
+        METRIC_SERIALIZATION_FAILED_TOTAL,
+        TAG_REASON, getFailureReason(e),
+        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+    ).increment()
+
+    /**
+     * Increments the counter for successful serialization.
+     */
+    fun serializationCompleted(workflowInfo: WorkflowInfo?) = registry.counter(
+        METRIC_SERIALIZATION_COMPLETED_TOTAL,
+        TAG_WORKFLOW_NAME, (workflowInfo?.workflowName ?: UNKNOWN_NAME).toString(),
+        TAG_WORKFLOW_VERSION, (workflowInfo?.workflowVersion ?: UNKNOWN_VERSION).toString()
+    ).increment()
+
 
     /**
      * Increments the counter for successfully processed messages.
@@ -144,7 +168,31 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
         val timer = registry.timer(METRIC_DESERIALIZATION_DURATION)
         val start = markNow()
         return try {
-            block()
+            block().also {
+                deserializationCompleted(it as? WorkflowInfo)
+            }
+        } catch (e: Exception) {
+            deserializationFailed(e)
+            throw e
+        } finally {
+            // Always record the duration, even if the block throws an exception.
+            timer.record(start.elapsedNow().toJavaDuration())
+        }
+    }
+
+    /**
+     * Records the duration of serialization
+     */
+    suspend fun <T> recordSerializationDuration(current: T, block: suspend () -> String): String {
+        val timer = registry.timer(METRIC_SERIALIZATION_DURATION)
+        val start = markNow()
+        return try {
+            block().also {
+                serializationCompleted(current as? WorkflowInfo)
+            }
+        } catch (e: Exception) {
+            serializationFailed(current as? WorkflowInfo, e)
+            throw e
         } finally {
             // Always record the duration, even if the block throws an exception.
             timer.record(start.elapsedNow().toJavaDuration())
@@ -164,13 +212,18 @@ internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
         )
         val start = markNow()
         return try {
-            block()
+            block().also {
+                processingCompleted(workflowInfo)
+            }
+        } catch (e: Exception) {
+            val reason = if (e is CompensationException) e.reason else getFailureReason(e)
+            processingFailed(reason, workflowInfo)
+            throw e
         } finally {
             // Always record the duration, even if the block throws an exception.
             timer.record(start.elapsedNow().toJavaDuration())
         }
     }
-
 
     companion object {
         // Tag Keys

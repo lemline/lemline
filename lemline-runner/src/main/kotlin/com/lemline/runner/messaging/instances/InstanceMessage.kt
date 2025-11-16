@@ -10,8 +10,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.processor.Processor
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.states.WorkflowState
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -43,20 +42,10 @@ data class InstanceMessage(
 
     override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
-    /**
-     * Updates the workflow state with the given processor's current position and states.
-     */
-    fun updateFrom(processor: Processor): InstanceMessage = copy(
-        workflowState = workflowState.copy(
-            currentPosition = processor.position!!,
-            currentStates = processor.state,
-        )
-    ).also { it.message = message }
-
     companion object {
 
         fun new(
-            workflowId: WorkflowId,
+            workflowId: WorkflowId = WorkflowId.random(),
             workflowNamespace: WorkflowNamespace,
             workflowName: WorkflowName,
             workflowVersion: WorkflowVersion,
@@ -69,7 +58,8 @@ data class InstanceMessage(
                 workflowName = workflowName,
                 workflowVersion = workflowVersion,
             ),
-            workflowState = WorkflowState.new(
+            workflowState = WorkflowState.Starting(
+                startedAt = kotlin.time.Clock.System.now(),
                 input = workflowInput,
             ),
             parentId = parentId,

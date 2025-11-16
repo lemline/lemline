@@ -8,11 +8,9 @@ import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.nodes.NodeState
 import com.lemline.core.random.random
-import com.lemline.core.workflows.NodeStates
-import com.lemline.core.workflows.WorkflowState
-import com.lemline.runner.messaging.database.CompletedMessage
+import com.lemline.core.states.WorkflowState
+import com.lemline.runner.messaging.database.DatabaseMessage
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
@@ -32,11 +30,13 @@ fun OutBoxStatus.Companion.random() = Random.nextInt(OutBoxStatus.entries.size).
 }
 
 fun WorkflowState.Companion.random(): WorkflowState {
-    val randomPos = NodePosition.random()
-
-    return WorkflowState(
-        currentPosition = randomPos,
-        currentStates = NodeStates(mapOf(randomPos to NodeState.random())),
+    // Generate a simple random state for testing (ReadyForNextTask)
+    // Could be extended to randomly choose between different state variants if needed
+    return WorkflowState.ReadyForNextTask(
+        taskStates = emptyMap(),
+        nodePosition = NodePosition.random(),
+        rawInput = JsonElement.random(),
+        flowDirective = null
     )
 }
 
@@ -103,15 +103,3 @@ fun WaitOutboxModel.Companion.random() = WaitOutboxModel(
     outBoxStatus = OutBoxStatus.random(),
     outboxScheduledFor = Instant.random(), // <- Not nullable
 ).also { it.randomize() }
-
-
-fun CompletedMessage.Companion.random(): CompletedMessage {
-    val parentId = IDV7.nullableRandom()
-
-    return CompletedMessage(
-        workflowInfo = WorkflowInfo.random(),
-        parentId = parentId,
-        output = if (parentId == null) null else JsonElement.random(),
-        isScheduledAfter = Random.nextBoolean(),
-    )
-}

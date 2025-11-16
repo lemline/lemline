@@ -15,7 +15,9 @@ internal const val DATABASE_OUT_CHANNEL = "ingestion-out"
 @ExperimentalTime
 @Startup
 @ApplicationScoped
-internal class DatabaseMessageEmitter : MessageEmitter<DatabaseMessage>() {
+internal class DatabaseMessageEmitter(
+    override val metrics: DatabaseMessageSubscriberMetrics
+) : MessageEmitter<DatabaseMessage>() {
     @Channel(DATABASE_OUT_CHANNEL)
     override lateinit var emitter: MutinyEmitter<String>
 }

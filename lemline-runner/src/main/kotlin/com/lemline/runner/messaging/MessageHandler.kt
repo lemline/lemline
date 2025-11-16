@@ -7,30 +7,31 @@ import com.lemline.common.values.WithOptionalWorkflowInfo
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.runner.failures.FailureReasons.getFailureReason
-import com.lemline.runner.healthcheck.FatalAckLiveness.livenessDownOnFatal
+import com.lemline.runner.healthcheck.FatalAckLiveness.livenessDownOnFailure
 import com.lemline.runner.healthcheck.RetryReadiness.readinessDownDuringRetries
 import io.quarkus.smallrye.reactivemessaging.ackSuspending
 import io.quarkus.smallrye.reactivemessaging.nackSuspending
-import java.util.concurrent.CompletionException
-import java.util.concurrent.ExecutionException
-import java.util.concurrent.TimeUnit
-import kotlin.random.Random
 import kotlin.time.ExperimentalTime
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeout
-import org.apache.kafka.common.errors.RetriableException
 import org.eclipse.microprofile.reactive.messaging.Message
 
 @ExperimentalTime
-internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
+internal interface MessageHandler<T> {
 
     suspend fun Message<String>.deserialize(): T
 
-    suspend fun T.handle(): T?
+    suspend fun handle(current: T): T?
 
-    suspend fun T.emit()
+    /**
+     * Serializes the message to a JSON string payload.
+     * Can throw CompensationException for corruption/serialization errors.
+     */
+    suspend fun serialize(current: T, next: T): String
+
+    /**
+     * Emits the serialized payload to the message broker.
+     * This is called with retry logic, so just perform the send operation.
+     */
+    suspend fun emit(payload: String)
 
     val logger: Logger
 
@@ -40,62 +41,91 @@ internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
 
     val onFailureTest: (Message<String>, Throwable?) -> Unit
 
+    // Retrieve workflowInfo if present
+    private val T?.workflowInfo get() = (this as? WithOptionalWorkflowInfo)?.workflowInfo
+
     suspend fun handleMessage(message: Message<String>) {
-        var next: T? = null
-        var workflowInfo: WorkflowInfo? = null
+        logger.debug { "Received: ${message.toLogString()}" }
 
         // --- Deserialization ---
-        val msg: T = message.tryWithCompensation {
-            logger.debug { "Received: ${message.toLogString()}" }
-            metrics.recordDeserializationDuration {
-                try {
-                    message.deserialize().also {
-                        // deserialisation succeeded
-                        workflowInfo = it.workflowInfo
-                        metrics.deserializationCompleted(workflowInfo)
-                    }
-                } catch (e: Exception) {
-                    metrics.deserializationFailed(e)
-                    throw e
-                }
-            }
-        }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles (neg)ack if block fails
+        val msg: T = message.deserializePayload()
+            .getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles ack if fails
 
-        // --- Processing ---
-        message.tryWithCompensation(workflowInfo) {
-            // We log here to get context
-            logger.debug { "Deserialized ${message.toLogString()}: $msg" }
-            // Process et get next message
-            next = metrics.recordProcessingDuration(workflowInfo) {
-                try {
-                    msg.handle().also {
-                        logger.debug { "Processed: ${message.toLogString()}" }
-                        metrics.processingCompleted(workflowInfo)
-                    }
-                } catch (e: Exception) {
-                    val reason = if (e is CompensationException) e.reason else getFailureReason(e)
-                    metrics.processingFailed(reason, workflowInfo)
-                    throw e
-                }
-            }
-            // Serialize and emit the next message if any
-            next?.emit()
-        }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles (neg)ack if block fails
+        // --- Processing  ---
+        val next: T? = message.handlePayload(msg)
+            .getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles ack if fails
+
+        // --- Serialization  ---
+        val nextPayload: String? = next?.let {
+            message.serializePayload(msg, it)
+        }?.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles ack if fails
+
+        // --- Emission ---
+        nextPayload?.let { payload ->
+            message.emitPayload(payload)
+        }?.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles ack if fails
 
         onCompleteTest(message, next)
-        // Success Path
-        message.acknowledgeWithRetry(workflowInfo)
+
+        // Success Path - ACK the original message
+        message.acknowledgeWithRetry(msg.workflowInfo)
+    }
+
+    private suspend fun Message<String>.deserializePayload(): Result<T> = tryWithCompensation {
+        metrics.recordDeserializationDuration {
+            deserialize()
+        }
+    }
+
+    private suspend fun Message<String>.handlePayload(payload: T): Result<T?> = tryWithCompensation {
+        metrics.recordProcessingDuration(payload.workflowInfo) {
+            handle(payload)
+        }
+    }
+
+    private suspend fun Message<String>.serializePayload(current: T, next: T): Result<String?> = tryWithCompensation {
+        metrics.recordSerializationDuration(next.workflowInfo) {
+            serialize(current, next)
+        }
+    }
+
+    private suspend fun Message<String>.emitPayload(nextPayload: String): Result<Unit> = tryWithCompensation {
+        emit(nextPayload)
     }
 
     /**
-     * Attempts to execute a suspending block within a log context.
-     * If failing,
-     * - the compensation actions of the CompensationException are executed, and the message is acknowledged.
-     * - if failing again, the message is negatively acknowledged.
+     * Executes a suspending processing [block] for this message and wraps it with
+     * compensation-aware error handling and broker ACK/NACK semantics.
      *
-     * @return The result of the block if successful, else null
+     * Execution is done inside a logging context derived from [workflowInfo].
      *
-     * @throws Exception If an error occurs during (negative) acknowledgment
+     * Behavior:
+     * - **Success path**: If [block] completes normally, its result is wrapped in
+     *   [Result.success] and returned. The caller is responsible for any final ACK.
+     * - **Compensation path**: If [block] throws a [CompensationException],
+     *   the exception’s `run` callback is invoked to perform compensating work
+     *   (e.g. persisting failure details). If compensation succeeds, the message is
+     *   acknowledged via [acknowledgeWithRetry] and a failed [Result] containing the
+     *   original [CompensationException] is returned.
+     * - **Failure during compensation**: If executing the compensation callback or
+     *   acknowledging the message throws, the error is logged, the message is
+     *   negatively acknowledged via [negAcknowledgeWithRetry], and a failed [Result]
+     *   with that error is returned.
+     * - **Generic failure path**: If [block] throws any other [Exception], the error
+     *   is logged, the message is negatively acknowledged via [negAcknowledgeWithRetry],
+     *   and a failed [Result] is returned.
+     *
+     * This helper ensures that:
+     * - Business logic can delegate failure handling via [CompensationException].
+     * - ACK/NACK behavior is consistent and uses the configured retry policies.
+     * - Callers only need to inspect the returned [Result] and do not have to manage
+     *   compensation or broker semantics directly.
+     *
+     * @param workflowInfo Optional workflow context used for logging and metrics.
+     * @param block The processing logic to execute for this message.
+     * @return [Result.success] with the block result on success, or [Result.failure]
+     *   with the thrown exception after the appropriate compensation / ACK / NACK
+     *   behavior has been applied.
      */
     suspend fun <S> Message<String>.tryWithCompensation(
         workflowInfo: WorkflowInfo? = null,
@@ -152,12 +182,14 @@ internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
         totalBudgetMs: Long = 6_000, // Keep local retry+processing under throttled.unprocessed-record-max-age.ms
         singleAttemptTimeoutMs: Long = 1_000
     ) = retry(
+        logger = logger,
         label = "ACK",
         maxAttempts = maxAttempts,
         totalBudgetMs = totalBudgetMs,
         singleAttemptTimeoutMs = singleAttemptTimeoutMs,
-        onRetryStart = { readinessDownDuringRetries.set(true) },
-        onFatalFailure = { _, _, _ -> livenessDownOnFatal.set(true) }
+        onRetry = { readinessDownDuringRetries.set(true) },
+        onSuccess = { readinessDownDuringRetries.set(false) },
+        onFailure = { _, _, _ -> livenessDownOnFailure.set(true) }
     ) {
         ackSuspending()
     }
@@ -199,107 +231,16 @@ internal interface MessageHandler<T : WithOptionalWorkflowInfo> {
         totalBudgetMs: Long = 6_000,
         singleAttemptTimeoutMs: Long = 1_000
     ) = retry(
+        logger = logger,
         label = "NACK",
         maxAttempts = maxAttempts,
         totalBudgetMs = totalBudgetMs,
         singleAttemptTimeoutMs = singleAttemptTimeoutMs,
-        onRetryStart = { readinessDownDuringRetries.set(true) },
-        onFatalFailure = { _, _, _ -> livenessDownOnFatal.set(true) }
+        onRetry = { readinessDownDuringRetries.set(true) },
+        onSuccess = { readinessDownDuringRetries.set(false) },
+        onFailure = { _, _, _ -> livenessDownOnFailure.set(true) }
     ) {
         nackSuspending(cause)
-    }
-
-    /**
-     * Retries the execution of a given suspending block of code until it succeeds, the maximum number of attempts
-     * is reached, or the total time budget in milliseconds is exceeded. The retry logic includes handling exceptions
-     * and applying an exponential backoff mechanism to space out subsequent attempts.
-     *
-     * This is a generic retry function that can be reused across different operations.
-     *
-     * @param label A descriptive label for the retry operation, used in logging to track the operation being attempted.
-     * @param maxAttempts The maximum number of retry attempts allowed before giving up.
-     * @param totalBudgetMs The total allowable time budget for retries, in milliseconds, after which retries will stop.
-     * @param onRetryStart Called when starting a retry attempt (attempt > 0). Optional.
-     * @param onFatalFailure Called when all retries are exhausted. Optional.
-     * @param block The suspending block of code to execute and retry upon failure.
-     */
-
-    suspend fun retry(
-        label: String,
-        maxAttempts: Int = 6,
-        totalBudgetMs: Long = 30_000,
-        singleAttemptTimeoutMs: Long = 15_000,
-        onRetryStart: (() -> Unit)? = null,
-        onFatalFailure: ((Exception, Int, Long) -> Unit)? = null,
-        block: suspend () -> Unit
-    ) {
-        var attempt = 0
-        val start = System.nanoTime()
-        while (true) {
-            try {
-                if (attempt > 0) onRetryStart?.invoke()
-                withTimeout(singleAttemptTimeoutMs) {
-                    block()
-                }
-                return
-            } catch (e: Exception) {
-                attempt++
-                val elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)
-                val retriable = isRetriable(e)
-                if (!retriable || attempt >= maxAttempts || elapsedMs >= totalBudgetMs) {
-                    logger.error(e) { "$label failed after $attempt attempts (${elapsedMs}ms)" }
-                    onFatalFailure?.invoke(e, attempt, elapsedMs)
-                    throw e
-                }
-                logger.debug(e) { "$label failed at $attempt attempt (${elapsedMs}ms) - retrying" }
-                sleepBackoff(attempt)
-            }
-        }
-    }
-
-    /**
-     * Determines whether the given throwable is considered retriable based on its root cause.
-     *
-     * @param t The throwable to evaluate.
-     * @return True if the throwable is retriable, false otherwise.
-     */
-    private fun isRetriable(t: Throwable): Boolean {
-        val c = rootCause(t)
-        // We check class names for RabbitMQ exceptions as we cannot add imports here.
-        val isRabbitMqTransient = when (c?.javaClass?.name) {
-            "com.rabbitmq.client.ShutdownSignalException",
-            "com.rabbitmq.client.AlreadyClosedException" -> true
-
-            else -> false
-        }
-        val isSqlTransient = c?.javaClass?.name?.startsWith("java.sql.SQLTransient") == true
-
-        return c is TimeoutCancellationException || // <- coroutine timeout exception
-            c is RetriableException || // <- kafka exception
-            c is java.io.IOException || // <- IO exception (e.g. connection reset)
-            isRabbitMqTransient || isSqlTransient
-    }
-
-    private fun rootCause(t: Throwable?): Throwable? {
-        var e = t
-        while (e is ExecutionException || e is CompletionException) e = e.cause
-        return e ?: t
-    }
-
-    /**
-     * Suspends the execution of the coroutine for a time duration that increases exponentially
-     * based on the retry attempt. This backoff mechanism helps in mitigating frequent retries
-     * in case of repeated failures.
-     *
-     * @param attempt The number of retry attempts made so far, zero-based. This determines the backoff delay duration.
-     * @param minMs The minimum duration in milliseconds for the initial backoff delay. Default value is 100 milliseconds.
-     * @param maxMs The maximum duration in milliseconds for the backoff delay, preventing excessive delay. Default value is 5000 milliseconds.
-     */
-    private suspend fun sleepBackoff(attempt: Int, minMs: Long = 100, maxMs: Long = 5_000) {
-        val pow = 1L shl attempt.coerceAtMost(5) // 1,2,4,8,16,32
-        val base = (minMs * pow).coerceAtMost(maxMs)
-        val jitter = Random.nextLong(0, base / 2 + 1)
-        delay(base + jitter)
     }
 
     companion object {

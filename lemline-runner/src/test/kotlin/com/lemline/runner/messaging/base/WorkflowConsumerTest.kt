@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.base
 
-import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -9,14 +8,9 @@ import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.database.DatabaseMessage
 import com.lemline.runner.messaging.database.DatabaseMessageHandler
-import com.lemline.runner.messaging.database.IngestionMessage
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.messaging.instances.InstanceMessageHandler
 import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.models.FailureModel
-import com.lemline.runner.models.RetryOutboxModel
-import com.lemline.runner.models.WaitOutboxModel
-import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldNotBeNull
@@ -99,7 +93,7 @@ internal abstract class WorkflowConsumerTest {
             namespace = WorkflowNamespace("test"),
             name = WorkflowName("test-workflow"),
             version = WorkflowVersion("1.0.0"),
-            definition = """
+            definition = $$"""
             document:
                 dsl: '1.0.0'
                 namespace: test
@@ -109,16 +103,16 @@ internal abstract class WorkflowConsumerTest {
                 - test:
                     switch:
                       - task:
-                          when: @{ . == "task" }
+                          when: ${ . == "task" }
                           then: taskCase
                       - wait:
-                          when: @{ . == "wait" }
+                          when: ${ . == "wait" }
                           then: waitCase
                       - completed:
-                          when: @{ . == "completed" }
+                          when: ${ . == "completed" }
                           then: exit
                       - error:
-                          when: @{ . == "retry" }
+                          when: ${ . == "retry" }
                           then: retryCase
                 - taskCase:
                     call: http
@@ -147,7 +141,7 @@ internal abstract class WorkflowConsumerTest {
                         - setCaught:
                             set:
                               caught: true
-            """.trimIndent().replace("@", "$")
+            """.trimIndent()
         )
         definitionRepository.insert(definitionModel)
 
@@ -195,7 +189,6 @@ internal abstract class WorkflowConsumerTest {
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.new(
-            workflowId = WorkflowId.random(),
             workflowNamespace = WorkflowNamespace("test"),
             workflowName = WorkflowName("test-workflow"),
             workflowVersion = WorkflowVersion("1.0.0"),
@@ -244,14 +237,11 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
+            val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.DeserializationFailure
             println("msg=$msg")
-            msg.instanceMessages.isEmpty() shouldBe true
-            msg.instanceModels.size shouldBe 1
-            val failure = msg.instanceModels[0] as FailureModel
-            failure.instanceMessage shouldBe null
-            failure.payload shouldBe invalidMessage
-            failure.errorReason shouldBe DESERIALIZATION_FAILURE
+            msg.payload shouldBe invalidMessage
+            msg.errorClass shouldNotBe null
+            msg.errorStackTrace shouldNotBe ""
         }
     }
 
@@ -274,7 +264,6 @@ internal abstract class WorkflowConsumerTest {
     fun `retry should trigger sending a RetryOutboxModel to the database topic`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.new(
-            workflowId = WorkflowId.random(),
             workflowNamespace = WorkflowNamespace("test"),
             workflowName = WorkflowName("test-workflow"),
             workflowVersion = WorkflowVersion("1.0.0"),
@@ -289,14 +278,11 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
-            msg.instanceMessages.isEmpty() shouldBe true
-            msg.instanceModels.size shouldBe 1
-            val retry = msg.instanceModels[0] as RetryOutboxModel
-            retry.instanceMessage.workflowState.currentPosition.toString() shouldBe "/do/3/retryCase"
-            retry.errorReason shouldBe "https://serverlessworkflow.io/errors/not-implemented"
-            retry.outBoxStatus shouldBe OutBoxStatus.PENDING
-            retry.outboxScheduledFor shouldNotBe null
+            val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.WorkflowPersistence
+            val instance = msg.instance
+            instance.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
+            val retryingState = instance.workflowState as com.lemline.core.states.WorkflowState.Retrying
+            retryingState.retryAt shouldNotBe null
         }
     }
 
@@ -320,11 +306,10 @@ internal abstract class WorkflowConsumerTest {
     fun `should store waiting instance in wait repository`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.new(
-            WorkflowId.random(),
             workflowNamespace = WorkflowNamespace("test"),
-            WorkflowName("test-workflow"),
-            WorkflowVersion("1.0.0"),
-            JsonPrimitive("wait"),
+            workflowName = WorkflowName("test-workflow"),
+            workflowVersion = WorkflowVersion("1.0.0"),
+            workflowInput = JsonPrimitive("wait"),
         )
 
         // When
@@ -335,13 +320,11 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
-            msg.instanceMessages.isEmpty() shouldBe true
-            msg.instanceModels.size shouldBe 1
-            val retry = msg.instanceModels[0] as WaitOutboxModel
-            retry.instanceMessage.workflowState.currentPosition.toString() shouldBe "/do/2/waitCase"
-            retry.outBoxStatus shouldBe OutBoxStatus.PENDING
-            retry.outboxScheduledFor shouldNotBe null
+            val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.WorkflowPersistence
+            val instance = msg.instance
+            instance.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
+            val waitingState = instance.workflowState as com.lemline.core.states.WorkflowState.Waiting
+            waitingState.waitUntil shouldNotBe null
         }
     }
 
@@ -363,7 +346,6 @@ internal abstract class WorkflowConsumerTest {
     fun `should handle completed workflow without sending message`() = runTest {
         // Given
         val instanceMessage = InstanceMessage.new(
-            workflowId = WorkflowId.random(),
             workflowNamespace = WorkflowNamespace("test"),
             workflowName = WorkflowName("test-workflow"),
             workflowVersion = WorkflowVersion("1.0.0"),

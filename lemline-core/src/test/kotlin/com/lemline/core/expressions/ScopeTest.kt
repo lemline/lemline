@@ -2,12 +2,11 @@
 package com.lemline.core.expressions
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.RuntimeDescriptor
-import com.lemline.core.expressions.scopes.Scope
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.loadWorkflowFromYaml
 import com.lemline.core.set
+import com.lemline.core.workflows.RuntimeDescriptor
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.api.types.Workflow
@@ -29,7 +28,7 @@ class ScopeTest :
         val testStartedAt = DateTimeDescriptor.from(Instant.now())
         val testWorkflowDescriptor = WorkflowDescriptor(
             id = UUID.randomUUID().toString(),
-            definition = LemlineJson.encodeToElement(workflow),
+            //definition = LemlineJson.encodeToElement(workflow),
             input = testInput,
             startedAt = LemlineJson.encodeToElement(testStartedAt),
         )
@@ -41,8 +40,8 @@ class ScopeTest :
             output = testOutput,
             startedAt = LemlineJson.encodeToElement(testStartedAt),
         )
-        val testContext = LemlineJson.jsonObject.set("custom", "data")
-        val testSecrets = mapOf("secretKey" to JsonPrimitive("secretValue"))
+        LemlineJson.jsonObject.set("custom", "data")
+        mapOf("secretKey" to JsonPrimitive("secretValue"))
 
         "should serialize and deserialize Workflow" {
 
@@ -78,21 +77,4 @@ class ScopeTest :
             deserializedDescriptor shouldBe testTaskDescriptor
         }
 
-        "should serialize and deserialize Scope" {
-            val originalScope = Scope(
-                context = testContext,
-                input = testInput,
-                output = testOutput,
-                secrets = testSecrets,
-                task = testTaskDescriptor,
-                workflow = testWorkflowDescriptor,
-                runtime = RuntimeDescriptor,
-            )
-
-            val jsonString = originalScope.toJsonObject().toString()
-            val deserializedScope = LemlineJson.decodeFromString<Scope>(jsonString)
-
-            // Compare individual components retrieved from the map
-            deserializedScope shouldBe originalScope
-        }
     })

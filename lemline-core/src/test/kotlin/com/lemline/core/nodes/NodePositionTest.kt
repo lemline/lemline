@@ -15,7 +15,7 @@ class NodePositionTest {
     @Test
     fun `root pointer and toString should be empty`() {
         val root = NodePosition.root
-        assertEquals("", root.toString())
+        assertEquals("/", root.toString())
         // Also via PositionPointer root
         assertEquals(NodePosition.root, PositionPointer.root.toPosition())
         assertNull(root.parent)
@@ -36,7 +36,7 @@ class NodePositionTest {
         assertEquals("/do/0/run", pos.parent!!.toString())
         assertEquals("/do/0", pos.parent!!.parent!!.toString())
         assertEquals("/do", pos.parent!!.parent!!.parent!!.toString())
-        assertEquals("", pos.parent!!.parent!!.parent!!.parent!!.toString())
+        assertEquals("/", pos.parent!!.parent!!.parent!!.parent!!.toString())
         assertNull(pos.parent!!.parent!!.parent!!.parent!!.parent)
     }
 
@@ -101,11 +101,11 @@ class NodePositionTest {
             val root = NodePosition.root
             val json = LemlineJson.encodeToString(root)
             // Empty pointer serializes to empty JSON string
-            assertEquals("\"\"", json)
+            assertEquals("\"/\"", json)
 
             val decoded = NodePosition.fromJsonString(json)
             assertEquals(root, decoded)
-            assertEquals("", decoded.toString())
+            assertEquals("/", decoded.toString())
         }
 
 

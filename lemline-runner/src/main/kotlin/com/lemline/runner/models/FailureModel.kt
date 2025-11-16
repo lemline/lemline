@@ -3,7 +3,7 @@ package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.workflows.WorkflowState
+import com.lemline.core.states.WorkflowState
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.instances.InstanceMessage
@@ -48,7 +48,7 @@ data class FailureModel(
 
     companion object {
         fun from(
-            id: IDV7,
+            id: IDV7 = IDV7.random(),
             instance: InstanceMessage,
             error: Throwable,
             reason: String = getFailureReason(error)
@@ -63,7 +63,7 @@ data class FailureModel(
         )
 
         fun from(
-            id: IDV7,
+            id: IDV7 = IDV7.random(),
             payload: String,
             error: Throwable,
             reason: String = getFailureReason(error)

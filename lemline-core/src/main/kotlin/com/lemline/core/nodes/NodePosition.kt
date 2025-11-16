@@ -2,7 +2,13 @@
 package com.lemline.core.nodes
 
 import com.lemline.common.json.LemlineJson
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * Represents a task initialPosition in the workflow.
@@ -80,5 +86,25 @@ data class NodePosition(private val path: List<String> = listOf()) {
 
         fun fromJsonString(jsonString: String): NodePosition = LemlineJson.decodeFromString(jsonString)
 
+    }
+}
+
+/**
+ * Custom kotlinx.serialization serializer for [com.lemline.core.nodes.NodePosition].
+ * Serializes to/from the string representation of its JsonPointer.
+ */
+internal object NodePositionSerializer : KSerializer<NodePosition> {
+
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("NodePosition", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: NodePosition) {
+        // Use the jsonPointer's string representation for serialization
+        encoder.encodeString(value.toString())
+    }
+
+    override fun deserialize(decoder: Decoder): NodePosition {
+        // Read the string, create a JsonPointer, then convert to NodePosition
+        return NodePosition.from(decoder.decodeString())
     }
 }

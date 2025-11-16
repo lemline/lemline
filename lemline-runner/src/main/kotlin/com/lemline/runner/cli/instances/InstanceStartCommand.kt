@@ -8,9 +8,10 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.exceptions.CliException
+import com.lemline.runner.messaging.database.DatabaseMessage
 import com.lemline.runner.messaging.database.DatabaseMessageEmitter
-import com.lemline.runner.messaging.database.IngestionMessage
 import com.lemline.runner.messaging.instances.InstanceMessageEmitter
+import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.starters.Starter
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
@@ -44,6 +45,9 @@ class InstanceStartCommand : Runnable {
 
     @Inject
     private lateinit var databaseEmitter: DatabaseMessageEmitter
+
+    @Inject
+    private lateinit var scheduleRepository: ScheduleRepository
 
     @Parameters(
         index = "0",
@@ -106,15 +110,15 @@ class InstanceStartCommand : Runnable {
         val workflowVersion =
             instanceMessage?.workflowVersion ?: scheduleOutboxModel?.workflowVersion
 
-        when (scheduleOutboxModel) {
-            null -> instanceEmitter.send(instanceMessage!!)
-            else -> databaseEmitter.send(
-                IngestionMessage(
-                    instanceModels = mutableListOf(scheduleOutboxModel),
-                    instanceMessages = listOfNotNull(instanceMessage)
-                )
-            )
+        if (scheduleOutboxModel != null) {
+            // Persist schedule to database (for cron or after/every schedules)
+            // The schedule must be persisted before sending any instance message
+            // TODO: This should ideally be transactional with message sending
+            scheduleRepository.insert(scheduleOutboxModel)
         }
+
+        // Send instance message if present (no schedule or immediate first run)
+        instanceMessage?.let { instanceEmitter.send(it) }
 
         cliPrint("Instance $workflowId started successfully (name: $workflowName, version: $workflowVersion, input: $workflowInput)")
     }
