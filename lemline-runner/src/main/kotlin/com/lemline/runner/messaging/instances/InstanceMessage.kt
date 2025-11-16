@@ -45,7 +45,7 @@ data class InstanceMessage(
     companion object {
 
         fun new(
-            workflowId: WorkflowId,
+            workflowId: WorkflowId = WorkflowId.random(),
             workflowNamespace: WorkflowNamespace,
             workflowName: WorkflowName,
             workflowVersion: WorkflowVersion,

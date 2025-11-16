@@ -42,4 +42,3 @@ internal fun TaskStates.updateWith(
 
     return updatedStates
 }
-
