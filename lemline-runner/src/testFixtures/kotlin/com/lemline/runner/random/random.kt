@@ -10,7 +10,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.random.random
 import com.lemline.core.states.WorkflowState
-import com.lemline.runner.messaging.database.CompletedMessage
+import com.lemline.runner.messaging.database.DatabaseMessage
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
@@ -103,15 +103,3 @@ fun WaitOutboxModel.Companion.random() = WaitOutboxModel(
     outBoxStatus = OutBoxStatus.random(),
     outboxScheduledFor = Instant.random(), // <- Not nullable
 ).also { it.randomize() }
-
-
-fun CompletedMessage.Companion.random(): CompletedMessage {
-    val parentId = IDV7.nullableRandom()
-
-    return CompletedMessage(
-        workflowInfo = WorkflowInfo.random(),
-        parentId = parentId,
-        output = if (parentId == null) null else JsonElement.random(),
-        isScheduledAfter = Random.nextBoolean(),
-    )
-}

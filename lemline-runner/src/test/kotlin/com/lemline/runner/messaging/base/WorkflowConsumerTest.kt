@@ -9,7 +9,6 @@ import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.database.DatabaseMessage
 import com.lemline.runner.messaging.database.DatabaseMessageHandler
-import com.lemline.runner.messaging.database.IngestionMessage
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.messaging.instances.InstanceMessageHandler
 import com.lemline.runner.models.DefinitionModel
@@ -244,14 +243,11 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
+            val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.DeserializationFailure
             println("msg=$msg")
-            msg.instanceMessages.isEmpty() shouldBe true
-            msg.instanceModels.size shouldBe 1
-            val failure = msg.instanceModels[0] as FailureModel
-            failure.instanceMessage shouldBe null
-            failure.payload shouldBe invalidMessage
-            failure.errorReason shouldBe DESERIALIZATION_FAILURE
+            msg.payload shouldBe invalidMessage
+            msg.errorClass shouldNotBe null
+            msg.errorStackTrace shouldNotBe ""
         }
     }
 
@@ -289,14 +285,11 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
-            msg.instanceMessages.isEmpty() shouldBe true
-            msg.instanceModels.size shouldBe 1
-            val retry = msg.instanceModels[0] as RetryOutboxModel
-            retry.instanceMessage.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
-            retry.errorReason shouldBe "Task retry"
-            retry.outBoxStatus shouldBe OutBoxStatus.PENDING
-            retry.outboxScheduledFor shouldNotBe null
+            val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.WorkflowPersistence
+            val instance = msg.instance
+            instance.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
+            val retryingState = instance.workflowState as com.lemline.core.states.WorkflowState.Retrying
+            retryingState.retryAt shouldNotBe null
         }
     }
 
@@ -335,13 +328,11 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as IngestionMessage
-            msg.instanceMessages.isEmpty() shouldBe true
-            msg.instanceModels.size shouldBe 1
-            val retry = msg.instanceModels[0] as WaitOutboxModel
-            retry.instanceMessage.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
-            retry.outBoxStatus shouldBe OutBoxStatus.PENDING
-            retry.outboxScheduledFor shouldNotBe null
+            val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.WorkflowPersistence
+            val instance = msg.instance
+            instance.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
+            val waitingState = instance.workflowState as com.lemline.core.states.WorkflowState.Waiting
+            waitingState.waitUntil shouldNotBe null
         }
     }
 
