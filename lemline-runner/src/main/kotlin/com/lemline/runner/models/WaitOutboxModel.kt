@@ -17,7 +17,7 @@ import kotlinx.serialization.Transient
 @SerialName("w") // <- type discriminator for polymorphic serialization
 data class WaitOutboxModel(
     @SerialName("id")
-    override val id: IDV7,
+    override val id: IDV7 = IDV7.random(),
 
     @SerialName("i")
     override val instanceMessage: InstanceMessage,

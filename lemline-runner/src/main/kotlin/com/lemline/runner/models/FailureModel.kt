@@ -48,7 +48,7 @@ data class FailureModel(
 
     companion object {
         fun from(
-            id: IDV7,
+            id: IDV7 = IDV7.random(),
             instance: InstanceMessage,
             error: Throwable,
             reason: String = getFailureReason(error)
@@ -63,7 +63,7 @@ data class FailureModel(
         )
 
         fun from(
-            id: IDV7,
+            id: IDV7 = IDV7.random(),
             payload: String,
             error: Throwable,
             reason: String = getFailureReason(error)

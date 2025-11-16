@@ -81,7 +81,7 @@ data class RetryOutboxModel(
 
     companion object {
         fun from(
-            id: IDV7,
+            id: IDV7 = IDV7.random(),
             instance: InstanceMessage,
             outboxScheduledFor: Instant,
             error: Throwable,
