@@ -5,6 +5,7 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalWorkflowException
+import com.lemline.core.states.BranchStatus
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
@@ -14,11 +15,14 @@ import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.messaging.instances.InstanceMessageEmitter
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
+import com.lemline.runner.models.ForkBranchModel
+import com.lemline.runner.models.ForkModel
 import com.lemline.runner.models.ParentOutboxModel
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.FailureRepository
+import com.lemline.runner.repositories.ForkRepository
 import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.ScheduleRepository
@@ -45,6 +49,7 @@ internal class DatabaseMessageHandler(
     private val scheduleRepository: ScheduleRepository,
     private val waitRepository: WaitRepository,
     private val failureRepository: FailureRepository,
+    private val forkRepository: ForkRepository,
     private val instanceEmitter: InstanceMessageEmitter,
     private val starter: Starter,
     override val metrics: DatabaseMessageSubscriberMetrics,
@@ -180,6 +185,10 @@ internal class DatabaseMessageHandler(
                 )
             }
 
+            is WorkflowState.RunningFork -> {
+                handleForkStarted(instance)
+            }
+
             is WorkflowState.ReadyForNextTask,
             is WorkflowState.Starting -> {
                 error("Unexpected state in database handler: $state")
@@ -261,6 +270,66 @@ internal class DatabaseMessageHandler(
             schedule.scheduleAfterCompletion()
             scheduleRepository.update(schedule)
             logger.debug { "Scheduled workflow ${schedule.workflowName} for ${schedule.outboxScheduledFor}" }
+        }
+    }
+
+    /**
+     * Handles fork started by:
+     * 1. Persisting fork metadata and parent workflow state
+     * 2. Creating branch models
+     * 3. Emitting instance messages for each branch
+     *
+     * Similar pattern to handleRunningChildWorkflow but with multiple branches.
+     */
+    private suspend fun handleForkStarted(instance: InstanceMessage) {
+        val state = instance.workflowState as? WorkflowState.RunningFork
+            ?: error("Expected RunningFork state, got ${instance.workflowState}")
+
+        // 1. Create fork metadata model
+        val forkModel = ForkModel(
+            instanceMessage = instance,
+            forkPosition = state.nodePosition.toString(),
+            compete = state.forkConfig.compete,
+            branchCount = state.forkConfig.branches.size
+        )
+
+        // 2. Create branch models
+        val forkBranchModels = state.forkConfig.branches.map { branch ->
+            ForkBranchModel(
+                forkId = forkModel.id,
+                branchIndex = branch.index,
+                branchName = branch.name,
+                branchNodePosition = branch.nodePosition.toString(),
+                status = BranchStatus.PENDING,
+                output = null,
+                error = null,
+                completedAt = null,
+                createdAt = Clock.System.now(),
+                updatedAt = Clock.System.now()
+            )
+        }
+
+        // 3. Insert fork and branches atomically (already uses transaction internally)
+        forkRepository.insertForkWithBranches(forkModel, forkBranchModels)
+
+        logger.debug {
+            "Fork started for instance ${instance.workflowInfo.workflowId}, position ${state.nodePosition}, " +
+                "compete=${state.forkConfig.compete}, branches=${state.forkConfig.branches.size}"
+        }
+
+        // 4. Emit instance messages for each branch
+        state.forkConfig.branches.forEach { branch ->
+            val branchMessage = instance.copy(
+                workflowState = WorkflowState.ReadyForNextTask(
+                    taskStates = state.taskStates,
+                    nodePosition = branch.nodePosition,
+                    rawInput = state.rawInput,
+                    flowDirective = null
+                )
+            )
+
+            logger.debug { "Scheduling branch ${branch.name} (index ${branch.index}) at ${branch.nodePosition}" }
+            instanceEmitter.send(branchMessage)
         }
     }
 

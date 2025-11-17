@@ -67,7 +67,6 @@ sealed class DatabaseMessage : JsonSerializable {
         val errorStackTrace: String
     ) : DatabaseMessage()
 
-
     companion object {
         fun fromJsonString(jsonString: String): DatabaseMessage =
             com.lemline.common.json.LemlineJson.decodeFromString(jsonString)
