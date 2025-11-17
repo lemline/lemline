@@ -95,8 +95,10 @@ sealed class WorkflowState {
         val rawOutput: JsonElement?,
         val flowDirective: FlowDirective?,
         val error: InternalWorkflowException.Error,
-        @Transient val exception: Exception = InternalWorkflowException(error)
     ) : WorkflowState() {
+
+        @Transient
+        val exception: Exception = InternalWorkflowException(error)
 
         constructor(
             taskStates: TaskStates,
@@ -112,7 +114,6 @@ sealed class WorkflowState {
             rawOutput = rawOutput,
             flowDirective = flowDirective,
             error = InternalWorkflowException.Error.fromUnexpectedException(exception, nodePosition),
-            exception = exception
         )
 
         override fun toString() = "Failed(" +
@@ -241,19 +242,19 @@ sealed class WorkflowState {
      * @property taskStates Current workflow state
      * @property nodePosition Position of the fork task node
      * @property rawInput Input to pass to all branches
-     * @property completedBranches Map of branch index to output (tracks which branches completed and their results)
+     * @property rawOutput Output of all branches
      */
     @Serializable
     data class RunningFork(
         override val taskStates: TaskStates,
         override val nodePosition: NodePosition,
-        val rawInput: JsonElement,
-        @Transient
-        val completedBranches: Map<Int, JsonElement> = emptyMap()
+        val rawInput: JsonElement? = null,
+        val rawOutput: JsonElement? = null,
     ) : WorkflowState() {
         override fun toString() = "RunningFork(" +
             "nodePosition=$nodePosition" +
-            ", completed=${completedBranches.size}" +
+            ", rawInput=$rawInput" +
+            ", rawOutput=$rawOutput" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }

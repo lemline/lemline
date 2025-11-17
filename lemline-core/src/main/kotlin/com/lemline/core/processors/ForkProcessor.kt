@@ -6,10 +6,8 @@ package com.lemline.core.processors
 import com.lemline.core.errors.ForkException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.BranchState
-import com.lemline.core.states.ForkTaskState
+import com.lemline.core.states.SimpleTaskState
 import io.serverlessworkflow.api.types.ForkTask
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
@@ -53,77 +51,19 @@ import kotlinx.serialization.json.JsonElement
  */
 class ForkProcessor(
     node: Node<ForkTask>
-) : NodeProcessor<ForkTask, ForkTaskState>(node) {
+) : NodeProcessor<ForkTask, SimpleTaskState>(node) {
 
-    private val forkConfig = node.task.fork
-
-    private val compete: Boolean = forkConfig.isCompete
-
-    private val branchCount: Int = node.children?.size ?: 0
-
-    override fun createState(transformedInput: JsonElement, scope: Scope): ForkTaskState {
-        return ForkTaskState(
-            startedAt = Clock.System.now(),
-            branchStates = (0 until branchCount).associateWith { BranchState.PENDING },
-            branchOutputs = emptyMap()
-        )
-    }
+    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleTaskState = SimpleTaskState()
 
     override fun getNextStepInfo(
-        state: ForkTaskState,
+        state: SimpleTaskState,
         dataset: JsonElement,
         scope: Scope,
         namedNode: String?
     ): NextStepInfo {
-        logger.debug { "ForkProcessor.getNextStepInfo: branchStates=${state.branchStates}, branchOutputs=${state.branchOutputs}" }
-
-        // First entry: All branches are PENDING
-        // Throw exception to trigger fork execution via orchestrator
-        // The orchestrator will derive fork config from the Node<ForkTask>
-        if (state.branchStates.values.all { it == BranchState.PENDING }) {
-            logger.debug { "All branches PENDING, throwing ForkException" }
-            throw ForkException(transformedInput = dataset)
-        }
-
-        // Re-entry: Orchestrator has executed branches and is calling back with assembled output
-        // The dataset contains the assembled output (single value or array)
-        // The state should already be updated by the orchestrator with completed branches
-
-        // Verify fork is complete
-        val isForkComplete = when {
-            compete && state.branchOutputs.isNotEmpty() -> true
-            !compete && state.branchOutputs.size == branchCount -> true
-            else -> false
-        }
-
-        if (!isForkComplete) {
-            throw IllegalStateException(
-                "Fork re-entered without completion: " +
-                    "compete=$compete, " +
-                    "completed=${state.branchOutputs.size}/$branchCount"
-            )
-        }
-
-        // Fork complete - return to parent
-        return NextStepInfo(
-            updatedState = null,  // Clear state - fork is done
-            nextNode = node.parent,
-            flowDirective = getFlowDirective()
-        )
-    }
-
-    /**
-     * Execute fork - just returns the assembled output.
-     *
-     * The transformedInput already contains the assembled output from the orchestrator.
-     * This is passed when fork re-enters after branches complete.
-     * So we just return it as-is.
-     */
-    override suspend fun execute(
-        transformedInput: JsonElement,
-        scope: Scope
-    ): JsonElement {
-        // The transformedInput already contains the assembled output from orchestrator
-        return transformedInput
+        // First entry
+        // Throws exception to trigger fork execution via orchestrator
+        // The orchestrator will derive fork config from the current Node<ForkTask>
+        throw ForkException(state = state, transformedInput = dataset)
     }
 }

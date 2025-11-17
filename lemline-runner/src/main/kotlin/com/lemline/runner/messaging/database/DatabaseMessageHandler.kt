@@ -9,7 +9,6 @@ import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.nodes.Node
 import com.lemline.core.states.BranchStatus
 import com.lemline.core.states.WorkflowState
-import io.serverlessworkflow.api.types.ForkTask
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
@@ -31,6 +30,7 @@ import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.starters.Starter
+import io.serverlessworkflow.api.types.ForkTask
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -296,7 +296,8 @@ internal class DatabaseMessageHandler(
             namespace = workflowInfo.workflowNamespace,
             name = workflowInfo.workflowName,
             version = workflowInfo.workflowVersion
-        ) ?: error("Workflow definition not found: ${workflowInfo.workflowNamespace}/${workflowInfo.workflowName}/${workflowInfo.workflowVersion}")
+        )
+            ?: error("Workflow definition not found: ${workflowInfo.workflowNamespace}/${workflowInfo.workflowName}/${workflowInfo.workflowVersion}")
 
         val nodesMap = DefinitionCache.getNodesMap(workflow)
         val forkNode = nodesMap[state.nodePosition]
@@ -345,7 +346,7 @@ internal class DatabaseMessageHandler(
                 workflowState = WorkflowState.ReadyForNextTask(
                     taskStates = state.taskStates,
                     nodePosition = branchNode.position,
-                    rawInput = state.rawInput,
+                    rawInput = state.rawInput ?: error("Raw input is required for running $state"),
                     flowDirective = null
                 )
             )

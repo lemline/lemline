@@ -38,7 +38,6 @@ data class RootState(
             ),
         )
 
-    // Compute scope fresh each time to reflect current context
     override val scope: Scope by lazy {
         buildJsonObject {
             put("context", context)

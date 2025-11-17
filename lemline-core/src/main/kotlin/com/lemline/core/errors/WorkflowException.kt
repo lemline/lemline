@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
+import com.lemline.core.states.TaskState
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
@@ -158,6 +159,8 @@ class WaitWorkflowException(
  *
  * Similar to WaitWorkflowException pattern.
  */
+@ExperimentalTime
 class ForkException(
+    val state: TaskState,
     val transformedInput: JsonElement
 ) : WorkflowException()

@@ -84,7 +84,7 @@ internal class ForkExecutionIntegrationTest {
         val forkState = WorkflowState.RunningFork(
             taskStates = emptyMap(),
             nodePosition = forkPosition,
-            rawInput = JsonPrimitive("input"),
+            rawOutput = JsonPrimitive("input"),
             completedBranches = emptyMap()
         )
 
@@ -269,7 +269,7 @@ internal class ForkExecutionIntegrationTest {
         val forkState = WorkflowState.RunningFork(
             taskStates = emptyMap(),
             nodePosition = forkPosition,
-            rawInput = JsonPrimitive("input"),
+            rawOutput = JsonPrimitive("input"),
             completedBranches = emptyMap()
         )
 
