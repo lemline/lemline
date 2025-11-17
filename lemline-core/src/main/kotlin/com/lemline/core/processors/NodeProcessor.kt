@@ -84,6 +84,12 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         // create a mutable local task context
         var context = TaskContext(startedAt = now)
 
+        // Validate input against schema (throws ValidationException)
+        validateInput(rawInput)
+
+        // Update context with raw input
+        context = context.copy(rawInput = rawInput)
+
         // if this node is conditional, check if it should be executed, if not return to parent
         if (!checkIf(rawInput, mergeScope(parentScope, context))) return StepResult(
             nextNode = node.parent,
@@ -91,13 +97,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
             stateUpdates = emptyMap(),
             flowDirective = null  // Continue to next sibling
         )
-
-        // Validate input against schema (throws ValidationException)
-        validateInput(rawInput)
-
-        // Update context with raw input
-        context = context.copy(rawInput = rawInput)
-
+        
         // Apply input transformation (throws ExpressionException)
         val transformedInput = transformInput(rawInput, mergeScope(parentScope, context))
 

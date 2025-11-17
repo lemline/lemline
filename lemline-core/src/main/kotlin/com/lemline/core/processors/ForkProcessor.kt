@@ -56,40 +56,9 @@ class ForkProcessor(
 ) : NodeProcessor<ForkTask, ForkTaskState>(node) {
 
     private val forkConfig = node.task.fork
-    // Access compete - try both field and method access
-    private val compete: Boolean = run {
-        try {
-            // Try direct field access first (Kotlin data class style)
-            try {
-                val field = forkConfig.javaClass.getDeclaredField("compete")
-                field.isAccessible = true
-                val result = field.get(forkConfig) as? Boolean ?: false
-                logger.debug { "Fork compete mode (via field): $result" }
-                return@run result
-            } catch (e: NoSuchFieldException) {
-                // Field doesn't exist, try method access
-            }
 
-            // Try method access with various naming conventions
-            val methods = listOf("compete", "getCompete", "isCompete")
-            for (methodName in methods) {
-                try {
-                    val method = forkConfig.javaClass.getMethod(methodName)
-                    val result = method.invoke(forkConfig) as? Boolean ?: false
-                    logger.debug { "Fork compete mode (via $methodName): $result" }
-                    return@run result
-                } catch (e: NoSuchMethodException) {
-                    // Try next method name
-                }
-            }
+    private val compete: Boolean = forkConfig.isCompete
 
-            logger.warn { "Could not access compete field, defaulting to false (cooperative mode)" }
-            false
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to access compete field, defaulting to false" }
-            false
-        }
-    }
     private val branchCount: Int = node.children?.size ?: 0
 
     override fun createState(transformedInput: JsonElement, scope: Scope): ForkTaskState {
@@ -110,21 +79,10 @@ class ForkProcessor(
 
         // First entry: All branches are PENDING
         // Throw exception to trigger fork execution via orchestrator
+        // The orchestrator will derive fork config from the Node<ForkTask>
         if (state.branchStates.values.all { it == BranchState.PENDING }) {
             logger.debug { "All branches PENDING, throwing ForkException" }
-            throw ForkException(
-                transformedInput = dataset,
-                config = ForkException.Config(
-                    compete = compete,
-                    branches = node.children!!.mapIndexed { index, child ->
-                        ForkException.BranchInfo(
-                            index = index,
-                            name = child.name,
-                            nodePosition = child.position
-                        )
-                    }
-                )
-            )
+            throw ForkException(transformedInput = dataset)
         }
 
         // Re-entry: Orchestrator has executed branches and is calling back with assembled output
@@ -141,8 +99,8 @@ class ForkProcessor(
         if (!isForkComplete) {
             throw IllegalStateException(
                 "Fork re-entered without completion: " +
-                "compete=$compete, " +
-                "completed=${state.branchOutputs.size}/$branchCount"
+                    "compete=$compete, " +
+                    "completed=${state.branchOutputs.size}/$branchCount"
             )
         }
 

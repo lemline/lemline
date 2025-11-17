@@ -235,60 +235,32 @@ sealed class WorkflowState {
      *
      * Similar to RunningChildWorkflow pattern.
      *
+     * Fork configuration (compete mode, branches) is derived from the Node<ForkTask>
+     * at nodePosition. Only runtime completion tracking is stored here.
+     *
      * @property taskStates Current workflow state
      * @property nodePosition Position of the fork task node
      * @property rawInput Input to pass to all branches
-     * @property forkConfig Fork execution configuration and progress tracking
+     * @property completedBranches Map of branch index to output (tracks which branches completed and their results)
      */
     @Serializable
     data class RunningFork(
         override val taskStates: TaskStates,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
-        val forkConfig: ForkConfig
+        val completedBranches: Map<Int, JsonElement> = emptyMap()
     ) : WorkflowState() {
         override fun toString() = "RunningFork(" +
             "nodePosition=$nodePosition" +
-            ", compete=${forkConfig.compete}" +
-            ", branches=${forkConfig.branches.size}" +
-            ", completed=${forkConfig.completedBranches.size}" +
+            ", completed=${completedBranches.size}" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 }
 
 /**
- * Configuration for fork execution, tracking branch progress.
- *
- * @property compete Whether branches race for first completion
- * @property branches List of branches to execute
- * @property completedBranches Map of branch index to output (tracks completion and stores results)
- */
-@Serializable
-data class ForkConfig(
-    val compete: Boolean,
-    val branches: List<BranchExecution>,
-    val completedBranches: Map<Int, JsonElement> = emptyMap()
-)
-
-/**
- * Execution state for a single branch.
- *
- * @property index Branch index in declaration order
- * @property name Branch name
- * @property nodePosition Position of branch root in workflow tree
- * @property status Current execution status
- */
-@Serializable
-data class BranchExecution(
-    val index: Int,
-    val name: String,
-    val nodePosition: NodePosition,
-    val status: BranchStatus
-)
-
-/**
  * Status of a branch execution.
+ * Used by the runner module for database tracking.
  */
 @Serializable
 enum class BranchStatus {

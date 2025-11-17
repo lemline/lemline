@@ -19,11 +19,25 @@ internal suspend fun executeContinuousWorkflow(
     input: JsonElement
 ): JsonElement {
     val workflow = getWorkflowToTest(yaml, namespace, name, version)
-    return runUntilComplete(
+    
+    val state = WorkflowOrchestrator.resume(
         workflow = workflow,
-        input = input,
+        state = WorkflowState.Starting(
+            input = input,
+            startedAt = Clock.System.now()
+        ),
         executionMode = ExecutionMode.CONTINUOUS
     )
+
+    return when (state) {
+        is WorkflowState.Completed ->
+            state.output
+
+        is WorkflowState.Failed ->
+            throw state.exception ?: IllegalStateException("Workflow failed without explicit exception: $state")
+
+        else -> throw IllegalStateException("Unexpected state: ${state::class.simpleName}")
+    }
 }
 
 internal suspend fun executeTaskByTaskWorkflow(
@@ -49,6 +63,7 @@ internal suspend fun executeActivityByActivityWorkflow(
     input: JsonElement
 ): JsonElement {
     val workflow = getWorkflowToTest(yaml, namespace, name, version)
+
     return runUntilComplete(
         workflow = workflow,
         input = input,
@@ -124,3 +139,4 @@ private tailrec suspend fun runWorkflowStep(
         runWorkflowStep(workflow, next, executionMode)
     }
 }
+

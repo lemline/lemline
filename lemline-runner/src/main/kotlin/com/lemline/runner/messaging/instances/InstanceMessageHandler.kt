@@ -290,8 +290,7 @@ internal class InstanceMessageHandler(
             is WorkflowState.RunningFork -> {
                 // Send to database for fork persistence + branch scheduling
                 logger.debug {
-                    "Starting fork at ${nextState.nodePosition}, compete=${nextState.forkConfig.compete}, " +
-                        "branches=${nextState.forkConfig.branches.size}"
+                    "Starting fork at ${nextState.nodePosition}"
                 }
                 sendToDatabase(nextInstanceMessage)
                 null  // Paused - waiting for branches to complete

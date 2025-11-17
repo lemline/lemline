@@ -6,11 +6,10 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.states.BranchExecution
+import com.lemline.core.nodes.Token
 import com.lemline.core.states.BranchStatus
-import com.lemline.core.states.ForkConfig
-import com.lemline.core.states.TaskStates
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.database.DatabaseMessage
 import com.lemline.runner.messaging.database.DatabaseMessageHandler
@@ -23,11 +22,9 @@ import io.kotest.matchers.shouldNotBe
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -63,7 +60,7 @@ internal class ForkExecutionIntegrationTest {
     private var lastForkId: com.lemline.common.values.IDV7? = null
 
     @BeforeEach
-    fun cleanup() = runTest {
+    fun setup() = runTest {
         // Clean up any existing forks from previous test
         lastForkId?.let { forkId ->
             try {
@@ -77,31 +74,18 @@ internal class ForkExecutionIntegrationTest {
 
     @Test
     fun `should persist fork and schedule branches`() = runTest {
-        // Given - a RunningFork state
-        val forkPosition = NodePosition.root.addName("testFork")
-        val branches = listOf(
-            BranchExecution(
-                index = 0,
-                name = "branch-0",
-                nodePosition = NodePosition.root.addName("branch0"),
-                status = BranchStatus.PENDING
-            ),
-            BranchExecution(
-                index = 1,
-                name = "branch-1",
-                nodePosition = NodePosition.root.addName("branch1"),
-                status = BranchStatus.PENDING
-            )
-        )
+        // Register workflow with 2 branches
+        registerCustomForkWorkflow(branchCount = 2, compete = false)
+
+        // Given - a RunningFork state at the fork position in the test workflow
+        // The fork is at /DO/0/testFork (root -> DO token -> index 0 -> task testFork)
+        val forkPosition = NodePosition.root.addToken(Token.DO).addIndex(0).addName("testFork")
 
         val forkState = WorkflowState.RunningFork(
             taskStates = emptyMap(),
             nodePosition = forkPosition,
             rawInput = JsonPrimitive("input"),
-            forkConfig = ForkConfig(
-                compete = false,
-                branches = branches
-            )
+            completedBranches = emptyMap()
         )
 
         val instanceMessage = InstanceMessage(
@@ -126,7 +110,8 @@ internal class ForkExecutionIntegrationTest {
         lastForkId = fork.id  // Store for cleanup
 
         // Then - branches should be created
-        val storedBranches = forkRepository.getBranches(fork.id
+        val storedBranches = forkRepository.getBranches(
+            fork.id
         )
         storedBranches shouldHaveSize 2
         storedBranches.all { it.status == BranchStatus.PENDING } shouldBe true
@@ -135,7 +120,7 @@ internal class ForkExecutionIntegrationTest {
     @Test
     fun `should detect cooperative fork completion when all branches complete`() = runTest {
         // Given - a fork with 2 branches
-        val forkPosition = NodePosition.root.addName("testFork")
+        val forkPosition = NodePosition.root.addToken(Token.DO).addIndex(0).addName("testFork")
         setupFork(forkPosition, branchCount = 2, compete = false)
 
         val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowInfo.workflowId, forkPosition)!!
@@ -172,7 +157,7 @@ internal class ForkExecutionIntegrationTest {
     @Test
     fun `should detect compete fork completion on first branch`() = runTest {
         // Given - a compete fork with 3 branches
-        val forkPosition = NodePosition.root.addName("testFork")
+        val forkPosition = NodePosition.root.addToken(Token.DO).addIndex(0).addName("testFork")
         setupFork(forkPosition, branchCount = 3, compete = true)
 
         val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowInfo.workflowId, forkPosition)!!
@@ -199,7 +184,7 @@ internal class ForkExecutionIntegrationTest {
     @Test
     fun `should handle multiple concurrent branch completions`() = runTest {
         // Given - a fork with 3 branches
-        val forkPosition = NodePosition.root.addName("testFork")
+        val forkPosition = NodePosition.root.addToken(Token.DO).addIndex(0).addName("testFork")
         setupFork(forkPosition, branchCount = 3, compete = false)
 
         val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowInfo.workflowId, forkPosition)!!
@@ -242,7 +227,7 @@ internal class ForkExecutionIntegrationTest {
     @Test
     fun `should cleanup fork after completion`() = runTest {
         // Given - a completed fork
-        val forkPosition = NodePosition.root.addName("testFork")
+        val forkPosition = NodePosition.root.addToken(Token.DO).addIndex(0).addName("testFork")
         setupFork(forkPosition, branchCount = 1, compete = false)
 
         // Get the fork that was created
@@ -278,23 +263,14 @@ internal class ForkExecutionIntegrationTest {
         branchCount: Int,
         compete: Boolean
     ) {
-        val branches = (0 until branchCount).map { index ->
-            BranchExecution(
-                index = index,
-                name = "branch-$index",
-                nodePosition = NodePosition.root.addName("branch$index"),
-                status = BranchStatus.PENDING
-            )
-        }
+        // Register a workflow with the specified fork configuration
+        registerCustomForkWorkflow(branchCount, compete)
 
         val forkState = WorkflowState.RunningFork(
             taskStates = emptyMap(),
             nodePosition = forkPosition,
             rawInput = JsonPrimitive("input"),
-            forkConfig = ForkConfig(
-                compete = compete,
-                branches = branches
-            )
+            completedBranches = emptyMap()
         )
 
         val instanceMessage = InstanceMessage(
@@ -305,5 +281,35 @@ internal class ForkExecutionIntegrationTest {
 
         val forkStartedMessage = DatabaseMessage.WorkflowPersistence(instanceMessage)
         databaseMessageHandler.handle(forkStartedMessage)
+    }
+
+    /**
+     * Registers a custom fork workflow with specified branch count and compete mode.
+     */
+    private fun registerCustomForkWorkflow(branchCount: Int, compete: Boolean) {
+        val branchesList = (0 until branchCount).joinToString("\n") { index ->
+            """
+    - branch$index:
+        set:
+          result: "branch-$index-output"
+    """.trimIndent()
+        }
+
+        val workflowYaml = """
+    document:
+      dsl: '1.0.0'
+      namespace: test
+      name: fork-test
+      version: '1.0.0'
+    do:
+      - testFork:
+          fork:
+            compete: $compete
+            branches:
+${branchesList.prependIndent("              ")}
+""".trimIndent()
+
+        println(workflowYaml)
+        DefinitionCache.parseAndPut(workflowYaml)
     }
 }

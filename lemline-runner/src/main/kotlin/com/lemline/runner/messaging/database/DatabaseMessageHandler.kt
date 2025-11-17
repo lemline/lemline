@@ -4,9 +4,12 @@ package com.lemline.runner.messaging.database
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
+import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.errors.InternalWorkflowException
+import com.lemline.core.nodes.Node
 import com.lemline.core.states.BranchStatus
 import com.lemline.core.states.WorkflowState
+import io.serverlessworkflow.api.types.ForkTask
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
@@ -280,26 +283,45 @@ internal class DatabaseMessageHandler(
      * 3. Emitting instance messages for each branch
      *
      * Similar pattern to handleRunningChildWorkflow but with multiple branches.
+     *
+     * Fork configuration (compete, branches) is derived from the workflow definition node.
      */
     private suspend fun handleForkStarted(instance: InstanceMessage) {
         val state = instance.workflowState as? WorkflowState.RunningFork
             ?: error("Expected RunningFork state, got ${instance.workflowState}")
 
+        // Get fork node from workflow definition to extract fork configuration
+        val workflowInfo = instance.workflowInfo
+        val workflow = DefinitionCache.getWorkflow(
+            namespace = workflowInfo.workflowNamespace,
+            name = workflowInfo.workflowName,
+            version = workflowInfo.workflowVersion
+        ) ?: error("Workflow definition not found: ${workflowInfo.workflowNamespace}/${workflowInfo.workflowName}/${workflowInfo.workflowVersion}")
+
+        val nodesMap = DefinitionCache.getNodesMap(workflow)
+        val forkNode = nodesMap[state.nodePosition]
+            ?: error("Fork node not found at ${state.nodePosition}")
+
+        @Suppress("UNCHECKED_CAST")
+        val forkTaskNode = forkNode as Node<ForkTask>
+        val compete = forkTaskNode.task.fork.isCompete
+        val branches = forkTaskNode.children ?: emptyList()
+
         // 1. Create fork metadata model
         val forkModel = ForkModel(
             instanceMessage = instance,
             forkPosition = state.nodePosition.toString(),
-            compete = state.forkConfig.compete,
-            branchCount = state.forkConfig.branches.size
+            compete = compete,
+            branchCount = branches.size
         )
 
         // 2. Create branch models
-        val forkBranchModels = state.forkConfig.branches.map { branch ->
+        val forkBranchModels = branches.mapIndexed { index, branchNode ->
             ForkBranchModel(
                 forkId = forkModel.id,
-                branchIndex = branch.index,
-                branchName = branch.name,
-                branchNodePosition = branch.nodePosition.toString(),
+                branchIndex = index,
+                branchName = branchNode.name,
+                branchNodePosition = branchNode.position.toString(),
                 status = BranchStatus.PENDING,
                 output = null,
                 error = null,
@@ -314,21 +336,21 @@ internal class DatabaseMessageHandler(
 
         logger.debug {
             "Fork started for instance ${instance.workflowInfo.workflowId}, position ${state.nodePosition}, " +
-                "compete=${state.forkConfig.compete}, branches=${state.forkConfig.branches.size}"
+                "compete=$compete, branches=${branches.size}"
         }
 
         // 4. Emit instance messages for each branch
-        state.forkConfig.branches.forEach { branch ->
+        branches.forEach { branchNode ->
             val branchMessage = instance.copy(
                 workflowState = WorkflowState.ReadyForNextTask(
                     taskStates = state.taskStates,
-                    nodePosition = branch.nodePosition,
+                    nodePosition = branchNode.position,
                     rawInput = state.rawInput,
                     flowDirective = null
                 )
             )
 
-            logger.debug { "Scheduling branch ${branch.name} (index ${branch.index}) at ${branch.nodePosition}" }
+            logger.debug { "Scheduling branch ${branchNode.name} at ${branchNode.position}" }
             instanceEmitter.send(branchMessage)
         }
     }

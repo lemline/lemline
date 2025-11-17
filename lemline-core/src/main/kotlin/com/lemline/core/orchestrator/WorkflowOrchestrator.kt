@@ -29,10 +29,7 @@ import com.lemline.core.processors.SetProcessor
 import com.lemline.core.processors.SwitchProcessor
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.processors.WaitProcessor
-import com.lemline.core.states.BranchExecution
 import com.lemline.core.states.BranchState
-import com.lemline.core.states.BranchStatus
-import com.lemline.core.states.ForkConfig
 import com.lemline.core.states.ForkTaskState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.TaskStates
@@ -268,24 +265,14 @@ object WorkflowOrchestrator {
                 }
             } catch (e: ForkException) {
                 // Fork needs to execute branches
+                // All fork config (compete, branches) is derived from node
                 if (executionMode.isAsync()) {
                     // Async mode: Return state for runner to schedule branches
                     return WorkflowState.RunningFork(
                         taskStates = taskStates.toMap(),
                         nodePosition = node.position,
                         rawInput = e.transformedInput,
-                        forkConfig = ForkConfig(
-                            compete = e.config.compete,
-                            branches = e.config.branches.map {
-                                BranchExecution(
-                                    index = it.index,
-                                    name = it.name,
-                                    nodePosition = it.nodePosition,
-                                    status = BranchStatus.PENDING
-                                )
-                            },
-                            completedBranches = emptyMap()
-                        )
+                        completedBranches = emptyMap()
                     )
                 }
 
@@ -299,46 +286,33 @@ object WorkflowOrchestrator {
             // Create new states map with updated state updates and context exports
             val newStates = taskStates.updateWith(result.stateUpdates, result.newContext)
 
-            when (val retryAt = result.retryAt) {
-                // Task completed
-                null -> if (executionMode.stopAfterTaskCompletion(node) && result.nextNode != null)
-                    return WorkflowState.ReadyForNextTask(
-                        taskStates = newStates,
-                        nodePosition = result.nextNode.position,
-                        rawInput = result.rawInput,
-                        flowDirective = result.flowDirective?.toKotlin(),
-                    )
-                // Task retried
-                else -> {
-                    if (executionMode.isAsync()) return WorkflowState.Retrying(
-                        taskStates = newStates,
-                        nodePosition = result.nextNode!!.position,
-                        rawInput = result.rawInput,
-                        flowDirective = result.flowDirective?.toKotlin(),
-                        retryAt = retryAt
-                    )
-                    // wait before retry
-                    executeDelay(retryAt, "Retrying at node: ${node.name} after")
-                }
-            }
-
-            // Check if next node is a ForkTask - this means a branch just completed
-            if (result.nextNode?.task is io.serverlessworkflow.api.types.ForkTask) {
-                logger.debug { "Branch completed, returning to fork: ${result.nextNode.reference}" }
-
-                // Return state indicating we're at the fork boundary
-                return WorkflowState.ReadyForNextTask(
+            // The current task must be retried
+            if (result.retryAt != null) {
+                if (executionMode.isAsync()) return WorkflowState.Retrying(
                     taskStates = newStates,
-                    nodePosition = result.nextNode.position,
+                    nodePosition = result.nextNode!!.position,
                     rawInput = result.rawInput,
-                    flowDirective = result.flowDirective?.toKotlin()
+                    flowDirective = result.flowDirective?.toKotlin(),
+                    retryAt = result.retryAt
                 )
+                // wait before retry
+                executeDelay(result.retryAt, "Retrying at node: ${node.name} after")
             }
 
+            // Workflow completed
             if (result.nextNode == null) {
                 logger.debug { "Workflow completed with output: $rawInput" }
                 return WorkflowState.Completed(output = rawInput)
             }
+
+            //
+            if (shouldStopHere(node, result.nextNode, newStates[result.nextNode.position], executionMode))
+                return WorkflowState.ReadyForNextTask(
+                    taskStates = newStates,
+                    nodePosition = result.nextNode.position,
+                    rawInput = result.rawInput,
+                    flowDirective = result.flowDirective?.toKotlin(),
+                )
 
             // Continue with the next iteration
             return resumeFromTask(
@@ -359,6 +333,18 @@ object WorkflowOrchestrator {
                 exception = e
             )
         }
+    }
+
+    internal fun shouldStopHere(
+        current: Node<*>,
+        nextNode: Node<*>,
+        nextState: TaskState?,
+        executionMode: ExecutionMode
+    ): Boolean {
+        // when reentering a fork task, always triggers a stop for executeSingleBranch
+        if (nextNode.task is ForkTask && nextState != null) return true
+        // Depends on the execution mode
+        return executionMode.stopAfterTaskCompletion(current)
     }
 
     internal suspend fun resumeFromInterruptedTask(
@@ -413,6 +399,43 @@ object WorkflowOrchestrator {
         block()
     } catch (e: InternalWorkflowException) {
         processInternalWorkflowException(e, current, taskStates)
+    }
+
+    /**
+     * Handle exception by finding a TryTask and returning the appropriate state transition.
+     */
+    private fun processInternalWorkflowException(
+        exception: InternalWorkflowException,
+        failingNode: Node<*>,
+        taskStates: TaskStates,
+    ): StepResult {
+        // Find the nearest TryTask that can handle this error
+        var tryNode: Node<*>? = failingNode
+
+        while (tryNode != null) {
+            if (tryNode.task is TryTask) {
+                @Suppress("UNCHECKED_CAST")
+                tryNode as Node<TryTask>
+                // current scope of the try node
+                val tryScope = getScope(tryNode, taskStates)
+                // current state of the try node
+                val tryTaskState = taskStates[tryNode.position] as TryTaskState
+                // build a processor for the try node
+                val processor = getNodeProcessor(tryNode) as TryProcessor
+                // check that this node actually can handle this error
+                if (processor.isCatching(exception.error, tryTaskState, tryScope)) {
+                    return processor.handleError(
+                        failingNode = failingNode,
+                        error = exception.error,
+                        state = tryTaskState,
+                        scope = tryScope
+                    )
+                }
+            }
+            tryNode = tryNode.parent
+        }
+        // No handler found - fail workflow
+        throw exception
     }
 
     private suspend fun processWaitException(
@@ -528,32 +551,24 @@ object WorkflowOrchestrator {
         taskStates: TaskStates,
         executionMode: ExecutionMode
     ): StepResult {
-        logger.debug { "Executing fork branches in parallel: ${exception.config.branches.map { it.name }}" }
+        @Suppress("UNCHECKED_CAST")
+        val forkTaskNode = forkNode as Node<ForkTask>
+        val branches = forkTaskNode.children ?: emptyList()
 
-        // Get nodesMap from forkNode (we can navigate from any node to find nodesMap)
-        // Build nodesMap from the fork node
-        val nodesMap = mutableMapOf<NodePosition, Node<*>>()
-        fun collect(node: Node<*>) {
-            nodesMap[node.position] = node
-            node.children?.forEach { collect(it) }
-        }
-        // Start from root (navigate up to root first)
-        var root = forkNode
-        while (root.parent != null) {
-            root = root.parent
-        }
-        collect(root)
+        logger.debug { "Executing fork branches in parallel: ${branches.map { it.name }}" }
 
         // Create initial fork state if it doesn't exist (it won't on first entry)
         val forkState = taskStates[forkNode.position] as? ForkTaskState ?: ForkTaskState(
             startedAt = Clock.System.now(),
-            branchStates = exception.config.branches.associate { it.index to BranchState.PENDING },
+            branchStates = branches.indices.associateWith { BranchState.PENDING },
             branchOutputs = emptyMap()
         )
         val taskStatesWithFork = taskStates + (forkNode.position to forkState)
 
         // Execute branches and get results
-        val branchResults = executeForkBranches(exception, taskStatesWithFork, executionMode, nodesMap)
+        // Branch nodes are direct children of the fork node
+        val branchResults =
+            executeForkBranches(exception.transformedInput, taskStatesWithFork, executionMode, forkTaskNode)
 
         // Update fork state with completed branches
         val updatedTaskStates = updateForkStateWithResults(taskStatesWithFork, forkNode.position, branchResults)
@@ -581,15 +596,16 @@ object WorkflowOrchestrator {
      * In cooperative mode, waits for all branches to complete.
      */
     private suspend fun executeForkBranches(
-        exception: ForkException,
+        branchInput: JsonElement,
         taskStates: TaskStates,
         executionMode: ExecutionMode,
-        nodesMap: Map<NodePosition, Node<*>>
+        forkNode: Node<ForkTask>
     ): ForkBranchResults {
-        return if (exception.config.compete) {
-            executeForkBranchesCompete(exception, taskStates, executionMode, nodesMap)
+        val compete = forkNode.task.fork.isCompete
+        return if (compete) {
+            executeForkBranchesCompete(branchInput, taskStates, executionMode, forkNode)
         } else {
-            executeForkBranchesCooperative(exception, taskStates, executionMode, nodesMap)
+            executeForkBranchesCooperative(branchInput, taskStates, executionMode, forkNode)
         }
     }
 
@@ -597,16 +613,17 @@ object WorkflowOrchestrator {
      * Execute fork branches in compete mode (race for first completion).
      */
     private suspend fun executeForkBranchesCompete(
-        exception: ForkException,
+        branchInput: JsonElement,
         taskStates: TaskStates,
         executionMode: ExecutionMode,
-        nodesMap: Map<NodePosition, Node<*>>
+        forkNode: Node<ForkTask>
     ): ForkBranchResults {
+        val branches = forkNode.children ?: emptyList()
         val results = coroutineScope {
-            exception.config.branches.map { branch ->
+            branches.mapIndexed { index, branchNode ->
                 async {
-                    val output = executeSingleBranch(branch, taskStates, exception.transformedInput, executionMode, nodesMap)
-                    branch.index to output
+                    val output = executeSingleBranch(branchNode, taskStates, branchInput, executionMode)
+                    index to output
                 }
             }
         }
@@ -631,15 +648,16 @@ object WorkflowOrchestrator {
      * Execute fork branches in cooperative mode (wait for all).
      */
     private suspend fun executeForkBranchesCooperative(
-        exception: ForkException,
+        branchInput: JsonElement,
         taskStates: TaskStates,
         executionMode: ExecutionMode,
-        nodesMap: Map<NodePosition, Node<*>>
+        forkNode: Node<ForkTask>
     ): ForkBranchResults {
+        val branches = forkNode.children ?: emptyList()
         val outputs = coroutineScope {
-            exception.config.branches.map { branch ->
+            branches.map { branchNode ->
                 async {
-                    executeSingleBranch(branch, taskStates, exception.transformedInput, executionMode, nodesMap)
+                    executeSingleBranch(branchNode, taskStates, branchInput, executionMode)
                 }
             }.awaitAll()
         }
@@ -657,18 +675,15 @@ object WorkflowOrchestrator {
 
     /**
      * Execute a single fork branch.
+     * Branch nodes are direct children of the fork node.
      */
     private suspend fun executeSingleBranch(
-        branch: ForkException.BranchInfo,
+        branchNode: Node<*>,
         taskStates: TaskStates,
         branchInput: JsonElement,
-        executionMode: ExecutionMode,
-        nodesMap: Map<NodePosition, Node<*>>
+        executionMode: ExecutionMode
     ): JsonElement {
-        val branchNode = nodesMap[branch.nodePosition]
-            ?: throw IllegalStateException("Branch node not found at ${branch.nodePosition}")
-
-        logger.debug { "Executing branch: ${branch.name}" }
+        logger.debug { "Executing branch: ${branchNode.name}" }
 
         val result = resumeFromTask(
             taskStates = taskStates,
@@ -678,7 +693,7 @@ object WorkflowOrchestrator {
             executionMode = executionMode
         )
 
-        return extractBranchOutput(result, branch.name)
+        return extractBranchOutput(result, branchNode.name)
     }
 
     /**
@@ -752,18 +767,23 @@ object WorkflowOrchestrator {
         val forkNode = nodesMap[state.nodePosition]
             ?: throw IllegalStateException("Fork node not found at ${state.nodePosition}")
 
-        logger.debug { "Resuming fork: ${state.forkConfig.branches.size} branches, ${state.forkConfig.completedBranches.size} completed" }
+        @Suppress("UNCHECKED_CAST")
+        val forkTaskNode = forkNode as Node<ForkTask>
+        val compete = forkTaskNode.task.fork.isCompete
+        val branchCount = forkTaskNode.children?.size ?: 0
+
+        logger.debug { "Resuming fork: $branchCount branches, ${state.completedBranches.size} completed" }
 
         // Check if fork is complete
         val isComplete = when {
-            state.forkConfig.compete && state.forkConfig.completedBranches.isNotEmpty() -> true
-            !state.forkConfig.compete && state.forkConfig.completedBranches.size == state.forkConfig.branches.size -> true
+            compete && state.completedBranches.isNotEmpty() -> true
+            !compete && state.completedBranches.size == branchCount -> true
             else -> false
         }
 
         if (isComplete) {
             // Fork complete - assemble output and continue parent workflow
-            val output = assembleForkOutput(state.forkConfig)
+            val output = assembleForkOutput(compete, branchCount, state.completedBranches)
 
             // Complete the fork task (applies output transformation, export, etc.)
             val result = completeInterruptedTask(
@@ -787,16 +807,24 @@ object WorkflowOrchestrator {
 
     /**
      * Assemble final output from completed branches.
+     *
+     * @param compete Whether branches race for first completion
+     * @param branchCount Total number of branches
+     * @param completedBranches Map of completed branch index to output
      */
-    private fun assembleForkOutput(config: ForkConfig): JsonElement {
-        return if (config.compete) {
+    private fun assembleForkOutput(
+        compete: Boolean,
+        branchCount: Int,
+        completedBranches: Map<Int, JsonElement>
+    ): JsonElement {
+        return if (compete) {
             // Compete mode: return first completed branch output
-            config.completedBranches.values.first()
+            completedBranches.values.first()
         } else {
             // Cooperative mode: return array in declaration order
             JsonArray(
-                config.branches.indices.map { index ->
-                    config.completedBranches[index]
+                (0 until branchCount).map { index ->
+                    completedBranches[index]
                         ?: throw IllegalStateException("Branch $index not completed")
                 }
             )
@@ -893,43 +921,6 @@ object WorkflowOrchestrator {
         (taskStates[current.position]?.scope ?: buildJsonObject { })
             // Recursively merge with parent scope
             .merge(current.parent?.let { getScope(it, taskStates) })
-
-    /**
-     * Handle exception by finding a TryTask and returning the appropriate state transition.
-     */
-    private fun processInternalWorkflowException(
-        exception: InternalWorkflowException,
-        failingNode: Node<*>,
-        taskStates: TaskStates,
-    ): StepResult {
-        // Find the nearest TryTask that can handle this error
-        var tryNode: Node<*>? = failingNode
-
-        while (tryNode != null) {
-            if (tryNode.task is TryTask) {
-                @Suppress("UNCHECKED_CAST")
-                tryNode as Node<TryTask>
-                // current scope of the try node
-                val tryScope = getScope(tryNode, taskStates)
-                // current state of the try node
-                val tryTaskState = taskStates[tryNode.position] as TryTaskState
-                // build a processor for the try node
-                val processor = getNodeProcessor(tryNode) as TryProcessor
-                // check that this node actually can handle this error
-                if (processor.isCatching(exception.error, tryTaskState, tryScope)) {
-                    return processor.handleError(
-                        failingNode = failingNode,
-                        error = exception.error,
-                        state = tryTaskState,
-                        scope = tryScope
-                    )
-                }
-            }
-            tryNode = tryNode.parent
-        }
-        // No handler found - fail workflow
-        throw exception
-    }
 
     /**
      * Completes an interrupted task by processing the output through the current node's processor.
