@@ -61,7 +61,7 @@ internal class ForkExecutionIntegrationTest {
 
     @BeforeEach
     fun setup() = runTest {
-        // Clean up any existing forks from previous test
+        // Clean up any existing forks from the previous test
         lastForkId?.let { forkId ->
             try {
                 forkRepository.delete(forkId)

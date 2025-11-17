@@ -88,10 +88,9 @@ fun ForTaskState.Companion.random() = ForTaskState(
     startedAt = Instant.random(),
     collection = listOf(JsonElement.random()),
     index = Random.nextInt(),
-).apply {
-    forEach = String.random()
+    forEach = String.random(),
     forAt = String.random()
-}
+)
 
 fun SimpleTaskState.Companion.random() = SimpleTaskState(
     startedAt = Instant.random(),
@@ -185,7 +184,7 @@ fun WorkflowState.Failed.Companion.random() =
             true -> randomFlowDirective()
             false -> null
         },
-        error = InternalWorkflowException.Error.random()
+        error = InternalWorkflowException.Error.random(),
     )
 
 fun WorkflowState.ReadyForNextTask.Companion.random() =

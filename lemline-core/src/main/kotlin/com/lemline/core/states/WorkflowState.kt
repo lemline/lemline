@@ -94,8 +94,8 @@ sealed class WorkflowState {
         val rawInput: JsonElement?,
         val rawOutput: JsonElement?,
         val flowDirective: FlowDirective?,
-        @Transient val exception: Exception? = null,
-        val error: InternalWorkflowException.Error
+        val error: InternalWorkflowException.Error,
+        @Transient val exception: Exception = InternalWorkflowException(error)
     ) : WorkflowState() {
 
         constructor(
@@ -111,8 +111,8 @@ sealed class WorkflowState {
             rawInput = rawInput,
             rawOutput = rawOutput,
             flowDirective = flowDirective,
-            exception = exception,
-            error = InternalWorkflowException.Error.fromUnexpectedException(exception, nodePosition)
+            error = InternalWorkflowException.Error.fromUnexpectedException(exception, nodePosition),
+            exception = exception
         )
 
         override fun toString() = "Failed(" +
@@ -248,6 +248,7 @@ sealed class WorkflowState {
         override val taskStates: TaskStates,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
+        @Transient
         val completedBranches: Map<Int, JsonElement> = emptyMap()
     ) : WorkflowState() {
         override fun toString() = "RunningFork(" +

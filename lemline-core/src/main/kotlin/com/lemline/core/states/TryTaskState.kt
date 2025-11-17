@@ -7,7 +7,6 @@ import com.lemline.core.errors.InternalWorkflowException
 import com.lemline.core.orchestrator.context.Scope
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
@@ -49,8 +48,7 @@ data class TryTaskState(
     val attemptIndex: Int,
     val runningCatch: Boolean,
     val lastError: InternalWorkflowException.Error? = null,
-    @Transient
-    val errorAs: String = "error"
+    val errorAs: String
 ) : TaskState() {
 
     fun newAttemptState(error: InternalWorkflowException.Error? = null): TryTaskState = copy(

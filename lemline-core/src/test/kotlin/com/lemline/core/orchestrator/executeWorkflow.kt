@@ -19,13 +19,15 @@ internal suspend fun executeContinuousWorkflow(
     input: JsonElement
 ): JsonElement {
     val workflow = getWorkflowToTest(yaml, namespace, name, version)
-    
+
+    val starting = WorkflowState.Starting(
+        input = input,
+        startedAt = Clock.System.now()
+    )
+
     val state = WorkflowOrchestrator.resume(
         workflow = workflow,
-        state = WorkflowState.Starting(
-            input = input,
-            startedAt = Clock.System.now()
-        ),
+        state = starting,
         executionMode = ExecutionMode.CONTINUOUS
     )
 
@@ -48,6 +50,7 @@ internal suspend fun executeTaskByTaskWorkflow(
     input: JsonElement
 ): JsonElement {
     val workflow = getWorkflowToTest(yaml, namespace, name, version)
+
     return runUntilComplete(
         workflow = workflow,
         input = input,
@@ -78,14 +81,14 @@ private suspend fun runUntilComplete(
     executionMode: ExecutionMode
 ): JsonElement {
 
-    val state = WorkflowState.Starting(
+    val starting = WorkflowState.Starting(
         input = input,
         startedAt = Clock.System.now()
     )
 
     return runWorkflowStep(
         workflow = workflow,
-        state = state,
+        jsonString = starting.toJsonString(),
         executionMode = executionMode,
     )
 }
@@ -93,9 +96,9 @@ private suspend fun runUntilComplete(
 // Stateless, reusable helper
 private tailrec suspend fun runWorkflowStep(
     workflow: Workflow,
-    state: WorkflowState,
+    jsonString: String,
     executionMode: ExecutionMode,
-): JsonElement = when (state) {
+): JsonElement = when (val state = WorkflowState.fromJsonString(jsonString)) {
     is WorkflowState.Completed ->
         state.output
 
@@ -127,7 +130,7 @@ private tailrec suspend fun runWorkflowStep(
             state = enrichedState,
             executionMode = executionMode
         )
-        runWorkflowStep(workflow, next, executionMode)
+        runWorkflowStep(workflow, next.toJsonString(), executionMode)
     }
 
     else -> {
@@ -136,7 +139,8 @@ private tailrec suspend fun runWorkflowStep(
             state = state,
             executionMode = executionMode
         )
-        runWorkflowStep(workflow, next, executionMode)
+
+        runWorkflowStep(workflow, next.toJsonString(), executionMode)
     }
 }
 

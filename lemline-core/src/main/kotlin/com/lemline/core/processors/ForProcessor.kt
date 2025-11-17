@@ -57,11 +57,12 @@ class ForProcessor(
     node: Node<ForTask>
 ) : NodeProcessor<ForTask, ForTaskState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = ForTaskState.from(
-        node,
+    override fun createState(transformedInput: JsonElement, scope: Scope) = ForTaskState(
         startedAt = Clock.System.now(),
         collection = evalForIn(transformedInput, scope),
-        index = -1
+        index = -1,
+        forEach = node.task.`for`.each ?: "item",
+        forAt = node.task.`for`.at ?: "index"
     )
 
     override fun getNextStepInfo(
@@ -90,11 +91,12 @@ class ForProcessor(
     }
 
     // At each iteration, we remove the first item from the collection and increment the index
-    private fun getNextState(state: ForTaskState): ForTaskState = ForTaskState.from(
-        node = node,
+    private fun getNextState(state: ForTaskState): ForTaskState = ForTaskState(
         startedAt = state.startedAt,
         collection = if (state.index >= 0) state.collection.drop(1) else state.collection,
-        index = state.index + 1
+        index = state.index + 1,
+        forEach = node.task.`for`.each ?: "item",
+        forAt = node.task.`for`.at ?: "index"
     )
 
     private fun shouldContinue(updatedState: ForTaskState, transformedInput: JsonElement, scope: Scope) =
@@ -106,7 +108,7 @@ class ForProcessor(
     }
 
     private fun evalForIn(dataset: JsonElement, scope: Scope): List<JsonElement> {
-        // For.in is evaluated during createState, before full context exists
+        // For.in is evaluated during createState, before the full context exists
         return evalList(dataset, node.task.`for`.`in`, "for.in", scope)
     }
 
