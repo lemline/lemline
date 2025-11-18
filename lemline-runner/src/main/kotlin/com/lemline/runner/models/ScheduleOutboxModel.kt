@@ -11,6 +11,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.utils.toDuration
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
@@ -37,7 +38,7 @@ data class ScheduleOutboxModel(
     override val id: IDV7,
 
     @SerialName("i")
-    override var instanceMessage: InstanceMessage,
+    override var instanceMessage: InstanceMessage<WorkflowCommand>,
 
     @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,

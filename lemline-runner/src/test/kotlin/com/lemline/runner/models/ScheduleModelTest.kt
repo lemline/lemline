@@ -26,7 +26,11 @@ class ScheduleModelTest {
         scheduleZone: String? = null
     ) = ScheduleOutboxModel(
         id = IDV7.random(),
-        instanceMessage = InstanceMessage.random(),
+        instanceMessage = InstanceMessage(
+            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
+            workflowState = com.lemline.core.states.WorkflowCommand.random(),
+            parentId = IDV7.random()
+        ),
         outBoxStatus = OutBoxStatus.PENDING,
         outboxScheduledFor = outboxScheduledFor,
         scheduleCron = scheduleCron,

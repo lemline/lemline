@@ -2,6 +2,8 @@
 package com.lemline.runner.messaging.database
 
 import com.lemline.common.json.JsonSerializable
+import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.instances.InstanceMessage
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -30,7 +32,7 @@ sealed class DatabaseMessage : JsonSerializable {
     @Serializable
     @SerialName("workflow_persistence")
     data class WorkflowPersistence(
-        val instance: InstanceMessage
+        val instance: InstanceMessage<WorkflowEvent>
     ) : DatabaseMessage()
 
     /**
@@ -44,7 +46,7 @@ sealed class DatabaseMessage : JsonSerializable {
     @Serializable
     @SerialName("infrastructure_failure")
     data class InfrastructureFailure(
-        val instance: InstanceMessage,
+        val instance: InstanceMessage<WorkflowCommand>,
         val errorClass: String,
         val errorMessage: String?,
         val errorStackTrace: String,

@@ -6,7 +6,7 @@ import kotlin.time.ExperimentalTime
 
 /**
  * Result of checking fork completion after a branch completes.
- * Returned by ForkRepository.recordBranchCompletion().
+ * Returned by ForkWaitingRepository.recordBranchCompletion().
  */
 @ExperimentalTime
 data class ForkCompletionResult(

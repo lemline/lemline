@@ -2,6 +2,7 @@
 package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
@@ -20,7 +21,7 @@ data class WaitOutboxModel(
     override val id: IDV7 = IDV7.random(),
 
     @SerialName("i")
-    override val instanceMessage: InstanceMessage,
+    override val instanceMessage: InstanceMessage<WorkflowEvent.WaitStarted>,
 
     @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,

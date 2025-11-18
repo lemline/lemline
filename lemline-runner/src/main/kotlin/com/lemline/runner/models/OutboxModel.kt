@@ -2,6 +2,7 @@
 package com.lemline.runner.models
 
 import com.lemline.common.values.WithDefiniteWorkflowInfo
+import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
@@ -26,7 +27,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalTime
 sealed class OutboxModel() : InstanceModel, WithDefiniteWorkflowInfo {
 
-    abstract val instanceMessage: InstanceMessage
+    abstract val instanceMessage: InstanceMessage<out WorkflowState>
 
     /**
      * Current status of the message in the outbox. Possible values:

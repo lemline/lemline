@@ -2,6 +2,8 @@
 package com.lemline.runner.repositories
 
 import com.lemline.common.values.WorkflowId
+import com.lemline.core.states.WorkflowCommand
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
@@ -64,7 +66,7 @@ class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
 
     override fun createModel(rs: ResultSet) = ScheduleOutboxModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage()!!,
+        instanceMessage = rs.getInstanceMessage<WorkflowCommand>()!!,
         scheduleAfter = rs.getString(SCHEDULE_AFTER_COLUMN),
         scheduleEvery = rs.getString(SCHEDULE_EVERY_COLUMN),
         scheduleCron = rs.getString(SCHEDULE_CRON_COLUMN),

@@ -5,7 +5,6 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.messaging.database.DatabaseMessageEmitter
@@ -60,7 +59,7 @@ class InstanceStartCommandTest {
     private lateinit var errStream: ByteArrayOutputStream
     private lateinit var originalOut: PrintStream
     private lateinit var originalErr: PrintStream
-    private lateinit var messageSlot: CapturingSlot<InstanceMessage>
+    private lateinit var messageSlot: CapturingSlot<InstanceMessage<com.lemline.core.states.WorkflowCommand.ResumeFromTask>>
 
     private val workflowDefinition = DefinitionModel(
         namespace = workflowNamespace,
@@ -113,7 +112,7 @@ class InstanceStartCommandTest {
 
     @BeforeEach
     fun setup() {
-        messageSlot = slot<InstanceMessage>()
+        messageSlot = slot<InstanceMessage<com.lemline.core.states.WorkflowCommand.ResumeFromTask>>()
         // Emitter mocks
         instanceEmitter = mockk(relaxUnitFun = true)
         databaseEmitter = mockk(relaxUnitFun = true)
@@ -171,7 +170,7 @@ class InstanceStartCommandTest {
      * Helper method to execute command and verify basic success conditions
      * Returns the captured Message for further assertions
      */
-    private fun executeCommandAndVerify(vararg args: String): InstanceMessage {
+    private fun executeCommandAndVerify(vararg args: String): InstanceMessage<com.lemline.core.states.WorkflowCommand.ResumeFromTask> {
         // When
         val exitCode = cmd.execute(*args)
 
@@ -187,8 +186,8 @@ class InstanceStartCommandTest {
         coVerify { instanceEmitter.send(capture(messageSlot)) }
 
         val sentInstanceMessage = messageSlot.captured
-        sentInstanceMessage.workflowName shouldBe workflowName
-        sentInstanceMessage.workflowVersion shouldBe workflowVersion
+        sentInstanceMessage.workflowInfo.workflowName shouldBe workflowName
+        sentInstanceMessage.workflowInfo.workflowVersion shouldBe workflowVersion
 
         return sentInstanceMessage
     }
@@ -214,7 +213,7 @@ class InstanceStartCommandTest {
             put("number", 123)
         }
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
+        sentMessage.workflowState.rawInput shouldBe expectedJson
     }
 
     @Test
@@ -240,7 +239,7 @@ class InstanceStartCommandTest {
             })
         }
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
+        sentMessage.workflowState.rawInput shouldBe expectedJson
     }
 
     @Test
@@ -264,7 +263,7 @@ class InstanceStartCommandTest {
             put("number", 123)
         }
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
+        sentMessage.workflowState.rawInput shouldBe expectedJson
     }
 
     @Test
@@ -287,7 +286,7 @@ class InstanceStartCommandTest {
             put("number", 123)
         }
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
+        sentMessage.workflowState.rawInput shouldBe expectedJson
     }
 
     @Test
@@ -312,7 +311,7 @@ class InstanceStartCommandTest {
             add(JsonPrimitive("four"))
         }
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
+        sentMessage.workflowState.rawInput shouldBe expectedJson
     }
 
     @Test
@@ -340,7 +339,7 @@ class InstanceStartCommandTest {
             })
         }
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe expectedJson
+        sentMessage.workflowState.rawInput shouldBe expectedJson
     }
 
 
@@ -351,7 +350,7 @@ class InstanceStartCommandTest {
             executeCommandAndVerify(workflowNamespace.toString(), workflowName.toString(), workflowVersion.toString())
 
         // Get the raw input as a JsonElement
-        val rawInput = (sentMessage.workflowState as WorkflowState.Starting).input
+        val rawInput = sentMessage.workflowState.rawInput
 
         // When no input is provided, the command should use an empty JSON object
         rawInput shouldBe JsonObject(emptyMap())
@@ -372,7 +371,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive("just a string")
+        sentMessage.workflowState.rawInput shouldBe JsonPrimitive("just a string")
     }
 
     @Test
@@ -390,7 +389,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive(42)
+        sentMessage.workflowState.rawInput shouldBe JsonPrimitive(42)
     }
 
     @Test
@@ -408,7 +407,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive("42")
+        sentMessage.workflowState.rawInput shouldBe JsonPrimitive("42")
     }
 
     @Test
@@ -426,7 +425,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive("42")
+        sentMessage.workflowState.rawInput shouldBe JsonPrimitive("42")
     }
 
     @Test
@@ -444,7 +443,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive(true)
+        sentMessage.workflowState.rawInput shouldBe JsonPrimitive(true)
     }
 
     @Test
@@ -462,7 +461,7 @@ class InstanceStartCommandTest {
                 inputJsonString
             )
 
-        (sentMessage.workflowState as WorkflowState.Starting).input shouldBe JsonPrimitive("true")
+        sentMessage.workflowState.rawInput shouldBe JsonPrimitive("true")
     }
 
     @Test
@@ -529,7 +528,7 @@ class InstanceStartCommandTest {
         errorSlot.captured shouldContain "'lastName'"
 
         // Verify emitter was NOT called (we failed before sending the message)
-        coVerify(exactly = 0) { instanceEmitter.send(any<InstanceMessage>()) }
+        coVerify(exactly = 0) { instanceEmitter.send(any<InstanceMessage<com.lemline.core.states.WorkflowCommand.ResumeFromTask>>()) }
     }
 
     // Helper method to inject dependencies using reflection

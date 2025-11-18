@@ -61,7 +61,7 @@ internal abstract class WorkflowConsumerTest {
     @Inject
     lateinit var databaseMessageHandler: DatabaseMessageHandler
 
-    val processingMessages = ConcurrentHashMap<String, CompletableFuture<InstanceMessage?>>()
+    val processingMessages = ConcurrentHashMap<String, CompletableFuture<InstanceMessage<*>?>>()
 
     val databaseMessages = ConcurrentHashMap<String, CompletableFuture<DatabaseMessage?>>()
 
@@ -76,7 +76,7 @@ internal abstract class WorkflowConsumerTest {
             processingMessages.remove(msg.payload)?.completeExceptionally(e)
         }
 
-        instanceMessageHandler.onCompleteTest = { msg: Message<String>, o: InstanceMessage? ->
+        instanceMessageHandler.onCompleteTest = { msg: Message<String>, o: InstanceMessage<*>? ->
             processingMessages.remove(msg.payload)?.complete(o)
         }
 
@@ -163,12 +163,12 @@ internal abstract class WorkflowConsumerTest {
 
     protected abstract fun receiveDatabaseMessage(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
 
-    private fun sendMessageFuture(messageJson: String): CompletableFuture<InstanceMessage?> {
+    private fun sendMessageFuture(messageJson: String): CompletableFuture<InstanceMessage<*>?> {
         // Send the message to the input topic
         sendInstanceMessage(messageJson)
 
         // returns the corresponding future
-        return processingMessages.computeIfAbsent(messageJson) { CompletableFuture() }
+        return processingMessages.computeIfAbsent(messageJson) { CompletableFuture<InstanceMessage<*>?>() }
     }
 
     /**
@@ -281,7 +281,7 @@ internal abstract class WorkflowConsumerTest {
             val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.WorkflowPersistence
             val instance = msg.instance
             instance.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
-            val retryingState = instance.workflowState as com.lemline.core.states.WorkflowState.Retrying
+            val retryingState = instance.workflowState as com.lemline.core.states.WorkflowEvent.RetryScheduled
             retryingState.retryAt shouldNotBe null
         }
     }
@@ -323,8 +323,8 @@ internal abstract class WorkflowConsumerTest {
             val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.WorkflowPersistence
             val instance = msg.instance
             instance.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
-            val waitingState = instance.workflowState as com.lemline.core.states.WorkflowState.Waiting
-            waitingState.waitUntil shouldNotBe null
+            val waitState = instance.workflowState as com.lemline.core.states.WorkflowEvent.WaitStarted
+            waitState.waitUntil shouldNotBe null
         }
     }
 

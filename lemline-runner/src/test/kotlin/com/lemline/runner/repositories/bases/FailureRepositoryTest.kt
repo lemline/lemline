@@ -40,7 +40,11 @@ internal abstract class FailureRepositoryTest {
         val ex = IllegalStateException("boom")
         val model = FailureModel.from(
             id = IDV7.random(),
-            instance = InstanceMessage.random(),
+            instance = InstanceMessage(
+                workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
+                workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+                parentId = IDV7.random()
+            ),
             error = ex,
         )
 
@@ -77,8 +81,16 @@ internal abstract class FailureRepositoryTest {
 
     @Test
     fun `should find failures by workflow id`() = runTest {
-        val instance1 = InstanceMessage.random()
-        val instance2 = InstanceMessage.random()
+        val instance1 = InstanceMessage(
+            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
+            workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+            parentId = IDV7.random()
+        )
+        val instance2 = InstanceMessage(
+            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
+            workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+            parentId = IDV7.random()
+        )
 
         val f1 = FailureModel.from(IDV7.random(), instance1, RuntimeException("e1")).copy(payload = "m1")
         val f2 = FailureModel.from(IDV7.random(), instance1, RuntimeException("e2")).copy(payload = "m2")
@@ -95,7 +107,11 @@ internal abstract class FailureRepositoryTest {
 
     @Test
     fun `count and deleteAll should work`() = runTest {
-        val instance = InstanceMessage.random()
+        val instance = InstanceMessage(
+            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
+            workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+            parentId = IDV7.random()
+        )
         val failures = List(3) { idx ->
             FailureModel.from(IDV7.random(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
         }
@@ -110,7 +126,15 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `deleteById should remove an existing failure`() = runTest {
         // Given
-        val failure = FailureModel.from(IDV7.random(), InstanceMessage.random(), RuntimeException("boom"))
+        val failure = FailureModel.from(
+            IDV7.random(),
+            InstanceMessage(
+                workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
+                workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+                parentId = IDV7.random()
+            ),
+            RuntimeException("boom")
+        )
         repository.insert(failure)
 
         // When
@@ -124,7 +148,15 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `deleteById should return 0 if failure does not exist`() = runTest {
         // Given
-        val failure = FailureModel.from(IDV7.random(), InstanceMessage.random(), RuntimeException("boom"))
+        val failure = FailureModel.from(
+            IDV7.random(),
+            InstanceMessage(
+                workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
+                workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+                parentId = IDV7.random()
+            ),
+            RuntimeException("boom")
+        )
         repository.insert(failure)
         val randomId = IDV7.random()
 

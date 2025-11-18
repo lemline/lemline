@@ -2,8 +2,9 @@
 package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
-import com.lemline.core.errors.InternalWorkflowException
+import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowException
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
@@ -22,7 +23,7 @@ data class RetryOutboxModel(
     override val id: IDV7,
 
     @SerialName("i")
-    override val instanceMessage: InstanceMessage,
+    override val instanceMessage: InstanceMessage<WorkflowEvent.RetryScheduled>,
 
     @SerialName("s")
     override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
@@ -82,7 +83,7 @@ data class RetryOutboxModel(
     companion object {
         fun from(
             id: IDV7 = IDV7.random(),
-            instance: InstanceMessage,
+            instance: InstanceMessage<WorkflowEvent.RetryScheduled>,
             outboxScheduledFor: Instant,
             error: Throwable,
             reason: String
@@ -91,16 +92,16 @@ data class RetryOutboxModel(
             instanceMessage = instance,
             errorReason = reason,
             errorClass = when (error) {
-                is InternalWorkflowException -> error.error.type
+                is InternalException -> error.error.type
                 is WorkflowException -> error::class.simpleName ?: "WorkflowException"
                 else -> error::class.qualifiedName!!
             },
             errorMessage = when (error) {
-                is InternalWorkflowException -> error.error.title
+                is InternalException -> error.error.title
                 else -> error.message
             },
             errorStackTrace = when (error) {
-                is InternalWorkflowException -> error.error.toJsonPrettyString()
+                is InternalException -> error.error.toJsonPrettyString()
                 else -> error.stackTraceToString()
             },
             outboxScheduledFor = outboxScheduledFor,

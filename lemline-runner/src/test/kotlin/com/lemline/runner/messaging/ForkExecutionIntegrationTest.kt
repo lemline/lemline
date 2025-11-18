@@ -14,7 +14,7 @@ import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.database.DatabaseMessage
 import com.lemline.runner.messaging.database.DatabaseMessageHandler
 import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.repositories.ForkRepository
+import com.lemline.runner.repositories.ForkWaitingRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -48,7 +48,7 @@ internal class ForkExecutionIntegrationTest {
     lateinit var databaseMessageHandler: DatabaseMessageHandler
 
     @Inject
-    lateinit var forkRepository: ForkRepository
+    lateinit var forkRepository: ForkWaitingRepository
 
     private val testWorkflowInfo = WorkflowInfo(
         workflowId = WorkflowId.random(),
@@ -81,14 +81,14 @@ internal class ForkExecutionIntegrationTest {
         // The fork is at /DO/0/testFork (root -> DO token -> index 0 -> task testFork)
         val forkPosition = NodePosition.root.addToken(Token.DO).addIndex(0).addName("testFork")
 
-        val forkState = WorkflowState.RunningFork(
-            taskStates = emptyMap(),
+        val forkState = com.lemline.core.states.WorkflowEvent.ForkStarted(
+            taskStates = emptyMap<com.lemline.core.nodes.NodePosition, com.lemline.core.states.TaskState>(),
             nodePosition = forkPosition,
-            rawOutput = JsonPrimitive("input"),
-            completedBranches = emptyMap()
+            forkState = com.lemline.core.states.ForkState(),
+            rawInput = JsonPrimitive("input")
         )
 
-        val instanceMessage = InstanceMessage(
+        val instanceMessage: InstanceMessage<com.lemline.core.states.WorkflowEvent> = InstanceMessage(
             workflowInfo = testWorkflowInfo,
             workflowState = forkState,
             parentId = null
@@ -266,14 +266,14 @@ internal class ForkExecutionIntegrationTest {
         // Register a workflow with the specified fork configuration
         registerCustomForkWorkflow(branchCount, compete)
 
-        val forkState = WorkflowState.RunningFork(
-            taskStates = emptyMap(),
+        val forkState = com.lemline.core.states.WorkflowEvent.ForkStarted(
+            taskStates = emptyMap<com.lemline.core.nodes.NodePosition, com.lemline.core.states.TaskState>(),
             nodePosition = forkPosition,
-            rawOutput = JsonPrimitive("input"),
-            completedBranches = emptyMap()
+            forkState = com.lemline.core.states.ForkState(),
+            rawInput = JsonPrimitive("input")
         )
 
-        val instanceMessage = InstanceMessage(
+        val instanceMessage: InstanceMessage<com.lemline.core.states.WorkflowEvent> = InstanceMessage(
             workflowInfo = testWorkflowInfo,
             workflowState = forkState,
             parentId = null

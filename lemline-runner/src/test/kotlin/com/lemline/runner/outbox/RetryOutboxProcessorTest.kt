@@ -42,7 +42,11 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>(
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = RetryOutboxModel(
         id = IDV7.random(),
-        instanceMessage = InstanceMessage.random(),
+        instanceMessage = InstanceMessage(
+            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
+            workflowState = com.lemline.core.states.WorkflowEvent.RetryScheduled.random(),
+            parentId = IDV7.random()
+        ),
         outboxScheduledFor = Clock.System.now(),
         errorReason = "test-error-reason",
         errorClass = "test-error-class",

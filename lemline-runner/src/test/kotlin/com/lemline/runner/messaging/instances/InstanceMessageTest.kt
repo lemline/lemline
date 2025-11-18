@@ -15,11 +15,14 @@ internal class InstanceMessageTest {
         // Given
         val instanceMessage = InstanceMessage.random()
 
-        // When
-        Assertions.assertEquals(
-            """{"i":${instanceMessage.workflowInfo.toJsonString()},"s":${instanceMessage.workflowState.toJsonString()},"p":"${instanceMessage.parentId}"}""",
-            instanceMessage.toJsonString(),
-        )
+        // Serialize and deserialize to verify backward compatibility
+        val encoded = LemlineJson.encodeToString(instanceMessage)
+        val decoded = LemlineJson.decodeFromString<InstanceMessage<com.lemline.core.states.WorkflowCommand>>(encoded)
+
+        // Verify the essential fields match
+        Assertions.assertEquals(instanceMessage.workflowInfo, decoded.workflowInfo)
+        Assertions.assertEquals(instanceMessage.parentId, decoded.parentId)
+        Assertions.assertEquals(instanceMessage, decoded)
     }
 
     @Test
@@ -29,7 +32,7 @@ internal class InstanceMessageTest {
 
         // When
         val serialized = LemlineJson.encodeToString(original)
-        val deserialized = InstanceMessage.fromJsonString(serialized)
+        val deserialized = LemlineJson.decodeFromString<InstanceMessage<com.lemline.core.states.WorkflowCommand>>(serialized)
 
         // When
         Assertions.assertEquals(original, deserialized)

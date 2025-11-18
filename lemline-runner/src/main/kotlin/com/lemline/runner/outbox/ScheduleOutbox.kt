@@ -55,11 +55,14 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
     // Cleanup configuration
     override val cleanupConf by lazy { lemlineConfig.outbox().schedule().cleanup() }
 
-    // process entity with status == PENDING and outboxDelayedUntil < now
+    /**
+     * Process scheduled workflow by updating next execution time and sending command.
+     * No transformation needed - ScheduleOutboxModel already stores WorkflowCommand.
+     */
     override suspend fun process(entity: ScheduleOutboxModel) {
-        // update the schedule model with the next instant to be processed
+        // Update the schedule model with the next instant to be processed
         entity.prepareNextScheduled(WorkflowId.random())
-        // start a new instance of the workflow (with new workflowId)
-        super.process(entity)
+        // Start a new instance of the workflow (instanceMessage already contains WorkflowCommand)
+        instanceEmitter.send(entity.instanceMessage)
     }
 }

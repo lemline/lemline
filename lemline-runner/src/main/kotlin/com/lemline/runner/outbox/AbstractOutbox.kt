@@ -74,9 +74,11 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
 
     private val isShuttingDown = AtomicBoolean(false)
 
-    open suspend fun process(entity: T) {
-        instanceEmitter.send(entity.instanceMessage)
-    }
+    /**
+     * Process an outbox entity by transforming and sending it.
+     * Subclasses MUST override this to transform Event → Command before sending.
+     */
+    protected abstract suspend fun process(entity: T)
 
     @PostConstruct
     fun init() {

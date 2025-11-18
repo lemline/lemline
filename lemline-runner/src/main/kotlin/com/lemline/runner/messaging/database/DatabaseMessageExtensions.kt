@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.database
 
+import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.instances.InstanceMessage
 import kotlin.time.ExperimentalTime
@@ -16,7 +17,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-fun InstanceMessage.toInfrastructureFailure(
+fun InstanceMessage<WorkflowCommand>.toFailure(
     exception: Exception,
     reason: String = getFailureReason(exception),
     retryable: Boolean
@@ -38,6 +39,7 @@ fun InstanceMessage.toInfrastructureFailure(
  * @param payload The raw message payload that failed to deserialize
  * @param error The exception that occurred during deserialization
  */
+
 @ExperimentalTime
 @ExperimentalSerializationApi
 fun createDeserializationFailure(

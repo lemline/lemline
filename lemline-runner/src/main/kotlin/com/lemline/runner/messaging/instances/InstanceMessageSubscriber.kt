@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.instances
 
+import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.config.WORKFLOWS_CONSUMER_CONCURRENCY
 import com.lemline.runner.config.WORKFLOWS_CONSUMER_ENABLED
 import com.lemline.runner.messaging.MessageSubscriber
@@ -25,4 +26,4 @@ internal class InstanceMessageSubscriber(
     @param:Channel(WORKFLOWS_IN_CHANNEL) override val publisher: Publisher<Message<String>>,
     override val handler: InstanceMessageHandler,
     override val metrics: InstanceMessageSubscriberMetrics,
-) : MessageSubscriber<InstanceMessage>()
+) : MessageSubscriber<InstanceMessage<WorkflowCommand>>()

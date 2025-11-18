@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
@@ -38,7 +40,7 @@ internal class WaitRepository : OutboxRepository<WaitOutboxModel>() {
     @ExperimentalTime
     override fun createModel(rs: ResultSet) = WaitOutboxModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage()!!,
+        instanceMessage = rs.getInstanceMessage<WorkflowEvent.WaitStarted>()!!,
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
     ).apply {

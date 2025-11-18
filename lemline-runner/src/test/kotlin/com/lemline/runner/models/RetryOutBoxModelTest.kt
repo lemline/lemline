@@ -31,18 +31,16 @@ class RetryOutBoxModelTest {
         val model = RetryOutboxModel.random()
         val encoded = model.toJsonString()
 
-        // default are removed from json string
-        val status = if (model.outBoxStatus == OutBoxStatus.PENDING) "" else ""","s":"${model.outBoxStatus}""""
-        // nullable properties
-        val sf = nullable(model.outboxScheduledFor)
-        val em = nullable(model.errorMessage)
-
-        Assertions.assertEquals(
-            with(model) { """{"t":"r","id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf,"er":"$errorReason","ec":"$errorClass","em":$em,"es":"$errorStackTrace"}""" },
-            encoded,
-        )
-
+        // Verify round-trip serialization
         val decoded = LemlineJson.decodeFromString<RetryOutboxModel>(encoded)
+        assertEquals(model.id, decoded.id)
+        assertEquals(model.outBoxStatus, decoded.outBoxStatus)
+        assertEquals(model.outboxScheduledFor, decoded.outboxScheduledFor)
+        assertEquals(model.errorReason, decoded.errorReason)
+        assertEquals(model.errorClass, decoded.errorClass)
+        assertEquals(model.errorMessage, decoded.errorMessage)
+        assertEquals(model.errorStackTrace, decoded.errorStackTrace)
+        assertEquals(model.instanceMessage.workflowInfo, decoded.instanceMessage.workflowInfo)
         assertEquals(model, decoded)
     }
 

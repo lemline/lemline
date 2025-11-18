@@ -51,13 +51,13 @@ import kotlinx.serialization.ExperimentalSerializationApi
 abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>() {
 
     companion object {
-        internal const val WORKFLOW_ID_COLUMN = "workflow_id"
-        internal const val WORKFLOW_NAMESPACE_COLUMN = "workflow_namespace"
-        internal const val WORKFLOW_NAME_COLUMN = "workflow_name"
-        internal const val WORKFLOW_VERSION_COLUMN = "workflow_version"
-        internal const val WORKFLOW_POSITION_COLUMN = "workflow_position"
-        internal const val WORKFLOW_STATE_COLUMN = "workflow_state"
-        internal const val PARENT_ID_COLUMN = "parent_id"
+        const val WORKFLOW_ID_COLUMN = "workflow_id"
+        const val WORKFLOW_NAMESPACE_COLUMN = "workflow_namespace"
+        const val WORKFLOW_NAME_COLUMN = "workflow_name"
+        const val WORKFLOW_VERSION_COLUMN = "workflow_version"
+        const val WORKFLOW_POSITION_COLUMN = "workflow_position"
+        const val WORKFLOW_STATE_COLUMN = "workflow_state"
+        const val PARENT_ID_COLUMN = "parent_id"
     }
 
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
@@ -86,19 +86,24 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
         )
     }
 
-    protected fun ResultSet.getInstanceMessage(): InstanceMessage? = when (val id = getIDV7(this, WORKFLOW_ID_COLUMN)) {
-        null -> null
-        else -> InstanceMessage(
-            workflowInfo = WorkflowInfo(
-                workflowId = WorkflowId(id),
-                workflowNamespace = WorkflowNamespace(getString(WORKFLOW_NAMESPACE_COLUMN)),
-                workflowName = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
-                workflowVersion = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
-            ),
-            workflowState = WorkflowState.fromJsonString(getString(WORKFLOW_STATE_COLUMN)),
-            parentId = getIDV7(this, PARENT_ID_COLUMN),
-        )
-    }
+    /**
+     * Deserializes InstanceMessage from ResultSet with type-safe WorkflowState.
+     * Uses inline + reified to allow each repository to specify the exact type it needs.
+     */
+    protected inline fun <reified S : WorkflowState> ResultSet.getInstanceMessage(): InstanceMessage<S>? =
+        when (val id = getIDV7(this, WORKFLOW_ID_COLUMN)) {
+            null -> null
+            else -> InstanceMessage(
+                workflowInfo = WorkflowInfo(
+                    workflowId = WorkflowId(id),
+                    workflowNamespace = WorkflowNamespace(getString(WORKFLOW_NAMESPACE_COLUMN)),
+                    workflowName = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
+                    workflowVersion = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
+                ),
+                workflowState = WorkflowState.fromJsonString(getString(WORKFLOW_STATE_COLUMN)) as S,
+                parentId = getIDV7(this, PARENT_ID_COLUMN),
+            )
+        }
 
     /**
      * Retrieves an entity by its WorkflowId.

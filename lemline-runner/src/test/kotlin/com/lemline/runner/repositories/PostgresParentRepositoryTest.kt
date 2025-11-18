@@ -2,7 +2,7 @@
 package com.lemline.runner.repositories
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
-import com.lemline.runner.repositories.bases.ParentRepositoryTest
+import com.lemline.runner.repositories.bases.ParentWaitingRepositoryTest
 import com.lemline.runner.tests.profiles.PostgresProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -19,4 +19,4 @@ import org.junit.jupiter.api.TestInstance
 @EnabledOnlyIfDockerAvailable
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class PostgresParentRepositoryTest : ParentRepositoryTest()
+internal class PostgresParentWaitingRepositoryTest : ParentWaitingRepositoryTest()

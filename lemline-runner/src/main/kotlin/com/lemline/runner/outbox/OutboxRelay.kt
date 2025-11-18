@@ -2,7 +2,6 @@
 package com.lemline.runner.outbox
 
 import com.lemline.common.logger.Logger
-import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository
@@ -92,10 +91,10 @@ internal class OutboxRelay<T : OutboxModel>(
 
                     // Insert new failures into the FAILURE_TABLE within the same transaction
                     // This can be undone by retrying the outbox
-                    val failures = messages
-                        .filter { it.outBoxStatus == OutBoxStatus.FAILED }
-                        .map { FailureModel.from(it) }
-                    failureRepository.insert(failures, connection)
+//                    val failures = messages
+//                        .filter { it.outBoxStatus == OutBoxStatus.FAILED }
+//                        .map { FailureModel.from(it) }
+//                    failureRepository.insert(failures, connection)
                 }
             }
         } while (toProcess >= batchSize)

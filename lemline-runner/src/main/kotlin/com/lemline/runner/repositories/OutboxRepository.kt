@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.common.values.IDV7
-import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.outbox.OutBoxStatus.FAILED
 import com.lemline.runner.outbox.OutBoxStatus.PENDING
 import com.lemline.runner.outbox.OutBoxStatus.SENT
 import jakarta.inject.Inject
@@ -76,16 +73,16 @@ abstract class OutboxRepository<T : OutboxModel> : WithInstanceRepository<T>() {
         )
     }
 
-    suspend fun retryById(id: IDV7, connection: Connection? = null): Int = withConnection(connection) { conn ->
-        findById(id, conn)?.let { entity ->
-            // if the outbox was failed, delete the failure entry
-            if (entity.outBoxStatus == FAILED) {
-                failureRepository.deleteById(FailureModel.from(entity).id, conn)
-            }
-            entity.outBoxStatus = PENDING
-            update(entity, conn)
-        } ?: 0
-    }
+//    suspend fun retryById(id: IDV7, connection: Connection? = null): Int = withConnection(connection) { conn ->
+//        findById(id, conn)?.let { entity ->
+//            // if the outbox was failed, delete the failure entry
+//            if (entity.outBoxStatus == FAILED) {
+//                failureRepository.deleteById(FailureModel.from(entity).id, conn)
+//            }
+//            entity.outBoxStatus = PENDING
+//            update(entity, conn)
+//        } ?: 0
+//    }
 
     /**
      * Finds and locks messages that are ready to be processed.

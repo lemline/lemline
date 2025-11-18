@@ -5,10 +5,11 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.errors.InternalWorkflowException
+import com.lemline.core.definitions.getNode
+import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
 import com.lemline.core.states.BranchStatus
-import com.lemline.core.states.WorkflowState
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
@@ -18,14 +19,14 @@ import com.lemline.runner.messaging.instances.InstanceMessageEmitter
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.ForkBranchModel
-import com.lemline.runner.models.ForkModel
-import com.lemline.runner.models.ParentOutboxModel
+import com.lemline.runner.models.ForkWaitingModel
+import com.lemline.runner.models.ParentWaitingModel
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.ForkRepository
-import com.lemline.runner.repositories.ParentRepository
+import com.lemline.runner.repositories.ForkWaitingRepository
+import com.lemline.runner.repositories.ParentWaitingRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.repositories.WaitRepository
@@ -47,12 +48,12 @@ import org.jetbrains.annotations.TestOnly
 @ApplicationScoped
 @ExperimentalSerializationApi
 internal class DatabaseMessageHandler(
-    private val parentRepository: ParentRepository,
+    private val parentRepository: ParentWaitingRepository,
     private val retryRepository: RetryRepository,
     private val scheduleRepository: ScheduleRepository,
     private val waitRepository: WaitRepository,
     private val failureRepository: FailureRepository,
-    private val forkRepository: ForkRepository,
+    private val forkRepository: ForkWaitingRepository,
     private val instanceEmitter: InstanceMessageEmitter,
     private val starter: Starter,
     override val metrics: DatabaseMessageSubscriberMetrics,
@@ -93,18 +94,22 @@ internal class DatabaseMessageHandler(
     }
 
     // ========================================
-    // Serialization & Emission
+    // Serialization
     // ========================================
 
     /**
-     * DatabaseMessage does not need serialization as it doesn't chain to other messages.
+     * DatabaseMessage does not need serialization as it doesn't reemit.
      */
     override suspend fun serialize(current: DatabaseMessage, next: DatabaseMessage): String {
         error("DatabaseMessage should not be serialized - it doesn't chain to other messages")
     }
 
+    // ========================================
+    // Emission
+    // ========================================
+
     /**
-     * DatabaseMessage does not emit to other channels.
+     * DatabaseMessage does not reemit.
      */
     override suspend fun emit(payload: String) {
         error("DatabaseMessage should not be emitted - it doesn't chain to other messages")
@@ -122,17 +127,11 @@ internal class DatabaseMessageHandler(
     @Throws(CompensationException::class)
     override suspend fun handle(current: DatabaseMessage): DatabaseMessage? {
         when (current) {
-            is DatabaseMessage.WorkflowPersistence -> {
-                handleWorkflowPersistence(current.instance)
-            }
+            is DatabaseMessage.WorkflowPersistence -> handleWorkflowPersistence(current.instance)
 
-            is DatabaseMessage.InfrastructureFailure -> {
-                handleInfrastructureFailure(current)
-            }
+            is DatabaseMessage.InfrastructureFailure -> handleInfrastructureFailure(current)
 
-            is DatabaseMessage.DeserializationFailure -> {
-                handleDeserializationFailure(current)
-            }
+            is DatabaseMessage.DeserializationFailure -> handleDeserializationFailure(current)
         }
         return null
     }
@@ -147,21 +146,22 @@ internal class DatabaseMessageHandler(
      * - Completed → Parent completion or schedule completion
      * - Failed → FailureModel
      */
-    private suspend fun handleWorkflowPersistence(instance: InstanceMessage) {
+    @Suppress("UNCHECKED_CAST")
+    private suspend fun handleWorkflowPersistence(instance: InstanceMessage<WorkflowEvent>) {
         when (val state = instance.workflowState) {
-            is WorkflowState.Waiting -> {
+            is WorkflowEvent.WaitStarted -> {
                 waitRepository.insert(
                     WaitOutboxModel(
-                        instanceMessage = instance,
+                        instanceMessage = instance as InstanceMessage<WorkflowEvent.WaitStarted>,
                         outboxScheduledFor = state.waitUntil
                     )
                 )
             }
 
-            is WorkflowState.Retrying -> {
+            is WorkflowEvent.RetryScheduled -> {
                 retryRepository.insert(
                     RetryOutboxModel.from(
-                        instance = instance,
+                        instance = instance as InstanceMessage<WorkflowEvent.RetryScheduled>,
                         outboxScheduledFor = state.retryAt,
                         error = IllegalStateException("Task failed and will be retried"), // TODO this is not the correct exception
                         reason = "Task retry"
@@ -169,59 +169,50 @@ internal class DatabaseMessageHandler(
                 )
             }
 
-            is WorkflowState.RunningChildWorkflow -> {
-                handleRunningChildWorkflow(instance, state)
-            }
-
-            is WorkflowState.Completed -> {
-                handleCompletion(instance, state)
-            }
-
-            is WorkflowState.Failed -> {
-                val exception = InternalWorkflowException(state.error)
+            is WorkflowEvent.TaskFailed -> {
+                val exception = InternalException(state.error) // TODO check if this is the correct exception
                 failureRepository.insert(
                     FailureModel.from(
-                        instance = instance,
+                        instance = instance as InstanceMessage<WorkflowEvent.TaskFailed>,
                         error = exception,
                         reason = getFailureReason(exception)
                     )
                 )
             }
 
-            is WorkflowState.RunningFork -> {
-                handleForkStarted(instance)
-            }
+            is WorkflowEvent.RunWorkflowStarted -> handleRunWorkflowStarted(instance as InstanceMessage<WorkflowEvent.RunWorkflowStarted>)
 
-            is WorkflowState.ReadyForNextTask,
-            is WorkflowState.Starting -> {
-                error("Unexpected state in database handler: $state")
-            }
+            is WorkflowEvent.WorkflowCompleted -> handleWorkflowCompleted(instance as InstanceMessage<WorkflowEvent.WorkflowCompleted>)
+
+            is WorkflowEvent.ForkStarted -> handleForkStarted(instance as InstanceMessage<WorkflowEvent.ForkStarted>)
+
+            is WorkflowEvent.ForkBranchCompleted -> handleForkBranchCompleted(instance)
+
+            is WorkflowEvent.TaskScheduled -> error("Unexpected state in database handler: $state")
         }
     }
 
-    private suspend fun handleRunningChildWorkflow(
-        instance: InstanceMessage,
-        state: WorkflowState.RunningChildWorkflow
+    private suspend fun handleRunWorkflowStarted(
+        instance: InstanceMessage<WorkflowEvent.RunWorkflowStarted>,
     ) {
-        failureRepository.withTransaction { conn ->
+        parentRepository.withTransaction { conn ->
             // Insert parent
             val parentId = IDV7.random()
             parentRepository.insert(
-                ParentOutboxModel(
+                entity = ParentWaitingModel(
                     id = parentId,
-                    instanceMessage = instance,
-                    outboxScheduledFor = null
+                    instanceMessage = instance
                 ),
-                conn
+                connection = conn
             )
 
             // Create the child + optional schedule
             val (child, schedule) = starter.getStartingMessages(
                 workflowId = WorkflowId.random(),
-                workflowNamespace = state.childConfig.namespace,
-                workflowName = state.childConfig.name,
-                optionalVersion = state.childConfig.version,
-                workflowInput = state.childConfig.input,
+                workflowNamespace = instance.workflowState.childConfig.namespace,
+                workflowName = instance.workflowState.childConfig.name,
+                optionalVersion = instance.workflowState.childConfig.version,
+                workflowInput = instance.workflowState.childConfig.input,
                 parentId = parentId,
                 zoneId = null
             ) { error(it) }
@@ -234,36 +225,33 @@ internal class DatabaseMessageHandler(
         }
     }
 
-    private suspend fun handleCompletion(
-        instance: InstanceMessage,
-        state: WorkflowState.Completed
+    private suspend fun handleWorkflowCompleted(
+        instance: InstanceMessage<WorkflowEvent.WorkflowCompleted>,
     ) {
         // Handle parent completion
         instance.parentId?.let { parentId ->
-            parentRepository.findById(parentId)?.let { parent ->
-                // Validate parent state
-                val currentState = parent.instanceMessage.workflowState
-                if (currentState !is WorkflowState.RunningChildWorkflow) {
-                    error("CRITICAL - Parent workflow ${parent.workflowId} is in unexpected state $currentState")
-                }
+            parentRepository.withTransaction { conn ->
+                parentRepository.findById(parentId, conn)?.let { parent ->
+                    // Parent state
+                    val state = parent.instanceMessage.workflowState
 
-                // Update parent with child output
-                val updatedParent = parent.copy(
-                    instanceMessage = parent.instanceMessage.copy(
-                        workflowState = currentState.copy(rawOutput = state.output)
-                    ),
-                    outBoxStatus = OutBoxStatus.SENT,
-                    outboxScheduledFor = Clock.System.now()
-                )
+                    // restart parent
+                    instanceEmitter.send(
+                        InstanceMessage(
+                            workflowInfo = parent.instanceMessage.workflowInfo,
+                            workflowState = state.resumeSync(instance.workflowState.output),
+                            parentId = parent.parentId,
+                        )
+                    )
 
-                // Send parent to workflow channel
-                instanceEmitter.send(updatedParent.instanceMessage)
-                parentRepository.update(updatedParent)
+                    // delete parent (event-driven state - processed once)
+                    parentRepository.delete(parent, conn)
 
-                logger.debug {
-                    "Parent workflow ${updatedParent.workflowId} resumed after child completion"
-                }
-            } ?: error("CRITICAL - Unable to find parent $parentId")
+                    logger.debug {
+                        "Parent workflow ${parent.workflowId} resumed after child completion"
+                    }
+                } ?: error("CRITICAL - Unable to find parent $parentId")
+            }
         }
 
         // Handle schedule completion
@@ -286,9 +274,8 @@ internal class DatabaseMessageHandler(
      *
      * Fork configuration (compete, branches) is derived from the workflow definition node.
      */
-    private suspend fun handleForkStarted(instance: InstanceMessage) {
-        val state = instance.workflowState as? WorkflowState.RunningFork
-            ?: error("Expected RunningFork state, got ${instance.workflowState}")
+    private suspend fun handleForkStarted(instance: InstanceMessage<WorkflowEvent.ForkStarted>) {
+        val state = instance.workflowState
 
         // Get fork node from workflow definition to extract fork configuration
         val workflowInfo = instance.workflowInfo
@@ -299,20 +286,17 @@ internal class DatabaseMessageHandler(
         )
             ?: error("Workflow definition not found: ${workflowInfo.workflowNamespace}/${workflowInfo.workflowName}/${workflowInfo.workflowVersion}")
 
-        val nodesMap = DefinitionCache.getNodesMap(workflow)
-        val forkNode = nodesMap[state.nodePosition]
-            ?: error("Fork node not found at ${state.nodePosition}")
+        val forkNode = workflow.getNode(state.nodePosition) as Node<ForkTask>
 
         @Suppress("UNCHECKED_CAST")
-        val forkTaskNode = forkNode as Node<ForkTask>
-        val compete = forkTaskNode.task.fork.isCompete
-        val branches = forkTaskNode.children ?: emptyList()
+        val isCompete = forkNode.task.fork.isCompete
+        val branches = forkNode.children ?: emptyList()
 
         // 1. Create fork metadata model
-        val forkModel = ForkModel(
+        val forkModel = ForkWaitingModel(
             instanceMessage = instance,
             forkPosition = state.nodePosition.toString(),
-            compete = compete,
+            compete = isCompete,
             branchCount = branches.size
         )
 
@@ -327,8 +311,8 @@ internal class DatabaseMessageHandler(
                 output = null,
                 error = null,
                 completedAt = null,
-                createdAt = Clock.System.now(),
-                updatedAt = Clock.System.now()
+                createdAt = state.forkState.startedAt,
+                updatedAt = state.forkState.startedAt
             )
         }
 
@@ -337,23 +321,24 @@ internal class DatabaseMessageHandler(
 
         logger.debug {
             "Fork started for instance ${instance.workflowInfo.workflowId}, position ${state.nodePosition}, " +
-                "compete=$compete, branches=${branches.size}"
+                "compete=$isCompete, branches=${branches.size}"
         }
 
         // 4. Emit instance messages for each branch
         branches.forEach { branchNode ->
-            val branchMessage = instance.copy(
-                workflowState = WorkflowState.ReadyForNextTask(
-                    taskStates = state.taskStates,
-                    nodePosition = branchNode.position,
-                    rawInput = state.rawInput ?: error("Raw input is required for running $state"),
-                    flowDirective = null
-                )
+            val branchMessage = InstanceMessage(
+                workflowInfo = instance.workflowInfo,
+                workflowState = instance.workflowState.startBranch(branchNode.position),
+                parentId = instance.parentId
             )
 
             logger.debug { "Scheduling branch ${branchNode.name} at ${branchNode.position}" }
             instanceEmitter.send(branchMessage)
         }
+    }
+
+    private suspend fun handleForkBranchCompleted(instance: InstanceMessage<WorkflowEvent>) {
+
     }
 
     /**
@@ -365,25 +350,25 @@ internal class DatabaseMessageHandler(
     private suspend fun handleInfrastructureFailure(message: DatabaseMessage.InfrastructureFailure) {
         if (message.retryable) {
             // Save to retry outbox - will be retried later
-            retryRepository.insert(
-                RetryOutboxModel.from(
-                    id = IDV7.random(),
-                    instance = message.instance,
-                    outboxScheduledFor = Clock.System.now(), // TODO: Calculate backoff
-                    error = RuntimeException("${message.errorClass}: ${message.errorMessage}"),
-                    reason = message.reason
-                )
-            )
+//            retryRepository.insert(
+//                RetryOutboxModel.from(
+//                    id = IDV7.random(),
+//                    instance = message.instance,
+//                    outboxScheduledFor = Clock.System.now(), // TODO: Calculate backoff
+//                    error = RuntimeException("${message.errorClass}: ${message.errorMessage}"),
+//                    reason = message.reason
+//                )
+//            )
         } else {
             // Save to failure table - permanent error
-            failureRepository.insert(
-                FailureModel.from(
-                    id = IDV7.random(),
-                    instance = message.instance,
-                    error = RuntimeException("${message.errorClass}: ${message.errorMessage}"),
-                    reason = message.reason
-                )
-            )
+//            failureRepository.insert(
+//                FailureModel.from(
+//                    id = IDV7.random(),
+//                    instance = message.instance,
+//                    error = RuntimeException("${message.errorClass}: ${message.errorMessage}"),
+//                    reason = message.reason
+//                )
+//            )
         }
     }
 
@@ -402,4 +387,112 @@ internal class DatabaseMessageHandler(
             )
         )
     }
+
+    /**
+     * Handles branch completion by:
+     * 1. Finding the matching branch in the fork
+     * 2. Recording branch completion in database (with pessimistic locking)
+     * 3. Checking if fork is complete
+     * 4. If complete, assembling output and resuming parent workflow
+     * 5. If not complete, waiting for more branches
+     */
+//    private suspend fun InstanceMessage.handleForkBranchCompletion(
+//        state: WorkflowState.TaskScheduled
+//    ): InstanceMessage? {
+//        val forkPosition = state.nodePosition
+//        val branchOutput = state.rawInput
+//
+//        // Get fork by workflow ID and position
+//        val fork = forkRepository.findByWorkflowIdAndPosition(workflowInfo.workflowId, forkPosition)
+//            ?: throw IllegalStateException("Fork not found at $forkPosition")
+//
+//        // Get fork branches to find which branch this is
+//        val branches = forkRepository.getBranches(fork.id)
+//
+//        // Find the branch that is still pending or running
+//        // In a distributed system, we need to identify which branch completed based on the nodePosition
+//        // Since all branches eventually return to the fork position, we need another way to identify them
+//        // For now, we'll just take the first pending branch (this is a simplification)
+//        val branch = branches.firstOrNull { it.status == com.lemline.core.states.BranchStatus.PENDING }
+//            ?: throw IllegalStateException("No pending branch found for fork at $forkPosition")
+//
+//        logger.debug {
+//            "Branch ${branch.branchIndex} (${branch.branchName}) completed for fork ${fork.id} at $forkPosition, " +
+//                "output: ${branchOutput.toString().take(100)}"
+//        }
+//
+//        // Record branch completion and check if fork is complete
+//        val completionResult = forkRepository.recordBranchCompletion(
+//            forkId = fork.id,
+//            branchIndex = branch.branchIndex,
+//            branchOutput = branchOutput
+//        )
+//
+//        // Check if fork is complete
+//        if (completionResult.isComplete) {
+//            logger.debug {
+//                "Fork complete at $forkPosition: ${completionResult.completedCount}/${completionResult.branchCount} branches, " +
+//                    "resuming parent workflow"
+//            }
+//            return resumeForkParent(completionResult, forkPosition)
+//        } else {
+//            logger.debug {
+//                "Fork not complete at $forkPosition: ${completionResult.completedCount}/${completionResult.branchCount} branches done"
+//            }
+//            return null  // Waiting for more branches
+//        }
+//    }
+
+    /**
+     * Resume parent workflow after fork completes.
+     * Assembles output from completed branches and creates resume message.
+     */
+//    private suspend fun InstanceMessage.resumeForkParent(
+//        completionResult: ForkCompletionResult,
+//        forkPosition: com.lemline.core.nodes.NodePosition
+//    ): InstanceMessage {
+//        // Assemble output based on compete mode
+//        val assembledOutput = if (completionResult.compete) {
+//            // Compete mode: return first completed branch output
+//            completionResult.branches
+//                .firstOrNull { it.status == com.lemline.core.states.BranchStatus.COMPLETED }
+//                ?.output
+//                ?.let { com.lemline.common.json.LemlineJson.decodeFromString<kotlinx.serialization.json.JsonElement>(it) }
+//                ?: throw IllegalStateException("No completed branch found in compete mode")
+//        } else {
+//            // Cooperative mode: return array in order
+//            val outputs = (0 until completionResult.branchCount).map { index ->
+//                val branch = completionResult.branches.find { it.branchIndex == index }
+//                    ?: throw IllegalStateException("Branch $index not found")
+//
+//                require(branch.status == com.lemline.core.states.BranchStatus.COMPLETED) {
+//                    "Branch $index not completed: ${branch.status}"
+//                }
+//
+//                com.lemline.common.json.LemlineJson.decodeFromString<kotlinx.serialization.json.JsonElement>(
+//                    branch.output!!
+//                )
+//            }
+//            kotlinx.serialization.json.JsonArray(outputs)
+//        }
+//
+//        // Create resume message
+//        val resumeMessage = copy(
+//            workflowState = WorkflowState.TaskScheduled(
+//                taskStates = completionResult.taskStates,
+//                nodePosition = forkPosition,
+//                rawInput = assembledOutput,
+//                flowDirective = null
+//            )
+//        )
+//
+//        // Clean up fork state - need to get fork ID first
+//        val fork = forkRepository.findByWorkflowIdAndPosition(workflowInfo.workflowId, forkPosition)
+//        if (fork != null) {
+//            forkRepository.delete(fork.id)
+//            logger.debug { "Fork parent resumed at $forkPosition, fork state deleted" }
+//        }
+//
+//        return resumeMessage
+//    }
 }

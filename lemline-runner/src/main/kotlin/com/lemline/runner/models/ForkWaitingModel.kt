@@ -3,6 +3,7 @@ package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.instances.InstanceMessage
 import kotlin.time.ExperimentalTime
@@ -21,12 +22,12 @@ import kotlinx.serialization.Serializable
 @ExperimentalSerializationApi
 @Serializable
 @SerialName("fork")
-data class ForkModel(
+data class ForkWaitingModel(
     @SerialName("id")
     override val id: IDV7 = IDV7.random(),
 
     @SerialName("i")
-    val instanceMessage: InstanceMessage,
+    val instanceMessage: InstanceMessage<WorkflowEvent.ForkStarted>,
 
     @SerialName("fp")
     val forkPosition: String,  // Serialized NodePosition

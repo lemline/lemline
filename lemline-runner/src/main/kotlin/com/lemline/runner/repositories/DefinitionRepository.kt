@@ -4,6 +4,7 @@ package com.lemline.runner.repositories
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.DefinitionModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject

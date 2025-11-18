@@ -2,6 +2,7 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.messaging.instances.InstanceMessageEmitter
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.repositories.FailureRepository
@@ -49,4 +50,19 @@ internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
 
     // Cleanup configuration
     override val cleanupConf by lazy { lemlineConfig.outbox().wait().cleanup() }
+
+    /**
+     * Transform WaitStarted Event → ResumeFromStartedTask Command before sending.
+     * This ensures the workflow handler receives a command it can process.
+     */
+    override suspend fun process(entity: WaitOutboxModel) {
+        val command = entity.instanceMessage.workflowState.resume()
+        instanceEmitter.send(
+            InstanceMessage(
+                workflowInfo = entity.instanceMessage.workflowInfo,
+                workflowState = command,
+                parentId = entity.instanceMessage.parentId
+            )
+        )
+    }
 }

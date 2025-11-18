@@ -7,6 +7,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.schemas.SchemaValidator
+import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.ScheduleOutboxModel
@@ -43,7 +44,7 @@ class Starter {
         parentId: IDV7?,
         zoneId: ZoneId?,
         onError: (String) -> Nothing,
-    ): Pair<InstanceMessage?, ScheduleOutboxModel?> {
+    ): Pair<InstanceMessage<WorkflowCommand>?, ScheduleOutboxModel?> {
         // Retrieve the workflow definition from the repository
         val workflow = definitions.get(workflowNamespace, workflowName, optionalVersion)
             ?: onError("Workflow $workflowName (version=${optionalVersion ?: "latest"}) not found.")

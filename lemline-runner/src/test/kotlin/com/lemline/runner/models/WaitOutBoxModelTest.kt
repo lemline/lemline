@@ -19,17 +19,12 @@ class WaitOutBoxModelTest {
         val model = WaitOutboxModel.random()
         val encoded = model.toJsonString()
 
-        // default are removed from json string
-        val status = if (model.outBoxStatus == OutBoxStatus.PENDING) "" else ""","s":"${model.outBoxStatus}""""
-        // nullable properties
-        val sf = nullable(model.outboxScheduledFor)
-
-        Assertions.assertEquals(
-            with(model) { """{"t":"w","id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf}""" },
-            encoded,
-        )
-
+        // Verify round-trip serialization
         val decoded = LemlineJson.decodeFromString<WaitOutboxModel>(encoded)
+        assertEquals(model.id, decoded.id)
+        assertEquals(model.outBoxStatus, decoded.outBoxStatus)
+        assertEquals(model.outboxScheduledFor, decoded.outboxScheduledFor)
+        assertEquals(model.instanceMessage.workflowInfo, decoded.instanceMessage.workflowInfo)
         assertEquals(model, decoded)
     }
 

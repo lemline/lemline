@@ -3,11 +3,10 @@ package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
-import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -22,7 +21,7 @@ data class FailureModel(
     override val id: IDV7,
 
     @SerialName("i")
-    var instanceMessage: InstanceMessage?,
+    var instanceMessage: InstanceMessage<WorkflowEvent.TaskFailed>?,
 
     @SerialName("p")
     val payload: String?,
@@ -49,7 +48,7 @@ data class FailureModel(
     companion object {
         fun from(
             id: IDV7 = IDV7.random(),
-            instance: InstanceMessage,
+            instance: InstanceMessage<WorkflowEvent.TaskFailed>,
             error: Throwable,
             reason: String = getFailureReason(error)
         ) = FailureModel(
@@ -77,18 +76,18 @@ data class FailureModel(
             errorStackTrace = error.stackTraceToString()
         )
 
-        fun from(outbox: OutboxModel): FailureModel {
-            require(outbox.outBoxStatus == OutBoxStatus.FAILED) { "The outbox status must be FAILED" }
-
-            return FailureModel(
-                id = IDV7.from(outbox.id),
-                instanceMessage = outbox.instanceMessage,
-                payload = null,
-                errorReason = FailureReasons.OUTBOX_FAILURE,
-                errorClass = outbox.outboxErrorClass!!,
-                errorMessage = outbox.outboxErrorMessage,
-                errorStackTrace = outbox.outboxErrorStackTrace!!
-            )
-        }
+//        fun from(outbox: OutboxModel): FailureModel {
+//            require(outbox.outBoxStatus == OutBoxStatus.FAILED) { "The outbox status must be FAILED" }
+//
+//            return FailureModel(
+//                id = IDV7.from(outbox.id),
+//                instanceMessage = outbox.instanceMessage,
+//                payload = null,
+//                errorReason = FailureReasons.OUTBOX_FAILURE,
+//                errorClass = outbox.outboxErrorClass!!,
+//                errorMessage = outbox.outboxErrorMessage,
+//                errorStackTrace = outbox.outboxErrorStackTrace!!
+//            )
+//        }
     }
 }

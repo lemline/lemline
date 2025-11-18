@@ -10,6 +10,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowState
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.SerialName
@@ -20,7 +21,7 @@ import org.eclipse.microprofile.reactive.messaging.Message
 
 @ExperimentalTime
 @Serializable
-data class InstanceMessage(
+data class InstanceMessage<S : WorkflowState>(
     /**
      * Description of the workflow instance
      */
@@ -29,7 +30,7 @@ data class InstanceMessage(
     /**
      * Description of the workflow instance
      */
-    @SerialName("s") val workflowState: WorkflowState,
+    @SerialName("s") val workflowState: S,
 
     /**
      * Parent's model ID waiting for this instance completion, if any.
@@ -58,15 +59,14 @@ data class InstanceMessage(
                 workflowName = workflowName,
                 workflowVersion = workflowVersion,
             ),
-            workflowState = WorkflowState.Starting(
-                startedAt = kotlin.time.Clock.System.now(),
-                input = workflowInput,
-            ),
+            workflowState = WorkflowCommand.start(workflowInput),
             parentId = parentId,
         )
 
-        fun fromJsonString(jsonString: String) = LemlineJson.decodeFromString<InstanceMessage>(jsonString)
+        inline fun <reified S : WorkflowState> fromJsonString(jsonString: String): InstanceMessage<S> =
+            LemlineJson.decodeFromString<InstanceMessage<S>>(jsonString)
 
-        fun fromMessage(message: Message<String>) = fromJsonString(message.payload).also { it.message = message }
+        inline fun <reified S : WorkflowState> fromMessage(message: Message<String>): InstanceMessage<S> =
+            fromJsonString<S>(message.payload).also { it.message = message }
     }
 }

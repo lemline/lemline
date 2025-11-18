@@ -3,6 +3,7 @@ package com.lemline.runner.repositories
 
 import com.lemline.common.logger.logger
 import com.lemline.runner.config.DATABASE_TYPE
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfigConstants
 import com.lemline.runner.config.MIGRATE_AT_START
 import io.quarkus.runtime.StartupEvent

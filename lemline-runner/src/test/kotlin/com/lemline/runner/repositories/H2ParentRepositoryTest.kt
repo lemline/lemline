@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.repositories.bases.ParentRepositoryTest
+import com.lemline.runner.repositories.bases.ParentWaitingRepositoryTest
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -17,4 +17,4 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class H2ParentRepositoryTest : ParentRepositoryTest()
+internal class H2ParentWaitingRepositoryTest : ParentWaitingRepositoryTest()

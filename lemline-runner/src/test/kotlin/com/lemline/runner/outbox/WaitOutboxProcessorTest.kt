@@ -42,7 +42,11 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
     // Implement the abstract factory method
     override fun createTestModel(payload: String) = WaitOutboxModel(
         id = IDV7.random(),
-        instanceMessage = InstanceMessage.random(),
+        instanceMessage = InstanceMessage(
+            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
+            workflowState = com.lemline.core.states.WorkflowEvent.WaitStarted.random(),
+            parentId = IDV7.random()
+        ),
         outboxScheduledFor = Clock.System.now(),
     )
 }

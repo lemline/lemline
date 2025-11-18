@@ -9,12 +9,12 @@ import com.lemline.core.states.BranchStatus
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.instances.InstanceMessage
 import com.lemline.runner.models.ForkBranchModel
-import com.lemline.runner.models.ForkModel
-import com.lemline.runner.repositories.ForkRepository
+import com.lemline.runner.models.ForkWaitingModel
+import com.lemline.runner.repositories.ForkWaitingRepository
 import io.kotest.matchers.collections.shouldHaveSize
+import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.nulls.shouldBeNull
 import jakarta.inject.Inject
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -25,17 +25,17 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
- * Abstract base test suite for ForkRepository implementations.
+ * Abstract base test suite for ForkWaitingRepository implementations.
  *
  * Verifies fork persistence, branch tracking, pessimistic locking,
  * and completion detection across different database backends.
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class ForkRepositoryTest {
+internal abstract class ForkWaitingRepositoryTest {
 
     @Inject
-    protected lateinit var repository: ForkRepository
+    protected lateinit var repository: ForkWaitingRepository
 
     private val testWorkflowId = WorkflowId.random()
     private val testPosition = NodePosition.root.addName("fork1")
@@ -291,7 +291,7 @@ internal abstract class ForkRepositoryTest {
     private fun createTestFork(
         branchCount: Int,
         compete: Boolean = false
-    ): ForkModel {
+    ): ForkWaitingModel {
         val forkId = IDV7.random()
         testForkId = forkId  // Store for cleanup
 
@@ -302,16 +302,16 @@ internal abstract class ForkRepositoryTest {
                 workflowName = com.lemline.common.values.WorkflowName("test-workflow"),
                 workflowVersion = com.lemline.common.values.WorkflowVersion("1.0")
             ),
-            workflowState = WorkflowState.ReadyForNextTask(
-                taskStates = emptyMap(),
+            workflowState = com.lemline.core.states.WorkflowEvent.ForkStarted(
+                taskStates = emptyMap<com.lemline.core.nodes.NodePosition, com.lemline.core.states.TaskState>(),
                 nodePosition = testPosition,
-                rawInput = JsonPrimitive("test-input"),
-                flowDirective = null
+                forkState = com.lemline.core.states.ForkState(),
+                rawInput = JsonPrimitive("test-input")
             ),
             parentId = null
         )
 
-        return ForkModel(
+        return ForkWaitingModel(
             id = forkId,
             instanceMessage = instanceMessage,
             forkPosition = testPosition.toString(),
@@ -320,7 +320,7 @@ internal abstract class ForkRepositoryTest {
         )
     }
 
-    private fun createTestBranches(fork: ForkModel, branchCount: Int) =
+    private fun createTestBranches(fork: ForkWaitingModel, branchCount: Int) =
         (0 until branchCount).map { index ->
             ForkBranchModel(
                 forkId = fork.id,

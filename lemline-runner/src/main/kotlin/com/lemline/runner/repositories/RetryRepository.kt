@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.OutBoxStatus
 import jakarta.enterprise.context.ApplicationScoped
@@ -61,7 +63,7 @@ class RetryRepository : OutboxRepository<RetryOutboxModel>() {
 
     override fun createModel(rs: ResultSet) = RetryOutboxModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage()!!,
+        instanceMessage = rs.getInstanceMessage<WorkflowEvent.RetryScheduled>()!!,
         outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
         errorReason = rs.getString(ERROR_REASON_COLUMN),
