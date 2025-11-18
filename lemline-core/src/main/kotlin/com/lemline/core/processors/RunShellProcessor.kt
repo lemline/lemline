@@ -6,9 +6,8 @@ package com.lemline.core.processors
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.SimpleTaskState
+import com.lemline.core.states.RunState
 import com.lemline.core.tasks.runs.Shell
-import io.serverlessworkflow.api.types.RunShell
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
 import kotlin.time.ExperimentalTime
@@ -56,9 +55,9 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class RunShellProcessor(
     node: Node<RunTask>,
-) : NodeProcessor<RunTask, SimpleTaskState>(node) {
+) : NodeProcessor<RunTask, RunState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleTaskState = SimpleTaskState()
+    override fun createState(transformedInput: JsonElement, scope: Scope): RunState = RunState()
 
     /**
      * Execute shell command action.
@@ -73,18 +72,12 @@ class RunShellProcessor(
     override suspend fun execute(
         transformedInput: JsonElement,
         scope: Scope,
+        state: RunState,
     ): JsonElement {
         logger.debug { "Executing shell command: ${node.name}" }
 
         // Extract shell configuration
-        val runConfig = node.task.run.get()
-        if (runConfig !is RunShell) {
-            raiseError(
-                WorkflowErrorType.RUNTIME,
-                "Expected RunShell configuration but got: ${runConfig?.javaClass?.simpleName}"
-            )
-        }
-
+        val runConfig = node.task.run.runShell
         val shellConfig = runConfig.shell
 
         // Evaluate command through expression evaluator

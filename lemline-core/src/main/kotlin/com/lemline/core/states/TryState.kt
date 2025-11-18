@@ -3,7 +3,7 @@
 
 package com.lemline.core.states
 
-import com.lemline.core.errors.InternalWorkflowException
+import com.lemline.core.errors.InternalException
 import com.lemline.core.orchestrator.context.Scope
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
@@ -42,22 +42,22 @@ import kotlinx.serialization.json.encodeToJsonElement
  * @property lastError Last caught error object (for context)
  */
 @Serializable
-data class TryTaskState(
+data class TryState(
     override val startedAt: Instant,
     val transformedInput: JsonElement,
     val attemptIndex: Int,
     val runningCatch: Boolean,
-    val lastError: InternalWorkflowException.Error? = null,
+    val lastError: InternalException.Error? = null,
     val errorAs: String
 ) : TaskState() {
 
-    fun newAttemptState(error: InternalWorkflowException.Error? = null): TryTaskState = copy(
+    fun newAttemptState(error: InternalException.Error? = null): TryState = copy(
         attemptIndex = attemptIndex + 1,
         runningCatch = false,
         lastError = error
     )
 
-    fun toCatchState(error: InternalWorkflowException.Error): TryTaskState = copy(
+    fun toCatchState(error: InternalException.Error): TryState = copy(
         runningCatch = true,
         lastError = error
     )

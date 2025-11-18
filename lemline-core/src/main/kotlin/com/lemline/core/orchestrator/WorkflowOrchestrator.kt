@@ -2,69 +2,32 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.logger.logger
-import com.lemline.common.values.name
-import com.lemline.common.values.namespace
-import com.lemline.common.values.version
-import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.errors.ChildWorkflowException
+import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.ForkException
-import com.lemline.core.errors.InternalWorkflowException
-import com.lemline.core.errors.WaitWorkflowException
+import com.lemline.core.errors.InternalException
+import com.lemline.core.errors.RunWorkflowException
+import com.lemline.core.errors.WaitException
+import com.lemline.core.errors.WorkflowException
 import com.lemline.core.nodes.Node
-import com.lemline.core.nodes.NodePosition
-import com.lemline.core.nodes.RootTask
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.orchestrator.context.merge
-import com.lemline.core.processors.CallHttpProcessor
-import com.lemline.core.processors.DoProcessor
-import com.lemline.core.processors.ForProcessor
-import com.lemline.core.processors.ForkProcessor
-import com.lemline.core.processors.NodeProcessor
-import com.lemline.core.processors.RaiseProcessor
-import com.lemline.core.processors.RootProcessor
-import com.lemline.core.processors.RunScriptProcessor
-import com.lemline.core.processors.RunShellProcessor
-import com.lemline.core.processors.RunWorkflowProcessor
-import com.lemline.core.processors.SetProcessor
-import com.lemline.core.processors.SwitchProcessor
+import com.lemline.core.orchestrator.sync.ForkSync
+import com.lemline.core.orchestrator.sync.RunWorkflowSync
+import com.lemline.core.orchestrator.sync.WaitSync
 import com.lemline.core.processors.TryProcessor
-import com.lemline.core.processors.WaitProcessor
-import com.lemline.core.states.TaskState
+import com.lemline.core.states.ForkState
 import com.lemline.core.states.TaskStates
-import com.lemline.core.states.TryTaskState
-import com.lemline.core.states.WorkflowState
+import com.lemline.core.states.TryState
+import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.updateWith
 import com.lemline.core.workflows.toJava
 import com.lemline.core.workflows.toKotlin
-import io.serverlessworkflow.api.types.CallHTTP
-import io.serverlessworkflow.api.types.DoTask
 import io.serverlessworkflow.api.types.FlowDirective
-import io.serverlessworkflow.api.types.ForTask
 import io.serverlessworkflow.api.types.ForkTask
-import io.serverlessworkflow.api.types.RaiseTask
-import io.serverlessworkflow.api.types.RunScript
-import io.serverlessworkflow.api.types.RunShell
-import io.serverlessworkflow.api.types.RunTask
-import io.serverlessworkflow.api.types.RunWorkflow
-import io.serverlessworkflow.api.types.SetTask
-import io.serverlessworkflow.api.types.SwitchTask
-import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TryTask
-import io.serverlessworkflow.api.types.WaitTask
 import io.serverlessworkflow.api.types.Workflow
-import kotlin.time.Clock
-import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.selects.select
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 
@@ -134,84 +97,24 @@ object WorkflowOrchestrator {
      */
     suspend fun resume(
         workflow: Workflow,
-        state: WorkflowState,
+        state: WorkflowCommand,
         executionMode: ExecutionMode
-    ): WorkflowState {
-        val nodesMap = DefinitionCache.getNodesMap(workflow)
+    ): WorkflowEvent = when (state) {
+        // Failed state - retry from failure point (may have rawInput or rawOutput)
+        is WorkflowCommand.ResumeFromTask -> resumeFromTask(
+            node = workflow.getNode(state.nodePosition),
+            rawInput = state.rawInput,
+            taskStates = state.taskStates,
+            flowDirective = state.flowDirective?.toJava(),
+            executionMode = executionMode
+        )
 
-        fun NodePosition.node(): Node<*> = nodesMap[this]
-            ?: throw IllegalStateException("Node not found at position $this in workflow: ${workflow.namespace}/${workflow.name}/${workflow.version}")
-
-        return when (state) {
-            is WorkflowState.Starting -> {
-                val rootNode = DefinitionCache.getRootNode(workflow)
-
-                resumeFromTask(
-                    taskStates = mutableMapOf(),
-                    node = rootNode,
-                    rawInput = state.input,
-                    flowDirective = null,
-                    executionMode = executionMode
-                )
-            }
-
-            is WorkflowState.Completed -> state
-            is WorkflowState.Failed -> when {
-                state.rawInput != null -> resumeFromTask(
-                    taskStates = state.taskStates,
-                    node = state.nodePosition.node(),
-                    rawInput = state.rawInput,
-                    flowDirective = state.flowDirective?.toJava(),
-                    executionMode = executionMode
-                )
-
-                state.rawOutput != null -> resumeFromInterruptedTask(
-                    taskStates = state.taskStates,
-                    node = state.nodePosition.node(),
-                    rawOutput = state.rawOutput,
-                    executionMode = executionMode
-                )
-
-                else -> throw IllegalStateException("rawInput or rawOutput is required for running $state")
-            }
-
-            is WorkflowState.ReadyForNextTask -> resumeFromTask(
-                taskStates = state.taskStates,
-                node = state.nodePosition.node(),
-                rawInput = state.rawInput,
-                flowDirective = state.flowDirective?.toJava(),
-                executionMode = executionMode
-            )
-
-            is WorkflowState.Retrying -> resumeFromTask(
-                taskStates = state.taskStates,
-                node = state.nodePosition.node(),
-                rawInput = state.rawInput,
-                flowDirective = state.flowDirective?.toJava(),
-                executionMode = executionMode
-            )
-
-            is WorkflowState.Waiting -> resumeFromInterruptedTask(
-                taskStates = state.taskStates,
-                node = state.nodePosition.node(),
-                rawOutput = state.rawOutput,
-                executionMode = executionMode
-            )
-
-            is WorkflowState.RunningChildWorkflow -> resumeFromInterruptedTask(
-                taskStates = state.taskStates,
-                node = state.nodePosition.node(),
-                rawOutput = state.rawOutput ?: throw IllegalStateException("rawOutput is required for running $state"),
-                executionMode = executionMode
-            )
-
-            is WorkflowState.RunningFork -> resumeFromInterruptedTask(
-                taskStates = state.taskStates,
-                node = state.nodePosition.node(),
-                rawOutput = state.rawOutput ?: throw IllegalStateException("rawOutput is required for running $state"),
-                executionMode = executionMode
-            )
-        }
+        is WorkflowCommand.ResumeFromStartedTask -> resumeFromStartedTask(
+            taskStates = state.taskStates,
+            node = workflow.getNode(state.nodePosition),
+            rawOutput = state.rawOutput,
+            executionMode = executionMode
+        )
     }
 
     /**
@@ -231,99 +134,127 @@ object WorkflowOrchestrator {
         rawInput: JsonElement,
         flowDirective: FlowDirective? = null,
         executionMode: ExecutionMode
-    ): WorkflowState {
+    ): WorkflowEvent {
         logger.debug { "resumeFromTask node=${node.reference}, input=$rawInput, flow=$flowDirective, states=$taskStates" }
 
         try {
-            val result = try {
+            val result: StepResult = try {
                 tryCatch(node, taskStates) {
-                    runStep(node, rawInput, taskStates, flowDirective)
+                    runStep(taskStates, node, rawInput, flowDirective)
                 }
-            } catch (e: ChildWorkflowException) {
-                // Sub-workflow needs to be started
-                if (executionMode.isAsync()) return WorkflowState.RunningChildWorkflow(
-                    taskStates = taskStates,
-                    nodePosition = node.position,
-                    rawOutput = e.transformedInput,
-                    childConfig = e.config,
-                )
-                // run the run workflow task synchronously
-                tryCatch(node, taskStates) {
-                    processRunWorkflowSync(taskStates, node, e.transformedInput, e.config, executionMode)
-                }
-            } catch (e: WaitWorkflowException) {
-                if (executionMode.isAsync()) return WorkflowState.Waiting(
-                    taskStates = taskStates,
-                    nodePosition = node.position,
-                    rawOutput = e.transformedInput,
-                    waitUntil = e.config.waitUntil,
-                )
-                // run the wait task synchronously
-                tryCatch(node, taskStates) {
-                    processWaitSync(taskStates, node, e.transformedInput, e.config.waitUntil, executionMode)
-                }
-            } catch (e: ForkException) {
-                @Suppress("UNCHECKED_CAST")
-                node as Node<ForkTask>
-                // Update the states with the fork one
-                val newStates = taskStates + (node.position to e.state)
+            } catch (e: WorkflowException) {
+                if (executionMode.isAsync()) {
+                    // Async: turn exceptions into pause WorkflowState and return immediately
+                    return when (e) {
+                        is RunWorkflowException -> WorkflowEvent.RunWorkflowStarted(
+                            taskStates = taskStates,
+                            nodePosition = node.position,
+                            runState = e.state,
+                            rawInput = e.transformedInput,
+                            childConfig = e.config,
+                        )
 
-                // Fork needs to execute branches
-                // All fork config (compete, branches) is derived from node
-                if (executionMode.isAsync()) return WorkflowState.RunningFork(
-                    taskStates = newStates,
-                    nodePosition = node.position,
-                    rawInput = e.transformedInput
-                )
+                        is WaitException -> WorkflowEvent.WaitStarted(
+                            taskStates = taskStates,
+                            nodePosition = node.position,
+                            waitState = e.state,
+                            rawOutput = e.transformedInput,
+                            waitUntil = e.config.waitUntil,
+                        )
 
-                // run the fork task synchronously
-                tryCatch(node, newStates) {
-                    processForkSync(newStates, node, e.transformedInput, executionMode)
+                        is ForkException -> WorkflowEvent.ForkStarted(
+                            taskStates = taskStates,
+                            nodePosition = node.position,
+                            forkState = e.state,
+                            rawInput = e.transformedInput,
+                        )
+
+                        is InternalException -> throw e // already handled by tryCatch
+                    }
+                } else {
+                    // Continuous: handle synchronously and continue with a StepResult
+                    when (e) {
+                        is RunWorkflowException -> RunWorkflowSync.execute(
+                            taskStates = taskStates,
+                            runWorkflowNode = node,
+                            transformedInput = e.transformedInput,
+                            config = e.config,
+                            executionMode = executionMode
+                        )
+
+                        is WaitException -> WaitSync.execute(
+                            taskStates = taskStates,
+                            waitNode = node,
+                            transformedInput = e.transformedInput,
+                            waitUntil = e.config.waitUntil,
+                            executionMode = executionMode
+                        )
+
+                        is ForkException -> ForkSync.execute(
+                            taskStates = taskStates,
+                            forkNode = node,
+                            forkState = e.state,
+                            rawInput = e.transformedInput,
+                            executionMode = executionMode
+                        )
+
+                        is InternalException -> throw e // defensive: shouldn't reach here
+                    }
                 }
             }
 
             // Create an updated states map
-            val newStates = taskStates.updateWith(result.stateUpdates, result.newContext)
+            val newStates = taskStates.updateWith(result.stateUpdates, result.nextContext)
 
             // Workflow completed
             if (result.nextNode == null) {
                 logger.debug { "Workflow completed with output: $rawInput" }
-                return WorkflowState.Completed(output = rawInput)
+                return WorkflowEvent.WorkflowCompleted(output = rawInput)
             }
 
             // The current task must be retried
             if (result.retryAt != null) {
-                if (executionMode.isAsync()) return WorkflowState.Retrying(
+                if (executionMode.isAsync()) return WorkflowEvent.RetryScheduled(
                     taskStates = newStates,
                     nodePosition = result.nextNode.position,
-                    rawInput = result.rawInput,
-                    flowDirective = result.flowDirective?.toKotlin(),
+                    rawInput = result.nextInput,
+                    flowDirective = result.nextDirective?.toKotlin(),
                     retryAt = result.retryAt
                 )
                 // wait before retry
-                executeDelay(result.retryAt, "Retrying at node: ${node.name} after")
+                WaitSync.executeDelay(result.retryAt, "Retrying at node: ${node.name} after")
             }
 
-            // Check if we should stop after this task / before running the next one
-            if (shouldStopHere(node, result.nextNode, newStates[result.nextNode.position], executionMode))
-                return WorkflowState.ReadyForNextTask(
+            // if we are now completing a fork branch
+            getCompletedForkBranch(result.nextNode, newStates, node)?.let {
+                return WorkflowEvent.ForkBranchCompleted(
                     taskStates = newStates,
                     nodePosition = result.nextNode.position,
-                    rawInput = result.rawInput,
-                    flowDirective = result.flowDirective?.toKotlin(),
+                    branchName = it,
+                    output = result.nextInput,
+                    flowDirective = result.nextDirective?.toKotlin(),
                 )
+            }
+
+            // Check if we should stop after this task
+            if (executionMode.stopAfterTaskCompletion(node)) return WorkflowEvent.TaskScheduled(
+                taskStates = newStates,
+                nodePosition = result.nextNode.position,
+                rawInput = result.nextInput,
+                flowDirective = result.nextDirective?.toKotlin(),
+            )
 
             // Continue with the next iteration
             return resumeFromTask(
-                newStates,
-                result.nextNode,
-                result.rawInput,
-                result.flowDirective,
+                taskStates = newStates,
+                node = result.nextNode,
+                rawInput = result.nextInput,
+                flowDirective = result.nextDirective,
                 executionMode = executionMode
             )
 
         } catch (e: Exception) {
-            return WorkflowState.Failed(
+            return WorkflowEvent.TaskFailed(
                 taskStates = taskStates.toMap(),
                 nodePosition = node.position,
                 rawInput = rawInput,
@@ -334,45 +265,43 @@ object WorkflowOrchestrator {
         }
     }
 
-    internal fun shouldStopHere(
-        current: Node<*>,
-        nextNode: Node<*>,
-        nextState: TaskState?,
-        executionMode: ExecutionMode
-    ): Boolean {
-        // when reentering a fork task, always triggers a stop for executeSingleBranch
-        if (nextNode.task is ForkTask && nextState != null) return true
-        // Depends on the execution mode
-        return executionMode.stopAfterTaskCompletion(current)
+    private fun getCompletedForkBranch(nextNode: Node<*>, taskStates: TaskStates, current: Node<*>): String? {
+        val nextState = taskStates[nextNode.position]
+        if (nextNode.task is ForkTask && nextState != null && nextState is ForkState) {
+            // nextNode is a fork, we enter from child, now let's find the branch name
+            return nextNode.children?.find { it.name == current.name }?.name
+                ?: throw IllegalStateException("Fork - can not find ${current.name} in ${nextNode.children?.joinToString { it.name }}")
+        }
+        return null
     }
 
-    internal suspend fun resumeFromInterruptedTask(
+    internal suspend fun resumeFromStartedTask(
         node: Node<*>,
         rawOutput: JsonElement,
         taskStates: TaskStates,
         executionMode: ExecutionMode
-    ): WorkflowState = run {
+    ): WorkflowEvent = run {
         logger.debug { "resumeFromInterruptedTask In: node=${node.reference}, output=$rawOutput, states=$taskStates" }
 
         try {
             // Complete the interrupted task (transforms output, updates state)
             val result = tryCatch(node, taskStates) {
-                completeInterruptedTask(taskStates, node, rawOutput)
+                completeStartedTask(taskStates, node, rawOutput)
             }
 
             // Create new states map with updated state updates and context exports
-            val newStates = taskStates.updateWith(result.stateUpdates, result.newContext)
+            val newStates = taskStates.updateWith(result.stateUpdates, result.nextContext)
 
             // Continue execution from the next node (may pause again or complete)
             return@run resumeFromTask(
                 taskStates = newStates,
-                node = result.nextNode ?: return WorkflowState.Completed(result.rawInput),
-                rawInput = result.rawInput,
-                flowDirective = result.flowDirective,
+                node = result.nextNode ?: return WorkflowEvent.WorkflowCompleted(result.nextInput),
+                rawInput = result.nextInput,
+                flowDirective = result.nextDirective,
                 executionMode = executionMode
             )
         } catch (e: Exception) {
-            return@run WorkflowState.Failed(
+            return@run WorkflowEvent.TaskFailed(
                 taskStates = taskStates,
                 nodePosition = node.position,
                 rawInput = null,
@@ -396,7 +325,7 @@ object WorkflowOrchestrator {
         block: suspend () -> StepResult
     ): StepResult = try {
         block()
-    } catch (e: InternalWorkflowException) {
+    } catch (e: InternalException) {
         processInternalWorkflowException(e, current, taskStates)
     }
 
@@ -404,7 +333,7 @@ object WorkflowOrchestrator {
      * Handle exception by finding a TryTask and returning the appropriate state transition.
      */
     private fun processInternalWorkflowException(
-        exception: InternalWorkflowException,
+        exception: InternalException,
         failingNode: Node<*>,
         taskStates: TaskStates,
     ): StepResult {
@@ -418,15 +347,15 @@ object WorkflowOrchestrator {
                 // current scope of the try node
                 val tryScope = getScope(tryNode, taskStates)
                 // current state of the try node
-                val tryTaskState = taskStates[tryNode.position] as TryTaskState
+                val tryState = taskStates[tryNode.position] as TryState
                 // build a processor for the try node
-                val processor = getNodeProcessor(tryNode) as TryProcessor
+                val processor = ProcessorFactory.getProcessor(tryNode) as TryProcessor
                 // check that this node actually can handle this error
-                if (processor.isCatching(exception.error, tryTaskState, tryScope)) {
+                if (processor.isCatching(exception.error, tryState, tryScope)) {
                     return processor.handleError(
                         failingNode = failingNode,
                         error = exception.error,
-                        state = tryTaskState,
+                        state = tryState,
                         scope = tryScope
                     )
                 }
@@ -437,246 +366,6 @@ object WorkflowOrchestrator {
         throw exception
     }
 
-    private suspend fun processWaitSync(
-        taskStates: TaskStates,
-        waitNode: Node<*>,
-        transformedInput: JsonElement,
-        waitUntil: Instant,
-        executionMode: ExecutionMode
-    ): StepResult {
-        // In case we change execution modes in the future, we check it here
-        if (executionMode != ExecutionMode.CONTINUOUS) throw IllegalStateException("Invalid execution mode: $executionMode")
-        // waiting
-        executeDelay(waitUntil, "Waiting at node: ${waitNode.name} for")
-        // complete the wait task
-        return completeInterruptedTask(taskStates, waitNode, transformedInput)
-    }
-
-    /**
-     * Processes starting a child workflow.
-     */
-    private suspend fun processRunWorkflowSync(
-        taskStates: TaskStates,
-        runWorkflowNode: Node<*>,
-        transformedInput: JsonElement?,
-        config: ChildWorkflowException.Config,
-        executionMode: ExecutionMode
-    ): StepResult {
-        // In case we change execution modes in the future, we check it here
-        if (executionMode != ExecutionMode.CONTINUOUS) throw IllegalStateException("Invalid execution mode: $executionMode")
-
-        // Resolve the sub-workflow definition from the cache
-        val subRootNode = resolveSubWorkflowRootNode(config)
-        // execute the sub-workflow synchronously or asynchronously
-        val childOutput = when (config.sync) {
-            true -> executeChildWorkflowSync(config, subRootNode)
-            false -> executeChildWorkflowAsync(transformedInput, config, subRootNode)
-        }
-        // complete the child workflow task
-        return completeInterruptedTask(taskStates, runWorkflowNode, childOutput)
-    }
-
-    /**
-     * Resolves the root node of a sub-workflow from the definition cache.
-     */
-    private fun resolveSubWorkflowRootNode(config: ChildWorkflowException.Config): Node<*> {
-        val childWorkflowName by lazy {
-            "(namespace=${config.namespace}, name=${config.name}, version=${config.version})"
-        }
-
-        val childWorkflow = DefinitionCache.getWorkflow(
-            namespace = config.namespace,
-            name = config.name,
-            version = config.version
-        ) ?: throw IllegalStateException(
-            "Workflow definition not found for sub-workflow: $childWorkflowName"
-        )
-        return DefinitionCache.getRootNode(childWorkflow)
-    }
-
-    /**
-     * Executes a child workflow synchronously.
-     */
-    private suspend fun executeChildWorkflowSync(
-        config: ChildWorkflowException.Config,
-        subWorkflowRootNode: Node<*>,
-    ): JsonElement {
-        logger.debug { "Executing child workflow inline: ${config.name}" }
-        return when (val output = resumeFromTask(
-            node = subWorkflowRootNode,
-            rawInput = config.input,
-            executionMode = ExecutionMode.CONTINUOUS
-        )) {
-            is WorkflowState.Completed -> {
-                logger.debug { "Child workflow completed, continuing parent" }
-                output.output
-            }
-
-            is WorkflowState.Failed -> {
-                logger.debug { "Child workflow failed, continuing parent" }
-                throw output.exception
-            }
-
-            else -> throw IllegalStateException("Unexpected output type: ${output::class.simpleName} for child workflow $config")
-        }
-    }
-
-    /**
-     * Executes a child workflow asynchronously.
-     */
-    private suspend fun executeChildWorkflowAsync(
-        transformedInput: JsonElement?,
-        config: ChildWorkflowException.Config,
-        subWorkflowRootNode: Node<*>,
-    ): JsonElement {
-        logger.debug { "Launching child workflow asynchronously (fire-and-forget): ${config.name}" }
-        CoroutineScope(currentCoroutineContext()).launch {
-            runCatching {
-                resumeFromTask(
-                    node = subWorkflowRootNode,
-                    rawInput = config.input,
-                    executionMode = ExecutionMode.CONTINUOUS
-                )
-            }.onSuccess {
-                logger.debug { "Async child workflow completed successfully" }
-            }.onFailure { ex ->
-                logger.error(ex) { "Async child workflow failed" }
-            }
-        }
-        return transformedInput!! // Use current input for fire-and-forget
-    }
-
-    private suspend fun processForkSync(
-        taskStates: TaskStates,
-        forkNode: Node<ForkTask>,
-        rawInput: JsonElement,
-        executionMode: ExecutionMode
-    ): StepResult {
-        // In case we change execution modes in the future, we check it here
-        if (executionMode != ExecutionMode.CONTINUOUS) throw IllegalStateException("Invalid execution mode: $executionMode")
-
-        val branches =
-            forkNode.children ?: throw IllegalStateException("Fork node in ${forkNode.reference} has no branches")
-
-        logger.debug { "Executing fork branches in parallel: ${branches.joinToString { it.name }}" }
-
-        // Execute branches and get the result
-        val output = if (forkNode.task.fork.isCompete) {
-            executeForkCompeteSync(taskStates, forkNode, rawInput)
-        } else {
-            executeForkCooperativeSync(taskStates, forkNode, rawInput)
-        }
-
-        // Complete the fork task - this applies output transformation, export, etc.
-        return completeInterruptedTask(
-            taskStates,
-            forkNode,
-            output
-        )
-    }
-
-    /**
-     * Execute fork branches in compete mode (race for first completion).
-     */
-    private suspend fun executeForkCompeteSync(
-        taskStates: TaskStates,
-        forkNode: Node<ForkTask>,
-        rawInput: JsonElement,
-    ): JsonElement {
-        val branches =
-            forkNode.children ?: throw IllegalStateException("Fork node in ${forkNode.reference} has no branches")
-        val results = coroutineScope {
-            branches.mapIndexed { index, branchNode ->
-                async {
-                    val output = executeForkBranchSync(branchNode, taskStates, rawInput)
-                    index to output
-                }
-            }
-        }
-
-        // Wait for first to complete
-        val (index, output) = select {
-            results.forEach { deferred ->
-                deferred.onAwait { it }
-            }
-        }
-
-        logger.debug { "Fork compete winner: index=$index , output=$output" }
-
-        return output
-    }
-
-    /**
-     * Execute fork branches in cooperative mode (wait for all).
-     */
-    private suspend fun executeForkCooperativeSync(
-        taskStates: TaskStates,
-        forkNode: Node<ForkTask>,
-        rawInput: JsonElement,
-    ): JsonElement {
-        val branches =
-            forkNode.children ?: throw IllegalStateException("Fork node in ${forkNode.reference} has no branches")
-        val outputs = coroutineScope {
-            branches.map { branchNode ->
-                async {
-                    executeForkBranchSync(branchNode, taskStates, rawInput)
-                }
-            }.awaitAll()
-        }
-
-        logger.debug { "Fork cooperative: all ${outputs.size} branches completed" }
-
-        return JsonArray(outputs)
-    }
-
-    /**
-     * Execute a single fork branch.
-     */
-    private suspend fun executeForkBranchSync(
-        branchNode: Node<*>,
-        taskStates: TaskStates,
-        branchInput: JsonElement,
-    ): JsonElement {
-        logger.debug { "Executing branch: ${branchNode.name}" }
-
-        // resumeFromTask stops as soon as reaching up a fork task
-        val result = resumeFromTask(
-            taskStates = taskStates,
-            node = branchNode,
-            rawInput = branchInput,
-            flowDirective = null,
-            executionMode = ExecutionMode.CONTINUOUS
-        )
-
-        return when (result) {
-            is WorkflowState.ReadyForNextTask -> {
-                logger.debug { "Branch ${branchNode.name} completed, stopped at fork" }
-                result.rawInput
-            }
-
-            is WorkflowState.Failed -> {
-                logger.error { "Branch ${branchNode.name} failed: ${result.error}" }
-                throw result.exception
-            }
-
-            else -> {
-                throw IllegalStateException(
-                    "Branch execution returned unexpected state: ${result::class.simpleName} for branch ${branchNode.name}"
-                )
-            }
-        }
-    }
-
-    /**
-     * Handles a delay operation
-     */
-    suspend fun executeDelay(waitUntil: Instant, logMessage: String) {
-        val delayDuration = waitUntil - Clock.System.now()
-        logger.debug { "$logMessage: $delayDuration" }
-        if (delayDuration > Duration.ZERO) delay(delayDuration)
-        logger.debug { "Delay completed" }
-    }
-
     /**
      * Execute a single step of workflow execution - pure function.
      *
@@ -684,70 +373,37 @@ object WorkflowOrchestrator {
      * or re-enter after child completion (state exists).
      *
      * @param node Current node to execute
-     * @param dataset Dataset to process
+     * @param rawInput Dataset to process
      * @param taskStates Current states map
      * @param flowDirective Navigation instruction (null on first entry)
      * @return StepResult with: next node, dataset, deltaStates, and flow directive
      */
     @Suppress("UNCHECKED_CAST")
     suspend fun runStep(
-        node: Node<*>,
-        dataset: JsonElement,
         taskStates: TaskStates,
+        node: Node<*>,
+        rawInput: JsonElement,
         flowDirective: FlowDirective?,
     ): StepResult {
         val state = taskStates[node.position]
         val scope = getScope(node, taskStates)
-        val processor = getNodeProcessor(node)
+        val processor = ProcessorFactory.getProcessor(node)
 
         return if (state == null) {
-            logger.debug { "Entering Down  node=${node.reference}, rawInput=$dataset" }
-            // First time entering this node - pass exprArgs as parameter
-            processor.enterFromParent(dataset, scope)
+            logger.debug { "Entering Down  node=${node.reference}, rawInput=$rawInput" }
+            // First time entering this node
+            processor.enterFromParent(rawInput, scope)
         } else {
             logger.debug {
-                "ReEntering Up  node=${node.reference}, transformedInput=$dataset${
+                "ReEntering Up  node=${node.reference}, transformedInput=$rawInput${
                     flowDirective?.get()?.let { ", flow=$it" } ?: ""
                 }, state=$state"
             }
             // Re-entering after a child completed
-            // Safe cast: state was created by the same processor type, so types match
-            processor.enterFromChild(state, flowDirective, dataset, scope)
+            processor.enterFromChild(state, flowDirective, rawInput, scope)
         }
     }
 
-    /**
-     * Retrieves the appropriate `NodeProcessor` for the given `Node` based on the type of task associated with the node.
-     */
-    @Suppress("UNCHECKED_CAST")
-    private fun <T : TaskBase> getNodeProcessor(
-        node: Node<T>
-    ): NodeProcessor<T, TaskState> {
-        return when (node.task) {
-            is RootTask -> RootProcessor(node as Node<RootTask>)
-            is DoTask -> DoProcessor(node as Node<DoTask>)
-            is ForTask -> ForProcessor(node as Node<ForTask>)
-            is SetTask -> SetProcessor(node as Node<SetTask>)
-            is SwitchTask -> SwitchProcessor(node as Node<SwitchTask>)
-            is TryTask -> TryProcessor(node as Node<TryTask>)
-            is RaiseTask -> RaiseProcessor(node as Node<RaiseTask>)
-            is CallHTTP -> CallHttpProcessor(node as Node<CallHTTP>)
-            is WaitTask -> WaitProcessor(node as Node<WaitTask>)
-            is ForkTask -> ForkProcessor(node as Node<ForkTask>)
-            is RunTask -> {
-                // Dispatch to appropriate run processor based on run configuration type
-                val runTask = node as Node<RunTask>
-                when (runTask.task.run.get()) {
-                    is RunShell -> RunShellProcessor(runTask)
-                    is RunScript -> RunScriptProcessor(runTask)
-                    is RunWorkflow -> RunWorkflowProcessor(runTask)
-                    else -> throw IllegalArgumentException("Unknown run task type: ${runTask.task.run.get()?.javaClass?.simpleName}")
-                }
-            }
-
-            else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
-        } as NodeProcessor<T, TaskState>
-    }
 
     /**
      * Retrieves the `Scope` associated with the given node by combining its own expression arguments
@@ -766,12 +422,12 @@ object WorkflowOrchestrator {
      * @param taskStates The current workflow states
      * @return StepResult containing the next node, dataset, and state updates
      */
-    private fun completeInterruptedTask(
+    internal fun completeStartedTask(
         taskStates: TaskStates,
         node: Node<*>,
         rawOutput: JsonElement
     ): StepResult {
-        val processor = getNodeProcessor(node)
+        val processor = ProcessorFactory.getProcessor(node)
         val scope = getScope(node, taskStates)
 
         return processor.completeTask(

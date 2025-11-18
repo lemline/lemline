@@ -18,12 +18,12 @@ import kotlinx.serialization.json.JsonObject
  * to the workflow's state, and directives that dictate further flow transitions.
  *
  * @property nextNode The next node in the workflow to process. Null if there is no next node.
- * @property rawInput The raw JSON input provided for execution of the current node.
+ * @property nextInput The raw JSON input provided for execution of the current node.
  * @property stateUpdates A map containing updates to the state of nodes in the workflow,
  * keyed by their positions, where the value is the new `TaskState` or null if no updates are needed.
- * @property flowDirective An optional directive providing instructions for controlling the
+ * @property nextDirective An optional directive providing instructions for controlling the
  * next steps in the workflow's execution, such as retry or skip.
- * @property newContext Optional JSON object representing updated workflow context.
+ * @property nextContext Optional JSON object representing updated workflow context.
  * Can include new or modified variables based on the currently executed node.
  * @property retryAt An optional timestamp indicating when the current task should be retried.
  * Null if no retry is necessary or applicable.
@@ -31,9 +31,9 @@ import kotlinx.serialization.json.JsonObject
 @ExperimentalTime
 data class StepResult(
     val nextNode: Node<*>?,
-    val rawInput: JsonElement,
+    val nextInput: JsonElement,
     val stateUpdates: Map<NodePosition, TaskState?>,
-    val flowDirective: FlowDirective? = null,
-    val newContext: JsonObject? = null,
+    val nextDirective: FlowDirective? = null,
+    val nextContext: JsonObject? = null,
     val retryAt: Instant? = null
 )

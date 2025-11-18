@@ -12,7 +12,7 @@ import kotlinx.serialization.json.buildJsonObject
 
 @Serializable
 @ExperimentalTime
-data class ForTaskState(
+data class ForState(
     override val startedAt: Instant = Clock.System.now(),
     val collection: List<JsonElement>,
     val index: Int = -1,

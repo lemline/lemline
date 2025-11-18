@@ -6,13 +6,11 @@ package com.lemline.core.processors
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.errors.ChildWorkflowException
-import com.lemline.core.errors.WorkflowErrorType
+import com.lemline.core.errors.RunWorkflowException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.SimpleTaskState
+import com.lemline.core.states.RunState
 import io.serverlessworkflow.api.types.RunTask
-import io.serverlessworkflow.api.types.RunWorkflow
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
@@ -57,9 +55,9 @@ import kotlinx.serialization.json.JsonElement
  */
 class RunWorkflowProcessor(
     node: Node<RunTask>,
-) : NodeProcessor<RunTask, SimpleTaskState>(node) {
+) : NodeProcessor<RunTask, RunState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleTaskState = SimpleTaskState()
+    override fun createState(transformedInput: JsonElement, scope: Scope) = RunState()
 
     /**
      * Execute sub-workflow action.
@@ -72,24 +70,18 @@ class RunWorkflowProcessor(
      * @param transformedInput Transformed input from parent
      * @param scope Expression evaluation scope
      * @return This method always throws ChildWorkflowStartedException
-     * @throws ChildWorkflowException Always thrown to signal child workflow initiation
+     * @throws RunWorkflowException Always thrown to signal child workflow initiation
      */
     override suspend fun execute(
         transformedInput: JsonElement,
         scope: Scope,
+        state: RunState,
     ): JsonElement {
         logger.debug { "Preparing sub-workflow: ${node.name}" }
 
         // Extract workflow configuration
-        val runConfig = node.task.run.get()
-        if (runConfig !is RunWorkflow) {
-            raiseError(
-                WorkflowErrorType.RUNTIME,
-                "Expected RunWorkflow configuration but got: ${runConfig?.javaClass?.simpleName}"
-            )
-        }
-
-        val workflowConfig = runConfig.workflow
+        val runWorkflow = node.task.run.runWorkflow
+        val workflowConfig = runWorkflow.workflow
 
         // Extract namespace, name, and version
         val subWorkflowNamespace = WorkflowNamespace(workflowConfig.namespace)
@@ -97,11 +89,11 @@ class RunWorkflowProcessor(
         val subWorkflowVersion = WorkflowVersion(workflowConfig.version)
 
         // Determine the input for the sub-workflow by evaluating the 'input' expression if it exists
-        val childWorkflowInput = eval(transformedInput, workflowConfig.input, scope)
+        val childWorkflowInput = runWorkflowInput(transformedInput, workflowConfig.input, scope)
 
-        val awaitCompletion = runConfig.isAwait
+        val awaitCompletion = runWorkflow.isAwait
 
-        val childWorkflowConfig = ChildWorkflowException.Config(
+        val childWorkflowConfig = RunWorkflowException.Config(
             namespace = subWorkflowNamespace,
             name = subWorkflowName,
             version = subWorkflowVersion,
@@ -110,9 +102,10 @@ class RunWorkflowProcessor(
         )
 
         // The orchestrator will resolve the definition and handle execution appropriately
-        logger.debug { "Throwing ChildWorkflowStartedException for orchestrator to handle:  $childWorkflowConfig" }
-        throw ChildWorkflowException(
-            transformedInput = if (awaitCompletion) null else transformedInput,
+        logger.debug { "Throwing ${RunWorkflowException::class.simpleName} for orchestrator to handle:  $childWorkflowConfig" }
+        throw RunWorkflowException(
+            state = state,
+            transformedInput = transformedInput,
             config = childWorkflowConfig
         )
     }

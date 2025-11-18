@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.DoTaskState
+import com.lemline.core.states.DoState
 import io.serverlessworkflow.api.types.DoTask
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -43,37 +43,37 @@ import kotlinx.serialization.json.JsonElement
  */
 class DoProcessor(
     node: Node<DoTask>
-) : NodeProcessor<DoTask, DoTaskState>(node) {
+) : NodeProcessor<DoTask, DoState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): DoTaskState = DoTaskState(
+    override fun createState(transformedInput: JsonElement, scope: Scope): DoState = DoState(
         startedAt = Clock.System.now(),
         index = -1
     )
 
     override fun getNextStepInfo(
-        state: DoTaskState,
+        state: DoState,
         dataset: JsonElement,
         scope: Scope,
         namedNode: String?,
-    ): NextStepInfo {
+    ): NextStepInfo<DoState> {
         val nextIndex = getNextIndex(state, namedNode)
         val updatedState = state.copy(index = nextIndex)
         return when (nextIndex >= (node.children?.size ?: 0)) {
             true -> NextStepInfo(
-                updatedState = null,
+                updatedState = updatedState,
                 nextNode = node.parent,
-                flowDirective = getFlowDirective()
+                nextDirective = getFlowDirective()
             )
 
             false -> NextStepInfo(
                 updatedState = updatedState,
                 nextNode = getChildByIndex(nextIndex),
-                flowDirective = null
+                nextDirective = null
             )
         }
     }
 
-    private fun getNextIndex(state: DoTaskState, name: String?): Int = when (name) {
+    private fun getNextIndex(state: DoState, name: String?): Int = when (name) {
         null -> state.index + 1
         else -> getChildIndexByName(name)
     }

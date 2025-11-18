@@ -10,7 +10,7 @@ import com.lemline.core.orchestrator.WorkflowOrchestrator
 import com.lemline.core.orchestrator.bases.AbstractOrchestratorTest
 import com.lemline.core.orchestrator.executeActivityByActivityWorkflow
 import com.lemline.core.states.TaskState
-import com.lemline.core.states.WorkflowState
+import com.lemline.core.states.WorkflowEvent
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
@@ -86,7 +86,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
 
             // Should pause after HTTP call completes
-            assertIs<WorkflowState.ReadyForNextTask>(result)
+            assertIs<WorkflowEvent.TaskScheduled>(result)
 
             // Output should contain the HTTP response
             val output = result.rawInput as JsonObject
@@ -110,7 +110,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
 
             // Should pause after shell command completes
-            assertIs<WorkflowState.ReadyForNextTask>(result)
+            assertIs<WorkflowEvent.TaskScheduled>(result)
 
             // Output should be JsonPrimitive with shell stdout
             val output = result.rawInput as kotlinx.serialization.json.JsonPrimitive
@@ -137,7 +137,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
 
             // Should pause instead of waiting
-            assertIs<WorkflowState.Waiting>(result)
+            assertIs<WorkflowEvent.WaitStarted>(result)
             assertTrue { result.waitUntil - now < 6.seconds }
             assertTrue { result.waitUntil - now > 5.seconds }
         }
@@ -157,7 +157,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 executionMode = executionMode
             )
 
-            assertIs<WorkflowState.Waiting>(result)
+            assertIs<WorkflowEvent.WaitStarted>(result)
             assertTrue { result.waitUntil - now < 6.seconds }
             assertTrue { result.waitUntil - now > 5.seconds }
         }
@@ -193,7 +193,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 executionMode = executionMode
             )
             // Should pause before starting sub-workflow
-            assertIs<WorkflowState.RunningChildWorkflow>(result)
+            assertIs<WorkflowEvent.RunWorkflowStarted>(result)
             assertEquals("childWorkflow", result.childConfig.name.toString())
             assertEquals("test", result.childConfig.namespace.toString())
             assertEquals("0.1.0", result.childConfig.version.toString())
@@ -227,7 +227,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 rawInput = JsonObject(emptyMap()),
                 executionMode = executionMode
             )
-            assertIs<WorkflowState.RunningChildWorkflow>(result)
+            assertIs<WorkflowEvent.RunWorkflowStarted>(result)
             assertEquals(false, result.childConfig.sync) // await=false
         }
 
@@ -249,7 +249,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 executionMode = executionMode
             )
             // Should complete without pausing (no activities)
-            assertIs<WorkflowState.Completed>(result)
+            assertIs<WorkflowEvent.WorkflowCompleted>(result)
             val output = result.output as JsonObject
             assertEquals("done", output["result"]?.jsonPrimitive?.content)
         }
@@ -274,7 +274,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 executionMode = executionMode
             )
             // Should complete all set tasks without pausing
-            assertIs<WorkflowState.Completed>(result)
+            assertIs<WorkflowEvent.WorkflowCompleted>(result)
             val output = result.output as JsonObject
             assertEquals(3, output["value"]?.jsonPrimitive?.int)
         }
@@ -305,7 +305,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 executionMode = executionMode
             )
             // Should execute setValue (no pause), then pause at HTTP call
-            assertIs<WorkflowState.ReadyForNextTask>(result)
+            assertIs<WorkflowEvent.TaskScheduled>(result)
 
             // States should contain the completed steps
             assertTrue(result.taskStates.isNotEmpty())
@@ -335,7 +335,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 executionMode = executionMode
             )
             // Should execute all set tasks, then pause after shell command
-            assertIs<WorkflowState.ReadyForNextTask>(result)
+            assertIs<WorkflowEvent.TaskScheduled>(result)
             val output = result.rawInput as kotlinx.serialization.json.JsonPrimitive
             assertTrue(output.content.contains("done"))
         }
@@ -366,7 +366,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
 
             // Should pause after HTTP call
-            assertIs<WorkflowState.ReadyForNextTask>(result)
+            assertIs<WorkflowEvent.TaskScheduled>(result)
 
             // States should be not empty and contain the completed steps
             assertTrue(result.taskStates.isNotEmpty())
@@ -399,7 +399,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 rawInput = JsonObject(emptyMap()),
                 executionMode = executionMode
             )
-            assertIs<WorkflowState.ReadyForNextTask>(result)
+            assertIs<WorkflowEvent.TaskScheduled>(result)
             // All loop iterations and transformations should be in state
             assertNotNull(result.taskStates)
             assertTrue(result.taskStates.isNotEmpty())
@@ -443,7 +443,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 rawInput = JsonObject(emptyMap()),
                 executionMode = executionMode
             )
-            assertIs<WorkflowState.RunningChildWorkflow>(pauseResult)
+            assertIs<WorkflowEvent.RunWorkflowStarted>(pauseResult)
             assertEquals("doubler", pauseResult.childConfig.name.toString())
             assertTrue(pauseResult.childConfig.sync)
 
@@ -456,7 +456,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             // Navigate to the actual task node: rootNode -> do block -> callChild task
             val doNode = rootNode.children!!.first()
             val callChildNode = doNode.children!!.first()
-            val resumeResult = WorkflowOrchestrator.resumeFromInterruptedTask(
+            val resumeResult = WorkflowOrchestrator.resumeFromStartedTask(
                 node = callChildNode,
                 rawOutput = childOutput,
                 taskStates = pauseResult.taskStates.toMutableMap(),
@@ -464,7 +464,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
 
             // Should complete the parent workflow
-            assertIs<WorkflowState.Completed>(resumeResult)
+            assertIs<WorkflowEvent.WorkflowCompleted>(resumeResult)
             val output = resumeResult.output as JsonObject
             assertEquals(20, output["result"]?.jsonPrimitive?.int)
             assertEquals(true, output["final"]?.jsonPrimitive?.content?.toBoolean())
@@ -508,7 +508,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 rawInput = JsonObject(emptyMap()),
                 executionMode = executionMode
             )
-            assertIs<WorkflowState.RunningChildWorkflow>(pauseResult)
+            assertIs<WorkflowEvent.RunWorkflowStarted>(pauseResult)
             assertEquals(false, pauseResult.childConfig.sync)
 
             // For await=false, parent continues immediately with the child's input
@@ -516,15 +516,15 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             // Runner calls resumeFromChildWorkflow immediately after starting the child
             val doNode = rootNode.children!!.first()
             val launchChildNode = doNode.children!![1]
-            val resumeResult = WorkflowOrchestrator.resumeFromInterruptedTask(
+            val resumeResult = WorkflowOrchestrator.resumeFromStartedTask(
                 node = launchChildNode,
-                rawOutput = pauseResult.rawOutput!!,  // run workflow node input
+                rawOutput = pauseResult.rawInput,  // run workflow node input
                 taskStates = pauseResult.taskStates.toMutableMap(),
                 executionMode = executionMode
             )
 
             // Should complete the parent workflow
-            assertIs<WorkflowState.Completed>(resumeResult)
+            assertIs<WorkflowEvent.WorkflowCompleted>(resumeResult)
             val output = resumeResult.output as JsonObject
             assertEquals(true, output["parentDone"]?.jsonPrimitive?.content?.toBoolean())
             // Note: For await=false, parent continues with child's input, which is {"value": "test"}
@@ -567,7 +567,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 rawInput = JsonObject(emptyMap()),
                 executionMode = executionMode
             )
-            assertIs<WorkflowState.RunningChildWorkflow>(pauseResult1)
+            assertIs<WorkflowEvent.RunWorkflowStarted>(pauseResult1)
 
             // Child completes
             val childOutput = kotlinx.serialization.json.buildJsonObject {
@@ -578,7 +578,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             // Navigate to the actual task node: rootNode -> do block -> callChild task (index 1)
             val doNode = rootNode.children!!.first()
             val callChildNode = doNode.children!![1]
-            val pauseResult2 = WorkflowOrchestrator.resumeFromInterruptedTask(
+            val pauseResult2 = WorkflowOrchestrator.resumeFromStartedTask(
                 node = callChildNode,
                 rawOutput = childOutput,
                 taskStates = pauseResult1.taskStates.toMutableMap(),
@@ -586,7 +586,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
 
             // Should pause at HTTP activity
-            assertIs<WorkflowState.ReadyForNextTask>(pauseResult2)
+            assertIs<WorkflowEvent.TaskScheduled>(pauseResult2)
             val output = pauseResult2.rawInput as JsonObject
             assertEquals(1, output["id"]?.jsonPrimitive?.int)
         }
@@ -637,7 +637,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
                 rawInput = JsonObject(emptyMap()),
                 executionMode = executionMode
             )
-            assertIs<WorkflowState.RunningChildWorkflow>(parentPause)
+            assertIs<WorkflowEvent.RunWorkflowStarted>(parentPause)
             assertEquals("child", parentPause.childConfig.name.toString())
 
             // Simulate child execution (which would also pause at grandchild, but we're simulating the final result)
@@ -649,7 +649,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             // Navigate to the actual task node: rootNode -> do block -> callChild task
             val doNode = rootNode.children!!.first()
             val callChildNode = doNode.children!!.first()
-            val resumeResult = WorkflowOrchestrator.resumeFromInterruptedTask(
+            val resumeResult = WorkflowOrchestrator.resumeFromStartedTask(
                 node = callChildNode,
                 rawOutput = childOutput,
                 taskStates = parentPause.taskStates.toMutableMap(),
@@ -657,7 +657,7 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             )
 
             // Should complete parent workflow
-            assertIs<WorkflowState.Completed>(resumeResult)
+            assertIs<WorkflowEvent.WorkflowCompleted>(resumeResult)
             val output = resumeResult.output as JsonObject
             assertEquals(1, output["level"]?.jsonPrimitive?.int)
         }

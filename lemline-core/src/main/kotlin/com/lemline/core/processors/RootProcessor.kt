@@ -59,11 +59,11 @@ class RootProcessor(
         dataset: JsonElement,
         scope: Scope,
         namedNode: String?,
-    ): NextStepInfo = when (state.hasRun) {
+    ): NextStepInfo<RootState> = when (state.hasRun) {
         true -> NextStepInfo(
-            updatedState = null,
+            updatedState = state,
             nextNode = null,
-            flowDirective = null
+            nextDirective = null
         )
 
         false -> {
@@ -71,7 +71,7 @@ class RootProcessor(
             NextStepInfo(
                 updatedState = updatedState,
                 nextNode = getDoNode(),
-                flowDirective = null
+                nextDirective = null
             )
         }
     }

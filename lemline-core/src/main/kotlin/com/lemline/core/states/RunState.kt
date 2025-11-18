@@ -9,6 +9,6 @@ import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class SimpleTaskState(
+data class RunState(
     override val startedAt: Instant = Clock.System.now(),
 ) : TaskState()

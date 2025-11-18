@@ -4,11 +4,21 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.definitions.getNode
 import com.lemline.core.getWorkflowToTest
-import com.lemline.core.states.WorkflowState
+import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.NodePosition
+import com.lemline.core.states.RootState
+import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.states.WorkflowEvent
+import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.Workflow
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.selects.select
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 
 internal suspend fun executeContinuousWorkflow(
@@ -20,23 +30,17 @@ internal suspend fun executeContinuousWorkflow(
 ): JsonElement {
     val workflow = getWorkflowToTest(yaml, namespace, name, version)
 
-    val starting = WorkflowState.Starting(
-        input = input,
-        startedAt = Clock.System.now()
-    )
+    val startState = WorkflowCommand.start(input)
 
     val state = WorkflowOrchestrator.resume(
         workflow = workflow,
-        state = starting,
+        state = startState,
         executionMode = ExecutionMode.CONTINUOUS
     )
 
     return when (state) {
-        is WorkflowState.Completed ->
-            state.output
-
-        is WorkflowState.Failed ->
-            throw state.exception ?: IllegalStateException("Workflow failed without explicit exception: $state")
+        is WorkflowEvent.WorkflowCompleted -> state.output
+        is WorkflowEvent.TaskFailed -> throw state.exception
 
         else -> throw IllegalStateException("Unexpected state: ${state::class.simpleName}")
     }
@@ -81,14 +85,11 @@ private suspend fun runUntilComplete(
     executionMode: ExecutionMode
 ): JsonElement {
 
-    val starting = WorkflowState.Starting(
-        input = input,
-        startedAt = Clock.System.now()
-    )
+    val startState = WorkflowCommand.start(input)
 
     return runWorkflowStep(
         workflow = workflow,
-        jsonString = starting.toJsonString(),
+        state = startState,
         executionMode = executionMode,
     )
 }
@@ -96,51 +97,89 @@ private suspend fun runUntilComplete(
 // Stateless, reusable helper
 private tailrec suspend fun runWorkflowStep(
     workflow: Workflow,
-    jsonString: String,
+    state: WorkflowCommand,
     executionMode: ExecutionMode,
-): JsonElement = when (val state = WorkflowState.fromJsonString(jsonString)) {
-    is WorkflowState.Completed ->
-        state.output
+): JsonElement {
 
-    is WorkflowState.Failed ->
-        throw state.exception ?: IllegalStateException("Workflow failed without explicit exception: $state")
+    val next = WorkflowOrchestrator.resume(
+        workflow = workflow,
+        state = state,
+        executionMode = executionMode
+    )
 
-    is WorkflowState.RunningChildWorkflow -> {
-        val enrichedState =
-            if (state.childConfig.sync) {
-                val childWorkflow = DefinitionCache.getWorkflow(
-                    namespace = state.childConfig.namespace,
-                    name = state.childConfig.name,
-                    version = state.childConfig.version
-                )
-                    ?: throw IllegalStateException("Child workflow not found: ${state.childConfig.namespace}/${state.childConfig.name}/${state.childConfig.version}")
-                val rawOutput = runUntilComplete(
-                    workflow = childWorkflow,
-                    input = state.childConfig.input,
-                    executionMode = ExecutionMode.CONTINUOUS
-                )
-                state.copy(rawOutput = rawOutput)
-            } else {
-                // await=false (fire-and-forget): rawOutput is already set in state
-                state
-            }
+    val jsonString = next.toJsonString()
 
-        val next = WorkflowOrchestrator.resume(
-            workflow = workflow,
-            state = enrichedState,
-            executionMode = executionMode
-        )
-        runWorkflowStep(workflow, next.toJsonString(), executionMode)
-    }
+    return when (val workflowEvent = WorkflowEvent.fromJsonString(jsonString)) {
+        is WorkflowEvent.WorkflowCompleted -> workflowEvent.output
+        is WorkflowEvent.TaskFailed -> throw workflowEvent.exception
+        is WorkflowEvent.ForkBranchCompleted -> workflowEvent.output
 
-    else -> {
-        val next = WorkflowOrchestrator.resume(
-            workflow = workflow,
-            state = state,
-            executionMode = executionMode
-        )
-
-        runWorkflowStep(workflow, next.toJsonString(), executionMode)
+        is WorkflowEvent.ForkStarted -> forkStarted(workflow, workflowEvent, executionMode)
+        is WorkflowEvent.RetryScheduled -> runWorkflowStep(workflow, workflowEvent.resume(), executionMode)
+        is WorkflowEvent.TaskScheduled -> runWorkflowStep(workflow, workflowEvent.resume(), executionMode)
+        is WorkflowEvent.WaitStarted -> runWorkflowStep(workflow, workflowEvent.resume(), executionMode)
+        is WorkflowEvent.RunWorkflowStarted -> runWorkflowStarted(workflow, workflowEvent, executionMode)
     }
 }
 
+private suspend fun runWorkflowStarted(
+    workflow: Workflow,
+    workflowState: WorkflowEvent.RunWorkflowStarted,
+    executionMode: ExecutionMode
+): JsonElement {
+    val enrichedState = if (workflowState.childConfig.sync) {
+        val childWorkflow = DefinitionCache.getWorkflow(
+            namespace = workflowState.childConfig.namespace,
+            name = workflowState.childConfig.name,
+            version = workflowState.childConfig.version
+        )
+            ?: throw IllegalStateException("Child workflow not found: ${workflowState.childConfig.namespace}/${workflowState.childConfig.name}/${workflowState.childConfig.version}")
+        val rawOutput = runUntilComplete(
+            workflow = childWorkflow,
+            input = workflowState.childConfig.input,
+            executionMode = executionMode
+        )
+        workflowState.resumeSync(rawOutput = rawOutput)
+    } else {
+        // await=false (fire-and-forget)
+        workflowState.resumeAsync()
+    }
+
+    return runWorkflowStep(workflow, enrichedState, executionMode)
+}
+
+private suspend fun forkStarted(
+    workflow: Workflow,
+    workflowState: WorkflowEvent.ForkStarted,
+    executionMode: ExecutionMode
+): JsonElement {
+    @Suppress("UNCHECKED_CAST")
+    val forkNode = workflow.getNode(workflowState.nodePosition) as Node<ForkTask>
+    (workflowState.taskStates[NodePosition.root] as RootState).id
+
+    // launch all branches in parallel
+    val results = coroutineScope {
+        forkNode.children!!.mapIndexed { index, branchNode ->
+            async {
+                val output = runWorkflowStep(workflow, workflowState.startBranch(branchNode.position), executionMode)
+                index to output
+            }
+        }
+    }
+
+    val output = if (forkNode.task.fork.isCompete) {
+        // returns the array of all branches
+        JsonArray(coroutineScope {
+            results.awaitAll().map { it.second }
+        })
+    } else {
+        // returns the winner branch
+        select {
+            results.forEach { deferred ->
+                deferred.onAwait { it }
+            }
+        }.second
+    }
+
+    return runWorkflowStep(workflow, workflowState.resume(output), executionMode)
+}

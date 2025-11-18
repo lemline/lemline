@@ -6,7 +6,7 @@ package com.lemline.core.processors
 import com.lemline.core.errors.ForkException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.SimpleTaskState
+import com.lemline.core.states.ForkState
 import io.serverlessworkflow.api.types.ForkTask
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -51,16 +51,16 @@ import kotlinx.serialization.json.JsonElement
  */
 class ForkProcessor(
     node: Node<ForkTask>
-) : NodeProcessor<ForkTask, SimpleTaskState>(node) {
+) : NodeProcessor<ForkTask, ForkState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleTaskState = SimpleTaskState()
+    override fun createState(transformedInput: JsonElement, scope: Scope) = ForkState()
 
     override fun getNextStepInfo(
-        state: SimpleTaskState,
+        state: ForkState,
         dataset: JsonElement,
         scope: Scope,
         namedNode: String?
-    ): NextStepInfo {
+    ): NextStepInfo<ForkState> {
         // First entry
         // Throws exception to trigger fork execution via orchestrator
         // The orchestrator will derive fork config from the current Node<ForkTask>

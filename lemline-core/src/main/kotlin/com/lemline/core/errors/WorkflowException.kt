@@ -6,7 +6,9 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.states.TaskState
+import com.lemline.core.states.ForkState
+import com.lemline.core.states.RunState
+import com.lemline.core.states.WaitState
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
@@ -24,7 +26,7 @@ sealed class WorkflowException : RuntimeException()
  *
  * @property error The workflow error associated with this exception.
  */
-open class InternalWorkflowException(
+data class InternalException(
     val error: Error
 ) : WorkflowException() {
 
@@ -75,9 +77,6 @@ open class InternalWorkflowException(
             )
         }
     }
-
-    override fun toString() =
-        "WorkflowException(error=$error)"
 }
 
 /**
@@ -87,8 +86,9 @@ open class InternalWorkflowException(
  * during a larger workflow process. It carries configuration details associated
  * with the child workflow, encapsulated within the [Config] instance.
  */
-class ChildWorkflowException(
-    val transformedInput: JsonElement?,
+data class RunWorkflowException(
+    val state: RunState,
+    val transformedInput: JsonElement,
     val config: Config
 ) : WorkflowException() {
 
@@ -125,7 +125,8 @@ class ChildWorkflowException(
  * @property config The configuration specifying the details of the wait, including the delay duration.
  */
 @ExperimentalTime
-class WaitWorkflowException(
+data class WaitException(
+    val state: WaitState,
     val transformedInput: JsonElement,
     val config: Config
 ) : WorkflowException() {
@@ -160,7 +161,7 @@ class WaitWorkflowException(
  * Similar to WaitWorkflowException pattern.
  */
 @ExperimentalTime
-class ForkException(
-    val state: TaskState,
+data class ForkException(
+    val state: ForkState,
     val transformedInput: JsonElement
 ) : WorkflowException()

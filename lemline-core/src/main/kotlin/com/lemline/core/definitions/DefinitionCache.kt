@@ -7,6 +7,9 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.common.values.index
+import com.lemline.common.values.name
+import com.lemline.common.values.namespace
+import com.lemline.common.values.version
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.RootTask
@@ -163,4 +166,19 @@ object DefinitionCache {
         workflowCache.clear()
         nodesMapCache.clear()
     }
+}
+
+/**
+ * Retrieves a node from the workflow based on its position.
+ *
+ * @param position The position of the node within the workflow.
+ * @return The node corresponding to the specified position in the workflow.
+ * @throws IllegalStateException If the node is not found at the specified position.
+ */
+fun Workflow.getNode(position: NodePosition): Node<*> {
+    val nodesMap = DefinitionCache.getNodesMap(this)
+    return nodesMap[position]
+        ?: throw IllegalStateException(
+            "Node not found at position $position in workflow: ${this.namespace}/${this.name}/${this.version}"
+        )
 }

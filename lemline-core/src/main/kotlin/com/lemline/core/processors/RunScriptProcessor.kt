@@ -6,11 +6,10 @@ package com.lemline.core.processors
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.SimpleTaskState
+import com.lemline.core.states.RunState
 import com.lemline.core.tasks.runs.Script
 import io.serverlessworkflow.api.types.ExternalScript
 import io.serverlessworkflow.api.types.InlineScript
-import io.serverlessworkflow.api.types.RunScript
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
 import java.io.File
@@ -70,9 +69,9 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class RunScriptProcessor(
     node: Node<RunTask>,
-) : NodeProcessor<RunTask, SimpleTaskState>(node) {
+) : NodeProcessor<RunTask, RunState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleTaskState = SimpleTaskState()
+    override fun createState(transformedInput: JsonElement, scope: Scope): RunState = RunState()
 
     /**
      * Execute script action.
@@ -87,18 +86,12 @@ class RunScriptProcessor(
     override suspend fun execute(
         transformedInput: JsonElement,
         scope: Scope,
+        state: RunState,
     ): JsonElement {
         logger.debug { "Executing script: ${node.name}" }
 
         // Extract script configuration
-        val runConfig = node.task.run.get()
-        if (runConfig !is RunScript) {
-            raiseError(
-                WorkflowErrorType.RUNTIME,
-                "Expected RunScript configuration but got: ${runConfig?.javaClass?.simpleName}"
-            )
-        }
-
+        val runConfig = node.task.run.runScript
         val scriptUnion = runConfig.script
         val scriptConfig = scriptUnion.get()
 
