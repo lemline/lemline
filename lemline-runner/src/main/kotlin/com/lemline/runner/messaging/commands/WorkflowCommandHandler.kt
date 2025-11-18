@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.instances
+package com.lemline.runner.messaging.commands
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.IDV7
 import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.errors.InternalException
 import com.lemline.core.orchestrator.ExecutionMode
 import com.lemline.core.orchestrator.WorkflowOrchestrator
 import com.lemline.core.states.WorkflowCommand
@@ -12,13 +14,13 @@ import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.messaging.database.DatabaseMessage
-import com.lemline.runner.messaging.database.DatabaseMessageEmitter
-import com.lemline.runner.messaging.database.createDeserializationFailure
-import com.lemline.runner.messaging.database.toFailure
+import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.messaging.toLogString
+import com.lemline.runner.models.FailureModel
 import com.lemline.runner.repositories.DefinitionRepository
+import com.lemline.runner.repositories.FailureRepository
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.Clock
@@ -28,18 +30,22 @@ import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
 
 /**
- * MessageHandler is responsible for consuming workflow messages from the incoming channel,
- * processing them, and sending the results to the outgoing channel. It orchestrates
- * the entire lifecycle of a message.
+ * Handles workflow commands by executing workflow steps and emitting resulting events.
+ *
+ * Processes InstanceMessage<WorkflowCommand> from the workflow channel, executes one step
+ * using WorkflowOrchestrator, and either:
+ * - Emits next command for continued execution (TaskScheduled)
+ * - Sends event to database channel for persistence (WaitStarted, RetryScheduled, etc.)
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
 @ApplicationScoped
-internal class InstanceMessageHandler(
+internal class WorkflowCommandHandler(
     private val instanceEmitter: InstanceMessageEmitter,
-    private val databaseEmitter: DatabaseMessageEmitter,
+    private val databaseEmitter: WorkflowEventEmitter,
     private val definitionRepository: DefinitionRepository,
-    override val metrics: InstanceMessageSubscriberMetrics,
+    private val failureRepository: FailureRepository,
+    override val metrics: WorkflowCommandSubscriberMetrics,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
 
@@ -63,15 +69,20 @@ internal class InstanceMessageHandler(
     } catch (e: Exception) {
         logger.info { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
 
-        // Send deserialization failure to database channel
+        // Store deserialization failure directly (we don't have a valid InstanceMessage to work with)
         throw CompensationException(DESERIALIZATION_FAILURE) {
-            databaseEmitter.send(
-                createDeserializationFailure(
-                    payload = payload,
-                    exception = e
-                )
-            )
+            deserializationFailed(e)
         }
+    }
+
+    private suspend fun Message<String>.deserializationFailed(cause: Exception) {
+        val failure = FailureModel.from(
+            id = IDV7.random(),
+            payload = payload,
+            error = cause,
+            reason = DESERIALIZATION_FAILURE
+        )
+        failureRepository.insert(failure)
     }
 
     // ========================================
@@ -91,18 +102,46 @@ internal class InstanceMessageHandler(
         } catch (e: Exception) {
             logger.error(e) { "Failed to serialize message: $next" }
 
-            // Send error to the database channel (not retryable - logic error).
-            // We cannot serialize the next message
+            // Send TaskFailed event to database (not retryable - serialization is a permanent error)
             throw CompensationException(SERIALIZATION_FAILURE) {
                 databaseEmitter.send(
-                    current.toFailure(
+                    current.toTaskFailed(
                         exception = e,
-                        reason = SERIALIZATION_FAILURE,
-                        retryable = false
+                        reason = SERIALIZATION_FAILURE
                     )
                 )
             }
         }
+    }
+
+    /**
+     * Converts an InstanceMessage<WorkflowCommand> to InstanceMessage<WorkflowEvent>
+     * for infrastructure failures that should be stored as permanent failures.
+     */
+    private fun InstanceMessage<WorkflowCommand>.toTaskFailed(
+        exception: Exception,
+        reason: String
+    ): InstanceMessage<WorkflowEvent> {
+        val error = InternalException.Error(
+            type = exception::class.qualifiedName ?: "Unknown",
+            status = 500,
+            instance = workflowId.toString(),
+            title = exception.message,
+            details = exception.stackTraceToString()
+        )
+
+        return InstanceMessage(
+            workflowInfo = workflowInfo,
+            workflowState = WorkflowEvent.TaskFailed(
+                taskStates = workflowState.taskStates,
+                nodePosition = workflowState.nodePosition,
+                rawInput = null,
+                rawOutput = null,
+                flowDirective = null,
+                error = error
+            ),
+            parentId = parentId
+        )
     }
 
     // ========================================
@@ -161,14 +200,13 @@ internal class InstanceMessageHandler(
         } catch (e: Exception) {
             logger.error(e) { "Error during workflow definition retrieval" }
 
-            // Send infrastructure failure to database channel (retryable - DB might recover)
+            // Send TaskFailed event to database (broker will handle message-level retries)
             val reason = getFailureReason(e)
             throw CompensationException(reason) {
                 databaseEmitter.send(
-                    toFailure(
+                    toTaskFailed(
                         exception = e,
-                        reason = reason,
-                        retryable = true
+                        reason = reason
                     )
                 )
             }
@@ -176,7 +214,7 @@ internal class InstanceMessageHandler(
 
         if (workflow != null) return workflow
 
-        // Still not found -> non-retryable infrastructure failure
+        // Still not found -> permanent failure
         val errorMsg = "Definition not found for workflow $workflowNamespace/$workflowName/$workflowVersion"
         logger.error { "$errorMsg. Storing in failure table for manual inspection." }
 
@@ -184,10 +222,9 @@ internal class InstanceMessageHandler(
 
         throw CompensationException(DEFINITION_MISSING) {
             databaseEmitter.send(
-                toFailure(
+                toTaskFailed(
                     exception = error,
-                    reason = DEFINITION_MISSING,
-                    retryable = false
+                    reason = DEFINITION_MISSING
                 )
             )
         }
@@ -304,30 +341,16 @@ internal class InstanceMessageHandler(
         }
     }
 
+    /**
+     * Sends a workflow event to the database channel for persistence.
+     */
     private suspend fun sendToDatabase(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent) {
         databaseEmitter.send(
-            DatabaseMessage.WorkflowPersistence(
-                InstanceMessage(
-                    workflowInfo = message.workflowInfo,
-                    workflowState = event,
-                    parentId = message.parentId,
-                )
+            InstanceMessage(
+                workflowInfo = message.workflowInfo,
+                workflowState = event,
+                parentId = message.parentId,
             )
         )
     }
-
-    /**
-     * Detects if this is a branch returning to its fork parent by checking
-     * if there's an active fork in the database at this position.
-     */
-//    private suspend fun InstanceMessage.isForkBranchCompletion(state: WorkflowState.TaskScheduled): Boolean {
-//        // Check if there's a fork at this position in the database
-//        val fork = forkRepository.findByWorkflowIdAndPosition(
-//            workflowInfo.workflowId,
-//            state.nodePosition
-//        )
-//        return fork != null
-//    }
-
-
 }

@@ -3,7 +3,7 @@ package com.lemline.runner.outbox
 
 import com.lemline.common.logger.logger
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.instances.InstanceMessageEmitter
+import com.lemline.runner.messaging.commands.InstanceMessageEmitter
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.OutboxRepository

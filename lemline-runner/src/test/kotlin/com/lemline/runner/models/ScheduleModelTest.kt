@@ -3,7 +3,9 @@ package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.common.values.WorkflowInfo
+import com.lemline.core.states.WorkflowCommand
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.random.random
 import kotlin.test.assertEquals
@@ -27,8 +29,8 @@ class ScheduleModelTest {
     ) = ScheduleOutboxModel(
         id = IDV7.random(),
         instanceMessage = InstanceMessage(
-            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
-            workflowState = com.lemline.core.states.WorkflowCommand.random(),
+            workflowInfo = WorkflowInfo.random(),
+            workflowState = WorkflowCommand.random(),
             parentId = IDV7.random()
         ),
         outBoxStatus = OutBoxStatus.PENDING,

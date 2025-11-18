@@ -2,8 +2,8 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.messaging.instances.InstanceMessageEmitter
+import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.messaging.commands.InstanceMessageEmitter
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.RetryRepository
@@ -20,7 +20,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * This class coordinates retry logic in two main areas:
  * - In workflow execution via [com.lemline.runner.StepByStepRunner]:
  *   - Uses `WorkflowInstance.onRetry()` to handle retries defined by the workflow itself.
- * - In message processing via [com.lemline.runner.messaging.instances.InstanceMessageHandler]:
+ * - In message processing via [com.lemline.runner.messaging.commands.WorkflowCommandHandler]:
  *   - `Message<String>.saveAsFailed()` records non-recoverable failures.
  *   - `Message<String>.saveForRetry()` schedules recoverable failures for future retry attempts.
  */

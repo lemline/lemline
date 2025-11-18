@@ -3,7 +3,7 @@ package com.lemline.runner.models
 
 import com.lemline.common.values.WithDefiniteWorkflowInfo
 import com.lemline.core.states.WorkflowState
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.outbox.OutboxRelay
 import kotlin.time.ExperimentalTime

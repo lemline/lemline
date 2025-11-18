@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.instances
+package com.lemline.runner.messaging.commands
 
-import com.lemline.common.json.LemlineJson
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.random.random
 import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.Assertions
@@ -16,8 +16,8 @@ internal class InstanceMessageTest {
         val instanceMessage = InstanceMessage.random()
 
         // Serialize and deserialize to verify backward compatibility
-        val encoded = LemlineJson.encodeToString(instanceMessage)
-        val decoded = LemlineJson.decodeFromString<InstanceMessage<com.lemline.core.states.WorkflowCommand>>(encoded)
+        val encoded = instanceMessage.toJsonString()
+        val decoded = InstanceMessage.fromJsonString<com.lemline.core.states.WorkflowCommand>(encoded)
 
         // Verify the essential fields match
         Assertions.assertEquals(instanceMessage.workflowInfo, decoded.workflowInfo)
@@ -31,8 +31,8 @@ internal class InstanceMessageTest {
         val original = InstanceMessage.random()
 
         // When
-        val serialized = LemlineJson.encodeToString(original)
-        val deserialized = LemlineJson.decodeFromString<InstanceMessage<com.lemline.core.states.WorkflowCommand>>(serialized)
+        val serialized = original.toJsonString()
+        val deserialized = InstanceMessage.fromJsonString<com.lemline.core.states.WorkflowCommand>(serialized)
 
         // When
         Assertions.assertEquals(original, deserialized)

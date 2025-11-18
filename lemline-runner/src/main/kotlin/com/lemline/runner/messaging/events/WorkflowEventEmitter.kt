@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.database
+package com.lemline.runner.messaging.events
 
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageEmitter
 import io.quarkus.runtime.Startup
 import io.smallrye.reactive.messaging.MutinyEmitter
@@ -15,9 +17,9 @@ internal const val DATABASE_OUT_CHANNEL = "ingestion-out"
 @ExperimentalTime
 @Startup
 @ApplicationScoped
-internal class DatabaseMessageEmitter(
-    override val metrics: DatabaseMessageSubscriberMetrics
-) : MessageEmitter<DatabaseMessage>() {
+internal class WorkflowEventEmitter(
+    override val metrics: WorkflowEventSubscriberMetrics
+) : MessageEmitter<InstanceMessage<WorkflowEvent>>() {
     @Channel(DATABASE_OUT_CHANNEL)
     override lateinit var emitter: MutinyEmitter<String>
 }

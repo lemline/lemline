@@ -9,7 +9,7 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.definitions.Definitions
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.ScheduleOutboxModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject

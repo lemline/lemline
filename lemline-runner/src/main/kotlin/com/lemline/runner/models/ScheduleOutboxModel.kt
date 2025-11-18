@@ -13,7 +13,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.utils.toDuration
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.outbox.OutBoxStatus
 import io.serverlessworkflow.api.types.Schedule
 import java.time.ZoneId

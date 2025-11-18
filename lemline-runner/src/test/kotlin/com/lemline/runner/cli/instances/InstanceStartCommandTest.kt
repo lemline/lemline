@@ -5,11 +5,11 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.states.WorkflowState
+import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.definitions.Definitions
-import com.lemline.runner.messaging.database.DatabaseMessageEmitter
-import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.messaging.instances.InstanceMessageEmitter
+import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.messaging.commands.InstanceMessageEmitter
+import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.setup
@@ -48,7 +48,7 @@ class InstanceStartCommandTest {
     private lateinit var definitions: Definitions
     private lateinit var definitionRepository: DefinitionRepository
     private lateinit var instanceEmitter: InstanceMessageEmitter
-    private lateinit var databaseEmitter: DatabaseMessageEmitter
+    private lateinit var databaseEmitter: WorkflowEventEmitter
 
     private var workflowNamespace = WorkflowNamespace("test")
     private var workflowName = WorkflowName("testWorkflow")
@@ -59,7 +59,7 @@ class InstanceStartCommandTest {
     private lateinit var errStream: ByteArrayOutputStream
     private lateinit var originalOut: PrintStream
     private lateinit var originalErr: PrintStream
-    private lateinit var messageSlot: CapturingSlot<InstanceMessage<com.lemline.core.states.WorkflowCommand.ResumeFromTask>>
+    private lateinit var messageSlot: CapturingSlot<InstanceMessage<WorkflowCommand.ResumeFromTask>>
 
     private val workflowDefinition = DefinitionModel(
         namespace = workflowNamespace,
@@ -112,7 +112,7 @@ class InstanceStartCommandTest {
 
     @BeforeEach
     fun setup() {
-        messageSlot = slot<InstanceMessage<com.lemline.core.states.WorkflowCommand.ResumeFromTask>>()
+        messageSlot = slot<InstanceMessage<WorkflowCommand.ResumeFromTask>>()
         // Emitter mocks
         instanceEmitter = mockk(relaxUnitFun = true)
         databaseEmitter = mockk(relaxUnitFun = true)
@@ -170,7 +170,7 @@ class InstanceStartCommandTest {
      * Helper method to execute command and verify basic success conditions
      * Returns the captured Message for further assertions
      */
-    private fun executeCommandAndVerify(vararg args: String): InstanceMessage<com.lemline.core.states.WorkflowCommand.ResumeFromTask> {
+    private fun executeCommandAndVerify(vararg args: String): InstanceMessage<WorkflowCommand.ResumeFromTask> {
         // When
         val exitCode = cmd.execute(*args)
 
@@ -528,7 +528,7 @@ class InstanceStartCommandTest {
         errorSlot.captured shouldContain "'lastName'"
 
         // Verify emitter was NOT called (we failed before sending the message)
-        coVerify(exactly = 0) { instanceEmitter.send(any<InstanceMessage<com.lemline.core.states.WorkflowCommand.ResumeFromTask>>()) }
+        coVerify(exactly = 0) { instanceEmitter.send(any<InstanceMessage<WorkflowCommand.ResumeFromTask>>()) }
     }
 
     // Helper method to inject dependencies using reflection

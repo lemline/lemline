@@ -2,7 +2,9 @@
 package com.lemline.runner.repositories.bases
 
 import com.lemline.common.values.IDV7
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.common.values.WorkflowInfo
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
@@ -41,8 +43,8 @@ internal abstract class FailureRepositoryTest {
         val model = FailureModel.from(
             id = IDV7.random(),
             instance = InstanceMessage(
-                workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
-                workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+                workflowInfo = WorkflowInfo.random(),
+                workflowState = WorkflowEvent.TaskFailed.random(),
                 parentId = IDV7.random()
             ),
             error = ex,
@@ -82,13 +84,13 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `should find failures by workflow id`() = runTest {
         val instance1 = InstanceMessage(
-            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
-            workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+            workflowInfo = WorkflowInfo.random(),
+            workflowState = WorkflowEvent.TaskFailed.random(),
             parentId = IDV7.random()
         )
         val instance2 = InstanceMessage(
-            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
-            workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+            workflowInfo = WorkflowInfo.random(),
+            workflowState = WorkflowEvent.TaskFailed.random(),
             parentId = IDV7.random()
         )
 
@@ -108,8 +110,8 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `count and deleteAll should work`() = runTest {
         val instance = InstanceMessage(
-            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
-            workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+            workflowInfo = WorkflowInfo.random(),
+            workflowState = WorkflowEvent.TaskFailed.random(),
             parentId = IDV7.random()
         )
         val failures = List(3) { idx ->
@@ -129,8 +131,8 @@ internal abstract class FailureRepositoryTest {
         val failure = FailureModel.from(
             IDV7.random(),
             InstanceMessage(
-                workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
-                workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+                workflowInfo = WorkflowInfo.random(),
+                workflowState = WorkflowEvent.TaskFailed.random(),
                 parentId = IDV7.random()
             ),
             RuntimeException("boom")
@@ -151,8 +153,8 @@ internal abstract class FailureRepositoryTest {
         val failure = FailureModel.from(
             IDV7.random(),
             InstanceMessage(
-                workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
-                workflowState = com.lemline.core.states.WorkflowEvent.TaskFailed.random(),
+                workflowInfo = WorkflowInfo.random(),
+                workflowState = WorkflowEvent.TaskFailed.random(),
                 parentId = IDV7.random()
             ),
             RuntimeException("boom")

@@ -2,7 +2,9 @@
 package com.lemline.runner.outbox
 
 import com.lemline.common.values.IDV7
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.common.values.WorkflowInfo
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.random.random
@@ -43,8 +45,8 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
     override fun createTestModel(payload: String) = WaitOutboxModel(
         id = IDV7.random(),
         instanceMessage = InstanceMessage(
-            workflowInfo = com.lemline.common.values.WorkflowInfo.random(),
-            workflowState = com.lemline.core.states.WorkflowEvent.WaitStarted.random(),
+            workflowInfo = WorkflowInfo.random(),
+            workflowState = WorkflowEvent.WaitStarted.random(),
             parentId = IDV7.random()
         ),
         outboxScheduledFor = Clock.System.now(),

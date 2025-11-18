@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.instances
+package com.lemline.runner.messaging.commands
 
 import com.lemline.runner.messaging.MessageSubscriberMetrics
 import io.micrometer.core.instrument.MeterRegistry
@@ -12,7 +12,7 @@ import kotlin.time.ExperimentalTime
  */
 @Singleton
 @ExperimentalTime
-internal class InstanceMessageSubscriberMetrics @Inject constructor(
+internal class WorkflowCommandSubscriberMetrics @Inject constructor(
     registry: MeterRegistry
 ) : MessageSubscriberMetrics(registry) {
     override val METRIC_PREFIX = "lemline.messaging.instances"

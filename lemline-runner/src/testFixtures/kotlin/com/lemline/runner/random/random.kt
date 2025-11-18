@@ -19,7 +19,7 @@ import com.lemline.core.states.WaitState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.models.ParentWaitingModel
@@ -117,6 +117,7 @@ fun FailureModel.Companion.random() = FailureModel(
             workflowState = WorkflowEvent.TaskFailed.random(),
             parentId = IDV7.random()
         )
+
         false -> null
     },
     payload = String.nullableRandom(),

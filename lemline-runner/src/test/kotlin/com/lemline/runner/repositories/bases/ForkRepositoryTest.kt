@@ -4,10 +4,15 @@ package com.lemline.runner.repositories.bases
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.BranchStatus
-import com.lemline.core.states.WorkflowState
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.core.states.ForkState
+import com.lemline.core.states.TaskState
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.ForkBranchModel
 import com.lemline.runner.models.ForkWaitingModel
 import com.lemline.runner.repositories.ForkWaitingRepository
@@ -298,14 +303,14 @@ internal abstract class ForkWaitingRepositoryTest {
         val instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo(
                 workflowId = testWorkflowId,
-                workflowNamespace = com.lemline.common.values.WorkflowNamespace("test"),
-                workflowName = com.lemline.common.values.WorkflowName("test-workflow"),
-                workflowVersion = com.lemline.common.values.WorkflowVersion("1.0")
+                workflowNamespace = WorkflowNamespace("test"),
+                workflowName = WorkflowName("test-workflow"),
+                workflowVersion = WorkflowVersion("1.0")
             ),
-            workflowState = com.lemline.core.states.WorkflowEvent.ForkStarted(
-                taskStates = emptyMap<com.lemline.core.nodes.NodePosition, com.lemline.core.states.TaskState>(),
+            workflowState = WorkflowEvent.ForkStarted(
+                taskStates = emptyMap<NodePosition, TaskState>(),
                 nodePosition = testPosition,
-                forkState = com.lemline.core.states.ForkState(),
+                forkState = ForkState(),
                 rawInput = JsonPrimitive("test-input")
             ),
             parentId = null

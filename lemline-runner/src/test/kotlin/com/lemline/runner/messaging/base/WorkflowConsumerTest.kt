@@ -4,12 +4,12 @@ package com.lemline.runner.messaging.base
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.messaging.CompensationException
-import com.lemline.runner.messaging.database.DatabaseMessage
-import com.lemline.runner.messaging.database.DatabaseMessageHandler
-import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.messaging.instances.InstanceMessageHandler
+import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.messaging.commands.WorkflowCommandHandler
+import com.lemline.runner.messaging.events.WorkflowEventHandler
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.assertions.throwables.shouldThrow
@@ -32,7 +32,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
- * Abstract base class for testing the [InstanceMessageHandler].
+ * Abstract base class for testing the [WorkflowCommandHandler].
  *
  * This class sets up a common test environment including repositories (Retry, Wait, Workflow)
  * and provides helper methods for sending messages and waiting for processing.
@@ -56,14 +56,14 @@ internal abstract class WorkflowConsumerTest {
     lateinit var definitionRepository: DefinitionRepository
 
     @Inject
-    lateinit var instanceMessageHandler: InstanceMessageHandler
+    lateinit var instanceMessageHandler: WorkflowCommandHandler
 
     @Inject
-    lateinit var databaseMessageHandler: DatabaseMessageHandler
+    lateinit var databaseMessageHandler: WorkflowEventHandler
 
     val processingMessages = ConcurrentHashMap<String, CompletableFuture<InstanceMessage<*>?>>()
 
-    val databaseMessages = ConcurrentHashMap<String, CompletableFuture<DatabaseMessage?>>()
+    val databaseMessages = ConcurrentHashMap<String, CompletableFuture<InstanceMessage<WorkflowEvent>?>>()
 
     @BeforeEach
     fun setup() = runTest {
@@ -84,7 +84,7 @@ internal abstract class WorkflowConsumerTest {
             databaseMessages.remove(msg.payload)?.completeExceptionally(e)
         }
 
-        databaseMessageHandler.onCompleteTest = { msg: Message<String>, o: DatabaseMessage? ->
+        databaseMessageHandler.onCompleteTest = { msg: Message<String>, o: InstanceMessage<WorkflowEvent>? ->
             databaseMessages.remove(msg.payload)?.complete(o)
         }
 
@@ -221,10 +221,10 @@ internal abstract class WorkflowConsumerTest {
      *
      * **Then: **
      * - Asserts that waiting for the processing future throws an exception (as processing fails).
-     * - Verifies that a message containing a failure model was sent to the database topic.
+     * - Verifies that no message was sent to the database topic (deserialization failures are stored directly).
      */
     @Test
-    fun `invalid message should trigger sending a FailureModel to the database topic`() = runTest {
+    fun `invalid message should be handled without sending to database topic`() = runTest {
         // Given
         val invalidMessage = "invalid json message"
 
@@ -235,14 +235,8 @@ internal abstract class WorkflowConsumerTest {
         val cause = shouldThrow<ExecutionException> { future.get(1, SECONDS) }.cause
         (cause is CompensationException && cause.reason == DESERIALIZATION_FAILURE) shouldBe true
 
-        // Check that a message was sent to the database topic
-        receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.DeserializationFailure
-            println("msg=$msg")
-            msg.payload shouldBe invalidMessage
-            msg.errorClass shouldNotBe null
-            msg.errorStackTrace shouldNotBe ""
-        }
+        // Check that no message was sent to the database topic (deserialization failures are stored directly in the repository)
+        receiveDatabaseMessage() shouldBe null
     }
 
     /**
@@ -278,10 +272,9 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.WorkflowPersistence
-            val instance = msg.instance
+            val instance = InstanceMessage.fromJsonString<WorkflowEvent>(this)
             instance.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
-            val retryingState = instance.workflowState as com.lemline.core.states.WorkflowEvent.RetryScheduled
+            val retryingState = instance.workflowState as WorkflowEvent.RetryScheduled
             retryingState.retryAt shouldNotBe null
         }
     }
@@ -320,10 +313,9 @@ internal abstract class WorkflowConsumerTest {
 
         // Check that a message was sent to the database topic
         receiveDatabaseMessage().shouldNotBeNull {
-            val msg = DatabaseMessage.fromJsonString(this) as DatabaseMessage.WorkflowPersistence
-            val instance = msg.instance
+            val instance = InstanceMessage.fromJsonString<WorkflowEvent>(this)
             instance.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
-            val waitState = instance.workflowState as com.lemline.core.states.WorkflowEvent.WaitStarted
+            val waitState = instance.workflowState as WorkflowEvent.WaitStarted
             waitState.waitUntil shouldNotBe null
         }
     }

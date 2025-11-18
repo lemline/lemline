@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.database
+package com.lemline.runner.messaging.events
 
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DATABASE_CONSUMER_ENABLED
 import com.lemline.runner.config.INGESTION_CONSUMER_CONCURRENCY
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageSubscriber
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
@@ -19,10 +21,10 @@ internal const val DATABASE_IN_CHANNEL = "ingestion-in"
 @ExperimentalSerializationApi
 @Startup
 @ApplicationScoped
-internal class DatabaseMessageSubscriber(
+internal class WorkflowEventSubscriber(
     @param:ConfigProperty(name = INGESTION_CONSUMER_CONCURRENCY) override val maxConcurrency: Long,
     @param:ConfigProperty(name = DATABASE_CONSUMER_ENABLED) override val enabled: Boolean,
     @param:Channel(DATABASE_IN_CHANNEL) override val publisher: Publisher<Message<String>>,
-    override val handler: DatabaseMessageHandler,
-    override val metrics: DatabaseMessageSubscriberMetrics,
-) : MessageSubscriber<DatabaseMessage>()
+    override val handler: WorkflowEventHandler,
+    override val metrics: WorkflowEventSubscriberMetrics,
+) : MessageSubscriber<InstanceMessage<WorkflowEvent>>()

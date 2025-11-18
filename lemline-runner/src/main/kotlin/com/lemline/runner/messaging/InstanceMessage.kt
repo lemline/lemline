@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.instances
+package com.lemline.runner.messaging
 
 import com.lemline.common.json.JsonSerializable
 import com.lemline.common.json.LemlineJson
@@ -13,6 +12,7 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowState
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -41,7 +41,13 @@ data class InstanceMessage<S : WorkflowState>(
     @Transient
     lateinit var message: Message<String>
 
-    override fun toJsonString(): String = LemlineJson.encodeToString(this)
+    override fun toJsonString(): String {
+        // Use polymorphic serializer for WorkflowState to handle sealed class hierarchy
+        @Suppress("UNCHECKED_CAST")
+        val serializer =
+            serializer(kotlinx.serialization.serializer<WorkflowState>()) as KSerializer<InstanceMessage<S>>
+        return LemlineJson.json.encodeToString(serializer, this)
+    }
 
     companion object {
 
@@ -63,8 +69,13 @@ data class InstanceMessage<S : WorkflowState>(
             parentId = parentId,
         )
 
-        inline fun <reified S : WorkflowState> fromJsonString(jsonString: String): InstanceMessage<S> =
-            LemlineJson.decodeFromString<InstanceMessage<S>>(jsonString)
+        inline fun <reified S : WorkflowState> fromJsonString(jsonString: String): InstanceMessage<S> {
+            // Use polymorphic serializer for WorkflowState to handle sealed class hierarchy
+            @Suppress("UNCHECKED_CAST")
+            val serializer =
+                serializer(kotlinx.serialization.serializer<WorkflowState>()) as KSerializer<InstanceMessage<S>>
+            return LemlineJson.json.decodeFromString(serializer, jsonString)
+        }
 
         inline fun <reified S : WorkflowState> fromMessage(message: Message<String>): InstanceMessage<S> =
             fromJsonString<S>(message.payload).also { it.message = message }

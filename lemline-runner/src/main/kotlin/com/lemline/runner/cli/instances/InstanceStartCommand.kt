@@ -8,8 +8,8 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.exceptions.CliException
-import com.lemline.runner.messaging.database.DatabaseMessageEmitter
-import com.lemline.runner.messaging.instances.InstanceMessageEmitter
+import com.lemline.runner.messaging.commands.InstanceMessageEmitter
+import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.starters.Starter
 import io.quarkus.arc.Unremovable
@@ -43,7 +43,7 @@ class InstanceStartCommand : Runnable {
     private lateinit var instanceEmitter: InstanceMessageEmitter
 
     @Inject
-    private lateinit var databaseEmitter: DatabaseMessageEmitter
+    private lateinit var databaseEmitter: WorkflowEventEmitter
 
     @Inject
     private lateinit var scheduleRepository: ScheduleRepository
