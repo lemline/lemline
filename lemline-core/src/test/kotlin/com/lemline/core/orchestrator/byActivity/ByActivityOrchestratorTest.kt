@@ -457,9 +457,9 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             val doNode = rootNode.children!!.first()
             val callChildNode = doNode.children!!.first()
             val resumeResult = WorkflowOrchestrator.resumeFromStartedTask(
+                taskStates = pauseResult.taskStates.toMutableMap(),
                 node = callChildNode,
                 rawOutput = childOutput,
-                taskStates = pauseResult.taskStates.toMutableMap(),
                 executionMode = executionMode
             )
 
@@ -517,9 +517,9 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             val doNode = rootNode.children!!.first()
             val launchChildNode = doNode.children!![1]
             val resumeResult = WorkflowOrchestrator.resumeFromStartedTask(
-                node = launchChildNode,
-                rawOutput = pauseResult.rawInput,  // run workflow node input
                 taskStates = pauseResult.taskStates.toMutableMap(),
+                node = launchChildNode,  // run workflow node input
+                rawOutput = pauseResult.rawInput,
                 executionMode = executionMode
             )
 
@@ -579,9 +579,9 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             val doNode = rootNode.children!!.first()
             val callChildNode = doNode.children!![1]
             val pauseResult2 = WorkflowOrchestrator.resumeFromStartedTask(
+                taskStates = pauseResult1.taskStates.toMutableMap(),
                 node = callChildNode,
                 rawOutput = childOutput,
-                taskStates = pauseResult1.taskStates.toMutableMap(),
                 executionMode = executionMode
             )
 
@@ -650,9 +650,9 @@ class ByActivityOrchestratorTest : AbstractOrchestratorTest() {
             val doNode = rootNode.children!!.first()
             val callChildNode = doNode.children!!.first()
             val resumeResult = WorkflowOrchestrator.resumeFromStartedTask(
+                taskStates = parentPause.taskStates.toMutableMap(),
                 node = callChildNode,
                 rawOutput = childOutput,
-                taskStates = parentPause.taskStates.toMutableMap(),
                 executionMode = executionMode
             )
 

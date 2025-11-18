@@ -24,12 +24,18 @@ import kotlinx.serialization.json.JsonElement
 sealed class WorkflowState {
     abstract val taskStates: TaskStates
     abstract val nodePosition: NodePosition
+
+    open fun toJsonString(): String = LemlineJson.encodeToString(this)
+
+    companion object {
+        fun fromJsonString(jsonString: String): WorkflowState = LemlineJson.decodeFromString(jsonString)
+    }
 }
 
 @Serializable
 sealed class WorkflowCommand : WorkflowState() {
 
-    fun toJsonString(): String = LemlineJson.encodeToString(this)
+    override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
     companion object {
         fun fromJsonString(jsonString: String): WorkflowCommand = LemlineJson.decodeFromString(jsonString)
@@ -92,7 +98,7 @@ sealed class WorkflowCommand : WorkflowState() {
 @Serializable
 sealed class WorkflowEvent : WorkflowState() {
 
-    fun toJsonString(): String = LemlineJson.encodeToString(this)
+    override fun toJsonString(): String = LemlineJson.encodeToString(this)
 
     companion object {
         fun fromJsonString(jsonString: String): WorkflowEvent = LemlineJson.decodeFromString(jsonString)

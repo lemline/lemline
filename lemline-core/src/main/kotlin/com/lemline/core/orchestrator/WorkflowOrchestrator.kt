@@ -275,41 +275,52 @@ object WorkflowOrchestrator {
         return null
     }
 
+    /**
+     * Resumes a previously started task in the workflow from an interrupted state.
+     *
+     * @param node The node representing the task to be resumed in the workflow.
+     * @param rawOutput The raw output of the interrupted task that needs to be processed.
+     * @param taskStates The current state of the workflow tasks, including updates and context.
+     * @param executionMode The mode of execution, which determines how the workflow progresses.
+     * @return A WorkflowEvent indicating either completion, failure, or the need to process the next task.
+     */
     internal suspend fun resumeFromStartedTask(
+        taskStates: TaskStates,
         node: Node<*>,
         rawOutput: JsonElement,
-        taskStates: TaskStates,
         executionMode: ExecutionMode
-    ): WorkflowEvent = run {
+    ): WorkflowEvent = try {
         logger.debug { "resumeFromInterruptedTask In: node=${node.reference}, output=$rawOutput, states=$taskStates" }
 
-        try {
-            // Complete the interrupted task (transforms output, updates state)
-            val result = tryCatch(node, taskStates) {
-                completeStartedTask(taskStates, node, rawOutput)
-            }
+        // Complete the interrupted task (transforms output, updates state)
+        val result = tryCatch(node, taskStates) {
+            completeStartedTask(taskStates, node, rawOutput)
+        }
 
+        if (result.nextNode == null) {
+            WorkflowEvent.WorkflowCompleted(result.nextInput)
+        } else {
             // Create new states map with updated state updates and context exports
             val newStates = taskStates.updateWith(result.stateUpdates, result.nextContext)
 
             // Continue execution from the next node (may pause again or complete)
-            return@run resumeFromTask(
+            resumeFromTask(
                 taskStates = newStates,
-                node = result.nextNode ?: return WorkflowEvent.WorkflowCompleted(result.nextInput),
+                node = result.nextNode,
                 rawInput = result.nextInput,
                 flowDirective = result.nextDirective,
                 executionMode = executionMode
             )
-        } catch (e: Exception) {
-            return@run WorkflowEvent.TaskFailed(
-                taskStates = taskStates,
-                nodePosition = node.position,
-                rawInput = null,
-                rawOutput = rawOutput,
-                flowDirective = null,
-                exception = e
-            )
         }
+    } catch (e: Exception) {
+        WorkflowEvent.TaskFailed(
+            taskStates = taskStates,
+            nodePosition = node.position,
+            rawInput = null,
+            rawOutput = rawOutput,
+            flowDirective = null,
+            exception = e
+        )
     }.also {
         logger.debug { "resumeFromInterruptedTask Out: state=$it" }
     }

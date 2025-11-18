@@ -26,6 +26,7 @@ import com.lemline.core.states.TryState
 import com.lemline.core.states.WaitState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowState
 import com.lemline.core.workflows.FlowDirective
 import com.lemline.core.workflows.FlowDirectiveEnum
 import com.lemline.core.workflows.FlowDirectiveGoto
@@ -188,6 +189,11 @@ fun RunWorkflowException.Config.Companion.random() = RunWorkflowException.Config
     input = JsonElement.random(),
     sync = Random.nextBoolean()
 )
+
+fun WorkflowState.Companion.random(): WorkflowState = when (Random.nextBoolean()) {
+    true -> WorkflowEvent.random()
+    false -> WorkflowCommand.random()
+}
 
 fun WorkflowCommand.Companion.random(): WorkflowCommand {
     return when (Random.nextInt(2)) {

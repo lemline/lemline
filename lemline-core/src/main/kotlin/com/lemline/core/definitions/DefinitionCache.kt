@@ -82,8 +82,7 @@ object DefinitionCache {
         namespace: WorkflowNamespace,
         name: WorkflowName,
         version: WorkflowVersion
-    ): Workflow? =
-        workflowCache[WorkflowIndex(namespace, name, version)]
+    ): Workflow? = workflowCache[WorkflowIndex(namespace, name, version)]
 
     /**
      * Retrieves a map of node positions to their corresponding nodes for a given workflow.
