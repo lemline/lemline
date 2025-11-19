@@ -1,78 +1,61 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.common.logger.logger
+import com.lemline.runner.cleaner.AbstractCleaner
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.commands.InstanceMessageEmitter
+import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.OutboxRepository
-import io.quarkus.runtime.ShutdownEvent
+import com.lemline.runner.repositories.RelayRepository
 import jakarta.annotation.PostConstruct
-import jakarta.enterprise.event.Observes
 import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Clock
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.ExperimentalSerializationApi
+import org.jetbrains.annotations.VisibleForTesting
 
 /**
- * AbstractOutbox provides base functionality for outbox pattern implementations.
- * It handles scheduling and execution of two primary operations:
- * 1. Processing pending messages and sending them to the workflow output channel
- * 2. Cleaning up old sent messages to prevent database bloat
+ * AbstractRelay provides base functionality for outbox pattern implementations.
+ * It extends AbstractCleaner to inherit cleanup scheduling and shutdown logic,
+ * and adds processing functionality for pending messages.
  *
- * The class uses a scheduled approach with configurable intervals for both operations.
+ * It handles scheduling and execution of processing pending messages and sending
+ * them to the workflow output channel. Cleanup of old sent messages is handled
+ * by the parent AbstractCleaner class.
+ *
+ * The class uses a scheduled approach with configurable intervals for processing.
  * It ensures thread safety by using SKIP concurrent execution strategy, preventing
  * multiple instances of the same operation from running simultaneously.
  *
+ * The processor implements the outbox pattern to ensure reliable message delivery by:
+ * - Storing messages in a database before attempting to send them
+ * - Processing messages in batches with configurable sizes
+ * - Implementing retry logic with exponential backoff
+ *
  * @param T Type of the message entity (must implement OutboxModel interface)
- * @see OutboxRelay for the core message processing logic
+ * @see AbstractCleaner for the cleanup infrastructure
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class AbstractOutbox<T : OutboxModel>() {
-    protected val logger by lazy { logger() }
-
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-
-    protected abstract val enabled: Boolean
+internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
 
     protected abstract val failureRepository: FailureRepository
-    protected abstract val outboxRepository: OutboxRepository<T>
-    protected abstract val instanceEmitter: InstanceMessageEmitter
+    override val repository: RelayRepository<T> get() = relayRepository
+    protected abstract val relayRepository: RelayRepository<T>
+    protected abstract val instanceEmitter: WorkflowCommandEmitter
 
     protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig?
-    protected abstract val cleanupConf: LemlineConfiguration.OutboxCleanupConfig
-
-    private val gracePeriod = 5000L
-
-    private val outboxRelay by lazy {
-        OutboxRelay(
-            logger = logger,
-            failureRepository = failureRepository,
-            outboxRepository = outboxRepository,
-            relay = ::process,
-        )
-    }
 
     private val outboxProcessingExecutor = Executors.newSingleThreadScheduledExecutor()
     private val outboxProcessing = AtomicBoolean(false)
-
-    private val outboxCleaningExecutor = Executors.newSingleThreadScheduledExecutor()
-    private val outboxCleaning = AtomicBoolean(false)
-
-    private val isShuttingDown = AtomicBoolean(false)
 
     /**
      * Process an outbox entity by transforming and sending it.
@@ -81,9 +64,9 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
     protected abstract suspend fun process(entity: T)
 
     @PostConstruct
-    fun init() {
+    override fun init() {
         if (!enabled) {
-            logger.debug { "🚫 Outbox disabled by config" }
+            logger.debug { "🚫 Relay disabled by config" }
             return
         }
 
@@ -95,61 +78,20 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
                 period,
                 TimeUnit.SECONDS
             )
-            logger.info { "⏱️ Outbox processing scheduled every ${period}s" }
+            logger.info { "⏱️ Relay processing scheduled every ${period}s" }
         }
 
-        // Schedule cleanup
-        val cleanupPeriodSeconds = cleanupConf.every.inWholeSeconds
-        outboxCleaningExecutor.scheduleAtFixedRate(
-            { scope.launch { cleanup() } },
-            0,
-            cleanupPeriodSeconds,
-            TimeUnit.SECONDS
-        )
-        logger.info { "⏱️ Outbox cleaning scheduled every ${cleanupPeriodSeconds}s" }
+        // Schedule cleanup (inherited from AbstractCleaner)
+        scheduleCleanup()
     }
 
-    // Quarkus will wait for the completion of performGracefulShutdown() before shutting down
-    fun onQuarkusShutdown(@Observes event: ShutdownEvent) {
-        logger.info { "🛑 ShutdownEvent received - initiating graceful shutdown" }
-        performGracefulShutdown(gracePeriod)
-    }
-
-    private fun performGracefulShutdown(timeoutMs: Long) {
-        if (!isShuttingDown.compareAndSet(false, true)) {
-            logger.info { "🛑 Shutdown already in progress - ignoring" }
-            return
-        }
-
-        logger.info { "🛑 Shutting down outbox..." }
-
-        // Shutdown executors first (prevents new coroutine launches)
+    /**
+     * Shutdown additional executors (processing executor).
+     * Cleanup executor is shut down by the parent class.
+     */
+    override fun shutdownExecutors() {
         shutdownExecutor(outboxProcessingExecutor, "processing")
-        shutdownExecutor(outboxCleaningExecutor, "cleaning")
-
-        // Wait for active coroutines to complete (non-blocking)
-        gracefulWaitForCompletion(timeoutMs)
-    }
-
-    private fun gracefulWaitForCompletion(timeoutMs: Long) {
-        // Use a separate thread to avoid blocking @PreDestroy
-        try {
-            runBlocking {
-                withTimeout(timeoutMs) {
-                    // Wait for all child coroutines to complete
-                    scope.coroutineContext.job.children.forEach { it.join() }
-                }
-                logger.info { "✅ All scheduled tasks processed, completing shutdown" }
-            }
-        } catch (_: TimeoutCancellationException) {
-            logger.warn { "⚠️ Graceful shutdown timed out with tasks still being processed" }
-        } catch (e: Exception) {
-            logger.error(e) { "💥 Error during graceful shutdown" }
-        } finally {
-            // Always cancel remaining coroutines
-            scope.cancel()
-            logger.info { "🏁 Outbox scope cancelled" }
-        }
+        super.shutdownExecutors() // Shutdown cleanup executor
     }
 
     /**
@@ -158,79 +100,157 @@ internal abstract class AbstractOutbox<T : OutboxModel>() {
      */
     private suspend fun outbox() {
         if (isShuttingDown.get()) {
-            logger.debug { "⏹️ Skipping outbox processing: shutdown in progress" }
+            logger.debug { "⏹️ Skipping relay processing: shutdown in progress" }
             return
         }
 
         if (!outboxProcessing.compareAndSet(false, true)) {
-            logger.warn { "⏭ Skipping scheduled outbox processing: previous execution still running" }
+            logger.warn { "⏭ Skipping scheduled relay processing: previous execution still running" }
             return
         }
 
         try {
-            outboxRelay.process(
+            processEntities(
                 batchSize = outboxConf!!.batchSize,
                 maxAttempts = outboxConf!!.maxAttempts,
                 initialDelay = outboxConf!!.initialDelay,
             )
         } catch (e: Exception) {
-            logger.error(e) { "💥 Error during outbox processing" }
+            logger.error(e) { "💥 Error during relay processing" }
         } finally {
             outboxProcessing.set(false)
         }
     }
 
     /**
-     * Safely executes the cleaning task while ensuring that no concurrent executions occur.
-     * This method uses an `AtomicBoolean` to prevent overlapping executions.
+     * Processes messages from the outbox table in batches.
+     * This method implements the core outbox pattern logic:
+     *
+     * 1. Retrieves a batch of pending messages
+     * 2. For each message:
+     *    - Attempts to process it using the provided processor
+     *    - On success, marks the message as sent
+     *    - On failure, implements retry logic with exponential backoff
+     * 3. Handles concurrent processing safely
+     *
+     * It's crucial to run this method within a transaction to ensure data consistency.
+     * Without a transaction, another runner could process the same messages concurrently
+     * while this one is still handling the results of the `findMessagesToProcess` query.
+     *
+     * The method uses exponential backoff for retries:
+     * - Initial delay is configurable
+     * - Each retry doubles the previous delay
+     * - Maximum retry attempts are configurable
+     *
+     * @param batchSize Maximum number of messages to process in one batch
+     * @param maxAttempts Maximum number of attempts before giving up (>=1)
+     * @param initialDelay Initial delay in seconds before first retry
      */
-    private suspend fun cleanup() {
-        if (isShuttingDown.get()) {
-            logger.debug { "⏹️ Skipping outbox cleaning: shutdown in progress" }
-            return
-        }
+    @VisibleForTesting
+    internal suspend fun processEntities(batchSize: Int, maxAttempts: Int, initialDelay: Duration) = try {
+        var totalToProcess = 0
+        var totalProcessed = 0
+        var batchNumber = 0
 
+        do {
+            batchNumber++
+            var toProcess = 0
+            // Find and process messages in the same transaction
+            relayRepository.withTransaction { connection ->
+                // Find and lock messages ready to process
+                val messages = relayRepository.findEntitiesToProcess(maxAttempts, batchSize, connection)
+                toProcess = messages.size
 
-        if (!outboxCleaning.compareAndSet(false, true)) {
-            logger.warn { "⏭ Skipping scheduled outbox cleaning: previous execution still running" }
-            return
-        }
+                if (toProcess > 0) {
+                    totalToProcess += toProcess
+                    val processed = processBatch(messages, maxAttempts, initialDelay)
+                    relayRepository.update(messages, connection)
+                    totalProcessed += processed
+                }
+            }
+        } while (toProcess >= batchSize)
 
-        try {
-            outboxRelay.cleanup(
-                afterDelay = cleanupConf.after,
-                batchSize = cleanupConf.batchSize,
-            )
-        } catch (e: Exception) {
-            logger.error(e) { "💥 Error during outbox cleaning" }
-        } finally {
-            outboxCleaning.set(false)
-        }
+        logBatches(totalProcessed, totalToProcess, batchNumber, "processed")
+    } catch (e: Exception) {
+        logger.error(e) { "💥Error during scheduled relay processing" }
+        // Don't throw the exception to prevent scheduler from stopping
+        // The next scheduled run will try again
     }
 
     /**
-     * Shuts down the given ScheduledExecutorService in a controlled manner.
-     *
-     * This method attempts to stop the executor gracefully within a timeout of 5 seconds, and if
-     * this fails, it forces the termination of all tasks. It also accounts for interrupted exceptions,
-     * ensuring the current thread's interrupt status is reasserted.
+     * Processes a list of entities concurrently on separate coroutines for improved performance.
      */
-    private fun shutdownExecutor(executor: ScheduledExecutorService, name: String) {
-        try {
-            //Stop accepting new scheduled tasks
-            executor.shutdown()
+    private suspend fun processBatch(
+        entities: List<T>,
+        maxAttempts: Int,
+        initialDelay: Duration
+    ): Int = coroutineScope {
+        entities.map {
+            async { processEntity(it, maxAttempts, initialDelay) }
+        }
+    }.awaitAll().count { it }
 
-            if (!executor.awaitTermination(gracePeriod, TimeUnit.MILLISECONDS)) {
-                logger.warn { "⚠️ Forcing shutdown of outbox $name executor" }
-                executor.shutdownNow()
-            } else {
-                logger.info { "✅ Outbox $name executor stopped gracefully" }
+    /**
+     * Processes a given message with retry handling, exponential backoff, and timestamp updates.
+     *
+     * The method increments the message's attempt count, processes the message,
+     * and updates timestamps accordingly. If the processing fails, it implements
+     * retries with a delayed schedule based on exponential backoff. Once the maximum
+     * attempts have been reached, outbox_failed_at is set.
+     */
+    private suspend fun processEntity(entity: T, maxAttempts: Int, initialDelay: Duration): Boolean = try {
+        entity.outboxAttemptCount++
+        process(entity)
+        // Mark as completed on success
+        entity.outboxCompletedAt = Clock.System.now()
+        true // <- return true (success)
+    } catch (e: Exception) {
+        logger.info(e) { "Failed to process $entity" }
+        entity.outboxErrorClass = e::class.qualifiedName
+        entity.outboxErrorMessage = e.message
+        entity.outboxErrorStackTrace = e.stackTraceToString()
+
+        if (entity.outboxAttemptCount >= maxAttempts) {
+            // Mark as permanently failed
+            entity.outboxFailedAt = Clock.System.now()
+            logger.error { "Message ${entity.workflowId} has reached maximum retry attempts" }
+        } else {
+            // Schedule for retry with exponential backoff
+            val nextDelay = calculateNextAttemptDelay(entity.outboxAttemptCount, initialDelay)
+            entity.outboxDelayedUntil = Clock.System.now() + nextDelay
+            logger.debug { "Message ${entity.workflowId} will be retried in ${nextDelay}ms (attempt ${entity.outboxAttemptCount})" }
+        }
+        false // <- return false (failure)
+    }
+
+    @VisibleForTesting
+    internal fun calculateNextAttemptDelay(attemptCount: Int, initialDelay: Duration): Duration {
+        // Exponential backoff: initialDelay * 2^(attemptCount-1)
+        // e.g., with initialDelay=1000ms (10s):
+        // attempt 1: 1000ms * 2^0 = 1000ms +/- 20%
+        // attempt 2: 1000ms * 2^1 = 2000ms +/- 20%
+        // attempt 3: 1000ms * 2^2 = 4000ms +/- 20%
+        val baseDelay = initialDelay.inWholeMilliseconds * (1L shl (attemptCount - 1))
+
+        // Add jitter of ±20%
+        val jitterRange = baseDelay * 0.2 // 20% of base delay
+        val jitter = (Math.random() - 0.5) * 2 * jitterRange // Random value between -1 and 1, multiplied by range
+
+        // Ensure we never return less than .1 second (100ms)
+        return (baseDelay + jitter).toLong().coerceAtLeast(100L).milliseconds
+    }
+
+    private fun logBatches(success: Int, total: Int, batchNumber: Int, action: String) {
+        val failed = total - success
+        when (total) {
+            0 -> logger.debug { "No message found to process" }
+            else -> when {
+                failed == 0 -> logger.debug { "All ${total.messages()} $action successfully (over ${batchNumber.batches()})" }
+                else -> logger.debug { "${success.messages()} $action successfully and ${failed.messages()} failed (over ${batchNumber.batches()})" }
             }
-        } catch (_: InterruptedException) {
-            // The current thread was interrupted while waiting
-            logger.error { "💥 Interrupted while shutting down outbox $name executor" }
-            executor.shutdownNow()
-            Thread.currentThread().interrupt() // <- reassert the interrupt status
         }
     }
+
+    private fun Int.messages(): String = this.toString() + " message" + if (this <= 1) "" else "s"
+    private fun Int.batches(): String = this.toString() + " batch" + if (this <= 1) "" else "es"
 }

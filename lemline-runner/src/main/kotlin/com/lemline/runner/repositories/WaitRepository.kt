@@ -4,8 +4,7 @@ package com.lemline.runner.repositories
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.WaitOutboxModel
-import com.lemline.runner.outbox.OutBoxStatus
-import com.lemline.runner.outbox.OutboxRelay
+import com.lemline.runner.outbox.AbstractOutbox
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.ResultSet
@@ -24,14 +23,14 @@ const val WAIT_TABLE = "lemline_waits"
  * uses native SQL queries with SKIP LOCKED for parallel processing safety,
  * ensuring reliable message delivery in distributed systems.
  *
- * @see OutboxRepository for base functionality and documentation
+ * @see RelayRepository for base functionality and documentation
  * @see WaitOutboxModel for the message model
- * @see OutboxRelay for the processing logic
+ * @see AbstractOutbox for the processing logic
  */
 @ApplicationScoped
 @ExperimentalSerializationApi
 @ExperimentalTime
-internal class WaitRepository : OutboxRepository<WaitOutboxModel>() {
+internal class WaitRepository : RelayRepository<WaitOutboxModel>() {
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
@@ -41,11 +40,13 @@ internal class WaitRepository : OutboxRepository<WaitOutboxModel>() {
     override fun createModel(rs: ResultSet) = WaitOutboxModel(
         id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowEvent.WaitStarted>()!!,
-        outBoxStatus = OutBoxStatus.valueOf(rs.getString(OUTBOX_STATUS_COLUMN)),
-        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
+        scheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN)!!,
+        outboxCompletedAt = getOutboxCompletedAt(rs)
     ).apply {
+        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN)
         outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN)
         outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN)
+        outboxFailedAt = rs.getInstant(OUTBOX_FAILED_AT_COLUMN)
         outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN)
         outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN)
         outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN)

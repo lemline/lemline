@@ -4,7 +4,7 @@ package com.lemline.runner.repositories
 import com.lemline.common.values.IDV7
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.models.ParentWaitingModel
+import com.lemline.runner.models.ParentModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.ResultSet
@@ -18,15 +18,15 @@ const val PARENT_TABLE = "lemline_parents"
  * Stores parent workflow state while waiting for child workflow completion.
  * Event-driven pattern - processed immediately when child completes, then deleted.
  *
- * @see WithInstanceRepository for base functionality
- * @see ParentWaitingModel for the state model
+ * @see CleanableRepository for base functionality
+ * @see ParentModel for the state model
  */
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class ParentWaitingRepository : WithInstanceRepository<ParentWaitingModel>() {
+internal class ParentRepository : CleanableRepository<ParentModel>() {
 
-    companion object {
+    companion object Companion {
         const val CHILD_ID_COLUMN = "child_id"
     }
 
@@ -37,10 +37,10 @@ internal class ParentWaitingRepository : WithInstanceRepository<ParentWaitingMod
 
     override val prepareStatementMap by lazy {
         super.prepareStatementMap + mapOf(
-            CHILD_ID_COLUMN to { stmt: java.sql.PreparedStatement, entity: ParentWaitingModel, idx: Int ->
+            CHILD_ID_COLUMN to { stmt: java.sql.PreparedStatement, entity: ParentModel, idx: Int ->
                 setIDV7(stmt, idx, entity.childId)
             },
-            PARENT_ID_COLUMN to { stmt: java.sql.PreparedStatement, entity: ParentWaitingModel, idx: Int ->
+            PARENT_ID_COLUMN to { stmt: java.sql.PreparedStatement, entity: ParentModel, idx: Int ->
                 // Store parent's parent workflow ID for user convenience
                 if (entity.instanceMessage.hasParentWaiting) {
                     setIDV7(stmt, idx, entity.instanceMessage.workflowId.value)
@@ -51,10 +51,11 @@ internal class ParentWaitingRepository : WithInstanceRepository<ParentWaitingMod
         )
     }
 
-    override fun createModel(rs: ResultSet) = ParentWaitingModel(
+    override fun createModel(rs: ResultSet) = ParentModel(
         id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowEvent.RunWorkflowStarted>()!!,
-        childId = getIDV7(rs, CHILD_ID_COLUMN)!!
+        childId = getIDV7(rs, CHILD_ID_COLUMN)!!,
+        outboxCompletedAt = getOutboxCompletedAt(rs)
     )
 
     /**
@@ -65,7 +66,7 @@ internal class ParentWaitingRepository : WithInstanceRepository<ParentWaitingMod
      * @param connection An optional database connection to use. If null, a new connection is acquired.
      * @return The parent model, or null if not found
      */
-    suspend fun findByChildId(childId: IDV7, connection: java.sql.Connection? = null): ParentWaitingModel? =
+    suspend fun findByChildId(childId: IDV7, connection: java.sql.Connection? = null): ParentModel? =
         withConnection(connection) { conn ->
             conn.prepareStatement(findByChildIdSql).use { stmt ->
                 setIDV7(stmt, 1, childId)

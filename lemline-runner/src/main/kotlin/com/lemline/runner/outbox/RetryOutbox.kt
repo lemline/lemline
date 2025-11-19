@@ -3,7 +3,7 @@ package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.messaging.commands.InstanceMessageEmitter
+import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.RetryRepository
@@ -31,7 +31,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
 
     @Inject
-    override lateinit var instanceEmitter: InstanceMessageEmitter
+    override lateinit var instanceEmitter: WorkflowCommandEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
@@ -40,7 +40,7 @@ internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
     override lateinit var failureRepository: FailureRepository
 
     @Inject
-    override lateinit var outboxRepository: RetryRepository
+    override lateinit var relayRepository: RetryRepository
 
     // Is this outbox enabled?
     override val enabled by lazy {
@@ -53,7 +53,7 @@ internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
     override val outboxConf by lazy { lemlineConfig.outbox().retry().outbox() }
 
     // Cleanup configuration
-    override val cleanupConf by lazy { lemlineConfig.outbox().retry().cleanup() }
+    override val cleanerConf by lazy { lemlineConfig.outbox().retry().cleanup() }
 
     /**
      * Transform RetryScheduled Event → ResumeFromTask Command before sending.

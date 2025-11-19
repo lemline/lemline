@@ -15,7 +15,7 @@ internal const val WORKFLOWS_OUT_CHANNEL = "workflows-out"
 @ExperimentalTime
 @Startup
 @ApplicationScoped
-internal class InstanceMessageEmitter(
+internal class WorkflowCommandEmitter(
     override val metrics: WorkflowCommandSubscriberMetrics
 ) : MessageEmitter<InstanceMessage<out WorkflowCommand>>() {
 

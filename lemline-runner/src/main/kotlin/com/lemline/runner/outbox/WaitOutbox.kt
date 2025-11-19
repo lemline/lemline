@@ -3,7 +3,7 @@ package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.messaging.commands.InstanceMessageEmitter
+import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.WaitRepository
@@ -27,7 +27,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
 
     @Inject
-    override lateinit var instanceEmitter: InstanceMessageEmitter
+    override lateinit var instanceEmitter: WorkflowCommandEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
@@ -36,7 +36,7 @@ internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
     override lateinit var failureRepository: FailureRepository
 
     @Inject
-    override lateinit var outboxRepository: WaitRepository
+    override lateinit var relayRepository: WaitRepository
 
     // Is this outbox enabled?
     override val enabled by lazy {
@@ -49,7 +49,7 @@ internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
     override val outboxConf by lazy { lemlineConfig.outbox().wait().outbox() }
 
     // Cleanup configuration
-    override val cleanupConf by lazy { lemlineConfig.outbox().wait().cleanup() }
+    override val cleanerConf by lazy { lemlineConfig.outbox().wait().cleanup() }
 
     /**
      * Transform WaitStarted Event → ResumeFromStartedTask Command before sending.

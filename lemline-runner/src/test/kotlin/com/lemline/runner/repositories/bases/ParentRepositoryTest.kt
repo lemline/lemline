@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.runner.models.ParentWaitingModel
+import com.lemline.runner.models.ParentModel
 import com.lemline.runner.random.random
-import com.lemline.runner.repositories.ParentWaitingRepository
+import com.lemline.runner.repositories.ParentRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import jakarta.inject.Inject
@@ -21,11 +21,11 @@ import org.junit.jupiter.api.Test
 internal abstract class ParentWaitingRepositoryTest {
 
     @Inject
-    lateinit var repository: ParentWaitingRepository
+    lateinit var repository: ParentRepository
 
     @Test
     fun `should insert and find parent waiting model`() = runTest {
-        val model = ParentWaitingModel.random()
+        val model = ParentModel.random()
 
         repository.insert(model)
 
@@ -37,7 +37,7 @@ internal abstract class ParentWaitingRepositoryTest {
 
     @Test
     fun `should delete parent waiting model`() = runTest {
-        val model = ParentWaitingModel.random()
+        val model = ParentModel.random()
 
         repository.insert(model)
         val found = repository.findById(model.id)

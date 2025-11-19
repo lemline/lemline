@@ -41,7 +41,7 @@ import org.jetbrains.annotations.TestOnly
 @ExperimentalSerializationApi
 @ApplicationScoped
 internal class WorkflowCommandHandler(
-    private val instanceEmitter: InstanceMessageEmitter,
+    private val instanceEmitter: WorkflowCommandEmitter,
     private val databaseEmitter: WorkflowEventEmitter,
     private val definitionRepository: DefinitionRepository,
     private val failureRepository: FailureRepository,

@@ -3,7 +3,7 @@ package com.lemline.runner.outbox
 
 import com.lemline.common.values.WorkflowId
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.commands.InstanceMessageEmitter
+import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ScheduleRepository
@@ -31,7 +31,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
 
     @Inject
-    override lateinit var instanceEmitter: InstanceMessageEmitter
+    override lateinit var instanceEmitter: WorkflowCommandEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
@@ -40,7 +40,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
     override lateinit var failureRepository: FailureRepository
 
     @Inject
-    override lateinit var outboxRepository: ScheduleRepository
+    override lateinit var relayRepository: ScheduleRepository
 
     // Is this outbox enabled?
     override val enabled by lazy {
@@ -53,7 +53,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
     override val outboxConf by lazy { lemlineConfig.outbox().schedule().outbox() }
 
     // Cleanup configuration
-    override val cleanupConf by lazy { lemlineConfig.outbox().schedule().cleanup() }
+    override val cleanerConf by lazy { lemlineConfig.outbox().schedule().cleanup() }
 
     /**
      * Process scheduled workflow by updating next execution time and sending command.

@@ -2,14 +2,11 @@
 package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.InstanceMessage
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 /**
  * Database model for fork metadata.
@@ -20,26 +17,11 @@ import kotlinx.serialization.Serializable
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-@Serializable
-@SerialName("fork")
-data class ForkWaitingModel(
-    @SerialName("id")
+data class ForkModel(
     override val id: IDV7 = IDV7.random(),
-
-    @SerialName("i")
-    val instanceMessage: InstanceMessage<WorkflowEvent.ForkStarted>,
-
-    @SerialName("fp")
+    override val instanceMessage: InstanceMessage<WorkflowEvent.ForkStarted>,
     val forkPosition: String,  // Serialized NodePosition
-
-    @SerialName("c")
     val compete: Boolean,
-
-    @SerialName("bc")
-    val branchCount: Int
-) : InstanceModel {
-
-    override val workflowInfo: WorkflowInfo get() = instanceMessage.workflowInfo
-
-    override val workflowState: WorkflowState get() = instanceMessage.workflowState
-}
+    val branchCount: Int,
+    override var outboxCompletedAt: Instant? = null
+) : CleanableModel()

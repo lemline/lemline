@@ -18,11 +18,14 @@ CREATE TABLE lemline_forks (
     compete TINYINT(1) NOT NULL,
     branch_count INT NOT NULL,
 
+    -- Cleanup tracking
+    outbox_completed_at TIMESTAMP(6),
+
     -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT NULL,
 
-    -- Unique constraint: one active fork per workflow position
+    -- Constraints
     CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, fork_position(255))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -68,5 +71,9 @@ CREATE INDEX idx_fork_branches_status
 
 CREATE INDEX idx_forks_created
     ON lemline_forks(created_at);
+
+-- Create index for cleanup queries
+CREATE INDEX idx_lemline_forks_completed
+    ON lemline_forks (outbox_completed_at);
 
 -- Note: (workflow_id, fork_position) has unique constraint, no separate index needed

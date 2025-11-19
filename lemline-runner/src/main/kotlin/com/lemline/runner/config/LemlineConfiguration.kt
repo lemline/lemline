@@ -317,6 +317,7 @@ interface LemlineConfiguration {
         fun retry(): ProcessOutboxConfig
         fun schedule(): ProcessOutboxConfig
         fun parent(): CleanupOutboxConfig
+        fun fork(): CleanupOutboxConfig
     }
 
     /**

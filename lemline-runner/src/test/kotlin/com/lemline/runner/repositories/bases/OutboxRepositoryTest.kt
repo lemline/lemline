@@ -2,10 +2,7 @@
 package com.lemline.runner.repositories.bases
 
 import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.outbox.OutBoxStatus.FAILED
-import com.lemline.runner.outbox.OutBoxStatus.PENDING
-import com.lemline.runner.outbox.OutBoxStatus.SENT
-import com.lemline.runner.repositories.OutboxRepository
+import com.lemline.runner.repositories.RelayRepository
 import io.kotest.common.runBlocking
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -47,7 +44,7 @@ import org.junit.jupiter.api.Test
 internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
     /** The repository implementation being tested */
-    internal abstract val repository: OutboxRepository<T>
+    internal abstract val repository: RelayRepository<T>
 
     /** Method to create a new instance of the model being tested */
     internal abstract fun createRandomEntity(): T
@@ -67,7 +64,8 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     /**
      * Filters a list of messages to find those that are ready to be processed.
      * A message is ready to process if:
-     * - It has PENDING status
+     * - Not completed (outbox_completed_at IS NULL)
+     * - Not failed (outbox_failed_at IS NULL)
      * - Its delayedUntil time has passed
      * - It hasn't exceeded maxAttempts
      */
@@ -75,7 +73,8 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         maxAttempts: Int = Int.MAX_VALUE,
         cutoffDate: Instant = Clock.System.now()
     ): List<T> = filter { entity ->
-        entity.outBoxStatus == PENDING &&
+        entity.outboxCompletedAt == null &&
+            entity.outboxFailedAt == null &&
             (entity.outboxDelayedUntil?.let { it <= cutoffDate } ?: false) &&
             entity.outboxAttemptCount < maxAttempts
     }
@@ -83,13 +82,13 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     /**
      * Filters a list of messages to find those that are ready to be deleted.
      * A message is ready to delete if:
-     * - It has SENT status
-     * - Its delayedUntil time is before the cutoff date
+     * - It has been completed (outbox_completed_at IS NOT NULL)
+     * - Its completed time is before the cutoff date
      */
     private fun List<T>.filterEntitiesToDelete(
         cutoffDate: Instant = Clock.System.now()
     ): List<T> = filter { entity ->
-        entity.outBoxStatus == SENT && (entity.outboxDelayedUntil?.let { it <= cutoffDate } ?: false)
+        entity.outboxCompletedAt != null && (entity.outboxCompletedAt?.let { it <= cutoffDate } ?: false)
     }
 
     /**
@@ -134,9 +133,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      */
     protected open suspend fun findMessagesToDelete(
         cutoffDate: Instant = Clock.System.now(),
-        limit: Int = Int.MAX_VALUE,
+        batchSize: Int = Int.MAX_VALUE,
         connection: Connection? = null
-    ): List<T> = repository.findEntitiesToDelete(cutoffDate = cutoffDate, limit = limit, connection)
+    ): List<T> = repository.findEntitiesToDelete(cutoffDate = cutoffDate, batchSize = batchSize, connection)
 
     /**
      * Tests that findMessagesToProcess returns the correct messages for processing.
@@ -253,7 +252,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         val expected = messages.filterEntitiesToDelete()
         val expectedIds = expected.map { it.workflowId }
 
-        val actual = findMessagesToDelete(limit = limit).filter { it.workflowId in messagesIds }
+        val actual = findMessagesToDelete(batchSize = limit).filter { it.workflowId in messagesIds }
 
         actual.size shouldBeLessThanOrEqualTo limit
 
@@ -288,8 +287,8 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                             repository.withTransaction { connection ->
                                 // get messages to process
                                 val results = findMessagesToProcess(maxAttempts, limit, connection)
-                                // mark messages as sent
-                                results.forEach { it.outBoxStatus = SENT }
+                                // mark messages as completed
+                                results.forEach { it.outboxCompletedAt = Clock.System.now() }
                                 // save them
                                 repository.update(results, connection)
                                 // record processed messages
@@ -392,8 +391,8 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                                         println("Processing...")
                                         // get messages to process
                                         val results = findMessagesToProcess(maxAttempts, limit, connection)
-                                        // mark messages as sent
-                                        results.forEach { it.outBoxStatus = SENT }
+                                        // mark messages as completed
+                                        results.forEach { it.outboxCompletedAt = Clock.System.now() }
                                         // delete them
                                         repository.delete(results, connection)
                                         // record processed messages
@@ -483,7 +482,8 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `insert should handle concurrent transactions correctly`() = runTest {
         // Given
         val message = createRandomEntity().apply {
-            outBoxStatus = PENDING
+            outboxCompletedAt = null
+            outboxFailedAt = null
             outboxDelayedUntil = Clock.System.now()
             outboxAttemptCount = 0
         }
@@ -824,7 +824,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     /**
      * Creates a batch of test messages with randomized properties.
      * Each message has:
-     * - Random status (PENDING, SENT, or FAILED)
+     * - Random state (pending, completed, or failed)
      * - Random delay duration
      * - Random attempt count
      * - Sequential message content
@@ -833,15 +833,24 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         val now = Clock.System.now()
         val messages = List(count) { i ->
             val duration = randomNonZero(1000).hours
-            val status = when (Random.nextInt(0, 2)) {
-                0 -> PENDING
-                1 -> SENT
-                else -> FAILED
-            }
+            val state = Random.nextInt(0, 2)
             val attemptCount = Random.nextInt(0, 5)
 
             createRandomEntity().apply {
-                this.outBoxStatus = status
+                when (state) {
+                    0 -> { // PENDING
+                        this.outboxCompletedAt = null
+                        this.outboxFailedAt = null
+                    }
+                    1 -> { // COMPLETED
+                        this.outboxCompletedAt = now + duration
+                        this.outboxFailedAt = null
+                    }
+                    else -> { // FAILED
+                        this.outboxCompletedAt = null
+                        this.outboxFailedAt = now + duration
+                    }
+                }
                 this.outboxDelayedUntil = now + duration
                 this.outboxAttemptCount = attemptCount
             }

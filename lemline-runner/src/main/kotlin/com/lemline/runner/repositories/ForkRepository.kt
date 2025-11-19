@@ -11,7 +11,7 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.ForkBranchModel
 import com.lemline.runner.models.ForkCompletionResult
-import com.lemline.runner.models.ForkWaitingModel
+import com.lemline.runner.models.ForkModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
@@ -19,7 +19,6 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -30,16 +29,16 @@ const val FORK_BRANCH_TABLE = "lemline_fork_branches"
 
 /**
  * Repository for managing fork execution state.
- * Extends WithInstanceRepository to follow standard pattern for instance-related entities.
+ * Extends WaitingRepository to follow standard pattern for waiting entities with cleanup tracking.
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
 @ApplicationScoped
-class ForkWaitingRepository : WithInstanceRepository<ForkWaitingModel>() {
+class ForkRepository : CleanableRepository<ForkModel>() {
 
     private val log = logger()
 
-    companion object {
+    companion object Companion {
         internal const val FORK_POSITION_COLUMN = "fork_position"
         internal const val COMPETE_COLUMN = "compete"
         internal const val BRANCH_COUNT_COLUMN = "branch_count"
@@ -51,33 +50,34 @@ class ForkWaitingRepository : WithInstanceRepository<ForkWaitingModel>() {
 
     override val tableName = FORK_TABLE
 
-    override val prepareStatementMap: Map<String, (PreparedStatement, ForkWaitingModel, Int) -> Unit> by lazy {
+    override val prepareStatementMap: Map<String, (PreparedStatement, ForkModel, Int) -> Unit> by lazy {
         super.prepareStatementMap + mapOf(
-            FORK_POSITION_COLUMN to { stmt: PreparedStatement, entity: ForkWaitingModel, idx: Int ->
+            FORK_POSITION_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
                 stmt.setString(idx, entity.forkPosition)
             },
-            COMPETE_COLUMN to { stmt: PreparedStatement, entity: ForkWaitingModel, idx: Int ->
+            COMPETE_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
                 stmt.setBoolean(idx, entity.compete)
             },
-            BRANCH_COUNT_COLUMN to { stmt: PreparedStatement, entity: ForkWaitingModel, idx: Int ->
+            BRANCH_COUNT_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
                 stmt.setInt(idx, entity.branchCount)
             }
         )
     }
 
-    override fun createModel(rs: ResultSet) = ForkWaitingModel(
+    override fun createModel(rs: ResultSet) = ForkModel(
         id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowEvent.ForkStarted>()!!,
         forkPosition = rs.getString(FORK_POSITION_COLUMN),
         compete = rs.getBoolean(COMPETE_COLUMN),
-        branchCount = rs.getInt(BRANCH_COUNT_COLUMN)
+        branchCount = rs.getInt(BRANCH_COUNT_COLUMN),
+        outboxCompletedAt = getOutboxCompletedAt(rs)
     )
 
     /**
      * Insert fork with all branches atomically.
      */
     suspend fun insertForkWithBranches(
-        fork: ForkWaitingModel,
+        fork: ForkModel,
         branches: List<ForkBranchModel>
     ) = withTransaction { conn ->
         // 1. Insert fork metadata
@@ -121,7 +121,7 @@ class ForkWaitingRepository : WithInstanceRepository<ForkWaitingModel>() {
         workflowId: WorkflowId,
         forkPosition: NodePosition,
         connection: Connection? = null
-    ): ForkWaitingModel? = withConnection(connection) { conn ->
+    ): ForkModel? = withConnection(connection) { conn ->
         conn.prepareStatement(findByWorkflowIdAndPositionSql).use { stmt ->
             setIDV7(stmt, 1, workflowId.value)
             stmt.setString(2, forkPosition.toString())
@@ -255,25 +255,6 @@ class ForkWaitingRepository : WithInstanceRepository<ForkWaitingModel>() {
 
     private val deleteForkSql by lazy {
         "DELETE FROM $tableName WHERE $ID_COLUMN = ?"
-    }
-
-    /**
-     * Clean up old forks (safety mechanism for orphaned forks).
-     */
-    suspend fun cleanupOldForks(olderThan: Instant, connection: Connection? = null): Int =
-        withConnection(connection) { conn ->
-            conn.prepareStatement(cleanupOldForksSql).use { stmt ->
-                stmt.setTimestamp(1, Timestamp.from(olderThan.toJavaInstant()))
-                val count = stmt.executeUpdate()
-                if (count > 0) {
-                    log.warn { "Cleaned up $count orphaned forks older than $olderThan" }
-                }
-                count
-            }
-        }
-
-    private val cleanupOldForksSql by lazy {
-        "DELETE FROM $tableName WHERE $CREATED_AT_COLUMN < ?"
     }
 
     // Helper method to convert ResultSet to ForkBranchModel

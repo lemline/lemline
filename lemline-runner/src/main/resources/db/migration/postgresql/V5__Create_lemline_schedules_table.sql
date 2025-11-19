@@ -13,10 +13,11 @@ CREATE TABLE lemline_schedules
     schedule_every          VARCHAR(255),
     schedule_cron           VARCHAR(255),
     schedule_zone           VARCHAR(64),
-    outbox_status           VARCHAR(50)    NOT NULL,
+    outbox_completed_at     TIMESTAMPTZ(6),
     outbox_scheduled_for    TIMESTAMPTZ(6),
     outbox_delayed_until    TIMESTAMPTZ(6),
     outbox_attempt_count    INTEGER        NOT NULL DEFAULT 0,
+    outbox_failed_at        TIMESTAMPTZ(6),
     outbox_error_class      TEXT,
     outbox_error_message    TEXT,
     outbox_error_stacktrace TEXT,
@@ -32,6 +33,12 @@ CREATE INDEX IF NOT EXISTS idx_lemline_schedules_workflow_id
 CREATE INDEX IF NOT EXISTS idx_lemline_schedules_parent_id
     ON lemline_schedules (parent_id);
 
--- Create an index for efficient querying on status and delayed_until
-CREATE INDEX IF NOT EXISTS idx_lemline_schedules_status_delayed_until
-    ON lemline_schedules (outbox_status, outbox_delayed_until);
+-- Create composite index for efficient querying of pending messages
+CREATE INDEX IF NOT EXISTS idx_lemline_schedules_processing
+    ON lemline_schedules (outbox_completed_at, outbox_failed_at, outbox_delayed_until)
+    WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
+
+-- Create index for cleanup queries
+CREATE INDEX IF NOT EXISTS idx_lemline_schedules_completed
+    ON lemline_schedules (outbox_completed_at)
+    WHERE outbox_completed_at IS NOT NULL;

@@ -8,7 +8,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.exceptions.CliException
-import com.lemline.runner.messaging.commands.InstanceMessageEmitter
+import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.starters.Starter
@@ -40,7 +40,7 @@ class InstanceStartCommand : Runnable {
     lateinit var starter: Starter
 
     @Inject
-    private lateinit var instanceEmitter: InstanceMessageEmitter
+    private lateinit var instanceEmitter: WorkflowCommandEmitter
 
     @Inject
     private lateinit var databaseEmitter: WorkflowEventEmitter

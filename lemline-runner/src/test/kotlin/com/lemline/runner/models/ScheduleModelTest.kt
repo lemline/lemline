@@ -6,10 +6,10 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.random.random
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -33,8 +33,7 @@ class ScheduleModelTest {
             workflowState = WorkflowCommand.random(),
             hasParentWaiting = false
         ),
-        outBoxStatus = OutBoxStatus.PENDING,
-        outboxScheduledFor = outboxScheduledFor,
+        initialScheduledFor = outboxScheduledFor,
         scheduleCron = scheduleCron,
         scheduleAfter = scheduleAfter,
         scheduleEvery = scheduleEvery,
@@ -58,10 +57,12 @@ class ScheduleModelTest {
     }
 
     @Test
-    fun `should return null when outboxScheduledFor is null`() {
+    fun `should calculate next execution when outboxScheduledFor is null`() {
         val model = createModel(scheduleCron = "* * * * *", outboxScheduledFor = null)
         model.prepareNextScheduled(WorkflowId.random())
-        assertNull(model.outboxScheduledFor)
+        // When outboxScheduledFor is null, it uses Clock.System.now() as the base time
+        // and calculates the next cron execution from that point
+        assertNotNull(model.outboxScheduledFor)
     }
 
     @Test

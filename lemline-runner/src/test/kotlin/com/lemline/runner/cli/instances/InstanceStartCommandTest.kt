@@ -8,7 +8,7 @@ import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.messaging.commands.InstanceMessageEmitter
+import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
@@ -47,7 +47,7 @@ class InstanceStartCommandTest {
     private lateinit var command: InstanceStartCommand
     private lateinit var definitions: Definitions
     private lateinit var definitionRepository: DefinitionRepository
-    private lateinit var instanceEmitter: InstanceMessageEmitter
+    private lateinit var instanceEmitter: WorkflowCommandEmitter
     private lateinit var databaseEmitter: WorkflowEventEmitter
 
     private var workflowNamespace = WorkflowNamespace("test")

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.runner.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -13,15 +13,19 @@ import kotlinx.serialization.ExperimentalSerializationApi
 class ParentWaitingModelTest {
 
     @Test
-    fun `ParentWaitingModel serializes and deserializes and keep the same fields`() {
-        val model = ParentWaitingModel.random()
-        val encoded = model.toJsonString()
+    fun `ParentModel can be created and fields accessed`() {
+        val model = ParentModel.random()
 
-        // Verify basic structure
-        val decoded = LemlineJson.decodeFromString<ParentWaitingModel>(encoded)
-        assertEquals(model.id, decoded.id)
-        assertEquals(model.instanceMessage.workflowInfo, decoded.instanceMessage.workflowInfo)
-        assertEquals(model, decoded)
+        // Verify all fields are accessible
+        assertNotNull(model.id)
+        assertNotNull(model.instanceMessage)
+        assertNotNull(model.childId)
+        assertNotNull(model.workflowInfo)
+
+        // Verify copy works
+        val copy = model.copy()
+        assertEquals(model.id, copy.id)
+        assertEquals(model.childId, copy.childId)
     }
 
 }

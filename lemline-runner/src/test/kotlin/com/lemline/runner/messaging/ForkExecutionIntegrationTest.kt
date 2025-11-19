@@ -12,7 +12,7 @@ import com.lemline.core.nodes.Token
 import com.lemline.core.states.BranchStatus
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.events.WorkflowEventHandler
-import com.lemline.runner.repositories.ForkWaitingRepository
+import com.lemline.runner.repositories.ForkRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
@@ -46,7 +46,7 @@ internal class ForkExecutionIntegrationTest {
     lateinit var databaseMessageHandler: WorkflowEventHandler
 
     @Inject
-    lateinit var forkRepository: ForkWaitingRepository
+    lateinit var forkRepository: ForkRepository
 
     private val testWorkflowInfo = WorkflowInfo(
         workflowId = WorkflowId.random(),

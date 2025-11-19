@@ -22,20 +22,15 @@ import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.models.ParentWaitingModel
+import com.lemline.runner.models.ParentModel
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.models.ScheduleOutboxModel
 import com.lemline.runner.models.WaitOutboxModel
-import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.random.Random
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
-
-fun OutBoxStatus.Companion.random() = Random.nextInt(OutBoxStatus.entries.size).let {
-    OutBoxStatus.entries[it]
-}
 
 fun WorkflowInfo.Companion.random() = WorkflowInfo(
     workflowId = com.lemline.common.values.WorkflowId.random(),
@@ -134,7 +129,7 @@ fun OutboxModel.randomize(nullableDelayed: Boolean = false) = apply {
     outboxErrorMessage = String.nullableRandom()
 }
 
-fun ParentWaitingModel.Companion.random() = ParentWaitingModel(
+fun ParentModel.Companion.random() = ParentModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
@@ -151,8 +146,7 @@ fun ScheduleOutboxModel.Companion.random() = ScheduleOutboxModel(
         workflowState = WorkflowCommand.random(),
         hasParentWaiting = Random.nextBoolean()
     ),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.nullableRandom(), // <- nullable
+    initialScheduledFor = Instant.nullableRandom(),
     scheduleAfter = String.nullableRandom(),
     scheduleEvery = String.nullableRandom(),
     scheduleCron = String.nullableRandom(),
@@ -166,13 +160,17 @@ fun RetryOutboxModel.Companion.random() = RetryOutboxModel(
         workflowState = WorkflowEvent.RetryScheduled.random(),
         hasParentWaiting = Random.nextBoolean()
     ),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.random(), // <- Not nullable
+    scheduledFor = Instant.random(),
     errorReason = String.random(),
     errorClass = String.random(),
     errorMessage = String.nullableRandom(),
     errorStackTrace = String.random(),
-).also { it.randomize() }
+).also {
+    // Don't call randomize() as outboxDelayedUntil cannot be null for RetryOutboxModel
+    it.outboxAttemptCount = Int.random()
+    it.outboxErrorClass = String.nullableRandom()
+    it.outboxErrorMessage = String.nullableRandom()
+}
 
 fun WaitOutboxModel.Companion.random() = WaitOutboxModel(
     id = IDV7.random(),
@@ -181,6 +179,10 @@ fun WaitOutboxModel.Companion.random() = WaitOutboxModel(
         workflowState = WorkflowEvent.WaitStarted.random(),
         hasParentWaiting = Random.nextBoolean()
     ),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.random(), // <- Not nullable
-).also { it.randomize() }
+    scheduledFor = Instant.random(),
+).also {
+    // Don't call randomize() as outboxDelayedUntil cannot be null for WaitOutboxModel
+    it.outboxAttemptCount = Int.random()
+    it.outboxErrorClass = String.nullableRandom()
+    it.outboxErrorMessage = String.nullableRandom()
+}

@@ -19,18 +19,18 @@ import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.messaging.commands.InstanceMessageEmitter
+import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.ForkBranchModel
 import com.lemline.runner.models.ForkCompletionResult
-import com.lemline.runner.models.ForkWaitingModel
-import com.lemline.runner.models.ParentWaitingModel
+import com.lemline.runner.models.ForkModel
+import com.lemline.runner.models.ParentModel
 import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.ForkWaitingRepository
-import com.lemline.runner.repositories.ParentWaitingRepository
+import com.lemline.runner.repositories.ForkRepository
+import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.repositories.WaitRepository
@@ -62,13 +62,13 @@ import org.jetbrains.annotations.TestOnly
 @ExperimentalSerializationApi
 internal class WorkflowEventHandler(
     private val definitions: Definitions,
-    private val parentRepository: ParentWaitingRepository,
+    private val parentRepository: ParentRepository,
     private val retryRepository: RetryRepository,
     private val scheduleRepository: ScheduleRepository,
     private val waitRepository: WaitRepository,
     private val failureRepository: FailureRepository,
-    private val forkRepository: ForkWaitingRepository,
-    private val instanceEmitter: InstanceMessageEmitter,
+    private val forkRepository: ForkRepository,
+    private val instanceEmitter: WorkflowCommandEmitter,
     private val starter: Starter,
     override val metrics: WorkflowEventSubscriberMetrics,
 ) : MessageHandler<InstanceMessage<WorkflowEvent>> {
@@ -175,7 +175,7 @@ internal class WorkflowEventHandler(
         waitRepository.insert(
             WaitOutboxModel(
                 instanceMessage = instance,
-                outboxScheduledFor = instance.workflowState.waitUntil
+                scheduledFor = instance.workflowState.waitUntil
             )
         )
     }
@@ -184,7 +184,7 @@ internal class WorkflowEventHandler(
         retryRepository.insert(
             RetryOutboxModel.from(
                 instance = instance,
-                outboxScheduledFor = instance.workflowState.retryAt,
+                scheduledFor = instance.workflowState.retryAt,
                 error = IllegalStateException("Task failed and will be retried"), // TODO this is not the correct exception
                 reason = "Task retry"
             )
@@ -209,7 +209,7 @@ internal class WorkflowEventHandler(
 
             // Insert parent with child_id
             parentRepository.insert(
-                entity = ParentWaitingModel(
+                entity = ParentModel(
                     id = IDV7.random(),
                     instanceMessage = instance,
                     childId = childWorkflowId.value
@@ -253,8 +253,9 @@ internal class WorkflowEventHandler(
                         )
                     )
 
-                    // delete parent (event-driven state - processed once)
-                    parentRepository.delete(parent, conn)
+                    // mark parent as completed for cleanup (event-driven state - processed once)
+                    parent.outboxCompletedAt = kotlin.time.Clock.System.now()
+                    parentRepository.update(parent, conn)
 
                     logger.debug {
                         "Parent workflow ${parent.workflowId} resumed after child ${instance.workflowId} completion"
@@ -274,7 +275,7 @@ internal class WorkflowEventHandler(
             scheduleRepository.findByWorkflowId(instance.workflowId)?.let { schedule ->
                 schedule.scheduleAfterCompletion()
                 scheduleRepository.update(schedule)
-                logger.debug { "Scheduled workflow ${schedule.workflowName} for ${schedule.outboxScheduledFor}" }
+                logger.debug { "Scheduled workflow ${schedule.workflowName} for ${schedule.outboxDelayedUntil}" }
             }
                 ?: error("CRITICAL - Unable to find workflow ${instance.workflowId} in schedules table.")
         }
@@ -308,7 +309,7 @@ internal class WorkflowEventHandler(
         val branches = forkNode.children ?: emptyList()
 
         // 1. Create fork metadata model
-        val forkModel = ForkWaitingModel(
+        val forkModel = ForkModel(
             instanceMessage = instance,
             forkPosition = state.nodePosition.toString(),
             compete = isCompete,
@@ -448,11 +449,12 @@ internal class WorkflowEventHandler(
             hasParentWaiting = instance.hasParentWaiting
         )
 
-        // Clean up fork state - find fork and delete
+        // Clean up fork state - mark as completed for cleanup
         val fork = forkRepository.findByWorkflowIdAndPosition(instance.workflowId, forkPosition)
         if (fork != null) {
-            forkRepository.delete(fork.id)
-            logger.debug { "Fork parent resumed at $forkPosition, fork state deleted" }
+            fork.outboxCompletedAt = kotlin.time.Clock.System.now()
+            forkRepository.update(fork)
+            logger.debug { "Fork parent resumed at $forkPosition, fork state marked for cleanup" }
         }
 
         // Emit resume message to workflow channel

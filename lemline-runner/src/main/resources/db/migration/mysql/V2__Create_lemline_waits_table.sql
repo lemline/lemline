@@ -9,10 +9,11 @@ CREATE TABLE IF NOT EXISTS lemline_waits
     workflow_position       TEXT         NOT NULL,
     workflow_state          MEDIUMTEXT   NOT NULL,
     parent_id               BINARY(16),
-    outbox_status           VARCHAR(50)  NOT NULL,
+    outbox_completed_at     TIMESTAMP(6),
     outbox_scheduled_for    TIMESTAMP(6) NOT NULL,
     outbox_delayed_until    TIMESTAMP(6) NOT NULL,
     outbox_attempt_count    INTEGER      NOT NULL DEFAULT 0,
+    outbox_failed_at        TIMESTAMP(6),
     outbox_error_class      TEXT,
     outbox_error_message    TEXT,
     outbox_error_stacktrace MEDIUMTEXT,
@@ -29,6 +30,10 @@ CREATE INDEX idx_lemline_waits_workflow_id
 CREATE INDEX idx_lemline_waits_parent_id
     ON lemline_waits (parent_id);
 
--- Create an index for efficient querying on status and delayed_until
-CREATE INDEX idx_lemline_waits_status_delayed_until
-    ON lemline_waits (outbox_status, outbox_delayed_until);
+-- Create composite index for efficient querying of pending messages
+CREATE INDEX idx_lemline_waits_processing
+    ON lemline_waits (outbox_completed_at, outbox_failed_at, outbox_delayed_until);
+
+-- Create index for cleanup queries
+CREATE INDEX idx_lemline_waits_completed
+    ON lemline_waits (outbox_completed_at);

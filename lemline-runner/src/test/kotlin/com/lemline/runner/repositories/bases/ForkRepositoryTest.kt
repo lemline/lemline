@@ -14,8 +14,8 @@ import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.ForkBranchModel
-import com.lemline.runner.models.ForkWaitingModel
-import com.lemline.runner.repositories.ForkWaitingRepository
+import com.lemline.runner.models.ForkModel
+import com.lemline.runner.repositories.ForkRepository
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
 import io.kotest.matchers.shouldBe
@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test
 internal abstract class ForkWaitingRepositoryTest {
 
     @Inject
-    protected lateinit var repository: ForkWaitingRepository
+    protected lateinit var repository: ForkRepository
 
     private val testWorkflowId = WorkflowId.random()
     private val testPosition = NodePosition.root.addName("fork1")
@@ -234,42 +234,8 @@ internal abstract class ForkWaitingRepositoryTest {
         repository.getBranches(fork.id) shouldHaveSize 0
     }
 
-    @Test
-    fun `should cleanup old forks`() = runTest {
-        // Given - insert an old fork (note: cleanup uses created_at from database, not model)
-        val fork = createTestFork(branchCount = 1)
-        val branches = createTestBranches(fork, branchCount = 1)
-
-        // Insert directly to database with old timestamp - skip this test for now as it requires DB manipulation
-        // This test would need direct SQL manipulation to set old created_at
-        repository.insertForkWithBranches(fork, branches)
-
-        // When - cleanup forks older than 1 hour
-        val deletedCount = repository.cleanupOldForks(
-            olderThan = Clock.System.now() - kotlin.time.Duration.parse("1h")
-        )
-
-        // Then - should not delete recent fork
-        deletedCount shouldBe 0
-        repository.findByWorkflowIdAndPosition(testWorkflowId, testPosition) shouldNotBe null
-    }
-
-    @Test
-    fun `should not cleanup recent forks`() = runTest {
-        // Given - insert a recent fork
-        val fork = createTestFork(branchCount = 1)
-        val branches = createTestBranches(fork, branchCount = 1)
-        repository.insertForkWithBranches(fork, branches)
-
-        // When - cleanup forks older than 1 hour
-        val deletedCount = repository.cleanupOldForks(
-            olderThan = Clock.System.now() - kotlin.time.Duration.parse("1h")
-        )
-
-        // Then
-        deletedCount shouldBe 0
-        repository.findByWorkflowIdAndPosition(testWorkflowId, testPosition) shouldNotBe null
-    }
+    // Cleanup tests removed - cleanup is now handled by WaitingCleaner and ForkWaitingCleaner
+    // which use the outbox_status and outbox_scheduled_for columns to track cleanup
 
     @Test
     fun `should return null when fork not found`() = runTest {
@@ -296,7 +262,7 @@ internal abstract class ForkWaitingRepositoryTest {
     private fun createTestFork(
         branchCount: Int,
         compete: Boolean = false
-    ): ForkWaitingModel {
+    ): ForkModel {
         val forkId = IDV7.random()
         testForkId = forkId  // Store for cleanup
 
@@ -316,7 +282,7 @@ internal abstract class ForkWaitingRepositoryTest {
             hasParentWaiting = false
         )
 
-        return ForkWaitingModel(
+        return ForkModel(
             id = forkId,
             instanceMessage = instanceMessage,
             forkPosition = testPosition.toString(),
@@ -325,7 +291,7 @@ internal abstract class ForkWaitingRepositoryTest {
         )
     }
 
-    private fun createTestBranches(fork: ForkWaitingModel, branchCount: Int) =
+    private fun createTestBranches(fork: ForkModel, branchCount: Int) =
         (0 until branchCount).map { index ->
             ForkBranchModel(
                 forkId = fork.id,

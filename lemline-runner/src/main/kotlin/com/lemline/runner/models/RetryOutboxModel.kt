@@ -6,90 +6,70 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.outbox.OutBoxStatus
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 
 @ExperimentalSerializationApi
 @ExperimentalTime
-@Serializable
-@SerialName("r") // <- type discriminator for polymorphic serialization
 data class RetryOutboxModel(
-    @SerialName("id")
     override val id: IDV7,
-
-    @SerialName("i")
     override val instanceMessage: InstanceMessage<WorkflowEvent.RetryScheduled>,
-
-    @SerialName("s")
-    override var outBoxStatus: OutBoxStatus = OutBoxStatus.PENDING,
-
-    @SerialName("f")
-    override var outboxScheduledFor: Instant?,
+    val scheduledFor: Instant,
 
     /**
      * Reason for this retry
      */
-    @SerialName("er")
     val errorReason: String,
 
     /**
      * Error class of the exception that triggered this retry
      */
-    @SerialName("ec")
     val errorClass: String,
 
     /**
      * Error message of the exception that triggered this retry
      */
-    @SerialName("em")
     val errorMessage: String?,
 
     /**
      * Stacktrace of the exception that triggered this retry
      */
-    @SerialName("es")
-    val errorStackTrace: String
+    val errorStackTrace: String,
+
+    override var outboxCompletedAt: Instant? = null
 
 ) : OutboxModel() {
 
-    init {
-        require(outboxScheduledFor != null) { "outboxScheduledFor cannot be null" }
-    }
+    override var outboxScheduledFor: Instant? = scheduledFor
 
-    @Transient
-    override var outboxDelayedUntil: Instant? = outboxScheduledFor
+    override var outboxDelayedUntil: Instant? = scheduledFor
         set(until) {
-            require(until != null) { "outboxDelayedUntil cannot be null" }
+            require(until != null) { "outboxDelayedUntil cannot be null for RetryOutboxModel" }
             field = until
         }
 
-    @Transient
     override var outboxAttemptCount: Int = 0
 
-    @Transient
+    override var outboxFailedAt: Instant? = null
+
     override var outboxErrorClass: String? = null
 
-    @Transient
     override var outboxErrorMessage: String? = null
 
-    @Transient
     override var outboxErrorStackTrace: String? = null
 
     companion object {
         fun from(
             id: IDV7 = IDV7.random(),
             instance: InstanceMessage<WorkflowEvent.RetryScheduled>,
-            outboxScheduledFor: Instant,
+            scheduledFor: Instant,
             error: Throwable,
             reason: String
         ) = RetryOutboxModel(
             id = id,
             instanceMessage = instance,
+            scheduledFor = scheduledFor,
             errorReason = reason,
             errorClass = when (error) {
                 is InternalException -> error.error.type
@@ -104,7 +84,6 @@ data class RetryOutboxModel(
                 is InternalException -> error.error.toJsonPrettyString()
                 else -> error.stackTraceToString()
             },
-            outboxScheduledFor = outboxScheduledFor,
         )
     }
 }

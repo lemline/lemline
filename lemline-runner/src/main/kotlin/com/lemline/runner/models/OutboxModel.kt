@@ -1,66 +1,58 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.common.values.WithDefiniteWorkflowInfo
-import com.lemline.core.states.WorkflowState
-import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.outbox.OutBoxStatus
-import com.lemline.runner.outbox.OutboxRelay
+import com.lemline.runner.outbox.AbstractOutbox
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Base class for outbox pattern message models.
- * This abstract class defines the common structure for messages stored in an outbox table,
- * implementing the outbox pattern to ensure reliable message delivery.
+ * This abstract class extends CleanableModel and adds retry/error tracking for the outbox pattern.
  *
- * The outbox pattern works by:
+ * OutboxModel entities are processed via scheduled relay with retry logic.
+ * They implement reliable message delivery through:
  * 1. Storing messages in a database before attempting to send them
  * 2. Processing messages in batches with retry logic
- * 3. Tracking message status and retry attempts
- * 4. Cleaning up successfully processed messages
+ * 3. Tracking retry attempts and error details
+ * 4. Cleaning up successfully processed messages (inherited from CleanableModel)
  *
- * @see OutboxRelay for the processing logic
+ * States are tracked via nullable timestamps:
+ * - Pending: outbox_completed_at IS NULL AND outbox_failed_at IS NULL
+ * - Completed: outbox_completed_at IS NOT NULL
+ * - Failed: outbox_failed_at IS NOT NULL
+ *
+ * @see AbstractOutbox for the processing logic
+ * @see CleanableModel for the base cleanup tracking
  */
 @ExperimentalSerializationApi
 @ExperimentalTime
-sealed class OutboxModel() : InstanceModel, WithDefiniteWorkflowInfo {
-
-    abstract val instanceMessage: InstanceMessage<out WorkflowState>
+sealed class OutboxModel : CleanableModel() {
 
     /**
-     * Current status of the message in the outbox. Possible values:
-     * - PENDING: Message is ready to be processed
-     * - SENT: Relay has successfully processed this message, and it is safe to delete it from the outbox table
-     * - FAILED: Relay has failed to process this message after maximum retry attempts
-     *
-     * Messages with FAILED status are not processed, neither deleted, and must be manually handled
-     *
-     * @see OutBoxStatus for possible status values
-     */
-    abstract var outBoxStatus: OutBoxStatus
-
-    /**
-     * The specific timestamp indicating when a message or task is scheduled for processing or execution by the outbox relay.
-     * If null, the message or task is not yet scheduled.
+     * Original/intended scheduled time for this message.
+     * Provides observability - shows when this was supposed to run vs actual processing time.
+     * - For Wait/Retry: Original scheduled time (doesn't change with retries)
+     * - For Schedule: Current scheduled execution time (updated each cycle)
      */
     abstract var outboxScheduledFor: Instant?
 
     /**
      * Timestamp indicating when the message should be processed next by the outbox relay.
-     * Used for retry by the outbox relay with exponential backoff.
+     * Used for retry scheduling with exponential backoff.
+     * - NULL: Process immediately
+     * - NOT NULL: Process after this timestamp
      *
-     * @see OutboxRelay for delay calculation
+     * @see AbstractOutbox for delay calculation
      */
     abstract var outboxDelayedUntil: Instant?
 
     /**
      * Number of processing attempts made for this message by the outbox relay.
      * This counter is incremented each time the relay fails.
-     * When it reaches the maximum configured attempts, the message is marked as FAILED.
+     * When it reaches the maximum configured attempts, outbox_failed_at is set.
      *
-     * @see OutboxRelay.process for retry logic
+     * @see AbstractOutbox for retry logic
      */
     abstract var outboxAttemptCount: Int
 
@@ -79,7 +71,10 @@ sealed class OutboxModel() : InstanceModel, WithDefiniteWorkflowInfo {
      */
     abstract var outboxErrorStackTrace: String?
 
-    override val workflowState get() = instanceMessage.workflowState
-
-    override val workflowInfo get() = instanceMessage.workflowInfo
+    /**
+     * Timestamp when the outbox processing permanently failed (max retries reached).
+     * - NULL: Not failed (either pending or completed)
+     * - NOT NULL: Failed after max retry attempts, requires manual intervention
+     */
+    abstract var outboxFailedAt: Instant?
 }

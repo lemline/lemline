@@ -9,7 +9,7 @@ import com.lemline.runner.models.WaitOutboxModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.OutboxRepository
+import com.lemline.runner.repositories.RelayRepository
 import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
@@ -36,7 +36,7 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
     override lateinit var failureRepository: FailureRepository
 
     // Implement the abstract repository property
-    override val outboxRepository: OutboxRepository<WaitOutboxModel> by lazy { waitRepository }
+    override val relayRepository: RelayRepository<WaitOutboxModel> by lazy { waitRepository }
 
     // Implement the abstract KClass property
     override val modelClass: KClass<WaitOutboxModel> = WaitOutboxModel::class
@@ -49,6 +49,6 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
             workflowState = WorkflowEvent.WaitStarted.random(),
             hasParentWaiting = false
         ),
-        outboxScheduledFor = Clock.System.now(),
+        scheduledFor = Clock.System.now(),
     )
 }
