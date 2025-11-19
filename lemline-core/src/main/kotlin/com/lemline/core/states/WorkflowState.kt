@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.RunWorkflowException
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.FlowDirective
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Result types returned by WorkflowOrchestrator when it detects a stopping point
@@ -40,12 +43,50 @@ sealed class WorkflowCommand : WorkflowState() {
     companion object {
         fun fromJsonString(jsonString: String): WorkflowCommand = LemlineJson.decodeFromString(jsonString)
 
-        fun start(input: JsonElement): WorkflowCommand = ResumeFromTask(
-            taskStates = emptyMap(),
-            nodePosition = NodePosition.root,
-            rawInput = input,
-            flowDirective = null,
+        @ExperimentalTime
+        fun start(
+            workflowId: WorkflowId = WorkflowId.random(),
+            workflowInput: JsonElement = buildJsonObject { },
+            hasParent: Boolean = false,
+            startedAt: Instant = Clock.System.now()
+        ): Start = Start(
+            workflowId = workflowId,
+            workflowInput = workflowInput,
+            hasParent = hasParent,
+            startedAt = startedAt
         )
+    }
+
+    /**
+     * Represents the initial command to start the execution of a workflow.
+     *
+     * This class is part of the workflow orchestration and defines the starting point for
+     * the execution of a workflow. It includes the input required for the workflow,
+     * the unique identifier for the workflow, and a flag indicating whether the workflow
+     * has a parent workflow.
+     *
+     * @property workflowInput The input parameters for the workflow execution.
+     * @property workflowId The unique identifier of the workflow.
+     * @property hasParent Indicates if the workflow is initiated by a parent workflow.
+     */
+    @Serializable
+    @ExperimentalTime
+    data class Start(
+        val workflowId: WorkflowId,
+        val workflowInput: JsonElement,
+        val hasParent: Boolean,
+        val startedAt: Instant
+    ) : WorkflowCommand() {
+
+        override val taskStates: TaskStates = mapOf()
+        override val nodePosition = NodePosition.root
+
+        override fun toString() = "${this::class.simpleName}(" +
+            "workflowId=$workflowId" +
+            ", workflowInput=$workflowInput" +
+            ", hasParent=$hasParent" +
+            ", startedAt=$startedAt" +
+            ")"
     }
 
     /**

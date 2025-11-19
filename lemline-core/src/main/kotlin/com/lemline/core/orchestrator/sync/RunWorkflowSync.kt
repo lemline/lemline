@@ -10,6 +10,7 @@ import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.orchestrator.WorkflowOrchestrator
 import com.lemline.core.states.TaskStates
 import com.lemline.core.states.WorkflowEvent
+import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
@@ -50,12 +51,15 @@ internal object RunWorkflowSync {
         }
 
         // Resolve the sub-workflow definition from the cache
-        val subRootNode = resolveRootNode(config)
+        val childWorkflow = resolveWorkflow(config)
 
         // Execute the sub-workflow synchronously or asynchronously
         val childOutput = when (config.sync) {
-            true -> executeSync(config, subRootNode)
-            false -> executeAsync(transformedInput, config, subRootNode)
+            true -> executeSync(childWorkflow, config.input)
+            false -> {
+                executeAsync(childWorkflow, config.input)
+                transformedInput!!
+            }
         }
 
         // Complete the child workflow task
@@ -69,41 +73,38 @@ internal object RunWorkflowSync {
      * @return The root node of the resolved workflow
      * @throws IllegalStateException if the workflow definition is not found
      */
-    fun resolveRootNode(config: RunWorkflowException.Config): Node<*> {
+    fun resolveWorkflow(config: RunWorkflowException.Config): Workflow {
         val childWorkflowName by lazy {
             "(namespace=${config.namespace}, name=${config.name}, version=${config.version})"
         }
 
-        val childWorkflow = DefinitionCache.getWorkflow(
+        return DefinitionCache.getWorkflow(
             namespace = config.namespace,
             name = config.name,
             version = config.version
         ) ?: throw IllegalStateException(
             "Workflow definition not found for sub-workflow: $childWorkflowName"
         )
-
-        return DefinitionCache.getRootNode(childWorkflow)
     }
 
     /**
-     * Executes a child workflow synchronously (await=true).
+     * Executes a child workflow synchronously and returns its output as a JSON element.
      *
-     * The parent workflow waits for the child to complete and receives its output.
-     *
-     * @param config Child workflow configuration
-     * @param subWorkflowRootNode Root node of the child workflow
-     * @return The output from the completed child workflow
-     * @throws Exception if the child workflow fails
+     * @param workflow The workflow to execute.
+     * @param workflowInput The input data for the workflow as a JSON element.
+     * @return The output of the workflow execution as a JSON element.
+     * @throws IllegalStateException If the workflow execution results in an unexpected output type.
+     * @throws Exception If the child workflow fails and propagates its failure.
      */
     suspend fun executeSync(
-        config: RunWorkflowException.Config,
-        subWorkflowRootNode: Node<*>,
+        workflow: Workflow,
+        workflowInput: JsonElement,
     ): JsonElement {
-        logger.debug { "Executing child workflow inline: ${config.name}" }
+        logger.debug { "Executing child workflow inline: ${workflow.document.name}" }
 
-        return when (val output = WorkflowOrchestrator.resumeFromTask(
-            node = subWorkflowRootNode,
-            rawInput = config.input,
+        return when (val output = WorkflowOrchestrator.start(
+            workflow = workflow,
+            workflowInput = workflowInput,
             executionMode = ExecutionMode.CONTINUOUS
         )) {
             is WorkflowEvent.WorkflowCompleted -> {
@@ -117,33 +118,30 @@ internal object RunWorkflowSync {
             }
 
             else -> throw IllegalStateException(
-                "Unexpected output type: ${output::class.simpleName} for child workflow $config"
+                "Unexpected output type: ${output::class.simpleName} for child workflow  ${workflow.document.name}"
             )
         }
     }
 
     /**
-     * Executes a child workflow asynchronously (await=false, fire-and-forget).
+     * Executes a child workflow asynchronously in a fire-and-forget manner. The method logs the execution
+     * status, capturing whether the workflow's execution completes successfully or fails to run.
+     * This is meant to launch another workflow process without waiting for its completion.
      *
-     * The parent workflow continues immediately without waiting for child completion.
-     *
-     * @param transformedInput The input to return to the parent (child runs independently)
-     * @param config Child workflow configuration
-     * @param subWorkflowRootNode Root node of the child workflow
-     * @return The transformed input (parent continues immediately)
+     * @param workflow The workflow to be executed asynchronously.
+     * @param workflowInput The input data passed to the workflow as a JSON element.
      */
     suspend fun executeAsync(
-        transformedInput: JsonElement?,
-        config: RunWorkflowException.Config,
-        subWorkflowRootNode: Node<*>,
-    ): JsonElement {
-        logger.debug { "Launching child workflow asynchronously (fire-and-forget): ${config.name}" }
+        workflow: Workflow,
+        workflowInput: JsonElement,
+    ) {
+        logger.debug { "Launching child workflow asynchronously (fire-and-forget): ${workflow.document.name}" }
 
         CoroutineScope(currentCoroutineContext()).launch {
             runCatching {
-                WorkflowOrchestrator.resumeFromTask(
-                    node = subWorkflowRootNode,
-                    rawInput = config.input,
+                WorkflowOrchestrator.start(
+                    workflow = workflow,
+                    workflowInput = workflowInput,
                     executionMode = ExecutionMode.CONTINUOUS
                 )
             }.onSuccess {
@@ -152,7 +150,5 @@ internal object RunWorkflowSync {
                 logger.error(ex) { "Async child workflow failed" }
             }
         }
-
-        return transformedInput!! // Use current input for fire-and-forget
     }
 }

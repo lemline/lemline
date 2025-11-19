@@ -73,7 +73,6 @@ fun JsonElement.Companion.nullableRandom(): JsonElement {
 fun NodePosition.Companion.random() = NodePosition(listOf(String.random(), String.random(), String.random()))
 
 fun WorkflowInfo.Companion.random() = WorkflowInfo(
-    workflowId = WorkflowId.random(),
     workflowNamespace = WorkflowNamespace.random(),
     workflowName = WorkflowName.random(),
     workflowVersion = WorkflowVersion.random(),
@@ -121,14 +120,13 @@ fun RaiseState.Companion.random() = RaiseState(
 
 fun RootState.Companion.random() = RootState(
     startedAt = Instant.random(),
-    id = String.random(),
-    input = JsonElement.random(),
+    workflowId = WorkflowId.random(),
+    workflowInput = JsonElement.random(),
     context = buildJsonObject {
         repeat(Random.nextInt(0, 4)) {
             put(String.random(), JsonElement.random())
         }
     },
-    hasRun = Random.nextBoolean(),
 )
 
 fun RunState.Companion.random() = RunState(

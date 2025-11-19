@@ -4,6 +4,7 @@
 package com.lemline.core.states
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.workflows.RuntimeDescriptor
@@ -21,10 +22,9 @@ import kotlinx.serialization.json.encodeToJsonElement
 @Serializable
 data class RootState(
     override val startedAt: Instant,
-    val id: String,
-    val input: JsonElement,
+    val workflowId: WorkflowId,
+    val workflowInput: JsonElement,
     val context: Scope = buildJsonObject {},
-    val hasRun: Boolean,
 ) : TaskState() {
 
     @Transient
@@ -32,8 +32,9 @@ data class RootState(
 
     private val workflowDescriptor
         get() = WorkflowDescriptor(
-            id, input,
-            LemlineJson.encodeToElement(
+            id = workflowId.toString(),
+            input = workflowInput,
+            startedAt = LemlineJson.encodeToElement(
                 DateTimeDescriptor.from(startedAt.toJavaInstant())
             ),
         )
@@ -56,10 +57,9 @@ data class RootState(
     fun copyWithContext(newContext: Scope): RootState {
         val state = RootState(
             startedAt = startedAt,
-            id = id,
-            input = input,
+            workflowId = workflowId,
+            workflowInput = workflowInput,
             context = newContext,
-            hasRun = hasRun,
         )
         // copy also transient fields
         if (this::secrets.isInitialized) state.secrets = this.secrets

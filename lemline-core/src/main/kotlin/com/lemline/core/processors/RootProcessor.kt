@@ -3,12 +3,10 @@
 
 package com.lemline.core.processors
 
-import com.lemline.common.values.IDV7
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.RootState
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
@@ -47,34 +45,20 @@ class RootProcessor(
     node: Node<RootTask>
 ) : NodeProcessor<RootTask, RootState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): RootState = RootState(
-        startedAt = Clock.System.now(),
-        id = IDV7.random().toString(),
-        input = transformedInput,
-        hasRun = false,
-    )
+    // the RootProcessor should not create the root state
+    override fun createState(
+        transformedInput: JsonElement,
+        scope: Scope
+    ): RootState = throw IllegalStateException("RootProcessor does not create state")
 
     override fun getNextStepInfo(
         state: RootState,
         dataset: JsonElement,
         scope: Scope,
         namedNode: String?,
-    ): NextStepInfo<RootState> = when (state.hasRun) {
-        true -> NextStepInfo(
-            updatedState = state,
-            nextNode = null,
-            nextDirective = null
-        )
-
-        false -> {
-            val updatedState = state.copy(hasRun = true)
-            NextStepInfo(
-                updatedState = updatedState,
-                nextNode = getDoNode(),
-                nextDirective = null
-            )
-        }
-    }
-
-    private fun getDoNode() = node.children?.getOrNull(0) ?: throw NoSuchElementException("RootTask has no do task")
+    ): NextStepInfo<RootState> = NextStepInfo(
+        updatedState = state,
+        nextNode = null,
+        nextDirective = null
+    )
 }

@@ -30,7 +30,7 @@ internal suspend fun executeContinuousWorkflow(
 ): JsonElement {
     val workflow = getWorkflowToTest(yaml, namespace, name, version)
 
-    val startState = WorkflowCommand.start(input)
+    val startState = WorkflowCommand.start(workflowInput = input)
 
     val state = WorkflowOrchestrator.resume(
         workflow = workflow,
@@ -85,7 +85,7 @@ private suspend fun runUntilComplete(
     executionMode: ExecutionMode
 ): JsonElement {
 
-    val startState = WorkflowCommand.start(input)
+    val startState = WorkflowCommand.start(workflowInput = input)
 
     return runWorkflowStep(
         workflow = workflow,
@@ -155,7 +155,7 @@ private suspend fun forkStarted(
 ): JsonElement {
     @Suppress("UNCHECKED_CAST")
     val forkNode = workflow.getNode(workflowState.nodePosition) as Node<ForkTask>
-    (workflowState.taskStates[NodePosition.root] as RootState).id
+    (workflowState.taskStates[NodePosition.root] as RootState).workflowId
 
     // launch all branches in parallel
     val results = coroutineScope {

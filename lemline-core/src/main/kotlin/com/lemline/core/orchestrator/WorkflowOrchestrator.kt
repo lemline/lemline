@@ -2,6 +2,7 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.ForkException
 import com.lemline.core.errors.InternalException
@@ -9,6 +10,7 @@ import com.lemline.core.errors.RunWorkflowException
 import com.lemline.core.errors.WaitException
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.nodes.Node
+import com.lemline.core.nodes.NodePosition
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.orchestrator.context.merge
 import com.lemline.core.orchestrator.sync.ForkSync
@@ -16,6 +18,7 @@ import com.lemline.core.orchestrator.sync.RunWorkflowSync
 import com.lemline.core.orchestrator.sync.WaitSync
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.states.ForkState
+import com.lemline.core.states.RootState
 import com.lemline.core.states.TaskStates
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
@@ -27,7 +30,9 @@ import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.Workflow
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 
@@ -87,6 +92,30 @@ object WorkflowOrchestrator {
     private val logger = logger()
 
     /**
+     * Starts a new workflow execution with the specified configuration.
+     *
+     * @param workflow The workflow to be executed.
+     * @param workflowId A unique identifier for the workflow. Defaults to a randomly generated `WorkflowId`.
+     * @param workflowInput The initial input data for the workflow in JSON format. Defaults to an empty JSON object.
+     * @param hasParent Indicates whether the workflow has a parent workflow. Defaults to `false`.
+     * @param startedAt The timestamp indicating when the workflow execution is started. Defaults to the current system time.
+     * @param executionMode The execution mode of the workflow. Defaults to `ExecutionMode.CONTINUOUS`.
+     * @return A `WorkflowEvent` indicating the result of starting the workflow execution.
+     */
+    suspend fun start(
+        workflow: Workflow,
+        workflowId: WorkflowId = WorkflowId.random(),
+        workflowInput: JsonElement = buildJsonObject { },
+        hasParent: Boolean = false,
+        startedAt: Instant = Clock.System.now(),
+        executionMode: ExecutionMode = ExecutionMode.CONTINUOUS,
+    ): WorkflowEvent = resume(
+        workflow,
+        WorkflowCommand.start(workflowId, workflowInput, hasParent, startedAt),
+        executionMode = executionMode,
+    )
+
+    /**
      * Resumes the execution of a workflow from a given state, continuing the execution based
      * on the current workflow state and execution mode provided.
      *
@@ -100,7 +129,27 @@ object WorkflowOrchestrator {
         state: WorkflowCommand,
         executionMode: ExecutionMode
     ): WorkflowEvent = when (state) {
-        // Failed state - retry from failure point (may have rawInput or rawOutput)
+
+        is WorkflowCommand.Start -> {
+            val rootNode = workflow.getNode(NodePosition.root)
+            val rootState = RootState(
+                startedAt = state.startedAt,
+                workflowId = state.workflowId,
+                workflowInput = state.workflowInput,
+            )
+            val taskStates: TaskStates = mapOf(NodePosition.root to rootState)
+            val doNode = rootNode.children?.getOrNull(0)
+                ?: throw java.lang.IllegalStateException("RootTask has no 'do' task")
+
+            resumeFromTask(
+                node = doNode,
+                rawInput = state.workflowInput,
+                taskStates = taskStates,
+                flowDirective = null,
+                executionMode = executionMode
+            )
+        }
+
         is WorkflowCommand.ResumeFromTask -> resumeFromTask(
             node = workflow.getNode(state.nodePosition),
             rawInput = state.rawInput,
