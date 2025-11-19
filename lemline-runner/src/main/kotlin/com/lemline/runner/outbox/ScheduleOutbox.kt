@@ -4,7 +4,7 @@ package com.lemline.runner.outbox
 import com.lemline.common.values.WorkflowId
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.runner.models.ScheduleOutboxModel
+import com.lemline.runner.models.ScheduleModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import io.quarkus.runtime.Startup
@@ -28,7 +28,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
+internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
 
     @Inject
     override lateinit var instanceEmitter: WorkflowCommandEmitter
@@ -59,7 +59,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
      * Process scheduled workflow by updating next execution time and sending command.
      * No transformation needed - ScheduleOutboxModel already stores WorkflowCommand.
      */
-    override suspend fun process(entity: ScheduleOutboxModel) {
+    override suspend fun process(entity: ScheduleModel) {
         // Update the schedule model with the next instant to be processed
         entity.prepareNextScheduled(WorkflowId.random())
         // Start a new instance of the workflow (instanceMessage already contains WorkflowCommand)

@@ -12,10 +12,10 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 @ExperimentalSerializationApi
 @ExperimentalTime
-data class RetryOutboxModel(
+data class RetryModel(
     override val id: IDV7,
     override val instanceMessage: InstanceMessage<WorkflowEvent.RetryScheduled>,
-    val scheduledFor: Instant,
+    override val outboxScheduledFor: Instant,
 
     /**
      * Reason for this retry
@@ -37,13 +37,9 @@ data class RetryOutboxModel(
      */
     val errorStackTrace: String,
 
-    override var outboxCompletedAt: Instant? = null
+    ) : OutboxModel() {
 
-) : OutboxModel() {
-
-    override var outboxScheduledFor: Instant? = scheduledFor
-
-    override var outboxDelayedUntil: Instant? = scheduledFor
+    override var outboxDelayedUntil: Instant? = outboxScheduledFor
         set(until) {
             require(until != null) { "outboxDelayedUntil cannot be null for RetryOutboxModel" }
             field = until
@@ -51,25 +47,27 @@ data class RetryOutboxModel(
 
     override var outboxAttemptCount: Int = 0
 
-    override var outboxFailedAt: Instant? = null
-
     override var outboxErrorClass: String? = null
 
     override var outboxErrorMessage: String? = null
 
     override var outboxErrorStackTrace: String? = null
 
-    companion object {
+    override var outboxCompletedAt: Instant? = null
+
+    override var outboxFailedAt: Instant? = null
+
+    companion object Companion {
         fun from(
             id: IDV7 = IDV7.random(),
             instance: InstanceMessage<WorkflowEvent.RetryScheduled>,
             scheduledFor: Instant,
             error: Throwable,
             reason: String
-        ) = RetryOutboxModel(
+        ) = RetryModel(
             id = id,
             instanceMessage = instance,
-            scheduledFor = scheduledFor,
+            outboxScheduledFor = scheduledFor,
             errorReason = reason,
             errorClass = when (error) {
                 is InternalException -> error.error.type

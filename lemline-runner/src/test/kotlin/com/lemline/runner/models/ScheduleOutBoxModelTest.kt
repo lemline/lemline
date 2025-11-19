@@ -14,7 +14,7 @@ class ScheduleOutBoxModelTest {
 
     @Test
     fun `ScheduleOutboxModel can be created and fields accessed`() {
-        val model = ScheduleOutboxModel.random()
+        val model = ScheduleModel.random()
 
         // Verify all fields are accessible
         assertNotNull(model.id)
@@ -25,7 +25,7 @@ class ScheduleOutBoxModelTest {
         // Verify copy works
         val copy = model.copy()
         assertEquals(model.id, copy.id)
-        assertEquals(model.initialScheduledFor, copy.initialScheduledFor)
+        assertEquals(model.outboxScheduledFor, copy.outboxScheduledFor)
         assertEquals(model.scheduleAfter, copy.scheduleAfter)
         assertEquals(model.scheduleEvery, copy.scheduleEvery)
         assertEquals(model.scheduleCron, copy.scheduleCron)

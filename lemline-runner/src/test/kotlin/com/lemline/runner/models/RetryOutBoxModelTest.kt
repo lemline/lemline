@@ -15,22 +15,22 @@ class RetryOutBoxModelTest {
 
     @Test
     fun `RetryOutboxModel can be created and fields accessed`() {
-        val model = RetryOutboxModel.random()
+        val model = RetryModel.random()
 
         // Verify all fields are accessible
         assertNotNull(model.id)
         assertNotNull(model.instanceMessage)
-        assertNotNull(model.scheduledFor)
+        assertNotNull(model.outboxScheduledFor)
         assertNotNull(model.errorReason)
         assertNotNull(model.errorClass)
         assertNotNull(model.errorStackTrace)
-        assertEquals(model.scheduledFor, model.outboxScheduledFor)
-        assertEquals(model.scheduledFor, model.outboxDelayedUntil)
+        assertEquals(model.outboxScheduledFor, model.outboxScheduledFor)
+        assertEquals(model.outboxScheduledFor, model.outboxDelayedUntil)
 
         // Verify copy works
         val copy = model.copy()
         assertEquals(model.id, copy.id)
-        assertEquals(model.scheduledFor, copy.scheduledFor)
+        assertEquals(model.outboxScheduledFor, copy.outboxScheduledFor)
         assertEquals(model.errorReason, copy.errorReason)
     }
 

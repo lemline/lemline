@@ -25,13 +25,13 @@ class ScheduleModelTest {
         scheduleCron: String? = null,
         outboxScheduledFor: Instant? = null,
         scheduleZone: String? = null
-    ) = ScheduleOutboxModel(
+    ) = ScheduleModel(
         id = IDV7.random(),
         instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
             workflowState = WorkflowCommand.ResumeFromTask.random(),
         ),
-        initialScheduledFor = outboxScheduledFor,
+        outboxScheduledFor = outboxScheduledFor,
         scheduleCron = scheduleCron,
         scheduleAfter = scheduleAfter,
         scheduleEvery = scheduleEvery,

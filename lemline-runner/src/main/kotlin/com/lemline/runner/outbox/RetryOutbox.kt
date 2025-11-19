@@ -4,7 +4,7 @@ package com.lemline.runner.outbox
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.runner.models.RetryOutboxModel
+import com.lemline.runner.models.RetryModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.RetryRepository
 import io.quarkus.runtime.Startup
@@ -28,7 +28,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
+internal class RetryOutbox : AbstractOutbox<RetryModel>() {
 
     @Inject
     override lateinit var instanceEmitter: WorkflowCommandEmitter
@@ -59,12 +59,11 @@ internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
      * Transform RetryScheduled Event → ResumeFromTask Command before sending.
      * This ensures the workflow handler receives a command it can process.
      */
-    override suspend fun process(entity: RetryOutboxModel) {
-        val command = entity.instanceMessage.workflowState.resume()
+    override suspend fun process(entity: RetryModel) {
         instanceEmitter.send(
             InstanceMessage(
                 workflowInfo = entity.instanceMessage.workflowInfo,
-                workflowState = command,
+                workflowState = entity.instanceMessage.workflowState.resume(),
             )
         )
     }

@@ -26,8 +26,8 @@ import com.lemline.runner.models.ForkBranchModel
 import com.lemline.runner.models.ForkCompletionResult
 import com.lemline.runner.models.ForkModel
 import com.lemline.runner.models.ParentModel
-import com.lemline.runner.models.RetryOutboxModel
-import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.models.RetryModel
+import com.lemline.runner.models.WaitModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ForkRepository
 import com.lemline.runner.repositories.ParentRepository
@@ -173,16 +173,16 @@ internal class WorkflowEventHandler(
 
     private suspend fun handleWaitStarted(instance: InstanceMessage<WorkflowEvent.WaitStarted>) {
         waitRepository.insert(
-            WaitOutboxModel(
+            WaitModel(
                 instanceMessage = instance,
-                scheduledFor = instance.workflowState.waitUntil
+                outboxScheduledFor = instance.workflowState.waitUntil
             )
         )
     }
 
     private suspend fun handleRetryScheduled(instance: InstanceMessage<WorkflowEvent.RetryScheduled>) {
         retryRepository.insert(
-            RetryOutboxModel.from(
+            RetryModel.from(
                 instance = instance,
                 scheduledFor = instance.workflowState.retryAt,
                 error = IllegalStateException("Task failed and will be retried"), // TODO this is not the correct exception

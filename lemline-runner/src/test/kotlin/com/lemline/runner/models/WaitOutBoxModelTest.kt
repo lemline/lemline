@@ -14,19 +14,19 @@ class WaitOutBoxModelTest {
 
     @Test
     fun `WaitOutboxModel can be created and fields accessed`() {
-        val model = WaitOutboxModel.random()
+        val model = WaitModel.random()
 
         // Verify all fields are accessible
         assertNotNull(model.id)
         assertNotNull(model.instanceMessage)
-        assertNotNull(model.scheduledFor)
-        assertEquals(model.scheduledFor, model.outboxScheduledFor)
-        assertEquals(model.scheduledFor, model.outboxDelayedUntil)
+        assertNotNull(model.outboxScheduledFor)
+        assertEquals(model.outboxScheduledFor, model.outboxScheduledFor)
+        assertEquals(model.outboxScheduledFor, model.outboxDelayedUntil)
 
         // Verify copy works
         val copy = model.copy()
         assertEquals(model.id, copy.id)
-        assertEquals(model.scheduledFor, copy.scheduledFor)
+        assertEquals(model.outboxScheduledFor, copy.outboxScheduledFor)
     }
 
 }

@@ -4,7 +4,7 @@ package com.lemline.runner.outbox
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.models.WaitModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.WaitRepository
 import io.quarkus.runtime.Startup
@@ -24,7 +24,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
+internal class WaitOutbox : AbstractOutbox<WaitModel>() {
 
     @Inject
     override lateinit var instanceEmitter: WorkflowCommandEmitter
@@ -55,12 +55,11 @@ internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
      * Transform WaitStarted Event → ResumeFromStartedTask Command before sending.
      * This ensures the workflow handler receives a command it can process.
      */
-    override suspend fun process(entity: WaitOutboxModel) {
-        val command = entity.instanceMessage.workflowState.resume()
+    override suspend fun process(entity: WaitModel) {
         instanceEmitter.send(
             InstanceMessage(
                 workflowInfo = entity.instanceMessage.workflowInfo,
-                workflowState = command,
+                workflowState = entity.instanceMessage.workflowState.resume(),
             )
         )
     }

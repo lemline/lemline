@@ -35,7 +35,7 @@ sealed class OutboxModel : AwaitingCompletionModel() {
      * - For Wait/Retry: Original scheduled time (doesn't change with retries)
      * - For Schedule: Current scheduled execution time (updated each cycle)
      */
-    abstract var outboxScheduledFor: Instant?
+    abstract val outboxScheduledFor: Instant?
 
     /**
      * Timestamp indicating when the message should be processed next by the outbox relay.

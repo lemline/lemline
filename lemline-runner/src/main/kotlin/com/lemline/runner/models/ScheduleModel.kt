@@ -29,31 +29,29 @@ import kotlinx.serialization.json.JsonElement
 
 @ExperimentalSerializationApi
 @ExperimentalTime
-data class ScheduleOutboxModel(
+data class ScheduleModel(
     override val id: IDV7,
     override var instanceMessage: InstanceMessage<WorkflowCommand.ResumeFromTask>,
-    val initialScheduledFor: Instant?,
+    override val outboxScheduledFor: Instant?,
     val scheduleAfter: String?,
     val scheduleEvery: String?,
     val scheduleCron: String?,
     val scheduleZone: String?,
-    override var outboxCompletedAt: Instant? = null
-
 ) : OutboxModel() {
 
-    override var outboxScheduledFor: Instant? = initialScheduledFor
-
-    override var outboxDelayedUntil: Instant? = initialScheduledFor
+    override var outboxDelayedUntil: Instant? = outboxScheduledFor
 
     override var outboxAttemptCount: Int = 0
-
-    override var outboxFailedAt: Instant? = null
 
     override var outboxErrorClass: String? = null
 
     override var outboxErrorMessage: String? = null
 
     override var outboxErrorStackTrace: String? = null
+
+    override var outboxCompletedAt: Instant? = null
+
+    override var outboxFailedAt: Instant? = null
 
     val after: Duration? by lazy { scheduleAfter?.let { Duration.parse(it) } }
 
@@ -83,14 +81,13 @@ data class ScheduleOutboxModel(
         }
 
         // Update both scheduled and delayed times
-        outboxScheduledFor = nextScheduled
         outboxDelayedUntil = nextScheduled
 
         // Mark as completed if this is a cron schedule with no more executions
-        if (nextScheduled == null && scheduleCron != null) {
-            outboxCompletedAt = Clock.System.now()
+        outboxCompletedAt = if (nextScheduled == null && scheduleCron != null) {
+            Clock.System.now()
         } else {
-            outboxCompletedAt = null
+            null
         }
 
         // set a new id for the next workflow instance
@@ -107,11 +104,10 @@ data class ScheduleOutboxModel(
      */
     fun scheduleAfterCompletion() {
         val nextTime = Clock.System.now() + after!!
-        outboxScheduledFor = nextTime
         outboxDelayedUntil = nextTime
     }
 
-    companion object {
+    companion object Companion {
         private val cronParser by lazy { CronParser(CronDefinitionBuilder.instanceDefinitionFor(CronType.UNIX)) }
 
         fun from(
@@ -122,7 +118,7 @@ data class ScheduleOutboxModel(
             workflowInput: JsonElement,
             schedule: Schedule,
             zoneId: ZoneId?
-        ): ScheduleOutboxModel {
+        ): ScheduleModel {
             val scheduleEvery = schedule.every?.toDuration()?.toString()
             val scheduleAfter = schedule.after?.toDuration()?.toString()
             val scheduleCron = schedule.cron
@@ -136,7 +132,7 @@ data class ScheduleOutboxModel(
                 else -> error("Invalid schedule model")
             }
 
-            return ScheduleOutboxModel(
+            return ScheduleModel(
                 id = IDV7.random(),
                 instanceMessage = InstanceMessage(
                     workflowInfo = WorkflowInfo(workflowNamespace, workflowName, workflowVersion),
@@ -146,7 +142,7 @@ data class ScheduleOutboxModel(
                 scheduleAfter = scheduleAfter,
                 scheduleCron = scheduleCron,
                 scheduleZone = zoneId?.id,
-                initialScheduledFor = initialScheduledFor
+                outboxScheduledFor = initialScheduledFor
             )
         }
     }

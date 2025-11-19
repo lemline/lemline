@@ -26,9 +26,9 @@ import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.models.ParentModel
-import com.lemline.runner.models.RetryOutboxModel
-import com.lemline.runner.models.ScheduleOutboxModel
-import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.models.RetryModel
+import com.lemline.runner.models.ScheduleModel
+import com.lemline.runner.models.WaitModel
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -159,26 +159,26 @@ fun ParentModel.Companion.random() = ParentModel(
     childId = IDV7.random()
 )
 
-fun ScheduleOutboxModel.Companion.random() = ScheduleOutboxModel(
+fun ScheduleModel.Companion.random() = ScheduleModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
         workflowState = WorkflowCommand.ResumeFromTask.random(),
     ),
-    initialScheduledFor = Instant.nullableRandom(),
+    outboxScheduledFor = Instant.nullableRandom(),
     scheduleAfter = String.nullableRandom(),
     scheduleEvery = String.nullableRandom(),
     scheduleCron = String.nullableRandom(),
     scheduleZone = String.nullableRandom(),
 ).also { it.randomize(nullableDelayed = true) }
 
-fun RetryOutboxModel.Companion.random() = RetryOutboxModel(
+fun RetryModel.Companion.random() = RetryModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
         workflowState = WorkflowEvent.RetryScheduled.random(),
     ),
-    scheduledFor = Instant.random(),
+    outboxScheduledFor = Instant.random(),
     errorReason = String.random(),
     errorClass = String.random(),
     errorMessage = String.nullableRandom(),
@@ -190,13 +190,13 @@ fun RetryOutboxModel.Companion.random() = RetryOutboxModel(
     it.outboxErrorMessage = String.nullableRandom()
 }
 
-fun WaitOutboxModel.Companion.random() = WaitOutboxModel(
+fun WaitModel.Companion.random() = WaitModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
         workflowState = WorkflowEvent.WaitStarted.random(),
     ),
-    scheduledFor = Instant.random(),
+    outboxScheduledFor = Instant.random(),
 ).also {
     // Don't call randomize() as outboxDelayedUntil cannot be null for WaitOutboxModel
     it.outboxAttemptCount = Int.random()

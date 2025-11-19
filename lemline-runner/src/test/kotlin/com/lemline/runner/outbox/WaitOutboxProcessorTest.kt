@@ -5,7 +5,7 @@ import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.models.WaitModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
@@ -27,7 +27,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @TestProfile(InMemoryProfile::class)
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() {
+internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitModel>() {
 
     @Inject // Inject the specific repository
     lateinit var waitRepository: WaitRepository
@@ -36,18 +36,18 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
     override lateinit var failureRepository: FailureRepository
 
     // Implement the abstract repository property
-    override val outboxRepository: OutboxRepository<WaitOutboxModel> by lazy { waitRepository }
+    override val outboxRepository: OutboxRepository<WaitModel> by lazy { waitRepository }
 
     // Implement the abstract KClass property
-    override val modelClass: KClass<WaitOutboxModel> = WaitOutboxModel::class
+    override val modelClass: KClass<WaitModel> = WaitModel::class
 
     // Implement the abstract factory method
-    override fun createTestModel(payload: String) = WaitOutboxModel(
+    override fun createTestModel(payload: String) = WaitModel(
         id = IDV7.random(),
         instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
             workflowState = WorkflowEvent.WaitStarted.random(),
         ),
-        scheduledFor = Clock.System.now(),
+        outboxScheduledFor = Clock.System.now(),
     )
 }

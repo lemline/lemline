@@ -163,8 +163,8 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
 
                 if (toProcess > 0) {
                     totalToProcess += toProcess
-                    val processed = processBatch(messages, maxAttempts, initialDelay)
-                    outboxRepository.update(messages, connection)
+                    processBatch(messages, maxAttempts, initialDelay)
+                    val processed = outboxRepository.update(messages, connection)
                     totalProcessed += processed
                 }
             }
@@ -245,12 +245,9 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
         when (total) {
             0 -> logger.debug { "No message found to process" }
             else -> when {
-                failed == 0 -> logger.debug { "All ${total.messages()} $action successfully (over ${batchNumber.batches()})" }
-                else -> logger.debug { "${success.messages()} $action successfully and ${failed.messages()} failed (over ${batchNumber.batches()})" }
+                failed == 0 -> logger.debug { "All ${total.entities()} $action successfully (over ${batchNumber.batches()})" }
+                else -> logger.debug { "${success.entities()} $action successfully and ${failed.entities()} failed (over ${batchNumber.batches()})" }
             }
         }
     }
-
-    private fun Int.messages(): String = this.toString() + " message" + if (this <= 1) "" else "s"
-    private fun Int.batches(): String = this.toString() + " batch" + if (this <= 1) "" else "es"
 }

@@ -5,7 +5,7 @@ import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.RetryOutboxModel
+import com.lemline.runner.models.RetryModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
@@ -27,7 +27,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @TestProfile(InMemoryProfile::class)
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>() {
+internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryModel>() {
 
     @Inject // Inject the retry repository
     lateinit var retryRepository: RetryRepository
@@ -36,19 +36,19 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>(
     override lateinit var failureRepository: FailureRepository
 
     // Implement the abstract repository property
-    override val outboxRepository: OutboxRepository<RetryOutboxModel> by lazy { retryRepository }
+    override val outboxRepository: OutboxRepository<RetryModel> by lazy { retryRepository }
 
     // Implement the abstract KClass property
-    override val modelClass: KClass<RetryOutboxModel> = RetryOutboxModel::class
+    override val modelClass: KClass<RetryModel> = RetryModel::class
 
     // Implement the abstract factory method
-    override fun createTestModel(payload: String) = RetryOutboxModel(
+    override fun createTestModel(payload: String) = RetryModel(
         id = IDV7.random(),
         instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
             workflowState = WorkflowEvent.RetryScheduled.random(),
         ),
-        scheduledFor = Clock.System.now(),
+        outboxScheduledFor = Clock.System.now(),
         errorReason = "test-error-reason",
         errorClass = "test-error-class",
         errorMessage = "test-error-message",

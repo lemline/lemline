@@ -102,8 +102,8 @@ internal abstract class AbstractCleaner<T : AwaitingCompletionModel> {
         }
     }
 
-    private fun Int.entities(): String = this.toString() + " entity" + if (this <= 1) "" else " entities"
-    private fun Int.batches(): String = this.toString() + " batch" + if (this <= 1) "" else "es"
+    protected fun Int.entities(): String = this.toString() + " entity" + if (this <= 1) "" else " entities"
+    protected fun Int.batches(): String = this.toString() + " batch" + if (this <= 1) "" else "es"
 
     @PostConstruct
     open fun init() {

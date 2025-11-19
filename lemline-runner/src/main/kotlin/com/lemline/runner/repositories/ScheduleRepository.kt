@@ -4,8 +4,8 @@ package com.lemline.runner.repositories
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.models.ScheduleOutboxModel
-import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.models.ScheduleModel
+import com.lemline.runner.models.WaitModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
@@ -27,13 +27,13 @@ const val SCHEDULE_TABLE = "lemline_schedules"
  * ensuring reliable message delivery in distributed systems.
  *
  * @see OutboxRepository for base functionality and documentation
- * @see WaitOutboxModel for the message model
+ * @see WaitModel for the message model
  * @see com.lemline.runner.outbox.OutboxRelay for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
+class ScheduleRepository : OutboxRepository<ScheduleModel>() {
 
     companion object {
         internal const val SCHEDULE_AFTER_COLUMN = "schedule_after"
@@ -48,40 +48,39 @@ class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
     override val tableName = SCHEDULE_TABLE
 
     // add the after, cron and every column
-    override val prepareStatementMap: Map<String, (PreparedStatement, ScheduleOutboxModel, Int) -> Unit> =
+    override val prepareStatementMap: Map<String, (PreparedStatement, ScheduleModel, Int) -> Unit> =
         super.prepareStatementMap + (
-            SCHEDULE_AFTER_COLUMN to { stmt: PreparedStatement, entity: ScheduleOutboxModel, idx: Int ->
+            SCHEDULE_AFTER_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
                 stmt.setString(idx, entity.scheduleAfter)
             }) + (
-            SCHEDULE_EVERY_COLUMN to { stmt: PreparedStatement, entity: ScheduleOutboxModel, idx: Int ->
+            SCHEDULE_EVERY_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
                 stmt.setString(idx, entity.scheduleEvery)
             }) + (
-            SCHEDULE_CRON_COLUMN to { stmt: PreparedStatement, entity: ScheduleOutboxModel, idx: Int ->
+            SCHEDULE_CRON_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
                 stmt.setString(idx, entity.scheduleCron)
             }) + (
-            SCHEDULE_ZONE_COLUMN to { stmt: PreparedStatement, entity: ScheduleOutboxModel, idx: Int ->
+            SCHEDULE_ZONE_COLUMN to { stmt: PreparedStatement, entity: ScheduleModel, idx: Int ->
                 stmt.setString(idx, entity.scheduleZone)
             })
 
-    override fun createModel(rs: ResultSet) = ScheduleOutboxModel(
+    override fun createModel(rs: ResultSet) = ScheduleModel(
         id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowCommand.ResumeFromTask>()!!,
-        initialScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
+        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
         scheduleAfter = rs.getString(SCHEDULE_AFTER_COLUMN),
         scheduleEvery = rs.getString(SCHEDULE_EVERY_COLUMN),
         scheduleCron = rs.getString(SCHEDULE_CRON_COLUMN),
         scheduleZone = rs.getString(SCHEDULE_ZONE_COLUMN),
-        outboxCompletedAt = getOutboxCompletedAt(rs)
     ).apply {
-        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN)
         outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN)
         outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN)
-        outboxFailedAt = rs.getInstant(OUTBOX_FAILED_AT_COLUMN)
         outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN)
         outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN)
         outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN)
+        outboxCompletedAt = rs.getInstant(OUTBOX_COMPLETED_AT_COLUMN)
+        outboxFailedAt = rs.getInstant(OUTBOX_FAILED_AT_COLUMN)
     }
 
-    suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection? = null): ScheduleOutboxModel? =
+    suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection? = null): ScheduleModel? =
         findWithWorkflowId(workflowId, connection).firstOrNull()
 }
