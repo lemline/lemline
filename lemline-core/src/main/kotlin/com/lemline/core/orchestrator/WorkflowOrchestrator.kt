@@ -260,7 +260,10 @@ object WorkflowOrchestrator {
             // Workflow completed
             if (result.nextNode == null) {
                 logger.debug { "Workflow completed with output: $rawInput" }
-                return WorkflowEvent.WorkflowCompleted(output = rawInput)
+                return WorkflowEvent.WorkflowCompleted(
+                    output = rawInput,
+                    taskStates = newStates,
+                )
             }
 
             // The current task must be retried
@@ -348,12 +351,15 @@ object WorkflowOrchestrator {
             completeStartedTask(taskStates, node, rawOutput)
         }
 
-        if (result.nextNode == null) {
-            WorkflowEvent.WorkflowCompleted(result.nextInput)
-        } else {
-            // Create new states map with updated state updates and context exports
-            val newStates = taskStates.updateWith(result.stateUpdates, result.nextContext)
+        // Create new states map with updated state updates and context exports
+        val newStates = taskStates.updateWith(result.stateUpdates, result.nextContext)
 
+        if (result.nextNode == null) {
+            WorkflowEvent.WorkflowCompleted(
+                result.nextInput,
+                newStates
+            )
+        } else {
             // Continue execution from the next node (may pause again or complete)
             resumeFromTask(
                 taskStates = newStates,

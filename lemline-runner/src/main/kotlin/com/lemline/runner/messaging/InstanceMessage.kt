@@ -42,30 +42,8 @@ data class InstanceMessage<S : WorkflowState>(
     val workflowId get() = workflowState.workflowId
 
     val hasWaitingParent get() = workflowState.hasWaitingParent
-    
-    companion object {
 
-//        fun new(
-//            workflowId: WorkflowId = WorkflowId.random(),
-//            workflowNamespace: WorkflowNamespace,
-//            workflowName: WorkflowName,
-//            workflowVersion: WorkflowVersion,
-//            workflowInput: JsonElement,
-//            hasWaitingParent: Boolean = false,
-//        ) = InstanceMessage(
-//            WorkflowInfo(
-//                workflowNamespace = workflowNamespace,
-//                workflowName = workflowName,
-//                workflowVersion = workflowVersion,
-//            ),
-//            workflowState = WorkflowCommand.Start(
-//                workflowId = workflowId,
-//                workflowInput = workflowInput,
-//                hasWaitingParent = hasWaitingParent,
-//                startedAt = Clock.System.now()
-//            ),
-//            hasParentWaiting = hasWaitingParent,
-//        )
+    companion object {
 
         @Suppress("UNCHECKED_CAST")
         inline fun <reified S : WorkflowState> fromJsonString(jsonString: String): InstanceMessage<S> {

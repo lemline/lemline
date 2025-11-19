@@ -45,7 +45,7 @@ class ScheduleModelTest {
         model.prepareNextScheduled(WorkflowId.random())
         // The next execution should be exactly one minute after the outboxScheduledFor time
         val expected = Instant.parse("2023-01-01T00:01:00Z")
-        assertEquals(expected, model.outboxScheduledFor)
+        assertEquals(expected, model.outboxDelayedUntil)
     }
 
     @Test
@@ -60,7 +60,7 @@ class ScheduleModelTest {
         model.prepareNextScheduled(WorkflowId.random())
         // When outboxScheduledFor is null, it uses Clock.System.now() as the base time
         // and calculates the next cron execution from that point
-        assertNotNull(model.outboxScheduledFor)
+        assertNotNull(model.outboxDelayedUntil)
     }
 
     @Test
@@ -73,7 +73,7 @@ class ScheduleModelTest {
         model.prepareNextScheduled(WorkflowId.random())
         // The next execution should be the next year
         val expected = Instant.parse("2024-01-01T00:00:00Z")
-        assertEquals(expected, model.outboxScheduledFor)
+        assertEquals(expected, model.outboxDelayedUntil)
     }
 
     @Test
@@ -87,6 +87,6 @@ class ScheduleModelTest {
 
         // 9 AM in New York on Jan 1st is 14:00 UTC
         val expected = Instant.parse("2023-01-01T14:00:00Z")
-        assertEquals(expected, model.outboxScheduledFor)
+        assertEquals(expected, model.outboxDelayedUntil)
     }
 }

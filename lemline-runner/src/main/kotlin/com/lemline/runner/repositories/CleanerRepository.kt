@@ -38,7 +38,7 @@ abstract class CleanerRepository<T : AwaitingCompletionModel> : WithInstanceRepo
          */
         internal const val OUTBOX_COMPLETED_AT_COLUMN = "outbox_completed_at"
     }
-    
+
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
         super.prepareStatementMap + mapOf(
             OUTBOX_COMPLETED_AT_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->

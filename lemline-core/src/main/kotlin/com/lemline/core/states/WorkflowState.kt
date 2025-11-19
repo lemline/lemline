@@ -153,9 +153,9 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     @Serializable
     data class WorkflowCompleted(
-        val output: JsonElement
+        val output: JsonElement,
+        override val taskStates: TaskStates,
     ) : WorkflowEvent() {
-        override val taskStates: TaskStates = emptyMap()
         override val nodePosition: NodePosition = NodePosition.root
 
         override fun toString() = "${this::class.simpleName}(" +

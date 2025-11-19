@@ -233,7 +233,8 @@ fun randomStates() = mapOf(
 )
 
 fun WorkflowEvent.WorkflowCompleted.Companion.random() = WorkflowEvent.WorkflowCompleted(
-    output = JsonElement.random()
+    output = JsonElement.random(),
+    taskStates = randomStates()
 )
 
 fun WorkflowEvent.TaskFailed.Companion.random() = WorkflowEvent.TaskFailed(
