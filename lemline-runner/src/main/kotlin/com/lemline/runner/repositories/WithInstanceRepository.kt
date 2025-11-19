@@ -58,6 +58,7 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
         const val WORKFLOW_POSITION_COLUMN = "workflow_position"
         const val WORKFLOW_STATE_COLUMN = "workflow_state"
         const val PARENT_ID_COLUMN = "parent_id"
+        const val HAS_PARENT_COLUMN = "has_parent"
     }
 
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
@@ -79,9 +80,6 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
             },
             WORKFLOW_STATE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 stmt.setString(idx, entity.workflowState?.toJsonString())
-            },
-            PARENT_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setIDV7(stmt, idx, entity.parentId)
             }
         )
     }
@@ -101,7 +99,7 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
                     workflowVersion = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
                 ),
                 workflowState = WorkflowState.fromJsonString(getString(WORKFLOW_STATE_COLUMN)) as S,
-                parentId = getIDV7(this, PARENT_ID_COLUMN),
+                hasParentWaiting = getIDV7(this, PARENT_ID_COLUMN) != null,
             )
         }
 

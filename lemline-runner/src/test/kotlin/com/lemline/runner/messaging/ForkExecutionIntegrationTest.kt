@@ -89,7 +89,7 @@ internal class ForkExecutionIntegrationTest {
         val instanceMessage: InstanceMessage<WorkflowEvent> = InstanceMessage(
             workflowInfo = testWorkflowInfo,
             workflowState = forkState,
-            parentId = null
+            hasParentWaiting = false
         )
 
         // When
@@ -272,7 +272,7 @@ internal class ForkExecutionIntegrationTest {
         val instanceMessage: InstanceMessage<WorkflowEvent> = InstanceMessage(
             workflowInfo = testWorkflowInfo,
             workflowState = forkState,
-            parentId = null
+            hasParentWaiting = false
         )
 
         databaseMessageHandler.handle(instanceMessage)

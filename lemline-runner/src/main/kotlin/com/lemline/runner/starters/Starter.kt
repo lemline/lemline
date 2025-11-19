@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.starters
 
-import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
@@ -41,7 +40,7 @@ class Starter {
         workflowName: WorkflowName,
         optionalVersion: WorkflowVersion?,
         workflowInput: JsonElement,
-        parentId: IDV7?,
+        hasParentWaiting: Boolean = false,
         zoneId: ZoneId?,
         onError: (String) -> Nothing,
     ): Pair<InstanceMessage<WorkflowCommand>?, ScheduleOutboxModel?> {
@@ -62,7 +61,7 @@ class Starter {
                 workflowName = workflowName,
                 workflowVersion = workflowVersion,
                 workflowInput = workflowInput,
-                parentId = parentId,
+                hasParent = hasParentWaiting,
             )
 
             false -> null
@@ -82,7 +81,7 @@ class Starter {
             )
         }
 
-        return instanceMessage to scheduleOutboxModel
+        return Pair(instanceMessage, scheduleOutboxModel)
     }
 
     private fun validateInput(

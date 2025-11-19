@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.common.values.IDV7
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.ParentWaitingModel
@@ -25,13 +26,54 @@ const val PARENT_TABLE = "lemline_parents"
 @ExperimentalSerializationApi
 internal class ParentWaitingRepository : WithInstanceRepository<ParentWaitingModel>() {
 
+    companion object {
+        const val CHILD_ID_COLUMN = "child_id"
+    }
+
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = PARENT_TABLE
 
+    override val prepareStatementMap by lazy {
+        super.prepareStatementMap + mapOf(
+            CHILD_ID_COLUMN to { stmt: java.sql.PreparedStatement, entity: ParentWaitingModel, idx: Int ->
+                setIDV7(stmt, idx, entity.childId)
+            },
+            PARENT_ID_COLUMN to { stmt: java.sql.PreparedStatement, entity: ParentWaitingModel, idx: Int ->
+                // Store parent's parent workflow ID for user convenience
+                if (entity.instanceMessage.hasParentWaiting) {
+                    setIDV7(stmt, idx, entity.instanceMessage.workflowId.value)
+                } else {
+                    stmt.setNull(idx, java.sql.Types.BINARY)
+                }
+            }
+        )
+    }
+
     override fun createModel(rs: ResultSet) = ParentWaitingModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage<WorkflowEvent.RunWorkflowStarted>()!!
+        instanceMessage = rs.getInstanceMessage<WorkflowEvent.RunWorkflowStarted>()!!,
+        childId = getIDV7(rs, CHILD_ID_COLUMN)!!
     )
+
+    /**
+     * Finds a parent by the child workflow ID.
+     * Used when a child workflow completes to resume its parent.
+     *
+     * @param childId The workflow ID of the child
+     * @param connection An optional database connection to use. If null, a new connection is acquired.
+     * @return The parent model, or null if not found
+     */
+    suspend fun findByChildId(childId: IDV7, connection: java.sql.Connection? = null): ParentWaitingModel? =
+        withConnection(connection) { conn ->
+            conn.prepareStatement(findByChildIdSql).use { stmt ->
+                setIDV7(stmt, 1, childId)
+                stmt.executeQuery().use { rs ->
+                    if (rs.next()) createModel(rs) else null
+                }
+            }
+        }
+
+    private val findByChildIdSql by lazy { "SELECT * FROM $tableName WHERE $CHILD_ID_COLUMN = ? LIMIT 1" }
 }

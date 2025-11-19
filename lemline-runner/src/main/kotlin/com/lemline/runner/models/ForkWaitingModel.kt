@@ -42,6 +42,4 @@ data class ForkWaitingModel(
     override val workflowInfo: WorkflowInfo get() = instanceMessage.workflowInfo
 
     override val workflowState: WorkflowState get() = instanceMessage.workflowState
-
-    override val parentId: IDV7? get() = instanceMessage.parentId
 }

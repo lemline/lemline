@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS lemline_parents
     workflow_version   VARCHAR(255)             NOT NULL,
     workflow_position  CLOB                     NOT NULL,
     workflow_state     CLOB                     NOT NULL,
+    child_id           UUID                     NOT NULL,
     parent_id          UUID,
     created_at         TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at         TIMESTAMP WITH TIME ZONE
@@ -17,6 +18,10 @@ CREATE TABLE IF NOT EXISTS lemline_parents
 CREATE INDEX idx_lemline_parents_workflow_id
     ON lemline_parents (workflow_id);
 
--- Create an index for efficient querying on parent_id
+-- Create a unique index on child_id (each child can have only one parent)
+CREATE UNIQUE INDEX idx_lemline_parents_child_id
+    ON lemline_parents (child_id);
+
+-- Create an index for efficient querying on parent_id (convenience for users)
 CREATE INDEX idx_lemline_parents_parent_id
     ON lemline_parents (parent_id);

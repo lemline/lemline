@@ -101,7 +101,7 @@ fun WorkflowState.Companion.random(): WorkflowState = WorkflowCommand.random()
 fun InstanceMessage.Companion.random() = InstanceMessage(
     workflowInfo = WorkflowInfo.random(),
     workflowState = WorkflowState.random(),
-    parentId = IDV7.random()
+    hasParentWaiting = Random.nextBoolean()
 )
 
 fun InstanceMessage.Companion.nullableRandom() = when (Random.nextBoolean()) {
@@ -115,7 +115,7 @@ fun FailureModel.Companion.random() = FailureModel(
         true -> InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
             workflowState = WorkflowEvent.TaskFailed.random(),
-            parentId = IDV7.random()
+            hasParentWaiting = Random.nextBoolean()
         )
 
         false -> null
@@ -139,8 +139,9 @@ fun ParentWaitingModel.Companion.random() = ParentWaitingModel(
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
         workflowState = WorkflowEvent.RunWorkflowStarted.random(),
-        parentId = IDV7.random()
-    )
+        hasParentWaiting = Random.nextBoolean()
+    ),
+    childId = IDV7.random()
 )
 
 fun ScheduleOutboxModel.Companion.random() = ScheduleOutboxModel(
@@ -148,7 +149,7 @@ fun ScheduleOutboxModel.Companion.random() = ScheduleOutboxModel(
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
         workflowState = WorkflowCommand.random(),
-        parentId = IDV7.random()
+        hasParentWaiting = Random.nextBoolean()
     ),
     outBoxStatus = OutBoxStatus.random(),
     outboxScheduledFor = Instant.nullableRandom(), // <- nullable
@@ -163,7 +164,7 @@ fun RetryOutboxModel.Companion.random() = RetryOutboxModel(
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
         workflowState = WorkflowEvent.RetryScheduled.random(),
-        parentId = IDV7.random()
+        hasParentWaiting = Random.nextBoolean()
     ),
     outBoxStatus = OutBoxStatus.random(),
     outboxScheduledFor = Instant.random(), // <- Not nullable
@@ -178,7 +179,7 @@ fun WaitOutboxModel.Companion.random() = WaitOutboxModel(
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
         workflowState = WorkflowEvent.WaitStarted.random(),
-        parentId = IDV7.random()
+        hasParentWaiting = Random.nextBoolean()
     ),
     outBoxStatus = OutBoxStatus.random(),
     outboxScheduledFor = Instant.random(), // <- Not nullable

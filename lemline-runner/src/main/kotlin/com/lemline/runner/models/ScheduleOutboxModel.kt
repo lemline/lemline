@@ -152,7 +152,7 @@ data class ScheduleOutboxModel(
                     workflowName = workflowName,
                     workflowVersion = workflowVersion,
                     workflowInput = workflowInput,
-                    parentId = null,
+                    hasParent = false,
                 ),
                 scheduleEvery = scheduleEvery,
                 scheduleAfter = scheduleAfter,

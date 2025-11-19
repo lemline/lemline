@@ -313,7 +313,7 @@ internal abstract class ForkWaitingRepositoryTest {
                 forkState = ForkState(),
                 rawInput = JsonPrimitive("test-input")
             ),
-            parentId = null
+            hasParentWaiting = false
         )
 
         return ForkWaitingModel(

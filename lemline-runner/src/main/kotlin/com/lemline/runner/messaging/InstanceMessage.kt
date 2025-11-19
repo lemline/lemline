@@ -1,8 +1,8 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
 import com.lemline.common.json.JsonSerializable
 import com.lemline.common.json.LemlineJson
-import com.lemline.common.values.IDV7
 import com.lemline.common.values.WithDefiniteWorkflowInfo
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
@@ -33,9 +33,9 @@ data class InstanceMessage<S : WorkflowState>(
     @SerialName("s") val workflowState: S,
 
     /**
-     * Parent's model ID waiting for this instance completion, if any.
+     * Whether this workflow instance has a parent waiting for its completion.
      */
-    @SerialName("p") val parentId: IDV7? = null
+    @SerialName("p") val hasParentWaiting: Boolean = false
 ) : WithDefiniteWorkflowInfo, JsonSerializable {
 
     @Transient
@@ -57,7 +57,7 @@ data class InstanceMessage<S : WorkflowState>(
             workflowName: WorkflowName,
             workflowVersion: WorkflowVersion,
             workflowInput: JsonElement,
-            parentId: IDV7? = null,
+            hasParent: Boolean = false,
         ) = InstanceMessage(
             WorkflowInfo(
                 workflowId = workflowId,
@@ -66,7 +66,7 @@ data class InstanceMessage<S : WorkflowState>(
                 workflowVersion = workflowVersion,
             ),
             workflowState = WorkflowCommand.start(workflowInput),
-            parentId = parentId,
+            hasParentWaiting = hasParent,
         )
 
         inline fun <reified S : WorkflowState> fromJsonString(jsonString: String): InstanceMessage<S> {

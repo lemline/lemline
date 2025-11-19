@@ -13,6 +13,7 @@ import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.BranchStatus
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
@@ -60,6 +61,7 @@ import org.jetbrains.annotations.TestOnly
 @ApplicationScoped
 @ExperimentalSerializationApi
 internal class WorkflowEventHandler(
+    private val definitions: Definitions,
     private val parentRepository: ParentWaitingRepository,
     private val retryRepository: RetryRepository,
     private val scheduleRepository: ScheduleRepository,
@@ -93,17 +95,14 @@ internal class WorkflowEventHandler(
         InstanceMessage.fromJsonString(payload)
     } catch (e: Exception) {
         logger.info { "Failed to deserialize message ${toLogString()} $payload: ${e.message}" }
-        throw CompensationException(DESERIALIZATION_FAILURE) { deserializationFailed(e) }
-    }
-
-    private suspend fun Message<String>.deserializationFailed(cause: Exception) {
-        val failure = FailureModel.from(
-            id = IDV7.random(),
-            payload = payload,
-            reason = DESERIALIZATION_FAILURE,
-            error = cause
-        )
-        failureRepository.insert(failure)
+        throw CompensationException(DESERIALIZATION_FAILURE) {
+            val failure = FailureModel.from(
+                payload = payload,
+                reason = DESERIALIZATION_FAILURE,
+                error = e
+            )
+            failureRepository.insert(failure)
+        }
     }
 
     // ========================================
@@ -205,24 +204,27 @@ internal class WorkflowEventHandler(
 
     private suspend fun handleRunWorkflowStarted(instance: InstanceMessage<WorkflowEvent.RunWorkflowStarted>) {
         parentRepository.withTransaction { conn ->
-            // Insert parent
-            val parentId = IDV7.random()
+            // Generate child workflow ID
+            val childWorkflowId = WorkflowId.random()
+
+            // Insert parent with child_id
             parentRepository.insert(
                 entity = ParentWaitingModel(
-                    id = parentId,
-                    instanceMessage = instance
+                    id = IDV7.random(),
+                    instanceMessage = instance,
+                    childId = childWorkflowId.value
                 ),
                 connection = conn
             )
 
             // Create the child + optional schedule
             val (child, schedule) = starter.getStartingMessages(
-                workflowId = WorkflowId.random(),
+                workflowId = childWorkflowId,
                 workflowNamespace = instance.workflowState.childConfig.namespace,
                 workflowName = instance.workflowState.childConfig.name,
                 optionalVersion = instance.workflowState.childConfig.version,
                 workflowInput = instance.workflowState.childConfig.input,
-                parentId = parentId,
+                hasParentWaiting = instance.workflowState.childConfig.sync, // <= true only for sync child
                 zoneId = null
             ) { error(it) }
 
@@ -235,10 +237,10 @@ internal class WorkflowEventHandler(
     }
 
     private suspend fun handleWorkflowCompleted(instance: InstanceMessage<WorkflowEvent.WorkflowCompleted>) {
-        // Handle parent completion
-        instance.parentId?.let { parentId ->
+        // If this workflow has a parent, resume it
+        if (instance.hasParentWaiting) {
             parentRepository.withTransaction { conn ->
-                parentRepository.findById(parentId, conn)?.let { parent ->
+                parentRepository.findByChildId(instance.workflowId.value)?.let { parent ->
                     // Parent state
                     val state = parent.instanceMessage.workflowState
 
@@ -247,7 +249,7 @@ internal class WorkflowEventHandler(
                         InstanceMessage(
                             workflowInfo = parent.instanceMessage.workflowInfo,
                             workflowState = state.resumeSync(instance.workflowState.output),
-                            parentId = parent.parentId,
+                            hasParentWaiting = parent.instanceMessage.hasParentWaiting,
                         )
                     )
 
@@ -255,19 +257,26 @@ internal class WorkflowEventHandler(
                     parentRepository.delete(parent, conn)
 
                     logger.debug {
-                        "Parent workflow ${parent.workflowId} resumed after child completion"
+                        "Parent workflow ${parent.workflowId} resumed after child ${instance.workflowId} completion"
                     }
-                } ?: error("CRITICAL - Unable to find parent $parentId")
+                } ?: error("CRITICAL - Unable to find parent for child ${instance.workflowId}")
             }
         }
 
         // Handle schedule completion
-        // TODO: Determine isScheduledAfter from workflow definition
-        // For now, check if workflow exists in schedule table
-        scheduleRepository.findByWorkflowId(instance.workflowId)?.let { schedule ->
-            schedule.scheduleAfterCompletion()
-            scheduleRepository.update(schedule)
-            logger.debug { "Scheduled workflow ${schedule.workflowName} for ${schedule.outboxScheduledFor}" }
+        val workflow = definitions.get(
+            instance.workflowInfo.workflowNamespace,
+            instance.workflowInfo.workflowName,
+            instance.workflowInfo.workflowVersion
+        )
+            ?: error("CRITICAL - Unable to find definition of workflow ${instance.workflowInfo.workflowNamespace}/${instance.workflowInfo.workflowName}/${instance.workflowInfo.workflowVersion}.")
+        if (workflow.schedule.after != null) {
+            scheduleRepository.findByWorkflowId(instance.workflowId)?.let { schedule ->
+                schedule.scheduleAfterCompletion()
+                scheduleRepository.update(schedule)
+                logger.debug { "Scheduled workflow ${schedule.workflowName} for ${schedule.outboxScheduledFor}" }
+            }
+                ?: error("CRITICAL - Unable to find workflow ${instance.workflowId} in schedules table.")
         }
     }
 
@@ -335,7 +344,7 @@ internal class WorkflowEventHandler(
             val branchMessage = InstanceMessage(
                 workflowInfo = instance.workflowInfo,
                 workflowState = instance.workflowState.startBranch(branchNode.position),
-                parentId = instance.parentId
+                hasParentWaiting = instance.hasParentWaiting
             )
 
             logger.debug { "Scheduling branch ${branchNode.name} at ${branchNode.position}" }
@@ -436,7 +445,7 @@ internal class WorkflowEventHandler(
                 rawInput = assembledOutput,
                 flowDirective = null
             ),
-            parentId = instance.parentId
+            hasParentWaiting = instance.hasParentWaiting
         )
 
         // Clean up fork state - find fork and delete

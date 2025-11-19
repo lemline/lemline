@@ -21,7 +21,7 @@ internal class InstanceMessageTest {
 
         // Verify the essential fields match
         Assertions.assertEquals(instanceMessage.workflowInfo, decoded.workflowInfo)
-        Assertions.assertEquals(instanceMessage.parentId, decoded.parentId)
+        Assertions.assertEquals(instanceMessage.hasParentWaiting, decoded.hasParentWaiting)
         Assertions.assertEquals(instanceMessage, decoded)
     }
 

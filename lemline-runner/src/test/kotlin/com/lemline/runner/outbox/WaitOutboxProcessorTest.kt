@@ -47,7 +47,7 @@ internal class WaitOutboxProcessorTest : OutboxProcessorTest<WaitOutboxModel>() 
         instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
             workflowState = WorkflowEvent.WaitStarted.random(),
-            parentId = IDV7.random()
+            hasParentWaiting = false
         ),
         outboxScheduledFor = Clock.System.now(),
     )

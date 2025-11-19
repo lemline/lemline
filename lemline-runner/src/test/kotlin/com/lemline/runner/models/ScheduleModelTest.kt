@@ -31,7 +31,7 @@ class ScheduleModelTest {
         instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
             workflowState = WorkflowCommand.random(),
-            parentId = IDV7.random()
+            hasParentWaiting = false
         ),
         outBoxStatus = OutBoxStatus.PENDING,
         outboxScheduledFor = outboxScheduledFor,

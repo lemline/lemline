@@ -28,8 +28,9 @@ class Definitions() {
         workflowVersion: WorkflowVersion? = null
     ): Workflow? {
 
-        if (workflowVersion == null) return get(workflowNamespace, workflowName)
+        if (workflowVersion == null) return getFromDatabase(workflowNamespace, workflowName)
 
+        // get the workflow from the cache first, if not in cache, get from the database and update the cache
         return DefinitionCache.getWorkflow(workflowNamespace, workflowName, workflowVersion)
             ?: definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion)
                 ?.parseAndPut()
@@ -38,7 +39,7 @@ class Definitions() {
     // parse the workflow definition and put it to the cache
     private fun DefinitionModel.parseAndPut(): Workflow = DefinitionCache.parseAndPut(definition)
 
-    private suspend fun get(workflowNamespace: WorkflowNamespace, workflowName: WorkflowName): Workflow? {
+    private suspend fun getFromDatabase(workflowNamespace: WorkflowNamespace, workflowName: WorkflowName): Workflow? {
         // by name only, get the last version from the repository
         val workflows = definitionRepository.listByName(workflowNamespace, workflowName)
         if (workflows.isEmpty()) return null

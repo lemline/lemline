@@ -61,7 +61,7 @@ internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
             InstanceMessage(
                 workflowInfo = entity.instanceMessage.workflowInfo,
                 workflowState = command,
-                parentId = entity.instanceMessage.parentId
+                hasParentWaiting = entity.instanceMessage.hasParentWaiting
             )
         )
     }

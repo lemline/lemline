@@ -20,14 +20,15 @@ data class ParentWaitingModel(
     override val id: IDV7,
 
     @SerialName("i")
-    val instanceMessage: InstanceMessage<WorkflowEvent.RunWorkflowStarted>
+    val instanceMessage: InstanceMessage<WorkflowEvent.RunWorkflowStarted>,
+
+    @SerialName("c")
+    val childId: IDV7
 ) : InstanceModel {
 
     override val workflowInfo: WorkflowInfo get() = instanceMessage.workflowInfo
 
     override val workflowState: WorkflowState get() = instanceMessage.workflowState
-
-    override val parentId: IDV7? get() = instanceMessage.parentId
 
     // Needed by tests
     companion object

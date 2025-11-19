@@ -19,10 +19,5 @@ sealed interface InstanceModel : WithId, WithOptionalWorkflowInfo, JsonSerializa
 
     val workflowState: WorkflowState?
 
-    /**
-     * The ID of the parent's model, if any.
-     */
-    val parentId: IDV7?
-
     override fun toJsonString(): String = LemlineJson.encodeToString(this)
 }

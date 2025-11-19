@@ -43,8 +43,6 @@ data class FailureModel(
 
     override val workflowState: WorkflowState? get() = instanceMessage?.workflowState
 
-    override val parentId: IDV7? get() = instanceMessage?.parentId
-
     companion object {
         fun from(
             id: IDV7 = IDV7.random(),
