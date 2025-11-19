@@ -11,7 +11,6 @@ CREATE TABLE lemline_forks (
     workflow_version VARCHAR(255),
     workflow_position VARCHAR(1000),
     workflow_state MEDIUMTEXT,
-    parent_id BINARY(16),
 
     -- Fork-specific fields
     fork_position VARCHAR(1000) NOT NULL,

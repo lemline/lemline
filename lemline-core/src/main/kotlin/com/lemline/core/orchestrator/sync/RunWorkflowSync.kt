@@ -105,6 +105,7 @@ internal object RunWorkflowSync {
         return when (val output = WorkflowOrchestrator.start(
             workflow = workflow,
             workflowInput = workflowInput,
+            hasWaitingParent = true,
             executionMode = ExecutionMode.CONTINUOUS
         )) {
             is WorkflowEvent.WorkflowCompleted -> {
@@ -142,6 +143,7 @@ internal object RunWorkflowSync {
                 WorkflowOrchestrator.start(
                     workflow = workflow,
                     workflowInput = workflowInput,
+                    hasWaitingParent = false,
                     executionMode = ExecutionMode.CONTINUOUS
                 )
             }.onSuccess {

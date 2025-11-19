@@ -23,8 +23,9 @@ import kotlinx.serialization.json.encodeToJsonElement
 data class RootState(
     override val startedAt: Instant,
     val workflowId: WorkflowId,
-    val workflowInput: JsonElement,
+    val workflowInput: JsonElement = buildJsonObject {},
     val context: Scope = buildJsonObject {},
+    val hasWaitingParent: Boolean = false,
 ) : TaskState() {
 
     @Transient
@@ -55,12 +56,7 @@ data class RootState(
      * @return A new RootState with the updated context
      */
     fun copyWithContext(newContext: Scope): RootState {
-        val state = RootState(
-            startedAt = startedAt,
-            workflowId = workflowId,
-            workflowInput = workflowInput,
-            context = newContext,
-        )
+        val state = copy(context = newContext)
         // copy also transient fields
         if (this::secrets.isInitialized) state.secrets = this.secrets
 

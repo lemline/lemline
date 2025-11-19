@@ -3,6 +3,7 @@
 
 package com.lemline.core.orchestrator
 
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.getWorkflowToTest
@@ -13,6 +14,7 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.Workflow
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -30,7 +32,12 @@ internal suspend fun executeContinuousWorkflow(
 ): JsonElement {
     val workflow = getWorkflowToTest(yaml, namespace, name, version)
 
-    val startState = WorkflowCommand.start(workflowInput = input)
+    val startState = WorkflowCommand.Start(
+        workflowId = WorkflowId.random(),
+        workflowInput = input,
+        hasWaitingParent = false,
+        startedAt = Clock.System.now()
+    )
 
     val state = WorkflowOrchestrator.resume(
         workflow = workflow,
@@ -58,6 +65,7 @@ internal suspend fun executeTaskByTaskWorkflow(
     return runUntilComplete(
         workflow = workflow,
         input = input,
+        hasWaitingParent = false,
         executionMode = ExecutionMode.TASK_BY_TASK
     )
 }
@@ -74,6 +82,7 @@ internal suspend fun executeActivityByActivityWorkflow(
     return runUntilComplete(
         workflow = workflow,
         input = input,
+        hasWaitingParent = false,
         executionMode = ExecutionMode.ACTIVITY_BY_ACTIVITY
     )
 }
@@ -82,10 +91,16 @@ internal suspend fun executeActivityByActivityWorkflow(
 private suspend fun runUntilComplete(
     workflow: Workflow,
     input: JsonElement,
+    hasWaitingParent: Boolean,
     executionMode: ExecutionMode
 ): JsonElement {
 
-    val startState = WorkflowCommand.start(workflowInput = input)
+    val startState = WorkflowCommand.Start(
+        workflowId = WorkflowId.random(),
+        workflowInput = input,
+        hasWaitingParent = hasWaitingParent,
+        startedAt = Clock.System.now()
+    )
 
     return runWorkflowStep(
         workflow = workflow,
@@ -137,6 +152,7 @@ private suspend fun runWorkflowStarted(
         val rawOutput = runUntilComplete(
             workflow = childWorkflow,
             input = workflowState.childConfig.input,
+            hasWaitingParent = true,
             executionMode = executionMode
         )
         workflowState.resumeSync(rawOutput = rawOutput)

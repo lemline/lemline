@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.repositories
+package com.lemline.runner.repositories.postgres
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
 import com.lemline.runner.repositories.bases.DefinitionRepositoryTest

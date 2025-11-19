@@ -97,7 +97,7 @@ object WorkflowOrchestrator {
      * @param workflow The workflow to be executed.
      * @param workflowId A unique identifier for the workflow. Defaults to a randomly generated `WorkflowId`.
      * @param workflowInput The initial input data for the workflow in JSON format. Defaults to an empty JSON object.
-     * @param hasParent Indicates whether the workflow has a parent workflow. Defaults to `false`.
+     * @param hasWaitingParent Indicates whether the workflow has a waiting parent workflow. Defaults to `false`.
      * @param startedAt The timestamp indicating when the workflow execution is started. Defaults to the current system time.
      * @param executionMode The execution mode of the workflow. Defaults to `ExecutionMode.CONTINUOUS`.
      * @return A `WorkflowEvent` indicating the result of starting the workflow execution.
@@ -106,14 +106,36 @@ object WorkflowOrchestrator {
         workflow: Workflow,
         workflowId: WorkflowId = WorkflowId.random(),
         workflowInput: JsonElement = buildJsonObject { },
-        hasParent: Boolean = false,
+        hasWaitingParent: Boolean = false,
         startedAt: Instant = Clock.System.now(),
         executionMode: ExecutionMode = ExecutionMode.CONTINUOUS,
     ): WorkflowEvent = resume(
-        workflow,
-        WorkflowCommand.start(workflowId, workflowInput, hasParent, startedAt),
-        executionMode = executionMode,
+        workflow = workflow,
+        state = initState(workflowId, workflowInput, hasWaitingParent, startedAt),
+        executionMode = executionMode
     )
+
+    fun initState(
+        workflowId: WorkflowId = WorkflowId.random(),
+        workflowInput: JsonElement = buildJsonObject { },
+        hasWaitingParent: Boolean = false,
+        startedAt: Instant = Clock.System.now(),
+    ): WorkflowCommand.ResumeFromTask {
+        val rootState = RootState(
+            startedAt = startedAt,
+            workflowId = workflowId,
+            workflowInput = workflowInput,
+            hasWaitingParent = hasWaitingParent,
+        )
+        val taskStates: TaskStates = mapOf(NodePosition.root to rootState)
+
+        return WorkflowCommand.ResumeFromTask(
+            nodePosition = NodePosition.doRoot,
+            rawInput = workflowInput,
+            taskStates = taskStates,
+            flowDirective = null,
+        )
+    }
 
     /**
      * Resumes the execution of a workflow from a given state, continuing the execution based
@@ -129,26 +151,6 @@ object WorkflowOrchestrator {
         state: WorkflowCommand,
         executionMode: ExecutionMode
     ): WorkflowEvent = when (state) {
-
-        is WorkflowCommand.Start -> {
-            val rootNode = workflow.getNode(NodePosition.root)
-            val rootState = RootState(
-                startedAt = state.startedAt,
-                workflowId = state.workflowId,
-                workflowInput = state.workflowInput,
-            )
-            val taskStates: TaskStates = mapOf(NodePosition.root to rootState)
-            val doNode = rootNode.children?.getOrNull(0)
-                ?: throw java.lang.IllegalStateException("RootTask has no 'do' task")
-
-            resumeFromTask(
-                node = doNode,
-                rawInput = state.workflowInput,
-                taskStates = taskStates,
-                flowDirective = null,
-                executionMode = executionMode
-            )
-        }
 
         is WorkflowCommand.ResumeFromTask -> resumeFromTask(
             node = workflow.getNode(state.nodePosition),

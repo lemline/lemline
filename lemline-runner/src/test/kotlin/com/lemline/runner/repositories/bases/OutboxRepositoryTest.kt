@@ -105,7 +105,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
      * Used to verify that the correct messages are returned by repository operations.
      */
     private fun List<T>.equalTo(other: List<T>): Boolean {
-        return this.map { it.workflowId }.toSet() == other.map { it.workflowId }.toSet()
+        return this.map { it.instanceMessage.workflowId }.toSet() == other.map { it.instanceMessage.workflowId }.toSet()
     }
 
     // Test configuration constants
@@ -147,14 +147,14 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `findMessagesToProcess should return all eligible pending messages that are ready for processing`() = runTest {
         val messages = insertEntities(messageCount)
-        val messagesIds = messages.map { it.workflowId }
+        val messagesIds = messages.map { it.instanceMessage.workflowId }
         val expected = messages.filterEntitiesToProcess(Int.MAX_VALUE)
-        val expectedIds = expected.map { it.workflowId }
-        val actual = findMessagesToProcess().filter { it.workflowId in messagesIds }
+        val expectedIds = expected.map { it.instanceMessage.workflowId }
+        val actual = findMessagesToProcess().filter { it.instanceMessage.workflowId in messagesIds }
 
         println("expected for processing: ${expected.size}")
         println("  actual for processing: ${actual.size}")
-        actual.filter { it.workflowId !in expectedIds }.forEach { println(it) }
+        actual.filter { it.instanceMessage.workflowId !in expectedIds }.forEach { println(it) }
         expected.equalTo(actual) shouldBe true
     }
 
@@ -165,15 +165,15 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `findMessagesToProcess should exclude messages that have exceeded maxAttempts`() = runTest {
         val messages = insertEntities(messageCount)
-        val messagesIds = messages.map { it.workflowId }
+        val messagesIds = messages.map { it.instanceMessage.workflowId }
         val expected = messages.filterEntitiesToProcess(maxAttempts = maxAttempts)
-        val expectedIds = expected.map { it.workflowId }
+        val expectedIds = expected.map { it.instanceMessage.workflowId }
 
-        val actual = findMessagesToProcess(maxAttempts = maxAttempts).filter { it.workflowId in messagesIds }
+        val actual = findMessagesToProcess(maxAttempts = maxAttempts).filter { it.instanceMessage.workflowId in messagesIds }
 
         println("expected for processing with maxAttempts: ${expected.size}")
         println("  actual for processing with maxAttempts: ${actual.size}")
-        actual.filter { it.workflowId !in expectedIds }.forEach { println(it) }
+        actual.filter { it.instanceMessage.workflowId !in expectedIds }.forEach { println(it) }
         expected.equalTo(actual) shouldBe true
     }
 
@@ -185,18 +185,18 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `findMessagesToProcess should respect the limit parameter and only return valid candidates`() = runTest {
         val messages = insertEntities(messageCount)
-        val messagesIds = messages.map { it.workflowId }
+        val messagesIds = messages.map { it.instanceMessage.workflowId }
         val expected = messages.filterEntitiesToProcess(Int.MAX_VALUE)
-        val expectedIds = expected.map { it.workflowId }
+        val expectedIds = expected.map { it.instanceMessage.workflowId }
 
-        val actual = findMessagesToProcess(limit = limit).filter { it.workflowId in messagesIds }
+        val actual = findMessagesToProcess(limit = limit).filter { it.instanceMessage.workflowId in messagesIds }
 
         actual.size shouldBeLessThanOrEqualTo limit
 
         println("expected for processing with limit: ${expected.size}")
         println("  actual for processing with limit: ${actual.size}")
-        actual.filter { it.workflowId !in expectedIds }.forEach { println(it) }
-        actual.count { it.workflowId !in expectedIds } shouldBe 0
+        actual.filter { it.instanceMessage.workflowId !in expectedIds }.forEach { println(it) }
+        actual.count { it.instanceMessage.workflowId !in expectedIds } shouldBe 0
     }
 
     /**
@@ -209,15 +209,15 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     fun `findMessagesToDelete should return all sent messages that are past their cutoff date`() = runTest {
         val now = Clock.System.now()
         val messages = insertEntities(messageCount)
-        val messagesIds = messages.map { it.workflowId }
+        val messagesIds = messages.map { it.instanceMessage.workflowId }
         val expected = messages.filterEntitiesToDelete(cutoffDate = now)
-        val expectedIds = expected.map { it.workflowId }
+        val expectedIds = expected.map { it.instanceMessage.workflowId }
 
-        val actual = findMessagesToDelete(cutoffDate = now).filter { it.workflowId in messagesIds }
+        val actual = findMessagesToDelete(cutoffDate = now).filter { it.instanceMessage.workflowId in messagesIds }
 
         println("expected for deletion: ${expected.size}")
         println("      actual deletion: ${actual.size}")
-        actual.filter { it.workflowId !in expectedIds }.forEach { println(it) }
+        actual.filter { it.instanceMessage.workflowId !in expectedIds }.forEach { println(it) }
         expected.equalTo(actual) shouldBe true
     }
 
@@ -228,15 +228,15 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `findMessagesToDelete should only return messages older than the specified cutoff date`() = runTest {
         val messages = insertEntities(messageCount)
-        val messagesIds = messages.map { it.workflowId }
+        val messagesIds = messages.map { it.instanceMessage.workflowId }
         val expected = messages.filterEntitiesToDelete(cutoffDate = cutoffDate)
-        val expectedIds = expected.map { it.workflowId }
+        val expectedIds = expected.map { it.instanceMessage.workflowId }
 
-        val actual = findMessagesToDelete(cutoffDate = cutoffDate).filter { it.workflowId in messagesIds }
+        val actual = findMessagesToDelete(cutoffDate = cutoffDate).filter { it.instanceMessage.workflowId in messagesIds }
 
         println("expected for deletion with cutoffDate: ${expected.size}")
         println("      actual deletion with cutoffDate: ${actual.size}")
-        actual.filter { it.workflowId !in expectedIds }.forEach { println(it) }
+        actual.filter { it.instanceMessage.workflowId !in expectedIds }.forEach { println(it) }
         expected.equalTo(actual) shouldBe true
     }
 
@@ -248,18 +248,18 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `findMessagesToDelete should respect the limit parameter and only return valid candidates`() = runTest {
         val messages = insertEntities(messageCount)
-        val messagesIds = messages.map { it.workflowId }
+        val messagesIds = messages.map { it.instanceMessage.workflowId }
         val expected = messages.filterEntitiesToDelete()
-        val expectedIds = expected.map { it.workflowId }
+        val expectedIds = expected.map { it.instanceMessage.workflowId }
 
-        val actual = findMessagesToDelete(batchSize = limit).filter { it.workflowId in messagesIds }
+        val actual = findMessagesToDelete(batchSize = limit).filter { it.instanceMessage.workflowId in messagesIds }
 
         actual.size shouldBeLessThanOrEqualTo limit
 
         println("expected for deletion with limit: ${expected.size}")
         println("      actual deletion with limit: ${actual.size}")
-        actual.filter { it.workflowId !in expectedIds }.forEach { println(it) }
-        actual.count { it.workflowId !in expectedIds } shouldBe 0
+        actual.filter { it.instanceMessage.workflowId !in expectedIds }.forEach { println(it) }
+        actual.count { it.instanceMessage.workflowId !in expectedIds } shouldBe 0
     }
 
     /**
@@ -272,7 +272,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `findMessagesToProcess should handle concurrent requests without duplicate processing`() = runTest {
         val messages = insertEntities(messageCount)
-        val messagesIds = messages.map { it.workflowId }
+        val messagesIds = messages.map { it.instanceMessage.workflowId }
         val expectedProcessed = messages.filterEntitiesToProcess(maxAttempts = maxAttempts).size
         val processedMessages = mutableListOf<T>()
         val executor = Executors.newFixedThreadPool(concurrentRequests)
@@ -292,7 +292,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                                 // save them
                                 repository.update(results, connection)
                                 // record processed messages
-                                synchronized(processedMessages) { processedMessages.addAll(results.filter { it.workflowId in messagesIds }) }
+                                synchronized(processedMessages) { processedMessages.addAll(results.filter { it.instanceMessage.workflowId in messagesIds }) }
                             }
                         }
                     } catch (e: Exception) {
@@ -308,7 +308,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         executor.shutdown()
 
         processedMessages shouldHaveSize expectedProcessed
-        val processIds = processedMessages.map { it.workflowId }
+        val processIds = processedMessages.map { it.instanceMessage.workflowId }
         processIds.toSet() shouldHaveSize processIds.size
     }
 
@@ -322,7 +322,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `findMessagesToDelete should handle concurrent requests without duplicate deletion`() = runTest {
         val messages = insertEntities(messageCount)
-        val messagesIds = messages.map { it.workflowId }
+        val messagesIds = messages.map { it.instanceMessage.workflowId }
         val expectedDeleted = messages.filterEntitiesToDelete(cutoffDate).size
         val deletedMessages = mutableListOf<T>()
         val executor = Executors.newFixedThreadPool(concurrentRequests)
@@ -340,7 +340,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                                 // delete them
                                 repository.delete(results, connection)
                                 // record deleted messages
-                                synchronized(deletedMessages) { deletedMessages.addAll(results.filter { it.workflowId in messagesIds }) }
+                                synchronized(deletedMessages) { deletedMessages.addAll(results.filter { it.instanceMessage.workflowId in messagesIds }) }
                             }
                         }
                     } catch (e: Exception) {
@@ -356,7 +356,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         executor.shutdown()
 
         deletedMessages shouldHaveSize expectedDeleted
-        val processIds = deletedMessages.map { it.workflowId }
+        val processIds = deletedMessages.map { it.instanceMessage.workflowId }
         processIds.toSet() shouldHaveSize processIds.size
     }
 
@@ -371,7 +371,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     @Test
     fun `should handle mixed concurrent processing and deletion operations without conflicts`() = runTest {
         val messages = insertEntities(messageCount)
-        val messagesIds = messages.map { it.workflowId }
+        val messagesIds = messages.map { it.instanceMessage.workflowId }
         val expectedProcessed = messages.filterEntitiesToProcess(maxAttempts = maxAttempts).size
         val expectedDeleted = messages.filterEntitiesToDelete(cutoffDate).size
         val processedMessages = mutableListOf<T>()
@@ -396,7 +396,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                                         // delete them
                                         repository.delete(results, connection)
                                         // record processed messages
-                                        synchronized(processedMessages) { processedMessages.addAll(results.filter { it.workflowId in messagesIds }) }
+                                        synchronized(processedMessages) { processedMessages.addAll(results.filter { it.instanceMessage.workflowId in messagesIds }) }
                                     }
 
                                     1 -> {
@@ -406,7 +406,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                                         // delete them
                                         repository.delete(results, connection)
                                         // record deleted messages
-                                        synchronized(deletedMessages) { deletedMessages.addAll(results.filter { it.workflowId in messagesIds }) }
+                                        synchronized(deletedMessages) { deletedMessages.addAll(results.filter { it.instanceMessage.workflowId in messagesIds }) }
                                     }
 
                                     else -> {}
@@ -430,9 +430,9 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
         processedMessages shouldHaveSize expectedProcessed
         deletedMessages shouldHaveSize expectedDeleted
-        val deletedIds = deletedMessages.map { it.workflowId }
+        val deletedIds = deletedMessages.map { it.instanceMessage.workflowId }
         deletedIds.toSet() shouldHaveSize deletedIds.size
-        val processedIds = processedMessages.map { it.workflowId }
+        val processedIds = processedMessages.map { it.instanceMessage.workflowId }
         processedIds.toSet() shouldHaveSize processedIds.size
 
         processedIds.intersect(deletedIds.toSet()).shouldBeEmpty()
@@ -472,7 +472,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
         exceptions.shouldBeEmpty()
         val allMessages = repository.listAll()
         allMessages shouldHaveSize messages.size
-        allMessages.map { it.workflowId }.toSet() shouldHaveSize messages.size
+        allMessages.map { it.instanceMessage.workflowId }.toSet() shouldHaveSize messages.size
     }
 
     /**

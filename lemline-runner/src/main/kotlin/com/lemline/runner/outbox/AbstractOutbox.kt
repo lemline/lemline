@@ -213,12 +213,12 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
         if (entity.outboxAttemptCount >= maxAttempts) {
             // Mark as permanently failed
             entity.outboxFailedAt = Clock.System.now()
-            logger.error { "Message ${entity.workflowId} has reached maximum retry attempts" }
+            logger.error { "Message ${entity.instanceMessage.workflowId} has reached maximum retry attempts" }
         } else {
             // Schedule for retry with exponential backoff
             val nextDelay = calculateNextAttemptDelay(entity.outboxAttemptCount, initialDelay)
             entity.outboxDelayedUntil = Clock.System.now() + nextDelay
-            logger.debug { "Message ${entity.workflowId} will be retried in ${nextDelay}ms (attempt ${entity.outboxAttemptCount})" }
+            logger.debug { "Message ${entity.instanceMessage.workflowId} will be retried in ${nextDelay}ms (attempt ${entity.outboxAttemptCount})" }
         }
         false // <- return false (failure)
     }

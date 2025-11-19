@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS lemline_failures
     workflow_version   VARCHAR(255),
     workflow_position  TEXT,
     workflow_state     MEDIUMTEXT,
-    parent_id          BINARY(16),
     payload            MEDIUMTEXT,
     error_reason       VARCHAR(255) NOT NULL,
     error_class        TEXT         NOT NULL,
@@ -22,6 +21,3 @@ CREATE TABLE IF NOT EXISTS lemline_failures
 CREATE INDEX idx_lemline_failures_workflow_id
     ON lemline_failures (workflow_id);
 
--- Create an index for efficient querying on parent_id
-CREATE INDEX idx_lemline_failures_parent_id
-    ON lemline_failures (parent_id);

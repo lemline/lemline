@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.repositories
+package com.lemline.runner.repositories.mysql
 
+import com.lemline.common.EnabledOnlyIfDockerAvailable
 import com.lemline.runner.repositories.bases.ParentWaitingRepositoryTest
-import com.lemline.runner.tests.profiles.InMemoryProfile
+import com.lemline.runner.tests.profiles.MySQLProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import kotlin.time.ExperimentalTime
@@ -10,11 +11,12 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.TestInstance
 
 /**
- * Runs the RetryRepositoryTest suite against an H2 database.
+ * Runs the RetryRepositoryTest suite against a MySQL database.
  */
 @QuarkusTest
-@TestProfile(InMemoryProfile::class)
+@TestProfile(MySQLProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@EnabledOnlyIfDockerAvailable
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class H2ParentWaitingRepositoryTest : ParentWaitingRepositoryTest()
+internal class MySQLParentRepositoryTest : ParentWaitingRepositoryTest()

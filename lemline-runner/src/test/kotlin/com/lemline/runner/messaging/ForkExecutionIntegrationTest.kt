@@ -10,6 +10,7 @@ import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.nodes.Token
 import com.lemline.core.states.BranchStatus
+import com.lemline.core.states.RootState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.events.WorkflowEventHandler
 import com.lemline.runner.repositories.ForkRepository
@@ -48,8 +49,9 @@ internal class ForkExecutionIntegrationTest {
     @Inject
     lateinit var forkRepository: ForkRepository
 
+    private val testWorkflowId = WorkflowId.random()
+
     private val testWorkflowInfo = WorkflowInfo(
-        workflowId = WorkflowId.random(),
         workflowNamespace = WorkflowNamespace("test"),
         workflowName = WorkflowName("fork-test"),
         workflowVersion = WorkflowVersion("1.0.0")
@@ -80,7 +82,13 @@ internal class ForkExecutionIntegrationTest {
         val forkPosition = NodePosition.root.addToken(Token.DO).addIndex(0).addName("testFork")
 
         val forkState = WorkflowEvent.ForkStarted(
-            taskStates = emptyMap<NodePosition, com.lemline.core.states.TaskState>(),
+            taskStates = mapOf(
+                NodePosition.root to RootState(
+                    startedAt = kotlin.time.Clock.System.now(),
+                    workflowId = testWorkflowId,
+                    workflowInput = JsonPrimitive("input")
+                )
+            ),
             nodePosition = forkPosition,
             forkState = com.lemline.core.states.ForkState(),
             rawInput = JsonPrimitive("input")
@@ -89,7 +97,6 @@ internal class ForkExecutionIntegrationTest {
         val instanceMessage: InstanceMessage<WorkflowEvent> = InstanceMessage(
             workflowInfo = testWorkflowInfo,
             workflowState = forkState,
-            hasParentWaiting = false
         )
 
         // When
@@ -97,7 +104,7 @@ internal class ForkExecutionIntegrationTest {
 
         // Then - fork should be persisted
         val fork = forkRepository.findByWorkflowIdAndPosition(
-            testWorkflowInfo.workflowId,
+            testWorkflowId,
             forkPosition
         )
         fork shouldNotBe null
@@ -119,7 +126,7 @@ internal class ForkExecutionIntegrationTest {
         val forkPosition = NodePosition.root.addToken(Token.DO).addIndex(0).addName("testFork")
         setupFork(forkPosition, branchCount = 2, compete = false)
 
-        val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowInfo.workflowId, forkPosition)!!
+        val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowId, forkPosition)!!
         lastForkId = fork.id
 
         // When - complete first branch
@@ -156,7 +163,7 @@ internal class ForkExecutionIntegrationTest {
         val forkPosition = NodePosition.root.addToken(Token.DO).addIndex(0).addName("testFork")
         setupFork(forkPosition, branchCount = 3, compete = true)
 
-        val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowInfo.workflowId, forkPosition)!!
+        val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowId, forkPosition)!!
         lastForkId = fork.id
 
         // When - complete first branch
@@ -183,7 +190,7 @@ internal class ForkExecutionIntegrationTest {
         val forkPosition = NodePosition.root.addToken(Token.DO).addIndex(0).addName("testFork")
         setupFork(forkPosition, branchCount = 3, compete = false)
 
-        val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowInfo.workflowId, forkPosition)!!
+        val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowId, forkPosition)!!
         lastForkId = fork.id
 
         // When - complete branches concurrently (simulated by sequential calls)
@@ -227,7 +234,7 @@ internal class ForkExecutionIntegrationTest {
         setupFork(forkPosition, branchCount = 1, compete = false)
 
         // Get the fork that was created
-        val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowInfo.workflowId, forkPosition)
+        val fork = forkRepository.findByWorkflowIdAndPosition(testWorkflowId, forkPosition)
         fork shouldNotBe null
         lastForkId = fork!!.id
 
@@ -239,7 +246,7 @@ internal class ForkExecutionIntegrationTest {
 
         // Verify fork exists
         forkRepository.findByWorkflowIdAndPosition(
-            testWorkflowInfo.workflowId,
+            testWorkflowId,
             forkPosition
         ) shouldNotBe null
 
@@ -248,7 +255,7 @@ internal class ForkExecutionIntegrationTest {
 
         // Then - fork should be deleted
         forkRepository.findByWorkflowIdAndPosition(
-            testWorkflowInfo.workflowId,
+            testWorkflowId,
             forkPosition
         ) shouldBe null
     }
@@ -263,7 +270,13 @@ internal class ForkExecutionIntegrationTest {
         registerCustomForkWorkflow(branchCount, compete)
 
         val forkState = WorkflowEvent.ForkStarted(
-            taskStates = emptyMap<NodePosition, com.lemline.core.states.TaskState>(),
+            taskStates = mapOf(
+                NodePosition.root to RootState(
+                    startedAt = kotlin.time.Clock.System.now(),
+                    workflowId = testWorkflowId,
+                    workflowInput = JsonPrimitive("input")
+                )
+            ),
             nodePosition = forkPosition,
             forkState = com.lemline.core.states.ForkState(),
             rawInput = JsonPrimitive("input")
@@ -272,7 +285,6 @@ internal class ForkExecutionIntegrationTest {
         val instanceMessage: InstanceMessage<WorkflowEvent> = InstanceMessage(
             workflowInfo = testWorkflowInfo,
             workflowState = forkState,
-            hasParentWaiting = false
         )
 
         databaseMessageHandler.handle(instanceMessage)

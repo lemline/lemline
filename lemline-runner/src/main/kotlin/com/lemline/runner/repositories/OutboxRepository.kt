@@ -8,7 +8,6 @@ import java.sql.PreparedStatement
 import java.sql.Timestamp
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -148,45 +147,13 @@ abstract class OutboxRepository<T : OutboxModel> : CleanerRepository<T>() {
             SELECT * FROM $tableName
             WHERE $OUTBOX_COMPLETED_AT_COLUMN IS NULL
               AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-              AND ($OUTBOX_DELAYED_UNTIL_COLUMN IS NULL OR $OUTBOX_DELAYED_UNTIL_COLUMN <= ?)
+              AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
+              AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
               AND $OUTBOX_ATTEMPT_COUNT_COLUMN < ?
-            ORDER BY $OUTBOX_DELAYED_UNTIL_COLUMN ASC NULLS FIRST
+            ORDER BY $OUTBOX_DELAYED_UNTIL_COLUMN ASC
             LIMIT ?
             FOR UPDATE SKIP LOCKED
         """.trimIndent()
     }
 
-    /**
-     * Finds and locks messages that are ready to be deleted.
-     * This method uses a native SQL query with SKIP LOCKED because Hibernate does not support this feature.
-     *
-     * Entities are ready for deletion if they have been completed and are older than the cutoff date.
-     *
-     * @param cutoffDate Messages completed before this date will be selected
-     * @param batchSize Maximum number of messages to retrieve
-     * @param connection Optional database connection to use
-     * @return List of locked messages ready for deletion
-     */
-    override suspend fun findEntitiesToDelete(cutoffDate: Instant, batchSize: Int, connection: Connection?): List<T> =
-        withConnection(connection) {
-            it.prepareStatement(findEntitiesToDeleteSQL).use { stmt ->
-                stmt.apply {
-                    setTimestamp(1, Timestamp.from(cutoffDate.toJavaInstant()))
-                    setInt(2, batchSize)
-                }
-
-                stmt.executeQuery().use { rs -> rs.toModels() }
-            }
-        }
-
-    private val findEntitiesToDeleteSQL by lazy {
-        """
-            SELECT * FROM $tableName
-            WHERE $OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
-              AND $OUTBOX_COMPLETED_AT_COLUMN < ?
-            ORDER BY $OUTBOX_COMPLETED_AT_COLUMN ASC
-            LIMIT ?
-            FOR UPDATE SKIP LOCKED
-        """.trimIndent()
-    }
 }

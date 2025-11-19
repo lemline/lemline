@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.repositories
+package com.lemline.runner.repositories.postgres
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
-import com.lemline.runner.repositories.bases.FailureRepositoryTest
+import com.lemline.runner.repositories.bases.WaitRepositoryTest
 import com.lemline.runner.tests.profiles.PostgresProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -11,7 +11,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.TestInstance
 
 /**
- * Runs the FailureRepositoryTest suite against a PostgresSQL database.
+ * Runs the WaitRepositoryTest suite against a PostgresSQL database.
  */
 @QuarkusTest
 @TestProfile(PostgresProfile::class)
@@ -19,4 +19,4 @@ import org.junit.jupiter.api.TestInstance
 @EnabledOnlyIfDockerAvailable
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class PostgresFailureRepositoryTest : FailureRepositoryTest()
+internal class PostgresWaitRepositoryTest : WaitRepositoryTest()

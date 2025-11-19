@@ -102,7 +102,7 @@ class InstanceStartCommand : Runnable {
             workflowName = workflowName,
             optionalVersion = version?.let { WorkflowVersion(it) },
             workflowInput = workflowInput,
-            hasParentWaiting = false,
+            hasWaitingParent = false,
             zoneId = getZoneId(),
         ) { cliError(it) }
 

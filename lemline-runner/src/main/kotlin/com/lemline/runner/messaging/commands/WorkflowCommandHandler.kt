@@ -140,7 +140,6 @@ internal class WorkflowCommandHandler(
                 flowDirective = null,
                 error = error
             ),
-            hasParentWaiting = hasParentWaiting
         )
     }
 
@@ -324,7 +323,7 @@ internal class WorkflowCommandHandler(
                 logger.debug { "Workflow completed with output: ${event.output}" }
 
                 // Determine if this workflow has a parent or need to be scheduled after completion
-                if (hasParentWaiting || workflow.schedule?.after != null) {
+                if (event.hasWaitingParent || workflow.schedule?.after != null) {
                     sendToDatabase(this, event)
                 }
                 null  // Terminal
@@ -349,7 +348,6 @@ internal class WorkflowCommandHandler(
             InstanceMessage(
                 workflowInfo = message.workflowInfo,
                 workflowState = event,
-                hasParentWaiting = message.hasParentWaiting,
             )
         )
     }

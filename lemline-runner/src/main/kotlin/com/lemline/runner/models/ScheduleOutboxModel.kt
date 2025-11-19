@@ -8,9 +8,11 @@ import com.cronutils.model.time.ExecutionTime
 import com.cronutils.parser.CronParser
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.orchestrator.WorkflowOrchestrator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.utils.toDuration
 import com.lemline.runner.messaging.InstanceMessage
@@ -29,7 +31,7 @@ import kotlinx.serialization.json.JsonElement
 @ExperimentalTime
 data class ScheduleOutboxModel(
     override val id: IDV7,
-    override var instanceMessage: InstanceMessage<WorkflowCommand>,
+    override var instanceMessage: InstanceMessage<WorkflowCommand.ResumeFromTask>,
     val initialScheduledFor: Instant?,
     val scheduleAfter: String?,
     val scheduleEvery: String?,
@@ -66,7 +68,7 @@ data class ScheduleOutboxModel(
      *
      * This is called by [com.lemline.runner.outbox.ScheduleOutbox], before sending the related message
      */
-    internal fun prepareNextScheduled(newId: WorkflowId) {
+    internal fun prepareNextScheduled(newWorkflowId: WorkflowId) {
         // Reset the attempt counter and error tracking
         outboxAttemptCount = 0
         outboxFailedAt = null
@@ -93,8 +95,9 @@ data class ScheduleOutboxModel(
 
         // set a new id for the next workflow instance
         instanceMessage = instanceMessage.copy(
-            workflowInfo = instanceMessage.workflowInfo.duplicate(newId),
+            workflowState = instanceMessage.workflowState.duplicate(workflowId = newWorkflowId)
         )
+
     }
 
     /**
@@ -135,13 +138,9 @@ data class ScheduleOutboxModel(
 
             return ScheduleOutboxModel(
                 id = IDV7.random(),
-                instanceMessage = InstanceMessage.new(
-                    workflowId = workflowId,
-                    workflowNamespace = workflowNamespace,
-                    workflowName = workflowName,
-                    workflowVersion = workflowVersion,
-                    workflowInput = workflowInput,
-                    hasParent = false,
+                instanceMessage = InstanceMessage(
+                    workflowInfo = WorkflowInfo(workflowNamespace, workflowName, workflowVersion),
+                    workflowState = WorkflowOrchestrator.initState(workflowId, workflowInput, false)
                 ),
                 scheduleEvery = scheduleEvery,
                 scheduleAfter = scheduleAfter,

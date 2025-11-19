@@ -10,7 +10,6 @@ import com.lemline.runner.random.random
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
 import kotlin.test.assertNotNull
-import kotlin.test.assertNull
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -30,8 +29,7 @@ class ScheduleModelTest {
         id = IDV7.random(),
         instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
-            workflowState = WorkflowCommand.random(),
-            hasParentWaiting = false
+            workflowState = WorkflowCommand.ResumeFromTask.random(),
         ),
         initialScheduledFor = outboxScheduledFor,
         scheduleCron = scheduleCron,

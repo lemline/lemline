@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.repositories
+package com.lemline.runner.repositories.mysql
 
-import com.lemline.runner.repositories.bases.ScheduleRepositoryTest
-import com.lemline.runner.tests.profiles.InMemoryProfile
+import com.lemline.runner.repositories.bases.ForkWaitingRepositoryTest
+import com.lemline.runner.tests.profiles.MySQLProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import kotlin.time.ExperimentalTime
@@ -10,11 +10,11 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.TestInstance
 
 /**
- * Runs the WorkflowRepositoryTest suite against an H2 database.
+ * Runs the ForkWaitingRepositoryTest suite against a MySQL database.
  */
 @QuarkusTest
-@TestProfile(InMemoryProfile::class)
+@TestProfile(MySQLProfile::class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class H2ScheduleRepositoryTest : ScheduleRepositoryTest()
+internal class MySQLForkRepositoryTest : ForkWaitingRepositoryTest()

@@ -2,9 +2,11 @@
 package com.lemline.runner.starters
 
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.orchestrator.WorkflowOrchestrator
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.definitions.Definitions
@@ -40,10 +42,10 @@ class Starter {
         workflowName: WorkflowName,
         optionalVersion: WorkflowVersion?,
         workflowInput: JsonElement,
-        hasParentWaiting: Boolean = false,
+        hasWaitingParent: Boolean,
         zoneId: ZoneId?,
         onError: (String) -> Nothing,
-    ): Pair<InstanceMessage<WorkflowCommand>?, ScheduleOutboxModel?> {
+    ): Pair<InstanceMessage<WorkflowCommand.ResumeFromTask>?, ScheduleOutboxModel?> {
         // Retrieve the workflow definition from the repository
         val workflow = definitions.get(workflowNamespace, workflowName, optionalVersion)
             ?: onError("Workflow $workflowName (version=${optionalVersion ?: "latest"}) not found.")
@@ -55,13 +57,9 @@ class Starter {
 
         // create the instance message, if not scheduled by a cron
         val instanceMessage = when (workflow.schedule?.cron.isNullOrBlank()) {
-            true -> InstanceMessage.new(
-                workflowId = workflowId,
-                workflowNamespace = workflowNamespace,
-                workflowName = workflowName,
-                workflowVersion = workflowVersion,
-                workflowInput = workflowInput,
-                hasParent = hasParentWaiting,
+            true -> InstanceMessage(
+                workflowInfo = WorkflowInfo(workflowNamespace, workflowName, workflowVersion),
+                workflowState = WorkflowOrchestrator.initState(workflowId, workflowInput, hasWaitingParent)
             )
 
             false -> null

@@ -4,6 +4,7 @@ package com.lemline.runner.messaging
 import com.lemline.common.logger.Logger
 import com.lemline.common.logger.withSuspendLoggingContext
 import com.lemline.common.values.WithOptionalWorkflowInfo
+import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
@@ -42,55 +43,39 @@ internal interface MessageHandler<T> {
     val onFailureTest: (Message<String>, Throwable?) -> Unit
 
     // Retrieve workflowInfo if present
-    private val T?.workflowInfo get() = (this as? WithOptionalWorkflowInfo)?.workflowInfo
+    val T?.workflowInfo get() = (this as? WithOptionalWorkflowInfo)?.workflowInfo
+
+    // Retrieve workflowId if present
+    val T?.workflowId get() = (this as? InstanceMessage<*>)?.workflowState?.workflowId
 
     suspend fun handleMessage(message: Message<String>) {
         logger.debug { "Received: ${message.toLogString()}" }
 
         // --- Deserialization ---
-        val msg: T = message.deserializePayload()
-            .getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles ack if fails
+        val msg: T = message.tryWithCompensation(null, null) {
+            metrics.recordDeserializationDuration {
+                message.deserialize()
+            }
+        }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles ack if fails
 
         // --- Processing  ---
-        val next: T? = message.handlePayload(msg)
-            .getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles ack if fails
+        message.tryWithCompensation(msg.workflowId, msg.workflowInfo) {
+            val next: T? = metrics.recordProcessingDuration(msg.workflowInfo) {
+                handle(msg)
+            }
+            val nextPayload: String? = next?.let {
+                metrics.recordSerializationDuration(next.workflowInfo) {
+                    serialize(msg, it)
+                }
+            }
+            nextPayload?.let { emit(it) }
 
-        // --- Serialization  ---
-        val nextPayload: String? = next?.let {
-            message.serializePayload(msg, it)
-        }?.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles ack if fails
+            onCompleteTest(message, next)
 
-        // --- Emission ---
-        nextPayload?.let { payload ->
-            message.emitPayload(payload)
-        }?.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles ack if fails
-
-        onCompleteTest(message, next)
+        }.getOrElse { onFailureTest(message, it); return } // <- tryWithCompensation handles ack if fails
 
         // Success Path - ACK the original message
-        message.acknowledgeWithRetry(msg.workflowInfo)
-    }
-
-    private suspend fun Message<String>.deserializePayload(): Result<T> = tryWithCompensation {
-        metrics.recordDeserializationDuration {
-            deserialize()
-        }
-    }
-
-    private suspend fun Message<String>.handlePayload(payload: T): Result<T?> = tryWithCompensation {
-        metrics.recordProcessingDuration(payload.workflowInfo) {
-            handle(payload)
-        }
-    }
-
-    private suspend fun Message<String>.serializePayload(current: T, next: T): Result<String?> = tryWithCompensation {
-        metrics.recordSerializationDuration(next.workflowInfo) {
-            serialize(current, next)
-        }
-    }
-
-    private suspend fun Message<String>.emitPayload(nextPayload: String): Result<Unit> = tryWithCompensation {
-        emit(nextPayload)
+        message.acknowledgeWithRetry(msg.workflowId, msg.workflowInfo)
     }
 
     /**
@@ -128,15 +113,16 @@ internal interface MessageHandler<T> {
      *   behavior has been applied.
      */
     suspend fun <S> Message<String>.tryWithCompensation(
-        workflowInfo: WorkflowInfo? = null,
+        workflowId: WorkflowId?,
+        workflowInfo: WorkflowInfo?,
         block: suspend () -> S
-    ): Result<S> = withSuspendLoggingContext(workflowInfo) {
+    ): Result<S> = withSuspendLoggingContext(workflowId, workflowInfo) {
         try {
             Result.success(block())
         } catch (compensation: CompensationException) {
             try {
                 compensation.run()
-                acknowledgeWithRetry(workflowInfo)
+                acknowledgeWithRetry(workflowId, workflowInfo)
                 Result.failure(compensation)
             } catch (e: Exception) {
                 // Failure path
@@ -158,6 +144,7 @@ internal interface MessageHandler<T> {
      * If the acknowledgment fails, an exception is thrown to trigger a broker reconnection
      */
     suspend fun Message<String>.acknowledgeWithRetry(
+        workflowId: WorkflowId?,
         workflowInfo: WorkflowInfo?,
     ) = try {
         ackWithRetry()

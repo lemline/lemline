@@ -224,7 +224,7 @@ internal class WorkflowEventHandler(
                 workflowName = instance.workflowState.childConfig.name,
                 optionalVersion = instance.workflowState.childConfig.version,
                 workflowInput = instance.workflowState.childConfig.input,
-                hasParentWaiting = instance.workflowState.childConfig.sync, // <= true only for sync child
+                hasWaitingParent = instance.workflowState.childConfig.sync, // <= true only for sync child
                 zoneId = null
             ) { error(it) }
 
@@ -238,9 +238,9 @@ internal class WorkflowEventHandler(
 
     private suspend fun handleWorkflowCompleted(instance: InstanceMessage<WorkflowEvent.WorkflowCompleted>) {
         // If this workflow has a parent, resume it
-        if (instance.hasParentWaiting) {
+        if (instance.workflowState.hasWaitingParent) {
             parentRepository.withTransaction { conn ->
-                parentRepository.findByChildId(instance.workflowId.value)?.let { parent ->
+                parentRepository.findByChildId(instance.workflowId)?.let { parent ->
                     // Parent state
                     val state = parent.instanceMessage.workflowState
 
@@ -249,7 +249,6 @@ internal class WorkflowEventHandler(
                         InstanceMessage(
                             workflowInfo = parent.instanceMessage.workflowInfo,
                             workflowState = state.resumeSync(instance.workflowState.output),
-                            hasParentWaiting = parent.instanceMessage.hasParentWaiting,
                         )
                     )
 
@@ -258,7 +257,7 @@ internal class WorkflowEventHandler(
                     parentRepository.update(parent, conn)
 
                     logger.debug {
-                        "Parent workflow ${parent.workflowId} resumed after child ${instance.workflowId} completion"
+                        "Parent workflow $parent resumed after child ${instance.workflowId} completion"
                     }
                 } ?: error("CRITICAL - Unable to find parent for child ${instance.workflowId}")
             }
@@ -336,7 +335,7 @@ internal class WorkflowEventHandler(
         forkRepository.insertForkWithBranches(forkModel, forkBranchModels)
 
         logger.debug {
-            "Fork started for instance ${instance.workflowInfo.workflowId}, position ${state.nodePosition}, " +
+            "Fork started for instance ${instance.workflowId}, position ${state.nodePosition}, " +
                 "compete=$isCompete, branches=${branches.size}"
         }
 
@@ -345,7 +344,6 @@ internal class WorkflowEventHandler(
             val branchMessage = InstanceMessage(
                 workflowInfo = instance.workflowInfo,
                 workflowState = instance.workflowState.startBranch(branchNode.position),
-                hasParentWaiting = instance.hasParentWaiting
             )
 
             logger.debug { "Scheduling branch ${branchNode.name} at ${branchNode.position}" }
@@ -446,7 +444,6 @@ internal class WorkflowEventHandler(
                 rawInput = assembledOutput,
                 flowDirective = null
             ),
-            hasParentWaiting = instance.hasParentWaiting
         )
 
         // Clean up fork state - mark as completed for cleanup

@@ -127,6 +127,7 @@ fun RootState.Companion.random() = RootState(
             put(String.random(), JsonElement.random())
         }
     },
+    hasWaitingParent = Random.nextBoolean()
 )
 
 fun RunState.Companion.random() = RunState(
@@ -150,7 +151,7 @@ fun TryState.Companion.random() = TryState(
         true -> InternalException.Error.random()
         false -> null
     },
-    errorAs = "error",
+    errorAs = String.random(),
 )
 
 fun SetState.Companion.random() = SetState(
@@ -226,7 +227,10 @@ fun WorkflowEvent.Companion.random(): WorkflowEvent {
     }
 }
 
-fun randomStates() = mapOf(NodePosition.random() to TaskState.random())
+fun randomStates() = mapOf(
+    NodePosition.root to RootState.random(),
+    NodePosition.random() to TaskState.random()
+)
 
 fun WorkflowEvent.WorkflowCompleted.Companion.random() = WorkflowEvent.WorkflowCompleted(
     output = JsonElement.random()

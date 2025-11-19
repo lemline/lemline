@@ -8,7 +8,6 @@ CREATE TABLE lemline_schedules
     workflow_version        VARCHAR(255)      NOT NULL,
     workflow_position       TEXT              NOT NULL,
     workflow_state          MEDIUMTEXT        NOT NULL,
-    parent_id               BINARY(16),
     schedule_after          VARCHAR(255),
     schedule_cron           VARCHAR(255),
     schedule_every          VARCHAR(255),
@@ -29,10 +28,6 @@ CREATE TABLE lemline_schedules
 -- Create an index for efficient querying on workflow_id
 CREATE INDEX idx_lemline_schedules_workflow_id
     ON lemline_schedules (workflow_id);
-
--- Create an index for efficient querying on parent_id
-CREATE INDEX idx_lemline_schedules_parent_id
-    ON lemline_schedules (parent_id);
 
 -- Create composite index for efficient querying of pending messages
 CREATE INDEX idx_lemline_schedules_processing

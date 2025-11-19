@@ -20,8 +20,6 @@ internal class InstanceMessageTest {
         val decoded = InstanceMessage.fromJsonString<com.lemline.core.states.WorkflowCommand>(encoded)
 
         // Verify the essential fields match
-        Assertions.assertEquals(instanceMessage.workflowInfo, decoded.workflowInfo)
-        Assertions.assertEquals(instanceMessage.hasParentWaiting, decoded.hasParentWaiting)
         Assertions.assertEquals(instanceMessage, decoded)
     }
 

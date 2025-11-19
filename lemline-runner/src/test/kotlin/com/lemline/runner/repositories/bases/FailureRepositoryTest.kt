@@ -45,7 +45,6 @@ internal abstract class FailureRepositoryTest {
             instance = InstanceMessage(
                 workflowInfo = WorkflowInfo.random(),
                 workflowState = WorkflowEvent.TaskFailed.random(),
-                hasParentWaiting = false
             ),
             error = ex,
         )
@@ -86,12 +85,10 @@ internal abstract class FailureRepositoryTest {
         val instance1 = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
             workflowState = WorkflowEvent.TaskFailed.random(),
-            hasParentWaiting = false
         )
         val instance2 = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
             workflowState = WorkflowEvent.TaskFailed.random(),
-            hasParentWaiting = false
         )
 
         val f1 = FailureModel.from(IDV7.random(), instance1, RuntimeException("e1")).copy(payload = "m1")
@@ -112,7 +109,6 @@ internal abstract class FailureRepositoryTest {
         val instance = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
             workflowState = WorkflowEvent.TaskFailed.random(),
-            hasParentWaiting = false
         )
         val failures = List(3) { idx ->
             FailureModel.from(IDV7.random(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
@@ -133,7 +129,6 @@ internal abstract class FailureRepositoryTest {
             InstanceMessage(
                 workflowInfo = WorkflowInfo.random(),
                 workflowState = WorkflowEvent.TaskFailed.random(),
-                hasParentWaiting = false
             ),
             RuntimeException("boom")
         )
@@ -155,7 +150,6 @@ internal abstract class FailureRepositoryTest {
             InstanceMessage(
                 workflowInfo = WorkflowInfo.random(),
                 workflowState = WorkflowEvent.TaskFailed.random(),
-                hasParentWaiting = false
             ),
             RuntimeException("boom")
         )

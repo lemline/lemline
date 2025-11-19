@@ -65,7 +65,6 @@ internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
             InstanceMessage(
                 workflowInfo = entity.instanceMessage.workflowInfo,
                 workflowState = command,
-                hasParentWaiting = entity.instanceMessage.hasParentWaiting
             )
         )
     }

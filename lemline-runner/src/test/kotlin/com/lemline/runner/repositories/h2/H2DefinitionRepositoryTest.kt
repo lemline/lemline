@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.repositories
+package com.lemline.runner.repositories.h2
 
 import com.lemline.runner.repositories.bases.DefinitionRepositoryTest
 import com.lemline.runner.tests.profiles.InMemoryProfile

@@ -7,13 +7,11 @@ import com.lemline.core.errors.RunWorkflowException
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.FlowDirective
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Result types returned by WorkflowOrchestrator when it detects a stopping point
@@ -33,6 +31,10 @@ sealed class WorkflowState {
     companion object {
         fun fromJsonString(jsonString: String): WorkflowState = LemlineJson.decodeFromString(jsonString)
     }
+
+    val workflowId: WorkflowId get() = (taskStates[NodePosition.root] as RootState).workflowId
+
+    val hasWaitingParent: Boolean get() = (taskStates[NodePosition.root] as RootState).hasWaitingParent
 }
 
 @Serializable
@@ -42,52 +44,39 @@ sealed class WorkflowCommand : WorkflowState() {
 
     companion object {
         fun fromJsonString(jsonString: String): WorkflowCommand = LemlineJson.decodeFromString(jsonString)
-
-        @ExperimentalTime
-        fun start(
-            workflowId: WorkflowId = WorkflowId.random(),
-            workflowInput: JsonElement = buildJsonObject { },
-            hasParent: Boolean = false,
-            startedAt: Instant = Clock.System.now()
-        ): Start = Start(
-            workflowId = workflowId,
-            workflowInput = workflowInput,
-            hasParent = hasParent,
-            startedAt = startedAt
-        )
     }
 
-    /**
-     * Represents the initial command to start the execution of a workflow.
-     *
-     * This class is part of the workflow orchestration and defines the starting point for
-     * the execution of a workflow. It includes the input required for the workflow,
-     * the unique identifier for the workflow, and a flag indicating whether the workflow
-     * has a parent workflow.
-     *
-     * @property workflowInput The input parameters for the workflow execution.
-     * @property workflowId The unique identifier of the workflow.
-     * @property hasParent Indicates if the workflow is initiated by a parent workflow.
-     */
-    @Serializable
-    @ExperimentalTime
-    data class Start(
-        val workflowId: WorkflowId,
-        val workflowInput: JsonElement,
-        val hasParent: Boolean,
-        val startedAt: Instant
-    ) : WorkflowCommand() {
-
-        override val taskStates: TaskStates = mapOf()
-        override val nodePosition = NodePosition.root
-
-        override fun toString() = "${this::class.simpleName}(" +
-            "workflowId=$workflowId" +
-            ", workflowInput=$workflowInput" +
-            ", hasParent=$hasParent" +
-            ", startedAt=$startedAt" +
-            ")"
-    }
+//    /**
+//     * Represents the initial command to start the execution of a workflow.
+//     *
+//     * This class is part of the workflow orchestration and defines the starting point for
+//     * the execution of a workflow. It includes the input required for the workflow,
+//     * the unique identifier for the workflow, and a flag indicating whether the workflow
+//     * has a parent workflow.
+//     *
+//     * @property workflowInput The input parameters for the workflow execution.
+//     * @property workflowId The unique identifier of the workflow.
+//     * @property hasWaitingParent Indicates if the workflow is initiated by a parent workflow.
+//     */
+//    @Serializable
+//    @ExperimentalTime
+//    data class Start(
+//        val workflowId: WorkflowId,
+//        val workflowInput: JsonElement,
+//        val hasWaitingParent: Boolean,
+//        val startedAt: Instant
+//    ) : WorkflowCommand() {
+//
+//        override val taskStates: TaskStates = mapOf()
+//        override val nodePosition = NodePosition.root
+//
+//        override fun toString() = "${this::class.simpleName}(" +
+//            "workflowId=$workflowId" +
+//            ", workflowInput=$workflowInput" +
+//            ", hasWaitingParent=$hasWaitingParent" +
+//            ", startedAt=$startedAt" +
+//            ")"
+//    }
 
     /**
      * Represents a command to resume workflow execution from a specific task.
@@ -110,6 +99,14 @@ sealed class WorkflowCommand : WorkflowState() {
             ", flowDirective=$flowDirective" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
+
+        @ExperimentalTime
+        fun duplicate(workflowId: WorkflowId): ResumeFromTask {
+            val rootState = taskStates[NodePosition.root] as RootState
+            return copy(
+                taskStates = taskStates + mapOf(NodePosition.root to rootState.copy(workflowId = workflowId))
+            )
+        }
     }
 
     /**
@@ -352,23 +349,16 @@ sealed class WorkflowEvent : WorkflowState() {
     }
 
     /**
-     * Represents a workflow paused during fork execution.
+     * Represents the starting state of a workflow fork operation.
      *
-     * This state is returned when ExecutionMode.Async encounters a fork task.
-     * The runner is responsible for:
-     * - Scheduling branch executions (potentially in parallel)
-     * - Tracking branch completion
-     * - Resuming the fork task when appropriate
+     * A fork operation allows parallel execution of multiple branches within a workflow.
+     * This class captures the state of the fork, the input data, and the position of the fork
+     * node within the workflow graph.
      *
-     * Similar to RunningChildWorkflow pattern.
-     *
-     * Fork configuration (compete mode, branches) is derived from the Node<ForkTask>
-     * at nodePosition. Only runtime completion tracking is stored here.
-     *
-     * @property taskStates Current workflow state
-     * @property nodePosition Position of the fork task node
-     * @property rawInput Input to pass to all branches
-     * @property rawOutput Output of all branches
+     * @property forkState Describes the current state of the fork, encompassing information
+     * such as the start time and the last completed branch, if any.
+     * @property rawInput Represents the raw JSON input data associated with the fork operation.
+     * This data is provided to the forked branches at their starting point.
      */
     @Serializable
     data class ForkStarted(

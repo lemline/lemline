@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging.base
 
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.orchestrator.WorkflowOrchestrator
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.messaging.CompensationException
@@ -188,11 +190,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage.new(
-            workflowNamespace = WorkflowNamespace("test"),
-            workflowName = WorkflowName("test-workflow"),
-            workflowVersion = WorkflowVersion("1.0.0"),
-            workflowInput = JsonPrimitive("task"),
+        val instanceMessage = InstanceMessage(
+            workflowInfo = WorkflowInfo(
+                WorkflowNamespace("test"),
+                WorkflowName("test-workflow"),
+                WorkflowVersion("1.0.0")
+            ),
+            workflowState = WorkflowOrchestrator.initState(workflowInput = JsonPrimitive("task")),
         )
 
         // When
@@ -257,11 +261,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `retry should trigger sending a RetryOutboxModel to the database topic`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage.new(
-            workflowNamespace = WorkflowNamespace("test"),
-            workflowName = WorkflowName("test-workflow"),
-            workflowVersion = WorkflowVersion("1.0.0"),
-            workflowInput = JsonPrimitive("retry"),
+        val instanceMessage = InstanceMessage(
+            workflowInfo = WorkflowInfo(
+                WorkflowNamespace("test"),
+                WorkflowName("test-workflow"),
+                WorkflowVersion("1.0.0")
+            ),
+            workflowState = WorkflowOrchestrator.initState(workflowInput = JsonPrimitive("retry")),
         )
 
         // When
@@ -298,11 +304,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should store waiting instance in wait repository`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage.new(
-            workflowNamespace = WorkflowNamespace("test"),
-            workflowName = WorkflowName("test-workflow"),
-            workflowVersion = WorkflowVersion("1.0.0"),
-            workflowInput = JsonPrimitive("wait"),
+        val instanceMessage = InstanceMessage(
+            workflowInfo = WorkflowInfo(
+                WorkflowNamespace("test"),
+                WorkflowName("test-workflow"),
+                WorkflowVersion("1.0.0")
+            ),
+            workflowState = WorkflowOrchestrator.initState(workflowInput = JsonPrimitive("wait")),
         )
 
         // When
@@ -337,11 +345,13 @@ internal abstract class WorkflowConsumerTest {
     @Test
     fun `should handle completed workflow without sending message`() = runTest {
         // Given
-        val instanceMessage = InstanceMessage.new(
-            workflowNamespace = WorkflowNamespace("test"),
-            workflowName = WorkflowName("test-workflow"),
-            workflowVersion = WorkflowVersion("1.0.0"),
-            workflowInput = JsonPrimitive("completed"),
+        val instanceMessage = InstanceMessage(
+            workflowInfo = WorkflowInfo(
+                WorkflowNamespace("test"),
+                WorkflowName("test-workflow"),
+                WorkflowVersion("1.0.0")
+            ),
+            workflowState = WorkflowOrchestrator.initState(workflowInput = JsonPrimitive("completed")),
         )
 
         // When

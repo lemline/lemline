@@ -8,7 +8,6 @@ CREATE TABLE IF NOT EXISTS lemline_retries
     workflow_version        VARCHAR(255)             NOT NULL,
     workflow_position       CLOB                     NOT NULL,
     workflow_state          CLOB                     NOT NULL,
-    parent_id               UUID,
     error_reason            VARCHAR(255)             NOT NULL,
     error_class             CLOB                     NOT NULL,
     error_message           CLOB,
@@ -28,10 +27,6 @@ CREATE TABLE IF NOT EXISTS lemline_retries
 -- Create an index for efficient querying on workflow_id
 CREATE INDEX idx_lemline_retries_workflow_id
     ON lemline_retries (workflow_id);
-
--- Create an index for efficient querying on parent_id
-CREATE INDEX idx_lemline_retries_parent_id
-    ON lemline_retries (parent_id);
 
 -- Create composite index for efficient querying of pending messages
 CREATE INDEX idx_lemline_retries_processing

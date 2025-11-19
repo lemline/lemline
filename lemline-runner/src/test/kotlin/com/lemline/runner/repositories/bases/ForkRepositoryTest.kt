@@ -10,7 +10,6 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.BranchStatus
 import com.lemline.core.states.ForkState
-import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.ForkBranchModel
@@ -268,18 +267,22 @@ internal abstract class ForkWaitingRepositoryTest {
 
         val instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo(
-                workflowId = testWorkflowId,
                 workflowNamespace = WorkflowNamespace("test"),
                 workflowName = WorkflowName("test-workflow"),
                 workflowVersion = WorkflowVersion("1.0")
             ),
             workflowState = WorkflowEvent.ForkStarted(
-                taskStates = emptyMap<NodePosition, TaskState>(),
+                taskStates = mapOf(
+                    NodePosition.root to com.lemline.core.states.RootState(
+                        startedAt = Clock.System.now(),
+                        workflowId = testWorkflowId,
+                        workflowInput = JsonPrimitive("test-input")
+                    )
+                ),
                 nodePosition = testPosition,
                 forkState = ForkState(),
                 rawInput = JsonPrimitive("test-input")
             ),
-            hasParentWaiting = false
         )
 
         return ForkModel(

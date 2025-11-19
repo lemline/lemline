@@ -11,7 +11,6 @@ CREATE TABLE lemline_forks (
     workflow_version VARCHAR(255),
     workflow_position TEXT,
     workflow_state TEXT,
-    parent_id UUID,
 
     -- Fork-specific fields
     fork_position TEXT NOT NULL,

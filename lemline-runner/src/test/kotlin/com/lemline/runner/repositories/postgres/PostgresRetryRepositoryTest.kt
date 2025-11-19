@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.repositories
+package com.lemline.runner.repositories.postgres
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
-import com.lemline.runner.repositories.bases.ParentWaitingRepositoryTest
+import com.lemline.runner.repositories.bases.RetryRepositoryTest
 import com.lemline.runner.tests.profiles.PostgresProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -19,4 +19,4 @@ import org.junit.jupiter.api.TestInstance
 @EnabledOnlyIfDockerAvailable
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class PostgresParentWaitingRepositoryTest : ParentWaitingRepositoryTest()
+internal class PostgresRetryRepositoryTest : RetryRepositoryTest()

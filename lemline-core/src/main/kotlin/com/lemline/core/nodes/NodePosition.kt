@@ -80,7 +80,9 @@ data class NodePosition(private val path: List<String> = listOf()) {
         get() = if (path.isEmpty()) null else NodePosition(path.dropLast(1))
 
     companion object {
-        val root = PositionPointer.root.toPosition()
+        val root = NodePosition(listOf())
+
+        val doRoot = NodePosition(listOf(Token.DO.token))
 
         fun from(path: String) = PositionPointer(path).toPosition()
 
