@@ -8,7 +8,6 @@ import java.sql.Timestamp
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
-import kotlin.time.toKotlinInstant
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
@@ -39,7 +38,7 @@ abstract class CleanerRepository<T : AwaitingCompletionModel> : WithInstanceRepo
          */
         internal const val OUTBOX_COMPLETED_AT_COLUMN = "outbox_completed_at"
     }
-
+    
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
         super.prepareStatementMap + mapOf(
             OUTBOX_COMPLETED_AT_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
@@ -48,14 +47,6 @@ abstract class CleanerRepository<T : AwaitingCompletionModel> : WithInstanceRepo
                 } ?: stmt.setNull(idx, java.sql.Types.TIMESTAMP)
             }
         )
-    }
-
-    /**
-     * Helper method to get outbox completed at timestamp from ResultSet.
-     */
-    protected fun getOutboxCompletedAt(rs: java.sql.ResultSet): Instant? {
-        val timestamp = rs.getTimestamp(OUTBOX_COMPLETED_AT_COLUMN)
-        return timestamp?.toInstant()?.toKotlinInstant()
     }
 
     /**
@@ -85,6 +76,7 @@ abstract class CleanerRepository<T : AwaitingCompletionModel> : WithInstanceRepo
         WHERE $OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
           AND $OUTBOX_COMPLETED_AT_COLUMN < ?
         LIMIT ?
+        FOR UPDATE SKIP LOCKED
         """.trimIndent()
     }
 }

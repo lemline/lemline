@@ -88,7 +88,7 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
     private fun List<T>.filterEntitiesToDelete(
         cutoffDate: Instant = Clock.System.now()
     ): List<T> = filter { entity ->
-        entity.outboxCompletedAt != null && (entity.outboxCompletedAt?.let { it <= cutoffDate } ?: false)
+        entity.outboxCompletedAt != null && (entity.outboxCompletedAt?.let { it < cutoffDate } ?: false)
     }
 
     /**
@@ -844,16 +844,16 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                     }
 
                     1 -> { // COMPLETED
-                        this.outboxCompletedAt = now + duration
+                        this.outboxCompletedAt = now - duration
                         this.outboxFailedAt = null
                     }
 
                     else -> { // FAILED
                         this.outboxCompletedAt = null
-                        this.outboxFailedAt = now + duration
+                        this.outboxFailedAt = now - duration
                     }
                 }
-                this.outboxDelayedUntil = now + duration
+                this.outboxDelayedUntil = now - duration
                 this.outboxAttemptCount = attemptCount
             }
         }

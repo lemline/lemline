@@ -70,7 +70,7 @@ class ForkRepository : CleanerRepository<ForkModel>() {
         forkPosition = rs.getString(FORK_POSITION_COLUMN),
         compete = rs.getBoolean(COMPETE_COLUMN),
         branchCount = rs.getInt(BRANCH_COUNT_COLUMN),
-        outboxCompletedAt = getOutboxCompletedAt(rs)
+        outboxCompletedAt = rs.getInstant(OUTBOX_COMPLETED_AT_COLUMN),
     )
 
     /**
@@ -179,7 +179,7 @@ class ForkRepository : CleanerRepository<ForkModel>() {
             "Fork $forkId: $completedCount/$branchCount branches completed, compete=$compete, isComplete=$isComplete"
         }
 
-        val taskStates = fork.workflowState?.taskStates ?: emptyMap()
+        val taskStates = fork.workflowState.taskStates
         val branches = getBranches(forkId, conn)
 
         ForkCompletionResult(

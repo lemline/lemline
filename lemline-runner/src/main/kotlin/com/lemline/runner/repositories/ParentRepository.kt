@@ -47,7 +47,7 @@ internal class ParentRepository : CleanerRepository<ParentModel>() {
         id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowEvent.RunWorkflowStarted>()!!,
         childId = getIDV7(rs, CHILD_ID_COLUMN)!!,
-        outboxCompletedAt = getOutboxCompletedAt(rs)
+        outboxCompletedAt = rs.getInstant(OUTBOX_COMPLETED_AT_COLUMN),
     )
 
     /**
