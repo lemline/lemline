@@ -15,7 +15,7 @@ data class ParentModel(
     override val instanceMessage: InstanceMessage<WorkflowEvent.RunWorkflowStarted>,
     val childId: IDV7,
     override var outboxCompletedAt: Instant? = null
-) : CleanableModel() {
+) : AwaitingCompletionModel() {
 
     // Needed by tests
     companion object Companion

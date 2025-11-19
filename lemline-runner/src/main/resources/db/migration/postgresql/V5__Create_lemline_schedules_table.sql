@@ -13,14 +13,14 @@ CREATE TABLE lemline_schedules
     schedule_every          VARCHAR(255),
     schedule_cron           VARCHAR(255),
     schedule_zone           VARCHAR(64),
-    outbox_completed_at     TIMESTAMPTZ(6),
     outbox_scheduled_for    TIMESTAMPTZ(6),
     outbox_delayed_until    TIMESTAMPTZ(6),
     outbox_attempt_count    INTEGER        NOT NULL DEFAULT 0,
-    outbox_failed_at        TIMESTAMPTZ(6),
     outbox_error_class      TEXT,
     outbox_error_message    TEXT,
     outbox_error_stacktrace TEXT,
+    outbox_completed_at     TIMESTAMPTZ(6),
+    outbox_failed_at        TIMESTAMPTZ(6),
     created_at              TIMESTAMPTZ(6) NOT NULL,
     updated_at              TIMESTAMPTZ(6)
 );

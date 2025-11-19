@@ -28,7 +28,7 @@ internal class ForkCleaner : AbstractCleaner<ForkModel>() {
     private lateinit var lemlineConfig: LemlineConfiguration
 
     @Inject
-    override lateinit var repository: ForkRepository
+    override lateinit var cleanerRepository: ForkRepository
 
     // Is this cleaner enabled?
     // Note: Fork cleanup uses parent config since fork is a type of parent-child relationship

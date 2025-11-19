@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.runner.models.CleanableModel
+import com.lemline.runner.models.AwaitingCompletionModel
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.Timestamp
@@ -26,12 +26,12 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * Generic Type:
  * - `T`: A type parameter extending `CleanableModel`, representing the type of entity this repository will handle.
  *
- * @see CleanableModel for the base entity interface
+ * @see AwaitingCompletionModel for the base entity interface
  * @see WithInstanceRepository for instance-related functionality
  */
 @ExperimentalSerializationApi
 @ExperimentalTime
-abstract class CleanableRepository<T : CleanableModel> : WithInstanceRepository<T>() {
+abstract class CleanerRepository<T : AwaitingCompletionModel> : WithInstanceRepository<T>() {
 
     companion object Companion {
         /**

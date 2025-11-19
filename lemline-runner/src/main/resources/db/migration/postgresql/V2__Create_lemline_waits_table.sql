@@ -9,14 +9,14 @@ CREATE TABLE IF NOT EXISTS lemline_waits
     workflow_position       TEXT           NOT NULL,
     workflow_state          TEXT           NOT NULL,
     parent_id               uuid,
-    outbox_completed_at     TIMESTAMPTZ(6),
     outbox_scheduled_for    TIMESTAMPTZ(6) NOT NULL,
     outbox_delayed_until    TIMESTAMPTZ(6) NOT NULL,
     outbox_attempt_count    INTEGER        NOT NULL DEFAULT 0,
-    outbox_failed_at        TIMESTAMPTZ(6),
     outbox_error_class      TEXT,
     outbox_error_message    TEXT,
     outbox_error_stacktrace TEXT,
+    outbox_completed_at     TIMESTAMPTZ(6),
+    outbox_failed_at        TIMESTAMPTZ(6),
     created_at              TIMESTAMPTZ(6) NOT NULL,
     updated_at              TIMESTAMPTZ(6)
 );

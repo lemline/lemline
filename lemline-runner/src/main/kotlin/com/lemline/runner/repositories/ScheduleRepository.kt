@@ -26,14 +26,14 @@ const val SCHEDULE_TABLE = "lemline_schedules"
  * uses native SQL queries with SKIP LOCKED for parallel processing safety,
  * ensuring reliable message delivery in distributed systems.
  *
- * @see RelayRepository for base functionality and documentation
+ * @see OutboxRepository for base functionality and documentation
  * @see WaitOutboxModel for the message model
  * @see com.lemline.runner.outbox.OutboxRelay for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-class ScheduleRepository : RelayRepository<ScheduleOutboxModel>() {
+class ScheduleRepository : OutboxRepository<ScheduleOutboxModel>() {
 
     companion object {
         internal const val SCHEDULE_AFTER_COLUMN = "schedule_after"

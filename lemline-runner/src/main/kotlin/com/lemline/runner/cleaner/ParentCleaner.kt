@@ -28,7 +28,7 @@ internal class ParentCleaner : AbstractCleaner<ParentModel>() {
     private lateinit var lemlineConfig: LemlineConfiguration
 
     @Inject
-    override lateinit var repository: ParentRepository
+    override lateinit var cleanerRepository: ParentRepository
 
     // Is this cleaner enabled?
     override val enabled by lazy {

@@ -24,4 +24,4 @@ data class ForkModel(
     val compete: Boolean,
     val branchCount: Int,
     override var outboxCompletedAt: Instant? = null
-) : CleanableModel()
+) : AwaitingCompletionModel()

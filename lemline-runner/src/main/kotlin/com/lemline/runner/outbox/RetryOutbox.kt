@@ -40,7 +40,7 @@ internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
     override lateinit var failureRepository: FailureRepository
 
     @Inject
-    override lateinit var relayRepository: RetryRepository
+    override lateinit var outboxRepository: RetryRepository
 
     // Is this outbox enabled?
     override val enabled by lazy {

@@ -23,11 +23,11 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * - Failed: outbox_failed_at IS NOT NULL
  *
  * @see AbstractOutbox for the processing logic
- * @see CleanableModel for the base cleanup tracking
+ * @see AwaitingCompletionModel for the base cleanup tracking
  */
 @ExperimentalSerializationApi
 @ExperimentalTime
-sealed class OutboxModel : CleanableModel() {
+sealed class OutboxModel : AwaitingCompletionModel() {
 
     /**
      * Original/intended scheduled time for this message.

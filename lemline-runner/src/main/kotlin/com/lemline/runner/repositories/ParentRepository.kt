@@ -18,13 +18,13 @@ const val PARENT_TABLE = "lemline_parents"
  * Stores parent workflow state while waiting for child workflow completion.
  * Event-driven pattern - processed immediately when child completes, then deleted.
  *
- * @see CleanableRepository for base functionality
+ * @see CleanerRepository for base functionality
  * @see ParentModel for the state model
  */
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class ParentRepository : CleanableRepository<ParentModel>() {
+internal class ParentRepository : CleanerRepository<ParentModel>() {
 
     companion object Companion {
         const val CHILD_ID_COLUMN = "child_id"

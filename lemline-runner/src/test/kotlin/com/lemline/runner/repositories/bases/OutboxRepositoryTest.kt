@@ -2,7 +2,7 @@
 package com.lemline.runner.repositories.bases
 
 import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.repositories.RelayRepository
+import com.lemline.runner.repositories.OutboxRepository
 import io.kotest.common.runBlocking
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Test
 internal abstract class OutboxRepositoryTest<T : OutboxModel> {
 
     /** The repository implementation being tested */
-    internal abstract val repository: RelayRepository<T>
+    internal abstract val repository: OutboxRepository<T>
 
     /** Method to create a new instance of the model being tested */
     internal abstract fun createRandomEntity(): T
@@ -842,10 +842,12 @@ internal abstract class OutboxRepositoryTest<T : OutboxModel> {
                         this.outboxCompletedAt = null
                         this.outboxFailedAt = null
                     }
+
                     1 -> { // COMPLETED
                         this.outboxCompletedAt = now + duration
                         this.outboxFailedAt = null
                     }
+
                     else -> { // FAILED
                         this.outboxCompletedAt = null
                         this.outboxFailedAt = now + duration

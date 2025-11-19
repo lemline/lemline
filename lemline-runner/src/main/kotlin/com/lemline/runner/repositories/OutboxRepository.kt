@@ -23,18 +23,18 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * - Customizable SQL prepared statement mappings for outbox retry/error/failure fields
  *
  * @param T The type of entity managed by this repository, extending OutboxModel.
- * @see CleanableRepository for cleanup functionality
+ * @see CleanerRepository for cleanup functionality
  * @see OutboxModel for the entity model
  */
 @Suppress("unused")
 @ExperimentalTime
 @ExperimentalSerializationApi
-abstract class RelayRepository<T : OutboxModel> : CleanableRepository<T>() {
+abstract class OutboxRepository<T : OutboxModel> : CleanerRepository<T>() {
 
     @Inject
     lateinit var failureRepository: FailureRepository
 
-    companion object {
+    companion object Companion {
         /**
          * Column name for scheduled for timestamp
          */

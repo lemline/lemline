@@ -13,14 +13,14 @@ CREATE TABLE IF NOT EXISTS lemline_retries
     error_class             TEXT         NOT NULL,
     error_message           TEXT,
     error_stacktrace        MEDIUMTEXT   NOT NULL,
-    outbox_completed_at     TIMESTAMP(6),
     outbox_scheduled_for    TIMESTAMP(6) NOT NULL,
     outbox_delayed_until    TIMESTAMP(6) NOT NULL,
     outbox_attempt_count    INTEGER      NOT NULL DEFAULT 0,
-    outbox_failed_at        TIMESTAMP(6),
     outbox_error_class      TEXT,
     outbox_error_message    TEXT,
     outbox_error_stacktrace MEDIUMTEXT,
+    outbox_completed_at     TIMESTAMP(6),
+    outbox_failed_at        TIMESTAMP(6),
     created_at              TIMESTAMP(6) NOT NULL,
     updated_at              TIMESTAMP(6)
 ) ENGINE = InnoDB

@@ -40,7 +40,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleOutboxModel>() {
     override lateinit var failureRepository: FailureRepository
 
     @Inject
-    override lateinit var relayRepository: ScheduleRepository
+    override lateinit var outboxRepository: ScheduleRepository
 
     // Is this outbox enabled?
     override val enabled by lazy {

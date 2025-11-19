@@ -9,7 +9,7 @@ import com.lemline.runner.models.RetryOutboxModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.RelayRepository
+import com.lemline.runner.repositories.OutboxRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
@@ -36,7 +36,7 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryOutboxModel>(
     override lateinit var failureRepository: FailureRepository
 
     // Implement the abstract repository property
-    override val relayRepository: RelayRepository<RetryOutboxModel> by lazy { retryRepository }
+    override val outboxRepository: OutboxRepository<RetryOutboxModel> by lazy { retryRepository }
 
     // Implement the abstract KClass property
     override val modelClass: KClass<RetryOutboxModel> = RetryOutboxModel::class

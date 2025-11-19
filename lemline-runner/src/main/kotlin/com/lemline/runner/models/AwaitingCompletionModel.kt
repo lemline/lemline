@@ -21,7 +21,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
  */
 @ExperimentalSerializationApi
 @ExperimentalTime
-sealed class CleanableModel : InstanceModel, WithDefiniteWorkflowInfo {
+sealed class AwaitingCompletionModel : InstanceModel, WithDefiniteWorkflowInfo {
 
     abstract val instanceMessage: InstanceMessage<out WorkflowState>
 

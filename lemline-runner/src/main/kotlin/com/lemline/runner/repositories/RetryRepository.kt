@@ -23,14 +23,14 @@ const val RETRY_TABLE = "lemline_retries"
  * uses native SQL queries with SKIP LOCKED for parallel processing safety,
  * ensuring reliable message delivery in distributed systems.
  *
- * @see RelayRepository for base functionality and documentation
+ * @see OutboxRepository for base functionality and documentation
  * @see RetryOutboxModel for the message model
  * @see com.lemline.runner.outbox.OutboxRelay for the processing logic
  */
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-class RetryRepository : RelayRepository<RetryOutboxModel>() {
+class RetryRepository : OutboxRepository<RetryOutboxModel>() {
 
     @Inject
     override lateinit var databaseManager: DatabaseManager

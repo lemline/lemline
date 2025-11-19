@@ -23,14 +23,14 @@ const val WAIT_TABLE = "lemline_waits"
  * uses native SQL queries with SKIP LOCKED for parallel processing safety,
  * ensuring reliable message delivery in distributed systems.
  *
- * @see RelayRepository for base functionality and documentation
+ * @see OutboxRepository for base functionality and documentation
  * @see WaitOutboxModel for the message model
  * @see AbstractOutbox for the processing logic
  */
 @ApplicationScoped
 @ExperimentalSerializationApi
 @ExperimentalTime
-internal class WaitRepository : RelayRepository<WaitOutboxModel>() {
+internal class WaitRepository : OutboxRepository<WaitOutboxModel>() {
     @Inject
     override lateinit var databaseManager: DatabaseManager
 

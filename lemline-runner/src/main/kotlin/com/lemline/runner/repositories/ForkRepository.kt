@@ -34,7 +34,7 @@ const val FORK_BRANCH_TABLE = "lemline_fork_branches"
 @ExperimentalTime
 @ExperimentalSerializationApi
 @ApplicationScoped
-class ForkRepository : CleanableRepository<ForkModel>() {
+class ForkRepository : CleanerRepository<ForkModel>() {
 
     private val log = logger()
 

@@ -6,7 +6,7 @@ import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.outbox.AbstractOutbox
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.RelayRepository
+import com.lemline.runner.repositories.OutboxRepository
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -51,7 +51,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     abstract val failureRepository: FailureRepository
 
     // Abstract repository to be provided by subclasses
-    abstract val relayRepository: RelayRepository<T>
+    abstract val outboxRepository: OutboxRepository<T>
 
     // Abstract Kotlin class reference needed for MockK
     abstract val modelClass: KClass<T>
@@ -64,7 +64,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     private val outboxRelay: AbstractOutbox<T> by lazy {
         object : AbstractOutbox<T>() {
             override val failureRepository = this@OutboxProcessorTest.failureRepository
-            override val relayRepository = this@OutboxProcessorTest.relayRepository
+            override val outboxRepository = this@OutboxProcessorTest.outboxRepository
             override val instanceEmitter = mock<WorkflowCommandEmitter>()
             override val outboxConf = null // Not used by test methods
             override val enabled = true
@@ -86,7 +86,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Reset mock before each test, default to success
         coEvery { mockedProcessor(any(modelClass)) } just Runs
 
-        relayRepository.deleteAll()
+        outboxRepository.deleteAll()
     }
 
     // --- Test methods --- //
@@ -112,7 +112,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun `process should handle successful message processing`() = runTest {
         // Arrange
         val message = createTestModel(payload = "SuccessPayload")
-        relayRepository.insert(message)
+        outboxRepository.insert(message)
 
         // Act
         outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
@@ -121,7 +121,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Verify the mock was called at least once
         coVerify(exactly = 1) { mockedProcessor(any(modelClass)) }
 
-        val processedMessage = relayRepository.findById(message.id)
+        val processedMessage = outboxRepository.findById(message.id)
         processedMessage shouldNotBe null
         processedMessage?.outboxCompletedAt shouldNotBe null
         processedMessage?.outboxFailedAt shouldBe null
@@ -159,7 +159,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun `process should handle retry logic on first failure then success`() = runBlocking(Dispatchers.IO) {
         // Arrange
         val original = createTestModel(payload = "RetryPayload")
-        relayRepository.insert(original)
+        outboxRepository.insert(original)
 
         val failureException = RuntimeException("Processing failed on purpose!")
         // Setup mock to fail the first time it's called in this sequence
@@ -171,7 +171,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert: First attempt failed - Check DB state
         coVerify(exactly = 1) { mockedProcessor(any(modelClass)) } // Verify it was called once
-        val updated = relayRepository.findById(original.id)!!
+        val updated = outboxRepository.findById(original.id)!!
 
         updated.outboxCompletedAt shouldBe null
         updated.outboxFailedAt shouldBe null
@@ -193,7 +193,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert: A second attempt succeeded - Check DB state
         coVerify(exactly = 2) { mockedProcessor(any(modelClass)) } // Verify it was called again
-        val final = relayRepository.findById(original.id)!!
+        val final = outboxRepository.findById(original.id)!!
 
         final.outboxCompletedAt shouldNotBe null
         final.outboxFailedAt shouldBe null
@@ -224,7 +224,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun `process should mark message as FAILED after max attempts`() = runBlocking(Dispatchers.IO) {
         // Arrange
         val original = createTestModel(payload = "FailPayload")
-        relayRepository.insert(original)
+        outboxRepository.insert(original)
         val originalDelayedUntil = original.outboxDelayedUntil!!
 
         val failureException = RuntimeException("Persistent failure!")
@@ -238,7 +238,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
             // when
             outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
             // then
-            val updated = relayRepository.findById(original.id)!!
+            val updated = outboxRepository.findById(original.id)!!
             if (attempt < maxAttempts) {
                 updated.outboxCompletedAt shouldBe null
                 updated.outboxFailedAt shouldBe null
@@ -281,14 +281,14 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun `process should handle batch processing correctly`() = runTest {
         // Arrange
         val messages = List(5) { createTestModel("batch_$it") }
-        relayRepository.insert(messages)
+        outboxRepository.insert(messages)
 
         // Act
         outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
 
         // Assert
         coVerify(exactly = 5) { mockedProcessor(any(modelClass)) }
-        val processedMessages = relayRepository.listAll()
+        val processedMessages = outboxRepository.listAll()
         processedMessages shouldHaveSize 5
         processedMessages.forEach { msg ->
             msg.outboxCompletedAt shouldNotBe null
@@ -319,7 +319,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert
         coVerify(exactly = 0) { mockedProcessor(any(modelClass)) }
-        relayRepository.countAll() shouldBe 0
+        outboxRepository.countAll() shouldBe 0
     }
 
 }

@@ -36,7 +36,7 @@ internal class WaitOutbox : AbstractOutbox<WaitOutboxModel>() {
     override lateinit var failureRepository: FailureRepository
 
     @Inject
-    override lateinit var relayRepository: WaitRepository
+    override lateinit var outboxRepository: WaitRepository
 
     // Is this outbox enabled?
     override val enabled by lazy {

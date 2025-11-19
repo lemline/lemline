@@ -3,8 +3,8 @@ package com.lemline.runner.cleaner
 
 import com.lemline.common.logger.logger
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.models.CleanableModel
-import com.lemline.runner.repositories.CleanableRepository
+import com.lemline.runner.models.AwaitingCompletionModel
+import com.lemline.runner.repositories.CleanerRepository
 import io.quarkus.runtime.ShutdownEvent
 import jakarta.annotation.PostConstruct
 import jakarta.enterprise.event.Observes
@@ -42,14 +42,14 @@ import kotlinx.serialization.ExperimentalSerializationApi
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class AbstractCleaner<T : CleanableModel> {
+internal abstract class AbstractCleaner<T : AwaitingCompletionModel> {
     protected val logger by lazy { logger() }
 
     protected val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     protected abstract val enabled: Boolean
     protected abstract val cleanerConf: LemlineConfiguration.OutboxCleanupConfig
-    protected abstract val repository: CleanableRepository<T>
+    protected abstract val cleanerRepository: CleanerRepository<T>
 
     protected val gracePeriod = 5000L
 
@@ -72,13 +72,13 @@ internal abstract class AbstractCleaner<T : CleanableModel> {
             batchNumber++
             var toDelete = 0
             // WaitingRepository extends Repository, so withTransaction is available
-            repository.withTransaction { connection ->
-                val entities = repository.findEntitiesToDelete(cutoffDate, cleanerConf.batchSize, connection)
+            cleanerRepository.withTransaction { connection ->
+                val entities = cleanerRepository.findEntitiesToDelete(cutoffDate, cleanerConf.batchSize, connection)
                 toDelete = entities.size
 
                 if (toDelete > 0) {
                     totalToDelete += toDelete
-                    val deleted = repository.delete(entities, connection)
+                    val deleted = cleanerRepository.delete(entities, connection)
                     totalDeleted += deleted
                 }
             }

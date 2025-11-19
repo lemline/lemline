@@ -6,7 +6,7 @@ import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.RelayRepository
+import com.lemline.runner.repositories.OutboxRepository
 import jakarta.annotation.PostConstruct
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -48,8 +48,8 @@ import org.jetbrains.annotations.VisibleForTesting
 internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
 
     protected abstract val failureRepository: FailureRepository
-    override val repository: RelayRepository<T> get() = relayRepository
-    protected abstract val relayRepository: RelayRepository<T>
+    protected abstract val outboxRepository: OutboxRepository<T>
+    override val cleanerRepository: OutboxRepository<T> get() = outboxRepository
     protected abstract val instanceEmitter: WorkflowCommandEmitter
 
     protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig?
@@ -156,15 +156,15 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
             batchNumber++
             var toProcess = 0
             // Find and process messages in the same transaction
-            relayRepository.withTransaction { connection ->
+            outboxRepository.withTransaction { connection ->
                 // Find and lock messages ready to process
-                val messages = relayRepository.findEntitiesToProcess(maxAttempts, batchSize, connection)
+                val messages = outboxRepository.findEntitiesToProcess(maxAttempts, batchSize, connection)
                 toProcess = messages.size
 
                 if (toProcess > 0) {
                     totalToProcess += toProcess
                     val processed = processBatch(messages, maxAttempts, initialDelay)
-                    relayRepository.update(messages, connection)
+                    outboxRepository.update(messages, connection)
                     totalProcessed += processed
                 }
             }
