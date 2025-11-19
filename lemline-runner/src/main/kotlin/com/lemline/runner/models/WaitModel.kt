@@ -11,8 +11,13 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalSerializationApi
 @ExperimentalTime
 data class WaitModel(
+    /** Unique identifier for this wait operation */
     override val id: IDV7 = IDV7.random(),
+
+    /** Workflow state when the wait was initiated */
     override val instanceMessage: InstanceMessage<WorkflowEvent.WaitStarted>,
+
+    /** Timestamp when the wait period should end and workflow should resume */
     override val outboxScheduledFor: Instant,
 ) : OutboxModel() {
 

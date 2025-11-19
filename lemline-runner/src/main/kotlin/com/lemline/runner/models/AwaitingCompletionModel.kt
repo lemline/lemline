@@ -23,6 +23,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalTime
 sealed class AwaitingCompletionModel : InstanceModel, WithDefiniteWorkflowInfo {
 
+    /** The workflow instance message containing workflow info and state */
     abstract val instanceMessage: InstanceMessage<out WorkflowState>
 
     /**
@@ -33,7 +34,9 @@ sealed class AwaitingCompletionModel : InstanceModel, WithDefiniteWorkflowInfo {
      */
     abstract var outboxCompletedAt: Instant?
 
+    /** Workflow execution state from the instance message */
     override val workflowState get() = instanceMessage.workflowState
 
+    /** Workflow definition info from the instance message */
     override val workflowInfo get() = instanceMessage.workflowInfo
 }

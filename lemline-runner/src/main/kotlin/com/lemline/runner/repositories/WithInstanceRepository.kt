@@ -7,7 +7,6 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowState
-import com.lemline.core.states.workflowId
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.InstanceModel
 import java.sql.Connection
@@ -62,7 +61,7 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
         super.prepareStatementMap + mapOf(
             WORKFLOW_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setIDV7(stmt, idx, entity.workflowState?.taskStates?.workflowId?.value)
+                setIDV7(stmt, idx, entity.workflowState?.workflowId?.value)
             },
             WORKFLOW_NAMESPACE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 stmt.setString(idx, entity.workflowNamespace?.toString())

@@ -13,17 +13,32 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalSerializationApi
 @ExperimentalTime
 data class FailureModel(
+    /** Unique identifier for this failure record */
     override val id: IDV7,
+
+    /** Workflow instance state when the failure occurred, null if payload deserialization failed */
     var instanceMessage: InstanceMessage<out WorkflowState>?,
+
+    /** Raw message payload if instanceMessage deserialization failed */
     val payload: String?,
+
+    /** High-level categorization of the failure reason */
     val errorReason: String,
+
+    /** Fully qualified class name of the exception that caused the failure */
     val errorClass: String,
+
+    /** Error message from the exception */
     val errorMessage: String?,
+
+    /** Full stack trace of the exception for debugging */
     val errorStackTrace: String,
 ) : InstanceModel {
 
+    /** Workflow definition info extracted from the instance message, null if payload deserialization failed */
     override val workflowInfo: WorkflowInfo? get() = instanceMessage?.workflowInfo
 
+    /** Workflow execution state extracted from the instance message, null if payload deserialization failed */
     override val workflowState: WorkflowState? get() = instanceMessage?.workflowState
 
     companion object {

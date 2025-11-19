@@ -13,28 +13,25 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalSerializationApi
 @ExperimentalTime
 data class RetryModel(
+    /** Unique identifier for this retry attempt */
     override val id: IDV7,
+
+    /** Workflow state when the retry was scheduled */
     override val instanceMessage: InstanceMessage<WorkflowEvent.RetryScheduled>,
+
+    /** Timestamp when the retry should be attempted */
     override val outboxScheduledFor: Instant,
 
-    /**
-     * Reason for this retry
-     */
+    /** Reason for this retry */
     val errorReason: String,
 
-    /**
-     * Error class of the exception that triggered this retry
-     */
+    /** Error class of the exception that triggered this retry */
     val errorClass: String,
 
-    /**
-     * Error message of the exception that triggered this retry
-     */
+    /** Error message of the exception that triggered this retry */
     val errorMessage: String?,
 
-    /**
-     * Stacktrace of the exception that triggered this retry
-     */
+    /** Stacktrace of the exception that triggered this retry */
     val errorStackTrace: String,
 
     ) : OutboxModel() {

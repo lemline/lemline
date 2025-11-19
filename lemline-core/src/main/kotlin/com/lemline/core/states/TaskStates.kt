@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
-import com.lemline.common.values.WorkflowId
 import com.lemline.core.nodes.NodePosition
 import kotlinx.serialization.json.JsonObject
 
@@ -43,5 +42,3 @@ internal fun TaskStates.updateWith(
 
     return updatedStates
 }
-
-val TaskStates.workflowId: WorkflowId get() = (this[NodePosition.root] as RootState).workflowId

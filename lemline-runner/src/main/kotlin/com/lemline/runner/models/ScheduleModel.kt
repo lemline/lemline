@@ -30,12 +30,23 @@ import kotlinx.serialization.json.JsonElement
 @ExperimentalSerializationApi
 @ExperimentalTime
 data class ScheduleModel(
+    /** Unique identifier for this scheduled workflow execution */
     override val id: IDV7,
+
     override var instanceMessage: InstanceMessage<WorkflowCommand.ResumeFromTask>,
+
     override val outboxScheduledFor: Instant?,
+
+    /** ISO 8601 duration for one-time delayed execution (e.g., PT1H for 1 hour) */
     val scheduleAfter: String?,
+
+    /** ISO 8601 duration for recurring interval execution (e.g., PT5M for every 5 minutes) */
     val scheduleEvery: String?,
+
+    /** Unix cron expression for cron-based scheduling (e.g., "0 9 * * *" for daily at 9 AM) */
     val scheduleCron: String?,
+
+    /** IANA timezone identifier for cron schedules (e.g., "America/New_York") */
     val scheduleZone: String?,
 ) : OutboxModel() {
 
@@ -53,12 +64,16 @@ data class ScheduleModel(
 
     override var outboxFailedAt: Instant? = null
 
+    /** Parsed duration for one-time delayed execution, null if not applicable */
     val after: Duration? by lazy { scheduleAfter?.let { Duration.parse(it) } }
 
+    /** Parsed duration for recurring interval execution, null if not applicable */
     val every: Duration? by lazy { scheduleEvery?.let { Duration.parse(it) } }
 
+    /** Parsed cron expression for cron-based scheduling, null if not applicable */
     val cron: Cron? by lazy { scheduleCron?.let { cronParser.parse(it) } }
 
+    /** Parsed timezone for cron-based scheduling, null if not specified */
     val zone: ZoneId? by lazy { scheduleZone?.let { ZoneId.of(it) } }
 
     /**

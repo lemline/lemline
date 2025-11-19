@@ -18,10 +18,21 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalTime
 @ExperimentalSerializationApi
 data class ForkModel(
+    /** Unique identifier for this fork execution */
     override val id: IDV7 = IDV7.random(),
+
+    /** Parent workflow state when the fork started */
     override val instanceMessage: InstanceMessage<WorkflowEvent.ForkStarted>,
-    val forkPosition: String,  // Serialized NodePosition
+
+    /** Serialized NodePosition indicating where the fork is in the workflow */
+    val forkPosition: String,
+
+    /** Whether branches compete (first to complete wins) or cooperate (all must complete) */
     val compete: Boolean,
+
+    /** Number of branches in this fork */
     val branchCount: Int,
+
+    /** Timestamp when all branches completed, null while awaiting */
     override var outboxCompletedAt: Instant? = null
 ) : AwaitingCompletionModel()
