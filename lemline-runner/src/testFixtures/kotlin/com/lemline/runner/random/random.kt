@@ -156,7 +156,7 @@ fun ParentModel.Companion.random() = ParentModel(
         workflowInfo = WorkflowInfo.random(),
         workflowState = WorkflowEvent.RunWorkflowStarted.random(),
     ),
-    childId = IDV7.random()
+    childId = WorkflowId.random()
 )
 
 fun ScheduleModel.Companion.random() = ScheduleModel(

@@ -10,7 +10,6 @@ import kotlin.time.ExperimentalTime
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import org.eclipse.microprofile.reactive.messaging.Message
 
 @ExperimentalTime
@@ -27,9 +26,6 @@ data class InstanceMessage<S : WorkflowState>(
     @SerialName("s") val workflowState: S,
 
     ) : WithDefiniteWorkflowInfo, JsonSerializable {
-
-    @Transient
-    lateinit var message: Message<String>
 
     @Suppress("UNCHECKED_CAST")
     override fun toJsonString(): String {
@@ -54,6 +50,6 @@ data class InstanceMessage<S : WorkflowState>(
         }
 
         inline fun <reified S : WorkflowState> fromMessage(message: Message<String>): InstanceMessage<S> =
-            fromJsonString<S>(message.payload).also { it.message = message }
+            fromJsonString<S>(message.payload)
     }
 }

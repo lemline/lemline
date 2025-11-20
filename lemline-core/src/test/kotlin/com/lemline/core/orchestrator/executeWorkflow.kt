@@ -32,7 +32,7 @@ internal suspend fun executeContinuousWorkflow(
 ): JsonElement {
     val workflow = getWorkflowToTest(yaml, namespace, name, version)
 
-    val startState = WorkflowCommand.Start(
+    val startState = WorkflowOrchestrator.initState(
         workflowId = WorkflowId.random(),
         workflowInput = input,
         hasWaitingParent = false,
@@ -95,7 +95,7 @@ private suspend fun runUntilComplete(
     executionMode: ExecutionMode
 ): JsonElement {
 
-    val startState = WorkflowCommand.Start(
+    val startState = WorkflowOrchestrator.initState(
         workflowId = WorkflowId.random(),
         workflowInput = input,
         hasWaitingParent = hasWaitingParent,

@@ -38,7 +38,7 @@ internal class ParentRepository : CleanerRepository<ParentModel>() {
     override val prepareStatementMap by lazy {
         super.prepareStatementMap + mapOf(
             CHILD_ID_COLUMN to { stmt: java.sql.PreparedStatement, entity: ParentModel, idx: Int ->
-                setIDV7(stmt, idx, entity.childId)
+                setIDV7(stmt, idx, entity.childId.value)
             }
         )
     }
@@ -46,7 +46,7 @@ internal class ParentRepository : CleanerRepository<ParentModel>() {
     override fun createModel(rs: ResultSet) = ParentModel(
         id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowEvent.RunWorkflowStarted>()!!,
-        childId = getIDV7(rs, CHILD_ID_COLUMN)!!,
+        childId = WorkflowId(getIDV7(rs, CHILD_ID_COLUMN)!!),
         outboxCompletedAt = rs.getInstant(OUTBOX_COMPLETED_AT_COLUMN),
     )
 

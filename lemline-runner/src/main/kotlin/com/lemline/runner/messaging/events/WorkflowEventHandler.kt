@@ -212,7 +212,7 @@ internal class WorkflowEventHandler(
                 entity = ParentModel(
                     id = IDV7.random(),
                     instanceMessage = instance,
-                    childId = childWorkflowId.value
+                    childId = childWorkflowId
                 ),
                 connection = conn
             )
@@ -238,7 +238,7 @@ internal class WorkflowEventHandler(
 
     private suspend fun handleWorkflowCompleted(instance: InstanceMessage<WorkflowEvent.WorkflowCompleted>) {
         // If this workflow has a parent, resume it
-        if (instance.workflowState.hasWaitingParent) {
+        if (instance.hasWaitingParent) {
             parentRepository.withTransaction { conn ->
                 parentRepository.findByChildId(instance.workflowId)?.let { parent ->
                     // Parent state

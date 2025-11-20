@@ -2,6 +2,7 @@
 package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
 import kotlin.time.ExperimentalTime
@@ -18,7 +19,7 @@ data class ParentModel(
     override val instanceMessage: InstanceMessage<WorkflowEvent.RunWorkflowStarted>,
 
     /** The workflow ID of the child workflow that was spawned */
-    val childId: IDV7,
+    val childId: WorkflowId,
 
     /** Timestamp when the child workflow completed, null while awaiting */
     override var outboxCompletedAt: Instant? = null
