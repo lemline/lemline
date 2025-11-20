@@ -13,7 +13,7 @@ CREATE TABLE lemline_forks (
     workflow_state MEDIUMTEXT,
 
     -- Fork-specific fields
-    position VARCHAR(1000) NOT NULL,
+    `position` VARCHAR(1000) NOT NULL,
     compete TINYINT(1) NOT NULL,
     output MEDIUMTEXT,
 
@@ -27,7 +27,7 @@ CREATE TABLE lemline_forks (
     updated_at TIMESTAMP NULL DEFAULT NULL,
 
     -- Constraints
-    CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, position(255))
+    CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, `position`(255))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Branch execution table

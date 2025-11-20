@@ -110,6 +110,7 @@ class ForkRepository : CleanerRepository<ForkModel>() {
             }
 
             conn.prepareStatement(insertBranchSql).use { stmt ->
+                val now = Timestamp.from(java.time.Instant.now())
                 branches.forEach { branch ->
                     setIDV7(stmt, 1, branch.forkId)
                     stmt.setString(2, branch.name)
@@ -117,8 +118,8 @@ class ForkRepository : CleanerRepository<ForkModel>() {
                     setIDV7(stmt, 4, branch.failureId)
                     stmt.setTimestamp(5, branch.completedAt?.toJavaInstant()?.let { Timestamp.from(it) })
                     stmt.setTimestamp(6, branch.failedAt?.toJavaInstant()?.let { Timestamp.from(it) })
-                    stmt.setTimestamp(7, Timestamp.from(java.time.Instant.now()))
-                    stmt.setNull(8, Types.TIMESTAMP)
+                    stmt.setTimestamp(7, now)
+                    stmt.setTimestamp(8, now)
                     stmt.addBatch()
                 }
                 stmt.executeBatch()
@@ -181,6 +182,14 @@ class ForkRepository : CleanerRepository<ForkModel>() {
     /**
      * Find fork with all its branches by workflow ID and position.
      * More efficient than separate queries when you need both fork and branches.
+     *
+     * Uses FOR UPDATE to acquire row-level locks, preventing concurrent workers from
+     * processing branch completions with stale data. This ensures thread-safe fork
+     * completion logic when multiple branches complete simultaneously.
+     *
+     * Database-specific locking:
+     * - PostgreSQL: FOR UPDATE OF f (locks only fork table, required for LEFT JOIN)
+     * - MySQL/H2: FOR UPDATE (locks all tables in query)
      */
     suspend fun findByWorkflowIdAndPositionWithBranches(
         workflowId: WorkflowId,
@@ -212,7 +221,7 @@ class ForkRepository : CleanerRepository<ForkModel>() {
     }
 
     private val findByWorkflowIdAndPositionWithBranchesSql by lazy {
-        """
+        val baseQuery = """
         SELECT f.$ID_COLUMN,
                f.$WORKFLOW_ID_COLUMN,
                f.$WORKFLOW_NAMESPACE_COLUMN,
@@ -241,6 +250,14 @@ class ForkRepository : CleanerRepository<ForkModel>() {
         WHERE f.$WORKFLOW_ID_COLUMN = ? AND f.$FORK_POSITION_COLUMN = ?
         ORDER BY b.$BRANCH_NAME_COLUMN
         """.trimIndent()
+
+        // Add FOR UPDATE with database-specific syntax
+        // PostgreSQL: Requires "FOR UPDATE OF f" because LEFT JOIN creates nullable side
+        // MySQL/H2: Use "FOR UPDATE" (doesn't support OF clause)
+        when (databaseManager.dbType) {
+            "postgresql" -> "$baseQuery\nFOR UPDATE OF f"
+            else -> "$baseQuery\nFOR UPDATE"
+        }
     }
 
     // Helper method to convert ResultSet to ForkBranchModel (from join query with aliased columns)

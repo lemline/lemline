@@ -81,7 +81,8 @@ fun WorkflowEvent.TaskFailed.Companion.random() = WorkflowEvent.TaskFailed(
         instance = "test-instance",
         title = "Test error",
         details = "Test error details"
-    )
+    ),
+    failedAt = Clock.System.now()
 )
 
 fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkflowStarted(
