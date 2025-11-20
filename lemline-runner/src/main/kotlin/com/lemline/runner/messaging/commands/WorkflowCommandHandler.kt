@@ -138,7 +138,8 @@ internal class WorkflowCommandHandler(
                 rawInput = null,
                 rawOutput = null,
                 flowDirective = null,
-                error = error
+                error = error,
+                failedAt = Clock.System.now()
             ),
         )
     }

@@ -13,19 +13,21 @@ CREATE TABLE lemline_forks (
     workflow_state MEDIUMTEXT,
 
     -- Fork-specific fields
-    fork_position VARCHAR(1000) NOT NULL,
+    position VARCHAR(1000) NOT NULL,
     compete TINYINT(1) NOT NULL,
-    branch_count INT NOT NULL,
+    output MEDIUMTEXT,
 
     -- Cleanup tracking
     outbox_completed_at TIMESTAMP(6),
+    failed_at TIMESTAMP NULL DEFAULT NULL,
+    failure_id BINARY(16),
 
     -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NULL DEFAULT NULL,
 
     -- Constraints
-    CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, fork_position(255))
+    CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, position(255))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Branch execution table
@@ -33,46 +35,44 @@ CREATE TABLE lemline_forks (
 CREATE TABLE lemline_fork_branches (
     -- Foreign key to parent fork
     fork_id BINARY(16) NOT NULL,
-    branch_index INT NOT NULL,
 
     -- Branch metadata
-    branch_name VARCHAR(255) NOT NULL,
-    branch_node_position VARCHAR(1000) NOT NULL,
+    name VARCHAR(255) NOT NULL,
 
     -- Execution state
-    status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     output MEDIUMTEXT,
-    error TEXT,
+    failure_id BINARY(16),
 
     -- Timestamps
     completed_at TIMESTAMP NULL DEFAULT NULL,
+    failed_at TIMESTAMP NULL DEFAULT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     -- Constraints
-    PRIMARY KEY (fork_id, branch_index),
+    PRIMARY KEY (fork_id, name),
 
     CONSTRAINT fk_fork_branches_fork
         FOREIGN KEY (fork_id)
         REFERENCES lemline_forks(id)
-        ON DELETE CASCADE,
-
-    CONSTRAINT chk_branch_status
-        CHECK (status IN ('PENDING', 'RUNNING', 'COMPLETED', 'FAULTED')),
-
-    CONSTRAINT chk_branch_index
-        CHECK (branch_index >= 0)
+        ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Indexes for performance
-CREATE INDEX idx_fork_branches_status
-    ON lemline_fork_branches(fork_id, status);
-
-CREATE INDEX idx_forks_created
-    ON lemline_forks(created_at);
 
 -- Create index for cleanup queries
 CREATE INDEX idx_lemline_forks_completed
     ON lemline_forks (outbox_completed_at);
 
--- Note: (workflow_id, fork_position) has unique constraint, no separate index needed
+-- Note: (workflow_id, position) has unique constraint, no separate index needed
+
+-- Foreign key constraints to failures table
+ALTER TABLE lemline_forks
+    ADD CONSTRAINT fk_forks_failure
+        FOREIGN KEY (failure_id)
+        REFERENCES lemline_failures(id)
+        ON DELETE SET NULL;
+
+ALTER TABLE lemline_fork_branches
+    ADD CONSTRAINT fk_fork_branches_failure
+        FOREIGN KEY (failure_id)
+        REFERENCES lemline_failures(id)
+        ON DELETE SET NULL;

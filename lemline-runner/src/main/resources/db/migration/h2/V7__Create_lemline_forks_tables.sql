@@ -14,19 +14,21 @@ CREATE TABLE lemline_forks
     workflow_state      CLOB,
 
     -- Fork-specific fields
-    fork_position       VARCHAR(1000) NOT NULL,
+    position            VARCHAR(1000) NOT NULL,
     compete             BOOLEAN       NOT NULL,
-    branch_count        INT           NOT NULL,
+    output              CLOB,
 
     -- Cleanup tracking
     outbox_completed_at TIMESTAMP WITH TIME ZONE,
+    failed_at           TIMESTAMP,
+    failure_id          UUID,
 
     -- Timestamps
     created_at          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP,
 
     -- Constraints
-    CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, fork_position)
+    CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, position)
 );
 
 -- Branch execution table
@@ -34,47 +36,45 @@ CREATE TABLE lemline_forks
 CREATE TABLE lemline_fork_branches
 (
     -- Foreign key to parent fork
-    fork_id              UUID          NOT NULL,
-    branch_index         INT           NOT NULL,
+    fork_id      UUID         NOT NULL,
 
     -- Branch metadata
-    branch_name          VARCHAR(255)  NOT NULL,
-    branch_node_position VARCHAR(1000) NOT NULL,
+    name         VARCHAR(255) NOT NULL,
 
     -- Execution state
-    status               VARCHAR(20)   NOT NULL DEFAULT 'PENDING',
-    output               CLOB,
-    error                CLOB,
+    output       CLOB,
+    failure_id   UUID,
 
     -- Timestamps
-    completed_at         TIMESTAMP,
-    created_at           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMP,
+    failed_at    TIMESTAMP,
+    created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     -- Constraints
-    PRIMARY KEY (fork_id, branch_index),
+    PRIMARY KEY (fork_id, name),
 
     CONSTRAINT fk_fork_branches_fork
         FOREIGN KEY (fork_id)
             REFERENCES lemline_forks (id)
-            ON DELETE CASCADE,
-
-    CONSTRAINT chk_branch_status
-        CHECK (status IN ('PENDING', 'RUNNING', 'COMPLETED', 'FAULTED')),
-
-    CONSTRAINT chk_branch_index
-        CHECK (branch_index >= 0)
+            ON DELETE CASCADE
 );
-
--- Indexes for performance
-CREATE INDEX idx_fork_branches_status
-    ON lemline_fork_branches (fork_id, status);
-
-CREATE INDEX idx_forks_created
-    ON lemline_forks (created_at);
 
 -- Create index for cleanup queries
 CREATE INDEX idx_lemline_forks_completed
     ON lemline_forks (outbox_completed_at);
 
--- Note: (workflow_id, fork_position) has unique constraint, no separate index needed
+-- Note: (workflow_id, position) has unique constraint, no separate index needed
+
+-- Foreign key constraints to failures table
+ALTER TABLE lemline_forks
+    ADD CONSTRAINT fk_forks_failure
+        FOREIGN KEY (failure_id)
+        REFERENCES lemline_failures (id)
+        ON DELETE SET NULL;
+
+ALTER TABLE lemline_fork_branches
+    ADD CONSTRAINT fk_fork_branches_failure
+        FOREIGN KEY (failure_id)
+        REFERENCES lemline_failures (id)
+        ON DELETE SET NULL;

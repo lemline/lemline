@@ -9,8 +9,6 @@ import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
-import com.lemline.core.nodes.NodePosition
-import com.lemline.core.states.BranchStatus
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.definitions.Definitions
@@ -23,7 +21,6 @@ import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.ForkBranchModel
-import com.lemline.runner.models.ForkCompletionResult
 import com.lemline.runner.models.ForkModel
 import com.lemline.runner.models.ParentModel
 import com.lemline.runner.models.RetryModel
@@ -37,6 +34,7 @@ import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.starters.Starter
 import io.serverlessworkflow.api.types.ForkTask
 import jakarta.enterprise.context.ApplicationScoped
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonArray
@@ -253,7 +251,7 @@ internal class WorkflowEventHandler(
                     )
 
                     // mark parent as completed for cleanup (event-driven state - processed once)
-                    parent.outboxCompletedAt = kotlin.time.Clock.System.now()
+                    parent.outboxCompletedAt = Clock.System.now()
                     parentRepository.update(parent, conn)
 
                     logger.debug {
@@ -310,24 +308,19 @@ internal class WorkflowEventHandler(
         // 1. Create fork metadata model
         val forkModel = ForkModel(
             instanceMessage = instance,
-            forkPosition = state.nodePosition.toString(),
-            compete = isCompete,
-            branchCount = branches.size
+            position = state.nodePosition.toString(),
+            compete = isCompete
         )
 
         // 2. Create branch models
-        val forkBranchModels = branches.mapIndexed { index, branchNode ->
+        val forkBranchModels = branches.map { branchNode ->
             ForkBranchModel(
                 forkId = forkModel.id,
-                branchIndex = index,
-                branchName = branchNode.name,
-                branchNodePosition = branchNode.position.toString(),
-                status = BranchStatus.PENDING,
+                name = branchNode.name,
                 output = null,
-                error = null,
                 completedAt = null,
-                createdAt = state.forkState.startedAt,
-                updatedAt = state.forkState.startedAt
+                failedAt = null,
+                failureId = null
             )
         }
 
@@ -364,97 +357,88 @@ internal class WorkflowEventHandler(
         val forkPosition = state.nodePosition
         val branchOutput = state.output
         val branchName = state.branchName
+        
+        forkRepository.withTransaction { conn ->
+            // Get fork with branches by workflow ID and position (single query)
+            val (fork, branches) = forkRepository.findByWorkflowIdAndPositionWithBranches(
+                instance.workflowId,
+                forkPosition,
+                conn
+            ) ?: error("Fork not found at $forkPosition for workflow ${instance.workflowId}")
 
-        // Get fork by workflow ID and position
-        val fork = forkRepository.findByWorkflowIdAndPosition(instance.workflowId, forkPosition)
-            ?: error("Fork not found at $forkPosition for workflow ${instance.workflowId}")
-
-        // Get fork branches to find which branch this is
-        val branches = forkRepository.getBranches(fork.id)
-
-        // Find the branch by name
-        val branch = branches.firstOrNull { it.branchName == branchName }
-            ?: error("Branch '$branchName' not found in fork at $forkPosition")
-
-        logger.debug {
-            "Branch ${branch.branchIndex} ($branchName) completed for fork ${fork.id} at $forkPosition, " +
-                "output: ${branchOutput.toString().take(100)}"
-        }
-
-        // Record branch completion and check if fork is complete
-        val completionResult = forkRepository.recordBranchCompletion(
-            forkId = fork.id,
-            branchIndex = branch.branchIndex,
-            branchOutput = branchOutput
-        )
-
-        // Check if fork is complete
-        if (completionResult.isComplete) {
             logger.debug {
-                "Fork complete at $forkPosition: ${completionResult.completedCount}/${completionResult.branchCount} branches, " +
-                    "resuming parent workflow"
+                "Branch '$branchName' completed for fork ${fork.id} at $forkPosition, " +
+                    "output: ${branchOutput.toString().take(100)}"
             }
-            resumeForkParent(instance, completionResult, forkPosition)
-        } else {
-            logger.debug {
-                "Fork not complete at $forkPosition: ${completionResult.completedCount}/${completionResult.branchCount} branches done"
+
+            // Find the branch by name
+            val branch = branches.firstOrNull { it.name == branchName }
+                ?: error("Branch '$branchName' not found in fork at $forkPosition")
+
+            if (branch.completedAt != null) {
+                logger.info { "Weird, the branch '$branchName' at $forkPosition is already completed" }
+                return@withTransaction null
             }
-            // Waiting for more branches - nothing to do
-        }
-    }
 
-    /**
-     * Resume parent workflow after fork completes.
-     * Assembles output from completed branches and creates resume message.
-     */
-    private suspend fun resumeForkParent(
-        instance: InstanceMessage<WorkflowEvent.ForkBranchCompleted>,
-        completionResult: ForkCompletionResult,
-        forkPosition: NodePosition
-    ) {
-        // Assemble output based on compete mode
-        val assembledOutput = if (completionResult.compete) {
-            // Compete mode: return first completed branch output
-            completionResult.branches
-                .firstOrNull { it.status == BranchStatus.COMPLETED }
-                ?.output
-                ?.let { LemlineJson.decodeFromString<JsonElement>(it) }
-                ?: error("No completed branch found in compete mode")
-        } else {
-            // Cooperative mode: return array in order
-            val outputs = (0 until completionResult.branchCount).map { index ->
-                val branch = completionResult.branches.find { it.branchIndex == index }
-                    ?: error("Branch $index not found")
+            // Update branch with completion data
+            branch.output = LemlineJson.encodeToString(branchOutput)
+            branch.completedAt = Clock.System.now()
+            // clean failure if needed
+            branch.failedAt = null
+            branch.failureId?.let {
+                failureRepository.deleteById(it, conn)
+                branch.failureId = null
+            }
 
-                require(branch.status == BranchStatus.COMPLETED) {
-                    "Branch $index not completed: ${branch.status}"
+            // Save the updated branch in the transaction
+            forkRepository.updateBranch(branch, conn)
+
+            // Apply business logic: check if the fork is complete based on the compete mode
+            if (fork.outboxCompletedAt == null) {
+                val completedCount = branches.count { it.completedAt != null }
+                val outputJson = when {
+                    fork.compete && completedCount == 1 -> branchOutput
+                    !fork.compete && completedCount == branches.size -> {
+                        val outputs = branches.map { b ->
+                            val out = b.output ?: error("Branch '${b.name}' has no output")
+                            LemlineJson.decodeFromString<JsonElement>(out)
+                        }
+                        JsonArray(outputs)
+                    }
+
+                    else -> null
                 }
 
-                LemlineJson.decodeFromString<JsonElement>(branch.output!!)
+                // Is the fork is now completed?
+                if (outputJson != null) {
+                    logger.debug { "Fork completed at $forkPosition with output $outputJson, resuming parent workflow" }
+                    // Update fork with completion data
+                    fork.output = LemlineJson.encodeToString(outputJson)
+                    fork.outboxCompletedAt = Clock.System.now()
+                    // Clean failure if needed
+                    fork.failedAt = null
+                    fork.failureId?.let {
+                        failureRepository.deleteById(it, conn)
+                        fork.failureId = null
+                    }
+                    forkRepository.update(fork, conn)
+
+                    val resumeMessage = InstanceMessage(
+                        workflowInfo = instance.workflowInfo,
+                        workflowState = WorkflowCommand.ResumeFromStartedTask(
+                            taskStates = instance.workflowState.taskStates,
+                            nodePosition = forkPosition,
+                            rawOutput = outputJson,
+                        ),
+                    )
+
+                    // Emit resume message to workflow channel
+                    instanceEmitter.send(resumeMessage)
+                } else {
+                    logger.debug { "Fork not yet completed at $forkPosition" }
+                    // Waiting for more branches - nothing to do
+                }
             }
-            JsonArray(outputs)
         }
-
-        // Create resume message
-        val resumeMessage = InstanceMessage(
-            workflowInfo = instance.workflowInfo,
-            workflowState = WorkflowCommand.ResumeFromTask(
-                taskStates = completionResult.taskStates,
-                nodePosition = forkPosition,
-                rawInput = assembledOutput,
-                flowDirective = null
-            ),
-        )
-
-        // Clean up fork state - mark as completed for cleanup
-        val fork = forkRepository.findByWorkflowIdAndPosition(instance.workflowId, forkPosition)
-        if (fork != null) {
-            fork.outboxCompletedAt = kotlin.time.Clock.System.now()
-            forkRepository.update(fork)
-            logger.debug { "Fork parent resumed at $forkPosition, fork state marked for cleanup" }
-        }
-
-        // Emit resume message to workflow channel
-        instanceEmitter.send(resumeMessage)
     }
 }

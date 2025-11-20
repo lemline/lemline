@@ -234,6 +234,7 @@ fun randomStates() = mapOf(
 
 fun WorkflowEvent.WorkflowCompleted.Companion.random() = WorkflowEvent.WorkflowCompleted(
     output = JsonElement.random(),
+    completedAt = Clock.System.now(),
     taskStates = randomStates()
 )
 
@@ -253,6 +254,7 @@ fun WorkflowEvent.TaskFailed.Companion.random() = WorkflowEvent.TaskFailed(
         false -> null
     },
     error = InternalException.Error.random(),
+    failedAt = Instant.random()
 )
 
 fun WorkflowEvent.TaskScheduled.Companion.random() = WorkflowEvent.TaskScheduled(
@@ -305,6 +307,7 @@ fun WorkflowEvent.ForkBranchCompleted.Companion.random() =
         nodePosition = NodePosition.random(),
         branchName = String.random(),
         output = JsonElement.random(),
+        completedAt = Clock.System.now(),
         flowDirective = when (Random.nextBoolean()) {
             true -> randomFlowDirective()
             false -> null

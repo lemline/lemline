@@ -8,7 +8,6 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.states.BranchStatus
 import com.lemline.core.states.ForkState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
@@ -29,10 +28,10 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
 /**
- * Abstract base test suite for ForkWaitingRepository implementations.
+ * Abstract base test suite for ForkRepository implementations.
  *
- * Verifies fork persistence, branch tracking, pessimistic locking,
- * and completion detection across different database backends.
+ * Verifies fork persistence, branch tracking, and retrieval
+ * across different database backends.
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
@@ -50,7 +49,7 @@ internal abstract class ForkWaitingRepositoryTest {
         // Clean up any existing test data
         testForkId?.let { forkId ->
             try {
-                repository.delete(forkId)
+                repository.deleteById(forkId)
             } catch (e: Exception) {
                 // Ignore if doesn't exist
             }
@@ -67,151 +66,36 @@ internal abstract class ForkWaitingRepositoryTest {
         repository.insertForkWithBranches(fork, branches)
 
         // Then
-        val retrievedFork = repository.findByWorkflowIdAndPosition(testWorkflowId, testPosition)
-        retrievedFork shouldNotBe null
-        retrievedFork!!.id shouldBe fork.id
-        retrievedFork.branchCount shouldBe 3
+        val retrievedResult = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)
+        retrievedResult shouldNotBe null
+
+        val (retrievedFork, retrievedBranches) = retrievedResult!!
+        retrievedFork.id shouldBe fork.id
         retrievedFork.compete shouldBe false
-
-        val retrievedBranches = repository.getBranches(fork.id)
         retrievedBranches shouldHaveSize 3
-        retrievedBranches.all { it.status == BranchStatus.PENDING } shouldBe true
+        retrievedBranches.all { it.completedAt == null } shouldBe true
     }
 
     @Test
-    fun `should record branch completion and detect incomplete fork`() = runTest {
+    fun `should update branch`() = runTest {
         // Given
-        val fork = createTestFork(branchCount = 3, compete = false)
-        val branches = createTestBranches(fork, branchCount = 3)
-        repository.insertForkWithBranches(fork, branches)
-
-        // When - complete first branch
-        val branchOutput = JsonPrimitive("result-0")
-        val result = repository.recordBranchCompletion(
-            forkId = fork.id,
-            branchIndex = 0,
-            branchOutput = branchOutput
-        )
-
-        // Then
-        result.isComplete shouldBe false
-        result.completedCount shouldBe 1
-        result.branchCount shouldBe 3
-        result.compete shouldBe false
-
-        val updatedBranches = repository.getBranches(fork.id)
-        updatedBranches.find { it.branchIndex == 0 }?.status shouldBe BranchStatus.COMPLETED
-        updatedBranches.find { it.branchIndex == 1 }?.status shouldBe BranchStatus.PENDING
-        updatedBranches.find { it.branchIndex == 2 }?.status shouldBe BranchStatus.PENDING
-    }
-
-    @Test
-    fun `should detect fork completion in cooperative mode when all branches complete`() = runTest {
-        // Given
-        val fork = createTestFork(branchCount = 2, compete = false)
+        val fork = createTestFork(branchCount = 2)
         val branches = createTestBranches(fork, branchCount = 2)
         repository.insertForkWithBranches(fork, branches)
 
-        // When - complete first branch
-        repository.recordBranchCompletion(
-            forkId = fork.id,
-            branchIndex = 0,
-            branchOutput = JsonPrimitive("result-0")
+        // When - update first branch
+        val branch = branches.first().copy(
+            output = "\"result-0\"",
+            completedAt = Clock.System.now()
         )
-
-        // When - complete second branch
-        val result = repository.recordBranchCompletion(
-            forkId = fork.id,
-            branchIndex = 1,
-            branchOutput = JsonPrimitive("result-1")
-        )
+        val updateCount = repository.updateBranch(branch)
 
         // Then
-        result.isComplete shouldBe true
-        result.completedCount shouldBe 2
-        result.branchCount shouldBe 2
-        result.compete shouldBe false
+        updateCount shouldBe 1
 
-        // Verify both branches are completed
-        val completedBranches = result.branches.filter { it.status == BranchStatus.COMPLETED }
-        completedBranches shouldHaveSize 2
-    }
-
-    @Test
-    fun `should detect fork completion in compete mode on first branch`() = runTest {
-        // Given
-        val fork = createTestFork(branchCount = 3, compete = true)
-        val branches = createTestBranches(fork, branchCount = 3)
-        repository.insertForkWithBranches(fork, branches)
-
-        // When - complete first branch
-        val result = repository.recordBranchCompletion(
-            forkId = fork.id,
-            branchIndex = 0,
-            branchOutput = JsonPrimitive("result-0")
-        )
-
-        // Then
-        result.isComplete shouldBe true
-        result.completedCount shouldBe 1
-        result.branchCount shouldBe 3
-        result.compete shouldBe true
-
-        // Verify only one branch is completed
-        val completedBranches = result.branches.filter { it.status == BranchStatus.COMPLETED }
-        completedBranches shouldHaveSize 1
-        completedBranches.first().branchIndex shouldBe 0
-    }
-
-    @Test
-    fun `should handle concurrent branch completions with pessimistic locking`() = runTest {
-        // Given
-        val fork = createTestFork(branchCount = 3, compete = false)
-        val branches = createTestBranches(fork, branchCount = 3)
-        repository.insertForkWithBranches(fork, branches)
-
-        // When - simulate concurrent completions
-        val result1 = repository.recordBranchCompletion(
-            forkId = fork.id,
-            branchIndex = 0,
-            branchOutput = JsonPrimitive("result-0")
-        )
-
-        val result2 = repository.recordBranchCompletion(
-            forkId = fork.id,
-            branchIndex = 1,
-            branchOutput = JsonPrimitive("result-1")
-        )
-
-        // Then - both should see correct counts
-        result1.completedCount shouldBe 1
-        result2.completedCount shouldBe 2
-
-        // Verify branch outputs are stored correctly
-        val branches1 = result1.branches
-        branches1.find { it.branchIndex == 0 }?.output shouldNotBe null
-
-        val branches2 = result2.branches
-        branches2.find { it.branchIndex == 0 }?.output shouldNotBe null
-        branches2.find { it.branchIndex == 1 }?.output shouldNotBe null
-    }
-
-    @Test
-    fun `should return task states in completion result`() = runTest {
-        // Given
-        val fork = createTestFork(branchCount = 1)
-        val branches = createTestBranches(fork, branchCount = 1)
-        repository.insertForkWithBranches(fork, branches)
-
-        // When
-        val result = repository.recordBranchCompletion(
-            forkId = fork.id,
-            branchIndex = 0,
-            branchOutput = JsonPrimitive("result")
-        )
-
-        // Then
-        result.taskStates shouldBe emptyMap()
+        val (_, retrievedBranches) = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)!!
+        retrievedBranches.find { it.name == branch.name }?.output shouldBe "\"result-0\""
+        retrievedBranches.find { it.name == branch.name }?.completedAt shouldNotBe null
     }
 
     @Test
@@ -223,18 +107,14 @@ internal abstract class ForkWaitingRepositoryTest {
 
         // Verify inserted
         repository.findByWorkflowIdAndPosition(testWorkflowId, testPosition) shouldNotBe null
-        repository.getBranches(fork.id) shouldHaveSize 2
 
         // When
-        repository.delete(fork.id)
+        repository.deleteById(fork.id)
 
         // Then
         repository.findByWorkflowIdAndPosition(testWorkflowId, testPosition).shouldBeNull()
-        repository.getBranches(fork.id) shouldHaveSize 0
+        repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition).shouldBeNull()
     }
-
-    // Cleanup tests removed - cleanup is now handled by WaitingCleaner and ForkWaitingCleaner
-    // which use the outbox_status and outbox_scheduled_for columns to track cleanup
 
     @Test
     fun `should return null when fork not found`() = runTest {
@@ -249,12 +129,31 @@ internal abstract class ForkWaitingRepositoryTest {
     }
 
     @Test
-    fun `should return empty list when no branches exist`() = runTest {
+    fun `should return null when fork with branches not found`() = runTest {
         // When
-        val branches = repository.getBranches(IDV7.random())
+        val result = repository.findByWorkflowIdAndPositionWithBranches(
+            WorkflowId.random(),
+            NodePosition.root.addName("nonexistent")
+        )
 
         // Then
-        branches shouldHaveSize 0
+        result.shouldBeNull()
+    }
+
+    @Test
+    fun `should return fork without branches when no branches exist`() = runTest {
+        // Given - insert fork without branches
+        val fork = createTestFork(branchCount = 0)
+        repository.insertForkWithBranches(fork, emptyList())
+
+        // When
+        val result = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)
+
+        // Then
+        result shouldNotBe null
+        val (retrievedFork, retrievedBranches) = result!!
+        retrievedFork.id shouldBe fork.id
+        retrievedBranches shouldHaveSize 0
     }
 
     // Helper functions
@@ -288,9 +187,8 @@ internal abstract class ForkWaitingRepositoryTest {
         return ForkModel(
             id = forkId,
             instanceMessage = instanceMessage,
-            forkPosition = testPosition.toString(),
-            compete = compete,
-            branchCount = branchCount
+            position = testPosition.toString(),
+            compete = compete
         )
     }
 
@@ -298,15 +196,11 @@ internal abstract class ForkWaitingRepositoryTest {
         (0 until branchCount).map { index ->
             ForkBranchModel(
                 forkId = fork.id,
-                branchIndex = index,
-                branchName = "branch-$index",
-                branchNodePosition = NodePosition.root.addName("branch$index").toString(),
-                status = BranchStatus.PENDING,
+                name = "branch-$index",
                 output = null,
-                error = null,
                 completedAt = null,
-                createdAt = Clock.System.now(),
-                updatedAt = Clock.System.now()
+                failedAt = null,
+                failureId = null
             )
         }
 }

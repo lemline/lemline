@@ -2,18 +2,21 @@
 
 ## Overview
 
-Lemline uses a layered repository pattern with native SQL for database operations. This guide covers creating and using repositories across PostgreSQL, MySQL, and H2.
+Lemline uses a layered repository pattern with native SQL for database operations. This guide covers creating and using
+repositories across PostgreSQL, MySQL, and H2.
 
 ## Core Concepts
 
 ### 1. Database Support
 
 All repositories must work across three databases:
+
 - **PostgreSQL** (production)
 - **MySQL** (production alternative)
 - **H2** (testing)
 
 Use database-agnostic SQL where possible. Database-specific migrations go in:
+
 - `src/main/resources/db/migration/postgresql/`
 - `src/main/resources/db/migration/mysql/`
 - `src/main/resources/db/migration/h2/`
@@ -21,6 +24,7 @@ Use database-agnostic SQL where possible. Database-specific migrations go in:
 ### 2. ID Management
 
 All entities use **IDV7** (UUID v7) as primary keys:
+
 - Time-ordered UUIDs (sortable by creation time)
 - Globally unique
 - Generated in application code, not database
@@ -60,6 +64,7 @@ class MyRepository : Repository<MyModel>() {
 ```
 
 **Key Methods:**
+
 - `insert(entity: T, connection: Connection? = null): Int`
 - `update(entity: T, connection: Connection? = null): Int`
 - `delete(entity: T, connection: Connection? = null): Int`
@@ -77,7 +82,7 @@ class ForkRepository : WithInstanceRepository<ForkModel>() {
 
     override val prepareStatementMap by lazy {
         super.prepareStatementMap + mapOf(
-            "fork_position" to { stmt, entity, idx ->
+            "position" to { stmt, entity, idx ->
                 stmt.setString(idx, entity.forkPosition)
             }
         )
@@ -86,7 +91,7 @@ class ForkRepository : WithInstanceRepository<ForkModel>() {
     override fun createModel(rs: ResultSet) = ForkModel(
         id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage()!!,
-        forkPosition = rs.getString("fork_position"),
+        forkPosition = rs.getString("position"),
         compete = rs.getBoolean("compete"),
         branchCount = rs.getInt("branch_count")
     )
@@ -94,6 +99,7 @@ class ForkRepository : WithInstanceRepository<ForkModel>() {
 ```
 
 **Inherited Columns:**
+
 - `id` (primary key)
 - `workflow_id`, `workflow_namespace`, `workflow_name`, `workflow_version`
 - `workflow_position`, `workflow_state`
@@ -101,6 +107,7 @@ class ForkRepository : WithInstanceRepository<ForkModel>() {
 - `created_at`, `updated_at`
 
 **Inherited Methods:**
+
 - All from `Repository<T>`
 - `getInstanceMessage(rs: ResultSet): InstanceMessage?`
 
@@ -109,6 +116,7 @@ class ForkRepository : WithInstanceRepository<ForkModel>() {
 For outbox pattern implementation (retries, waits, schedules).
 
 Extends `WithInstanceRepository<T>` and adds:
+
 - `outbox_status` (PENDING, SENT)
 - `outbox_scheduled_for`
 - `outbox_delayed_until`
@@ -204,6 +212,7 @@ suspend fun findById(id: IDV7): Model? = withConnection(null) { conn ->
 ### When to Use What
 
 **withConnection(connection)**
+
 - Read operations (SELECT)
 - Single writes that can participate in external transactions
 - Accepts `connection: Connection? = null` parameter
@@ -216,6 +225,7 @@ suspend fun findById(id: IDV7, connection: Connection? = null): T? =
 ```
 
 **withTransaction**
+
 - Multiple related writes requiring atomicity
 - Never accepts connection parameter (always creates new transaction)
 
@@ -267,50 +277,54 @@ stmt.setString(index, LemlineJson.encodeToString(instanceMessage))
 ### Creating Tables
 
 PostgreSQL example:
+
 ```sql
-CREATE TABLE lemline_forks (
+CREATE TABLE lemline_forks
+(
     -- Primary key
-    id UUID NOT NULL PRIMARY KEY,
+    id                      UUID        NOT NULL PRIMARY KEY,
 
     -- Workflow instance columns (WithInstanceRepository)
-    workflow_id UUID,
-    workflow_namespace VARCHAR(255),
-    workflow_name VARCHAR(255),
-    workflow_version VARCHAR(255),
-    workflow_position TEXT,
-    workflow_state TEXT,
-    parent_id UUID,
+    workflow_id             UUID,
+    workflow_namespace      VARCHAR(255),
+    workflow_name           VARCHAR(255),
+    workflow_version        VARCHAR(255),
+    workflow_position       TEXT,
+    workflow_state          TEXT,
+    parent_id               UUID,
 
     -- Entity-specific columns
-    fork_position TEXT NOT NULL,
-    compete BOOLEAN NOT NULL,
-    branch_count INT NOT NULL,
+    position                TEXT        NOT NULL,
+    compete                 BOOLEAN     NOT NULL,
+    branch_count            INT         NOT NULL,
 
     -- Outbox columns (if OutboxRepository)
-    outbox_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    outbox_scheduled_for TIMESTAMP,
-    outbox_delayed_until TIMESTAMP,
-    outbox_attempt_count INT NOT NULL DEFAULT 0,
-    outbox_error_class VARCHAR(500),
-    outbox_error_message TEXT,
+    outbox_status           VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    outbox_scheduled_for    TIMESTAMP,
+    outbox_delayed_until    TIMESTAMP,
+    outbox_attempt_count    INT         NOT NULL DEFAULT 0,
+    outbox_error_class      VARCHAR(500),
+    outbox_error_message    TEXT,
     outbox_error_stacktrace TEXT,
 
     -- Standard timestamps
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP
+    created_at              TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at              TIMESTAMP
 );
 
 -- Indexes
-CREATE INDEX idx_forks_workflow_id ON lemline_forks(workflow_id);
-CREATE INDEX idx_forks_position ON lemline_forks(fork_position);
+CREATE INDEX idx_forks_workflow_id ON lemline_forks (workflow_id);
+CREATE INDEX idx_forks_position ON lemline_forks (position);
 ```
 
 MySQL differences:
+
 - Use `DATETIME` instead of `TIMESTAMP`
 - Use `VARCHAR(36)` instead of `UUID`
 - Adjust syntax for AUTO_INCREMENT if needed
 
 H2 differences:
+
 - Generally compatible with PostgreSQL syntax
 - Use for testing only
 
@@ -347,7 +361,7 @@ suspend fun findByWorkflowIdAndPosition(
 }
 
 private val findByWorkflowIdAndPositionSql by lazy {
-    "SELECT * FROM $tableName WHERE workflow_id = ? AND fork_position = ? LIMIT 1"
+    "SELECT * FROM $tableName WHERE workflow_id = ? AND position = ? LIMIT 1"
 }
 ```
 
@@ -407,6 +421,7 @@ class H2ForkRepositoryTest : ForkRepositoryTest()
 ```
 
 Base test class:
+
 ```kotlin
 abstract class ForkRepositoryTest {
     @Inject

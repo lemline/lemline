@@ -262,6 +262,7 @@ object WorkflowOrchestrator {
                 logger.debug { "Workflow completed with output: $rawInput" }
                 return WorkflowEvent.WorkflowCompleted(
                     output = rawInput,
+                    completedAt = Clock.System.now(),
                     taskStates = newStates,
                 )
             }
@@ -286,6 +287,7 @@ object WorkflowOrchestrator {
                     nodePosition = result.nextNode.position,
                     branchName = it,
                     output = result.nextInput,
+                    completedAt = Clock.System.now(),
                     flowDirective = result.nextDirective?.toKotlin(),
                 )
             }
@@ -314,7 +316,8 @@ object WorkflowOrchestrator {
                 rawInput = rawInput,
                 rawOutput = null,
                 flowDirective = flowDirective?.toKotlin(),
-                exception = e
+                exception = e,
+                failedAt = Clock.System.now(),
             )
         }
     }
@@ -357,6 +360,7 @@ object WorkflowOrchestrator {
         if (result.nextNode == null) {
             WorkflowEvent.WorkflowCompleted(
                 result.nextInput,
+                completedAt = Clock.System.now(),
                 newStates
             )
         } else {

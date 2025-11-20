@@ -7,6 +7,7 @@ import com.lemline.core.errors.RunWorkflowException
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.FlowDirective
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
@@ -151,9 +152,11 @@ sealed class WorkflowEvent : WorkflowState() {
      *
      * @property output The final output dataset from the workflow
      */
+    @ExperimentalTime
     @Serializable
     data class WorkflowCompleted(
         val output: JsonElement,
+        val completedAt: Instant,
         override val taskStates: TaskStates,
     ) : WorkflowEvent() {
         override val nodePosition: NodePosition = NodePosition.root
@@ -176,6 +179,7 @@ sealed class WorkflowEvent : WorkflowState() {
      * @property exception The exception that caused the workflow to fail.
      * @property error The serialized exception that caused the workflow to fail.
      */
+    @ExperimentalTime
     @Serializable
     data class TaskFailed(
         override val taskStates: TaskStates,
@@ -184,6 +188,7 @@ sealed class WorkflowEvent : WorkflowState() {
         val rawOutput: JsonElement?,
         val flowDirective: FlowDirective?,
         val error: InternalException.Error,
+        val failedAt: Instant,
     ) : WorkflowEvent() {
 
         val exception: Exception get() = InternalException(error)
@@ -194,7 +199,8 @@ sealed class WorkflowEvent : WorkflowState() {
             rawInput: JsonElement?,
             rawOutput: JsonElement?,
             flowDirective: FlowDirective?,
-            exception: Exception
+            exception: Exception,
+            failedAt: Instant = Clock.System.now(),
         ) : this(
             taskStates = taskStates,
             nodePosition = nodePosition,
@@ -202,6 +208,7 @@ sealed class WorkflowEvent : WorkflowState() {
             rawOutput = rawOutput,
             flowDirective = flowDirective,
             error = InternalException.Error.fromUnexpectedException(exception, nodePosition),
+            failedAt = failedAt
         )
 
         override fun toString() = "${this::class.simpleName}(" +
@@ -397,12 +404,14 @@ sealed class WorkflowEvent : WorkflowState() {
      * @property output The raw JSON output of the completed branch.
      * @property flowDirective An optional flow directive specifying the next steps in the workflow.
      */
+    @ExperimentalTime
     @Serializable
     data class ForkBranchCompleted(
         override val taskStates: TaskStates,
         override val nodePosition: NodePosition,
         val branchName: String,
         val output: JsonElement,
+        val completedAt: Instant,
         val flowDirective: FlowDirective?
     ) : WorkflowEvent() {
         override fun toString() = "${this::class.simpleName}(" +
