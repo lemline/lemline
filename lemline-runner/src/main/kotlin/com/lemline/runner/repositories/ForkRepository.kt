@@ -2,6 +2,7 @@
 package com.lemline.runner.repositories
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.WorkflowEvent
@@ -181,92 +182,94 @@ class ForkRepository : CleanerRepository<ForkModel>() {
 
     /**
      * Find fork with all its branches by workflow ID and position.
-     * More efficient than separate queries when you need both fork and branches.
      *
-     * Uses FOR UPDATE to acquire row-level locks, preventing concurrent workers from
-     * processing branch completions with stale data. This ensures thread-safe fork
-     * completion logic when multiple branches complete simultaneously.
+     * Uses FOR UPDATE to acquire a row-level lock on the fork, preventing concurrent workers from
+     * processing branch completions with stale data. This ensures thread-safe fork completion logic
+     * when multiple branches complete simultaneously.
      *
-     * Database-specific locking:
-     * - PostgreSQL: FOR UPDATE OF f (locks only fork table, required for LEFT JOIN)
-     * - MySQL/H2: FOR UPDATE (locks all tables in query)
+     * Implementation uses two simple queries within the same connection/transaction:
+     * 1. Find and lock the fork (SELECT ... FOR UPDATE)
+     * 2. Find all branches for that fork (SELECT ... WHERE fork_id = ?)
+     *
+     * This approach is simpler and more portable across databases than using a JOIN with FOR UPDATE.
      */
     suspend fun findByWorkflowIdAndPositionWithBranches(
         workflowId: WorkflowId,
         forkPosition: NodePosition,
         connection: Connection? = null
     ): Pair<ForkModel, List<ForkBranchModel>>? = withConnection(connection) { conn ->
-        conn.prepareStatement(findByWorkflowIdAndPositionWithBranchesSql).use { stmt ->
+        // 1. Find and lock the fork
+        val fork = findByWorkflowIdAndPositionForUpdate(workflowId, forkPosition, conn)
+            ?: return@withConnection null
+
+        // 2. Find all branches for this fork
+        val branches = findBranchesByForkId(fork.id, conn)
+
+        Pair(fork, branches)
+    }
+
+    /**
+     * Find fork by workflow ID and position with pessimistic locking.
+     * Acquires a row-level lock using FOR UPDATE to prevent concurrent modifications.
+     */
+    private suspend fun findByWorkflowIdAndPositionForUpdate(
+        workflowId: WorkflowId,
+        forkPosition: NodePosition,
+        connection: Connection
+    ): ForkModel? {
+        return connection.prepareStatement(findByWorkflowIdAndPositionForUpdateSql).use { stmt ->
             setIDV7(stmt, 1, workflowId.value)
             stmt.setString(2, forkPosition.toString())
             stmt.executeQuery().use { rs ->
-                var fork: ForkModel? = null
-                val branches = mutableListOf<ForkBranchModel>()
-
-                while (rs.next()) {
-                    // Fork data is the same in all rows, only create once
-                    if (fork == null) {
-                        fork = createModel(rs)
-                    }
-
-                    // Check if there's branch data (LEFT JOIN might have NULLs)
-                    if (rs.getObject("b_$BRANCH_FORK_ID_COLUMN") != null) {
-                        branches.add(rs.toForkBranchModelFromJoin())
-                    }
-                }
-
-                fork?.let { Pair(it, branches) }
+                if (rs.next()) createModel(rs) else null
             }
         }
     }
 
-    private val findByWorkflowIdAndPositionWithBranchesSql by lazy {
-        val baseQuery = """
-        SELECT f.$ID_COLUMN,
-               f.$WORKFLOW_ID_COLUMN,
-               f.$WORKFLOW_NAMESPACE_COLUMN,
-               f.$WORKFLOW_NAME_COLUMN,
-               f.$WORKFLOW_VERSION_COLUMN,
-               f.$WORKFLOW_POSITION_COLUMN,
-               f.$WORKFLOW_STATE_COLUMN,
-               f.$FORK_POSITION_COLUMN,
-               f.$FORK_COMPETE_COLUMN,
-               f.$FORK_OUTPUT_COLUMN,
-               f.$FORK_FAILED_AT_COLUMN,
-               f.$FORK_FAILURE_ID_COLUMN,
-               f.$OUTBOX_COMPLETED_AT_COLUMN,
-               f.$CREATED_AT_COLUMN,
-               f.$UPDATED_AT_COLUMN,
-               b.$BRANCH_FORK_ID_COLUMN AS b_$BRANCH_FORK_ID_COLUMN,
-               b.$BRANCH_NAME_COLUMN AS b_$BRANCH_NAME_COLUMN,
-               b.$BRANCH_OUTPUT_COLUMN AS b_$BRANCH_OUTPUT_COLUMN,
-               b.$BRANCH_FAILURE_ID_COLUMN AS b_$BRANCH_FAILURE_ID_COLUMN,
-               b.$BRANCH_COMPLETED_AT_COLUMN AS b_$BRANCH_COMPLETED_AT_COLUMN,
-               b.$BRANCH_FAILED_AT_COLUMN AS b_$BRANCH_FAILED_AT_COLUMN,
-               b.$CREATED_AT_COLUMN AS b_$CREATED_AT_COLUMN,
-               b.$UPDATED_AT_COLUMN AS b_$UPDATED_AT_COLUMN
-        FROM $tableName f
-        LEFT JOIN $FORK_BRANCH_TABLE b ON f.$ID_COLUMN = b.$BRANCH_FORK_ID_COLUMN
-        WHERE f.$WORKFLOW_ID_COLUMN = ? AND f.$FORK_POSITION_COLUMN = ?
-        ORDER BY b.$BRANCH_NAME_COLUMN
+    private val findByWorkflowIdAndPositionForUpdateSql by lazy {
+        """
+        SELECT * FROM $tableName
+        WHERE $WORKFLOW_ID_COLUMN = ? AND $FORK_POSITION_COLUMN = ?
+        FOR UPDATE
         """.trimIndent()
+    }
 
-        // Add FOR UPDATE with database-specific syntax
-        // PostgreSQL: Requires "FOR UPDATE OF f" because LEFT JOIN creates nullable side
-        // MySQL/H2: Use "FOR UPDATE" (doesn't support OF clause)
-        when (databaseManager.dbType) {
-            "postgresql" -> "$baseQuery\nFOR UPDATE OF f"
-            else -> "$baseQuery\nFOR UPDATE"
+    /**
+     * Find all branches for a given fork ID, ordered by name.
+     */
+    private suspend fun findBranchesByForkId(
+        forkId: IDV7,
+        connection: Connection
+    ): List<ForkBranchModel> {
+        return connection.prepareStatement(findBranchesByForkIdSql).use { stmt ->
+            setIDV7(stmt, 1, forkId)
+            stmt.executeQuery().use { rs ->
+                val branches = mutableListOf<ForkBranchModel>()
+                while (rs.next()) {
+                    branches.add(rs.toForkBranchModel())
+                }
+                branches
+            }
         }
     }
 
-    // Helper method to convert ResultSet to ForkBranchModel (from join query with aliased columns)
-    private fun ResultSet.toForkBranchModelFromJoin() = ForkBranchModel(
-        forkId = getIDV7(this, "b_$BRANCH_FORK_ID_COLUMN")!!,
-        name = getString("b_$BRANCH_NAME_COLUMN"),
-        output = getString("b_$BRANCH_OUTPUT_COLUMN"),
-        completedAt = getInstant("b_$BRANCH_COMPLETED_AT_COLUMN"),
-        failedAt = getInstant("b_$BRANCH_FAILED_AT_COLUMN"),
-        failureId = getIDV7(this, "b_$BRANCH_FAILURE_ID_COLUMN"),
+    private val findBranchesByForkIdSql by lazy {
+        """
+        SELECT * FROM $FORK_BRANCH_TABLE
+        WHERE $BRANCH_FORK_ID_COLUMN = ?
+        ORDER BY $BRANCH_NAME_COLUMN
+        """.trimIndent()
+    }
+
+    /**
+     * Convert ResultSet to ForkBranchModel.
+     */
+    private fun ResultSet.toForkBranchModel() = ForkBranchModel(
+        forkId = getIDV7(this, BRANCH_FORK_ID_COLUMN)!!,
+        name = getString(BRANCH_NAME_COLUMN),
+        output = getString(BRANCH_OUTPUT_COLUMN),
+        completedAt = getInstant(BRANCH_COMPLETED_AT_COLUMN),
+        failedAt = getInstant(BRANCH_FAILED_AT_COLUMN),
+        failureId = getIDV7(this, BRANCH_FAILURE_ID_COLUMN),
     )
 }

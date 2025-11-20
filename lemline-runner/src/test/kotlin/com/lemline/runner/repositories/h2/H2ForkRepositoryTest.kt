@@ -6,10 +6,7 @@ import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import kotlin.time.ExperimentalTime
-import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
-import org.junit.jupiter.api.Disabled
-import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 
 /**
@@ -23,11 +20,4 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class H2ForkRepositoryTest : ForkWaitingRepositoryTest() {
-
-    @Test
-    @Disabled("H2 has different transaction isolation behavior - test is flaky")
-    override fun `should handle concurrent branch updates without race conditions`() = runTest {
-        // Disabled for H2
-    }
-}
+internal class H2ForkRepositoryTest : ForkWaitingRepositoryTest()

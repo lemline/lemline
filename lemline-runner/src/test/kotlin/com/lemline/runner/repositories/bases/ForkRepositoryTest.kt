@@ -42,7 +42,7 @@ import org.junit.jupiter.api.Test
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract open class ForkWaitingRepositoryTest {
+internal abstract class ForkWaitingRepositoryTest {
 
     @Inject
     protected lateinit var repository: ForkRepository

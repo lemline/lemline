@@ -357,7 +357,7 @@ internal class WorkflowEventHandler(
         val forkPosition = state.nodePosition
         val branchOutput = state.output
         val branchName = state.branchName
-        
+
         forkRepository.withTransaction { conn ->
             // Get fork with branches by workflow ID and position (single query)
             val (fork, branches) = forkRepository.findByWorkflowIdAndPositionWithBranches(
