@@ -6,7 +6,7 @@ package com.lemline.core.processors
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.errors.RunWorkflowException
+import com.lemline.core.errors.RunWorkflowStartedException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.RunState
@@ -70,7 +70,7 @@ class RunWorkflowProcessor(
      * @param transformedInput Transformed input from parent
      * @param scope Expression evaluation scope
      * @return This method always throws ChildWorkflowStartedException
-     * @throws RunWorkflowException Always thrown to signal child workflow initiation
+     * @throws RunWorkflowStartedException Always thrown to signal child workflow initiation
      */
     override suspend fun execute(
         transformedInput: JsonElement,
@@ -93,7 +93,7 @@ class RunWorkflowProcessor(
 
         val awaitCompletion = runWorkflow.isAwait
 
-        val childWorkflowConfig = RunWorkflowException.Config(
+        val childWorkflowConfig = RunWorkflowStartedException.Config(
             namespace = subWorkflowNamespace,
             name = subWorkflowName,
             version = subWorkflowVersion,
@@ -102,8 +102,8 @@ class RunWorkflowProcessor(
         )
 
         // The orchestrator will resolve the definition and handle execution appropriately
-        logger.debug { "Throwing ${RunWorkflowException::class.simpleName} for orchestrator to handle:  $childWorkflowConfig" }
-        throw RunWorkflowException(
+        logger.debug { "Throwing ${RunWorkflowStartedException::class.simpleName} for orchestrator to handle:  $childWorkflowConfig" }
+        throw RunWorkflowStartedException(
             state = state,
             transformedInput = transformedInput,
             config = childWorkflowConfig

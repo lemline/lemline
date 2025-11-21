@@ -3,7 +3,7 @@
 
 package com.lemline.core.processors
 
-import com.lemline.core.errors.WaitException
+import com.lemline.core.errors.WaitStartedException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.WaitState
@@ -63,9 +63,9 @@ class WaitProcessor(
         state: WaitState,
     ): JsonElement {
         getDelay()?.let {
-            val config = WaitException.Config(waitUntil = Clock.System.now() + it)
+            val config = WaitStartedException.Config(waitUntil = Clock.System.now() + it)
             logger.debug { "Throwing WaitException for orchestrator to handle: $config" }
-            throw WaitException(state, transformedInput, config)
+            throw WaitStartedException(state, transformedInput, config)
         }
 
         logger.debug { "Wait skipped (duration <= 0) for task: ${node.name}" }

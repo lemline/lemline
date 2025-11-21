@@ -331,8 +331,15 @@ internal class WorkflowCommandHandler(
             }
 
             is WorkflowEvent.ForkBranchCompleted -> {
-                // Send to database for failure persistence
+                // Send to database for branch completion tracking
                 logger.debug { "Branch completed at ${event.nodePosition}" }
+                sendToDatabase(this, event)
+                null  // Terminal
+            }
+
+            is WorkflowEvent.ForkBranchFailed -> {
+                // Send to database for branch failure tracking
+                logger.debug { "Branch failed at ${event.nodePosition}: ${event.error}" }
                 sendToDatabase(this, event)
                 null  // Terminal
             }

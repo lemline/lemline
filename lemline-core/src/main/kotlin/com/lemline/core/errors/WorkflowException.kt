@@ -5,10 +5,12 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.ForkState
 import com.lemline.core.states.RunState
 import com.lemline.core.states.WaitState
+import io.serverlessworkflow.api.types.ForkTask
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
@@ -69,12 +71,15 @@ data class InternalException(
         companion object Companion {
             private const val URI_BASE = "https://serverlessworkflow.io/spec/1.0.0/errors"
 
-            fun fromUnexpectedException(e: Exception, position: NodePosition) = Error(
-                errorType = WorkflowErrorType.RUNTIME,
-                position = position,
-                title = e.message,
-                details = e.stackTraceToString(),
-            )
+            fun from(e: Exception, position: NodePosition) = when (e) {
+                is InternalException -> e.error
+                else -> Error(
+                    errorType = WorkflowErrorType.RUNTIME,
+                    position = position,
+                    title = e.message,
+                    details = e.stackTraceToString(),
+                )
+            }
         }
     }
 }
@@ -86,7 +91,7 @@ data class InternalException(
  * during a larger workflow process. It carries configuration details associated
  * with the child workflow, encapsulated within the [Config] instance.
  */
-data class RunWorkflowException(
+data class RunWorkflowStartedException(
     val state: RunState,
     val transformedInput: JsonElement,
     val config: Config
@@ -125,7 +130,7 @@ data class RunWorkflowException(
  * @property config The configuration specifying the details of the wait, including the delay duration.
  */
 @ExperimentalTime
-data class WaitException(
+data class WaitStartedException(
     val state: WaitState,
     val transformedInput: JsonElement,
     val config: Config
@@ -161,7 +166,23 @@ data class WaitException(
  * Similar to WaitWorkflowException pattern.
  */
 @ExperimentalTime
-data class ForkException(
+data class ForkStartedException(
     val state: ForkState,
     val transformedInput: JsonElement
+) : WorkflowException()
+
+/**
+ * Exception thrown when a branch operation within a `Fork` workflow fails.
+ *
+ * This exception is specifically tied to `ForkState` and encapsulates the details of the failure,
+ * including the state of the fork, the branch name where the failure occurred, and the underlying exception.
+ *
+ * @property branchName The name of the branch where the failure occurred.
+ * @property exception The underlying exception that triggered this failure.
+ */
+@ExperimentalTime
+data class ForkBranchFailedException(
+    val forkNode: Node<ForkTask>,
+    val branchName: String,
+    val exception: Exception
 ) : WorkflowException()

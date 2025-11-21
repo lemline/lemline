@@ -9,12 +9,10 @@ import com.lemline.core.orchestrator.WorkflowOrchestrator
 import com.lemline.core.states.ForkState
 import com.lemline.core.states.TaskStates
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.utils.mapAwaitAllFailFast
+import com.lemline.core.utils.mapAwaitFirstFailSlow
 import io.serverlessworkflow.api.types.ForkTask
 import kotlin.time.ExperimentalTime
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.selects.select
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 
@@ -88,23 +86,12 @@ internal object ForkSync {
         val branches = forkNode.children
             ?: throw IllegalStateException("Fork node in ${forkNode.reference} has no branches")
 
-        val results = coroutineScope {
-            branches.mapIndexed { index, branchNode ->
-                async {
-                    val output = executeBranch(branchNode, taskStates, rawInput)
-                    index to output
-                }
-            }
+        // Get the first success - if all branches failed, the last exception will be rethrown from here
+        val output = branches.mapAwaitFirstFailSlow { branchNode ->
+            executeBranch(branchNode, taskStates, rawInput)
         }
 
-        // Wait for first to complete
-        val (index, output) = select {
-            results.forEach { deferred ->
-                deferred.onAwait { it }
-            }
-        }
-
-        logger.debug { "Fork compete winner: index=$index , output=$output" }
+        logger.debug { "Fork compete winner: output=$output" }
 
         return output
     }
@@ -127,12 +114,9 @@ internal object ForkSync {
         val branches = forkNode.children
             ?: throw IllegalStateException("Fork node in ${forkNode.reference} has no branches")
 
-        val outputs = coroutineScope {
-            branches.map { branchNode ->
-                async {
-                    executeBranch(branchNode, taskStates, rawInput)
-                }
-            }.awaitAll()
+        // Get all results - If a branch failed, the first exception will be rethrown from here
+        val outputs = branches.mapAwaitAllFailFast { branchNode ->
+            executeBranch(branchNode, taskStates, rawInput)
         }
 
         logger.debug { "Fork cooperative: all ${outputs.size} branches completed" }
@@ -171,7 +155,7 @@ internal object ForkSync {
         return when (result) {
             is WorkflowEvent.ForkBranchCompleted -> result.output
 
-            is WorkflowEvent.TaskFailed -> {
+            is WorkflowEvent.ForkBranchFailed -> {
                 logger.error { "Branch ${branchNode.name} failed: ${result.error}" }
                 throw result.exception
             }

@@ -10,7 +10,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.InternalException
-import com.lemline.core.errors.RunWorkflowException
+import com.lemline.core.errors.RunWorkflowStartedException
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.CallState
 import com.lemline.core.states.DoState
@@ -181,7 +181,7 @@ fun randomFlowDirective(): FlowDirective = when (Random.nextInt(4)) {
     else -> FlowDirectiveGoto(String.random())
 }
 
-fun RunWorkflowException.Config.Companion.random() = RunWorkflowException.Config(
+fun RunWorkflowStartedException.Config.Companion.random() = RunWorkflowStartedException.Config(
     namespace = WorkflowNamespace.random(),
     name = WorkflowName.random(),
     version = WorkflowVersion.random(),
@@ -291,7 +291,7 @@ fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkf
     nodePosition = NodePosition.random(),
     runState = RunState.random(),
     rawInput = JsonElement.random(),
-    childConfig = RunWorkflowException.Config.random()
+    childConfig = RunWorkflowStartedException.Config.random()
 )
 
 fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(

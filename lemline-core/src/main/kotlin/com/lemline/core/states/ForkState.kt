@@ -11,5 +11,4 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class ForkState(
     override val startedAt: Instant = Clock.System.now(),
-    val lastCompleted: String? = null
 ) : TaskState()

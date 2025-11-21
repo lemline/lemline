@@ -3,7 +3,7 @@ package com.lemline.core.states
 
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
-import com.lemline.core.errors.RunWorkflowException
+import com.lemline.core.errors.RunWorkflowStartedException
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.FlowDirective
@@ -207,7 +207,7 @@ sealed class WorkflowEvent : WorkflowState() {
             rawInput = rawInput,
             rawOutput = rawOutput,
             flowDirective = flowDirective,
-            error = InternalException.Error.fromUnexpectedException(exception, nodePosition),
+            error = InternalException.Error.from(exception, nodePosition),
             failedAt = failedAt
         )
 
@@ -332,7 +332,7 @@ sealed class WorkflowEvent : WorkflowState() {
         override val nodePosition: NodePosition,
         val runState: RunState,
         val rawInput: JsonElement,
-        val childConfig: RunWorkflowException.Config,
+        val childConfig: RunWorkflowStartedException.Config,
     ) : WorkflowEvent() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -419,6 +419,39 @@ sealed class WorkflowEvent : WorkflowState() {
             ", branchName=$branchName" +
             ", transformedInput=$output" +
             ", flowDirective=$flowDirective" +
+            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+    }
+
+    /**
+     * Event emitted when a fork branch execution fails.
+     *
+     * This event is generated when a branch within a fork task fails during execution.
+     * The fork's error handling strategy (compete vs cooperative) determines what
+     * happens next based on this failure.
+     *
+     * @property taskStates The task states at the time of failure
+     * @property nodePosition The position of the fork task (not the failing task within the branch)
+     * @property branchName The name of the failed branch
+     * @property error The error that caused the branch to fail
+     * @property failedAt Timestamp when the branch failed
+     */
+    @ExperimentalTime
+    @Serializable
+    data class ForkBranchFailed(
+        override val taskStates: TaskStates,
+        override val nodePosition: NodePosition,
+        val branchName: String,
+        val error: InternalException.Error,
+        val failedAt: Instant
+    ) : WorkflowEvent() {
+        val exception: InternalException
+            get() = InternalException(error)
+
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", branchName=$branchName" +
+            ", error=$error" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }

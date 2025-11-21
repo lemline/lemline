@@ -173,14 +173,14 @@ class TryProcessor(
             shouldRetry -> StepResult(
                 nextNode = getDoTry(),  // Re-enter try body
                 nextInput = state.transformedInput,  // Original input
-                stateUpdates = updatesToCleanState(failingNode, state.newAttemptState(error)),
+                stateUpdates = cleanStateUpdates(failingNode, state.newAttemptState(error)),
                 retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(state.attemptIndex)
             )
             // Otherwise, enter the catch block
             else -> StepResult(
                 nextNode = getCatchNode(),  // Re-enter try body
                 nextInput = state.transformedInput,  // Original input
-                stateUpdates = updatesToCleanState(failingNode, state.toCatchState(error)),
+                stateUpdates = cleanStateUpdates(failingNode, state.toCatchState(error)),
             )
         }
     }
@@ -221,7 +221,7 @@ class TryProcessor(
      * Updates the state of nodes to reflect a clean state, starting from a given failing node
      * up to a higher-level try node in the hierarchy.
      */
-    private fun updatesToCleanState(
+    private fun cleanStateUpdates(
         failingNode: Node<*>,
         updatedState: TryState,
     ): Map<NodePosition, TaskState?> {

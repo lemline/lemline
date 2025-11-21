@@ -128,6 +128,7 @@ private tailrec suspend fun runWorkflowStep(
         is WorkflowEvent.WorkflowCompleted -> workflowEvent.output
         is WorkflowEvent.TaskFailed -> throw workflowEvent.exception
         is WorkflowEvent.ForkBranchCompleted -> workflowEvent.output
+        is WorkflowEvent.ForkBranchFailed -> throw workflowEvent.exception
 
         is WorkflowEvent.ForkStarted -> forkStarted(workflow, workflowEvent, executionMode)
         is WorkflowEvent.RetryScheduled -> runWorkflowStep(workflow, workflowEvent.resume(), executionMode)

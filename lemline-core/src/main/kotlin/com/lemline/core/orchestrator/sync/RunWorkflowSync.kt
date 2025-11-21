@@ -3,7 +3,7 @@ package com.lemline.core.orchestrator.sync
 
 import com.lemline.common.logger.logger
 import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.errors.RunWorkflowException
+import com.lemline.core.errors.RunWorkflowStartedException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.ExecutionMode
 import com.lemline.core.orchestrator.StepResult
@@ -42,7 +42,7 @@ internal object RunWorkflowSync {
         taskStates: TaskStates,
         runWorkflowNode: Node<*>,
         transformedInput: JsonElement?,
-        config: RunWorkflowException.Config,
+        config: RunWorkflowStartedException.Config,
         executionMode: ExecutionMode
     ): StepResult {
         // In case we change execution modes in the future, we check it here
@@ -73,7 +73,7 @@ internal object RunWorkflowSync {
      * @return The root node of the resolved workflow
      * @throws IllegalStateException if the workflow definition is not found
      */
-    fun resolveWorkflow(config: RunWorkflowException.Config): Workflow {
+    fun resolveWorkflow(config: RunWorkflowStartedException.Config): Workflow {
         val childWorkflowName by lazy {
             "(namespace=${config.namespace}, name=${config.name}, version=${config.version})"
         }

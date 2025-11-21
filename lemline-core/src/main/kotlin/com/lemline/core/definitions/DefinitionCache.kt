@@ -62,7 +62,8 @@ object DefinitionCache {
     fun parseAndPut(definition: String): Workflow =
         try {
             WorkflowReader.validation().read(definition, WorkflowFormat.YAML)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            println(e)
             WorkflowReader.validation().read(definition, WorkflowFormat.JSON)
         }.also { workflow ->
             workflowCache[workflow.index] = workflow

@@ -12,7 +12,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.InternalException
-import com.lemline.core.errors.RunWorkflowException
+import com.lemline.core.errors.RunWorkflowStartedException
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.random.random
 import com.lemline.core.states.RootState
@@ -90,7 +90,7 @@ fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkf
     nodePosition = NodePosition.random(),
     runState = RunState(),
     rawInput = JsonElement.random(),
-    childConfig = RunWorkflowException.Config(
+    childConfig = RunWorkflowStartedException.Config(
         namespace = WorkflowNamespace("test"),
         name = WorkflowName("test"),
         version = WorkflowVersion("1.0"),

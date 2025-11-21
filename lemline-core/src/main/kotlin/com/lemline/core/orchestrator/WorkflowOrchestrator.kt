@@ -4,10 +4,11 @@ package com.lemline.core.orchestrator
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.getNode
-import com.lemline.core.errors.ForkException
+import com.lemline.core.errors.ForkBranchFailedException
+import com.lemline.core.errors.ForkStartedException
 import com.lemline.core.errors.InternalException
-import com.lemline.core.errors.RunWorkflowException
-import com.lemline.core.errors.WaitException
+import com.lemline.core.errors.RunWorkflowStartedException
+import com.lemline.core.errors.WaitStartedException
 import com.lemline.core.errors.WorkflowException
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
@@ -23,6 +24,10 @@ import com.lemline.core.states.TaskStates
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowEvent.ForkBranchFailed
+import com.lemline.core.states.WorkflowEvent.ForkStarted
+import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
+import com.lemline.core.states.WorkflowEvent.WaitStarted
 import com.lemline.core.states.updateWith
 import com.lemline.core.workflows.toJava
 import com.lemline.core.workflows.toKotlin
@@ -196,8 +201,8 @@ object WorkflowOrchestrator {
             } catch (e: WorkflowException) {
                 if (executionMode.isAsync()) {
                     // Async: turn exceptions into pause WorkflowState and return immediately
-                    return when (e) {
-                        is RunWorkflowException -> WorkflowEvent.RunWorkflowStarted(
+                    when (e) {
+                        is RunWorkflowStartedException -> return RunWorkflowStarted(
                             taskStates = taskStates,
                             nodePosition = node.position,
                             runState = e.state,
@@ -205,7 +210,7 @@ object WorkflowOrchestrator {
                             childConfig = e.config,
                         )
 
-                        is WaitException -> WorkflowEvent.WaitStarted(
+                        is WaitStartedException -> return WaitStarted(
                             taskStates = taskStates,
                             nodePosition = node.position,
                             waitState = e.state,
@@ -213,19 +218,21 @@ object WorkflowOrchestrator {
                             waitUntil = e.config.waitUntil,
                         )
 
-                        is ForkException -> WorkflowEvent.ForkStarted(
+                        is ForkStartedException -> return ForkStarted(
                             taskStates = taskStates,
                             nodePosition = node.position,
                             forkState = e.state,
                             rawInput = e.transformedInput,
                         )
 
+                        is ForkBranchFailedException -> return forkBranchFailed(taskStates, node, e)
+
                         is InternalException -> throw e // already handled by tryCatch
                     }
                 } else {
                     // Continuous: handle synchronously and continue with a StepResult
                     when (e) {
-                        is RunWorkflowException -> RunWorkflowSync.execute(
+                        is RunWorkflowStartedException -> RunWorkflowSync.execute(
                             taskStates = taskStates,
                             runWorkflowNode = node,
                             transformedInput = e.transformedInput,
@@ -233,7 +240,7 @@ object WorkflowOrchestrator {
                             executionMode = executionMode
                         )
 
-                        is WaitException -> WaitSync.execute(
+                        is WaitStartedException -> WaitSync.execute(
                             taskStates = taskStates,
                             waitNode = node,
                             transformedInput = e.transformedInput,
@@ -241,13 +248,15 @@ object WorkflowOrchestrator {
                             executionMode = executionMode
                         )
 
-                        is ForkException -> ForkSync.execute(
+                        is ForkStartedException -> ForkSync.execute(
                             taskStates = taskStates,
                             forkNode = node,
                             forkState = e.state,
                             rawInput = e.transformedInput,
                             executionMode = executionMode
                         )
+
+                        is ForkBranchFailedException -> return forkBranchFailed(taskStates, node, e)
 
                         is InternalException -> throw e // defensive: shouldn't reach here
                     }
@@ -280,8 +289,8 @@ object WorkflowOrchestrator {
                 WaitSync.executeDelay(result.retryAt, "Retrying at node: ${node.name} after")
             }
 
-            // if we are now completing a fork branch
-            getCompletedForkBranch(result.nextNode, newStates, node)?.let {
+            // Are we now completing a fork branch?
+            forkBranchCompleted(newStates, result.nextNode, node)?.let {
                 return WorkflowEvent.ForkBranchCompleted(
                     taskStates = newStates,
                     nodePosition = result.nextNode.position,
@@ -310,6 +319,7 @@ object WorkflowOrchestrator {
             )
 
         } catch (e: Exception) {
+            // Uncaught task failure
             return WorkflowEvent.TaskFailed(
                 taskStates = taskStates.toMap(),
                 nodePosition = node.position,
@@ -322,12 +332,38 @@ object WorkflowOrchestrator {
         }
     }
 
-    private fun getCompletedForkBranch(nextNode: Node<*>, taskStates: TaskStates, current: Node<*>): String? {
+    private fun forkBranchFailed(
+        taskStates: TaskStates,
+        failingNode: Node<*>,
+        e: ForkBranchFailedException
+    ): ForkBranchFailed {
+        val cleanUpdateStates = buildMap {
+            // Clean state of all nodes up to the fork node
+            var node = failingNode
+            do {
+                put(node.position, null)
+                node = node.parent
+                    ?: throw IllegalStateException("Fork not found on path up of node ${failingNode.reference}")
+            } while (node != e.forkNode)
+        }
+        return ForkBranchFailed(
+            taskStates = taskStates.updateWith(cleanUpdateStates, null),
+            nodePosition = e.forkNode.position,
+            branchName = e.branchName,
+            error = InternalException.Error.from(
+                e.exception,
+                failingNode.position
+            ),
+            failedAt = Clock.System.now(),
+        )
+    }
+
+    private fun forkBranchCompleted(taskStates: TaskStates, nextNode: Node<*>, currentNode: Node<*>): String? {
         val nextState = taskStates[nextNode.position]
         if (nextNode.task is ForkTask && nextState != null && nextState is ForkState) {
             // nextNode is a fork, we enter from child, now let's find the branch name
-            return nextNode.children?.find { it.name == current.name }?.name
-                ?: throw IllegalStateException("Fork - can not find ${current.name} in ${nextNode.children?.joinToString { it.name }}")
+            return nextNode.children?.find { it.name == currentNode.name }?.name
+                ?: throw IllegalStateException("Fork - can not find ${currentNode.name} in ${nextNode.children?.joinToString { it.name }}")
         }
         return null
     }
@@ -403,6 +439,10 @@ object WorkflowOrchestrator {
 
     /**
      * Handle exception by finding a TryTask and returning the appropriate state transition.
+     *
+     * Walks up the node tree looking for a TryTask that can handle the error.
+     * Stops at fork boundaries - fork tasks act as error boundaries and handle
+     * errors internally, according to their compete strategy.
      */
     private fun processInternalWorkflowException(
         exception: InternalException,
@@ -410,18 +450,21 @@ object WorkflowOrchestrator {
         taskStates: TaskStates,
     ): StepResult {
         // Find the nearest TryTask that can handle this error
-        var tryNode: Node<*>? = failingNode
+        var current: Node<*>? = failingNode
 
-        while (tryNode != null) {
-            if (tryNode.task is TryTask) {
+        while (current != null) {
+
+            // if we reached a try task, we check if this error can be handled by it
+            // if yes, we continue from there (retry or catch)
+            if (current.task is TryTask) {
                 @Suppress("UNCHECKED_CAST")
-                tryNode as Node<TryTask>
+                current as Node<TryTask>
                 // current scope of the try node
-                val tryScope = getScope(tryNode, taskStates)
+                val tryScope = getScope(current, taskStates)
                 // current state of the try node
-                val tryState = taskStates[tryNode.position] as TryState
-                // build a processor for the try node
-                val processor = ProcessorFactory.getProcessor(tryNode) as TryProcessor
+                val tryState = taskStates[current.position] as TryState
+                // processor for the try node
+                val processor = TryProcessor(current)
                 // check that this node actually can handle this error
                 if (processor.isCatching(exception.error, tryState, tryScope)) {
                     return processor.handleError(
@@ -432,7 +475,19 @@ object WorkflowOrchestrator {
                     )
                 }
             }
-            tryNode = tryNode.parent
+
+            // This must be AFTER the previous test to handle the case of a try task just after a fork
+            // if we reached a fork task, we exit
+            if (current.parent?.task is ForkTask) {
+                @Suppress("UNCHECKED_CAST")
+                throw ForkBranchFailedException(
+                    forkNode = current.parent as Node<ForkTask>,
+                    branchName = current.name,
+                    exception = exception
+                )
+            }
+
+            current = current.parent
         }
         // No handler found - fail workflow
         throw exception
