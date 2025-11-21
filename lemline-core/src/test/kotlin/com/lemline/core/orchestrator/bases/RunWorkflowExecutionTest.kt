@@ -2,7 +2,10 @@
 package com.lemline.core.orchestrator.bases
 
 import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.errors.InternalException
 import com.lemline.core.getWorkflowToTest
+import io.kotest.assertions.throwables.shouldNotThrowAny
+import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -488,6 +491,124 @@ abstract class RunWorkflowExecutionTest : FunSpec() {
 
             assertEquals(30, output["doubled"]?.jsonPrimitive?.int)
             assertEquals(15, output["parentValue"]?.jsonPrimitive?.int)
+        }
+
+        test("exception raised in sub-workflow should propagate to parent for sync execution") {
+            // Child workflow that raises an error
+            val childYaml = """
+                do:
+                  - raiseError:
+                      raise:
+                        error:
+                          type: https://serverlessworkflow.io/errors/child
+                          status: 400
+                          title: Validation failed
+            """
+            getWorkflowToTest(childYaml, namespace = "test", name = "failing-child", version = "0.1.0")
+
+            // Parent workflow that calls the failing child (sync by default)
+            val parentYaml = """
+                do:
+                  - callFailingChild:
+                      run:
+                        workflow:
+                          namespace: test
+                          name: failing-child
+                          version: '0.1.0'
+            """
+
+            val exception = shouldThrow<InternalException> {
+                executeWorkflow(
+                    parentYaml,
+                    namespace = "test",
+                    name = "parent",
+                    version = "0.1.0"
+                )
+            }
+
+            assertEquals(400, exception.error.status)
+            assertEquals("https://serverlessworkflow.io/errors/child", exception.error.type)
+        }
+
+        test("exception raised in sub-workflow should not propagate to parent for async execution") {
+            // Child workflow that raises an error
+            val childYaml = """
+                do:
+                  - raiseError:
+                      raise:
+                        error:
+                          type: https://serverlessworkflow.io/errors/child
+                          status: 400
+                          title: Validation failed
+            """
+            getWorkflowToTest(childYaml, namespace = "test", name = "failing-child", version = "0.1.0")
+
+            // Parent workflow that calls the failing child (sync by default)
+            val parentYaml = """
+                do:
+                  - callFailingChild:
+                      run:
+                        await: false
+                        workflow:
+                          namespace: test
+                          name: failing-child
+                          version: '0.1.0'
+            """
+
+            shouldNotThrowAny {
+                executeWorkflow(
+                    parentYaml,
+                    namespace = "test",
+                    name = "parent",
+                    version = "0.1.0"
+                )
+            }
+        }
+
+        test("parent workflow can catch exception thrown by sub-workflow") {
+            // Child workflow that raises an error
+            val childYaml = """
+                do:
+                  - raiseError:
+                      raise:
+                        error:
+                          type: https://serverlessworkflow.io/errors/not-found
+                          status: 404
+                          title: Resource not found
+            """
+            getWorkflowToTest(childYaml, namespace = "test", name = "error-child", version = "0.1.0")
+
+            // Parent workflow that catches the error from sub-workflow
+            val parentYaml = $$"""
+                do:
+                  - tryCallChild:
+                      try:
+                        - callChild:
+                            run:
+                              workflow:
+                                namespace: test
+                                name: error-child
+                                version: '0.1.0'
+                      catch:
+                        as: caught
+                        do:
+                          - handleError:
+                              set:
+                                handled: true
+                                errorStatus: ${ $caught.status }
+                                errorType: ${ $caught.type }
+            """
+
+            val output = executeWorkflow(
+                parentYaml,
+                namespace = "test",
+                name = "parent",
+                version = "0.1.0"
+            ) as JsonObject
+
+            assertEquals(true, output["handled"]?.jsonPrimitive?.content?.toBoolean())
+            assertEquals(404, output["errorStatus"]?.jsonPrimitive?.int)
+            assertEquals(true, output["errorType"]?.jsonPrimitive?.content?.contains("not-found"))
         }
     }
 
