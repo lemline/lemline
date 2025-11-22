@@ -2,20 +2,9 @@
 package com.lemline.core.errors
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.states.ForkState
-import com.lemline.core.states.RunState
-import com.lemline.core.states.WaitState
-import io.serverlessworkflow.api.types.ForkTask
-import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
+
 
 sealed class WorkflowException : RuntimeException()
 
@@ -83,106 +72,3 @@ data class InternalException(
         }
     }
 }
-
-/**
- * Exception indicating that a child workflow should be started.
- *
- * This exception serves as a marker to indicate the initiation of a child workflow
- * during a larger workflow process. It carries configuration details associated
- * with the child workflow, encapsulated within the [Config] instance.
- */
-data class RunWorkflowStartedException(
-    val state: RunState,
-    val transformedInput: JsonElement,
-    val config: Config
-) : WorkflowException() {
-
-    /**
-     * Configuration details required to initiate a child workflow.
-     *
-     * This data class encapsulates the metadata and input parameters needed to
-     * start a child workflow instance within a larger workflow process.
-     *
-     * @property namespace The namespace of the child workflow, used to scope workflows within an environment.
-     * @property name The name of the child workflow to be executed.
-     * @property version The version of the child workflow.
-     * @property input The input provided to the child workflow.
-     * @property sync Indicates whether the parent workflow should wait for the child workflow to complete.
-     */
-    @Serializable
-    data class Config(
-        val namespace: WorkflowNamespace,
-        val name: WorkflowName,
-        val version: WorkflowVersion,
-        val input: JsonElement,
-        val sync: Boolean
-    )
-}
-
-
-/**
- * Exception indicating that a wait has been requested during a workflow's execution.
- *
- * This exception is thrown to signal that a delay or pause, defined by a [Config],
- * has been incorporated into the workflow's control flow. It can be used to coordinate
- * asynchronous operations or introduce timed pauses in workflow processing.
- *
- * @property config The configuration specifying the details of the wait, including the delay duration.
- */
-@ExperimentalTime
-data class WaitStartedException(
-    val state: WaitState,
-    val transformedInput: JsonElement,
-    val config: Config
-) : WorkflowException() {
-
-    /**
-     * Configuration for specifying the wait duration in a workflow task.
-     *
-     * This configuration is used to indicate a target timestamp until which
-     * a delay or pause is requested during a workflow's execution. It is typically
-     * used in conjunction with orchestrators to manage timed pauses or schedule
-     * task execution at a specific time.
-     *
-     * @property waitUntil The timestamp indicating when the wait should end.
-     */
-    @Serializable
-    data class Config(
-        @Contextual val waitUntil: Instant
-    )
-}
-
-/**
- * Exception indicating that fork branches should be executed.
- *
- * This exception is thrown when a fork task needs to execute its branches.
- * The orchestrator catches this and either:
- * - ExecutionMode.Complete: Executes branches in parallel using coroutines
- * - ExecutionMode.Async: Returns WorkflowState.RunningFork for runner to schedule
- *
- * All fork configuration (compete mode, branches) is derived from the Node<ForkTask>
- * that threw this exception. Only the transformedInput needs to be carried.
- *
- * Similar to WaitWorkflowException pattern.
- */
-@ExperimentalTime
-data class ForkStartedException(
-    val state: ForkState,
-    val transformedInput: JsonElement
-) : WorkflowException()
-
-/**
- * Exception thrown when a branch operation within a `Fork` workflow fails.
- *
- * This exception is specifically tied to `ForkState` and encapsulates the details of the failure,
- * including the state of the fork, the branch name where the failure occurred, and the underlying exception.
- *
- * @property branchName The name of the branch where the failure occurred.
- * @property exception The underlying exception that triggered this failure.
- */
-@ExperimentalTime
-data class ForkBranchFailedException(
-    val forkNode: Node<ForkTask>,
-    val branchName: String,
-    val exception: Exception
-) : WorkflowException()

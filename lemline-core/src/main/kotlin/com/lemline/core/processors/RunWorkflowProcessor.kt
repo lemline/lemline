@@ -6,7 +6,7 @@ package com.lemline.core.processors
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.errors.RunWorkflowStartedException
+import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.RunState

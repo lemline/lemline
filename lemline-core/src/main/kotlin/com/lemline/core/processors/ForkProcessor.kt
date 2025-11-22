@@ -3,7 +3,7 @@
 
 package com.lemline.core.processors
 
-import com.lemline.core.errors.ForkStartedException
+import com.lemline.core.errors.AsyncTaskException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.ForkState
@@ -64,6 +64,6 @@ class ForkProcessor(
         // First entry
         // Throws exception to trigger fork execution via orchestrator
         // The orchestrator will derive fork config from the current Node<ForkTask>
-        throw ForkStartedException(state = state, transformedInput = dataset)
+        throw AsyncTaskException.ForkStartedException(state = state, transformedInput = dataset)
     }
 }

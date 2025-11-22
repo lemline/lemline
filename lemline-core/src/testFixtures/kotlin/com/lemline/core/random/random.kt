@@ -9,8 +9,8 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.errors.InternalException
-import com.lemline.core.errors.RunWorkflowStartedException
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.CallState
 import com.lemline.core.states.DoState
@@ -197,7 +197,7 @@ fun WorkflowState.Companion.random(): WorkflowState = when (Random.nextBoolean()
 fun WorkflowCommand.Companion.random(): WorkflowCommand {
     return when (Random.nextInt(2)) {
         0 -> WorkflowCommand.ResumeFromTask.random()
-        else -> WorkflowCommand.ResumeFromStartedTask.random()
+        else -> WorkflowCommand.ResumeWithCompletedTask.random()
     }
 }
 
@@ -208,7 +208,7 @@ fun WorkflowCommand.ResumeFromTask.Companion.random() = WorkflowCommand.ResumeFr
     flowDirective = randomFlowDirective(),
 )
 
-fun WorkflowCommand.ResumeFromStartedTask.Companion.random() = WorkflowCommand.ResumeFromStartedTask(
+fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand.ResumeWithCompletedTask(
     taskStates = randomStates(),
     nodePosition = NodePosition.random(),
     rawOutput = JsonElement.random(),
@@ -217,13 +217,13 @@ fun WorkflowCommand.ResumeFromStartedTask.Companion.random() = WorkflowCommand.R
 fun WorkflowEvent.Companion.random(): WorkflowEvent {
     return when (Random.nextInt(8)) {
         0 -> WorkflowEvent.WorkflowCompleted.random()
-        1 -> WorkflowEvent.TaskFailed.random()
+        1 -> WorkflowEvent.WorkflowFailed.random()
         2 -> WorkflowEvent.TaskScheduled.random()
         3 -> WorkflowEvent.WaitStarted.random()
         4 -> WorkflowEvent.RetryScheduled.random()
         5 -> WorkflowEvent.RunWorkflowStarted.random()
         6 -> WorkflowEvent.ForkStarted.random()
-        else -> WorkflowEvent.ForkBranchCompleted.random()
+        else -> WorkflowEvent.BranchCompleted.random()
     }
 }
 
@@ -238,7 +238,7 @@ fun WorkflowEvent.WorkflowCompleted.Companion.random() = WorkflowEvent.WorkflowC
     taskStates = randomStates()
 )
 
-fun WorkflowEvent.TaskFailed.Companion.random() = WorkflowEvent.TaskFailed(
+fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFailed(
     taskStates = randomStates(),
     nodePosition = NodePosition.random(),
     rawInput = when (Random.nextBoolean()) {
@@ -301,8 +301,8 @@ fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(
     rawInput = JsonElement.random(),
 )
 
-fun WorkflowEvent.ForkBranchCompleted.Companion.random() =
-    WorkflowEvent.ForkBranchCompleted(
+fun WorkflowEvent.BranchCompleted.Companion.random() =
+    WorkflowEvent.BranchCompleted(
         taskStates = randomStates(),
         nodePosition = NodePosition.random(),
         branchName = String.random(),

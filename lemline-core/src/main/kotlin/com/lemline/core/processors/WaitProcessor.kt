@@ -3,7 +3,7 @@
 
 package com.lemline.core.processors
 
-import com.lemline.core.errors.WaitStartedException
+import com.lemline.core.errors.AsyncTaskException.WaitStartedException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.WaitState
