@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowState
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.InstanceModel
 import java.sql.Connection
 import java.sql.PreparedStatement
@@ -51,19 +50,18 @@ import kotlinx.serialization.ExperimentalSerializationApi
 abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>() {
 
     companion object {
-        internal const val WORKFLOW_ID_COLUMN = "workflow_id"
-        internal const val WORKFLOW_NAMESPACE_COLUMN = "workflow_namespace"
-        internal const val WORKFLOW_NAME_COLUMN = "workflow_name"
-        internal const val WORKFLOW_VERSION_COLUMN = "workflow_version"
-        internal const val WORKFLOW_POSITION_COLUMN = "workflow_position"
-        internal const val WORKFLOW_STATE_COLUMN = "workflow_state"
-        internal const val PARENT_ID_COLUMN = "parent_id"
+        const val WORKFLOW_ID_COLUMN = "workflow_id"
+        const val WORKFLOW_NAMESPACE_COLUMN = "workflow_namespace"
+        const val WORKFLOW_NAME_COLUMN = "workflow_name"
+        const val WORKFLOW_VERSION_COLUMN = "workflow_version"
+        const val WORKFLOW_POSITION_COLUMN = "workflow_position"
+        const val WORKFLOW_STATE_COLUMN = "workflow_state"
     }
 
     override val prepareStatementMap: Map<String, (PreparedStatement, T, Int) -> Unit> by lazy {
         super.prepareStatementMap + mapOf(
             WORKFLOW_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setIDV7(stmt, idx, entity.workflowId?.value)
+                setIDV7(stmt, idx, entity.workflowState?.workflowId?.value)
             },
             WORKFLOW_NAMESPACE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 stmt.setString(idx, entity.workflowNamespace?.toString())
@@ -79,26 +77,26 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
             },
             WORKFLOW_STATE_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
                 stmt.setString(idx, entity.workflowState?.toJsonString())
-            },
-            PARENT_ID_COLUMN to { stmt: PreparedStatement, entity: T, idx: Int ->
-                setIDV7(stmt, idx, entity.parentId)
             }
         )
     }
 
-    protected fun ResultSet.getInstanceMessage(): InstanceMessage? = when (val id = getIDV7(this, WORKFLOW_ID_COLUMN)) {
-        null -> null
-        else -> InstanceMessage(
-            workflowInfo = WorkflowInfo(
-                workflowId = WorkflowId(id),
-                workflowNamespace = WorkflowNamespace(getString(WORKFLOW_NAMESPACE_COLUMN)),
-                workflowName = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
-                workflowVersion = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
-            ),
-            workflowState = WorkflowState.fromJsonString(getString(WORKFLOW_STATE_COLUMN)),
-            parentId = getIDV7(this, PARENT_ID_COLUMN),
-        )
-    }
+    /**
+     * Deserializes InstanceMessage from ResultSet with type-safe WorkflowState.
+     * Uses inline + reified to allow each repository to specify the exact type it needs.
+     */
+    protected inline fun <reified S : WorkflowState> ResultSet.getInstanceMessage(): InstanceMessage<S>? =
+        when (val id = getIDV7(this, WORKFLOW_ID_COLUMN)) {
+            null -> null
+            else -> InstanceMessage(
+                workflowInfo = WorkflowInfo(
+                    workflowNamespace = WorkflowNamespace(getString(WORKFLOW_NAMESPACE_COLUMN)),
+                    workflowName = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
+                    workflowVersion = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
+                ),
+                workflowState = WorkflowState.fromJsonString(getString(WORKFLOW_STATE_COLUMN)) as S,
+            )
+        }
 
     /**
      * Retrieves an entity by its WorkflowId.
@@ -114,22 +112,6 @@ abstract class WithInstanceRepository<T : InstanceModel> : WithIdRepository<T>()
         }
 
     private val findWithWorkflowIdSql by lazy { "SELECT * FROM $tableName WHERE $WORKFLOW_ID_COLUMN = ?" }
-
-
-    /**
-     * Retrieves an entity by its ParenId.
-     *
-     * @return The entity with the specified parentId, or null if not found.
-     */
-    suspend fun findWithParentId(parentId: IDV7, connection: Connection? = null): List<T> =
-        withConnection(connection) { conn ->
-            conn.prepareStatement(findWithParentIdSql).use { stmt ->
-                setIDV7(stmt, 1, parentId)
-                stmt.executeQuery().use { it.toModels() }
-            }
-        }
-
-    private val findWithParentIdSql by lazy { "SELECT * FROM $tableName WHERE $PARENT_ID_COLUMN = ?" }
 
     protected fun ResultSet.toModels(): List<T> = buildList {
         while (next()) {

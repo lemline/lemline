@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
-import com.lemline.core.errors.ChildWorkflowException
-import com.lemline.core.errors.InternalWorkflowException
+import com.lemline.common.values.WorkflowId
+import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
+import com.lemline.core.errors.InternalException
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.workflows.FlowDirective
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -26,77 +27,134 @@ sealed class WorkflowState {
     abstract val taskStates: TaskStates
     abstract val nodePosition: NodePosition
 
-    fun toJsonString(): String = LemlineJson.encodeToString(this)
+    open fun toJsonString(): String = LemlineJson.encodeToString(this)
 
     companion object {
         fun fromJsonString(jsonString: String): WorkflowState = LemlineJson.decodeFromString(jsonString)
     }
 
-    /**
-     * Represents the initial state of a workflow, capturing the start time and input data.
-     *
-     * @property startedAt The timestamp representing when the state began.
-     * @property input The JSON input data associated with the state.
-     */
-    @ExperimentalTime
-    @Serializable
-    data class Starting(
-        val startedAt: Instant,
-        val input: JsonElement,
-    ) : WorkflowState() {
-        override val taskStates: TaskStates = mutableMapOf()
-        override val nodePosition: NodePosition = NodePosition.root
+    val workflowId: WorkflowId get() = (taskStates[NodePosition.root] as RootState).workflowId
 
-        override fun toString() = "Starting(" +
-            "startedAt=$startedAt" +
-            ", input=$input" +
+    val hasWaitingParent: Boolean get() = (taskStates[NodePosition.root] as RootState).hasWaitingParent
+}
+
+@Serializable
+sealed class WorkflowCommand : WorkflowState() {
+
+    /**
+     * Command to resume workflow execution from a specific task.
+     */
+    @Serializable
+    data class ResumeFromTask(
+        override val taskStates: TaskStates,
+        override val nodePosition: NodePosition,
+        val rawInput: JsonElement,
+        val flowDirective: FlowDirective? = null
+    ) : WorkflowCommand() {
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", rawInput=$rawInput" +
+            ", flowDirective=$flowDirective" +
+            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+
+        @ExperimentalTime
+        fun duplicate(workflowId: WorkflowId): ResumeFromTask {
+            val rootState = taskStates[NodePosition.root] as RootState
+            return copy(
+                taskStates = taskStates + mapOf(NodePosition.root to rootState.copy(workflowId = workflowId))
+            )
+        }
+    }
+
+    /**
+     * Command to resume execution with a task completed asynchronously.
+     */
+    @Serializable
+    data class ResumeWithCompletedTask(
+        override val taskStates: TaskStates,
+        override val nodePosition: NodePosition,
+        val rawOutput: JsonElement,
+    ) : WorkflowCommand() {
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", rawOutput=$rawOutput" +
+            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 
     /**
-     * Workflow execution completed successfully.
-     *
-     * This indicates that the entire workflow has finished executing and
-     * there are no more steps to process. The runner should mark the workflow
-     * instance as complete and emit the final output.
-     *
-     * @property output The final output dataset from the workflow
+     * Command to resume execution with a task failed asynchronously.
      */
     @Serializable
-    data class Completed(
-        val output: JsonElement
-    ) : WorkflowState() {
-        override val taskStates: TaskStates = emptyMap()
+    data class ResumeWithFailedTask(
+        override val taskStates: TaskStates,
+        override val nodePosition: NodePosition,
+        val error: InternalException.Error,
+    ) : WorkflowCommand() {
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", error=$error" +
+            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+    }
+}
+
+@Serializable
+sealed class WorkflowEvent : WorkflowState() {
+
+    /**
+     * Represents the result of a workflow's progression.
+     */
+    sealed class Outcome : WorkflowEvent() {
+        /**
+         * Extracts the associated value from the [WorkflowEvent.Outcome] based on its type.
+         */
+        @ExperimentalTime
+        internal fun value(): JsonElement = when (this) {
+            is WorkflowCompleted -> output
+            is BranchCompleted -> output
+            is WorkflowFailed -> throw exception
+            is BranchFailed -> throw exception
+        }
+    }
+
+    /**
+     * Event emitted when a workflow completes.
+     */
+    @ExperimentalTime
+    @Serializable
+    data class WorkflowCompleted(
+        val output: JsonElement,
+        val completedAt: Instant,
+        override val taskStates: TaskStates,
+    ) : Outcome() {
         override val nodePosition: NodePosition = NodePosition.root
 
-        override fun toString() = "Completed(" +
+        override fun toString() = "${this::class.simpleName}(" +
             "output=$output" +
             ")"
     }
 
     /**
-     * Represents a failure in a workflow process, encapsulating details about the states and error context.
+     * Event emitted when a task fails without the error being caught (outside a fork).
      *
-     * If rawInput is not null, this error comes from the [com.lemline.core.orchestrator.WorkflowOrchestrator.resumeFromTask] method
-     * If rawOutput is not null, this error comes from the [com.lemline.core.orchestrator.WorkflowOrchestrator.resumeFromInterruptedTask] method
-     *
-     * @property taskStates The state information associated with the workflow at the time of failure.
-     * @property nodePosition The position of the node in the workflow where the failure occurred.
-     * @property rawInput The raw input data at the point of failure, if available.
-     * @property rawOutput The raw output data at the point of failure, if available.
-     * @property exception The exception that caused the workflow to fail.
-     * @property error The serialized exception that caused the workflow to fail.
+     * If rawInput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromTask] method
+     * If rawOutput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromCompletedTask] method
      */
+    @ExperimentalTime
     @Serializable
-    data class Failed(
+    data class WorkflowFailed(
         override val taskStates: TaskStates,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement?,
         val rawOutput: JsonElement?,
         val flowDirective: FlowDirective?,
-        @Transient val exception: Exception? = null,
-        val error: InternalWorkflowException.Error
-    ) : WorkflowState() {
+        val error: InternalException.Error,
+        val failedAt: Instant,
+    ) : Outcome() {
+
+        val exception: Exception get() = InternalException(error)
 
         constructor(
             taskStates: TaskStates,
@@ -104,18 +162,19 @@ sealed class WorkflowState {
             rawInput: JsonElement?,
             rawOutput: JsonElement?,
             flowDirective: FlowDirective?,
-            exception: Exception
+            exception: Exception,
+            failedAt: Instant = Clock.System.now(),
         ) : this(
             taskStates = taskStates,
             nodePosition = nodePosition,
             rawInput = rawInput,
             rawOutput = rawOutput,
             flowDirective = flowDirective,
-            exception = exception,
-            error = InternalWorkflowException.Error.fromUnexpectedException(exception, nodePosition)
+            error = InternalException.Error.from(exception, nodePosition),
+            failedAt = failedAt
         )
 
-        override fun toString() = "Failed(" +
+        override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", rawOutput=$rawOutput" +
@@ -126,101 +185,192 @@ sealed class WorkflowState {
     }
 
     /**
-     * Represents the state of an activity that has been completed,
-     * including information about the next node position,
-     * the states involved, and the generated output.
-     *
-     * @property taskStates Represents a map containing workflow state.
-     * @property nodePosition The position of the next node
-     * @property rawInput The input of the next node
-     * @property flowDirective The flow directive to be applied to the next node
+     * Event emitted when a fork branch execution completes.
      */
+    @ExperimentalTime
     @Serializable
-    data class ReadyForNextTask(
+    data class BranchCompleted(
         override val taskStates: TaskStates,
         override val nodePosition: NodePosition,
-        val rawInput: JsonElement,
+        val branchName: String,
+        val output: JsonElement,
+        val completedAt: Instant,
         val flowDirective: FlowDirective?
-    ) : WorkflowState() {
-        override fun toString() = "ReadyForNextTask(" +
+    ) : Outcome() {
+        override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
-            ", rawInput=$rawInput" +
+            ", branchName=$branchName" +
+            ", transformedInput=$output" +
             ", flowDirective=$flowDirective" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 
     /**
-     * Represents a result that indicates a wait is needed during processing.
-     *
-     * @property taskStates The states after the wait.
-     * @property nodePosition Specifies the position of the wait task.
-     * @property rawOutput Contains transformed input == raw output in the wait task.
-     * @property waitUntil Defines the duration for which the wait is required.
+     * Event emitted when a fork branch execution fails.
+     */
+    @ExperimentalTime
+    @Serializable
+    data class BranchFailed(
+        override val taskStates: TaskStates,
+        override val nodePosition: NodePosition,
+        val branchName: String,
+        val error: InternalException.Error,
+        val failedAt: Instant
+    ) : Outcome() {
+        val exception: InternalException
+            get() = InternalException(error)
+
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", branchName=$branchName" +
+            ", error=$error" +
+            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+    }
+
+    sealed class Suspension : WorkflowEvent()
+
+    /**
+     * Event emitted when the next task is scheduled.
+     */
+    @Serializable
+    data class TaskScheduled(
+        override val taskStates: TaskStates,
+        override val nodePosition: NodePosition,
+        val rawInput: JsonElement,
+        val flowDirective: FlowDirective?
+    ) : Suspension() {
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", rawInput=$rawInput" +
+            ", flowDirective=$flowDirective" +
+            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+
+        fun resume() = WorkflowCommand.ResumeFromTask(
+            taskStates = taskStates,
+            nodePosition = nodePosition,
+            rawInput = rawInput,
+            flowDirective = flowDirective,
+        )
+    }
+
+    /**
+     * Event emitted when a wait task is scheduled.
      */
     @Serializable
     @ExperimentalTime
-    data class Waiting(
+    data class WaitStarted(
         override val taskStates: TaskStates,
         override val nodePosition: NodePosition,
+        val waitState: WaitState,
         val rawOutput: JsonElement,
         @Contextual val waitUntil: Instant
-    ) : WorkflowState() {
-        override fun toString() = "Waiting(" +
+    ) : Suspension() {
+        override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
             ", waitUntil=$waitUntil" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
+
+        fun resume() = WorkflowCommand.ResumeWithCompletedTask(
+            taskStates = taskStates,
+            nodePosition = nodePosition,
+            rawOutput = rawOutput,
+        )
     }
 
     /**
-     * Represents a state where a retry is required for a specific node in the system.
-     *
-     * @property taskStates The states at retry.
-     * @property nodePosition Specifies the position of the task to retry.
-     * @property rawInput The raw input of the task to retry.
-     * @property retryAt The time duration to wait before retrying.
+     * Event emitted when a task retry is scheduled.
      */
     @Serializable
     @ExperimentalTime
-    data class Retrying(
+    data class RetryScheduled(
         override val taskStates: TaskStates,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
         val flowDirective: FlowDirective?,
         val retryAt: Instant
-    ) : WorkflowState() {
-        override fun toString() = "WaitingToRetry(" +
+    ) : Suspension() {
+        override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
             ", retryAt=$retryAt" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
+
+        fun resume() = WorkflowCommand.ResumeFromTask(
+            taskStates = taskStates,
+            nodePosition = nodePosition,
+            rawInput = rawInput,
+            flowDirective = flowDirective,
+        )
     }
 
 
     /**
-     * Represents a result state where a sub-workflow needs to be initiated.
-     *
-     * @property taskStates Represents a map containing the workflow state.
-     * @property nodePosition Specifies the position of the RunWorkflow node
-     * @property rawOutput The transformed input of the run workflow task.
-     * @property childConfig Configuration details specifying the child workflow to be started.
+     * Event emitted when a child workflow is scheduled.
      */
     @Serializable
-    data class RunningChildWorkflow(
+    data class RunWorkflowStarted(
         override val taskStates: TaskStates,
         override val nodePosition: NodePosition,
-        val rawOutput: JsonElement?,
-        val childConfig: ChildWorkflowException.Config,
-    ) : WorkflowState() {
-        override fun toString() = "RunningChildWorkflow(" +
+        val runState: RunState,
+        val rawInput: JsonElement,
+        val childConfig: RunWorkflowStartedException.Config,
+    ) : Suspension() {
+        override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
-            ", transformedInput=$rawOutput" +
+            ", runState=$runState" +
+            ", transformedInput=$rawInput" +
             ", childConfig=$childConfig" +
             ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
             ")"
+
+        fun resumeAsCompleted(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
+            taskStates = taskStates,
+            nodePosition = nodePosition,
+            rawOutput = rawOutput,
+        )
+
+        fun resumeAsFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
+            taskStates = taskStates,
+            nodePosition = nodePosition,
+            error = error,
+        )
+
+        fun resumeAsync() = WorkflowCommand.ResumeWithCompletedTask(
+            taskStates = taskStates,
+            nodePosition = nodePosition,
+            rawOutput = rawInput,
+        )
+    }
+
+    /**
+     * Event emitted when a fork is started.
+     * (each branch is processed separately)
+     */
+    @Serializable
+    data class ForkStarted(
+        override val taskStates: TaskStates,
+        override val nodePosition: NodePosition,
+        val forkState: ForkState,
+        val rawInput: JsonElement,
+    ) : Suspension() {
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", forkState=$forkState" +
+            ", rawInput=$rawInput" +
+            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+
+        fun resume(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
+            taskStates = taskStates,
+            nodePosition = nodePosition,
+            rawOutput = rawOutput,
+        )
     }
 }

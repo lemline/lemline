@@ -8,14 +8,14 @@ CREATE TABLE IF NOT EXISTS lemline_waits
     workflow_version        VARCHAR(255)   NOT NULL,
     workflow_position       TEXT           NOT NULL,
     workflow_state          TEXT           NOT NULL,
-    parent_id               uuid,
-    outbox_status           VARCHAR(50)    NOT NULL,
     outbox_scheduled_for    TIMESTAMPTZ(6) NOT NULL,
     outbox_delayed_until    TIMESTAMPTZ(6) NOT NULL,
     outbox_attempt_count    INTEGER        NOT NULL DEFAULT 0,
     outbox_error_class      TEXT,
     outbox_error_message    TEXT,
     outbox_error_stacktrace TEXT,
+    outbox_completed_at     TIMESTAMPTZ(6),
+    outbox_failed_at        TIMESTAMPTZ(6),
     created_at              TIMESTAMPTZ(6) NOT NULL,
     updated_at              TIMESTAMPTZ(6)
 );
@@ -24,10 +24,12 @@ CREATE TABLE IF NOT EXISTS lemline_waits
 CREATE INDEX IF NOT EXISTS idx_lemline_waits_workflow_id
     ON lemline_waits (workflow_id);
 
--- Create an index for efficient querying on parent_id
-CREATE INDEX IF NOT EXISTS idx_lemline_waits_parent_id
-    ON lemline_waits (parent_id);
+-- Create composite index for efficient querying of pending messages
+CREATE INDEX IF NOT EXISTS idx_lemline_waits_processing
+    ON lemline_waits (outbox_completed_at, outbox_failed_at, outbox_delayed_until)
+    WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
 
--- Create an index for efficient querying on status and delayed_until
-CREATE INDEX IF NOT EXISTS idx_lemline_waits_status_delayed_until
-    ON lemline_waits (outbox_status, outbox_delayed_until);
+-- Create index for cleanup queries
+CREATE INDEX IF NOT EXISTS idx_lemline_waits_completed
+    ON lemline_waits (outbox_completed_at)
+    WHERE outbox_completed_at IS NOT NULL;

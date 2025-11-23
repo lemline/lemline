@@ -8,9 +8,8 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.exceptions.CliException
-import com.lemline.runner.messaging.database.DatabaseMessage
-import com.lemline.runner.messaging.database.DatabaseMessageEmitter
-import com.lemline.runner.messaging.instances.InstanceMessageEmitter
+import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
+import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.starters.Starter
 import io.quarkus.arc.Unremovable
@@ -41,10 +40,10 @@ class InstanceStartCommand : Runnable {
     lateinit var starter: Starter
 
     @Inject
-    private lateinit var instanceEmitter: InstanceMessageEmitter
+    private lateinit var instanceEmitter: WorkflowCommandEmitter
 
     @Inject
-    private lateinit var databaseEmitter: DatabaseMessageEmitter
+    private lateinit var databaseEmitter: WorkflowEventEmitter
 
     @Inject
     private lateinit var scheduleRepository: ScheduleRepository
@@ -103,7 +102,7 @@ class InstanceStartCommand : Runnable {
             workflowName = workflowName,
             optionalVersion = version?.let { WorkflowVersion(it) },
             workflowInput = workflowInput,
-            parentId = null,
+            hasWaitingParent = false,
             zoneId = getZoneId(),
         ) { cliError(it) }
 

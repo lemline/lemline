@@ -6,44 +6,120 @@ package com.lemline.runner.random
 import com.lemline.common.random.nullableRandom
 import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.errors.AsyncTaskException
+import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.random.random
+import com.lemline.core.states.RootState
+import com.lemline.core.states.RunState
+import com.lemline.core.states.TaskStates
+import com.lemline.core.states.WaitState
+import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
-import com.lemline.runner.messaging.database.DatabaseMessage
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.OutboxModel
-import com.lemline.runner.models.ParentOutboxModel
-import com.lemline.runner.models.RetryOutboxModel
-import com.lemline.runner.models.ScheduleOutboxModel
-import com.lemline.runner.models.WaitOutboxModel
-import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.models.ParentModel
+import com.lemline.runner.models.RetryModel
+import com.lemline.runner.models.ScheduleModel
+import com.lemline.runner.models.WaitModel
 import kotlin.random.Random
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
-fun OutBoxStatus.Companion.random() = Random.nextInt(OutBoxStatus.entries.size).let {
-    OutBoxStatus.entries[it]
+// Helper function to create task states with RootState
+private fun randomTaskStates(): TaskStates = mapOf(
+    NodePosition.root to RootState(
+        startedAt = Clock.System.now(),
+        workflowId = WorkflowId.random(),
+        workflowInput = JsonElement.random()
+    )
+)
+
+fun WorkflowInfo.Companion.random() = WorkflowInfo(
+    workflowNamespace = WorkflowNamespace.random(),
+    workflowName = WorkflowName.random(),
+    workflowVersion = WorkflowVersion.random()
+)
+
+fun WorkflowCommand.Companion.random() = when (Random.nextBoolean()) {
+    true -> WorkflowCommand.ResumeFromTask.random()
+    false -> WorkflowCommand.ResumeWithCompletedTask.random()
 }
 
-fun WorkflowState.Companion.random(): WorkflowState {
-    // Generate a simple random state for testing (ReadyForNextTask)
-    // Could be extended to randomly choose between different state variants if needed
-    return WorkflowState.ReadyForNextTask(
-        taskStates = emptyMap(),
-        nodePosition = NodePosition.random(),
-        rawInput = JsonElement.random(),
-        flowDirective = null
+fun WorkflowCommand.ResumeFromTask.Companion.random() = WorkflowCommand.ResumeFromTask(
+    taskStates = randomTaskStates(),
+    nodePosition = NodePosition.random(),
+    rawInput = JsonElement.random(),
+    flowDirective = null
+)
+
+fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand.ResumeWithCompletedTask(
+    taskStates = randomTaskStates(),
+    nodePosition = NodePosition.random(),
+    rawOutput = JsonElement.random(),
+)
+
+fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFailed(
+    taskStates = randomTaskStates(),
+    nodePosition = NodePosition.random(),
+    rawInput = JsonElement.random(),
+    rawOutput = JsonElement.random(),
+    flowDirective = null,
+    error = InternalException.Error(
+        type = "TestError",
+        status = 500,
+        instance = "test-instance",
+        title = "Test error",
+        details = "Test error details"
+    ),
+    failedAt = Clock.System.now()
+)
+
+fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkflowStarted(
+    taskStates = randomTaskStates(),
+    nodePosition = NodePosition.random(),
+    runState = RunState(),
+    rawInput = JsonElement.random(),
+    childConfig = AsyncTaskException.RunWorkflowStartedException.Config(
+        namespace = WorkflowNamespace("test"),
+        name = WorkflowName("test"),
+        version = WorkflowVersion("1.0"),
+        input = JsonElement.random(),
+        sync = true
     )
-}
+)
+
+fun WorkflowEvent.RetryScheduled.Companion.random() = WorkflowEvent.RetryScheduled(
+    taskStates = randomTaskStates(),
+    nodePosition = NodePosition.random(),
+    rawInput = JsonElement.random(),
+    flowDirective = null,
+    retryAt = Clock.System.now()
+)
+
+fun WorkflowEvent.WaitStarted.Companion.random() = WorkflowEvent.WaitStarted(
+    taskStates = randomTaskStates(),
+    nodePosition = NodePosition.random(),
+    waitState = WaitState(),
+    rawOutput = JsonElement.random(),
+    waitUntil = Clock.System.now()
+)
+
+fun WorkflowState.Companion.random(): WorkflowState = WorkflowCommand.random()
 
 fun InstanceMessage.Companion.random() = InstanceMessage(
     workflowInfo = WorkflowInfo.random(),
     workflowState = WorkflowState.random(),
-    parentId = IDV7.random()
 )
 
 fun InstanceMessage.Companion.nullableRandom() = when (Random.nextBoolean()) {
@@ -53,7 +129,14 @@ fun InstanceMessage.Companion.nullableRandom() = when (Random.nextBoolean()) {
 
 fun FailureModel.Companion.random() = FailureModel(
     id = IDV7.random(),
-    instanceMessage = InstanceMessage.nullableRandom(),
+    instanceMessage = when (Random.nextBoolean()) {
+        true -> InstanceMessage(
+            workflowInfo = WorkflowInfo.random(),
+            workflowState = WorkflowEvent.WorkflowFailed.random(),
+        )
+
+        false -> null
+    },
     payload = String.nullableRandom(),
     errorReason = String.random(),
     errorClass = String.random(),
@@ -68,38 +151,56 @@ fun OutboxModel.randomize(nullableDelayed: Boolean = false) = apply {
     outboxErrorMessage = String.nullableRandom()
 }
 
-fun ParentOutboxModel.Companion.random() = ParentOutboxModel(
+fun ParentModel.Companion.random() = ParentModel(
     id = IDV7.random(),
-    instanceMessage = InstanceMessage.random(),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.nullableRandom(), // <- Nullable
-).also { it.randomize(nullableDelayed = true) }
+    instanceMessage = InstanceMessage(
+        workflowInfo = WorkflowInfo.random(),
+        workflowState = WorkflowEvent.RunWorkflowStarted.random(),
+    ),
+    childId = WorkflowId.random()
+)
 
-fun ScheduleOutboxModel.Companion.random() = ScheduleOutboxModel(
+fun ScheduleModel.Companion.random() = ScheduleModel(
     id = IDV7.random(),
-    instanceMessage = InstanceMessage.random(),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.nullableRandom(), // <- nullable
+    instanceMessage = InstanceMessage(
+        workflowInfo = WorkflowInfo.random(),
+        workflowState = WorkflowCommand.ResumeFromTask.random(),
+    ),
+    outboxScheduledFor = Instant.nullableRandom(),
     scheduleAfter = String.nullableRandom(),
     scheduleEvery = String.nullableRandom(),
     scheduleCron = String.nullableRandom(),
     scheduleZone = String.nullableRandom(),
 ).also { it.randomize(nullableDelayed = true) }
 
-fun RetryOutboxModel.Companion.random() = RetryOutboxModel(
+fun RetryModel.Companion.random() = RetryModel(
     id = IDV7.random(),
-    instanceMessage = InstanceMessage.random(),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.random(), // <- Not nullable
+    instanceMessage = InstanceMessage(
+        workflowInfo = WorkflowInfo.random(),
+        workflowState = WorkflowEvent.RetryScheduled.random(),
+    ),
+    outboxScheduledFor = Instant.random(),
     errorReason = String.random(),
     errorClass = String.random(),
     errorMessage = String.nullableRandom(),
     errorStackTrace = String.random(),
-).also { it.randomize() }
+).also {
+    // Don't call randomize() as outboxDelayedUntil cannot be null for RetryOutboxModel
+    it.outboxAttemptCount = Int.random()
+    it.outboxErrorClass = String.nullableRandom()
+    it.outboxErrorMessage = String.nullableRandom()
+}
 
-fun WaitOutboxModel.Companion.random() = WaitOutboxModel(
+fun WaitModel.Companion.random() = WaitModel(
     id = IDV7.random(),
-    instanceMessage = InstanceMessage.random(),
-    outBoxStatus = OutBoxStatus.random(),
-    outboxScheduledFor = Instant.random(), // <- Not nullable
-).also { it.randomize() }
+    instanceMessage = InstanceMessage(
+        workflowInfo = WorkflowInfo.random(),
+        workflowState = WorkflowEvent.WaitStarted.random(),
+    ),
+    outboxScheduledFor = Instant.random(),
+).also {
+    // Don't call randomize() as outboxDelayedUntil cannot be null for WaitOutboxModel
+    it.outboxAttemptCount = Int.random()
+    it.outboxErrorClass = String.nullableRandom()
+    it.outboxErrorMessage = String.nullableRandom()
+}

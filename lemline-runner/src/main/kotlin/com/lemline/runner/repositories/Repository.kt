@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
@@ -56,17 +57,21 @@ abstract class Repository<T> {
 
 
     private fun bindInsert(stmt: PreparedStatement, entity: T) {
-        allColumns.mapIndexed { index, column ->
-            when (column) {
-                CREATED_AT_COLUMN -> stmt.setTimestamp(index + 1, Timestamp.from(java.time.Instant.now()))
-                UPDATED_AT_COLUMN -> stmt.setNull(index + 1, Types.TIMESTAMP)
-                else -> prepareStatementMap[column]!!(stmt, entity, index + 1)
+        allColumns.forEachIndexed { index, column ->
+            when {
+                // Use custom handler if provided in prepareStatementMap
+                prepareStatementMap.containsKey(column) -> prepareStatementMap[column]!!(stmt, entity, index + 1)
+                // Default CREATED_AT to current timestamp if not in prepareStatementMap
+                column == CREATED_AT_COLUMN -> stmt.setTimestamp(index + 1, Timestamp.from(java.time.Instant.now()))
+                // Default UPDATED_AT to null if not in prepareStatementMap
+                column == UPDATED_AT_COLUMN -> stmt.setNull(index + 1, Types.TIMESTAMP)
+                else -> error("No handler for column $column")
             }
         }
     }
 
     private fun bindUpdate(stmt: PreparedStatement, entity: T) {
-        updatableColumns.mapIndexed { index, column ->
+        updatableColumns.forEachIndexed { index, column ->
             when (column) {
                 UPDATED_AT_COLUMN -> stmt.setTimestamp(index + 1, Timestamp.from(java.time.Instant.now()))
                 else -> prepareStatementMap[column]!!(stmt, entity, index + 1)
@@ -75,7 +80,13 @@ abstract class Repository<T> {
     }
 
     private fun bindKeys(stmt: PreparedStatement, entity: T, startIndex: Int = 0) {
-        keyColumns.mapIndexed { index, column -> prepareStatementMap[column]!!(stmt, entity, startIndex + index + 1) }
+        keyColumns.forEachIndexed { index, column ->
+            prepareStatementMap[column]!!(
+                stmt,
+                entity,
+                startIndex + index + 1
+            )
+        }
     }
 
     /**

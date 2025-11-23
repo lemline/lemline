@@ -14,20 +14,21 @@ Before diving into debugging techniques, it's important to understand how Lemlin
 
 ## Enabling Debug Logging
 
-Lemline provides comprehensive logging to help diagnose issues. Configure your logging levels in `application.properties`:
+Lemline provides comprehensive logging to help diagnose issues. Configure your logging levels in
+`application.properties`:
 
 ```properties
 # Enable detailed logging for core components
 quarkus.log.category."com.lemline.core".level=DEBUG
 quarkus.log.category."com.lemline.core.expressions".level=TRACE
 quarkus.log.category."com.lemline.core.nodes".level=DEBUG
-
 # Logging for specific subsystems
 quarkus.log.category."com.lemline.runner.outbox".level=DEBUG
 quarkus.log.category."com.lemline.runner.messaging".level=DEBUG
 ```
 
 Log levels include:
+
 - **ERROR**: Severe issues that prevent workflow execution
 - **WARN**: Issues that don't prevent execution but might cause incorrect behavior
 - **INFO**: Normal workflow execution events
@@ -43,6 +44,7 @@ lemline definitions get my-workflow --verbose
 ```
 
 This command displays:
+
 - Parsed workflow structure
 - Validation results
 - Node graph construction
@@ -57,6 +59,7 @@ lemline.tracing.level=DETAILED
 ```
 
 Trace levels include:
+
 - **BASIC**: Shows only task transitions
 - **STANDARD**: Shows tasks, state changes, and errors
 - **DETAILED**: Shows all operations including expression evaluation results

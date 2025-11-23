@@ -3,11 +3,11 @@
 
 package com.lemline.core.processors
 
-import com.lemline.core.errors.InternalWorkflowException
+import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.SimpleTaskState
+import com.lemline.core.states.RaiseState
 import io.serverlessworkflow.api.types.RaiseTask
 import io.serverlessworkflow.api.types.RaiseTaskError
 import kotlin.time.Clock
@@ -34,17 +34,17 @@ import kotlinx.serialization.json.JsonElement
  */
 class RaiseProcessor(
     node: Node<RaiseTask>
-) : NodeProcessor<RaiseTask, SimpleTaskState>(node) {
+) : NodeProcessor<RaiseTask, RaiseState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleTaskState = SimpleTaskState(
+    override fun createState(transformedInput: JsonElement, scope: Scope) = RaiseState(
         startedAt = Clock.System.now()
     )
 
-    override suspend fun execute(transformedInput: JsonElement, scope: Scope): JsonElement {
+    override suspend fun execute(transformedInput: JsonElement, scope: Scope, state: RaiseState): JsonElement {
         val errorDef = node.task.raise.error.getErrorDef()
 
         // Create WorkflowError from error definition
-        val error = InternalWorkflowException.Error(
+        val error = InternalException.Error(
             type = errorDef.getErrorType(),
             status = errorDef.status,
             instance = node.position.positionPointer.toString(),
@@ -54,7 +54,7 @@ class RaiseProcessor(
 
         // Throw WorkflowException - this will be caught by CompleteOrchestrator
         // and handled by the nearest TryTask with matching catch block
-        throw InternalWorkflowException(error)
+        throw InternalException(error)
     }
 
     private fun RaiseTaskError.getErrorDef(): io.serverlessworkflow.api.types.Error {

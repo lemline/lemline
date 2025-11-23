@@ -9,11 +9,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class WorkflowInfo(
     /**
-     * The ID of the workflow.
-     */
-    @SerialName("i") val workflowId: WorkflowId,
-
-    /**
      * The namespace of the workflow.
      */
     @SerialName("s") val workflowNamespace: WorkflowNamespace,
@@ -28,10 +23,6 @@ data class WorkflowInfo(
      */
     @SerialName("v") val workflowVersion: WorkflowVersion
 ) : JsonSerializable {
-    /**
-     * Creates a new instance with a new ID.
-     */
-    fun duplicate(newId: WorkflowId): WorkflowInfo = copy(workflowId = newId)
 
     override fun toJsonString() = LemlineJson.encodeToString(this)
 

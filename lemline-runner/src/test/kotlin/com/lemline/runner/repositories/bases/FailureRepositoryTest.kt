@@ -2,7 +2,9 @@
 package com.lemline.runner.repositories.bases
 
 import com.lemline.common.values.IDV7
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.common.values.WorkflowInfo
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
@@ -40,8 +42,11 @@ internal abstract class FailureRepositoryTest {
         val ex = IllegalStateException("boom")
         val model = FailureModel.from(
             id = IDV7.random(),
-            instance = InstanceMessage.random(),
-            error = ex,
+            instance = InstanceMessage(
+                workflowInfo = WorkflowInfo.random(),
+                workflowState = WorkflowEvent.WorkflowFailed.random(),
+            ),
+            exception = ex,
         )
 
         repository.insert(model) shouldBe 1
@@ -61,7 +66,7 @@ internal abstract class FailureRepositoryTest {
         val model = FailureModel.from(
             id = IDV7.random(),
             payload = "payload",
-            error = ex,
+            exception = ex,
         )
 
         repository.insert(model) shouldBe 1
@@ -77,8 +82,14 @@ internal abstract class FailureRepositoryTest {
 
     @Test
     fun `should find failures by workflow id`() = runTest {
-        val instance1 = InstanceMessage.random()
-        val instance2 = InstanceMessage.random()
+        val instance1 = InstanceMessage(
+            workflowInfo = WorkflowInfo.random(),
+            workflowState = WorkflowEvent.WorkflowFailed.random(),
+        )
+        val instance2 = InstanceMessage(
+            workflowInfo = WorkflowInfo.random(),
+            workflowState = WorkflowEvent.WorkflowFailed.random(),
+        )
 
         val f1 = FailureModel.from(IDV7.random(), instance1, RuntimeException("e1")).copy(payload = "m1")
         val f2 = FailureModel.from(IDV7.random(), instance1, RuntimeException("e2")).copy(payload = "m2")
@@ -95,7 +106,10 @@ internal abstract class FailureRepositoryTest {
 
     @Test
     fun `count and deleteAll should work`() = runTest {
-        val instance = InstanceMessage.random()
+        val instance = InstanceMessage(
+            workflowInfo = WorkflowInfo.random(),
+            workflowState = WorkflowEvent.WorkflowFailed.random(),
+        )
         val failures = List(3) { idx ->
             FailureModel.from(IDV7.random(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
         }
@@ -110,7 +124,14 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `deleteById should remove an existing failure`() = runTest {
         // Given
-        val failure = FailureModel.from(IDV7.random(), InstanceMessage.random(), RuntimeException("boom"))
+        val failure = FailureModel.from(
+            IDV7.random(),
+            InstanceMessage(
+                workflowInfo = WorkflowInfo.random(),
+                workflowState = WorkflowEvent.WorkflowFailed.random(),
+            ),
+            RuntimeException("boom")
+        )
         repository.insert(failure)
 
         // When
@@ -124,7 +145,14 @@ internal abstract class FailureRepositoryTest {
     @Test
     fun `deleteById should return 0 if failure does not exist`() = runTest {
         // Given
-        val failure = FailureModel.from(IDV7.random(), InstanceMessage.random(), RuntimeException("boom"))
+        val failure = FailureModel.from(
+            IDV7.random(),
+            InstanceMessage(
+                workflowInfo = WorkflowInfo.random(),
+                workflowState = WorkflowEvent.WorkflowFailed.random(),
+            ),
+            RuntimeException("boom")
+        )
         repository.insert(failure)
         val randomId = IDV7.random()
 

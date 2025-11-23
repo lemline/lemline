@@ -51,7 +51,7 @@ All you need to deploy are stateless Lemline Runners that connect to **your even
 
 ```mermaid
 flowchart LR
-    %% Force left/middle/right alignment
+%% Force left/middle/right alignment
     subgraph Infra["Your Infra"]
         direction TB
         Broker["Your Event Broker<br/>(Kafka, RabbitMQ)"]
@@ -72,7 +72,7 @@ flowchart LR
         A3[Service C]
     end
 
-    %% Connections
+%% Connections
     Broker <--> L1
     DB <--> L1
     L1 <--> A1
@@ -221,7 +221,7 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 - [x] For
 - [ ] Listen
 - [ ] Emit
-- [ ] Fork
+- [x] Fork
 
 - Try:
     - [x] Retry

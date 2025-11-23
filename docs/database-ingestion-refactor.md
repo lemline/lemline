@@ -41,9 +41,9 @@ Step 1.1: Create DatabaseMessage Sealed Class
 File: lemline-runner/src/main/kotlin/com/lemline/runner/messaging/database/DatabaseMessage.kt
 
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.database
+package com.lemline.runner.messaging.events
 
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.messaging.commands.InstanceMessage
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
@@ -124,9 +124,9 @@ Step 1.2: Add Helper Extension Functions
 File: lemline-runner/src/main/kotlin/com/lemline/runner/messaging/database/DatabaseMessageExtensions.kt
 
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.database
+package com.lemline.runner.messaging.events
 
-import com.lemline.runner.messaging.instances.InstanceMessage
+import com.lemline.runner.messaging.commands.InstanceMessage
 
 /**
 

@@ -30,7 +30,7 @@ internal abstract class MessageEmitter<T : JsonSerializable> {
     // Retrieve workflowInfo if present
     private val T?.workflowInfo get() = (this as? WithOptionalWorkflowInfo)?.workflowInfo
 
-    suspend fun send(payload: String) {
+    suspend fun sendPayload(payload: String) {
         val md = MetaData(messageId = IDV7.random())
         retry(
             logger = logger,
@@ -47,7 +47,7 @@ internal abstract class MessageEmitter<T : JsonSerializable> {
         val payload = metrics.recordSerializationDuration(msg.workflowInfo) {
             msg.toJsonString()
         }
-        send(payload)
+        sendPayload(payload)
     }
 
     private suspend fun emit(payload: String, metadata: MetaData) {

@@ -6,79 +6,74 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
-import com.lemline.runner.messaging.instances.InstanceMessage
-import com.lemline.runner.outbox.OutBoxStatus
+import com.lemline.runner.messaging.InstanceMessage
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 
 @ExperimentalSerializationApi
 @ExperimentalTime
-@Serializable
-@SerialName("f") // <- type discriminator for polymorphic serialization
 data class FailureModel(
-    @SerialName("id")
+    /** Unique identifier for this failure record */
     override val id: IDV7,
 
-    @SerialName("i")
-    var instanceMessage: InstanceMessage?,
+    /** Workflow instance state when the failure occurred, null if payload deserialization failed */
+    var instanceMessage: InstanceMessage<out WorkflowState>?,
 
-    @SerialName("p")
+    /** Raw message payload if instanceMessage deserialization failed */
     val payload: String?,
 
-    @SerialName("er")
+    /** High-level categorization of the failure reason */
     val errorReason: String,
 
-    @SerialName("ec")
+    /** Fully qualified class name of the exception that caused the failure */
     val errorClass: String,
 
-    @SerialName("em")
+    /** Error message from the exception */
     val errorMessage: String?,
 
-    @SerialName("es")
+    /** Full stack trace of the exception for debugging */
     val errorStackTrace: String,
 ) : InstanceModel {
 
+    /** Workflow definition info extracted from the instance message, null if payload deserialization failed */
     override val workflowInfo: WorkflowInfo? get() = instanceMessage?.workflowInfo
 
+    /** Workflow execution state extracted from the instance message, null if payload deserialization failed */
     override val workflowState: WorkflowState? get() = instanceMessage?.workflowState
-
-    override val parentId: IDV7? get() = instanceMessage?.parentId
 
     companion object {
         fun from(
             id: IDV7 = IDV7.random(),
-            instance: InstanceMessage,
-            error: Throwable,
-            reason: String = getFailureReason(error)
+            instance: InstanceMessage<out WorkflowState>,
+            exception: Exception,
+            reason: String = getFailureReason(exception)
         ) = FailureModel(
             id = id,
             instanceMessage = instance,
             payload = null,
             errorReason = reason,
-            errorClass = error::class.qualifiedName!!,
-            errorMessage = error.message,
-            errorStackTrace = error.stackTraceToString()
+            errorClass = exception::class.qualifiedName!!,
+            errorMessage = exception.message,
+            errorStackTrace = exception.stackTraceToString()
         )
 
         fun from(
             id: IDV7 = IDV7.random(),
             payload: String,
-            error: Throwable,
-            reason: String = getFailureReason(error)
+            exception: Exception,
+            reason: String = getFailureReason(exception)
         ) = FailureModel(
             id = id,
             instanceMessage = null,
             payload = payload,
             errorReason = reason,
-            errorClass = error::class.qualifiedName!!,
-            errorMessage = error.message,
-            errorStackTrace = error.stackTraceToString()
+            errorClass = exception::class.qualifiedName!!,
+            errorMessage = exception.message,
+            errorStackTrace = exception.stackTraceToString()
         )
 
         fun from(outbox: OutboxModel): FailureModel {
-            require(outbox.outBoxStatus == OutBoxStatus.FAILED) { "The outbox status must be FAILED" }
+            require(outbox.outboxFailedAt != null) { "The outbox must have FAILED" }
 
             return FailureModel(
                 id = IDV7.from(outbox.id),

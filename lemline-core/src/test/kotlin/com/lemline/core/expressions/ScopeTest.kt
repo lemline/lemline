@@ -2,6 +2,7 @@
 package com.lemline.core.expressions
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.expressions.scopes.TaskDescriptor
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
 import com.lemline.core.loadWorkflowFromYaml
@@ -12,7 +13,6 @@ import io.kotest.matchers.shouldBe
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import java.time.Instant
-import java.util.*
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -27,7 +27,7 @@ class ScopeTest :
         val testDefinition = JsonObject(mapOf("type" to JsonPrimitive("set")))
         val testStartedAt = DateTimeDescriptor.from(Instant.now())
         val testWorkflowDescriptor = WorkflowDescriptor(
-            id = UUID.randomUUID().toString(),
+            id = WorkflowId.random().toString(),
             //definition = LemlineJson.encodeToElement(workflow),
             input = testInput,
             startedAt = LemlineJson.encodeToElement(testStartedAt),

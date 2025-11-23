@@ -2,7 +2,7 @@
 package com.lemline.runner.cli.migrate
 
 import com.lemline.runner.cli.GlobalMixin
-import com.lemline.runner.repositories.DatabaseManager
+import com.lemline.runner.config.DatabaseManager
 import jakarta.inject.Inject
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin

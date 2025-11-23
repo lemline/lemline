@@ -5,11 +5,6 @@ interface WithOptionalWorkflowInfo {
     val workflowInfo: WorkflowInfo?
 
     /**
-     * Represents the unique identifier of a workflow, if available.
-     */
-    val workflowId: WorkflowId? get() = workflowInfo?.workflowId
-
-    /**
      * Represents the namespace of a workflow, if available.
      */
     val workflowNamespace: WorkflowNamespace? get() = workflowInfo?.workflowNamespace
@@ -27,11 +22,6 @@ interface WithOptionalWorkflowInfo {
 
 interface WithDefiniteWorkflowInfo : WithOptionalWorkflowInfo {
     override val workflowInfo: WorkflowInfo
-
-    /**
-     *  workflowId is redefined here to ensure it is always non-null, overriding a nullable version from WithOptionalWorkflowInfo.
-     */
-    override val workflowId: WorkflowId get() = workflowInfo.workflowId
 
     /**
      *  workflowNamespace is redefined here to ensure it is always non-null, overriding a nullable version from WithOptionalWorkflowInfo.

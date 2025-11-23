@@ -2,15 +2,9 @@
 package com.lemline.core.errors
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.nodes.NodePosition
-import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
+
 
 sealed class WorkflowException : RuntimeException()
 
@@ -23,7 +17,7 @@ sealed class WorkflowException : RuntimeException()
  *
  * @property error The workflow error associated with this exception.
  */
-open class InternalWorkflowException(
+data class InternalException(
     val error: Error
 ) : WorkflowException() {
 
@@ -66,81 +60,15 @@ open class InternalWorkflowException(
         companion object Companion {
             private const val URI_BASE = "https://serverlessworkflow.io/spec/1.0.0/errors"
 
-            fun fromUnexpectedException(e: Exception, position: NodePosition) = Error(
-                errorType = WorkflowErrorType.RUNTIME,
-                position = position,
-                title = e.message,
-                details = e.stackTraceToString(),
-            )
+            fun from(e: Exception, position: NodePosition) = when (e) {
+                is InternalException -> e.error
+                else -> Error(
+                    errorType = WorkflowErrorType.RUNTIME,
+                    position = position,
+                    title = e.message,
+                    details = e.stackTraceToString(),
+                )
+            }
         }
     }
-
-    override fun toString() =
-        "WorkflowException(error=$error)"
-}
-
-/**
- * Exception indicating that a child workflow should be started.
- *
- * This exception serves as a marker to indicate the initiation of a child workflow
- * during a larger workflow process. It carries configuration details associated
- * with the child workflow, encapsulated within the [Config] instance.
- */
-class ChildWorkflowException(
-    val transformedInput: JsonElement?,
-    val config: Config
-) : WorkflowException() {
-
-    /**
-     * Configuration details required to initiate a child workflow.
-     *
-     * This data class encapsulates the metadata and input parameters needed to
-     * start a child workflow instance within a larger workflow process.
-     *
-     * @property namespace The namespace of the child workflow, used to scope workflows within an environment.
-     * @property name The name of the child workflow to be executed.
-     * @property version The version of the child workflow.
-     * @property input The input provided to the child workflow.
-     * @property sync Indicates whether the parent workflow should wait for the child workflow to complete.
-     */
-    @Serializable
-    data class Config(
-        val namespace: WorkflowNamespace,
-        val name: WorkflowName,
-        val version: WorkflowVersion,
-        val input: JsonElement,
-        val sync: Boolean
-    )
-}
-
-
-/**
- * Exception indicating that a wait has been requested during a workflow's execution.
- *
- * This exception is thrown to signal that a delay or pause, defined by a [Config],
- * has been incorporated into the workflow's control flow. It can be used to coordinate
- * asynchronous operations or introduce timed pauses in workflow processing.
- *
- * @property config The configuration specifying the details of the wait, including the delay duration.
- */
-@ExperimentalTime
-class WaitWorkflowException(
-    val transformedInput: JsonElement,
-    val config: Config
-) : WorkflowException() {
-
-    /**
-     * Configuration for specifying the wait duration in a workflow task.
-     *
-     * This configuration is used to indicate a target timestamp until which
-     * a delay or pause is requested during a workflow's execution. It is typically
-     * used in conjunction with orchestrators to manage timed pauses or schedule
-     * task execution at a specific time.
-     *
-     * @property waitUntil The timestamp indicating when the wait should end.
-     */
-    @Serializable
-    data class Config(
-        @Contextual val waitUntil: Instant
-    )
 }

@@ -2,7 +2,7 @@
 package com.lemline.runner.repositories.bases
 
 import com.lemline.common.random.random
-import com.lemline.runner.models.WaitOutboxModel
+import com.lemline.runner.models.WaitModel
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.WaitRepository
 import jakarta.inject.Inject
@@ -15,13 +15,13 @@ import kotlinx.serialization.ExperimentalSerializationApi
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class WaitRepositoryTest : OutboxRepositoryTest<WaitOutboxModel>() {
+internal abstract class WaitRepositoryTest : OutboxRepositoryTest<WaitModel>() {
 
     @Inject
     override lateinit var repository: WaitRepository
 
-    override fun createRandomEntity() = WaitOutboxModel.random()
+    override fun createRandomEntity() = WaitModel.random()
 
-    override fun changeDelayedUntil(model: WaitOutboxModel) =
+    override fun changeDelayedUntil(model: WaitModel) =
         model.copy().apply { outboxDelayedUntil = Instant.random() }
 }

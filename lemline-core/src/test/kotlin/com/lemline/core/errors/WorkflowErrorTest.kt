@@ -12,7 +12,7 @@ import org.junit.jupiter.api.Test
 class WorkflowErrorTest {
     @Test
     fun `test error serialization to JSON`() {
-        val error = InternalWorkflowException.Error(
+        val error = InternalException.Error(
             errorType = WorkflowErrorType.VALIDATION,
             title = "Invalid_input",
             status = 400,
@@ -46,7 +46,7 @@ class WorkflowErrorTest {
             }
         """.trimIndent()
 
-        val error: InternalWorkflowException.Error = LemlineJson.decodeFromString(json)
+        val error: InternalException.Error = LemlineJson.decodeFromString(json)
 
         assertEquals("https://serverlessworkflow.io/spec/1.0.0/errors/validation", error.type)
         assertEquals("Operation timed out", error.title)
@@ -57,7 +57,7 @@ class WorkflowErrorTest {
 
     @Test
     fun `test error with default status serialization`() {
-        val error = InternalWorkflowException.Error(
+        val error = InternalException.Error(
             errorType = WorkflowErrorType.RUNTIME,
             title = "Internal_error",
             details = "An_unexpected_error_occurred",

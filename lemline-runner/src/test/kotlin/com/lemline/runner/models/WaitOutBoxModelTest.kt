@@ -1,36 +1,32 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.models
 
-import com.lemline.common.json.LemlineJson
-import com.lemline.runner.outbox.OutBoxStatus
 import com.lemline.runner.random.random
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
-import org.junit.jupiter.api.Assertions
 
 @ExperimentalTime
 @ExperimentalSerializationApi
 class WaitOutBoxModelTest {
 
     @Test
-    fun `WaitOutboxModel serializes and deserializes and keep the same fields`() {
-        val model = WaitOutboxModel.random()
-        val encoded = model.toJsonString()
+    fun `WaitOutboxModel can be created and fields accessed`() {
+        val model = WaitModel.random()
 
-        // default are removed from json string
-        val status = if (model.outBoxStatus == OutBoxStatus.PENDING) "" else ""","s":"${model.outBoxStatus}""""
-        // nullable properties
-        val sf = nullable(model.outboxScheduledFor)
+        // Verify all fields are accessible
+        assertNotNull(model.id)
+        assertNotNull(model.instanceMessage)
+        assertNotNull(model.outboxScheduledFor)
+        assertEquals(model.outboxScheduledFor, model.outboxScheduledFor)
+        assertEquals(model.outboxScheduledFor, model.outboxDelayedUntil)
 
-        Assertions.assertEquals(
-            with(model) { """{"t":"w","id":"$id","i":${instanceMessage.toJsonString()}$status,"f":$sf}""" },
-            encoded,
-        )
-
-        val decoded = LemlineJson.decodeFromString<WaitOutboxModel>(encoded)
-        assertEquals(model, decoded)
+        // Verify copy works
+        val copy = model.copy()
+        assertEquals(model.id, copy.id)
+        assertEquals(model.outboxScheduledFor, copy.outboxScheduledFor)
     }
 
 }

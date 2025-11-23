@@ -2,8 +2,9 @@
 package com.lemline.runner.outbox
 
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.messaging.instances.InstanceMessageEmitter
-import com.lemline.runner.models.RetryOutboxModel
+import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
+import com.lemline.runner.models.RetryModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.RetryRepository
 import io.quarkus.runtime.Startup
@@ -19,7 +20,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * This class coordinates retry logic in two main areas:
  * - In workflow execution via [com.lemline.runner.StepByStepRunner]:
  *   - Uses `WorkflowInstance.onRetry()` to handle retries defined by the workflow itself.
- * - In message processing via [com.lemline.runner.messaging.instances.InstanceMessageHandler]:
+ * - In message processing via [com.lemline.runner.messaging.commands.WorkflowCommandHandler]:
  *   - `Message<String>.saveAsFailed()` records non-recoverable failures.
  *   - `Message<String>.saveForRetry()` schedules recoverable failures for future retry attempts.
  */
@@ -27,10 +28,10 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
+internal class RetryOutbox : AbstractOutbox<RetryModel>() {
 
     @Inject
-    override lateinit var instanceEmitter: InstanceMessageEmitter
+    override lateinit var instanceEmitter: WorkflowCommandEmitter
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
@@ -52,5 +53,18 @@ internal class RetryOutbox : AbstractOutbox<RetryOutboxModel>() {
     override val outboxConf by lazy { lemlineConfig.outbox().retry().outbox() }
 
     // Cleanup configuration
-    override val cleanupConf by lazy { lemlineConfig.outbox().retry().cleanup() }
+    override val cleanerConf by lazy { lemlineConfig.outbox().retry().cleanup() }
+
+    /**
+     * Transform RetryScheduled Event → ResumeFromTask Command before sending.
+     * This ensures the workflow handler receives a command it can process.
+     */
+    override suspend fun process(entity: RetryModel) {
+        instanceEmitter.send(
+            InstanceMessage(
+                workflowInfo = entity.instanceMessage.workflowInfo,
+                workflowState = entity.instanceMessage.workflowState.resume(),
+            )
+        )
+    }
 }

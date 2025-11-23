@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.ForTaskState
+import com.lemline.core.states.ForState
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -55,49 +55,51 @@ import kotlinx.serialization.json.JsonElement
  */
 class ForProcessor(
     node: Node<ForTask>
-) : NodeProcessor<ForTask, ForTaskState>(node) {
+) : NodeProcessor<ForTask, ForState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = ForTaskState.from(
-        node,
+    override fun createState(transformedInput: JsonElement, scope: Scope) = ForState(
         startedAt = Clock.System.now(),
         collection = evalForIn(transformedInput, scope),
-        index = -1
+        index = -1,
+        forEach = node.task.`for`.each ?: "item",
+        forAt = node.task.`for`.at ?: "index"
     )
 
     override fun getNextStepInfo(
-        state: ForTaskState,
+        state: ForState,
         dataset: JsonElement,
         scope: Scope,
         namedNode: String?,
-    ): NextStepInfo {
+    ): NextStepInfo<ForState> {
         // get an updated state for the current node
         val updatedState = getNextState(state)
 
         // Check if we should continue looping (while condition and collection bounds)
         return when (shouldContinue(updatedState, dataset, scope)) {
             false -> NextStepInfo(
-                updatedState = null,
+                updatedState = updatedState,
                 nextNode = node.parent,
-                flowDirective = getFlowDirective()
+                nextDirective = getFlowDirective()
             )
 
             true -> NextStepInfo(
                 updatedState = updatedState,
                 nextNode = getDoNode(),
-                flowDirective = null
+                nextDirective = null
             )
         }
     }
 
     // At each iteration, we remove the first item from the collection and increment the index
-    private fun getNextState(state: ForTaskState): ForTaskState = ForTaskState.from(
-        node = node,
+    private fun getNextState(state: ForState): ForState = ForState(
         startedAt = state.startedAt,
         collection = if (state.index >= 0) state.collection.drop(1) else state.collection,
-        index = state.index + 1
+        index = state.index + 1,
+        forEach = node.task.`for`.each ?: "item",
+        forAt = node.task.`for`.at ?: "index"
     )
 
-    private fun shouldContinue(updatedState: ForTaskState, transformedInput: JsonElement, scope: Scope) =
+    private fun shouldContinue(updatedState: ForState, transformedInput: JsonElement, scope: Scope) =
         updatedState.collection.isNotEmpty() && evalWhile(transformedInput, scope)
 
     private fun evalWhile(dataset: JsonElement, scope: Scope): Boolean {
@@ -106,7 +108,7 @@ class ForProcessor(
     }
 
     private fun evalForIn(dataset: JsonElement, scope: Scope): List<JsonElement> {
-        // For.in is evaluated during createState, before full context exists
+        // For.in is evaluated during createState, before the full context exists
         return evalList(dataset, node.task.`for`.`in`, "for.in", scope)
     }
 

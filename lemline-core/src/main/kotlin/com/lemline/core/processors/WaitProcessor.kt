@@ -3,10 +3,10 @@
 
 package com.lemline.core.processors
 
-import com.lemline.core.errors.WaitWorkflowException
+import com.lemline.core.errors.AsyncTaskException.WaitStartedException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.SimpleTaskState
+import com.lemline.core.states.WaitState
 import com.lemline.core.utils.toDuration
 import io.serverlessworkflow.api.types.WaitTask
 import kotlin.time.Clock
@@ -43,9 +43,9 @@ import kotlinx.serialization.json.JsonElement
  */
 class WaitProcessor(
     node: Node<WaitTask>,
-) : NodeProcessor<WaitTask, SimpleTaskState>(node) {
+) : NodeProcessor<WaitTask, WaitState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleTaskState = SimpleTaskState()
+    override fun createState(transformedInput: JsonElement, scope: Scope) = WaitState()
 
     /**
      * Execute wait action - returns input unchanged.
@@ -60,11 +60,12 @@ class WaitProcessor(
     override suspend fun execute(
         transformedInput: JsonElement,
         scope: Scope,
+        state: WaitState,
     ): JsonElement {
         getDelay()?.let {
-            val config = WaitWorkflowException.Config(waitUntil = Clock.System.now() + it)
+            val config = WaitStartedException.Config(waitUntil = Clock.System.now() + it)
             logger.debug { "Throwing WaitException for orchestrator to handle: $config" }
-            throw WaitWorkflowException(transformedInput, config)
+            throw WaitStartedException(state, transformedInput, config)
         }
 
         logger.debug { "Wait skipped (duration <= 0) for task: ${node.name}" }

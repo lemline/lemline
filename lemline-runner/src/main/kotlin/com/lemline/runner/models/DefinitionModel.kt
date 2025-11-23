@@ -8,12 +8,16 @@ import com.lemline.common.values.WorkflowVersion
 import io.serverlessworkflow.api.types.Workflow
 
 data class DefinitionModel(
+    /** The namespace of the workflow definition */
     val namespace: WorkflowNamespace,
 
+    /** The name of the workflow definition */
     val name: WorkflowName,
 
+    /** The version of the workflow definition */
     val version: WorkflowVersion,
 
+    /** The complete workflow definition in YAML format */
     val definition: String
 ) {
     companion object {

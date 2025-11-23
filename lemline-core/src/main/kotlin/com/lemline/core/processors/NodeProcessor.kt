@@ -4,7 +4,7 @@ package com.lemline.core.processors
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonElement
 import com.lemline.common.logger.logger
-import com.lemline.core.errors.InternalWorkflowException
+import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
@@ -25,6 +25,7 @@ import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.api.types.SubflowInput
 import io.serverlessworkflow.api.types.TaskBase
+import io.serverlessworkflow.api.types.Use
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonArray
@@ -56,11 +57,23 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     open suspend fun execute(
         transformedInput: JsonElement,
         scope: Scope,
+        state: S,
     ): JsonElement = transformedInput
 
     /**
+     * Use object, if any
+     */
+    val use: Use? by lazy {
+        var rootNode: Node<*> = node
+        while (rootNode.parent != null) rootNode = rootNode.parent
+        if (rootNode.task !is RootTask) throw IllegalStateException("RootNode has no RootTask! $rootNode")
+
+        rootNode.task.use
+    }
+
+    /**
      * Determine:
-     * - the updated state after the current node
+     * - the updated state of current node
      * - the next node (parent or child)
      * - the flow directive for the parent (if any)
      *
@@ -72,7 +85,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         dataset: JsonElement,
         scope: Scope,
         namedNode: String? = null,
-    ) = NextStepInfo(null, node.parent, getFlowDirective())
+    ): NextStepInfo<S> = NextStepInfo(state, node.parent, getFlowDirective())
 
     // ========================================
     // Entering a Node for the first time
@@ -84,19 +97,19 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         // create a mutable local task context
         var context = TaskContext(startedAt = now)
 
-        // if this node is conditional, check if it should be executed, if not return to parent
-        if (!checkIf(rawInput, mergeScope(parentScope, context))) return StepResult(
-            nextNode = node.parent,
-            rawInput = rawInput,
-            stateUpdates = emptyMap(),
-            flowDirective = null  // Continue to next sibling
-        )
-
         // Validate input against schema (throws ValidationException)
         validateInput(rawInput)
 
         // Update context with raw input
         context = context.copy(rawInput = rawInput)
+
+        // if this node is conditional, check if it should be executed, if not return to parent
+        if (!checkIf(rawInput, mergeScope(parentScope, context))) return StepResult(
+            nextNode = node.parent,
+            nextInput = rawInput,
+            stateUpdates = emptyMap(),
+            nextDirective = null  // Continue to next sibling
+        )
 
         // Apply input transformation (throws ExpressionException)
         val transformedInput = transformInput(rawInput, mergeScope(parentScope, context))
@@ -126,7 +139,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
             // END: Workflow complete - recursive unwinding
             FlowDirectiveEnum.END -> continueToEnd(datasetFromChild)
             // EXIT: exit current node
-            FlowDirectiveEnum.EXIT -> continueToParent(datasetFromChild, getFlowDirective(), parentScope, null)
+            FlowDirectiveEnum.EXIT -> continueToParent(state, datasetFromChild, getFlowDirective(), parentScope, null)
             // CONTINUE: continue
             FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild, parentScope, null)
         }
@@ -154,7 +167,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         // check if we should return to parent
         return when (nextNode == node.parent) {
             // case of leaf (activities, switch, ...) OR end of a control flow
-            true -> continueToParent(transformedInput, currentFlowDirective, parentScope, taskContext)
+            true -> continueToParent(updatedState, transformedInput, currentFlowDirective, parentScope, taskContext)
 
             // control flows that are not completed (do, for, ...), going to a child
             false -> continueToChild(nextNode, transformedInput, updatedState)
@@ -164,7 +177,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     internal fun continueToChild(
         childNode: Node<*>?,
         childRawInput: JsonElement,
-        updatedState: TaskState?
+        updatedState: TaskState
     ) = StepResult(
         childNode,
         childRawInput,
@@ -176,7 +189,8 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // EXIT
     // ========================================
     internal suspend fun continueToParent(
-        dataset: JsonElement,
+        state: S,
+        transformedInput: JsonElement,
         currentFlowDirective: FlowDirective?,
         parentScope: Scope,
         taskContext: TaskContext?
@@ -186,7 +200,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
 
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
-        val rawOutput = execute(dataset, mergeScope(parentScope, context))
+        val rawOutput = execute(transformedInput, mergeScope(parentScope, context), state)
 
         // Complete the task with the raw output
         return completeTask(rawOutput, currentFlowDirective, parentScope, context)
@@ -236,9 +250,9 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
 
     internal fun continueToEnd(dataset: JsonElement) = StepResult(
         nextNode = node.parent,
-        rawInput = dataset,
+        nextInput = dataset,
         stateUpdates = mapOf(node.position to null), // clear the state of the current node
-        flowDirective = FlowDirective().apply { setFlowDirectiveEnum(FlowDirectiveEnum.END) } // Pass END up the chain
+        nextDirective = FlowDirective().apply { setFlowDirectiveEnum(FlowDirectiveEnum.END) } // Pass END up the chain
     )
 
     // ========================================
@@ -273,14 +287,14 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
      * Transform input using input.from expression.
      */
     private fun transformInput(rawInput: JsonElement, scope: Scope): JsonElement {
-        return eval(rawInput, node.task.input?.from, scope)
+        return inputFrom(rawInput, node.task.input?.from, scope)
     }
 
     /**
      * Transforms the output dataset using the task's `output.as` expression.
      */
     private fun transformOutput(rawOutput: JsonElement, scope: Scope): JsonElement {
-        return eval(rawOutput, node.task.output?.`as`, scope)
+        return outputAs(rawOutput, node.task.output?.`as`, scope)
     }
 
     /**
@@ -290,7 +304,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         val exportDef = node.task.export ?: return null
 
         // Evaluate export.as expression with transformed output as input
-        val exportedData = evalObject(transformedOutput, exportDef.`as`, "export.as", scope)
+        val exportedData = exportAs(transformedOutput, exportDef.`as`, scope)
 
         // Validate exported data against schema if provided
         exportDef.schema?.let { schema ->
@@ -317,7 +331,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     }
 
     // ========================================
-    // Expression Evaluation Helpers
+    // Validation helper
     // ========================================
 
     private fun validate(data: JsonElement, schemaUnion: SchemaUnion) = try {
@@ -325,6 +339,27 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     } catch (e: Exception) {
         raiseError(VALIDATION, e.message, e.stackTraceToString())
     }
+
+    // ========================================
+    // Expression Evaluation Helpers
+    // ========================================
+
+    private fun inputFrom(data: JsonElement, inputFrom: InputFrom?, scope: JsonObject): JsonElement =
+        inputFrom?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
+
+    private fun outputAs(data: JsonElement, outputAs: OutputAs?, scope: JsonObject): JsonElement =
+        outputAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
+
+    private fun exportAs(data: JsonElement, exportAs: ExportAs?, scope: JsonObject): JsonObject =
+        (exportAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data).let {
+            when (it is JsonObject) {
+                true -> it
+                false -> raiseError(EXPRESSION, "'.export.as' expression must be an object, but is '$it'")
+            }
+        }
+
+    internal fun runWorkflowInput(data: JsonElement, subFlowInput: SubflowInput?, scope: JsonObject): JsonElement =
+        subFlowInput?.let { eval(data, it.additionalProperties.toJsonElement(), scope, false) } ?: data
 
     protected fun evalBoolean(
         data: JsonElement,
@@ -350,31 +385,8 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         }
     }
 
-    private fun evalObject(
-        data: JsonElement,
-        expr: ExportAs,
-        name: String,
-        scope: JsonObject
-    ) = eval(data, expr, scope).let {
-        when (it is JsonObject) {
-            true -> it
-            false -> raiseError(EXPRESSION, "'.$name' expression must be an object, but is '$it'")
-        }
-    }
 
-    private fun eval(data: JsonElement, inputFrom: InputFrom?, scope: JsonObject) =
-        inputFrom?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
-
-    private fun eval(data: JsonElement, outputAs: OutputAs?, scope: JsonObject) =
-        outputAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
-
-    private fun eval(data: JsonElement, exportAs: ExportAs?, scope: JsonObject) =
-        exportAs?.let { eval(data, LemlineJson.encodeToElement(it), scope, true) } ?: data
-
-    internal fun eval(data: JsonElement, subFlowInput: SubflowInput?, scope: JsonObject) =
-        subFlowInput?.let { eval(data, it.additionalProperties.toJsonElement(), scope, false) } ?: data
-
-    private fun eval(data: JsonElement, expr: String, scope: JsonObject) = try {
+    private fun eval(data: JsonElement, expr: String, scope: JsonObject): JsonElement = try {
         JQExpression.eval(data, JsonPrimitive(expr), scope, false)
     } catch (e: Exception) {
         raiseError(EXPRESSION, e.message, e.stackTraceToString())
@@ -392,7 +404,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     }
 
     // ========================================
-    // Error Handling
+    // Error raising helper
     // ========================================
 
     internal open fun raiseError(
@@ -401,26 +413,14 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         details: String? = null,
         status: Int? = null,
     ): Nothing {
-        val error = InternalWorkflowException.Error(
+        val error = InternalException.Error(
             errorType = type,
             title = title ?: "Unknown Error",
             details = details,
             status = status ?: type.defaultStatus,
             position = node.position,
         )
-        throw InternalWorkflowException(error)
-    }
-
-    /**
-     * Retrieves the root task of the current node by traversing up the hierarchy.
-     */
-    protected fun getRootTask(): RootTask {
-        var rootNode: Node<*> = node
-        while (rootNode.parent != null) rootNode = rootNode.parent
-
-        if (rootNode.task !is RootTask) throw IllegalStateException("RootNode is not a RootTask! $rootNode")
-
-        return rootNode.task
+        throw InternalException(error)
     }
 }
 
@@ -428,12 +428,12 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
  * Represents the result of determining the next navigation step within a workflow or process.
  *
  * Components:
- * - A `NodeState?`: The updated state of the current node, null indicates node is completed
+ * - A `NodeState?`: The updated state of the *current* node
  * - A `Node<*>?`: The next node to navigate to, null indicates navigation ends
  * - A `FlowDirective?`: Directives influencing the parent execution flow (if any)
  */
-data class NextStepInfo(
-    val updatedState: TaskState?,
+data class NextStepInfo<T : TaskState>(
+    val updatedState: T,
     val nextNode: Node<*>?,
-    val flowDirective: FlowDirective?
+    val nextDirective: FlowDirective?
 )

@@ -24,7 +24,7 @@ internal fun TaskStates.updateWith(
     // Apply state updates
     for ((node, state) in stateUpdates) {
         if (state == null) {
-            updatedStates.remove(node)  // Delete state
+            if (node != NodePosition.root) updatedStates.remove(node)  // Delete state
         } else {
             updatedStates[node] = state  // Update or insert state
         }

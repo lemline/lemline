@@ -9,7 +9,7 @@ import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.SimpleTaskState
+import com.lemline.core.states.CallState
 import com.lemline.core.tasks.calls.HttpCall
 import io.ktor.http.*
 import io.serverlessworkflow.api.types.AuthenticationPolicy
@@ -69,9 +69,9 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 class CallHttpProcessor(
     node: Node<CallHTTP>,
-) : NodeProcessor<CallHTTP, SimpleTaskState>(node) {
+) : NodeProcessor<CallHTTP, CallState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): SimpleTaskState = SimpleTaskState()
+    override fun createState(transformedInput: JsonElement, scope: Scope) = CallState()
 
     /**
      * Execute HTTP call action.
@@ -85,6 +85,7 @@ class CallHttpProcessor(
     override suspend fun execute(
         transformedInput: JsonElement,
         scope: Scope,
+        state: CallState,
     ): JsonElement {
         logger.debug { "Executing HTTP call: ${node.name}" }
 
@@ -240,7 +241,7 @@ class CallHttpProcessor(
      * Retrieves authentication policy by name from workflow's use section.
      */
     private fun getAuthenticationPolicyByName(name: String): AuthenticationPolicy {
-        return getRootTask().use?.authentications?.additionalProperties?.get(name)?.get()
+        return use?.authentications?.additionalProperties?.get(name)?.get()
             ?: raiseError(CONFIGURATION, "Named authentication not found: $name")
     }
 
