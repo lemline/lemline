@@ -18,7 +18,11 @@ CREATE TABLE lemline_forks
     -- Cleanup tracking
     outbox_completed_at TIMESTAMP WITH TIME ZONE,
     failed_at           TIMESTAMP,
-    failure_id          UUID,
+    -- Error details (inline instead of FK to failures table)
+    error_reason        VARCHAR(255),
+    error_class         VARCHAR(500),
+    error_message       CLOB,
+    error_stack_trace   CLOB,
     -- Timestamps
     created_at          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP,
@@ -37,10 +41,14 @@ CREATE TABLE lemline_fork_branches
     name         VARCHAR(255) NOT NULL,
     -- Execution state
     output       CLOB,
-    failure_id   UUID,
     -- Timestamps
     completed_at TIMESTAMP,
     failed_at    TIMESTAMP,
+    -- Error details (inline instead of FK to failures table)
+    error_reason        VARCHAR(255),
+    error_class         VARCHAR(500),
+    error_message       CLOB,
+    error_stack_trace   CLOB,
     created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- Constraints
@@ -57,16 +65,3 @@ CREATE INDEX idx_lemline_forks_completed
     ON lemline_forks (outbox_completed_at);
 
 -- Note: (workflow_id, position) has unique constraint, no separate index needed
-
--- Foreign key constraints to failures table
-ALTER TABLE lemline_forks
-    ADD CONSTRAINT fk_forks_failure
-        FOREIGN KEY (failure_id)
-            REFERENCES lemline_failures (id)
-            ON DELETE SET NULL;
-
-ALTER TABLE lemline_fork_branches
-    ADD CONSTRAINT fk_fork_branches_failure
-        FOREIGN KEY (failure_id)
-            REFERENCES lemline_failures (id)
-            ON DELETE SET NULL;

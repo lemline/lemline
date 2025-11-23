@@ -347,8 +347,7 @@ internal class WorkflowEventHandler(
                 name = branchNode.name,
                 output = null,
                 completedAt = null,
-                failedAt = null,
-                failureId = null
+                failedAt = null
             )
         }
 
@@ -415,12 +414,12 @@ internal class WorkflowEventHandler(
             // Update branch with completion data
             branch.output = LemlineJson.encodeToString(branchOutput)
             branch.completedAt = Clock.System.now()
-            // clean failure if needed
+            // Clean error data if branch was previously failed
             branch.failedAt = null
-            branch.failureId?.let {
-                failureRepository.deleteById(it, conn)
-                branch.failureId = null
-            }
+            branch.errorReason = null
+            branch.errorClass = null
+            branch.errorMessage = null
+            branch.errorStackTrace = null
 
             // Save the updated branch in the transaction
             forkRepository.updateBranch(branch, conn)
@@ -447,12 +446,12 @@ internal class WorkflowEventHandler(
                     // Update fork with completion data
                     fork.output = LemlineJson.encodeToString(outputJson)
                     fork.outboxCompletedAt = Clock.System.now()
-                    // Clean failure if needed
+                    // Clean error data if fork was previously failed
                     fork.failedAt = null
-                    fork.failureId?.let {
-                        failureRepository.deleteById(it, conn)
-                        fork.failureId = null
-                    }
+                    fork.errorReason = null
+                    fork.errorClass = null
+                    fork.errorMessage = null
+                    fork.errorStackTrace = null
                     forkRepository.update(fork, conn)
 
                     val resumeMessage = InstanceMessage(
@@ -518,9 +517,13 @@ internal class WorkflowEventHandler(
             }
 
             // Update branch with failure data
+            // Store error inline - we don't know yet if this will trigger a workflow failure
+            // (the failure can be caught by a try node above the fork)
             branch.failedAt = Clock.System.now()
-            branch.failureId =
-                null // TODO Store the error here - not in table failures, as do not know yet if this failure triggers a workflow failure
+            branch.errorReason = branchError.type
+            branch.errorClass = branchError.type
+            branch.errorMessage = branchError.title
+            branch.errorStackTrace = branchError.details
 
             // Save the updated branch in the transaction
             forkRepository.updateBranch(branch, conn)
@@ -537,6 +540,15 @@ internal class WorkflowEventHandler(
 
                 if (error != null) {
                     logger.debug { "Fork failed at $forkPosition, resuming workflow with error" }
+
+                    fork.failedAt = branch.failedAt
+                    fork.errorReason = branchError.type
+                    fork.errorClass = branchError.type
+                    fork.errorMessage = branchError.title
+                    fork.errorStackTrace = branchError.details
+
+                    // Save the updated branch in the transaction
+                    forkRepository.updateBranch(branch, conn)
 
                     // we do not know yet if the workflow will be failing after this fork failure
                     // this exception can be caught above the fork, that's why we restart from there

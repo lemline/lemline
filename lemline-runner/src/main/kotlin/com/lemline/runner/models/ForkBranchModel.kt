@@ -26,6 +26,15 @@ data class ForkBranchModel(
     /** Timestamp when the branch failed */
     var failedAt: Instant?,
 
-    /** Id of the failure entity if the branch failed */
-    var failureId: IDV7? = null,
+    /** High-level categorization of the failure reason, null if no failure */
+    var errorReason: String? = null,
+
+    /** Fully qualified class name of the exception that caused the failure, null if no failure */
+    var errorClass: String? = null,
+
+    /** Error message from the exception, null if no failure or no message */
+    var errorMessage: String? = null,
+
+    /** Full stack trace of the exception for debugging, null if no failure */
+    var errorStackTrace: String? = null
 )

@@ -424,8 +424,7 @@ internal abstract class ForkWaitingRepositoryTest {
                 name = "branch-$index",
                 output = null,
                 completedAt = null,
-                failedAt = null,
-                failureId = null
+                failedAt = null
             )
         }
 }

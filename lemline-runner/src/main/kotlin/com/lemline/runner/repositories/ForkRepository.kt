@@ -40,7 +40,10 @@ class ForkRepository : CleanerRepository<ForkModel>() {
         internal const val FORK_COMPETE_COLUMN = "compete"
         internal const val FORK_OUTPUT_COLUMN = "output"
         internal const val FORK_FAILED_AT_COLUMN = "failed_at"
-        internal const val FORK_FAILURE_ID_COLUMN = "failure_id"
+        internal const val FORK_ERROR_REASON_COLUMN = "error_reason"
+        internal const val FORK_ERROR_CLASS_COLUMN = "error_class"
+        internal const val FORK_ERROR_MESSAGE_COLUMN = "error_message"
+        internal const val FORK_ERROR_STACK_TRACE_COLUMN = "error_stack_trace"
 
         // Fork branch table columns
         internal const val BRANCH_FORK_ID_COLUMN = "fork_id"
@@ -48,7 +51,10 @@ class ForkRepository : CleanerRepository<ForkModel>() {
         internal const val BRANCH_OUTPUT_COLUMN = "output"
         internal const val BRANCH_COMPLETED_AT_COLUMN = "completed_at"
         internal const val BRANCH_FAILED_AT_COLUMN = "failed_at"
-        internal const val BRANCH_FAILURE_ID_COLUMN = "failure_id"
+        internal const val BRANCH_ERROR_REASON_COLUMN = "error_reason"
+        internal const val BRANCH_ERROR_CLASS_COLUMN = "error_class"
+        internal const val BRANCH_ERROR_MESSAGE_COLUMN = "error_message"
+        internal const val BRANCH_ERROR_STACK_TRACE_COLUMN = "error_stack_trace"
     }
 
     @Inject
@@ -72,8 +78,17 @@ class ForkRepository : CleanerRepository<ForkModel>() {
                     stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
                 } ?: stmt.setNull(idx, java.sql.Types.TIMESTAMP)
             },
-            FORK_FAILURE_ID_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
-                setIDV7(stmt, idx, entity.failureId)
+            FORK_ERROR_REASON_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+                stmt.setString(idx, entity.errorReason)
+            },
+            FORK_ERROR_CLASS_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+                stmt.setString(idx, entity.errorClass)
+            },
+            FORK_ERROR_MESSAGE_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+                stmt.setString(idx, entity.errorMessage)
+            },
+            FORK_ERROR_STACK_TRACE_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+                stmt.setString(idx, entity.errorStackTrace)
             },
         )
     }
@@ -86,7 +101,10 @@ class ForkRepository : CleanerRepository<ForkModel>() {
         output = rs.getString(FORK_OUTPUT_COLUMN),
         outboxCompletedAt = rs.getInstant(OUTBOX_COMPLETED_AT_COLUMN),
         failedAt = rs.getInstant(FORK_FAILED_AT_COLUMN),
-        failureId = getIDV7(rs, FORK_FAILURE_ID_COLUMN),
+        errorReason = rs.getString(FORK_ERROR_REASON_COLUMN),
+        errorClass = rs.getString(FORK_ERROR_CLASS_COLUMN),
+        errorMessage = rs.getString(FORK_ERROR_MESSAGE_COLUMN),
+        errorStackTrace = rs.getString(FORK_ERROR_STACK_TRACE_COLUMN),
     )
 
     /**
@@ -104,9 +122,12 @@ class ForkRepository : CleanerRepository<ForkModel>() {
             val insertBranchSql by lazy {
                 """
                 INSERT INTO $FORK_BRANCH_TABLE (
-                    $BRANCH_FORK_ID_COLUMN, $BRANCH_NAME_COLUMN, $BRANCH_OUTPUT_COLUMN, $BRANCH_FAILURE_ID_COLUMN,
-                    $BRANCH_COMPLETED_AT_COLUMN, $BRANCH_FAILED_AT_COLUMN, $CREATED_AT_COLUMN, $UPDATED_AT_COLUMN
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    $BRANCH_FORK_ID_COLUMN, $BRANCH_NAME_COLUMN, $BRANCH_OUTPUT_COLUMN,
+                    $BRANCH_COMPLETED_AT_COLUMN, $BRANCH_FAILED_AT_COLUMN,
+                    $BRANCH_ERROR_REASON_COLUMN, $BRANCH_ERROR_CLASS_COLUMN,
+                    $BRANCH_ERROR_MESSAGE_COLUMN, $BRANCH_ERROR_STACK_TRACE_COLUMN,
+                    $CREATED_AT_COLUMN, $UPDATED_AT_COLUMN
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """.trimIndent()
             }
 
@@ -116,11 +137,14 @@ class ForkRepository : CleanerRepository<ForkModel>() {
                     setIDV7(stmt, 1, branch.forkId)
                     stmt.setString(2, branch.name)
                     stmt.setString(3, branch.output)
-                    setIDV7(stmt, 4, branch.failureId)
-                    stmt.setTimestamp(5, branch.completedAt?.toJavaInstant()?.let { Timestamp.from(it) })
-                    stmt.setTimestamp(6, branch.failedAt?.toJavaInstant()?.let { Timestamp.from(it) })
-                    stmt.setTimestamp(7, now)
-                    stmt.setTimestamp(8, now)
+                    stmt.setTimestamp(4, branch.completedAt?.toJavaInstant()?.let { Timestamp.from(it) })
+                    stmt.setTimestamp(5, branch.failedAt?.toJavaInstant()?.let { Timestamp.from(it) })
+                    stmt.setString(6, branch.errorReason)
+                    stmt.setString(7, branch.errorClass)
+                    stmt.setString(8, branch.errorMessage)
+                    stmt.setString(9, branch.errorStackTrace)
+                    stmt.setTimestamp(10, now)
+                    stmt.setTimestamp(11, now)
                     stmt.addBatch()
                 }
                 stmt.executeBatch()
@@ -158,12 +182,15 @@ class ForkRepository : CleanerRepository<ForkModel>() {
         withConnection(connection) { conn ->
             conn.prepareStatement(updateBranchSql).use { stmt ->
                 stmt.setString(1, branch.output)
-                setIDV7(stmt, 2, branch.failureId)
-                stmt.setTimestamp(3, branch.completedAt?.toJavaInstant()?.let { Timestamp.from(it) })
-                stmt.setTimestamp(4, branch.failedAt?.toJavaInstant()?.let { Timestamp.from(it) })
-                stmt.setTimestamp(5, Timestamp.from(java.time.Instant.now()))
-                setIDV7(stmt, 6, branch.forkId)
-                stmt.setString(7, branch.name)
+                stmt.setTimestamp(2, branch.completedAt?.toJavaInstant()?.let { Timestamp.from(it) })
+                stmt.setTimestamp(3, branch.failedAt?.toJavaInstant()?.let { Timestamp.from(it) })
+                stmt.setString(4, branch.errorReason)
+                stmt.setString(5, branch.errorClass)
+                stmt.setString(6, branch.errorMessage)
+                stmt.setString(7, branch.errorStackTrace)
+                stmt.setTimestamp(8, Timestamp.from(java.time.Instant.now()))
+                setIDV7(stmt, 9, branch.forkId)
+                stmt.setString(10, branch.name)
                 stmt.executeUpdate()
             }
         }
@@ -172,9 +199,12 @@ class ForkRepository : CleanerRepository<ForkModel>() {
         """
         UPDATE $FORK_BRANCH_TABLE
         SET $BRANCH_OUTPUT_COLUMN = ?,
-            $BRANCH_FAILURE_ID_COLUMN = ?,
             $BRANCH_COMPLETED_AT_COLUMN = ?,
             $BRANCH_FAILED_AT_COLUMN = ?,
+            $BRANCH_ERROR_REASON_COLUMN = ?,
+            $BRANCH_ERROR_CLASS_COLUMN = ?,
+            $BRANCH_ERROR_MESSAGE_COLUMN = ?,
+            $BRANCH_ERROR_STACK_TRACE_COLUMN = ?,
             $UPDATED_AT_COLUMN = ?
         WHERE $BRANCH_FORK_ID_COLUMN = ? AND $BRANCH_NAME_COLUMN = ?
         """.trimIndent()
@@ -270,6 +300,9 @@ class ForkRepository : CleanerRepository<ForkModel>() {
         output = getString(BRANCH_OUTPUT_COLUMN),
         completedAt = getInstant(BRANCH_COMPLETED_AT_COLUMN),
         failedAt = getInstant(BRANCH_FAILED_AT_COLUMN),
-        failureId = getIDV7(this, BRANCH_FAILURE_ID_COLUMN),
+        errorReason = getString(BRANCH_ERROR_REASON_COLUMN),
+        errorClass = getString(BRANCH_ERROR_CLASS_COLUMN),
+        errorMessage = getString(BRANCH_ERROR_MESSAGE_COLUMN),
+        errorStackTrace = getString(BRANCH_ERROR_STACK_TRACE_COLUMN),
     )
 }
