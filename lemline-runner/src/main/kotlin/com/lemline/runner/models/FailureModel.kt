@@ -45,31 +45,31 @@ data class FailureModel(
         fun from(
             id: IDV7 = IDV7.random(),
             instance: InstanceMessage<out WorkflowState>,
-            error: Throwable,
-            reason: String = getFailureReason(error)
+            exception: Exception,
+            reason: String = getFailureReason(exception)
         ) = FailureModel(
             id = id,
             instanceMessage = instance,
             payload = null,
             errorReason = reason,
-            errorClass = error::class.qualifiedName!!,
-            errorMessage = error.message,
-            errorStackTrace = error.stackTraceToString()
+            errorClass = exception::class.qualifiedName!!,
+            errorMessage = exception.message,
+            errorStackTrace = exception.stackTraceToString()
         )
 
         fun from(
             id: IDV7 = IDV7.random(),
             payload: String,
-            error: Throwable,
-            reason: String = getFailureReason(error)
+            exception: Exception,
+            reason: String = getFailureReason(exception)
         ) = FailureModel(
             id = id,
             instanceMessage = null,
             payload = payload,
             errorReason = reason,
-            errorClass = error::class.qualifiedName!!,
-            errorMessage = error.message,
-            errorStackTrace = error.stackTraceToString()
+            errorClass = exception::class.qualifiedName!!,
+            errorMessage = exception.message,
+            errorStackTrace = exception.stackTraceToString()
         )
 
         fun from(outbox: OutboxModel): FailureModel {

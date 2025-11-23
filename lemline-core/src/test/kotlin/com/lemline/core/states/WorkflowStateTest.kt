@@ -21,7 +21,7 @@ class WorkflowStateTest {
 
             // When
             val serialized = workflowCommand.toJsonString()
-            val deserialized = WorkflowCommand.fromJsonString(serialized)
+            val deserialized = WorkflowState.fromJsonString(serialized)
 
             // Then
             assertEquals(workflowCommand, deserialized)
@@ -36,7 +36,7 @@ class WorkflowStateTest {
 
             // When
             val serialized = workflowEvent.toJsonString()
-            val deserialized = WorkflowEvent.fromJsonString(serialized)
+            val deserialized = WorkflowState.fromJsonString(serialized)
 
             // Then
             assertEquals(workflowEvent, deserialized)

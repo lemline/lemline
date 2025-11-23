@@ -12,7 +12,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.orchestrator.WorkflowOrchestrator
+import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.utils.toDuration
 import com.lemline.runner.messaging.InstanceMessage
@@ -151,7 +151,7 @@ data class ScheduleModel(
                 id = IDV7.random(),
                 instanceMessage = InstanceMessage(
                     workflowInfo = WorkflowInfo(workflowNamespace, workflowName, workflowVersion),
-                    workflowState = WorkflowOrchestrator.initState(workflowId, workflowInput, false)
+                    workflowState = StepByStepOrchestrator.initCmd(workflowId, workflowInput, false)
                 ),
                 scheduleEvery = scheduleEvery,
                 scheduleAfter = scheduleAfter,

@@ -43,57 +43,17 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 
 /**
- * Complete workflow orchestrator that executes workflows from start to finish.
+ * The StepByStepOrchestrator object handles the orchestration of workflow execution,
+ * managing task states, and processing commands to resume or complete various
+ * tasks and activities within a workflow context.
  *
- * This orchestrator implements the standard workflow execution model:
- * - Activities execute via their processors (real HTTP calls, shell commands)
- * - Delays actually wait using coroutines
- * - Sub-workflows execute inline recursively (await=true) or fire-and-forget (await=false)
- * - Returns final workflow output
- *
- * ## Pure Functional Model
- *
- * State is **external to nodes** - stored in `Map<NodePosition, NodeState>`.
- * All functions are pure - they take immutable inputs and return new values:
- *
- * ```
- * while current is not null:
- *     (next, dataset, deltaStates, flowDirective) = run(current, dataset, states, flowDirective)
- *     states = applyDelta(states, deltaStates)  // Apply changes atomically
- *     current = next
- * ```
- *
- * ## No Cloning Needed
- *
- * Since run() is pure:
- * - It never mutates the states map
- * - It returns deltaStates map showing changes
- * - If it throws exception, states is unchanged
- * - applyDelta() creates new map when it succeeds
- *
- * ## Dataset Flow
- *
- * The dataset flows functionally as parameters (never stored):
- * - Down: Parent output → child input
- * - Up: Child output → parent input
- * - Transformed at node boundaries (input.from, output.as)
- *
- * ## Usage
- *
- * - **Synchronous testing**: Test workflows without distributed infrastructure
- * - **Single-node execution**: Run workflows on a single machine
- *
- * For distributed execution with pause/resume, use PausableOrchestrator instead.
- *
- * ## Example
- *
- * ```kotlin
- * val workflow = buildNodeInstance(definition)
- * val output = CompleteOrchestrator.run(workflow, input)
- * ```
+ * This orchestrator provides methods to initiate a workflow, execute commands at both
+ * task and activity levels, and manage task transitions during workflow execution.
+ * Internally, it handles resuming workflows that involve both successful task completions
+ * and error states.
  */
 @ExperimentalTime
-object StepOrchestrator {
+object StepByStepOrchestrator {
 
     private val logger = logger()
 
@@ -186,8 +146,6 @@ object StepOrchestrator {
         rawInput: JsonElement,
         flowDirective: FlowDirective? = null,
     ): WorkflowEvent {
-        logger.debug { "resumeFromTask node=${node.reference}, input=$rawInput, flow=$flowDirective, states=$taskStates" }
-
         try {
             val stepResult: StepResult = try {
                 // run the next task within a try-catch block to handle workflow-caught exceptions
@@ -250,7 +208,7 @@ object StepOrchestrator {
         node: Node<*>,
         rawOutput: JsonElement,
     ): WorkflowEvent = try {
-        logger.debug { "stepResumeFromCompletedTask  In: node=${node.reference}, output=$rawOutput, states=$taskStates" }
+        logger.debug { "resumeFromCompletedTask  In: node=${node.reference}, output=$rawOutput, states=$taskStates" }
 
         // Resume the completed task (transforms output, updates state)
         val stepResult = tryCatch(node, taskStates) {
@@ -271,7 +229,7 @@ object StepOrchestrator {
             exception = e
         )
     }.also {
-        logger.debug { "stepResumeFromCompletedTask Out: event=$it" }
+        logger.debug { "resumeFromCompletedTask Out: event=$it" }
     }
 
     /**
@@ -283,7 +241,7 @@ object StepOrchestrator {
         node: Node<*>,
         error: InternalException.Error,
     ): WorkflowEvent = try {
-        logger.debug { "stepResumeFromFailedTask  In: node=${node.reference}, error=$error, states=$taskStates" }
+        logger.debug { "resumeFromFailedTask  In: node=${node.reference}, error=$error, states=$taskStates" }
 
         // Resume the failed task (hopefully, the error can be handled)
         val stepResult = tryCatch(node, taskStates) {
@@ -304,7 +262,7 @@ object StepOrchestrator {
             exception = e
         )
     }.also {
-        logger.debug { "stepResumeFromFailedTask Out: event=$it" }
+        logger.debug { "resumeFromFailedTask Out: event=$it" }
     }
 
     private fun getNextEvent(
@@ -483,14 +441,14 @@ object StepOrchestrator {
         val processor = ProcessorFactory.getProcessor(node)
 
         return if (state == null) {
-            logger.debug { "Entering Down  node=${node.reference}, rawInput=$rawInput" }
+            logger.debug { "Entering Down  node=${node.reference} - ${node.task::class.simpleName}(input=$rawInput)" }
             // First time entering this node
             processor.enterFromParent(rawInput, scope)
         } else {
             logger.debug {
-                "ReEntering Up  node=${node.reference}, transformedInput=$rawInput${
+                "ReEntering Up  node=${node.reference} - ${node.task::class.simpleName}(input=$rawInput${
                     flowDirective?.get()?.let { ", flow=$it" } ?: ""
-                }, state=$state"
+                }), state=$state"
             }
             // Re-entering after a child completed
             processor.enterFromChild(state, flowDirective, rawInput, scope)

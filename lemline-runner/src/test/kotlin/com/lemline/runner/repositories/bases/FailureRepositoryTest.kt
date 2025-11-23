@@ -44,9 +44,9 @@ internal abstract class FailureRepositoryTest {
             id = IDV7.random(),
             instance = InstanceMessage(
                 workflowInfo = WorkflowInfo.random(),
-                workflowState = WorkflowEvent.TaskFailed.random(),
+                workflowState = WorkflowEvent.WorkflowFailed.random(),
             ),
-            error = ex,
+            exception = ex,
         )
 
         repository.insert(model) shouldBe 1
@@ -66,7 +66,7 @@ internal abstract class FailureRepositoryTest {
         val model = FailureModel.from(
             id = IDV7.random(),
             payload = "payload",
-            error = ex,
+            exception = ex,
         )
 
         repository.insert(model) shouldBe 1
@@ -84,11 +84,11 @@ internal abstract class FailureRepositoryTest {
     fun `should find failures by workflow id`() = runTest {
         val instance1 = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
-            workflowState = WorkflowEvent.TaskFailed.random(),
+            workflowState = WorkflowEvent.WorkflowFailed.random(),
         )
         val instance2 = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
-            workflowState = WorkflowEvent.TaskFailed.random(),
+            workflowState = WorkflowEvent.WorkflowFailed.random(),
         )
 
         val f1 = FailureModel.from(IDV7.random(), instance1, RuntimeException("e1")).copy(payload = "m1")
@@ -108,7 +108,7 @@ internal abstract class FailureRepositoryTest {
     fun `count and deleteAll should work`() = runTest {
         val instance = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
-            workflowState = WorkflowEvent.TaskFailed.random(),
+            workflowState = WorkflowEvent.WorkflowFailed.random(),
         )
         val failures = List(3) { idx ->
             FailureModel.from(IDV7.random(), instance, RuntimeException("err-$idx")).copy(payload = "m$idx")
@@ -128,7 +128,7 @@ internal abstract class FailureRepositoryTest {
             IDV7.random(),
             InstanceMessage(
                 workflowInfo = WorkflowInfo.random(),
-                workflowState = WorkflowEvent.TaskFailed.random(),
+                workflowState = WorkflowEvent.WorkflowFailed.random(),
             ),
             RuntimeException("boom")
         )
@@ -149,7 +149,7 @@ internal abstract class FailureRepositoryTest {
             IDV7.random(),
             InstanceMessage(
                 workflowInfo = WorkflowInfo.random(),
-                workflowState = WorkflowEvent.TaskFailed.random(),
+                workflowState = WorkflowEvent.WorkflowFailed.random(),
             ),
             RuntimeException("boom")
         )

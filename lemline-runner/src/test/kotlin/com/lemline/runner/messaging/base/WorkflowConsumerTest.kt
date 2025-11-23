@@ -5,7 +5,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.orchestrator.WorkflowOrchestrator
+import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.messaging.CompensationException
@@ -67,6 +67,12 @@ internal abstract class WorkflowConsumerTest {
 
     val databaseMessages = ConcurrentHashMap<String, CompletableFuture<InstanceMessage<WorkflowEvent>?>>()
 
+    private val workflowInfo = WorkflowInfo(
+        WorkflowNamespace("test"),
+        WorkflowName("test-workflow"),
+        WorkflowVersion("1.0.0")
+    )
+
     @BeforeEach
     fun setup() = runTest {
         // Clear the database
@@ -124,7 +130,7 @@ internal abstract class WorkflowConsumerTest {
                     then: exit
                 - waitCase:
                     wait:
-                      seconds: 30
+                      milliseconds: 100
                     then: exit
                 - retryCase:
                     try:
@@ -161,9 +167,9 @@ internal abstract class WorkflowConsumerTest {
 
     protected abstract fun sendInstanceMessage(message: String)
 
-    protected abstract fun receiveInstanceMessage(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
+    protected abstract suspend fun receiveInstanceMessage(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
 
-    protected abstract fun receiveDatabaseMessage(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
+    protected abstract suspend fun receivedEvent(timeout: Long = 1, unit: TimeUnit = SECONDS): String?
 
     private fun sendMessageFuture(messageJson: String): CompletableFuture<InstanceMessage<*>?> {
         // Send the message to the input topic
@@ -191,12 +197,8 @@ internal abstract class WorkflowConsumerTest {
     fun `should process valid workflow message and send to output topic`() = runTest {
         // Given
         val instanceMessage = InstanceMessage(
-            workflowInfo = WorkflowInfo(
-                WorkflowNamespace("test"),
-                WorkflowName("test-workflow"),
-                WorkflowVersion("1.0.0")
-            ),
-            workflowState = WorkflowOrchestrator.initState(workflowInput = JsonPrimitive("task")),
+            workflowInfo = workflowInfo,
+            workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("task")),
         )
 
         // When
@@ -211,7 +213,7 @@ internal abstract class WorkflowConsumerTest {
         }
 
         // Verify that no message was sent to the database topic
-        receiveDatabaseMessage() shouldBe null
+        receivedEvent() shouldBe null
     }
 
     /**
@@ -240,7 +242,7 @@ internal abstract class WorkflowConsumerTest {
         (cause is CompensationException && cause.reason == DESERIALIZATION_FAILURE) shouldBe true
 
         // Check that no message was sent to the database topic (deserialization failures are stored directly in the repository)
-        receiveDatabaseMessage() shouldBe null
+        receivedEvent() shouldBe null
     }
 
     /**
@@ -262,12 +264,8 @@ internal abstract class WorkflowConsumerTest {
     fun `retry should trigger sending a RetryOutboxModel to the database topic`() = runTest {
         // Given
         val instanceMessage = InstanceMessage(
-            workflowInfo = WorkflowInfo(
-                WorkflowNamespace("test"),
-                WorkflowName("test-workflow"),
-                WorkflowVersion("1.0.0")
-            ),
-            workflowState = WorkflowOrchestrator.initState(workflowInput = JsonPrimitive("retry")),
+            workflowInfo = workflowInfo,
+            workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("retry")),
         )
 
         // When
@@ -277,7 +275,7 @@ internal abstract class WorkflowConsumerTest {
         future.get(1, SECONDS) shouldBe null
 
         // Check that a message was sent to the database topic
-        receiveDatabaseMessage().shouldNotBeNull {
+        receivedEvent().shouldNotBeNull {
             val instance = InstanceMessage.fromJsonString<WorkflowEvent>(this)
             instance.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
             val retryingState = instance.workflowState as WorkflowEvent.RetryScheduled
@@ -305,22 +303,21 @@ internal abstract class WorkflowConsumerTest {
     fun `should store waiting instance in wait repository`() = runTest {
         // Given
         val instanceMessage = InstanceMessage(
-            workflowInfo = WorkflowInfo(
-                WorkflowNamespace("test"),
-                WorkflowName("test-workflow"),
-                WorkflowVersion("1.0.0")
-            ),
-            workflowState = WorkflowOrchestrator.initState(workflowInput = JsonPrimitive("wait")),
+            workflowInfo = workflowInfo,
+            workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("wait")),
         )
 
         // When
-        val future = sendMessageFuture(instanceMessage.toJsonString())
+        val scheduleWaitCommand = sendMessageFuture(instanceMessage.toJsonString()).get(5, SECONDS)
 
         // Then
-        println(future.get(2, SECONDS))
+        scheduleWaitCommand shouldNotBe null
+        receivedEvent().shouldBe(null)
+
+        sendMessageFuture(scheduleWaitCommand!!.toJsonString()).get(1, SECONDS)
 
         // Check that a message was sent to the database topic
-        receiveDatabaseMessage().shouldNotBeNull {
+        receivedEvent().shouldNotBeNull {
             val instance = InstanceMessage.fromJsonString<WorkflowEvent>(this)
             instance.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
             val waitState = instance.workflowState as WorkflowEvent.WaitStarted
@@ -346,20 +343,16 @@ internal abstract class WorkflowConsumerTest {
     fun `should handle completed workflow without sending message`() = runTest {
         // Given
         val instanceMessage = InstanceMessage(
-            workflowInfo = WorkflowInfo(
-                WorkflowNamespace("test"),
-                WorkflowName("test-workflow"),
-                WorkflowVersion("1.0.0")
-            ),
-            workflowState = WorkflowOrchestrator.initState(workflowInput = JsonPrimitive("completed")),
+            workflowInfo = workflowInfo,
+            workflowState = StepByStepOrchestrator.initCmd(workflowInput = JsonPrimitive("completed")),
         )
 
         // When
         val future = sendMessageFuture(instanceMessage.toJsonString())
 
         // Then
-        future.get(1, SECONDS) shouldBe null
+        future.get(5, SECONDS) shouldBe null
 
-        receiveDatabaseMessage() shouldBe null
+        receivedEvent() shouldBe null
     }
 }

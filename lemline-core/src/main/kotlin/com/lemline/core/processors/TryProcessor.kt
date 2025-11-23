@@ -7,7 +7,7 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.NodePosition
-import com.lemline.core.orchestrator.StepOrchestrator
+import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.TaskState
@@ -88,7 +88,7 @@ class TryProcessor(
      * This method handles both the first attempt (down) and the completion (up) of the `TryState` node.
      *
      * This method is used in "normal" execution.
-     * This is bypassed by [StepOrchestrator] when this node caught an exception.
+     * This is bypassed by [StepByStepOrchestrator] when this node caught an exception.
      */
     override fun getNextStepInfo(
         state: TryState,

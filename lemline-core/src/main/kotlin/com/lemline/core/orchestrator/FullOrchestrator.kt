@@ -33,7 +33,7 @@ import kotlinx.serialization.json.buildJsonObject
  * coordinating parallel execution of multiple workflow branches.
  */
 @ExperimentalTime
-internal object WorkflowOrchestrator {
+internal object FullOrchestrator {
 
     private val logger = logger()
 
@@ -44,7 +44,7 @@ internal object WorkflowOrchestrator {
         hasWaitingParent: Boolean = false,
         startedAt: Instant = Clock.System.now(),
     ): JsonElement {
-        val cmd = StepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
+        val cmd = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
 
         return resume(workflow, cmd).value()
     }
@@ -54,7 +54,7 @@ internal object WorkflowOrchestrator {
         command: WorkflowCommand,
     ): WorkflowEvent.Outcome {
 
-        return when (val event = StepOrchestrator.runByTask(workflow, command)) {
+        return when (val event = StepByStepOrchestrator.runByTask(workflow, command)) {
             is WorkflowEvent.WaitStarted -> resume(workflow, handle(event))
             is WorkflowEvent.TaskScheduled -> resume(workflow, handle(event))
             is WorkflowEvent.RetryScheduled -> resume(workflow, handle(event))
@@ -91,7 +91,8 @@ internal object WorkflowOrchestrator {
         return when (event.childConfig.sync) {
             true -> {
                 // synchronous execution
-                val initCmd = StepOrchestrator.initCmd(workflowInput = event.childConfig.input, hasWaitingParent = true)
+                val initCmd =
+                    StepByStepOrchestrator.initCmd(workflowInput = event.childConfig.input, hasWaitingParent = true)
                 val result = resume(childWorkflow, initCmd)
                 logger.debug { "Child workflow completed" }
                 when (result) {
@@ -106,7 +107,7 @@ internal object WorkflowOrchestrator {
                 // asynchronous execution
                 CoroutineScope(currentCoroutineContext()).launch {
                     val initCmd =
-                        StepOrchestrator.initCmd(workflowInput = event.childConfig.input, hasWaitingParent = true)
+                        StepByStepOrchestrator.initCmd(workflowInput = event.childConfig.input, hasWaitingParent = true)
                     resume(childWorkflow, initCmd) // <= output is not handled
                     logger.debug { "Child workflow completed" }
                 }

@@ -4,9 +4,9 @@ package com.lemline.runner.messaging.commands
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
-import com.lemline.core.orchestrator.ExecutionMode
-import com.lemline.core.orchestrator.WorkflowOrchestrator
+import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
@@ -41,8 +41,8 @@ import org.jetbrains.annotations.TestOnly
 @ExperimentalSerializationApi
 @ApplicationScoped
 internal class WorkflowCommandHandler(
-    private val instanceEmitter: WorkflowCommandEmitter,
-    private val databaseEmitter: WorkflowEventEmitter,
+    private val commandEmitter: WorkflowCommandEmitter,
+    private val eventEmitter: WorkflowEventEmitter,
     private val definitionRepository: DefinitionRepository,
     private val failureRepository: FailureRepository,
     override val metrics: WorkflowCommandSubscriberMetrics,
@@ -79,7 +79,7 @@ internal class WorkflowCommandHandler(
         val failure = FailureModel.from(
             id = IDV7.random(),
             payload = payload,
-            error = cause,
+            exception = cause,
             reason = DESERIALIZATION_FAILURE
         )
         failureRepository.insert(failure)
@@ -104,8 +104,8 @@ internal class WorkflowCommandHandler(
 
             // Send TaskFailed event to database (not retryable - serialization is a permanent error)
             throw CompensationException(SERIALIZATION_FAILURE) {
-                databaseEmitter.send(
-                    current.toTaskFailed(
+                eventEmitter.send(
+                    current.toWorkflowFailed(
                         exception = e,
                         reason = SERIALIZATION_FAILURE
                     )
@@ -118,7 +118,7 @@ internal class WorkflowCommandHandler(
      * Converts an InstanceMessage<WorkflowCommand> to InstanceMessage<WorkflowEvent>
      * for infrastructure failures that should be stored as permanent failures.
      */
-    private fun InstanceMessage<WorkflowCommand>.toTaskFailed(
+    private fun InstanceMessage<WorkflowCommand>.toWorkflowFailed(
         exception: Exception,
         reason: String
     ): InstanceMessage<WorkflowEvent> {
@@ -132,7 +132,7 @@ internal class WorkflowCommandHandler(
 
         return InstanceMessage(
             workflowInfo = workflowInfo,
-            workflowState = WorkflowEvent.TaskFailed(
+            workflowState = WorkflowEvent.WorkflowFailed(
                 taskStates = workflowState.taskStates,
                 nodePosition = workflowState.nodePosition,
                 rawInput = null,
@@ -153,7 +153,7 @@ internal class WorkflowCommandHandler(
      * MessageEmitter.send() handles retries internally.
      */
     override suspend fun emit(payload: String) {
-        instanceEmitter.sendPayload(payload)
+        commandEmitter.sendPayload(payload)
     }
 
     // ========================================
@@ -203,8 +203,8 @@ internal class WorkflowCommandHandler(
             // Send TaskFailed event to database (broker will handle message-level retries)
             val reason = getFailureReason(e)
             throw CompensationException(reason) {
-                databaseEmitter.send(
-                    toTaskFailed(
+                eventEmitter.send(
+                    toWorkflowFailed(
                         exception = e,
                         reason = reason
                     )
@@ -221,8 +221,8 @@ internal class WorkflowCommandHandler(
         val error = IllegalStateException(errorMsg)
 
         throw CompensationException(DEFINITION_MISSING) {
-            databaseEmitter.send(
-                toTaskFailed(
+            eventEmitter.send(
+                toWorkflowFailed(
                     exception = error,
                     reason = DEFINITION_MISSING
                 )
@@ -240,11 +240,11 @@ internal class WorkflowCommandHandler(
      */
     private suspend fun InstanceMessage<WorkflowCommand>.executeStep(workflow: Workflow): InstanceMessage<WorkflowCommand>? {
 
-        // Execute using WorkflowOrchestrator
-        val event = WorkflowOrchestrator.resume(
+        // Execute using StepByStepOrchestrator
+        logger.debug { "resumeFromTask state=$workflowState" }
+        val event = StepByStepOrchestrator.runByActivity(
             workflow = workflow,
-            state = workflowState,
-            executionMode = ExecutionMode.ACTIVITY_BY_ACTIVITY
+            command = workflowState,
         )
 
         // Handle the outcome
@@ -263,7 +263,7 @@ internal class WorkflowCommandHandler(
         return when (event) {
             is WorkflowEvent.TaskScheduled -> {
                 // Activity scheduled
-                logger.debug { "Activity completed at ${event.nodePosition}" }
+                logger.debug { "Activity scheduled node=${event.nodePosition} - ${workflow.getNode(event.nodePosition).task::class.simpleName}(input=${event.rawInput})" }
                 event.resume()
             }
 
@@ -274,17 +274,9 @@ internal class WorkflowCommandHandler(
                     event.resume()
                 } else {
                     // Send to the database for persistence
-                    logger.debug { "Starting wait task, resuming at ${event.waitUntil}" }
                     sendToDatabase(this, event)
                     null  // Paused
                 }
-            }
-
-            is WorkflowEvent.TaskFailed -> {
-                // Send to database for failure persistence
-                logger.error { "Workflow failed at ${event.nodePosition}: ${event.error}" }
-                sendToDatabase(this, event)
-                null  // Terminal
             }
 
             is WorkflowEvent.RetryScheduled -> {
@@ -294,7 +286,6 @@ internal class WorkflowCommandHandler(
                     event.resume()
                 } else {
                     // Send to the database for persistence
-                    logger.debug { "Scheduling retry, retrying at ${event.retryAt}" }
                     sendToDatabase(this, event)
                     null  // Paused
                 }
@@ -302,8 +293,8 @@ internal class WorkflowCommandHandler(
 
             is WorkflowEvent.RunWorkflowStarted -> {
                 // Send to the database for parent storage + child creation
-                logger.debug { "Starting child workflow at ${event.nodePosition}" }
                 sendToDatabase(this, event)
+
                 when (event.childConfig.sync) {
                     // waiting for synchronous completion
                     true -> null
@@ -314,7 +305,6 @@ internal class WorkflowCommandHandler(
 
             is WorkflowEvent.ForkStarted -> {
                 // Send to the database for fork persistence + branch scheduling
-                logger.debug { "Starting fork at ${event.nodePosition}" }
                 sendToDatabase(this, event)
                 null  // Paused - waiting for branches to complete
             }
@@ -330,16 +320,20 @@ internal class WorkflowCommandHandler(
                 null  // Terminal
             }
 
-            is WorkflowEvent.ForkBranchCompleted -> {
-                // Send to database for branch completion tracking
-                logger.debug { "Branch completed at ${event.nodePosition}" }
+            is WorkflowEvent.WorkflowFailed -> {
+                // Send to database for failure persistence
                 sendToDatabase(this, event)
                 null  // Terminal
             }
 
-            is WorkflowEvent.ForkBranchFailed -> {
+            is WorkflowEvent.BranchCompleted -> {
+                // Send to database for branch completion tracking
+                sendToDatabase(this, event)
+                null  // Terminal
+            }
+
+            is WorkflowEvent.BranchFailed -> {
                 // Send to database for branch failure tracking
-                logger.debug { "Branch failed at ${event.nodePosition}: ${event.error}" }
                 sendToDatabase(this, event)
                 null  // Terminal
             }
@@ -352,7 +346,8 @@ internal class WorkflowCommandHandler(
      * Sends a workflow event to the database channel for persistence.
      */
     private suspend fun sendToDatabase(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent) {
-        databaseEmitter.send(
+        logger.debug { "Sending event to database: $event" }
+        eventEmitter.send(
             InstanceMessage(
                 workflowInfo = message.workflowInfo,
                 workflowState = event,

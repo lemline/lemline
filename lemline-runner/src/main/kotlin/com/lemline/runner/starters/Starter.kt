@@ -6,7 +6,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.orchestrator.WorkflowOrchestrator
+import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.definitions.Definitions
@@ -59,7 +59,7 @@ class Starter {
         val instanceMessage = when (workflow.schedule?.cron.isNullOrBlank()) {
             true -> InstanceMessage(
                 workflowInfo = WorkflowInfo(workflowNamespace, workflowName, workflowVersion),
-                workflowState = WorkflowOrchestrator.initState(workflowId, workflowInput, hasWaitingParent)
+                workflowState = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent)
             )
 
             false -> null

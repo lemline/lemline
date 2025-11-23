@@ -97,7 +97,7 @@ internal class WorkflowEventHandler(
             val failure = FailureModel.from(
                 payload = payload,
                 reason = DESERIALIZATION_FAILURE,
-                error = e
+                exception = e
             )
             failureRepository.insert(failure)
         }
@@ -137,11 +137,11 @@ internal class WorkflowEventHandler(
      * Routes different events to appropriate repositories:
      * - [WorkflowEvent.WaitStarted] → waits table
      * - [WorkflowEvent.RetryScheduled] → retries table
-     * - [WorkflowEvent.TaskFailed] → failures table
+     * - [WorkflowEvent.WorkflowFailed] → failures table
      * - [WorkflowEvent.RunWorkflowStarted] → parents table + child creation
      * - [WorkflowEvent.WorkflowCompleted] → parent completion
      * - [WorkflowEvent.ForkStarted] → forks table + branch creation
-     * - [WorkflowEvent.ForkBranchCompleted] → branch completion
+     * - [WorkflowEvent.BranchCompleted] → branch completion
      *
      * Database operations fail fast - if they fail, the message will be NACKed
      * and redelivered by the broker.
@@ -154,17 +154,17 @@ internal class WorkflowEventHandler(
 
             is WorkflowEvent.RetryScheduled -> handleRetryScheduled(current as InstanceMessage<WorkflowEvent.RetryScheduled>)
 
-            is WorkflowEvent.TaskFailed -> handleTaskFailed(current as InstanceMessage<WorkflowEvent.TaskFailed>)
-
             is WorkflowEvent.RunWorkflowStarted -> handleRunWorkflowStarted(current as InstanceMessage<WorkflowEvent.RunWorkflowStarted>)
-
-            is WorkflowEvent.WorkflowCompleted -> handleWorkflowCompleted(current as InstanceMessage<WorkflowEvent.WorkflowCompleted>)
 
             is WorkflowEvent.ForkStarted -> handleForkStarted(current as InstanceMessage<WorkflowEvent.ForkStarted>)
 
-            is WorkflowEvent.ForkBranchCompleted -> handleForkBranchCompleted(current as InstanceMessage<WorkflowEvent.ForkBranchCompleted>)
+            is WorkflowEvent.BranchCompleted -> handleBranchCompleted(current as InstanceMessage<WorkflowEvent.BranchCompleted>)
 
-            is WorkflowEvent.ForkBranchFailed -> handleForkBranchFailed(current as InstanceMessage<WorkflowEvent.ForkBranchFailed>)
+            is WorkflowEvent.BranchFailed -> handleBranchFailed(current as InstanceMessage<WorkflowEvent.BranchFailed>)
+
+            is WorkflowEvent.WorkflowCompleted -> handleWorkflowCompleted(current as InstanceMessage<WorkflowEvent.WorkflowCompleted>)
+
+            is WorkflowEvent.WorkflowFailed -> handleWorkflowFailed(current as InstanceMessage<WorkflowEvent.WorkflowFailed>)
 
             is WorkflowEvent.TaskScheduled -> error("Unexpected state in workflow event handler: $state")
         }
@@ -191,15 +191,41 @@ internal class WorkflowEventHandler(
         )
     }
 
-    private suspend fun handleTaskFailed(instance: InstanceMessage<WorkflowEvent.TaskFailed>) {
-        val exception = InternalException(instance.workflowState.error) // TODO check if this is the correct exception
-        failureRepository.insert(
-            FailureModel.from(
-                instance = instance,
-                error = exception,
-                reason = getFailureReason(exception)
+    private suspend fun handleWorkflowFailed(instance: InstanceMessage<WorkflowEvent.WorkflowFailed>) {
+        failureRepository.withTransaction { conn ->
+            val exception = InternalException(instance.workflowState.error)
+            failureRepository.insert(
+                FailureModel.from(
+                    instance = instance,
+                    exception = exception,
+                    reason = getFailureReason(exception)
+                ),
+                conn
             )
-        )
+            // If this workflow has a parent, resume it with the child exception, in case
+            if (instance.hasWaitingParent) {
+                parentRepository.findByChildId(instance.workflowId, conn)?.let { parent ->
+                    // Parent state
+                    val state = parent.instanceMessage.workflowState
+
+                    // restart parent
+                    instanceEmitter.send(
+                        InstanceMessage(
+                            workflowInfo = parent.instanceMessage.workflowInfo,
+                            workflowState = state.resumeAsFailed(instance.workflowState.error),
+                        )
+                    )
+
+                    // mark parent as completed for cleanup (event-driven state - processed once)
+                    parent.outboxCompletedAt = Clock.System.now()
+                    parentRepository.update(parent, conn)
+
+                    logger.debug {
+                        "Parent workflow $parent resumed after child ${instance.workflowId} completion"
+                    }
+                } ?: error("CRITICAL - Unable to find parent for child ${instance.workflowId}")
+            }
+        }
     }
 
     private suspend fun handleRunWorkflowStarted(instance: InstanceMessage<WorkflowEvent.RunWorkflowStarted>) {
@@ -240,7 +266,7 @@ internal class WorkflowEventHandler(
         // If this workflow has a parent, resume it
         if (instance.hasWaitingParent) {
             parentRepository.withTransaction { conn ->
-                parentRepository.findByChildId(instance.workflowId)?.let { parent ->
+                parentRepository.findByChildId(instance.workflowId, conn)?.let { parent ->
                     // Parent state
                     val state = parent.instanceMessage.workflowState
 
@@ -248,7 +274,7 @@ internal class WorkflowEventHandler(
                     instanceEmitter.send(
                         InstanceMessage(
                             workflowInfo = parent.instanceMessage.workflowInfo,
-                            workflowState = state.resumeSync(instance.workflowState.output),
+                            workflowState = state.resumeAsCompleted(instance.workflowState.output),
                         )
                     )
 
@@ -338,7 +364,11 @@ internal class WorkflowEventHandler(
         branches.forEach { branchNode ->
             val branchMessage = InstanceMessage(
                 workflowInfo = instance.workflowInfo,
-                workflowState = instance.workflowState.startBranch(branchNode.position),
+                workflowState = WorkflowCommand.ResumeFromTask(
+                    taskStates = instance.workflowState.taskStates,
+                    nodePosition = branchNode.position,
+                    rawInput = instance.workflowState.rawInput
+                ),
             )
 
             logger.debug { "Scheduling branch ${branchNode.name} at ${branchNode.position}" }
@@ -354,7 +384,7 @@ internal class WorkflowEventHandler(
      * 4. If complete, assembling output and resuming parent workflow
      * 5. If not complete, waiting for more branches
      */
-    private suspend fun handleForkBranchCompleted(instance: InstanceMessage<WorkflowEvent.ForkBranchCompleted>) {
+    private suspend fun handleBranchCompleted(instance: InstanceMessage<WorkflowEvent.BranchCompleted>) {
         val state = instance.workflowState
         val forkPosition = state.nodePosition
         val branchOutput = state.output
@@ -411,7 +441,7 @@ internal class WorkflowEventHandler(
                     else -> null
                 }
 
-                // Is the fork is now completed?
+                // Is the fork now completed?
                 if (outputJson != null) {
                     logger.debug { "Fork completed at $forkPosition with output $outputJson, resuming parent workflow" }
                     // Update fork with completion data
@@ -427,7 +457,7 @@ internal class WorkflowEventHandler(
 
                     val resumeMessage = InstanceMessage(
                         workflowInfo = instance.workflowInfo,
-                        workflowState = WorkflowCommand.ResumeFromStartedTask(
+                        workflowState = WorkflowCommand.ResumeWithCompletedTask(
                             taskStates = instance.workflowState.taskStates,
                             nodePosition = forkPosition,
                             rawOutput = outputJson,
@@ -455,7 +485,7 @@ internal class WorkflowEventHandler(
      *
      * Similar pattern to handleForkBranchCompleted but with error handling logic.
      */
-    private suspend fun handleForkBranchFailed(instance: InstanceMessage<WorkflowEvent.ForkBranchFailed>) {
+    private suspend fun handleBranchFailed(instance: InstanceMessage<WorkflowEvent.BranchFailed>) {
         val state = instance.workflowState
         val forkPosition = state.nodePosition
         val branchError = state.error
@@ -482,109 +512,44 @@ internal class WorkflowEventHandler(
                 logger.info { "Weird, the branch '$branchName' at $forkPosition is already failed" }
                 return@withTransaction null
             }
-
-            // Create failure record
-            val failureId = IDV7.random()
-            failureRepository.insert(
-                FailureModel(
-                    id = failureId,
-                    workflowId = instance.workflowId,
-                    nodePosition = forkPosition.toString(),
-                    error = branchError,
-                    reason = "Fork branch '$branchName' failed"
-                ),
-                conn
-            )
+            if (branch.completedAt != null) {
+                logger.info { "Weird, the branch '$branchName' at $forkPosition is already completed" }
+                return@withTransaction null
+            }
 
             // Update branch with failure data
             branch.failedAt = Clock.System.now()
-            branch.failureId = failureId
-            // Clean success fields if they existed
-            branch.completedAt = null
-            branch.output = null
+            branch.failureId =
+                null // TODO Store the error here - not in table failures, as do not know yet if this failure triggers a workflow failure
 
             // Save the updated branch in the transaction
             forkRepository.updateBranch(branch, conn)
 
             // Apply business logic based on compete mode
             if (fork.outboxCompletedAt == null && fork.failedAt == null) {
-                if (fork.compete) {
-                    // COMPETE MODE: Wait for all branches to finish, only fail if all failed
-                    val finishedCount = branches.count { it.completedAt != null || it.failedAt != null }
-                    if (finishedCount == branches.size) {
-                        // All branches finished - check if any succeeded
-                        val successfulBranch = branches.firstOrNull { it.completedAt != null }
-                        if (successfulBranch != null) {
-                            // At least one succeeded - fork succeeds with that output
-                            val output = successfulBranch.output ?: error("Successful branch has no output")
-                            val outputJson = LemlineJson.decodeFromString<JsonElement>(output)
 
-                            logger.debug { "Compete fork completed at $forkPosition despite failures, winner: ${successfulBranch.name}" }
+                val failedCount = branches.count { it.failedAt != null }
+                val error = when {
+                    fork.compete && failedCount == branches.size -> instance.workflowState.error
+                    !fork.compete && failedCount == 1 -> instance.workflowState.error
+                    else -> null
+                }
 
-                            fork.output = output
-                            fork.outboxCompletedAt = Clock.System.now()
-                            forkRepository.update(fork, conn)
+                if (error != null) {
+                    logger.debug { "Fork failed at $forkPosition, resuming workflow with error" }
 
-                            val resumeMessage = InstanceMessage(
-                                workflowInfo = instance.workflowInfo,
-                                workflowState = WorkflowCommand.ResumeFromStartedTask(
-                                    taskStates = instance.workflowState.taskStates,
-                                    nodePosition = forkPosition,
-                                    rawOutput = outputJson,
-                                ),
-                            )
-
-                            instanceEmitter.send(resumeMessage)
-                        } else {
-                            // All branches failed - fork fails with last error
-                            val lastFailedBranch = branches.lastOrNull { it.failedAt != null }
-                                ?: error("No failed branches found")
-                            val lastFailureId = lastFailedBranch.failureId
-                                ?: error("Failed branch has no failure ID")
-
-                            logger.error { "Compete fork failed at $forkPosition - all ${branches.size} branches failed" }
-
-                            fork.failedAt = Clock.System.now()
-                            fork.failureId = lastFailureId
-                            forkRepository.update(fork, conn)
-
-                            // Resume parent workflow with error
-                            val resumeMessage = InstanceMessage(
-                                workflowInfo = instance.workflowInfo,
-                                workflowState = WorkflowCommand.ResumeFromTask(
-                                    taskStates = instance.workflowState.taskStates,
-                                    nodePosition = forkPosition,
-                                    rawInput = null, // Error case
-                                    flowDirective = null
-                                ),
-                            )
-
-                            instanceEmitter.send(resumeMessage)
-                        }
-                    } else {
-                        logger.debug { "Compete fork at $forkPosition: branch failed, waiting for other branches" }
-                        // Still waiting for other branches
-                    }
-                } else {
-                    // COOPERATIVE MODE: Fail immediately on first branch failure
-                    logger.error { "Cooperative fork failed at $forkPosition - branch '$branchName' failed" }
-
-                    fork.failedAt = Clock.System.now()
-                    fork.failureId = failureId
-                    forkRepository.update(fork, conn)
-
-                    // Resume parent workflow with error
+                    // we do not know yet if the workflow will be failing after this fork failure
+                    // this exception can be caught above the fork, that's why we restart from there
                     val resumeMessage = InstanceMessage(
                         workflowInfo = instance.workflowInfo,
-                        workflowState = WorkflowCommand.ResumeFromTask(
+                        workflowState = WorkflowCommand.ResumeWithFailedTask(
                             taskStates = instance.workflowState.taskStates,
                             nodePosition = forkPosition,
-                            rawInput = null, // Error case
-                            flowDirective = null
+                            error = error,
                         ),
                     )
-
                     instanceEmitter.send(resumeMessage)
+
                 }
             }
         }

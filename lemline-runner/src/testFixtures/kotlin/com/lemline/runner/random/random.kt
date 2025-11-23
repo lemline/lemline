@@ -11,8 +11,8 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.errors.AsyncTaskException
 import com.lemline.core.errors.InternalException
-import com.lemline.core.errors.RunWorkflowStartedException
 import com.lemline.core.nodes.NodePosition
 import com.lemline.core.random.random
 import com.lemline.core.states.RootState
@@ -53,7 +53,7 @@ fun WorkflowInfo.Companion.random() = WorkflowInfo(
 
 fun WorkflowCommand.Companion.random() = when (Random.nextBoolean()) {
     true -> WorkflowCommand.ResumeFromTask.random()
-    false -> WorkflowCommand.ResumeFromStartedTask.random()
+    false -> WorkflowCommand.ResumeWithCompletedTask.random()
 }
 
 fun WorkflowCommand.ResumeFromTask.Companion.random() = WorkflowCommand.ResumeFromTask(
@@ -63,13 +63,13 @@ fun WorkflowCommand.ResumeFromTask.Companion.random() = WorkflowCommand.ResumeFr
     flowDirective = null
 )
 
-fun WorkflowCommand.ResumeFromStartedTask.Companion.random() = WorkflowCommand.ResumeFromStartedTask(
+fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand.ResumeWithCompletedTask(
     taskStates = randomTaskStates(),
     nodePosition = NodePosition.random(),
     rawOutput = JsonElement.random(),
 )
 
-fun WorkflowEvent.TaskFailed.Companion.random() = WorkflowEvent.TaskFailed(
+fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFailed(
     taskStates = randomTaskStates(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
@@ -90,7 +90,7 @@ fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkf
     nodePosition = NodePosition.random(),
     runState = RunState(),
     rawInput = JsonElement.random(),
-    childConfig = RunWorkflowStartedException.Config(
+    childConfig = AsyncTaskException.RunWorkflowStartedException.Config(
         namespace = WorkflowNamespace("test"),
         name = WorkflowName("test"),
         version = WorkflowVersion("1.0"),
@@ -132,7 +132,7 @@ fun FailureModel.Companion.random() = FailureModel(
     instanceMessage = when (Random.nextBoolean()) {
         true -> InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
-            workflowState = WorkflowEvent.TaskFailed.random(),
+            workflowState = WorkflowEvent.WorkflowFailed.random(),
         )
 
         false -> null

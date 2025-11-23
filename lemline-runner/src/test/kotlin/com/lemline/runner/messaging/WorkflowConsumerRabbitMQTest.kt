@@ -144,9 +144,9 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
         )
     }
 
-    override fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? =
+    override suspend fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? =
         instanceDeliveries.poll(timeout, unit)?.let { String(it.body) }
 
-    override fun receiveDatabaseMessage(timeout: Long, unit: TimeUnit): String? =
+    override suspend fun receivedEvent(timeout: Long, unit: TimeUnit): String? =
         databaseDeliveries.poll(timeout, unit)?.let { String(it.body) }
 }

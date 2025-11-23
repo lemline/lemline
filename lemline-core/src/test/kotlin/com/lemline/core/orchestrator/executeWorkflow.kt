@@ -20,14 +20,14 @@ internal suspend fun executeWorkflow(
 ): JsonElement {
     val workflow = getWorkflowToTest(yaml, namespace, name, version)
 
-    val startState = StepOrchestrator.initCmd(
+    val startState = StepByStepOrchestrator.initCmd(
         workflowId = WorkflowId.random(),
         workflowInput = input,
         hasWaitingParent = false,
         startedAt = Clock.System.now()
     )
 
-    val event = WorkflowOrchestrator.resume(
+    val event = FullOrchestrator.resume(
         workflow = workflow,
         command = startState,
     )

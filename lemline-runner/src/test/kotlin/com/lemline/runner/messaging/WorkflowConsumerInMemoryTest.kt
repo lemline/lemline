@@ -16,6 +16,7 @@ import jakarta.enterprise.inject.Any
 import jakarta.inject.Inject
 import java.util.concurrent.TimeUnit
 import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.Tag
 
@@ -79,9 +80,9 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      * @param unit The time unit of the timeout
      * @return The received message, or null if no message was received within the timeout
      */
-    override fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? {
+    override suspend fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? {
         // Wait for the message to be processed
-        Thread.sleep(10)
+        delay(10)
         // Get the first message from the sink
         return instanceSink.received().firstOrNull()?.payload
     }
@@ -93,9 +94,9 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      * @param unit The time unit of the timeout
      * @return The received message, or null if no message was received within the timeout
      */
-    override fun receiveDatabaseMessage(timeout: Long, unit: TimeUnit): String? {
+    override suspend fun receivedEvent(timeout: Long, unit: TimeUnit): String? {
         // Wait for the message to be processed
-        Thread.sleep(10)
+        delay(10)
         // Get the first message from the sink
         return databaseSink.received().firstOrNull()?.payload
     }

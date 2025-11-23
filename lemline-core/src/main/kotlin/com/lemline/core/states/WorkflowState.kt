@@ -41,12 +41,6 @@ sealed class WorkflowState {
 @Serializable
 sealed class WorkflowCommand : WorkflowState() {
 
-    override fun toJsonString(): String = LemlineJson.encodeToString(this)
-
-    companion object {
-        fun fromJsonString(jsonString: String): WorkflowCommand = LemlineJson.decodeFromString(jsonString)
-    }
-
     /**
      * Command to resume workflow execution from a specific task.
      */
@@ -55,7 +49,7 @@ sealed class WorkflowCommand : WorkflowState() {
         override val taskStates: TaskStates,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
-        val flowDirective: FlowDirective?
+        val flowDirective: FlowDirective? = null
     ) : WorkflowCommand() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -109,12 +103,6 @@ sealed class WorkflowCommand : WorkflowState() {
 @Serializable
 sealed class WorkflowEvent : WorkflowState() {
 
-    override fun toJsonString(): String = LemlineJson.encodeToString(this)
-
-    companion object {
-        fun fromJsonString(jsonString: String): WorkflowEvent = LemlineJson.decodeFromString(jsonString)
-    }
-
     /**
      * Represents the result of a workflow's progression.
      */
@@ -151,8 +139,8 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when a task fails without the error being caught (outside a fork).
      *
-     * If rawInput is not null, this error comes from the [com.lemline.core.orchestrator.StepOrchestrator.resumeFromTask] method
-     * If rawOutput is not null, this error comes from the [com.lemline.core.orchestrator.StepOrchestrator.resumeFromCompletedTask] method
+     * If rawInput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromTask] method
+     * If rawOutput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromCompletedTask] method
      */
     @ExperimentalTime
     @Serializable
@@ -383,13 +371,6 @@ sealed class WorkflowEvent : WorkflowState() {
             taskStates = taskStates,
             nodePosition = nodePosition,
             rawOutput = rawOutput,
-        )
-
-        fun startBranch(branchPosition: NodePosition) = WorkflowCommand.ResumeFromTask(
-            taskStates = taskStates,
-            nodePosition = branchPosition,
-            rawInput = rawInput,
-            flowDirective = null,
         )
     }
 }

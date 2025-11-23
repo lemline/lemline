@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
-import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowId
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.FailureModel
@@ -90,7 +88,7 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
 
     override fun createModel(rs: ResultSet) = FailureModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage<WorkflowEvent.TaskFailed>(),
+        instanceMessage = rs.getInstanceMessage<WorkflowEvent.WorkflowFailed>(),
         payload = rs.getString(PAYLOAD_COLUMN),
         errorReason = rs.getString(ERROR_REASON_COLUMN),
         errorClass = rs.getString(ERROR_CLASS_COLUMN),

@@ -110,12 +110,12 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
         instanceProducer.send(ProducerRecord(instanceTopicIn, message)).get()
     }
 
-    override fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? {
+    override suspend fun receiveInstanceMessage(timeout: Long, unit: TimeUnit): String? {
         val records = instanceConsumer.poll(Duration.ofMillis(unit.toMillis(timeout)))
         return records.firstOrNull()?.value()
     }
 
-    override fun receiveDatabaseMessage(timeout: Long, unit: TimeUnit): String? {
+    override suspend fun receivedEvent(timeout: Long, unit: TimeUnit): String? {
         val records = databaseConsumer.poll(Duration.ofMillis(unit.toMillis(timeout)))
         return records.firstOrNull()?.value()
     }
