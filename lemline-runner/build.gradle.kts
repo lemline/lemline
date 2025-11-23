@@ -12,7 +12,7 @@ plugins {
 }
 
 group = "com.lemline"
-val baseVersion = "0.2.0"
+val baseVersion = "0.3.0"
 
 // Determine the version dynamically: use Git tag if present (CI), otherwise nightly suffix for main branch builds
 val envRef = System.getenv("GITHUB_REF") ?: ""
