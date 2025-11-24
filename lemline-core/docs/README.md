@@ -1,86 +1,42 @@
-# Lemline Core
+# Lemline Core Documentation
 
-The `lemline-core` module is the heart of the Lemline workflow engine. It implements the Serverless Workflow DSL specification and provides the pure execution logic for workflows.
+The `lemline-core` module implements the Serverless Workflow DSL v1.0 specification, providing a pure, stateless execution engine.
 
-## 🧠 Core Philosophy
+## Documentation Index
 
-This module is designed as a **pure functional execution engine**. It does not handle:
-- Persistence (database)
-- Messaging (Kafka/RabbitMQ)
-- Scheduling
-- HTTP Server
+| Document | Description | When to Read |
+|----------|-------------|--------------|
+| [core-overview.md](core-overview.md) | Module structure, DSL parsing, adding new task types | Starting point, adding features |
+| [core-nodes.md](core-nodes.md) | Node tree architecture, NodePosition, navigation | Working with workflow structure |
+| [core-orchestrators.md](core-orchestrators.md) | StepByStep and Full orchestrators | Execution control, testing |
+| [core-processors.md](core-processors.md) | NodeProcessor pattern, control flows, activities | Implementing task logic |
+| [core-fork.md](core-fork.md) | Parallel branches, error boundaries | Fork/join patterns |
+| [core-errors.md](core-errors.md) | Exceptions, retry policies, error handling | Error handling, debugging |
+| [core-states.md](core-states.md) | TaskState, WorkflowState, commands/events | State management |
+| [core-expressions.md](core-expressions.md) | JQ expressions, scope, evaluation | Data transformation |
 
-Instead, it provides a `WorkflowOrchestrator` that takes the current state and input, executes the next step, and returns the new state and output. This separation allows the core to be extremely testable and embeddable in various runtimes (like the Quarkus-based `lemline-runner`).
+## Quick Reference
 
-## 🏗 Architecture
+### Key Classes
 
-### 1. Nodes & Definitions (`com.lemline.core.nodes`)
-Workflows are parsed into a tree of immutable `Node<T>` objects.
-- Each `Node` wraps a Serverless Workflow DSL task (e.g., `CallHTTP`, `Switch`, `Do`).
-- Nodes are identified by a unique `NodePosition` (e.g., `[0, "myTask", "do", 1]`).
-- The structure is static and immutable once loaded.
+| Class | Location | Purpose |
+|-------|----------|---------|
+| `DefinitionCache` | `definitions/` | Parse and cache workflows |
+| `StepByStepOrchestrator` | `orchestrator/` | Production execution |
+| `FullOrchestrator` | `orchestrator/` | Testing execution |
+| `Node<T>` | `nodes/` | Immutable workflow node |
+| `NodePosition` | `nodes/` | Node addressing |
+| `NodeProcessor<T,S>` | `processors/` | Task execution interface |
+| `TaskState` | `states/` | Execution state base |
+| `JQExpression` | `expressions/` | Expression evaluator |
 
-### 2. Execution Engine (`com.lemline.core.orchestrator`)
-The `WorkflowOrchestrator` is the main entry point. It implements a step-by-step execution loop:
+### Common Tasks
 
-```kotlin
-// Pure functional signature
-fun resumeFromTask(
-    taskStates: TaskStates,
-    node: Node<*>,
-    rawInput: JsonElement
-): WorkflowEvent
-```
-
-It handles:
-- **Navigation**: Moving between nodes (Down -> Enter, Up -> Return).
-- **Control Flow**: `if/else` (Switch), loops (For), parallel (Fork).
-- **Error Handling**: `try/catch/retry` logic.
-- **Data Transformation**: Evaluating JQ expressions.
-
-### 3. Processors (`com.lemline.core.processors`)
-Each node type has a corresponding `NodeProcessor`.
-- `CallHttpProcessor`: Executes HTTP requests.
-- `SwitchProcessor`: Evaluates conditions and chooses the next path.
-- `WaitProcessor`: Calculates wait duration.
-- `DoProcessor`: Manages sequential execution of child tasks.
-
-Processors handle two main events:
-- `enterFromParent`: Called when execution reaches this node from above.
-- `enterFromChild`: Called when a child node completes and execution returns to this node.
-
-### 4. State Management (`com.lemline.core.states`)
-State is external to the nodes.
-- `TaskStates`: A map of `NodePosition -> NodeState`.
-- `WorkflowState`: The result of an execution step, which can be:
-    - `WorkflowCompleted`: The workflow finished.
-    - `TaskScheduled`: A task executed, proceed to the next one.
-    - `WaitStarted`: The workflow needs to sleep (persisted to DB).
-    - `RunWorkflowStarted`: A sub-workflow started.
-    - `TaskFailed`: An error occurred.
-
-## 🔄 Execution Flow
-
-1. **Resume**: The runner calls `WorkflowOrchestrator.resume()`.
-2. **Step**: The orchestrator finds the processor for the current node.
-3. **Execute**: The processor executes its logic (e.g., make HTTP call, evaluate condition).
-4. **Result**:
-    - If the task completes immediately, it returns the next node.
-    - If the task needs to wait (e.g., `delay`), it throws a `WaitException`.
-    - If the task fails, it throws an exception.
-5. **Event**: The orchestrator catches these signals and returns a `WorkflowEvent` to the runner.
-
-## 🧪 Testing
-
-The core module is tested extensively using unit tests that simulate workflow execution without external dependencies.
-- `DataFlowTest.kt`: Verifies input/output transformation.
-- `ControlFlowTest.kt`: Verifies branching and looping.
-- `ErrorHandlingTest.kt`: Verifies retries and catch blocks.
-
-## 📦 Key Packages
-
-- `com.lemline.core.nodes`: Workflow definition tree.
-- `com.lemline.core.orchestrator`: Execution engine.
-- `com.lemline.core.processors`: Node-specific execution logic.
-- `com.lemline.core.expressions`: JQ expression evaluation.
-- `com.lemline.core.states`: Runtime state models.
+| Task | Documentation |
+|------|---------------|
+| Add new task type | [core-overview.md](core-overview.md#adding-a-new-task-type) |
+| Create processor | [core-processors.md](core-processors.md#creating-a-new-processor) |
+| Handle errors | [core-errors.md](core-errors.md#error-handling-flow) |
+| Test workflows | [core-orchestrators.md](core-orchestrators.md#usage-examples) |
+| Debug navigation | [core-nodes.md](core-nodes.md#debugging) |
+| Write expressions | [core-expressions.md](core-expressions.md#common-jq-patterns) |
