@@ -1,126 +1,126 @@
 # Spec Command
 
-Create a detailed technical specification for a new feature in this Quarkus + Kotlin reactive application.
+Create a detailed technical specification for a new feature in the Lemline workflow orchestration runtime.
 
 **Feature request:** {{placeholderText}}
 
 ## Process
 
 1. **Review documentation** to understand project standards:
-    - `/docs/backend/reactive/guide-http-best-practices.md` - Complete endpoint creation checklist
-    - `/docs/backend/reactive/guide-mutations.md` and `/docs/backend/reactive/guide-queries.md` - Reactive patterns (@WithSession, @WithTransaction)
-    - `/docs/backend/testing/guide-reactive.md` - Testing reactive code
-    - `/docs/backend/monitoring/` - Metrics documentation and naming conventions (metrics-*.md files)
-    - `/docs/backend/database/guide-setup.md` - Migration workflow
-    - `/docs/backend/database/guide-schema-changes.md` - Migration examples and rollback patterns
+    - `/CLAUDE.md` - Project overview and architecture
+    - `/lemline-core/docs/` - Developer guides for core logic
+    - `/lemline-runner/docs/` - Developer guides for infrastructure
+    - `/docs/adr/` - Architecture Decision Records
 
 2. **Read the codebase** to understand existing patterns:
-    - Explore similar entities, DTOs, resources, repositories
-    - Check authorization patterns (UserResource.kt, AuthResource.kt)
-    - Review existing migrations (db/migration/)
+    - Explore similar task types, instances, repositories
+    - Check existing nodes in `lemline-core/src/main/kotlin/com/lemline/core/nodes/`
+    - Review outbox patterns in `lemline-runner/src/main/kotlin/com/lemline/runner/outbox/`
+    - Check existing migrations in `db/migration/`
 
 3. **Create specification with sensible defaults:**
-    - **Authorization**: Default to @RolesAllowed(USER_ROLE); use ADMIN_ROLE for admin ops; @PermitAll only for
-      auth/public endpoints
-    - **Session/Transaction**: Use @WithSession for reads (GET), @WithTransaction for writes (POST/PUT/PATCH/DELETE)
-    - **Data model**: UUID primary keys, created_at/updated_at timestamps, snake_case DB names
-    - **REST**: Follow /api/v1/[resource] pattern with standard HTTP methods
-    - **DTOs**: Always use DTOs (never expose entities), put in lemline-common
-    - **Reactive**: All endpoints return Uni<Response>, use .mapIt/.flatMapIt/.toResponse()/.orNotFound()
-    - **Metrics**: Add business-relevant metrics and document in /docs/backend/METRICS.md
-    - **OpenAPI**: Add @Operation, @APIResponse annotations with descriptions
-    - **Testing**: Include authorization tests (401/403/success) and functional tests
+    - **State Management**: Use exception-driven control flow (WaitStartedException, TaskRetriedException, etc.)
+    - **Data model**: UUID v7 primary keys (IDV7), created_at/updated_at timestamps, snake_case DB names
+    - **Repositories**: Use Kotlin coroutines (`suspend` functions), implement `findByUUID(uuid: IDV7): T?`
+    - **Outbox pattern**: PENDING → processing → SENT, use FOR UPDATE SKIP LOCKED
+    - **Messaging**: Distinguish commands-in/out (high-throughput) vs events-out (durable operations)
+    - **Testing**: Use Kotest with `@QuarkusTest`, test with PostgreSQL/MySQL/H2
 
 4. **Write specification to `/docs/features/spec_[feature_name].md`** containing:
    ```markdown
    # Feature: [Name]
 
    ## Overview
-   Brief description and business value
+   Brief description and purpose in the workflow execution context
 
-   ## API Endpoints
+   ## Workflow Integration
 
-   ### POST /api/v1/[resource]
-   - **Authorization**: @RolesAllowed(USER_ROLE)
-   - **Session/Transaction**: @WithTransaction
-   - **Request**: `CreateXRequest`
-   - **Response**: `XResponse` (201 Created)
-   - **Errors**: 400, 401, 403, 409
-   - **Metrics**: `x.created` counter
-   - **OpenAPI**: @Operation(summary = "Create new X")
+   ### Task Type (if adding new task)
+   - **Task Name**: `taskName`
+   - **Model Location**: `lemline-core/src/main/kotlin/com/lemline/core/models/tasks/`
+   - **Instance Location**: `lemline-core/src/main/kotlin/com/lemline/core/instances/`
+   - **Control Flow**: Describe exception-based control (e.g., throws WaitStartedException)
 
-   ### GET /api/v1/[resource]/{id}
-   - **Authorization**: @RolesAllowed(USER_ROLE)
-   - **Session/Transaction**: @WithSession
-   - **Response**: `XResponse` (200 OK)
-   - **Errors**: 401, 403, 404
-   - **OpenAPI**: @Operation(summary = "Get X by ID")
-
-   [... all endpoints ...]
+   ### State Management
+   - **NodeState**: What state needs to persist between steps
+   - **NodePosition**: How position navigates through the task
 
    ## Data Model
 
-   ### Entity: X
+   ### Entity: [EntityName]
    ```kotlin
-   @Entity
-   @Table(name = "x_table")
-   class X : PanacheEntityBase() {
-       @Id
-       @Column(name = "id")
-       var id: UUID = UUID.randomUUID()
+   data class EntityModel(
+       val id: IDV7 = IDV7.generate(),
+       val workflowId: IDV7,
        // ... fields ...
-   }
+       val status: EntityStatus = EntityStatus.PENDING,
+       val createdAt: Instant = Instant.now(),
+       val updatedAt: Instant = Instant.now()
+   )
    ```
 
-   ### DTOs (lemline-common)
+   ### Repository
    ```kotlin
-   data class CreateXRequest(...)
-   data class XResponse(...)
+   interface EntityRepository : WithUUIDRepository<EntityModel> {
+       suspend fun findByUUID(uuid: IDV7): EntityModel?
+       suspend fun findByWorkflowId(workflowId: IDV7): List<EntityModel>
+       suspend fun insertBatch(entities: List<EntityModel>)
+   }
    ```
 
    ## Database Migration
 
-   **V[N]__[description].sql**
+   **V[N]__[description].sql** (for each supported database)
    ```sql
-   CREATE TABLE x_table (...);
-   CREATE INDEX idx_x_field ON x_table(field);
-   ```
-
-   **Rollback:**
-   ```sql
-   DROP TABLE IF EXISTS x_table;
+   CREATE TABLE lemline_[entity] (
+       id UUID PRIMARY KEY,
+       workflow_id UUID NOT NULL,
+       -- ... fields ...
+       status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+   );
+   CREATE INDEX idx_lemline_[entity]_workflow ON lemline_[entity](workflow_id);
+   CREATE INDEX idx_lemline_[entity]_status ON lemline_[entity](status);
    ```
 
    ## Implementation Files
 
-    - `lemline-common/src/main/kotlin/com/lemline/common/dto/XDto.kt`
-    - `lemline-backend/src/main/kotlin/com/lemline/domain/X.kt`
-    - `lemline-backend/src/main/kotlin/com/lemline/repository/XRepository.kt`
-    - `lemline-backend/src/main/kotlin/com/lemline/mapper/XMapper.kt`
-    - `lemline-backend/src/main/kotlin/com/lemline/resource/XResource.kt`
-    - `lemline-backend/src/test/kotlin/com/lemline/XResourceTest.kt`
-    - `lemline-backend/src/test/kotlin/com/lemline/XAuthorizationTest.kt`
-    - `lemline-backend/src/main/resources/db/migration/V[N]__[description].sql`
+   ### lemline-core (workflow logic)
+    - `lemline-core/src/main/kotlin/com/lemline/core/models/tasks/[Task].kt`
+    - `lemline-core/src/main/kotlin/com/lemline/core/instances/[Task]Instance.kt`
 
-   ## Metrics
+   ### lemline-runner (infrastructure)
+    - `lemline-runner/src/main/kotlin/com/lemline/runner/models/[Entity]Model.kt`
+    - `lemline-runner/src/main/kotlin/com/lemline/runner/repositories/[Entity]Repository.kt`
+    - `lemline-runner/src/main/kotlin/com/lemline/runner/outbox/[Entity]Outbox.kt` (if outbox needed)
+    - `lemline-runner/src/main/resources/db/migration/postgresql/V[N]__[description].sql`
+    - `lemline-runner/src/main/resources/db/migration/mysql/V[N]__[description].sql`
+    - `lemline-runner/src/main/resources/db/migration/h2/V[N]__[description].sql`
 
-   Document in `/docs/backend/monitoring/metrics-[domain].md`:
-    - `x.created` - Counter for X creation attempts
-    - `x.created.success` - Counter for successful creations
-    - [... other metrics ...]
+   ### Tests
+    - `lemline-core/src/test/kotlin/com/lemline/core/tests/[Feature]Test.kt`
+    - `lemline-runner/src/test/kotlin/com/lemline/runner/tests/[Feature]Test.kt`
+
+   ## Messaging Flow
+
+   Describe how the feature integrates with messaging channels:
+    - **commands-in**: [what messages trigger this feature]
+    - **commands-out**: [what messages this feature emits]
+    - **events-out**: [what database operations are needed]
 
    ## Key Implementation Details
-    - Any business logic decisions
-    - Validation rules
-    - Edge cases to handle
-    - Security considerations
+    - Exception-driven control flow specifics
+    - State serialization requirements
+    - Retry/backoff policies if applicable
+    - Parent-child workflow interactions if applicable
 
    ## Testing Checklist
-   Reference `/docs/backend/reactive/guide-http-best-practices.md` and `/docs/backend/testing/guide-endpoints.md` for complete checklist:
-    - [ ] Authorization tests (401, 403, success for each role)
-    - [ ] Input validation tests (400 for invalid data)
-    - [ ] Happy path tests (200/201/204)
-    - [ ] Error cases (404, 409)
+    - [ ] Unit tests for task logic (lemline-core)
+    - [ ] Integration tests with database (lemline-runner)
+    - [ ] Test with PostgreSQL, MySQL, and H2
+    - [ ] Test retry/error scenarios
+    - [ ] Test state persistence across restarts
 
    ## Open Questions
     - [Only if genuinely ambiguous]
@@ -136,16 +136,14 @@ Create a detailed technical specification for a new feature in this Quarkus + Ko
 
 **When in doubt:**
 
-- Require authentication (USER_ROLE minimum)
-- Use @WithSession for reads (GET), @WithTransaction for writes (POST/PUT/PATCH/DELETE)
-- Add pagination for list endpoints (limit/offset query params)
+- Use exception-driven control flow for async operations
+- Add to outbox tables for durable operations (waits, retries, parent tracking)
 - Include standard timestamps (created_at, updated_at)
-- Use optimistic locking for updates (version field)
-- Add indexes for foreign keys and frequently queried fields
-- Return 404 for not found, 409 for conflicts, 400 for validation errors
-- Add business metrics and document in /docs/backend/monitoring/metrics-[domain].md
-- Include OpenAPI descriptions (@Operation, @APIResponse)
-- Test both happy path and error cases (see /docs/backend/reactive/guide-http-best-practices.md and /docs/backend/testing/guide-endpoints.md)
+- Use IDV7 (time-sortable UUIDs) for all primary keys
+- Add indexes for foreign keys and frequently queried fields (workflow_id, status)
+- Use `suspend` functions for all database operations
+- Use batch operations for performance (`insertBatch`, `updateBatch`)
+- Test with all supported databases (PostgreSQL, MySQL, H2)
 - Follow existing naming conventions in the codebase
 
 **Only ask questions when:**
@@ -153,4 +151,4 @@ Create a detailed technical specification for a new feature in this Quarkus + Ko
 - Business logic is fundamentally ambiguous
 - Multiple architectural approaches have significant tradeoffs
 - The request conflicts with existing patterns
-- Security model is unclear
+- The feature significantly changes the execution model

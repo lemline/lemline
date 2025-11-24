@@ -31,9 +31,9 @@ IMPORTANT: If a scope is provided, then restrict the commit to the given scope
 
 ## Example Good Commit Messages
 
-- "Add SSE API for workflow composition with reactive streaming"
-- "Implement workflow composer service with mock conversation flow"
-- "Fix authentication configuration for bearer token policies"
-- "Refactor workflow data to use type-safe Kotlin classes"
+- "Add exponential backoff retry policy for outbox processors"
+- "Implement Fork task with parallel branch execution"
+- "Fix workflow state serialization for large payloads"
+- "Refactor StepByStepRunner to use coroutine-based error handling"
 
 AGAIN - DO NOT MENTION CLAUDE IN GIT MESSAGE

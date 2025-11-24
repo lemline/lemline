@@ -1,416 +1,406 @@
 Please create comprehensive tests for: $ARGUMENTS
 
-## Frontend Tests (Vitest + React Testing Library)
+## lemline-core Tests (Kotlin Test + Coroutines)
 
 **Location & Naming:**
-- Co-locate: `src/components/Foo.test.tsx` next to `src/components/Foo.tsx`
-- Run: `npm run test` (watch) or `npm run test -- --run` (single)
-- Debug: `npm run test -- Foo.test` or `npm run test -- -t "test name"`
+- Location: `lemline-core/src/test/kotlin/com/lemline/core/tests/`
+- Run: `./gradlew :lemline-core:test`
+- Debug: `./gradlew :lemline-core:test --tests "YourTestClass" --info`
 
-**Setup test utilities** (`src/test/utils/test-utils.tsx`):
-```typescript
-import { ReactElement } from 'react'
-import { render } from '@testing-library/react'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { MemoryRouter } from 'react-router-dom'
+**Basic test structure:**
+```kotlin
+import kotlinx.coroutines.test.runTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 
-export function renderWithProviders(
-  component: ReactElement,
-  { initialRoute = '/', queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
-  }) } = {}
-) {
-  return render(
-    <MemoryRouter initialEntries={[initialRoute]}>
-      <QueryClientProvider client={queryClient}>
-        {component}
-      </QueryClientProvider>
-    </MemoryRouter>
-  )
+class WorkflowProcessorTest {
+
+    @Test
+    fun `should execute simple workflow`() = runTest {
+        val definition = """
+            document:
+              dsl: 1.0.0
+              namespace: test
+              name: simple-workflow
+              version: 1.0.0
+            do:
+              - setData:
+                  set:
+                    result: Hello World
+        """.trimIndent()
+
+        val processor = getWorkflowProcessor(definition, emptyMap())
+        processor.run()
+
+        assertEquals("Hello World", processor.output["result"])
+    }
+
+    @Test
+    fun `should handle task with input transformation`() = runTest {
+        val definition = """
+            document:
+              dsl: 1.0.0
+              namespace: test
+              name: transform-workflow
+              version: 1.0.0
+            do:
+              - processData:
+                  input:
+                    from: "\${ .input.userId }"
+                  set:
+                    processed: true
+        """.trimIndent()
+
+        val input = mapOf("userId" to 123)
+        val processor = getWorkflowProcessor(definition, input)
+        processor.run()
+
+        assertEquals(true, processor.output["processed"])
+    }
 }
 ```
 
-**Mock TanStack Query hooks:**
-```typescript
-import { useIntegrations, useCreateIntegration } from '@/hooks/useIntegrations'
-import { renderWithProviders } from '@/test/utils/test-utils'
-import userEvent from '@testing-library/user-event'
-import { screen, waitFor } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+**Test categories:**
+- Data flow: `DataFlowTest.kt` (input/output transformations, JQ expressions)
+- Control flow: `ControlFlowTest.kt` (if, switch, goto, for)
+- Error handling: `ErrorHandlingTest.kt` (try/catch/retry)
+- Activities: `ActivitiesTest.kt` (HTTP, Shell, Script tasks)
+- Task types: `ForkTest.kt`, `WaitTest.kt`, `RunWorkflowTest.kt`
 
-vi.mock('@/hooks/useIntegrations')
-
-describe('IntegrationsPage', () => {
-  beforeEach(() => {
-    vi.mocked(useIntegrations).mockReturnValue({
-      data: [{ id: '1', name: 'Test', apiUrl: 'https://api.test.com', authType: 'NONE', status: 'ACTIVE' }],
-      isLoading: false,
-      error: null,
-    } as any)
-
-    vi.mocked(useCreateIntegration).mockReturnValue({
-      mutate: vi.fn(),
-      mutateAsync: vi.fn(),
-      isPending: false,
-    } as any)
-  })
-
-  it('should display integration list', () => {
-    renderWithProviders(<IntegrationsPage />)
-    expect(screen.getByText('Test')).toBeInTheDocument()
-  })
-
-  it('should show loading state', () => {
-    vi.mocked(useIntegrations).mockReturnValue({ isLoading: true } as any)
-    renderWithProviders(<IntegrationsPage />)
-    expect(screen.getByText(/loading/i)).toBeInTheDocument()
-  })
-
-  it('should handle user interaction', async () => {
-    const user = userEvent.setup()
-    renderWithProviders(<IntegrationForm />)
-
-    await user.type(screen.getByLabelText(/name/i), 'My Integration')
-    await user.click(screen.getByRole('button', { name: /submit/i }))
-
-    await waitFor(() => {
-      expect(mockSubmit).toHaveBeenCalled()
-    })
-  })
-})
-```
-
-**Frontend test checklist:**
-- ✅ Loading states (`isLoading: true`)
-- ✅ Error states (`error: new Error(...)`)
-- ✅ User interactions with `userEvent` (NOT `fireEvent`)
-- ✅ Form validation and submission
-- ✅ Conditional rendering
-- ✅ Clean up: `vi.clearAllMocks()` in `afterEach`
+**Core test checklist:**
+- Test happy path execution
+- Test JQ expression evaluation
+- Test error scenarios (invalid expressions, missing data)
+- Test state transitions (PENDING → RUNNING → COMPLETED/FAULTED)
 
 ---
 
-## Backend Tests (JUnit + RestAssured + Quarkus)
+## lemline-runner Tests (Kotest + QuarkusTest)
 
 **Location & Naming:**
-- Standard: `src/test/kotlin/com/lemline/FooTest.kt`
-- Run: `./gradlew test --tests "FooTest"`
-- Debug: `./gradlew test --tests "FooTest" --stacktrace`
+- Location: `lemline-runner/src/test/kotlin/com/lemline/runner/tests/`
+- Run: `./gradlew :lemline-runner:test`
+- Run specific: `./gradlew :lemline-runner:test --tests "YourTestClass"`
 
-**Setup test class with JWT tokens:**
+**Test profiles:**
 ```kotlin
+// PostgreSQL profile
+class PostgresProfile : QuarkusTestProfile {
+    override fun getConfigProfile(): String = "postgres"
+}
+
+// MySQL profile
+class MysqlProfile : QuarkusTestProfile {
+    override fun getConfigProfile(): String = "mysql"
+}
+
+// H2 profile (default, in-memory)
+class H2Profile : QuarkusTestProfile {
+    override fun getConfigProfile(): String = "h2"
+}
+```
+
+**Basic test structure with Kotest:**
+```kotlin
+import io.kotest.core.spec.style.FunSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.quarkus.test.junit.QuarkusTest
-import io.restassured.RestAssured.given
-import io.restassured.http.ContentType
-import org.hamcrest.Matchers.*
-import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Test
+import io.quarkus.test.junit.TestProfile
 import jakarta.inject.Inject
+import com.lemline.common.IDV7
 
 @QuarkusTest
-class IntegrationResourceTest {
+@TestProfile(PostgresProfile::class)
+class WaitRepositoryTest : FunSpec({
 
     @Inject
-    lateinit var userRepository: UserRepository
+    lateinit var waitRepository: WaitRepository
 
-    @Inject
-    lateinit var jwtService: JwtService
-
-    private lateinit var userToken: String
-    private lateinit var adminToken: String
-
-    @BeforeEach
-    fun setup() {
-        val user = User(
-            email = "test-${System.currentTimeMillis()}@example.com",
-            passwordHash = PasswordHasher.hash("password"),
-            fullName = "Test User",
-            role = UserRole.USER
+    test("should insert and find wait by UUID") {
+        val wait = WaitOutboxModel(
+            id = IDV7.generate(),
+            workflowId = IDV7.generate(),
+            namespace = "test",
+            name = "test-workflow",
+            version = "1.0.0",
+            instanceId = IDV7.generate(),
+            delayedUntil = Instant.now().plusSeconds(60),
+            status = OutboxStatus.PENDING
         )
-        userRepository.persist(user)
-        userToken = jwtService.generateToken(user)
 
-        val admin = User(
-            email = "admin-${System.currentTimeMillis()}@example.com",
-            passwordHash = PasswordHasher.hash("password"),
-            fullName = "Admin User",
-            role = UserRole.ADMIN
+        waitRepository.insert(wait)
+        val found = waitRepository.findByUUID(wait.id)
+
+        found shouldNotBe null
+        found?.id shouldBe wait.id
+        found?.status shouldBe OutboxStatus.PENDING
+    }
+
+    test("should find pending waits for processing") {
+        val wait = WaitOutboxModel(
+            id = IDV7.generate(),
+            workflowId = IDV7.generate(),
+            namespace = "test",
+            name = "test-workflow",
+            version = "1.0.0",
+            instanceId = IDV7.generate(),
+            delayedUntil = Instant.now().minusSeconds(10), // Due now
+            status = OutboxStatus.PENDING
         )
-        userRepository.persist(admin)
-        adminToken = jwtService.generateToken(admin)
-    }
-}
-```
 
-**Create test data factory** (`src/test/kotlin/com/lemline/utils/TestDataFactory.kt`):
-```kotlin
-object TestDataFactory {
-    fun createIntegrationRequest(
-        name: String = "Test Integration",
-        apiUrl: String = "https://api.example.com",
-        authType: AuthType = AuthType.NONE,
-        authCredentials: Map<String, Any>? = null,
-        description: String? = null
-    ) = CreateIntegrationRequest(name, apiUrl, authType, authCredentials, description)
+        waitRepository.insert(wait)
+        val pending = waitRepository.findEntitiesToProcess(limit = 10)
 
-    fun createUser(
-        email: String = "test-${System.currentTimeMillis()}@example.com",
-        role: UserRole = UserRole.USER
-    ) = User(email, PasswordHasher.hash("password"), "Test User", role)
-}
-```
-
-**Test examples:**
-```kotlin
-@Test
-fun `should create integration with valid data`() {
-    val request = TestDataFactory.createIntegrationRequest(
-        name = "Slack",
-        authType = AuthType.API_KEY,
-        authCredentials = mapOf("apiKey" to "test-key")
-    )
-
-    given {
-        contentType(ContentType.JSON)
-        body(request)
-        header("Authorization", "Bearer $userToken")
-    } When {
-        post("/api/v1/integrations")
-    } Then {
-        statusCode(201)
-        body("id", notNullValue())
-        body("name", equalTo("Slack"))
-        body("authCredentials", nullValue()) // Must not expose
-    }
-}
-
-@Test
-fun `should return validation error for invalid data`() {
-    val request = TestDataFactory.createIntegrationRequest(apiUrl = "not-a-url")
-
-    given {
-        contentType(ContentType.JSON)
-        body(request)
-        header("Authorization", "Bearer $userToken")
-    } When {
-        post("/api/v1/integrations")
-    } Then {
-        statusCode(400)
-        body("violations[0].field", equalTo("apiUrl"))
-    }
-}
-```
-
-**Parametrized tests:**
-```kotlin
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.ValueSource
-
-@ParameterizedTest
-@ValueSource(strings = ["", "   ", "a", "x".repeat(256)])
-fun `should reject invalid names`(invalidName: String) {
-    val request = TestDataFactory.createIntegrationRequest(name = invalidName)
-
-    given {
-        contentType(ContentType.JSON)
-        body(request)
-        header("Authorization", "Bearer $userToken")
-    } When {
-        post("/api/v1/integrations")
-    } Then {
-        statusCode(400)
-        body("violations.field", hasItem("name"))
-    }
-}
-```
-
-**Backend test checklist:**
-- ✅ Success (201/200)
-- ✅ Validation errors (400)
-- ✅ Authentication (401 - no/invalid token)
-- ✅ Authorization (403 - insufficient permissions)
-- ✅ Not found (404)
-- ✅ Use test data factories
-- ✅ Generate unique emails with timestamp
-
----
-
-## Security Testing
-
-**Authentication & Authorization:**
-```kotlin
-@Test
-fun `should reject request without authentication token`() {
-    val request = TestDataFactory.createIntegrationRequest()
-
-    given {
-        contentType(ContentType.JSON)
-        body(request)
-        // No Authorization header
-    } When {
-        post("/api/v1/integrations")
-    } Then {
-        statusCode(401)
-    }
-}
-
-@Test
-fun `should reject regular user accessing admin endpoint`() {
-    given {
-        header("Authorization", "Bearer $userToken")
-    } When {
-        get("/api/v1/admin/users")
-    } Then {
-        statusCode(403)
-    }
-}
-
-@Test
-fun `should prevent access to other users resources`() {
-    // Create resource for another user
-    val otherUser = TestDataFactory.createUser()
-    userRepository.persist(otherUser)
-    val otherUserToken = jwtService.generateToken(otherUser)
-
-    val resourceId = given {
-        contentType(ContentType.JSON)
-        body(TestDataFactory.createIntegrationRequest())
-        header("Authorization", "Bearer $otherUserToken")
-    } When {
-        post("/api/v1/integrations")
-    } Then {
-        statusCode(201)
-        extract().path<String>("id")
+        pending.any { it.id == wait.id } shouldBe true
     }
 
-    // Try to access with different user
-    given {
-        header("Authorization", "Bearer $userToken")
-    } When {
-        get("/api/v1/integrations/$resourceId")
-    } Then {
-        statusCode(404) // Should not reveal existence
+    test("should update status to SENT") {
+        val wait = WaitOutboxModel(
+            id = IDV7.generate(),
+            workflowId = IDV7.generate(),
+            namespace = "test",
+            name = "test-workflow",
+            version = "1.0.0",
+            instanceId = IDV7.generate(),
+            delayedUntil = Instant.now(),
+            status = OutboxStatus.PENDING
+        )
+
+        waitRepository.insert(wait)
+        waitRepository.updateStatus(wait.id, OutboxStatus.SENT)
+
+        val updated = waitRepository.findByUUID(wait.id)
+        updated?.status shouldBe OutboxStatus.SENT
     }
-}
-```
-
-**Input validation (verify defense):**
-```kotlin
-@Test
-fun `should safely handle SQL injection as literal string`() {
-    val maliciousInput = "'; DROP TABLE integrations; --"
-    val request = TestDataFactory.createIntegrationRequest(name = maliciousInput)
-
-    val id = given {
-        contentType(ContentType.JSON)
-        body(request)
-        header("Authorization", "Bearer $userToken")
-    } When {
-        post("/api/v1/integrations")
-    } Then {
-        statusCode(201)
-        body("name", equalTo(maliciousInput)) // Stored as literal string
-        extract().path<String>("id")
-    }
-
-    // Verify table still exists
-    given {
-        header("Authorization", "Bearer $userToken")
-    } When {
-        get("/api/v1/integrations/$id")
-    } Then {
-        statusCode(200)
-    }
-}
-
-@Test
-fun `should reject dangerous URL formats`() {
-    listOf("javascript:alert(1)", "file:///etc/passwd", "data:text/html,<script>").forEach { url ->
-        given {
-            contentType(ContentType.JSON)
-            body(TestDataFactory.createIntegrationRequest(apiUrl = url))
-            header("Authorization", "Bearer $userToken")
-        } When {
-            post("/api/v1/integrations")
-        } Then {
-            statusCode(400)
-        }
-    }
-}
-```
-
-**Sensitive data:**
-```kotlin
-@Test
-fun `should not expose password hash in user response`() {
-    given {
-        header("Authorization", "Bearer $userToken")
-    } When {
-        get("/api/v1/users/me")
-    } Then {
-        statusCode(200)
-        body("email", notNullValue())
-        body("passwordHash", nullValue()) // Must not expose
-    }
-}
-
-@Test
-fun `should not expose credentials in integration response`() {
-    val request = TestDataFactory.createIntegrationRequest(
-        authType = AuthType.API_KEY,
-        authCredentials = mapOf("apiKey" to "secret-key")
-    )
-
-    val id = given {
-        contentType(ContentType.JSON)
-        body(request)
-        header("Authorization", "Bearer $userToken")
-    } When {
-        post("/api/v1/integrations")
-    } Then {
-        statusCode(201)
-        extract().path<String>("id")
-    }
-
-    given {
-        header("Authorization", "Bearer $userToken")
-    } When {
-        get("/api/v1/integrations/$id")
-    } Then {
-        statusCode(200)
-        body("authCredentials", nullValue()) // Must not expose
-    }
-}
-```
-
-**Frontend security:**
-```typescript
-describe('Protected Routes', () => {
-  it('should redirect to login without token', async () => {
-    vi.spyOn(authStorage, 'getToken').mockReturnValue(null)
-    renderWithProviders(<ProfilePage />, { initialRoute: '/profile' })
-
-    await waitFor(() => {
-      expect(window.location.pathname).toBe('/login')
-    })
-  })
-
-  it('should hide admin features for regular users', () => {
-    vi.spyOn(authStorage, 'isAdmin').mockReturnValue(false)
-    renderWithProviders(<AppLayout><DashboardPage /></AppLayout>)
-
-    expect(screen.queryByRole('link', { name: /admin/i })).not.toBeInTheDocument()
-  })
 })
 ```
 
-**Security checklist:**
-- [ ] Missing/invalid auth tokens rejected (401)
-- [ ] Authorization enforces user boundaries (403, 404)
-- [ ] Admin endpoints protected (403)
-- [ ] Input validation prevents injection (SQL, XSS, SSRF)
-- [ ] Sensitive data not exposed (passwords, credentials)
-- [ ] Error messages don't leak internals
+**Testing suspend functions:**
+```kotlin
+// All repository methods are suspend functions
+// Kotest handles coroutines naturally
+
+test("should batch insert entities") {
+    val entities = (1..10).map {
+        RetryOutboxModel(
+            id = IDV7.generate(),
+            workflowId = IDV7.generate(),
+            // ... fields
+        )
+    }
+
+    retryRepository.insertBatch(entities)
+
+    entities.forEach { entity ->
+        val found = retryRepository.findByUUID(entity.id)
+        found shouldNotBe null
+    }
+}
+```
+
+**Test with different databases:**
+```kotlin
+// Run tests with PostgreSQL
+@QuarkusTest
+@TestProfile(PostgresProfile::class)
+class PostgresRepositoryTest : FunSpec({ /* tests */ })
+
+// Run same tests with MySQL
+@QuarkusTest
+@TestProfile(MysqlProfile::class)
+class MysqlRepositoryTest : FunSpec({ /* tests */ })
+
+// Run same tests with H2 (fast, in-memory)
+@QuarkusTest
+@TestProfile(H2Profile::class)
+class H2RepositoryTest : FunSpec({ /* tests */ })
+```
+
+---
+
+## Outbox Pattern Testing
+
+**Test outbox processing lifecycle:**
+```kotlin
+@QuarkusTest
+@TestProfile(PostgresProfile::class)
+class OutboxProcessingTest : FunSpec({
+
+    @Inject
+    lateinit var waitRepository: WaitRepository
+
+    @Inject
+    lateinit var waitOutbox: WaitOutbox
+
+    test("should process pending waits") {
+        // Arrange: Create a due wait
+        val wait = WaitOutboxModel(
+            id = IDV7.generate(),
+            workflowId = IDV7.generate(),
+            namespace = "test",
+            name = "test-workflow",
+            version = "1.0.0",
+            instanceId = IDV7.generate(),
+            delayedUntil = Instant.now().minusSeconds(10),
+            status = OutboxStatus.PENDING
+        )
+        waitRepository.insert(wait)
+
+        // Act: Process outbox
+        waitOutbox.processOutbox()
+
+        // Assert: Status should be SENT
+        val processed = waitRepository.findByUUID(wait.id)
+        processed?.status shouldBe OutboxStatus.SENT
+    }
+
+    test("should increment attempt count on failure") {
+        val retry = RetryOutboxModel(
+            id = IDV7.generate(),
+            workflowId = IDV7.generate(),
+            // ... fields with invalid data to cause failure
+            attemptCount = 0
+        )
+        retryRepository.insert(retry)
+
+        // Simulate failed processing
+        retryOutbox.processOutbox()
+
+        val updated = retryRepository.findByUUID(retry.id)
+        updated?.attemptCount shouldBe 1
+    }
+
+    test("should respect FOR UPDATE SKIP LOCKED") {
+        // Create multiple pending entities
+        val entities = (1..5).map {
+            WaitOutboxModel(
+                id = IDV7.generate(),
+                // ... fields
+                status = OutboxStatus.PENDING
+            )
+        }
+        entities.forEach { waitRepository.insert(it) }
+
+        // Process with limit
+        val processed = waitRepository.findEntitiesToProcess(limit = 2)
+
+        // Should only get 2 entities
+        processed.size shouldBe 2
+    }
+})
+```
+
+---
+
+## Workflow Execution Testing
+
+**Test exception-driven control flow:**
+```kotlin
+@QuarkusTest
+@TestProfile(PostgresProfile::class)
+class StepByStepRunnerTest : FunSpec({
+
+    @Inject
+    lateinit var stepByStepRunner: StepByStepRunner
+
+    @Inject
+    lateinit var waitRepository: WaitRepository
+
+    test("should create wait entry when WaitStartedException thrown") {
+        val definition = """
+            document:
+              dsl: 1.0.0
+              namespace: test
+              name: wait-workflow
+              version: 1.0.0
+            do:
+              - waitTask:
+                  wait:
+                    seconds: 60
+        """.trimIndent()
+
+        val message = createInstanceMessage(definition)
+
+        // Run should create a wait entry
+        stepByStepRunner.run(message)
+
+        // Verify wait was created
+        val waits = waitRepository.findByWorkflowId(message.workflowId)
+        waits.size shouldBe 1
+        waits.first().status shouldBe OutboxStatus.PENDING
+    }
+
+    test("should resume workflow after wait completes") {
+        // Create a workflow that already completed waiting
+        val message = createInstanceMessage(definition)
+            .copy(position = listOf(0, "waitTask")) // Resume from wait task
+
+        stepByStepRunner.run(message)
+
+        // Verify workflow continued
+        // ... assertions
+    }
+})
+```
+
+---
+
+## Test Data Factories
+
+**Create reusable test data:**
+```kotlin
+object TestDataFactory {
+
+    fun createWaitModel(
+        id: IDV7 = IDV7.generate(),
+        workflowId: IDV7 = IDV7.generate(),
+        namespace: String = "test",
+        name: String = "test-workflow",
+        version: String = "1.0.0",
+        delayedUntil: Instant = Instant.now().plusSeconds(60),
+        status: OutboxStatus = OutboxStatus.PENDING
+    ) = WaitOutboxModel(
+        id = id,
+        workflowId = workflowId,
+        namespace = namespace,
+        name = name,
+        version = version,
+        instanceId = IDV7.generate(),
+        delayedUntil = delayedUntil,
+        status = status
+    )
+
+    fun createRetryModel(
+        id: IDV7 = IDV7.generate(),
+        workflowId: IDV7 = IDV7.generate(),
+        attemptCount: Int = 0,
+        maxAttempts: Int = 3
+    ) = RetryOutboxModel(
+        id = id,
+        workflowId = workflowId,
+        // ... other fields
+        attemptCount = attemptCount,
+        maxAttempts = maxAttempts
+    )
+
+    fun createWorkflowDefinition(
+        namespace: String = "test",
+        name: String = "test-workflow",
+        version: String = "1.0.0",
+        tasks: String = "- setData:\n    set:\n      result: done"
+    ) = """
+        document:
+          dsl: 1.0.0
+          namespace: $namespace
+          name: $name
+          version: $version
+        do:
+          $tasks
+    """.trimIndent()
+}
+```
 
 ---
 
@@ -419,30 +409,36 @@ describe('Protected Routes', () => {
 **Test structure:**
 - Use descriptive names: `should [expected behavior] when [condition]`
 - One logical assertion per test
-- Arrange-Act-Assert (Given-When-Then)
+- Arrange-Act-Assert pattern
 - Use test data factories for consistency
 - Clean up in `afterEach` / `@BeforeEach`
 
 **What to avoid:**
-- ❌ Testing implementation details
-- ❌ Shared mutable state between tests
-- ❌ Copy-pasted test code
-- ❌ Testing third-party libraries
+- Testing implementation details
+- Shared mutable state between tests
+- Copy-pasted test code
+- Testing third-party libraries
 
-**Coverage:**
+**Test checklist:**
+- [ ] Happy path (success scenarios)
+- [ ] Error handling (exceptions, invalid input)
+- [ ] Edge cases (empty data, max values)
+- [ ] Database operations (CRUD, batch)
+- [ ] State transitions (status changes)
+- [ ] Concurrency (FOR UPDATE SKIP LOCKED)
+
+**Run tests:**
 ```bash
-# Frontend
-npm run test -- --coverage
+# All tests
+./gradlew test
 
-# Backend
-./gradlew test jacocoTestReport
-```
+# Specific module
+./gradlew :lemline-core:test
+./gradlew :lemline-runner:test
 
-**Quick debugging:**
-```typescript
-// Frontend: see what rendered
-screen.debug()
+# Specific test class
+./gradlew test --tests "WaitRepositoryTest"
 
-// Backend: print response
-println("Response: ${extract().asString()}")
+# With debug output
+./gradlew test --tests "YourTest" --info --stacktrace
 ```

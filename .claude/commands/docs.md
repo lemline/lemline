@@ -4,11 +4,10 @@ Reorganize for Human + AI Consumption the documentation relative to: **{{placeho
 
 Examples of placeholder text:
 
-- "authentication and JWT handling"
-- "reactive programming patterns"
-- "database migrations and schema management"
-- "API integration with OpenAPI and Orval"
-- "the entire /docs directory"
+- "orchestrators and execution flow in lemline-core"
+- "messaging and outbox patterns in lemline-runner"
+- "repository patterns in lemline-runner"
+- "the entire lemline-core/docs directory"
 
 ## Objectives
 
@@ -18,573 +17,241 @@ Examples of placeholder text:
 4. **Clear Separation**: Principles (why) vs Guides (how)
 5. **Strong Index**: README.md/index file for navigation
 
-## Recommended Structure
+## Current Documentation Structure
+
+Lemline uses **module-level documentation** instead of a central `/docs/dev/` folder:
 
 ```
-/docs/
-├── README.md (navigation hub - "I want to..." scenarios)
-├── backend/
-│   ├── authentication/
-│   │   ├── README.md           # Index + quick start
-│   │   ├── principles.md       # Why JWT, session strategy
-│   │   ├── guide-login.md      # How to implement login
-│   │   ├── guide-refresh.md    # Token refresh patterns
-│   │   └── troubleshooting.md  # Common auth issues
-│   ├── reactive/
-│   │   ├── README.md
-│   │   ├── principles.md
-│   │   ├── guide-queries.md
-│   │   ├── guide-mutations.md
-│   │   └── troubleshooting.md
-│   └── ...
-├── frontend/
-│   ├── apis/
-│   │   ├── README.md           # Index + quick start
-│   │   ├── principles.md       # Contract-driven, type safety
-│   │   ├── choices.md          # Why Orval/React Query/Axios
-│   │   ├── guide-queries.md    # Fetching data patterns
-│   │   ├── guide-mutations.md  # Creating/updating/deleting
-│   │   ├── guide-auth.md       # Authentication flow
-│   │   ├── guide-errors.md     # Error handling
-│   │   ├── guide-files.md      # File uploads
-│   │   ├── guide-sse.md        # SSE streaming
-│   │   └── troubleshooting.md  # Common pitfalls
-│   └── ...
-└── shared/
-    └── ...
+lemline-core/docs/
+├── README.md                    # Index + quick reference
+├── core-overview.md             # Module structure, DSL parsing
+├── core-nodes.md                # Node tree, NodePosition
+├── core-orchestrators.md        # StepByStep and Full orchestrators
+├── core-processors.md           # NodeProcessor pattern
+├── core-fork.md                 # Parallel branches
+├── core-errors.md               # Exceptions, retry policies
+├── core-states.md               # TaskState, WorkflowState
+├── core-expressions.md          # JQ expressions, scope
+└── core-execution-model.md      # Formal execution model
+
+lemline-runner/docs/
+├── README.md                    # Index + quick reference
+├── runner-configuration.md      # Config system, database/messaging setup
+├── runner-messaging.md          # Dual-channel design, commands/events
+├── runner-tables.md             # Database tables, outbox pattern
+├── runner-repositories-guide.md # Repository patterns, transactions
+├── runner-logging.md            # Logging strategy, MDC
+└── runner-cli.md                # CLI commands
+
+docs/
+├── adr/                         # Architecture Decision Records
+└── (other project-wide docs)
 ```
 
-**Key changes from previous approach**:
+**Key principles**:
 
-- ✅ Use **topic folders** (authentication/, reactive/, apis/) instead of flat principles/guides/reference
-- ✅ Each folder has **README.md index** (50-100 lines)
-- ✅ **principles.md** for architectural philosophy (100-200 lines)
-- ✅ **choices.md** for technology decisions (optional, 100-150 lines)
-- ✅ **guide-{task}.md** for specific how-tos (80-150 lines each)
-- ✅ **troubleshooting.md** for common pitfalls (80-120 lines)
-- ❌ No separate "reference" docs (content goes in code comments or guides)
-
-## When to Create Topic Folder
-
-✅ **Create folder** when:
-
-- Topic has 3+ distinct sub-tasks requiring separate guides
-- Total topic content exceeds 300 lines across all guides
-- Topic is a major architectural concern (auth, APIs, state, database)
-- Topic requires both principles and multiple how-to guides
-
-❌ **Stay in parent folder** when:
-
-- Topic is <200 lines total (single guide sufficient)
-- Topic has <3 sub-tasks
-- Topic is rarely referenced
-- Topic is a sub-feature of larger topic (e.g., "file uploads" under "apis")
+- **Module-specific docs** go in `lemline-{module}/docs/`
+- **Naming convention**: `{module}-{topic}.md` (e.g., `core-orchestrators.md`, `runner-messaging.md`)
+- Each module has a **README.md index** with quick reference tables
+- **No nested folders** within module docs (flat structure)
 
 ## Document Guidelines
 
-### README.md (Index File)
+### README.md (Module Index)
 
-Every topic folder must have a README.md with this structure:
+Every module docs folder must have a README.md:
 
 ````markdown
-# [Topic Name]
+# Lemline {Module} Documentation
 
-[One paragraph overview of the topic]
+The `lemline-{module}` module [one sentence description].
 
-## Quick Start
+## Documentation Index
 
-```typescript
-// Minimal working example (5-10 lines)
-const { data } = useGetApiV1Users()
-```
+| Document | Description | When to Read |
+|----------|-------------|--------------|
+| [{module}-topic1.md]({module}-topic1.md) | Topic description | Use case |
+| [{module}-topic2.md]({module}-topic2.md) | Topic description | Use case |
 
-## Documentation
+## Quick Reference
 
-### Understanding
+### Key Classes
 
-- [Principles](./principles.md) - Core philosophy and architecture
-- [Technology Choices](./choices.md) - Why we chose X over Y
+| Class | Location | Purpose |
+|-------|----------|---------|
+| `ClassName` | `package/` | Brief purpose |
 
-### How-To Guides
+### Common Tasks
 
-- [Task 1](./guide-task1.md) - Brief description
-- [Task 2](./guide-task2.md) - Brief description
-- [Task 3](./guide-task3.md) - Brief description
-
-### Troubleshooting
-
-- [Common Pitfalls](./troubleshooting.md)
-
-## File Structure
-
-```
-src/api/
-├── client.ts              # AXIOS_INSTANCE
-├── generated/             # Auto-generated by Orval
-│   ├── model/            # TypeScript types
-│   └── {domain}/         # React Query hooks
-```
+| Task | Documentation |
+|------|---------------|
+| Do something | [{module}-topic.md]({module}-topic.md#section) |
 
 ## Commands
 
 ```bash
-npm run generate-api      # Regenerate types and hooks
-npm run generate-api:watch  # Watch mode
+./gradlew :lemline-{module}:test
+./gradlew :lemline-{module}:build
 ```
 ````
 
 **Target**: 50-80 lines, **max 100 lines**
 
-### principles.md
-
-```markdown
-# [Topic] Principles
-
-**When to read this**: Understand architectural philosophy and design decisions.
-
-**Related docs**: [Link to README.md for full index]
-
-## Core Philosophy
-
-[3-5 core principles, no code]
-
-## Architecture Flow
-
-[Conceptual diagrams, text-based]
-
-## Why This Approach?
-
-[Rationale for choices]
-
-## Design Decisions
-
-[What we chose and why, alternatives considered]
-
-## Common Misconceptions
-
-[Correct wrong mental models]
-```
-
-**Target**: 120-180 lines, **max 200**, purely conceptual, minimal/no code
-
-### choices.md (Optional)
-
-```markdown
-# Technology Choices
-
-Why we chose [Technology A] over [Technology B].
-
-## Decision: [Technology A]
-
-**Alternatives considered**: B, C, D
-
-**Why A wins**:
-
-- Reason 1
-- Reason 2
-
-**Trade-offs accepted**:
-
-- Limitation 1
-- Limitation 2
-
-[Repeat for each major technology choice]
-```
-
-**Target**: 100-150 lines
-
-### guide-{task}.md
-
-Example: `guide-queries.md` or `guide-mutations.md`
+### Topic Document ({module}-{topic}.md)
 
 ````markdown
-# Fetching Data (Queries)
+# Lemline {Module} - {Topic}
 
-**When to read this**: Learn how to fetch data from the backend using React Query hooks.
+This document covers {topic} for the lemline-{module} module.
 
-**Related docs**: [README.md](./README.md) for full index
+## Overview
 
-## Quick Start
+[Brief overview paragraph]
 
-```typescript
-import { useGetApiV1Users } from '@/api/generated'
+## Key Files
 
-const { data, isLoading, error } = useGetApiV1Users()
-```
+| File | Purpose |
+|------|---------|
+| `path/File.kt` | Brief purpose |
 
-## Basic Query
+---
 
-[Inline pattern with code]
+## Main Content
 
-```typescript
-const { data: users, isLoading } = useGetApiV1Users()
-```
+[Organized with ## headers for major sections]
 
-## With Path Parameters
+---
 
-[Inline pattern with code]
+## Best Practices / Common Patterns
 
-```typescript
-const { data: user } = useGetApiV1UsersId(userId)
-```
+[If applicable]
 
-## Conditional Queries
+---
 
-[Inline pattern with code]
+## Troubleshooting
 
-```typescript
-const { data } = useGetApiV1Users({
-  query: { enabled: isAuthenticated }
-})
-```
+[If applicable - common issues table]
 
-## See Also
-
-- [Mutations](./guide-mutations.md) - Creating/updating data
+| Issue | Check |
+|-------|-------|
+| Problem | Solution |
 ````
 
-**Target**: 80-120 lines, **max 150 lines**
-
-**Critical**: Guides should be **self-contained** with inline code + explanations, not cross-reference chains.
-
-### troubleshooting.md
-
-````markdown
-# Troubleshooting
-
-Common pitfalls and solutions.
-
-## Issue: Query Not Refetching After Mutation
-
-**Symptoms**: UI shows stale data after creating/updating a record.
-
-**Cause**: Forgot to invalidate queries in mutation's `onSuccess` callback.
-
-**Solution**:
-
-```typescript
-const createUser = usePostApiV1Users({
-  mutation: {
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/v1/users'] })
-    },
-  },
-})
-```
-
-## Issue: TypeScript Error "Type X is not assignable to Y"
-
-**Symptoms**: Compile error after regenerating API types.
-
-**Cause**: Backend changed API contract (added/removed fields).
-
-**Solution**:
-
-1. Review backend changes in OpenAPI spec
-2. Update frontend code to match new contract
-3. This is intentional - prevents runtime errors
-
-[Repeat for each common issue - 5-10 issues typical]
-````
-
-**Target**: 80-120 lines, **max 150 lines**
+**Target**: 80-150 lines, **max 200 lines**
 
 ## Specific Instructions
 
 ### Step 1: Audit
 
 ```bash
-# List all docs and line counts
-find docs/{{topic}} -name "*.md" -exec wc -l {} \; | sort -n
+# List all docs and line counts in a module
+find lemline-{module}/docs -name "*.md" -exec wc -l {} \; | sort -n
 
 # Find files exceeding 200 lines
-find docs/{{topic}} -name "*.md" -exec wc -l {} \; | awk '$1 > 200 {print}'
+find lemline-{module}/docs -name "*.md" -exec wc -l {} \; | awk '$1 > 200 {print}'
 
-# Identify potential duplicated content
-grep -rn "Quick Start" docs/{{topic}}/ | wc -l  # Should be 1 per topic
-grep -rn "Common Patterns" docs/{{topic}}/ | wc -l
-grep -rn "Error Handling" docs/{{topic}}/ | wc -l
-
-# Find duplicated code blocks (>5 identical lines)
-# Manual review: Look for same code examples in multiple files
+# Check README exists
+test -f lemline-{module}/docs/README.md && echo "README exists" || echo "Missing README"
 ```
 
-### Step 2: Create Topic Folder Structure
+### Step 2: Create New Document
 
 ```bash
-# Example: Reorganizing API docs
-mkdir -p docs/frontend/apis
-touch docs/frontend/apis/SKILL.md
-touch docs/frontend/apis/principles.md
-touch docs/frontend/apis/choices.md
-touch docs/frontend/apis/guide-queries.md
-touch docs/frontend/apis/guide-mutations.md
-# ... etc
+# Create new topic document
+touch lemline-{module}/docs/{module}-{topic}.md
+
+# Follow naming convention:
+# lemline-core/docs/core-{topic}.md
+# lemline-runner/docs/runner-{topic}.md
 ```
 
 ### Step 3: Move Content
 
-**For direct renames (1:1 file moves)**:
+**For content from `/docs/dev/` to module docs**:
 
-- **DO use `git mv`** to preserve file history
-- Example: `git mv docs/old/FILE.md docs/new-structure/FILE.md`
+- Identify which module owns the content
+- Rename following `{module}-{topic}.md` convention
+- Use `git mv` to preserve history when possible
 
 **For splits (1 file → many files)**:
 
-- Create new files with content
-- Add comment at top: `<!-- Split from: docs/old/BIG_FILE.md -->`
-- Delete old file with commit message: "Split into guide-x.md, guide-y.md, guide-z.md"
-- Git will track renames if >50% content similarity
+- Create new files with focused content
+- Add comment at top: `<!-- Split from: {original-file}.md -->`
+- Update README.md index
 
-**Content distribution**:
+### Step 4: Update README.md Index
 
-- **Extract principles** from guides into principles.md
-- **Extract tech choices** into choices.md
-- **Move reference info** to inline code comments (see below)
-- **Delete duplicates** (keep DRY principle)
+After adding/moving docs, update the module's README.md:
 
-**Code Comment Guidelines** (where reference docs go):
-
-```typescript
-// src/api/client.ts
-/**
- * Custom Axios instance for Orval-generated hooks
- *
- * Features:
- * - JWT token injection from localStorage
- * - Token refresh on 401 with request queueing
- * - ApiError mapping for consistent error handling
- *
- * @see docs/frontend/apis/guide-auth.md for usage patterns
- */
-export const AXIOS_INSTANCE = Axios.create({
-    baseURL: API_BASE_URL,  // Backend base URL
-    headers: {
-        'Content-Type': 'application/json',  // Default content type
-    },
-    withCredentials: true,  // Send httpOnly cookies for refresh token
-})
-```
-
-**What to document in code vs docs**:
-
-- Code comments: Config options, parameters, return values, technical details
-- Docs: Patterns, workflows, when to use, common pitfalls, examples
-- **Link between them**: Use `@see` tags in code to point to relevant guides
-
-### Step 4: Write README.md Index
-
-- Quick start example (5-10 lines)
-- Clear table of contents
-- Links to all guides
-- File structure diagram
+- Add entry to Documentation Index table
+- Add relevant entries to Quick Reference
+- Add to Common Tasks if applicable
 
 ### Step 5: Validate
 
 ```bash
 # No doc exceeds 200 lines
-find docs/{{topic}} -name "*.md" -exec wc -l {} \; | awk '$1 > 200 {print $2 ": " $1 " lines (EXCEEDS MAX)"}'
+find lemline-{module}/docs -name "*.md" -exec wc -l {} \; | awk '$1 > 200 {print $2 ": " $1 " lines (EXCEEDS MAX)"}'
 
-# Check for broken links (relative paths only)
-cd docs/{{topic}} && \
-for link in $(grep -roh "\[.*\](\.\/.*\.md)" . 2>/dev/null | sed 's/.*(\.\///' | sed 's/).*//' | sort -u); do
-  test -f "$link" || echo "BROKEN: $link"
-done
-test $? -eq 0 && echo "✅ All links valid" || true
-cd - > /dev/null
+# Verify README.md exists
+test -f lemline-{module}/docs/README.md || echo "Missing README.md"
 
-# Verify SKILL.md exists in each topic folder
-find docs/{{topic}} -type d -mindepth 1 -maxdepth 1 | while IFS= read -r dir; do
-  test -f "$dir/README.md" || echo "Missing: $dir/README.md"
-done
-
-# Verify no cross-reference chains (max 1 level)
-# Manual review: Check that guides don't link to other guides (except in "See Also")
+# Check all docs follow naming convention
+ls lemline-core/docs/*.md | grep -v "^lemline-core/docs/core-" | grep -v README
+ls lemline-runner/docs/*.md | grep -v "^lemline-runner/docs/runner-" | grep -v README
 ```
 
-### Step 6: Update Project References
-
-Search for references to old docs:
+### Step 6: Update Cross-References
 
 ```bash
-# Find old doc references
-grep -r "docs/{{old-path}}" CLAUDE.md .claude/ docs/ --color
+# Find references to old paths
+grep -r "$subject" CLAUDE.md .claude/ lemline-*/docs/ --color
 
-# Find all markdown links to update
-grep -rn "\[.*\](.*{{old-path}}.*)" CLAUDE.md .claude/ docs/
-
-# After updating, verify no references remain
-grep -r "{{old-path}}" CLAUDE.md .claude/ docs/ && echo "ERROR: Old references still exist" || echo "OK: All updated"
+# Verify no broken links remain
+grep -r "\[.*\](.*\.md)" lemline-{module}/docs/ | while read line; do
+  # Check if linked file exists
+  echo "$line"
+done
 ```
 
 ## Line Count Limits
 
-| File Type          | Target  | Max | If Exceeds Max                     |
-|--------------------|---------|-----|------------------------------------|
-| README.md (index)  | 50-80   | 100 | Reduce quick start, link more      |
-| principles.md      | 120-180 | 200 | Extract choices to choices.md      |
-| choices.md         | 100-150 | 200 | Split by technology domain         |
-| guide-*.md         | 80-120  | 150 | Split into multiple focused guides |
-| troubleshooting.md | 80-120  | 150 | Split by error category            |
+| File Type           | Target | Max | If Exceeds Max                   |
+|---------------------|--------|-----|----------------------------------|
+| README.md (index)   | 50-80  | 100 | Reduce quick start, link more    |
+| {module}-{topic}.md | 80-150 | 200 | Split into multiple focused docs |
 
-**Philosophy**: If a file exceeds max, split into multiple focused guides. No exceptions.
+**Philosophy**: If a file exceeds max, split into multiple focused documents.
 
-## Self-Contained vs Cross-Reference
+## Example: Adding New Documentation
 
-**Prefer self-contained**:
+**Scenario**: Document a new "activities" feature in lemline-core
 
-```markdown
-## Error Handling
+1. **Create file**: `lemline-core/docs/core-activities.md`
 
-[Inline pattern with code example]
-```
+2. **Write content** following the topic document template
 
-**Avoid cross-reference chains**:
+3. **Update index**: Add to `lemline-core/docs/README.md`:
+   ```markdown
+   | [core-activities.md](core-activities.md) | Activity runners (HTTP, Shell, Script) | Implementing activities |
+   ```
 
-```markdown
-## Error Handling
-
-See [Error Handling Guide](./guide-errors.md) for details.
-[Then that guide references another guide...]
-```
-
-**Exception**: README.md can cross-reference (it's an index).
-
-## Example Transformation
-
-**Before** (Old structure):
-
-```
-docs/frontend/
-├── principles/API_DATA_FLOW.md (630 lines - TOO LONG)
-├── guides/API_INTEGRATION.md (930 lines - TOO LONG)
-└── reference/API_CLIENT.md (658 lines - TOO LONG)
-```
-
-**After** (New structure):
-
-```
-docs/frontend/apis/
-├── README.md (80 lines - index + quick start)
-├── principles.md (200 lines - philosophy only)
-├── choices.md (150 lines - why Orval/React Query/Axios)
-├── guide-queries.md (100 lines - fetching data)
-├── guide-mutations.md (120 lines - create/update/delete)
-├── guide-auth.md (100 lines - login/logout/refresh)
-├── guide-errors.md (80 lines - error handling)
-├── guide-files.md (60 lines - file uploads)
-├── guide-sse.md (80 lines - SSE streaming)
-└── troubleshooting.md (100 lines - common pitfalls)
-```
-
-**Result**:
-
-- ✅ 10 files, each <200 lines (avg 97 lines)
-- ✅ Clear navigation via README.md
-- ✅ AI can load exactly what's needed
-- ✅ No duplication
-
-**Content distribution** (from 2218 lines total):
-
-- Kept in guides (reorganized): 970 lines
-- Moved to inline code comments: ~400 lines
-- Moved to actual config files: ~200 lines
-- Deleted (duplicated examples): ~500 lines
-- Deleted (reference info now in generated code): ~148 lines
-- **Net reduction**: 1248 lines (56% decrease)
-
-## AI Efficiency Tips
-
-### File Naming for AI Discoverability
-
-Use semantic prefixes AI can pattern-match:
-
-| File Type       | Naming Pattern           | Example               | AI Inference                  |
-|-----------------|--------------------------|-----------------------|-------------------------------|
-| Index           | `README.md`              | `README.md`           | "Entry point, navigation hub" |
-| Principles      | `principles.md`          | `principles.md`       | "Why, philosophy, decisions"  |
-| Choices         | `choices.md`             | `choices.md`          | "Technology trade-offs"       |
-| How-to guides   | `guide-{verb}-{noun}.md` | `guide-fetch-data.md` | "How to {verb} {noun}"        |
-| Troubleshooting | `troubleshooting.md`     | `troubleshooting.md`  | "Common errors, solutions"    |
-
-**AI can infer content from filename**:
-
-- "How do I fetch data?" → Look for `guide-fetch-*.md` or `guide-queries.md`
-- "Why React Query?" → Look for `choices.md` or `principles.md`
-- "Token refresh error?" → Look for `troubleshooting.md`
-- "What are the patterns?" → Look for README.md → Links to guides
-
-### Content Organization for AI
-
-- **Front-load important info** (AI reads top-to-bottom, summary first)
-- **Consistent heading structure** (## for sections, ### for subsections)
-- **Keep related content together** (don't split error handling across 3 files)
-- **README.md is the map** (AI reads this first to navigate)
-- **Self-contained guides** (AI doesn't need to follow link chains)
-
-## Human Developer Tips
-
-- **README.md is landing page** with "I want to..." scenarios
-- **Quick start in every README** (copy-paste code)
-- **Troubleshooting section** for common issues
-- **Progressive disclosure**: Quick start → Patterns → Edge cases
-
-## Verification Checklist
-
-### Pre-Reorganization
-
-- [ ] Topic has >300 total lines (worth folder)
-- [ ] Identified 3+ distinct sub-tasks (worth guides)
-- [ ] Checked for existing docs on same topic (avoid duplication)
-- [ ] Planned migration path (which content goes where)
-- [ ] Verified source code structure aligns with doc structure
-
-### Post-Reorganization
-
-- [ ] All docs under 200 lines (run validation script)
-- [ ] Each topic folder has README.md
-- [ ] No cross-reference chains (max 1 level deep)
-- [ ] All code examples include file paths
-- [ ] No duplicated content (run duplication check)
-- [ ] Old file references updated in CLAUDE.md
-- [ ] Old file references updated in .claude/
-- [ ] Code has JSDoc comments with `@see` links to guides
-
-### AI Navigation Test
-
-Simulate AI navigation (run these queries):
-
-1. **Test**: "How do I implement login?"
-    - Expected: AI reads README.md → guide-login.md
-    - Verify: Guide is self-contained, no link-following needed
-
-2. **Test**: "Why did we choose Orval?"
-    - Expected: AI reads README.md → choices.md
-    - Verify: Clear rationale with alternatives considered
-
-3. **Test**: "Token refresh failing"
-    - Expected: AI reads README.md → troubleshooting.md
-    - Verify: Common issue documented with solution
-
-4. **Test**: "What are the API integration patterns?"
-    - Expected: AI reads README.md → See list of guides
-    - Verify: Each guide <150 lines, focused on one pattern
+4. **Validate**:
+   ```bash
+   wc -l lemline-core/docs/core-activities.md  # Should be < 200
+   ```
 
 ## When to Use This Command
 
-✅ **Use when**:
+**Use when**:
 
 - Any single file exceeds 150 lines
-- Topic has 3+ distinct sub-tasks (deserves folder structure)
-- Total topic content exceeds 300 lines across files
-- Single file covers multiple unrelated topics
-- AI struggles to find relevant info
-- Developers ask "Where is X documented?"
-- Adding new major feature/topic
+- Adding documentation for a new feature
+- Content doesn't fit existing documents
+- Reorganizing after significant changes
 
-❌ **Don't use when**:
+**Don't use when**:
 
 - Docs are already well-organized
 - File is <150 lines and focused
-- Topic has <3 sub-tasks
-- Total topic content <200 lines (keep as single guide in parent folder)
+- Minor updates to existing docs
