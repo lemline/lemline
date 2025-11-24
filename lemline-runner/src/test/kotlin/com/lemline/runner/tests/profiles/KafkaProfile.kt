@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
-import com.lemline.runner.config.DATABASE_CONSUMER_ENABLED
-import com.lemline.runner.config.DATABASE_PRODUCER_ENABLED
+import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
+import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_TYPE
+import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
+import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_KAFKA
 import com.lemline.runner.config.MESSAGING_TYPE
-import com.lemline.runner.config.WORKFLOWS_CONSUMER_ENABLED
-import com.lemline.runner.config.WORKFLOWS_PRODUCER_ENABLED
 import com.lemline.runner.tests.resources.KafkaTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 import io.quarkus.test.junit.QuarkusTestProfile.TestResourceEntry
@@ -34,15 +34,15 @@ class KafkaProfile : QuarkusTestProfile {
             DATABASE_TYPE to DB_TYPE_IN_MEMORY,
             // Messaging configuration
             MESSAGING_TYPE to MSG_TYPE_KAFKA,
-            WORKFLOWS_CONSUMER_ENABLED to "true",
-            WORKFLOWS_PRODUCER_ENABLED to "true",
-            DATABASE_CONSUMER_ENABLED to "true",
-            DATABASE_PRODUCER_ENABLED to "true",
+            COMMANDS_CONSUMER_ENABLED to "true",
+            COMMANDS_PRODUCER_ENABLED to "true",
+            EVENTS_CONSUMER_ENABLED to "true",
+            EVENTS_PRODUCER_ENABLED to "true",
 
-            "mp.messaging.incoming.workflows-in.topic" to "lemline-workflows-in",
-            "mp.messaging.outgoing.workflows-out.topic" to "lemline-workflows-out",
-            "mp.messaging.incoming.ingestion-in.topic" to "lemline-ingestion-in",
-            "mp.messaging.outgoing.ingestion-out.topic" to "lemline-ingestion-out",
+            "mp.messaging.incoming.commands-in.topic" to "lemline-commands-in",
+            "mp.messaging.outgoing.commands-out.topic" to "lemline-commands-out",
+            "mp.messaging.incoming.events-in.topic" to "lemline-events-in",
+            "mp.messaging.outgoing.events-out.topic" to "lemline-events-out",
 
             "smallrye.messaging.kafka.topic.creation.enable" to "true"
         )

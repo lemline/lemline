@@ -31,7 +31,6 @@ Parse arguments as: /refactor [scope]
 2. 🎯 Performance: Reduce re-renders, optimize loops
 3. 📦 Structure: Extract components, organize imports
 4. 🎨 Readability: Better names, add comments, simplify logic
-5. ✅ Types: Add TypeScript/PropTypes if missing
 
 ## Constraints
 

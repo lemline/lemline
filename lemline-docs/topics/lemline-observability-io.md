@@ -1,6 +1,8 @@
 # I/O Observability
 
-This document explains how to monitor, analyze, and optimize input/output (I/O) operations in Lemline workflows. I/O operations, including network calls, database interactions, message processing, and file operations, often represent the most significant performance bottlenecks and failure points in workflow execution.
+This document explains how to monitor, analyze, and optimize input/output (I/O) operations in Lemline workflows. I/O
+operations, including network calls, database interactions, message processing, and file operations, often represent the
+most significant performance bottlenecks and failure points in workflow execution.
 
 ## Types of I/O in Lemline Workflows
 
@@ -20,55 +22,55 @@ Lemline provides comprehensive metrics for I/O operations:
 
 ### HTTP Metrics
 
-| Metric | Description | Dimensions |
-|--------|-------------|------------|
-| `lemline_http_request_duration_seconds` | HTTP request duration | endpoint, method, status_code |
-| `lemline_http_request_size_bytes` | Size of HTTP request payloads | endpoint, method |
-| `lemline_http_response_size_bytes` | Size of HTTP response payloads | endpoint, method |
-| `lemline_http_request_count` | Count of HTTP requests | endpoint, method, status_code |
-| `lemline_http_connection_errors` | Count of HTTP connection errors | endpoint, error_type |
-| `lemline_http_timeout_count` | Count of HTTP request timeouts | endpoint, method |
+| Metric                                  | Description                     | Dimensions                    |
+|-----------------------------------------|---------------------------------|-------------------------------|
+| `lemline_http_request_duration_seconds` | HTTP request duration           | endpoint, method, status_code |
+| `lemline_http_request_size_bytes`       | Size of HTTP request payloads   | endpoint, method              |
+| `lemline_http_response_size_bytes`      | Size of HTTP response payloads  | endpoint, method              |
+| `lemline_http_request_count`            | Count of HTTP requests          | endpoint, method, status_code |
+| `lemline_http_connection_errors`        | Count of HTTP connection errors | endpoint, error_type          |
+| `lemline_http_timeout_count`            | Count of HTTP request timeouts  | endpoint, method              |
 
 ### Database Metrics
 
-| Metric | Description | Dimensions |
-|--------|-------------|------------|
-| `lemline_db_operation_duration_seconds` | Database operation duration | operation_type, table |
-| `lemline_db_query_count` | Count of database queries | operation_type, table |
-| `lemline_db_row_count` | Number of rows affected/returned | operation_type, table |
-| `lemline_db_transaction_duration_seconds` | Database transaction duration | - |
-| `lemline_db_connection_count` | Active database connections | pool_name |
-| `lemline_db_connection_wait_duration_seconds` | Wait time for database connections | pool_name |
+| Metric                                        | Description                        | Dimensions            |
+|-----------------------------------------------|------------------------------------|-----------------------|
+| `lemline_db_operation_duration_seconds`       | Database operation duration        | operation_type, table |
+| `lemline_db_query_count`                      | Count of database queries          | operation_type, table |
+| `lemline_db_row_count`                        | Number of rows affected/returned   | operation_type, table |
+| `lemline_db_transaction_duration_seconds`     | Database transaction duration      | -                     |
+| `lemline_db_connection_count`                 | Active database connections        | pool_name             |
+| `lemline_db_connection_wait_duration_seconds` | Wait time for database connections | pool_name             |
 
 ### Message Queue Metrics
 
-| Metric | Description | Dimensions |
-|--------|-------------|------------|
-| `lemline_message_publish_duration_seconds` | Time to publish messages | destination, message_type |
-| `lemline_message_consume_duration_seconds` | Time to consume messages | source, message_type |
-| `lemline_message_size_bytes` | Size of messages | destination, message_type |
-| `lemline_message_count` | Count of messages | destination, operation_type, message_type |
-| `lemline_message_error_count` | Count of message errors | destination, error_type |
-| `lemline_message_lag` | Consumer lag in messages | source, consumer_group |
+| Metric                                     | Description              | Dimensions                                |
+|--------------------------------------------|--------------------------|-------------------------------------------|
+| `lemline_message_publish_duration_seconds` | Time to publish messages | destination, message_type                 |
+| `lemline_message_consume_duration_seconds` | Time to consume messages | source, message_type                      |
+| `lemline_message_size_bytes`               | Size of messages         | destination, message_type                 |
+| `lemline_message_count`                    | Count of messages        | destination, operation_type, message_type |
+| `lemline_message_error_count`              | Count of message errors  | destination, error_type                   |
+| `lemline_message_lag`                      | Consumer lag in messages | source, consumer_group                    |
 
 ### File System Metrics
 
-| Metric | Description | Dimensions |
-|--------|-------------|------------|
-| `lemline_file_operation_duration_seconds` | File operation duration | operation_type, file_type |
-| `lemline_file_size_bytes` | Size of files read/written | operation_type, file_type |
-| `lemline_file_operation_count` | Count of file operations | operation_type, file_type |
-| `lemline_file_operation_errors` | Count of file operation errors | operation_type, error_type |
+| Metric                                    | Description                    | Dimensions                 |
+|-------------------------------------------|--------------------------------|----------------------------|
+| `lemline_file_operation_duration_seconds` | File operation duration        | operation_type, file_type  |
+| `lemline_file_size_bytes`                 | Size of files read/written     | operation_type, file_type  |
+| `lemline_file_operation_count`            | Count of file operations       | operation_type, file_type  |
+| `lemline_file_operation_errors`           | Count of file operation errors | operation_type, error_type |
 
 ### Event Processing Metrics
 
-| Metric | Description | Dimensions |
-|--------|-------------|------------|
-| `lemline_event_wait_duration_seconds` | Time waiting for events | event_type, source |
-| `lemline_event_processing_duration_seconds` | Time processing events | event_type, source |
-| `lemline_event_count` | Count of events received | event_type, source |
-| `lemline_event_size_bytes` | Size of event payloads | event_type, source |
-| `lemline_event_timeout_count` | Count of event wait timeouts | event_type, source |
+| Metric                                      | Description                  | Dimensions         |
+|---------------------------------------------|------------------------------|--------------------|
+| `lemline_event_wait_duration_seconds`       | Time waiting for events      | event_type, source |
+| `lemline_event_processing_duration_seconds` | Time processing events       | event_type, source |
+| `lemline_event_count`                       | Count of events received     | event_type, source |
+| `lemline_event_size_bytes`                  | Size of event payloads       | event_type, source |
+| `lemline_event_timeout_count`               | Count of event wait timeouts | event_type, source |
 
 ## Setting Up I/O Monitoring
 
@@ -78,19 +80,19 @@ Enable detailed I/O monitoring in your Lemline configuration:
 
 ```yaml
 lemline:
-  observability:
-    io:
-      enabled: true
-      detailed-metrics: true
-      sampling-rate: 1.0  # Sample 100% of I/O operations
-      trace:
-        enabled: true
-      metrics:
-        http: true
-        database: true
-        messaging: true
-        filesystem: true
-        events: true
+    observability:
+        io:
+            enabled: true
+            detailed-metrics: true
+            sampling-rate: 1.0  # Sample 100% of I/O operations
+            trace:
+                enabled: true
+            metrics:
+                http: true
+                database: true
+                messaging: true
+                filesystem: true
+                events: true
 ```
 
 ### Integration with OpenTelemetry
@@ -99,21 +101,21 @@ For distributed tracing of I/O operations:
 
 ```yaml
 lemline:
-  observability:
-    opentelemetry:
-      enabled: true
-      service-name: lemline-workflows
-      exporter:
-        type: otlp
-        endpoint: https://telemetry.example.com:4317
-      span-processors:
-        batch:
-          max-queue-size: 2048
-          max-export-batch-size: 512
-          scheduler-interval-millis: 5000
-      instrumentation:
-        io:
-          enabled: true
+    observability:
+        opentelemetry:
+            enabled: true
+            service-name: lemline-commands
+            exporter:
+                type: otlp
+                endpoint: https://telemetry.example.com:4317
+            span-processors:
+                batch:
+                    max-queue-size: 2048
+                    max-export-batch-size: 512
+                    scheduler-interval-millis: 5000
+            instrumentation:
+                io:
+                    enabled: true
 ```
 
 ### Log Configuration for I/O
@@ -122,13 +124,13 @@ Configure detailed logging for I/O operations:
 
 ```yaml
 lemline:
-  logging:
-    io:
-      enabled: true
-      level: INFO  # Set to DEBUG for more verbose logging
-      include-payload: false  # Set to true to include actual data (caution: may log sensitive data)
-      include-headers: true
-      max-payload-size: 1024  # Truncate large payloads
+    logging:
+        io:
+            enabled: true
+            level: INFO  # Set to DEBUG for more verbose logging
+            include-payload: false  # Set to true to include actual data (caution: may log sensitive data)
+            include-headers: true
+            max-payload-size: 1024  # Truncate large payloads
 ```
 
 ## I/O Visualization and Analysis
@@ -504,32 +506,32 @@ Set up alerts for I/O issues:
 
 ```yaml
 alerts:
-  - name: HighHttpErrorRate
-    expr: sum(rate(lemline_http_request_count{status_code=~"5.."}[5m])) / sum(rate(lemline_http_request_count[5m])) > 0.05
-    for: 2m
-    labels:
-      severity: warning
-    annotations:
-      summary: "High HTTP error rate detected"
-      description: "HTTP error rate is above 5% for the last 5 minutes"
+    -   name: HighHttpErrorRate
+        expr: sum(rate(lemline_http_request_count{status_code=~"5.."}[5m])) / sum(rate(lemline_http_request_count[5m])) > 0.05
+        for: 2m
+        labels:
+            severity: warning
+        annotations:
+            summary: "High HTTP error rate detected"
+            description: "HTTP error rate is above 5% for the last 5 minutes"
 
-  - name: SlowDatabaseQueries
-    expr: histogram_quantile(0.95, sum(rate(lemline_db_operation_duration_seconds_bucket[5m])) by (le, operation_type)) > 1.0
-    for: 5m
-    labels:
-      severity: warning
-    annotations:
-      summary: "Slow database queries detected"
-      description: "95th percentile of database query time is above 1 second"
+    -   name: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, sum(rate(lemline_db_operation_duration_seconds_bucket[5m])) by (le, operation_type)) > 1.0
+        for: 5m
+        labels:
+            severity: warning
+        annotations:
+            summary: "Slow database queries detected"
+            description: "95th percentile of database query time is above 1 second"
 
-  - name: MessageQueueLag
-    expr: max(lemline_message_lag) > 1000
-    for: 5m
-    labels:
-      severity: warning
-    annotations:
-      summary: "High message queue lag detected"
-      description: "Message queue consumer lag is above 1000 messages"
+    -   name: MessageQueueLag
+        expr: max(lemline_message_lag) > 1000
+        for: 5m
+        labels:
+            severity: warning
+        annotations:
+            summary: "High message queue lag detected"
+            description: "Message queue consumer lag is above 1000 messages"
 ```
 
 ## I/O Analysis Case Studies
@@ -539,30 +541,32 @@ alerts:
 **Problem:** Workflows failing due to intermittent HTTP timeouts
 
 **Analysis Approach:**
+
 1. Analyze HTTP timeout metrics by endpoint
 2. Review HTTP connection patterns
 3. Test different timeout and retry configurations
 
 **Solution:**
+
 ```yaml
 lemline:
-  http:
-    client:
-      connect-timeout: 2s
-      socket-timeout: 10s
-      retry:
-        max-attempts: 3
-        statuses:
-          - 408  # Request Timeout
-          - 429  # Too Many Requests
-          - 503  # Service Unavailable
-        methods:
-          - GET
-          - HEAD
-        backoff:
-          delay: 200ms
-          multiplier: 2
-          max-delay: 2s
+    http:
+        client:
+            connect-timeout: 2s
+            socket-timeout: 10s
+            retry:
+                max-attempts: 3
+                statuses:
+                    - 408  # Request Timeout
+                    - 429  # Too Many Requests
+                    - 503  # Service Unavailable
+                methods:
+                    - GET
+                    - HEAD
+                backoff:
+                    delay: 200ms
+                    multiplier: 2
+                    max-delay: 2s
 ```
 
 ### Case Study 2: Database Connection Bottlenecks
@@ -570,24 +574,26 @@ lemline:
 **Problem:** Workflows blocked waiting for database connections
 
 **Analysis Approach:**
+
 1. Monitor connection pool metrics (usage, wait time)
 2. Analyze connection usage patterns across workflows
 3. Review database operation durations
 
 **Solution:**
+
 ```yaml
 lemline:
-  database:
-    hikari:
-      maximum-pool-size: 50
-      connection-timeout: 5000
-      validation-timeout: 2000
-      metrics:
-        enabled: true
-    statement-timeout: 5s
-    operations:
-      logging:
-        threshold: 1000ms
+    database:
+        hikari:
+            maximum-pool-size: 50
+            connection-timeout: 5000
+            validation-timeout: 2000
+            metrics:
+                enabled: true
+        statement-timeout: 5s
+        operations:
+            logging:
+                threshold: 1000ms
 ```
 
 ### Case Study 3: Message Processing Backlog
@@ -595,26 +601,28 @@ lemline:
 **Problem:** Message queue consumers falling behind during peak loads
 
 **Analysis Approach:**
+
 1. Monitor message lag metrics
 2. Analyze message processing rates
 3. Identify message processing bottlenecks
 
 **Solution:**
+
 ```yaml
 lemline:
-  messaging:
-    kafka:
-      consumers:
-        concurrency: 5
-        auto-scaling:
-          enabled: true
-          min: 2
-          max: 10
-          target-utilization: 0.7
-      producer:
-        batch-size: 16384
-        linger-ms: 10
-        compression-type: lz4
+    messaging:
+        kafka:
+            consumers:
+                concurrency: 5
+                auto-scaling:
+                    enabled: true
+                    min: 2
+                    max: 10
+                    target-utilization: 0.7
+            producer:
+                batch-size: 16384
+                linger-ms: 10
+                compression-type: lz4
 ```
 
 ## Advanced I/O Observability
@@ -625,14 +633,14 @@ Track data flow through your system:
 
 ```yaml
 lemline:
-  observability:
-    data-flow:
-      enabled: true
-      tracking:
-        payload-hashing: true
-        correlation-id-propagation: true
-      visualization:
-        enabled: true
+    observability:
+        data-flow:
+            enabled: true
+            tracking:
+                payload-hashing: true
+                correlation-id-propagation: true
+            visualization:
+                enabled: true
 ```
 
 ### I/O Rate Limiting
@@ -641,19 +649,19 @@ Configure rate limiting to prevent I/O overload:
 
 ```yaml
 lemline:
-  rate-limiting:
-    http:
-      default:
-        limit: 100
-        window: 1s
-      endpoints:
-        "api.example.com":
-          limit: 50
-          window: 1s
-    database:
-      write-operations:
-        limit: 500
-        window: 1s
+    rate-limiting:
+        http:
+            default:
+                limit: 100
+                window: 1s
+            endpoints:
+                "api.example.com":
+                    limit: 50
+                    window: 1s
+        database:
+            write-operations:
+                limit: 500
+                window: 1s
 ```
 
 ### I/O Security Monitoring
@@ -662,12 +670,12 @@ Monitor for I/O security issues:
 
 ```yaml
 lemline:
-  observability:
-    security:
-      enabled: true
-      sensitive-data-detection: true
-      auth-failure-tracking: true
-      unusual-pattern-detection: true
+    observability:
+        security:
+            enabled: true
+            sensitive-data-detection: true
+            auth-failure-tracking: true
+            unusual-pattern-detection: true
 ```
 
 ## Best Practices for I/O Observability
@@ -685,11 +693,15 @@ lemline:
 
 ## Conclusion
 
-Effective I/O observability is crucial for maintaining reliable and efficient workflow operations in Lemline. By systematically monitoring, analyzing, and optimizing I/O operations, you can identify bottlenecks, prevent cascading failures, set appropriate timeouts and retries, and ensure your workflows interact efficiently with external systems.
+Effective I/O observability is crucial for maintaining reliable and efficient workflow operations in Lemline. By
+systematically monitoring, analyzing, and optimizing I/O operations, you can identify bottlenecks, prevent cascading
+failures, set appropriate timeouts and retries, and ensure your workflows interact efficiently with external systems.
 
-The combination of comprehensive metrics, distributed tracing, and intelligent alerting provides a complete view of I/O behavior, enabling both reactive troubleshooting and proactive optimization of your workflow-based applications.
+The combination of comprehensive metrics, distributed tracing, and intelligent alerting provides a complete view of I/O
+behavior, enabling both reactive troubleshooting and proactive optimization of your workflow-based applications.
 
 For more details on other observability aspects, see:
+
 - [Lifecycle Observability](lemline-observability-lifecycle.md)
 - [Performance Observability](lemline-observability-performance.md)
 - [Sizing and Scaling](lemline-observability-sizing.md)

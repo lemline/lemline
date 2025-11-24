@@ -104,17 +104,17 @@ lemline:
       # sasl-username: ${LEMLINE_KAFKA_USER:}
       # sasl-password: ${LEMLINE_KAFKA_PASSWORD:}                        # set via env/secret manager
       workflows:
-        topic: ${LEMLINE_WORKFLOWS_TOPIC:lemline-workflows}
+        topic: ${LEMLINE_WORKFLOWS_TOPIC:lemline-commands}
         consumer:
           concurrency: ${LEMLINE_WORKFLOWS_CONCURRENCY:10}
-          dlq: ${LEMLINE_WORKFLOWS_DLQ:lemline-workflows-dlq}
-          group-id: ${LEMLINE_WORKFLOWS_KAFKA_GROUP_ID:lemline-workflows-g1}
-      ingestion:
-        topic: ${LEMLINE_INGESTION_TOPIC:lemline-ingestion}
+          dlq: ${LEMLINE_WORKFLOWS_DLQ:lemline-commands-dlq}
+          group-id: ${LEMLINE_WORKFLOWS_KAFKA_GROUP_ID:lemline-commands-g1}
+      events:
+        topic: ${LEMLINE_INGESTION_TOPIC:lemline-events}
         consumer:
           concurrency: ${LEMLINE_INGESTION_CONCURRENCY:5}
-          dlq: ${LEMLINE_INGESTION_DLQ:lemline-ingestion-dlq}
-          group-id: ${LEMLINE_INGESTION_KAFKA_GROUP_ID:lemline-ingestion-g1}
+          dlq: ${LEMLINE_INGESTION_DLQ:lemline-events-dlq}
+          group-id: ${LEMLINE_INGESTION_KAFKA_GROUP_ID:lemline-events-g1}
 
     # --- RabbitMQ Specific Settings (Uncomment and configure to use RabbitMQ) ---
     rabbitmq:
@@ -131,4 +131,4 @@ lemline:
         queue: ${LEMLINE_WORKFLOWS_TOPIC:lemline}
         consumer:
           concurrency: ${LEMLINE_WORKFLOWS_CONCURRENCY:5}
-          dlq: ${LEMLINE_WORKFLOWS_DLQ:lemline-ingestion-dlq}
+          dlq: ${LEMLINE_WORKFLOWS_DLQ:lemline-events-dlq}

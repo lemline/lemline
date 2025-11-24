@@ -2,7 +2,8 @@
 
 ## Overview
 
-Lemline implements a robust messaging architecture based on SmallRye Reactive Messaging to handle communication between workflow components, external systems, and to support event-driven workflow execution.
+Lemline implements a robust messaging architecture based on SmallRye Reactive Messaging to handle communication between
+workflow components, external systems, and to support event-driven workflow execution.
 
 ## Implementation Details
 
@@ -20,11 +21,13 @@ data class Message(
 ```
 
 Each Message contains:
+
 - The workflow name and version
 - The states of the workflow at different positions
 - The current active position
 
 Messages can be created using the `newInstance` method which initializes a new workflow message with:
+
 - A unique ID (based on time-ordered UUID)
 - Root state with the input payload
 - Starting timestamp
@@ -33,13 +36,14 @@ Messages can be created using the `newInstance` method which initializes a new w
 
 The `MessageConsumer` in `messaging/MessageConsumer.kt` handles:
 
-1. Consuming messages from the incoming channel (`workflows-in`)
+1. Consuming messages from the incoming channel (`commands-in`)
 2. Processing messages using the appropriate workflow definition
 3. Managing the workflow instance lifecycle
 4. Handling different message states (WAITING, RUNNING, COMPLETED, FAULTED, etc.)
-5. Sending output messages to the outgoing channel (`workflows-out`)
+5. Sending output messages to the outgoing channel (`commands-out`)
 
-The consumer uses Kotlin coroutines to process messages asynchronously and implements error handling to track failed message processing.
+The consumer uses Kotlin coroutines to process messages asynchronously and implements error handling to track failed
+message processing.
 
 ### Outbox Pattern Implementation
 
@@ -50,6 +54,7 @@ For reliable message delivery, Lemline implements the Outbox pattern:
 - `WaitOutbox`: Manages delayed message processing
 
 The outbox processor manages:
+
 - Batch processing of pending messages
 - Configurable retry attempts
 - Cleanup of processed messages after a configured time period
@@ -64,21 +69,24 @@ Lemline currently supports these messaging systems:
 
 ## Configuration
 
-Messaging configuration is defined in the `MessagingConfig` interface in `LemlineConfiguration.kt`. Each messaging system has specific properties, and the system automatically generates the correct SmallRye Reactive Messaging properties.
+Messaging configuration is defined in the `MessagingConfig` interface in `LemlineConfiguration.kt`. Each messaging
+system has specific properties, and the system automatically generates the correct SmallRye Reactive Messaging
+properties.
 
 Example configuration:
+
 ```yaml
 lemline:
-  messaging:
-    type: kafka  # Options: in-memory, kafka, rabbitmq
-    consumer:
-      enabled: true
-    producer:
-      enabled: true
-    kafka:
-      brokers: localhost:9092
-      topic: lemline-workflows
-      groupId: lemline-group
+    messaging:
+        type: kafka  # Options: in-memory, kafka, rabbitmq
+        consumer:
+            enabled: true
+        producer:
+            enabled: true
+        kafka:
+            brokers: localhost:9092
+            topic: lemline-commands
+            groupId: lemline-group
 ```
 
 ## Adding Support for a New Messaging Technology
@@ -88,6 +96,7 @@ lemline:
 Add the SmallRye connector to `lemline-runner` module's dependencies:
 
 ```xml
+
 <dependency>
     <groupId>io.smallrye.reactive</groupId>
     <artifactId>smallrye-reactive-messaging-[connector-name]</artifactId>
@@ -98,6 +107,7 @@ Add the SmallRye connector to `lemline-runner` module's dependencies:
 For example, to add Apache Pulsar:
 
 ```xml
+
 <dependency>
     <groupId>io.smallrye.reactive</groupId>
     <artifactId>smallrye-reactive-messaging-pulsar</artifactId>
@@ -129,7 +139,7 @@ interface PulsarConfig {
 
     @WithDefault("lemline")
     fun topic(): String
-    
+
     fun topicDlq(): Optional<String>
     fun topicOut(): Optional<String>
 }
@@ -142,11 +152,11 @@ Update the `MessagingConfig` interface:
 ```kotlin
 interface MessagingConfig {
     // Existing code...
-    
+
     @WithDefault("in-memory")
     @Pattern(regexp = "in-memory|kafka|rabbitmq|pulsar")
     fun type(): String
-    
+
     // Add new broker specific setting
     fun pulsar(): PulsarConfig
 }
@@ -160,28 +170,28 @@ Add a new branch in the `toQuarkusProperties` method:
 companion object {
     fun toQuarkusProperties(config: MessagingConfig): Map<String, String> {
         // Existing code...
-        
+
         when (config.type()) {
             // Existing cases...
-            
+
             MSG_TYPE_PULSAR -> {
                 val pulsarConfig = config.pulsar()
-                
+
                 // Server configuration
                 props["pulsar.client.serviceUrl"] = pulsarConfig.serviceUrl()
-                
+
                 // Incoming channel
                 if (config.consumer().enabled()) {
                     props["$incoming.connector"] = PULSAR_CONNECTOR
                     props["$incoming.topic"] = pulsarConfig.topic()
                     props["$incoming.subscription-name"] = "lemline-subscription"
                     props["$incoming.subscription-type"] = "Shared"
-                    
-                    pulsarConfig.topicDlq().ifPresent { 
-                        props["$incoming.dead-letter-topic"] = it 
+
+                    pulsarConfig.topicDlq().ifPresent {
+                        props["$incoming.dead-letter-topic"] = it
                     }
                 }
-                
+
                 // Outgoing channel
                 if (config.producer().enabled()) {
                     props["$outgoing.connector"] = PULSAR_CONNECTOR
@@ -215,7 +225,7 @@ Configure your application to use the new messaging technology:
 ```properties
 lemline.messaging.type=pulsar
 lemline.messaging.pulsar.serviceUrl=pulsar://localhost:6650
-lemline.messaging.pulsar.topic=lemline-workflows
+lemline.messaging.pulsar.topic=lemline-commands
 lemline.messaging.consumer.enabled=true
 lemline.messaging.producer.enabled=true
 ```
@@ -230,6 +240,7 @@ lemline.messaging.producer.enabled=true
 
 ### Debugging Tips
 
-- Enable DEBUG logging for SmallRye Reactive Messaging: `quarkus.log.category."io.smallrye.reactive.messaging".level=DEBUG`
+- Enable DEBUG logging for SmallRye Reactive Messaging:
+  `quarkus.log.category."io.smallrye.reactive.messaging".level=DEBUG`
 - Monitor the message broker's admin interface to verify message flow
 - Use the in-memory connector for testing to isolate messaging issues from broker connectivity issues 

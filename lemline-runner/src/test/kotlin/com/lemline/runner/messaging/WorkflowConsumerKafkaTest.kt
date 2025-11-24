@@ -3,10 +3,10 @@ package com.lemline.runner.messaging
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
 import com.lemline.runner.messaging.base.WorkflowConsumerTest
-import com.lemline.runner.messaging.commands.WORKFLOWS_IN_CHANNEL
-import com.lemline.runner.messaging.commands.WORKFLOWS_OUT_CHANNEL
-import com.lemline.runner.messaging.events.DATABASE_IN_CHANNEL
-import com.lemline.runner.messaging.events.DATABASE_OUT_CHANNEL
+import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
+import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
+import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
+import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import com.lemline.runner.tests.profiles.KafkaProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -39,16 +39,16 @@ internal class WorkflowConsumerKafkaTest : WorkflowConsumerTest() {
     @ConfigProperty(name = "kafka.bootstrap.servers")
     lateinit var bootstrapServers: String
 
-    @ConfigProperty(name = "mp.messaging.incoming.$WORKFLOWS_IN_CHANNEL.topic")
+    @ConfigProperty(name = "mp.messaging.incoming.$COMMANDS_IN_CHANNEL.topic")
     lateinit var instanceTopicIn: String
 
-    @ConfigProperty(name = "mp.messaging.outgoing.$WORKFLOWS_OUT_CHANNEL.topic")
+    @ConfigProperty(name = "mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.topic")
     lateinit var instanceTopicOut: String
 
-    @ConfigProperty(name = "mp.messaging.incoming.$DATABASE_IN_CHANNEL.topic")
+    @ConfigProperty(name = "mp.messaging.incoming.$EVENTS_IN_CHANNEL.topic")
     lateinit var databaseTopicIn: String
 
-    @ConfigProperty(name = "mp.messaging.outgoing.$DATABASE_OUT_CHANNEL.topic")
+    @ConfigProperty(name = "mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.topic")
     lateinit var databaseTopicOut: String
 
     private lateinit var instanceProducer: KafkaProducer<String, String>

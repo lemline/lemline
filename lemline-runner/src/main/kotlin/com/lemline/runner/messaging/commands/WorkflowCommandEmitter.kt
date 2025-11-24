@@ -10,7 +10,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.ExperimentalTime
 import org.eclipse.microprofile.reactive.messaging.Channel
 
-internal const val WORKFLOWS_OUT_CHANNEL = "workflows-out"
+internal const val COMMANDS_OUT_CHANNEL = "commands-out"
 
 @ExperimentalTime
 @Startup
@@ -19,6 +19,6 @@ internal class WorkflowCommandEmitter(
     override val metrics: WorkflowCommandSubscriberMetrics
 ) : MessageEmitter<InstanceMessage<out WorkflowCommand>>() {
 
-    @Channel(WORKFLOWS_OUT_CHANNEL)
+    @Channel(COMMANDS_OUT_CHANNEL)
     override lateinit var emitter: MutinyEmitter<String>
 }

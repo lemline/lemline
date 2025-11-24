@@ -2,7 +2,10 @@
 
 ## Purpose
 
-In distributed systems, failures are inevitable. Lemline implements several resilience patterns to ensure that workflows can gracefully handle these failures and maintain system stability. These patterns help in creating robust, fault-tolerant workflows that can recover from transient failures and provide consistent behavior even when external dependencies fail.
+In distributed systems, failures are inevitable. Lemline implements several resilience patterns to ensure that workflows
+can gracefully handle these failures and maintain system stability. These patterns help in creating robust,
+fault-tolerant workflows that can recover from transient failures and provide consistent behavior even when external
+dependencies fail.
 
 Resilience patterns in Lemline enable:
 
@@ -16,7 +19,8 @@ Resilience patterns in Lemline enable:
 
 ### Purpose
 
-The retry pattern allows workflows to automatically attempt an operation multiple times when a transient failure occurs, improving the chances of eventual success without manual intervention.
+The retry pattern allows workflows to automatically attempt an operation multiple times when a transient failure occurs,
+improving the chances of eventual success without manual intervention.
 
 ### Implementation
 
@@ -24,20 +28,20 @@ In Lemline, retries are configured in the `try` block with a detailed policy:
 
 ```yaml
 try:
-  retry:
-    policy:
-      strategy: backoff
-      backoff:
-        delay: PT1S
-        multiplier: 2
-        jitter: 0.1
-      limit:
-        attempt:
-          count: 5
-        duration: PT5M
-  do:
-    - callHTTP:
-        url: "http://example.com/api"
+    retry:
+        policy:
+            strategy: backoff
+            backoff:
+                delay: PT1S
+                multiplier: 2
+                jitter: 0.1
+            limit:
+                attempt:
+                    count: 5
+                duration: PT5M
+    do:
+        -   callHTTP:
+                url: "http://example.com/api"
 ```
 
 ### Key Components
@@ -60,7 +64,9 @@ try:
 
 ### Purpose
 
-The circuit breaker pattern prevents a failing service from being repeatedly called, which can cascade failures throughout the system. It "trips" after a threshold of failures, temporarily blocking further calls to allow the service to recover.
+The circuit breaker pattern prevents a failing service from being repeatedly called, which can cascade failures
+throughout the system. It "trips" after a threshold of failures, temporarily blocking further calls to allow the service
+to recover.
 
 ### Implementation
 
@@ -87,20 +93,22 @@ lemline.circuit-breaker.http-client.timeout=PT30S
 Circuit breakers automatically protect `callHTTP`, `callGRPC`, and other external service calls:
 
 ```yaml
-- checkInventory:
-    callHTTP:
-      url: "http://inventory-service/api/check"
-      method: "GET"
-      # This call is protected by circuit breaker
+-   checkInventory:
+        callHTTP:
+            url: "http://inventory-service/api/check"
+            method: "GET"
+            # This call is protected by circuit breaker
 ```
 
-If the circuit is open due to previous failures, the call will fail immediately with a `CircuitBreakerOpenException` that can be caught and handled.
+If the circuit is open due to previous failures, the call will fail immediately with a `CircuitBreakerOpenException`
+that can be caught and handled.
 
 ## Timeout Pattern
 
 ### Purpose
 
-The timeout pattern prevents operations from blocking indefinitely by setting maximum allowed durations for tasks and workflows, ensuring resource release and preventing deadlocks.
+The timeout pattern prevents operations from blocking indefinitely by setting maximum allowed durations for tasks and
+workflows, ensuring resource release and preventing deadlocks.
 
 ### Implementation
 
@@ -114,14 +122,14 @@ Timeouts can be configured at multiple levels:
 
 ```yaml
 # Task-level timeout
-- fetchData:
-    callHTTP:
-      url: "http://data-service/api/data"
-      timeout: PT10S  # 10-second timeout
+-   fetchData:
+        callHTTP:
+            url: "http://data-service/api/data"
+            timeout: PT10S  # 10-second timeout
 
 # Workflow-level timeout
 workflow:
-  timeout: PT5M  # 5-minute timeout for entire workflow
+    timeout: PT5M  # 5-minute timeout for entire workflow
 ```
 
 ### Error Handling
@@ -130,26 +138,28 @@ When timeouts occur, they raise a standard `timeout` error:
 
 ```yaml
 try:
-  do:
-    - longRunningTask:
-        callHTTP:
-          url: "http://slow-service/api"
-          timeout: PT5S
-  catch:
-    - error:
-        with:
-          type: "https://serverlessworkflow.io/spec/1.0.0/errors/timeout"
-      do:
-        - fallback:
-            set:
-              result: "default-value"
+    do:
+        -   longRunningTask:
+                callHTTP:
+                    url: "http://slow-service/api"
+                    timeout: PT5S
+    catch:
+        -   error:
+                with:
+                    type: "https://serverlessworkflow.io/spec/1.0.0/errors/timeout"
+            do:
+                -   fallback:
+                        set:
+                            result: "default-value"
 ```
 
 ## Bulkhead Pattern
 
 ### Purpose
 
-The bulkhead pattern isolates elements of an application into pools so that if one fails, the others continue to function. It's named after the compartments in a ship that prevent the entire vessel from flooding when one section is damaged.
+The bulkhead pattern isolates elements of an application into pools so that if one fails, the others continue to
+function. It's named after the compartments in a ship that prevent the entire vessel from flooding when one section is
+damaged.
 
 ### Implementation
 
@@ -172,21 +182,22 @@ lemline.bulkhead.database.max-concurrent-operations=10
 The `fork` task automatically implements a form of bulkhead pattern by isolating parallel execution paths:
 
 ```yaml
-- processBatch:
-    fork:
-      branches:
-        - processItems:
-            # ... operations ...
-        - updateInventory:
-            # ... operations ...
-      # If one branch fails, it doesn't affect others
+-   processBatch:
+        fork:
+            branches:
+                -   processItems:
+                    # ... operations ...
+                -   updateInventory:
+                    # ... operations ...
+            # If one branch fails, it doesn't affect others
 ```
 
 ## Health Checks
 
 ### Purpose
 
-Health checks provide continuous monitoring of system components and services to detect failures early and trigger appropriate resilience mechanisms.
+Health checks provide continuous monitoring of system components and services to detect failures early and trigger
+appropriate resilience mechanisms.
 
 ### Implementation
 
@@ -212,7 +223,7 @@ Lemline implements progressive recovery through:
 
 1. **Rate limiting**: Gradually increasing workload after recovery
 2. **Prioritization**: Processing critical work first during recovery
-3. **Backpressure**: Controlling ingestion rates to prevent overwhelming the system
+3. **Backpressure**: Controlling events rates to prevent overwhelming the system
 
 ### Rate Limiting Configuration
 
@@ -227,14 +238,14 @@ lemline.rate-limit.recovery.increase-factor=1.5
 
 ### When to Use Each Pattern
 
-| Pattern | When to Use |
-|---------|-------------|
-| Retry | For transient failures in external services |
-| Circuit Breaker | For protecting against persistent external service failures |
-| Timeout | For operations that might block indefinitely |
-| Bulkhead | For isolating critical paths from failures in non-critical ones |
-| Health Checks | For continuous monitoring and early failure detection |
-| Progressive Recovery | For gradually recovering from system-wide failures |
+| Pattern              | When to Use                                                     |
+|----------------------|-----------------------------------------------------------------|
+| Retry                | For transient failures in external services                     |
+| Circuit Breaker      | For protecting against persistent external service failures     |
+| Timeout              | For operations that might block indefinitely                    |
+| Bulkhead             | For isolating critical paths from failures in non-critical ones |
+| Health Checks        | For continuous monitoring and early failure detection           |
+| Progressive Recovery | For gradually recovering from system-wide failures              |
 
 ### Combined Patterns
 
@@ -256,37 +267,38 @@ These patterns are most effective when combined. Common combinations include:
 ## Example: Complete Resilience Implementation
 
 ```yaml
-- processOrder:
-    try:
-      retry:
-        policy:
-          strategy: backoff
-          backoff:
-            delay: PT1S
-            multiplier: 2
-            jitter: 0.1
-          limit:
-            attempt:
-              count: 3
-      do:
-        - submitOrder:
-            callHTTP:
-              url: "http://order-service/api/orders"
-              method: "POST"
-              timeout: PT5S  # Timeout pattern
-    catch:
-      # Fallback strategy
-      - error:
-          with:
-            type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
-        do:
-          - queueForLater:
-              emit:
-                event: "OrderPending"
-                data: "${ .order }"
+-   processOrder:
+        try:
+            retry:
+                policy:
+                    strategy: backoff
+                    backoff:
+                        delay: PT1S
+                        multiplier: 2
+                        jitter: 0.1
+                    limit:
+                        attempt:
+                            count: 3
+            do:
+                -   submitOrder:
+                        callHTTP:
+                            url: "http://order-service/api/orders"
+                            method: "POST"
+                            timeout: PT5S  # Timeout pattern
+        catch:
+            # Fallback strategy
+            -   error:
+                    with:
+                        type: "https://serverlessworkflow.io/spec/1.0.0/errors/communication"
+                do:
+                    -   queueForLater:
+                            emit:
+                                event: "OrderPending"
+                                data: "${ .order }"
 ```
 
 This example combines multiple resilience patterns:
+
 - **Retry pattern** with exponential backoff for transient failures
 - **Timeout pattern** to prevent indefinite blocking
 - **Circuit breaker** (implicitly applied to HTTP calls)

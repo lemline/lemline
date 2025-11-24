@@ -8,12 +8,12 @@ import jakarta.inject.Singleton
 import kotlin.time.ExperimentalTime
 
 /**
- * Provides micrometer metrics for monitoring ingestion message processing.
+ * Provides micrometer metrics for monitoring events message processing.
  */
 @Singleton
 @ExperimentalTime
 internal class WorkflowEventSubscriberMetrics @Inject constructor(
     registry: MeterRegistry
 ) : MessageSubscriberMetrics(registry) {
-    override val METRIC_PREFIX = "lemline.messaging.database"
+    override val METRIC_PREFIX = "lemline.messaging.events"
 }

@@ -35,7 +35,7 @@ internal class ForkCleaner : AbstractCleaner<ForkModel>() {
     override val enabled by lazy {
         lemlineConfig.outbox().parent().enabled().getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()
-            ?: lemlineConfig.messaging().workflows().getOrNull()?.consumer()?.enabled() ?: false
+            ?: lemlineConfig.messaging().commands().getOrNull()?.consumer()?.enabled() ?: false
     }
 
     // Cleanup configuration

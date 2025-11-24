@@ -50,30 +50,29 @@ The configuration file is searched in the following order:
 4. XDG-compliant location: `~/.config/lemline/config.yaml`
 5. Home directory: `~/.lemline.yaml`
 
-
 For example, with this configuration file (e.g., `config.yaml`):
 
 ```yaml
 lemline:
-  database:
-    type: postgresql
-    migrate-at-start: true
-    postgresql:
-      host: db.example.com
-      port: 5432
-      username: lemline
-      password: secure-password
-      name: lemline_db
-  
-  messaging:
-    type: kafka
-    consumer:
-      enabled: true
-    producer:
-      enabled: true
-    kafka:
-      brokers: kafka.example.com:9092
-      topic: workflows-in
+    database:
+        type: postgresql
+        migrate-at-start: true
+        postgresql:
+            host: db.example.com
+            port: 5432
+            username: lemline
+            password: secure-password
+            name: lemline_db
+
+    messaging:
+        type: kafka
+        consumer:
+            enabled: true
+        producer:
+            enabled: true
+        kafka:
+            brokers: kafka.example.com:9092
+            topic: commands-in
 ```
 
 Then launch with:
@@ -108,30 +107,30 @@ Lemline CLI commands automatically set appropriate configuration:
 
 ```yaml
 lemline:
-  database:
-    # Database type: in-memory, postgresql, mysql
-    type: postgresql
-    
-    # Whether to run migrations at startup
-    migrate-at-start: true
-    
-    # PostgreSQL-specific configuration (used when type is postgresql)
-    postgresql:
-      host: localhost
-      port: 5432
-      username: lemline
-      password: lemline
-      name: lemline
-      schema: public
-      ssl: false
-    
-    # MySQL-specific configuration (used when type is mysql)
-    mysql:
-      host: localhost
-      port: 3306
-      username: lemline
-      password: lemline
-      name: lemline
+    database:
+        # Database type: in-memory, postgresql, mysql
+        type: postgresql
+
+        # Whether to run migrations at startup
+        migrate-at-start: true
+
+        # PostgreSQL-specific configuration (used when type is postgresql)
+        postgresql:
+            host: localhost
+            port: 5432
+            username: lemline
+            password: lemline
+            name: lemline
+            schema: public
+            ssl: false
+
+        # MySQL-specific configuration (used when type is mysql)
+        mysql:
+            host: localhost
+            port: 3306
+            username: lemline
+            password: lemline
+            name: lemline
 ```
 
 ## Messaging Configuration
@@ -146,35 +145,35 @@ lemline:
 
 ```yaml
 lemline:
-  messaging:
-    # Messaging type: in-memory, kafka, rabbitmq
-    type: kafka
-    
-    # Consumer settings
-    consumer:
-      enabled: true
-    
-    # Producer settings
-    producer:
-      enabled: true
-    
-    # Kafka-specific configuration (used when type is kafka)
-    kafka:
-      brokers: localhost:9092
-      topic: lemline-workflows
-      groupId: lemline-group
-      topicOut: lemline-workflows-out
-      topicDlq: lemline-workflows-dlq
-    
-    # RabbitMQ-specific configuration (used when type is rabbitmq)
-    rabbitmq:
-      host: localhost
-      port: 5672
-      username: guest
-      password: guest
-      queue: lemline-workflows
-      queueOut: lemline-workflows-out
-      queueDlq: lemline-workflows-dlq
+    messaging:
+        # Messaging type: in-memory, kafka, rabbitmq
+        type: kafka
+
+        # Consumer settings
+        consumer:
+            enabled: true
+
+        # Producer settings
+        producer:
+            enabled: true
+
+        # Kafka-specific configuration (used when type is kafka)
+        kafka:
+            brokers: localhost:9092
+            topic: lemline-commands
+            groupId: lemline-group
+            topicOut: lemline-commands-out
+            topicDlq: lemline-commands-dlq
+
+        # RabbitMQ-specific configuration (used when type is rabbitmq)
+        rabbitmq:
+            host: localhost
+            port: 5672
+            username: guest
+            password: guest
+            queue: lemline-commands
+            queueOut: lemline-commands-out
+            queueDlq: lemline-commands-dlq
 ```
 
 ## Implementation Details
@@ -183,32 +182,33 @@ lemline:
 
 Lemline's configuration system operates in distinct phases to ensure proper initialization and runtime flexibility:
 
-1. **Pre-Quarkus CLI Processing**: 
-   - Process command-line arguments and set system properties
-   - Set logging levels
-   - Locate configuration files
-   - Configure message consumer/producer activation based on commands
+1. **Pre-Quarkus CLI Processing**:
+    - Process command-line arguments and set system properties
+    - Set logging levels
+    - Locate configuration files
+    - Configure message consumer/producer activation based on commands
 
 2. **Quarkus Startup Configuration**:
-   - Transform Lemline configuration into Quarkus-compatible format
-   - Load and apply configuration from external files
-   - Set up database connections and messaging infrastructure
+    - Transform Lemline configuration into Quarkus-compatible format
+    - Load and apply configuration from external files
+    - Set up database connections and messaging infrastructure
 
 3. **Runtime Configuration Management**:
-   - Initialize database connections based on configuration
-   - Execute database migrations when appropriate
-   - Enable/disable messaging consumers based on configuration
-   - Apply runtime settings from configuration sources
+    - Initialize database connections based on configuration
+    - Execute database migrations when appropriate
+    - Enable/disable messaging consumers based on configuration
+    - Apply runtime settings from configuration sources
 
 4. **Dynamic Service Activation**:
-   - Selectively activate message consumers/producers at runtime
-   - Choose appropriate database implementations
+    - Selectively activate message consumers/producers at runtime
+    - Choose appropriate database implementations
 
 This phased approach allows Lemline to be configured flexibly while respecting Quarkus's initialization constraints.
 
 ### Pre-Quarkus CLI Processing
 
 Before Quarkus starts, the `LemlineApplication` class processes command-line arguments to set environment variables for:
+
 * log level
 * config path
 * producer/consumer enabled
@@ -257,7 +257,8 @@ fun main(args: Array<String>) {
 }
 ```
 
-> Note: all database sources (and corresponding Flyway instances) are active at Quarkus startup, but no connection are established until one is proactively requested. This is how it's possible to choose a database type at runtime.
+> Note: all database sources (and corresponding Flyway instances) are active at Quarkus startup, but no connection are
+> established until one is proactively requested. This is how it's possible to choose a database type at runtime.
 
 #### Command-Specific Configuration
 
@@ -317,7 +318,8 @@ private fun setConfigPath(parseResults: List<ParseResult>) {
 
 ### Quarkus Startup Configuration
 
-During Quarkus startup, the `LemlineConfigSourceFactory` transforms Lemline configuration into Quarkus-compatible properties:
+During Quarkus startup, the `LemlineConfigSourceFactory` transforms Lemline configuration into Quarkus-compatible
+properties:
 
 ```kotlin
 @ConfigRoot(phase = ConfigPhase.BUILD_TIME)
@@ -356,7 +358,8 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 }
 ```
 
-This factory runs at Quarkus's `BUILD_TIME` phase, ensuring configuration is available early in the initialization process.
+This factory runs at Quarkus's `BUILD_TIME` phase, ensuring configuration is available early in the initialization
+process.
 
 #### Type-safe Configuration
 
@@ -408,7 +411,7 @@ class DatabaseManager {
             // ... other database types ...
         }
     }
-    
+
     // Similar lazy initialization for Flyway
     val flyway: Flyway by lazy {
         // Choose Flyway instance based on configuration
@@ -462,8 +465,8 @@ The `MessageConsumer` class activates or deactivates the message consumer based 
 @Startup
 @ApplicationScoped
 internal class MessageConsumer @Inject constructor(
-    @Channel(WORKFLOW_IN) private val messages: Multi<String>,
-    @Channel(WORKFLOW_OUT) private val emitter: Emitter<String>,
+    @Channel(COMMANDS_IN) private val messages: Multi<String>,
+    @Channel(COMMANDS_OUT) private val emitter: Emitter<String>,
     @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
     // ...
 ) {
@@ -476,12 +479,13 @@ internal class MessageConsumer @Inject constructor(
             logger.info { "❌ Consumer disabled" }
         }
     }
-    
+
     // ... message processing methods ...
 }
 ```
 
-This runtime check allows the message consumer to be selectively enabled or disabled based on configuration, even in native mode.
+This runtime check allows the message consumer to be selectively enabled or disabled based on configuration, even in
+native mode.
 
 ### Type-safe Configuration
 
@@ -498,10 +502,10 @@ interface LemlineConfiguration {
 interface DatabaseConfig {
     @Pattern(regexp = "in-memory|postgresql|mysql")
     fun type(): String
-    
+
     @WithDefault("false")
     fun migrateAtStart(): Boolean
-    
+
     fun postgresql(): PostgreSQLConfig
     fun mysql(): MySQLConfig
 }
@@ -517,16 +521,16 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
     override fun getConfigSources(context: ConfigSourceContext): Iterable<ConfigSource> {
         // Collect Lemline properties
         val lemlineProps = mutableMapOf<String, String>()
-        
+
         // Add properties from context
         for (name in context.iterateNames()) {
             if (name.startsWith("lemline.")) {
-                context.getValue(name)?.value?.let { 
-                    lemlineProps[name] = it.split("#").first().trim() 
+                context.getValue(name)?.value?.let {
+                    lemlineProps[name] = it.split("#").first().trim()
                 }
             }
         }
-        
+
         // Load from config file if specified
         LemlineApplication.configPath?.let {
             ExtraFileConfigFactory().getConfig(it).properties.forEach { (name, value) ->
@@ -535,20 +539,20 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
                 }
             }
         }
-        
+
         // Transform into Quarkus properties
         val quarkusPropsList = mutableListOf<ConfigSource>()
-        
+
         // Process database configuration
-        processDatabaseConfig(lemlineProps)?.let { 
-            quarkusPropsList.add(it) 
+        processDatabaseConfig(lemlineProps)?.let {
+            quarkusPropsList.add(it)
         }
-        
+
         // Process messaging configuration
-        processMessagingConfig(lemlineProps)?.let { 
-            quarkusPropsList.add(it) 
+        processMessagingConfig(lemlineProps)?.let {
+            quarkusPropsList.add(it)
         }
-        
+
         return quarkusPropsList
     }
 }

@@ -9,10 +9,10 @@ import com.lemline.runner.cli.CustomParameterHandler
 import com.lemline.runner.cli.MainCommand
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
-import com.lemline.runner.config.DATABASE_CONSUMER_ENABLED
-import com.lemline.runner.config.DATABASE_PRODUCER_ENABLED
-import com.lemline.runner.config.WORKFLOWS_CONSUMER_ENABLED
-import com.lemline.runner.config.WORKFLOWS_PRODUCER_ENABLED
+import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
+import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
+import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
+import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
 import io.quarkus.picocli.runtime.annotations.TopCommand
 import io.quarkus.runtime.Quarkus
 import io.quarkus.runtime.QuarkusApplication
@@ -100,33 +100,33 @@ class LemlineApplication : QuarkusApplication {
 
                 if (helpOrVersion) {
                     disableMetricsEndpoint()
-                    System.setProperty(DATABASE_CONSUMER_ENABLED, "false")
-                    System.setProperty(WORKFLOWS_CONSUMER_ENABLED, "false")
-                    System.setProperty(DATABASE_PRODUCER_ENABLED, "false")
-                    System.setProperty(WORKFLOWS_PRODUCER_ENABLED, "false")
+                    System.setProperty(EVENTS_CONSUMER_ENABLED, "false")
+                    System.setProperty(COMMANDS_CONSUMER_ENABLED, "false")
+                    System.setProperty(EVENTS_PRODUCER_ENABLED, "false")
+                    System.setProperty(COMMANDS_PRODUCER_ENABLED, "false")
                 } else {
                     // The listen command, if any
                     val listen = parseResults.command<ListenCommand>()
 
                     if (listen == null) {
                         disableMetricsEndpoint()
-                        System.setProperty(DATABASE_CONSUMER_ENABLED, "false")
-                        System.setProperty(WORKFLOWS_CONSUMER_ENABLED, "false")
-                        System.setProperty(DATABASE_PRODUCER_ENABLED, "false")
-                        System.setProperty(WORKFLOWS_PRODUCER_ENABLED, "false")
+                        System.setProperty(EVENTS_CONSUMER_ENABLED, "false")
+                        System.setProperty(COMMANDS_CONSUMER_ENABLED, "false")
+                        System.setProperty(EVENTS_PRODUCER_ENABLED, "false")
+                        System.setProperty(COMMANDS_PRODUCER_ENABLED, "false")
                     } else {
                         listen.port?.let { setMetricsEndpointPort(it) }
-                        System.setProperty(DATABASE_CONSUMER_ENABLED, "true")
-                        System.setProperty(WORKFLOWS_CONSUMER_ENABLED, "true")
-                        System.setProperty(DATABASE_PRODUCER_ENABLED, "true")
-                        System.setProperty(WORKFLOWS_PRODUCER_ENABLED, "true")
+                        System.setProperty(EVENTS_CONSUMER_ENABLED, "true")
+                        System.setProperty(COMMANDS_CONSUMER_ENABLED, "true")
+                        System.setProperty(EVENTS_PRODUCER_ENABLED, "true")
+                        System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
                     }
 
                     // the instance start command, if any
                     val start = parseResults.command<InstanceStartCommand>()
                     if (start != null) {
-                        System.setProperty(WORKFLOWS_PRODUCER_ENABLED, "true")
-                        System.setProperty(DATABASE_PRODUCER_ENABLED, "true")
+                        System.setProperty(COMMANDS_PRODUCER_ENABLED, "true")
+                        System.setProperty(EVENTS_PRODUCER_ENABLED, "true")
                     }
                 }
             } catch (ex: Exception) {

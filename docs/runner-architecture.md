@@ -1,6 +1,7 @@
 # Lemline Runner Architecture
 
-This document describes the `lemline-runner` module, which provides the distributed execution infrastructure for the pure functional `WorkflowOrchestrator` from `lemline-core`.
+This document describes the `lemline-runner` module, which provides the distributed execution infrastructure for the
+pure functional `WorkflowOrchestrator` from `lemline-core`.
 
 ## Table of Contents
 
@@ -14,21 +15,25 @@ This document describes the `lemline-runner` module, which provides the distribu
 
 ## Overview
 
-The `lemline-runner` is a **stateless, horizontally-scalable Quarkus application** that bridges distributed infrastructure (message brokers, databases) with the pure functional `WorkflowOrchestrator` from `lemline-core`.
+The `lemline-runner` is a **stateless, horizontally-scalable Quarkus application** that bridges distributed
+infrastructure (message brokers, databases) with the pure functional `WorkflowOrchestrator` from `lemline-core`.
 
 **Core Responsibilities**:
+
 - Consume workflow state messages from message broker
 - Execute workflow steps using `WorkflowOrchestrator`
 - Handle pause points (wait, retry, child workflows) via outbox pattern
 - Emit next workflow state or persist for scheduled resumption
 
 **Design Philosophy**:
+
 - **Stateless workers** - No in-memory workflow state; any worker can process any message
 - **Event-driven** - Message broker as state carrier (hot path) and coordinator
 - **Database for pauses** - Only write to DB when workflow must pause (timers, retries, parent tracking)
 - **Horizontal scaling** - Add workers to increase throughput; no coordination needed
 
 **Technology Stack**:
+
 - **Quarkus** - Reactive, lightweight runtime
 - **Mutiny** - Reactive programming with backpressure
 - **SmallRye Reactive Messaging** - Kafka/RabbitMQ integration
@@ -41,14 +46,16 @@ The `lemline-runner` is a **stateless, horizontally-scalable Quarkus application
 
 Lemline uses **two distinct message channels** with different characteristics:
 
-**Workflow Channel** (`workflows-in` → `workflows-out`):
+**Workflow Channel** (`commands-in` → `commands-out`):
+
 - **Purpose**: High-throughput, stateless workflow state flow
 - **Message**: `InstanceMessage` (compressed workflow state + metadata)
 - **Processing**: Fast, in-memory execution of single workflow step
 - **Database**: No writes - pure message transformation
 - **Latency**: ~milliseconds (message broker + compute)
 
-**Database Channel** (`ingestion-in` → Database):
+**Database Channel** (`events-in` → Database):
+
 - **Purpose**: Durable operations requiring transactional guarantees
 - **Message**: `IngestionMessage` or `CompletedMessage`
 - **Processing**: Transactional database writes
@@ -56,6 +63,7 @@ Lemline uses **two distinct message channels** with different characteristics:
 - **Latency**: ~tens of milliseconds (database I/O)
 
 **Why separate?**
+
 - Workflow execution (hot path) never blocked by database latency
 - Database writes batched and processed asynchronously
 - System remains responsive even during database degradation
@@ -63,9 +71,12 @@ Lemline uses **two distinct message channels** with different characteristics:
 
 ### 2. State Carried in Messages
 
-Per the [Serverless Workflow specification's stateless execution model](https://github.com/serverlessworkflow/specification/blob/main/dsl.md), workflow state is externalized:
+Per
+the [Serverless Workflow specification's stateless execution model](https://github.com/serverlessworkflow/specification/blob/main/dsl.md),
+workflow state is externalized:
 
 **InstanceMessage** structure:
+
 ```kotlin
 data class InstanceMessage(
     val workflowInfo: WorkflowInfo,        // namespace, name, version, id
@@ -96,6 +107,7 @@ sealed class WorkflowState {
 ```
 
 **Benefits**:
+
 - Any worker can resume any workflow (no session affinity needed)
 - Workflow state compressed and serialized in single message
 - Database only stores pauses - active workflows live in message flow
@@ -120,18 +132,18 @@ All database writes use the **Transactional Outbox Pattern**:
 ```mermaid
 graph TD
     subgraph "Workflow Channel (Hot Path)"
-        A[workflows-in] --> B[InstanceMessageSubscriber]
+        A[commands-in] --> B[InstanceMessageSubscriber]
         B --> C[InstanceMessageHandler]
         C --> D[WorkflowOrchestrator.resume]
         D --> E{WorkflowState}
         E -->|ReadyForNextTask| F[Next InstanceMessage]
         F --> G[InstanceMessageEmitter]
-        G --> H[workflows-out]
+        G --> H[commands-out]
         H -.->|Loop| A
     end
 
     subgraph "Database Channel (Cold Path)"
-        J[ingestion-in] --> K[DatabaseMessageSubscriber]
+        J[events-in] --> K[DatabaseMessageSubscriber]
         K --> L[DatabaseMessageHandler]
         L --> M{Message Type}
         M -->|IngestionMessage| N[Insert outbox models]
@@ -155,14 +167,14 @@ graph TD
 
 ### Channel Characteristics
 
-| Aspect | Workflow Channel | Database Channel |
-|--------|------------------|------------------|
-| **Throughput** | Very High (10k+ msg/s) | Lower (100s msg/s) |
-| **Latency** | Low (~ms) | Higher (~10s ms) |
-| **Database** | No writes | Transactional writes |
-| **Purpose** | Active execution | Pause/resume coordination |
-| **Scaling** | Add workers | Add workers + DB connections |
-| **Failure Mode** | Retry via broker | Outbox ensures delivery |
+| Aspect           | Workflow Channel       | Database Channel             |
+|------------------|------------------------|------------------------------|
+| **Throughput**   | Very High (10k+ msg/s) | Lower (100s msg/s)           |
+| **Latency**      | Low (~ms)              | Higher (~10s ms)             |
+| **Database**     | No writes              | Transactional writes         |
+| **Purpose**      | Active execution       | Pause/resume coordination    |
+| **Scaling**      | Add workers            | Add workers + DB connections |
+| **Failure Mode** | Retry via broker       | Outbox ensures delivery      |
 
 ## Message Processing
 
@@ -171,6 +183,7 @@ graph TD
 **File**: `lemline-runner/src/main/kotlin/com/lemline/runner/messaging/instances/`
 
 **Flow**:
+
 ```kotlin
 // 1. Subscribe with backpressure
 InstanceMessageSubscriber.onNext(message: Message<String>) {
@@ -279,6 +292,7 @@ InstanceMessageEmitter.send(instanceMessage: InstanceMessage) {
 ```
 
 **Reactive Backpressure**:
+
 - Subscriber requests N messages (configured via `maxConcurrency`)
 - Processes each message asynchronously
 - Requests next only after ack/nack
@@ -289,6 +303,7 @@ InstanceMessageEmitter.send(instanceMessage: InstanceMessage) {
 **File**: `lemline-runner/src/main/kotlin/com/lemline/runner/messaging/database/`
 
 **Flow**:
+
 ```kotlin
 DatabaseMessageHandler.handle(message: DatabaseMessage) {
     withTransaction {
@@ -358,6 +373,7 @@ DatabaseMessageHandler.handle(message: DatabaseMessage) {
 ### Base Architecture
 
 **OutboxRelay** (`OutboxRelay.kt`):
+
 - Generic outbox processor using repository pattern
 - Batch processing with configurable size
 - `FOR UPDATE SKIP LOCKED` prevents concurrent processing
@@ -365,6 +381,7 @@ DatabaseMessageHandler.handle(message: DatabaseMessage) {
 - Metrics tracking (processed, failed, duration)
 
 **AbstractOutbox** (`AbstractOutbox.kt`):
+
 - Scheduled executor (process + cleanup jobs)
 - Graceful shutdown support
 - Delegates to OutboxRelay for actual processing
@@ -380,6 +397,7 @@ DatabaseMessageHandler.handle(message: DatabaseMessage) {
 **Table**: `lemline_waits`
 
 **Processing**:
+
 ```sql
 SELECT * FROM lemline_waits
 WHERE outbox_status = 'PENDING'
@@ -391,13 +409,14 @@ LIMIT :batchSize
 ```
 
 **Flow**:
+
 1. Wait task encountered → Orchestrator returns `WorkflowState.Waiting(waitUntil)`
 2. InstanceMessageHandler pattern matches on Waiting state
 3. Create `WaitOutboxModel(scheduledFor = waitUntil)`
-4. Emit `IngestionMessage` to `ingestion-in`
+4. Emit `IngestionMessage` to `events-in`
 5. DatabaseMessageHandler inserts to `lemline_waits`
 6. WaitOutbox poller queries due waits
-7. Emit `InstanceMessage` to `workflows-in`
+7. Emit `InstanceMessage` to `commands-in`
 8. Update `status = SENT`
 
 **Cleanup**: Deletes SENT records older than retention period
@@ -411,22 +430,25 @@ LIMIT :batchSize
 **Table**: `lemline_retries`
 
 **Two Types**:
+
 1. **Workflow-defined retries**: From TRY task retry configuration
 2. **Infrastructure retries**: Message processing failures
 
 **Processing**: Same query pattern as WaitOutbox
 
 **Flow**:
+
 1. Task fails within TRY block → Orchestrator returns `WorkflowState.Retrying(retryAt)`
 2. InstanceMessageHandler pattern matches on Retrying state
 3. Create `RetryOutboxModel(scheduledFor = retryAt, ...)`
-4. Emit `IngestionMessage` to `ingestion-in`
+4. Emit `IngestionMessage` to `events-in`
 5. DatabaseMessageHandler inserts to `lemline_retries`
 6. RetryOutbox poller queries due retries
-7. Emit `InstanceMessage` to `workflows-in` (retry attempt)
+7. Emit `InstanceMessage` to `commands-in` (retry attempt)
 8. Update `status = SENT`
 
 **Backoff Calculation**:
+
 ```kotlin
 fun calculateBackoff(attempt: Int, policy: RetryPolicy): Duration {
     return when (policy.strategy) {
@@ -454,22 +476,23 @@ fun calculateBackoff(attempt: Int, policy: RetryPolicy): Duration {
 **Special Behavior**: **No scheduled processing** - parent resumed by `CompletedMessage`
 
 **Flow**:
+
 1. RunWorkflow task encountered → Orchestrator returns `WorkflowState.RunningChildWorkflow(childConfig)`
 2. InstanceMessageHandler pattern matches on RunningChildWorkflow state
 3. Create `ParentOutboxModel` (parent state, no schedule)
 4. Create child `InstanceMessage` using Starter
-5. Emit `IngestionMessage(models=[parent], messages=[child])` to `ingestion-in`
+5. Emit `IngestionMessage(models=[parent], messages=[child])` to `events-in`
 6. DatabaseMessageHandler:
-   - Inserts parent to `lemline_parents`
-   - Emits child to `workflows-in` immediately
+    - Inserts parent to `lemline_parents`
+    - Emits child to `commands-in` immediately
 7. Child executes independently
-8. On child completion: `CompletedMessage(parentId, output)` → `ingestion-in`
+8. On child completion: `CompletedMessage(parentId, output)` → `events-in`
 9. DatabaseMessageHandler:
-   - Finds parent in `lemline_parents`
-   - Validates parent is in RunningChildWorkflow state
-   - Updates parent's RunningChildWorkflow state with `rawOutput = child output`
-   - Emits parent to `workflows-in` (direct send)
-   - Updates `status = SENT`
+    - Finds parent in `lemline_parents`
+    - Validates parent is in RunningChildWorkflow state
+    - Updates parent's RunningChildWorkflow state with `rawOutput = child output`
+    - Emits parent to `commands-in` (direct send)
+    - Updates `status = SENT`
 
 **Cleanup**: Only cleanup job (deletes old SENT records)
 
@@ -484,10 +507,11 @@ fun calculateBackoff(attempt: Int, policy: RetryPolicy): Duration {
 **Processing**: Queries schedules due for execution
 
 **Flow**:
+
 1. Schedule created (via API or configuration)
 2. ScheduleOutbox poller finds due schedules
 3. Creates new workflow instance
-4. Emits `InstanceMessage` to `workflows-in`
+4. Emits `InstanceMessage` to `commands-in`
 5. Updates `lastRunAt`, calculates `nextRunAt`
 
 ### Outbox Table Schema
@@ -517,7 +541,8 @@ ON lemline_waits (outbox_status, outbox_scheduled_for, outbox_attempt_count);
 
 ## Pause Point Handling
 
-The runner uses pattern matching on `WorkflowState` sealed class variants to identify pause points. The `WorkflowOrchestrator` from `lemline-core` returns different state variants to signal the runner what action to take.
+The runner uses pattern matching on `WorkflowState` sealed class variants to identify pause points. The
+`WorkflowOrchestrator` from `lemline-core` returns different state variants to signal the runner what action to take.
 
 ### WorkflowState Variants
 
@@ -542,11 +567,11 @@ sealed class WorkflowState {
 
 ```mermaid
 sequenceDiagram
-    participant W as workflows-in
+    participant W as commands-in
     participant H as InstanceMessageHandler
     participant O as WorkflowOrchestrator
     participant D as DatabaseMessageEmitter
-    participant I as ingestion-in
+    participant I as events-in
 
     W->>H: InstanceMessage
     H->>H: Deserialize, load definition
@@ -555,7 +580,7 @@ sequenceDiagram
     alt Step Completed
         O-->>H: WorkflowState.ReadyForNextTask
         H->>H: Pattern match: ReadyForNextTask
-        H->>W: Emit next InstanceMessage to workflows-out
+        H->>W: Emit next InstanceMessage to commands-out
 
     else Wait Task
         O-->>H: WorkflowState.Waiting(waitUntil)
@@ -565,7 +590,7 @@ sequenceDiagram
         else Wait time in future
             H->>H: Create WaitOutboxModel
             H->>D: Send IngestionMessage
-            D->>I: Emit to ingestion-in
+            D->>I: Emit to events-in
             Note over H: Pause (null returned)
         end
 
@@ -577,7 +602,7 @@ sequenceDiagram
         else Retry time in future
             H->>H: Create RetryOutboxModel
             H->>D: Send IngestionMessage
-            D->>I: Emit to ingestion-in
+            D->>I: Emit to events-in
             Note over H: Pause (null returned)
         end
 
@@ -586,14 +611,14 @@ sequenceDiagram
         H->>H: Pattern match: RunningChildWorkflow
         H->>H: Create ParentOutboxModel + child message
         H->>D: Send IngestionMessage
-        D->>I: Emit to ingestion-in
+        D->>I: Emit to events-in
         Note over H: Pause (null returned)
 
     else Completed
         O-->>H: WorkflowState.Completed
         H->>H: Pattern match: Completed
         H->>D: Send CompletedMessage (if parent/schedule)
-        D->>I: Emit to ingestion-in
+        D->>I: Emit to events-in
         Note over H: Terminal (null returned)
 
     else Failed
@@ -601,7 +626,7 @@ sequenceDiagram
         H->>H: Pattern match: Failed
         H->>H: Create FailureModel
         H->>D: Send IngestionMessage
-        D->>I: Emit to ingestion-in
+        D->>I: Emit to events-in
         Note over H: Terminal (null returned)
     end
 ```
@@ -623,15 +648,16 @@ do:
 ```
 
 **Execution**:
+
 1. `startProcess` executes → emits next InstanceMessage
 2. Message consumed, `waitForCompletion` task reached
 3. WorkflowOrchestrator returns `WorkflowState.Waiting(waitUntil = now + 5 min)`
 4. InstanceMessageHandler pattern matches on Waiting state
-5. Creates `WaitOutboxModel`, emits `IngestionMessage` to `ingestion-in`
+5. Creates `WaitOutboxModel`, emits `IngestionMessage` to `events-in`
 6. DatabaseMessageHandler inserts to `lemline_waits`
 7. WaitOutbox scheduler polls every N seconds
 8. After 5 minutes, finds due wait
-9. Emits InstanceMessage to `workflows-in`
+9. Emits InstanceMessage to `commands-in`
 10. Workflow resumes at `finalizeProcess` task
 
 ### Retry Task Example
@@ -660,14 +686,15 @@ do:
 ```
 
 **Execution**:
+
 1. `httpRequest` fails → Orchestrator catches error in TRY block
 2. Orchestrator checks retry policy and calculates backoff
 3. WorkflowOrchestrator returns `WorkflowState.Retrying(retryAt = now + 1s)` (attempt 0)
 4. InstanceMessageHandler pattern matches on Retrying state
-5. Creates `RetryOutboxModel`, emits `IngestionMessage` to `ingestion-in`
+5. Creates `RetryOutboxModel`, emits `IngestionMessage` to `events-in`
 6. DatabaseMessageHandler inserts to `lemline_retries`
 7. RetryOutbox scheduler finds due retry
-8. Emits InstanceMessage to `workflows-in` (attempt 1)
+8. Emits InstanceMessage to `commands-in` (attempt 1)
 9. If fails again: `retryAt = now + 2s` (exponential backoff)
 10. If fails 3rd time: enters catch block or fails workflow
 
@@ -687,24 +714,25 @@ do:
 ```
 
 **Execution**:
+
 1. `processOrder` task reached
 2. WorkflowOrchestrator returns `WorkflowState.RunningChildWorkflow(childConfig)`
 3. InstanceMessageHandler pattern matches on RunningChildWorkflow state
 4. Creates:
-   - `ParentOutboxModel` (parent state with RunningChildWorkflow)
-   - Child `InstanceMessage` (new workflow instance) via Starter
-5. Emits `IngestionMessage(models=[parent], messages=[child])` to `ingestion-in`
+    - `ParentOutboxModel` (parent state with RunningChildWorkflow)
+    - Child `InstanceMessage` (new workflow instance) via Starter
+5. Emits `IngestionMessage(models=[parent], messages=[child])` to `events-in`
 6. DatabaseMessageHandler:
-   - Inserts parent to `lemline_parents`
-   - Emits child to `workflows-in` immediately
+    - Inserts parent to `lemline_parents`
+    - Emits child to `commands-in` immediately
 7. Child workflow executes independently
 8. On child completion:
-   - Child emits `CompletedMessage(parentId, output)` to `ingestion-in`
+    - Child emits `CompletedMessage(parentId, output)` to `events-in`
 9. DatabaseMessageHandler:
-   - Finds parent in `lemline_parents`
-   - Validates state is RunningChildWorkflow
-   - Updates `rawOutput` field with child's output
-   - Emits parent to `workflows-in` (direct send)
+    - Finds parent in `lemline_parents`
+    - Validates state is RunningChildWorkflow
+    - Updates `rawOutput` field with child's output
+    - Emits parent to `commands-in` (direct send)
 10. Parent resumes from RunningChildWorkflow state with child output
 
 ## Component Reference
@@ -712,6 +740,7 @@ do:
 ### Application Entry Point
 
 **LemlineApplication** (`LemlineApplication.kt`)
+
 - Quarkus main application
 - CLI via Picocli (listen, config, definition, instance, migrate commands)
 - Configures logging, enables/disables consumers
@@ -719,24 +748,28 @@ do:
 ### Message Subscribers
 
 **MessageSubscriber** (`MessageSubscriber.kt`)
+
 - Abstract base for reactive message consumers
 - Backpressure via request(N) pattern
 - Graceful shutdown with timeout
 - Error handling with retry/DLQ
 
 **InstanceMessageSubscriber** (`InstanceMessageSubscriber.kt`)
-- Consumes from `workflows-in` channel
+
+- Consumes from `commands-in` channel
 - Delegates to `InstanceMessageHandler`
 - Configurable concurrency
 
 **DatabaseMessageSubscriber** (`DatabaseMessageSubscriber.kt`)
-- Consumes from `ingestion-in` channel
+
+- Consumes from `events-in` channel
 - Delegates to `DatabaseMessageHandler`
 - Transactional processing
 
 ### Message Handlers
 
 **InstanceMessageHandler** (`InstanceMessageHandler.kt`)
+
 - Deserializes `InstanceMessage`
 - Loads workflow definition (cached)
 - Calls `WorkflowOrchestrator.resume()` for step-by-step execution
@@ -744,6 +777,7 @@ do:
 - Emits next state or creates outbox for pause points
 
 **DatabaseMessageHandler** (`DatabaseMessageHandler.kt`)
+
 - Handles `IngestionMessage`: inserts outbox models
 - Handles `CompletedMessage`: updates parent/schedule
 - Transactional database writes
@@ -752,27 +786,32 @@ do:
 ### Message Emitters
 
 **InstanceMessageEmitter** (`InstanceMessageEmitter.kt`)
-- Emits to `workflows-out` channel
+
+- Emits to `commands-out` channel
 - Serializes `InstanceMessage` to JSON
 
 **DatabaseMessageEmitter** (`DatabaseMessageEmitter.kt`)
-- Emits to `ingestion-in` channel
+
+- Emits to `events-in` channel
 - Serializes `DatabaseMessage` to JSON
 
 ### Outbox Components
 
 **OutboxRelay** (`OutboxRelay.kt`)
+
 - Generic outbox processor
 - Batch queries with `FOR UPDATE SKIP LOCKED`
 - Exponential backoff retry logic
 - Cleanup old SENT records
 
 **AbstractOutbox** (`AbstractOutbox.kt`)
+
 - Scheduled execution framework
 - Process job + cleanup job
 - Graceful shutdown
 
 **Concrete Outboxes**:
+
 - `WaitOutbox` - Timer delays
 - `RetryOutbox` - Error retries with backoff
 - `ParentOutbox` - Child workflow coordination (cleanup only)
@@ -783,6 +822,7 @@ do:
 All repositories extend `Repository<T>` base class:
 
 **Pattern**:
+
 ```kotlin
 interface WaitRepository : Repository<WaitOutboxModel> {
     fun insert(model: WaitOutboxModel): Uni<Void>
@@ -793,6 +833,7 @@ interface WaitRepository : Repository<WaitOutboxModel> {
 ```
 
 **Implementations**:
+
 - `WaitRepository` - `lemline_waits` table
 - `RetryRepository` - `lemline_retries` table
 - `ParentRepository` - `lemline_parents` table
@@ -803,11 +844,13 @@ interface WaitRepository : Repository<WaitOutboxModel> {
 ### Configuration
 
 **LemlineConfiguration** (`LemlineConfiguration.kt`)
+
 - User configuration model (YAML/environment)
 - Database, messaging, outbox settings
 - Converts to Quarkus properties
 
 **Key Settings**:
+
 ```yaml
 lemline:
   database:
@@ -842,13 +885,13 @@ lemline-runner/src/main/kotlin/com/lemline/runner/
 ├── messaging/
 │   ├── MessageSubscriber.kt            ← Reactive subscriber base
 │   ├── instances/
-│   │   ├── InstanceMessageSubscriber.kt   ← workflows-in consumer
+│   │   ├── InstanceMessageSubscriber.kt   ← commands-in consumer
 │   │   ├── InstanceMessageHandler.kt      ← Workflow execution (⚠️ incomplete)
-│   │   └── InstanceMessageEmitter.kt      ← workflows-out producer
+│   │   └── InstanceMessageEmitter.kt      ← commands-out producer
 │   └── database/
-│       ├── DatabaseMessageSubscriber.kt   ← ingestion-in consumer
+│       ├── DatabaseMessageSubscriber.kt   ← events-in consumer
 │       ├── DatabaseMessageHandler.kt      ← Database writes
-│       └── DatabaseMessageEmitter.kt      ← ingestion-out producer
+│       └── DatabaseMessageEmitter.kt      ← events-out producer
 │
 ├── outbox/
 │   ├── OutboxRelay.kt                  ← Generic outbox processor
@@ -891,28 +934,34 @@ lemline-runner/src/main/kotlin/com/lemline/runner/
 The Lemline runner provides distributed execution infrastructure with:
 
 **Architecture**:
+
 - **Dual-channel design** - Separate hot path (execution) and cold path (persistence)
 - **Stateless workers** - State carried in messages, any worker can process any message
 - **Outbox pattern** - Reliable, asynchronous database writes with retry
 - **Reactive streams** - Backpressure and resilience built-in
 
 **Components**:
+
 - **Message subscribers** - Consume from workflow and database channels
 - **Message handlers** - Execute workflows or write to database
 - **Outbox processors** - Scheduled polling with batch processing
 - **Repositories** - Reactive SQL with `FOR UPDATE SKIP LOCKED`
 
 **Pause Points**:
+
 - **Wait** - Timer delays via scheduled outbox
 - **Retry** - Error handling with exponential backoff
 - **Child workflows** - Parent-child coordination via outbox and CompletedMessage
 - **Scheduled execution** - Cron-like execution via scheduled outbox
 
 **Status**:
+
 - ✅ Message infrastructure complete
 - ✅ Outbox pattern implemented
 - ✅ Database handling functional
 - ✅ WorkflowOrchestrator integration complete
 - ✅ Pattern matching on WorkflowState sealed class variants
 
-The runner separates infrastructure concerns (messaging, persistence, scheduling) from workflow logic (handled by `WorkflowOrchestrator` in `lemline-core`). The integration uses pattern matching on `WorkflowState` variants instead of exception-driven control flow, providing clearer semantics and better type safety.
+The runner separates infrastructure concerns (messaging, persistence, scheduling) from workflow logic (handled by
+`WorkflowOrchestrator` in `lemline-core`). The integration uses pattern matching on `WorkflowState` variants instead of
+exception-driven control flow, providing clearer semantics and better type safety.

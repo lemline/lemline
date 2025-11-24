@@ -46,7 +46,7 @@ internal class RetryOutbox : AbstractOutbox<RetryModel>() {
     override val enabled by lazy {
         lemlineConfig.outbox().retry().enabled().getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()
-            ?: lemlineConfig.messaging().workflows().getOrNull()?.consumer()?.enabled() ?: false
+            ?: lemlineConfig.messaging().commands().getOrNull()?.consumer()?.enabled() ?: false
     }
 
     // Outbox processing configuration

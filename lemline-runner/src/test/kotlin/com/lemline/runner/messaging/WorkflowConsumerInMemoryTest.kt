@@ -2,10 +2,10 @@
 package com.lemline.runner.messaging
 
 import com.lemline.runner.messaging.base.WorkflowConsumerTest
-import com.lemline.runner.messaging.commands.WORKFLOWS_IN_CHANNEL
-import com.lemline.runner.messaging.commands.WORKFLOWS_OUT_CHANNEL
-import com.lemline.runner.messaging.events.DATABASE_IN_CHANNEL
-import com.lemline.runner.messaging.events.DATABASE_OUT_CHANNEL
+import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
+import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
+import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
+import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -48,12 +48,12 @@ internal class WorkflowConsumerInMemoryTest : WorkflowConsumerTest() {
      * 2. Initializes the channels for fresh testing
      */
     override fun setupMessaging() {
-        instanceSource = connector.source(WORKFLOWS_IN_CHANNEL)
-        instanceSink = connector.sink(WORKFLOWS_OUT_CHANNEL)
+        instanceSource = connector.source(COMMANDS_IN_CHANNEL)
+        instanceSink = connector.sink(COMMANDS_OUT_CHANNEL)
 
 
-        databaseSource = connector.source(DATABASE_IN_CHANNEL)
-        databaseSink = connector.sink(DATABASE_OUT_CHANNEL)
+        databaseSource = connector.source(EVENTS_IN_CHANNEL)
+        databaseSink = connector.sink(EVENTS_OUT_CHANNEL)
     }
 
     /**

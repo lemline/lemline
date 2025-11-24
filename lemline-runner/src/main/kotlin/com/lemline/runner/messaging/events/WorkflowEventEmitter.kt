@@ -11,7 +11,7 @@ import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Channel
 
-internal const val DATABASE_OUT_CHANNEL = "ingestion-out"
+internal const val EVENTS_OUT_CHANNEL = "events-out"
 
 @ExperimentalSerializationApi
 @ExperimentalTime
@@ -20,6 +20,6 @@ internal const val DATABASE_OUT_CHANNEL = "ingestion-out"
 internal class WorkflowEventEmitter(
     override val metrics: WorkflowEventSubscriberMetrics
 ) : MessageEmitter<InstanceMessage<WorkflowEvent>>() {
-    @Channel(DATABASE_OUT_CHANNEL)
+    @Channel(EVENTS_OUT_CHANNEL)
     override lateinit var emitter: MutinyEmitter<String>
 }

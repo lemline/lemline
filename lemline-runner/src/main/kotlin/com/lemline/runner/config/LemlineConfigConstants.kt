@@ -31,8 +31,8 @@ object LemlineConfigConstants {
     const val KAFKA_CONNECTOR = "smallrye-kafka"
     const val RABBITMQ_CONNECTOR = "smallrye-rabbitmq"
 
-    const val WORKFLOWS_TOPIC_DEFAULT = "lemline-workflows"
-    const val INGESTION_TOPIC_DEFAULT = "lemline-ingestion"
+    const val COMMANDS_TOPIC_DEFAULT = "lemline-commands"
+    const val EVENTS_TOPIC_DEFAULT = "lemline-events"
 
     // Postgres
     const val POSTGRES_HOST_DEFAULT = "localhost"

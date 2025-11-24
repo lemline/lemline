@@ -7,13 +7,15 @@
 
 ## Overview
 
-Lemline's execution architecture separates **orchestration logic** (lemline-core) from **distributed infrastructure** (lemline-runner) through two distinct orchestrator implementations.
+Lemline's execution architecture separates **orchestration logic** (lemline-core) from **distributed infrastructure** (
+lemline-runner) through two distinct orchestrator implementations.
 
 ### Core Principle
 
 > **Orchestrators control workflow execution. Processors contain task-specific logic. State flows externally.**
 
-The orchestrator decides *when* to execute steps and *when* to pause. Processors transform data and execute activities without knowing about execution modes.
+The orchestrator decides *when* to execute steps and *when* to pause. Processors transform data and execute activities
+without knowing about execution modes.
 
 ---
 
@@ -43,12 +45,14 @@ The orchestrator decides *when* to execute steps and *when* to pause. Processors
 **Purpose**: Synchronous execution from start to finish
 
 **Behavior**:
+
 - Activities execute completely (HTTP calls, shell commands, scripts)
 - Delays actually wait using `kotlinx.coroutines.delay()`
 - Sub-workflows execute inline recursively (await=true) or fire-and-forget (await=false)
 - Returns final workflow output
 
 **Use Cases**:
+
 - Testing workflows without infrastructure
 - Single-node deployments
 - Development environments
@@ -58,12 +62,14 @@ The orchestrator decides *when* to execute steps and *when* to pause. Processors
 **Purpose**: Distributed execution with pause/resume capability
 
 **Behavior**:
+
 - Activities execute completely, **then pause** and return control
 - Delays return duration to runner **instead of waiting**
 - Sub-workflows throw exception **before execution**, runner handles persistence
 - Returns `PausableResult` indicating pause reason or completion
 
 **Use Cases**:
+
 - Production distributed execution
 - State persistence at async boundaries
 - Multi-worker horizontal scaling
@@ -77,6 +83,7 @@ The orchestrator decides *when* to execute steps and *when* to pause. Processors
 Both orchestrators use exceptions for non-linear control flow (similar to try/catch):
 
 **Sub-workflow Invocation**:
+
 ```kotlin
 // RunWorkflowProcessor always throws (never executes inline)
 throw ChildWorkflowRequestedException(
@@ -91,10 +98,12 @@ throw ChildWorkflowRequestedException(
 ```
 
 **Orchestrator Response**:
+
 - **CompleteOrchestrator**: Catches exception, executes child inline or async
 - **PausableOrchestrator**: Catches exception, captures state, returns `SubWorkflowNeeded`
 
 **Benefits**:
+
 - Input transformation happens before exception (guaranteed correct child input)
 - Consistent pattern across error handling and sub-workflows
 - Processor stays pure and mode-agnostic
@@ -123,6 +132,7 @@ After each step execution, check for boundaries:
 ```
 
 **State Consistency Guarantee**: All pauses happen *after* step completes, ensuring:
+
 - Activity output is available
 - State updates are applied
 - No partial execution state
@@ -130,6 +140,7 @@ After each step execution, check for boundaries:
 ### 3. Delay Handling
 
 **CompleteOrchestrator**:
+
 ```kotlin
 if (result.delay?.isPositive() == true) {
     delay(result.delay)  // Actually wait
@@ -137,6 +148,7 @@ if (result.delay?.isPositive() == true) {
 ```
 
 **PausableOrchestrator**:
+
 ```kotlin
 if (result.delay?.isPositive() == true) {
     return PausableResult.WaitNeeded(
@@ -153,6 +165,7 @@ Processors (WaitTask, retry logic) return delay duration in step result. Orchest
 ### 4. Sub-workflow Execution
 
 **CompleteOrchestrator**:
+
 ```kotlin
 catch (e: ChildWorkflowRequestedException) {
     if (e.config.awaitCompletion) {
@@ -168,6 +181,7 @@ catch (e: ChildWorkflowRequestedException) {
 ```
 
 **PausableOrchestrator**:
+
 ```kotlin
 // When child workflow requested
 catch (e: ChildWorkflowRequestedException) {
@@ -192,8 +206,11 @@ fun resumeFromChildWorkflow(
 ```
 
 Runner handles both initiation and resumption:
-- **await=true**: Save parent state → start child → when child completes → `resumeFromChildWorkflow(node, childOutput, states)`
-- **await=false**: Start child immediately → `resumeFromChildWorkflow(node, childConfig.input, states)` (parent continues with child's input)
+
+- **await=true**: Save parent state → start child → when child completes →
+  `resumeFromChildWorkflow(node, childOutput, states)`
+- **await=false**: Start child immediately → `resumeFromChildWorkflow(node, childConfig.input, states)` (parent
+  continues with child's input)
 
 ---
 
@@ -245,7 +262,7 @@ sealed class PausableResult {
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ Receive InstanceMessage from workflows-in       │
+│ Receive InstanceMessage from commands-in       │
 │   ↓                                              │
 │ Deserialize: position, states, workflow def     │
 │   ↓                                              │
@@ -253,7 +270,7 @@ sealed class PausableResult {
 │   ↓                                              │
 │ Match PausableResult:                           │
 │   • Complete           → Emit completion event  │
-│   • ActivityCompleted  → Emit to workflows-out  │
+│   • ActivityCompleted  → Emit to commands-out  │
 │   • WaitNeeded         → Insert lemline_waits   │
 │   • RetryNeeded        → Insert lemline_retries │
 │   • SubWorkflowNeeded  → Handle parent/child    │
@@ -261,6 +278,7 @@ sealed class PausableResult {
 ```
 
 **Key Insight**: Runner never executes workflow logic. It only:
+
 1. Deserializes state
 2. Calls PausableOrchestrator
 3. Handles pause results via infrastructure (Kafka, database, outbox)
@@ -279,6 +297,7 @@ val output = orchestrator.run(rootNode, input, states)
 ```
 
 **Benefits**:
+
 - Pure functional execution
 - Easy serialization for persistence
 - State consistency guaranteed by design
@@ -304,20 +323,24 @@ Compressed and sent via Kafka messages. Any worker can deserialize and continue 
 ## Benefits
 
 ### Clean Separation
+
 - **lemline-core**: Pure orchestration, no infrastructure dependencies
 - **lemline-runner**: Infrastructure only, no workflow logic
 
 ### Testability
+
 - Test CompleteOrchestrator without Kafka/database
 - Test PausableOrchestrator with mock infrastructure
 - Integration tests only at runner level
 
 ### Type Safety
+
 - Pause points explicit in code (not hidden in configuration)
 - Compiler enforces state consistency
 - No runtime mode switching surprises
 
 ### Horizontal Scaling
+
 - Stateless workers (state in messages)
 - Any worker can process any message
 - Natural backpressure via Kafka consumer groups
@@ -330,24 +353,28 @@ Compressed and sent via Kafka messages. Any worker can deserialize and continue 
 **After**: Two specialized orchestrators (Complete and Pausable)
 
 **Changes**:
+
 1. Renamed `ExecutionOrchestrator` → `BaseOrchestrator` (shared logic)
 2. Created `CompleteOrchestrator` (was default behavior)
 3. Created `PausableOrchestrator` (new pausable behavior)
 4. Moved delay handling from processors to orchestrators
 5. Changed sub-workflow execution to exception-based control flow
 
-**Rationale**: Separate implementations are clearer, simpler, and easier to maintain than conditional logic in a single class.
+**Rationale**: Separate implementations are clearer, simpler, and easier to maintain than conditional logic in a single
+class.
 
 ---
 
 ## References
 
 **Implementation**:
+
 - `lemline-core/src/main/kotlin/com/lemline/core/execution/BaseOrchestrator.kt`
 - `lemline-core/src/main/kotlin/com/lemline/core/execution/complete/CompleteOrchestrator.kt`
 - `lemline-core/src/main/kotlin/com/lemline/core/execution/pausable/PausableOrchestrator.kt`
 - `lemline-runner/src/main/kotlin/com/lemline/runner/StepByStepRunner.kt`
 
 **Tests**:
+
 - `lemline-core/src/test/kotlin/com/lemline/core/execution/complete/CompleteOrchestratorTest.kt`
 - `lemline-core/src/test/kotlin/com/lemline/core/execution/pausable/PausableOrchestratorTest.kt`

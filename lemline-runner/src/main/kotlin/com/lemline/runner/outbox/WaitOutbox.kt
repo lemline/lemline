@@ -42,7 +42,7 @@ internal class WaitOutbox : AbstractOutbox<WaitModel>() {
     override val enabled by lazy {
         lemlineConfig.outbox().wait().enabled().getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()
-            ?: lemlineConfig.messaging().workflows().getOrNull()?.consumer()?.enabled() ?: false
+            ?: lemlineConfig.messaging().commands().getOrNull()?.consumer()?.enabled() ?: false
     }
 
     // Outbox processing configuration

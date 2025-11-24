@@ -14,7 +14,9 @@ The Lemline project requires a flexible configuration system that can support:
 4. External configuration files for deployment-specific settings
 5. Proper initialization order, especially for database resources and migrations
 
-Quarkus provides a robust configuration system, but it follows specific conventions and initialization phases that must be carefully managed to ensure correct application startup, particularly when dealing with database connections and migrations.
+Quarkus provides a robust configuration system, but it follows specific conventions and initialization phases that must
+be carefully managed to ensure correct application startup, particularly when dealing with database connections and
+migrations.
 
 ## Decision
 
@@ -32,26 +34,26 @@ We have implemented a comprehensive configuration strategy with the following co
 
 Lemline's configuration system operates in distinct phases to ensure proper initialization and runtime flexibility:
 
-1. **Pre-Quarkus CLI Processing**: 
-   - Process command-line arguments and set system properties
-   - Set logging levels
-   - Locate configuration files
-   - Configure message consumer/producer activation based on commands
+1. **Pre-Quarkus CLI Processing**:
+    - Process command-line arguments and set system properties
+    - Set logging levels
+    - Locate configuration files
+    - Configure message consumer/producer activation based on commands
 
 2. **Quarkus Startup Configuration**:
-   - Transform Lemline configuration into Quarkus-compatible format
-   - Load and apply configuration from external files
-   - Set up database connections and messaging infrastructure
+    - Transform Lemline configuration into Quarkus-compatible format
+    - Load and apply configuration from external files
+    - Set up database connections and messaging infrastructure
 
 3. **Runtime Configuration Management**:
-   - Initialize database connections based on configuration
-   - Execute database migrations when appropriate
-   - Enable/disable messaging consumers based on configuration
-   - Apply runtime settings from configuration sources
+    - Initialize database connections based on configuration
+    - Execute database migrations when appropriate
+    - Enable/disable messaging consumers based on configuration
+    - Apply runtime settings from configuration sources
 
 4. **Dynamic Service Activation**:
-   - Selectively activate message consumers/producers at runtime
-   - Choose appropriate database implementations
+    - Selectively activate message consumers/producers at runtime
+    - Choose appropriate database implementations
 
 This phased approach allows Lemline to be configured flexibly while respecting Quarkus's initialization constraints.
 
@@ -171,7 +173,8 @@ private fun setConfigPath(parseResults: List<ParseResult>) {
 
 ### Quarkus Startup Configuration
 
-During Quarkus startup, the `LemlineConfigSourceFactory` transforms Lemline configuration into Quarkus-compatible properties:
+During Quarkus startup, the `LemlineConfigSourceFactory` transforms Lemline configuration into Quarkus-compatible
+properties:
 
 ```kotlin
 @ConfigRoot(phase = ConfigPhase.BUILD_TIME)
@@ -210,7 +213,8 @@ class LemlineConfigSourceFactory : ConfigSourceFactory {
 }
 ```
 
-This factory runs at Quarkus's `BUILD_TIME` phase, ensuring configuration is available early in the initialization process.
+This factory runs at Quarkus's `BUILD_TIME` phase, ensuring configuration is available early in the initialization
+process.
 
 #### Type-safe Configuration
 
@@ -262,7 +266,7 @@ class DatabaseManager {
             // ... other database types ...
         }
     }
-    
+
     // Similar lazy initialization for Flyway
     val flyway: Flyway by lazy {
         // Choose Flyway instance based on configuration
@@ -316,8 +320,8 @@ The `MessageConsumer` class activates or deactivates the message consumer based 
 @Startup
 @ApplicationScoped
 internal class MessageConsumer @Inject constructor(
-    @Channel(WORKFLOW_IN) private val messages: Multi<String>,
-    @Channel(WORKFLOW_OUT) private val emitter: Emitter<String>,
+    @Channel(COMMANDS_IN) private val messages: Multi<String>,
+    @Channel(COMMANDS_OUT) private val emitter: Emitter<String>,
     @ConfigProperty(name = CONSUMER_ENABLED) private val enabled: Boolean,
     // ...
 ) {
@@ -330,12 +334,13 @@ internal class MessageConsumer @Inject constructor(
             logger.info { "❌ Consumer disabled" }
         }
     }
-    
+
     // ... message processing methods ...
 }
 ```
 
-This runtime check allows the message consumer to be selectively enabled or disabled based on configuration, even in native mode.
+This runtime check allows the message consumer to be selectively enabled or disabled based on configuration, even in
+native mode.
 
 ## Using External Configuration Files
 
@@ -356,27 +361,28 @@ To use an external configuration file:
    ```
 
 Example configuration file:
+
 ```yaml
 lemline:
-  database:
-    type: postgresql
-    migrate-at-start: true
-    postgresql:
-      host: db.example.com
-      port: 5432
-      username: lemline
-      password: secure-password
-      name: lemline_db
-  
-  messaging:
-    type: kafka
-    producer:
-      enabled: true
-    consumer:
-      enabled: true
-    kafka:
-      brokers: kafka.example.com:9092
-      topic: workflows-in
+    database:
+        type: postgresql
+        migrate-at-start: true
+        postgresql:
+            host: db.example.com
+            port: 5432
+            username: lemline
+            password: secure-password
+            name: lemline_db
+
+    messaging:
+        type: kafka
+        producer:
+            enabled: true
+        consumer:
+            enabled: true
+        kafka:
+            brokers: kafka.example.com:9092
+            topic: commands-in
 ```
 
 ## Message Consumer and Producer Activation
@@ -386,9 +392,9 @@ Lemline supports selectively enabling or disabling message consumers and produce
 ### Activation Methods
 
 1. **CLI Commands**:
-   - The `listen` command automatically enables both consumer and producer
-   - The `instance start` command automatically enables only the producer
-   - Other commands leave both disabled by default
+    - The `listen` command automatically enables both consumer and producer
+    - The `instance start` command automatically enables only the producer
+    - Other commands leave both disabled by default
 
 2. **System Properties**:
    ```
@@ -412,7 +418,8 @@ Lemline supports selectively enabling or disabling message consumers and produce
 
 ## Native Executable Support
 
-A key advantage of this configuration approach is its compatibility with Quarkus native compilation. In a native executable:
+A key advantage of this configuration approach is its compatibility with Quarkus native compilation. In a native
+executable:
 
 1. **Pre-Quarkus Processing**: Still processes CLI arguments and sets system properties
 2. **Database Selection**: Can select between database types at runtime
@@ -420,6 +427,7 @@ A key advantage of this configuration approach is its compatibility with Quarkus
 4. **Configuration Files**: Can still load external configuration files
 
 This runtime flexibility is achieved through:
+
 - Using lazy initialization for database and Flyway resources
 - Checking configuration values at runtime in `@PostConstruct` methods
 - Avoiding reflection-based configuration by using explicit @ConfigMapping

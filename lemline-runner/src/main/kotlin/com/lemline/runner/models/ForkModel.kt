@@ -63,4 +63,5 @@ data class ForkModel(
 
     /** Full stack trace of the exception for debugging, null if no failure */
     var errorStackTrace: String? = null
+
 ) : AwaitingCompletionModel()

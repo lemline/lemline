@@ -46,7 +46,7 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     override val enabled by lazy {
         lemlineConfig.outbox().schedule().enabled().getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()
-            ?: lemlineConfig.messaging().workflows().getOrNull()?.consumer()?.enabled() ?: false
+            ?: lemlineConfig.messaging().commands().getOrNull()?.consumer()?.enabled() ?: false
     }
 
     // Outbox processing configuration

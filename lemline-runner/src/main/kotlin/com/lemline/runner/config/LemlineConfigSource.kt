@@ -3,14 +3,15 @@ package com.lemline.runner.config
 
 import com.lemline.common.logger.logger
 import com.lemline.runner.LemlineApplication
+import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
+import com.lemline.runner.config.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_USERNAME_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.INGESTION_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
@@ -41,11 +42,10 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.WORKFLOWS_TOPIC_DEFAULT
-import com.lemline.runner.messaging.commands.WORKFLOWS_IN_CHANNEL
-import com.lemline.runner.messaging.commands.WORKFLOWS_OUT_CHANNEL
-import com.lemline.runner.messaging.events.DATABASE_IN_CHANNEL
-import com.lemline.runner.messaging.events.DATABASE_OUT_CHANNEL
+import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
+import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
+import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
+import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -59,24 +59,24 @@ enum class TopicType(
     val consumerConcurrency: String,
     val consumerGroupDefault: String,
 ) {
-    WORKFLOWS(
-        "workflows",
-        WORKFLOWS_TOPIC_DEFAULT,
-        WORKFLOWS_IN_CHANNEL,
-        WORKFLOWS_OUT_CHANNEL,
-        WORKFLOWS_CONSUMER_ENABLED,
-        WORKFLOWS_PRODUCER_ENABLED,
-        WORKFLOWS_CONSUMER_CONCURRENCY,
+    COMMANDS(
+        "commands",
+        COMMANDS_TOPIC_DEFAULT,
+        COMMANDS_IN_CHANNEL,
+        COMMANDS_OUT_CHANNEL,
+        COMMANDS_CONSUMER_ENABLED,
+        COMMANDS_PRODUCER_ENABLED,
+        COMMANDS_CONSUMER_CONCURRENCY,
         KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
     ),
-    DATABASE(
-        "ingestion",
-        INGESTION_TOPIC_DEFAULT,
-        DATABASE_IN_CHANNEL,
-        DATABASE_OUT_CHANNEL,
-        DATABASE_CONSUMER_ENABLED,
-        DATABASE_PRODUCER_ENABLED,
-        INGESTION_CONSUMER_CONCURRENCY,
+    EVENTS(
+        "events",
+        EVENTS_TOPIC_DEFAULT,
+        EVENTS_IN_CHANNEL,
+        EVENTS_OUT_CHANNEL,
+        EVENTS_CONSUMER_ENABLED,
+        EVENTS_PRODUCER_ENABLED,
+        EVENTS_CONSUMER_CONCURRENCY,
         KAFKA_DATABASE_GROUP_ID_DEFAULT
     );
 }
@@ -224,8 +224,8 @@ class LemlineConfigSource : PropertiesConfigSource(
                 if (!containsKey("kafka.sasl.mechanism")) set("kafka.sasl.mechanism", "PLAIN")
             }
 
-            configureKafkaTopic(props, TopicType.WORKFLOWS)
-            configureKafkaTopic(props, TopicType.DATABASE)
+            configureKafkaTopic(props, TopicType.COMMANDS)
+            configureKafkaTopic(props, TopicType.EVENTS)
         }
 
         private fun MutableMap<String, String>.configureKafkaTopic(
@@ -271,8 +271,8 @@ class LemlineConfigSource : PropertiesConfigSource(
             // Optional values
             props["$rabbit.ssl-enabled"]?.let { set("rabbitmq-ssl", it) }
 
-            configureRabbitQueue(props, TopicType.WORKFLOWS)
-            configureRabbitQueue(props, TopicType.DATABASE)
+            configureRabbitQueue(props, TopicType.COMMANDS)
+            configureRabbitQueue(props, TopicType.EVENTS)
         }
 
         private fun MutableMap<String, String>.configureRabbitQueue(
@@ -314,11 +314,11 @@ class LemlineConfigSource : PropertiesConfigSource(
         }
 
         private fun MutableMap<String, String>.configureInMemory() {
-            set("mp.messaging.incoming.$WORKFLOWS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
-            set("mp.messaging.outgoing.$WORKFLOWS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+            set("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+            set("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
 
-            set("mp.messaging.incoming.$DATABASE_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
-            set("mp.messaging.outgoing.$DATABASE_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+            set("mp.messaging.incoming.$EVENTS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+            set("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
         }
 
         private fun generateMetricsProperties(props: Map<String, String>): Map<String, String> {

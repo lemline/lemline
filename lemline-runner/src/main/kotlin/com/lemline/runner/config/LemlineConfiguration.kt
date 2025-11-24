@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.config
 
+import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_BASELINE_ON_MIGRATE_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_MIGRATE_AT_START_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.INGESTION_TOPIC_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
@@ -22,7 +23,6 @@ import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PASSWORD_DEFAUL
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.POSTGRES_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.WORKFLOWS_TOPIC_DEFAULT
 import io.smallrye.config.ConfigMapping
 import io.smallrye.config.WithDefault
 import jakarta.validation.constraints.Min
@@ -30,16 +30,16 @@ import jakarta.validation.constraints.Pattern
 import java.util.*
 
 const val DATABASE_TYPE = "lemline.database.type"
-const val MESSAGING_TYPE = "lemline.messaging.type"
 const val MIGRATE_AT_START = "lemline.database.migrate-at-start"
+const val MESSAGING_TYPE = "lemline.messaging.type"
 
-const val WORKFLOWS_PRODUCER_ENABLED = "lemline.messaging.workflows.producer.enabled"
-const val WORKFLOWS_CONSUMER_ENABLED = "lemline.messaging.workflows.consumer.enabled"
-const val WORKFLOWS_CONSUMER_CONCURRENCY = "lemline.messaging.workflows.consumer.concurrency"
+const val COMMANDS_PRODUCER_ENABLED = "lemline.messaging.commands.producer.enabled"
+const val COMMANDS_CONSUMER_ENABLED = "lemline.messaging.commands.consumer.enabled"
+const val COMMANDS_CONSUMER_CONCURRENCY = "lemline.messaging.commands.consumer.concurrency"
 
-const val DATABASE_PRODUCER_ENABLED = "lemline.messaging.database.producer.enabled"
-const val DATABASE_CONSUMER_ENABLED = "lemline.messaging.database.consumer.enabled"
-const val INGESTION_CONSUMER_CONCURRENCY = "lemline.messaging.database.consumer.concurrency"
+const val EVENTS_PRODUCER_ENABLED = "lemline.messaging.events.producer.enabled"
+const val EVENTS_CONSUMER_ENABLED = "lemline.messaging.events.consumer.enabled"
+const val EVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.events.consumer.concurrency"
 
 /**
  * Type-safe configuration mapping for Lemline.
@@ -156,16 +156,15 @@ interface LemlineConfiguration {
     interface MessagingConfig {
 
         /**
-         * Database type.
+         * Messaging type.
          * If not provided, it will be set in [LemlineConfigSource]
          */
         @Pattern(regexp = "in-memory|kafka|rabbitmq")
         fun type(): String
 
-        fun workflows(): Optional<ChannelConfig>
+        fun commands(): Optional<ChannelConfig>
 
-
-        fun database(): Optional<ChannelConfig>
+        fun events(): Optional<ChannelConfig>
 
         /**
          * Optional Kafka configuration
@@ -214,14 +213,14 @@ interface LemlineConfiguration {
     }
 
     interface KafkaWorkflowsConfig {
-        @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
+        @WithDefault(COMMANDS_TOPIC_DEFAULT)
         fun topic(): String
         fun consumer(): KafkaConsumerWorkflowsConfig
         fun producer(): KafkaProducerConfig
     }
 
     interface KafkaIngestionConfig {
-        @WithDefault(INGESTION_TOPIC_DEFAULT)
+        @WithDefault(EVENTS_TOPIC_DEFAULT)
         fun topic(): String
         fun consumer(): KafkaConsumerDatabaseConfig
         fun producer(): KafkaProducerConfig
@@ -284,7 +283,7 @@ interface LemlineConfiguration {
         @WithDefault(RABBITMQ_VHOST_DEFAULT)
         fun virtualHost(): Optional<String>
 
-        @WithDefault(WORKFLOWS_TOPIC_DEFAULT)
+        @WithDefault(COMMANDS_TOPIC_DEFAULT)
         fun queue(): String
         fun consumer(): RabbitConsumerConfig
         fun producer(): RabbitProducerConfig
@@ -294,7 +293,7 @@ interface LemlineConfiguration {
         @WithDefault(RABBITMQ_VHOST_DEFAULT)
         fun virtualHost(): Optional<String>
 
-        @WithDefault(INGESTION_TOPIC_DEFAULT)
+        @WithDefault(EVENTS_TOPIC_DEFAULT)
         fun queue(): String
         fun consumer(): RabbitConsumerConfig
         fun producer(): RabbitProducerConfig

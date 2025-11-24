@@ -11,9 +11,10 @@ Lemline implements a 3-layer approach for handling error:
 Note: If a failure is handled by the workflow definition (try/catch), Lemline does not see it as an error but a "normal"
 processing of the workflow.
 
-To avoid a coupling between the broker and the database, every upsert to the database is done through an `db_ingestion`
+To avoid a coupling between the broker and the database, every upsert to the database is done through a `lemline_events`
 topic. Also, this way insert in the database can done by batch.
-If the database is not available when handling a message that needs it, the message will be saved in the `db_ingestion`
+If the database is not available when handling a message that needs it, the message will be saved in the
+`lemline_events`
 topic and retried later.
 
 In that way, the broker is never blocked by the database unavailability.
@@ -34,7 +35,7 @@ send or (neg)acknowledge a message
 
 ## Error Handling
 
-If Lemline encounters an error before 6., it will send the (idempotent) message to an `db_ingestion` topic, with
+If Lemline encounters an error before 6., it will send the (idempotent) message to an `lemline_events` topic, with
 additional info (status, stacktrace).
 
 Once in the `lemline_retries` table, the message will be processed by a relay that will resend the message at a later
@@ -44,7 +45,7 @@ time.
 
 When starting a workflow, whose definition contains a `schedule` attribute, Lemline will
 
-- send a (idempotent) message to the `db_ingestion` topic with the workflow definition and the schedule
+- send a (idempotent) message to the `lemline_events` topic with the workflow definition and the schedule
 - start the workflow (if the schedule is not a cron) by sending a message to the `workflow` topic
 
 Once in the `lemline_schedules` table, the message will be processed by a relay that will resend the message at a later
@@ -54,7 +55,7 @@ time.
 
 When starting a child workflow, Lemline will:
 
-- send a (idempotent) message to the `db_ingestion` topic with the parent definition
+- send a (idempotent) message to the `lemline_events` topic with the parent definition
 - start the child workflow by sending a message to the `workflow` topic
 
 When the child workflow is completed, Lemline will use the `lemline_parents` table to see if there is a parent
@@ -66,7 +67,7 @@ time.
 
 When starting a wait task, Lemline will
 
-- send a (idempotent) message to the `db_ingestion` topic with the delay.
+- send a (idempotent) message to the `lemline_events` topic with the delay.
 
 Once in the `lemline_waits` table, the message will be processed by a relay that will resend the message at a later
 time.
@@ -77,7 +78,7 @@ TBD
 
 ## Ingestion Message Subscription
 
-Another process inside Lemline reads those messages from the `db_ingestion` topic and save them to different tables
+Another process inside Lemline reads those messages from the `lemline_events` topic and save them to different tables
 depending on their nature:
 
 - the `lemline_retries` table

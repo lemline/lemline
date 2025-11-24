@@ -3,10 +3,10 @@ package com.lemline.runner.messaging
 
 import com.lemline.common.EnabledOnlyIfDockerAvailable
 import com.lemline.runner.messaging.base.WorkflowConsumerTest
-import com.lemline.runner.messaging.commands.WORKFLOWS_IN_CHANNEL
-import com.lemline.runner.messaging.commands.WORKFLOWS_OUT_CHANNEL
-import com.lemline.runner.messaging.events.DATABASE_IN_CHANNEL
-import com.lemline.runner.messaging.events.DATABASE_OUT_CHANNEL
+import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
+import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
+import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
+import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import com.lemline.runner.tests.profiles.RabbitMQProfile
 import com.rabbitmq.client.Channel
 import com.rabbitmq.client.Connection
@@ -47,16 +47,16 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
     @ConfigProperty(name = "rabbitmq-password")
     lateinit var rabbitmqPassword: String
 
-    @ConfigProperty(name = "mp.messaging.incoming.$WORKFLOWS_IN_CHANNEL.queue.name")
+    @ConfigProperty(name = "mp.messaging.incoming.$COMMANDS_IN_CHANNEL.queue.name")
     lateinit var instanceQueueIn: String
 
-    @ConfigProperty(name = "mp.messaging.outgoing.$WORKFLOWS_OUT_CHANNEL.queue.name")
+    @ConfigProperty(name = "mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.queue.name")
     lateinit var instanceQueueOut: String
 
-    @ConfigProperty(name = "mp.messaging.incoming.$DATABASE_IN_CHANNEL.queue.name")
+    @ConfigProperty(name = "mp.messaging.incoming.$EVENTS_IN_CHANNEL.queue.name")
     lateinit var databaseQueueIn: String
 
-    @ConfigProperty(name = "mp.messaging.outgoing.$DATABASE_OUT_CHANNEL.queue.name")
+    @ConfigProperty(name = "mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.queue.name")
     lateinit var databaseQueueOut: String
 
     private lateinit var connection: Connection
@@ -87,19 +87,19 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 
         // Declare the incoming queue
         val instanceArgs = mapOf(
-            "x-dead-letter-exchange" to "$WORKFLOWS_IN_CHANNEL.dlx",
-            "x-dead-letter-routing-key" to "lemline-workflows.dlq"
+            "x-dead-letter-exchange" to "$COMMANDS_IN_CHANNEL.dlx",
+            "x-dead-letter-routing-key" to "lemline-commands.dlq"
         )
         instanceChannel.queueDeclare(instanceQueueIn, true, false, false, instanceArgs)
         val databaseArgs = mapOf(
-            "x-dead-letter-exchange" to "$DATABASE_IN_CHANNEL.dlx",
-            "x-dead-letter-routing-key" to "lemline-ingestion.dlq"
+            "x-dead-letter-exchange" to "$EVENTS_IN_CHANNEL.dlx",
+            "x-dead-letter-routing-key" to "lemline-events.dlq"
         )
         databaseChannel.queueDeclare(databaseQueueIn, true, false, false, databaseArgs)
 
         // Explicitly declare the exchange that SmallRye will default to
-        instanceChannel.exchangeDeclare(WORKFLOWS_OUT_CHANNEL, "topic", true)
-        databaseChannel.exchangeDeclare(DATABASE_OUT_CHANNEL, "topic", true)
+        instanceChannel.exchangeDeclare(COMMANDS_OUT_CHANNEL, "topic", true)
+        databaseChannel.exchangeDeclare(EVENTS_OUT_CHANNEL, "topic", true)
 
         // Declare the outgoing queue (where this test consumes)
         instanceChannel.queueDeclare(instanceQueueOut, true, false, false, null)
@@ -107,8 +107,8 @@ internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {
 
         // Bind the outgoing queue to the exchange with an EMPTY routing key,
         // matching the default behavior observed in the logs.
-        instanceChannel.queueBind(instanceQueueOut, WORKFLOWS_OUT_CHANNEL, "") // routingKey = ""
-        databaseChannel.queueBind(databaseQueueOut, DATABASE_OUT_CHANNEL, "") // routingKey = ""
+        instanceChannel.queueBind(instanceQueueOut, COMMANDS_OUT_CHANNEL, "") // routingKey = ""
+        databaseChannel.queueBind(databaseQueueOut, EVENTS_OUT_CHANNEL, "") // routingKey = ""
 
         // Purge queues
         instanceChannel.queuePurge(instanceQueueIn)
