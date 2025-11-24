@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.common.values.IDV7
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
@@ -10,6 +11,7 @@ import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.sql.Types
+import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toKotlinInstant
@@ -27,6 +29,48 @@ abstract class Repository<T> {
      * The database manager instance used to access the database.
      */
     protected abstract val databaseManager: DatabaseManager
+
+    /**
+     * Helper function to set an IDV7 value in a PreparedStatement.
+     * Handles database-specific UUID encoding (native UUID for PostgreSQL/H2, binary for MySQL).
+     */
+    protected val setIDV7: (PreparedStatement, Int, IDV7?) -> Unit by lazy {
+        when (databaseManager.dbType) {
+            DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> { stmt, parameterIndex, id ->
+                when (id) {
+                    null -> stmt.setNull(parameterIndex, Types.OTHER)
+                    else -> stmt.setObject(parameterIndex, id.value)
+                }
+            }
+
+            DB_TYPE_MYSQL -> { stmt, parameterIndex, id ->
+                when (id) {
+                    null -> stmt.setNull(parameterIndex, Types.BINARY)
+                    else -> stmt.setBytes(parameterIndex, id.toBytes())
+                }
+            }
+
+            else -> error("Unsupported database type '${databaseManager.dbType}'")
+        }
+    }
+
+    /**
+     * Helper function to get an IDV7 value from a ResultSet.
+     * Handles database-specific UUID decoding (native UUID for PostgreSQL/H2, binary for MySQL).
+     */
+    protected val getIDV7: (ResultSet, String) -> IDV7? by lazy {
+        when (databaseManager.dbType) {
+            DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> { rs, columnName ->
+                rs.getObject(columnName, UUID::class.java)?.let { IDV7(it) }
+            }
+
+            DB_TYPE_MYSQL -> { rs, columnName ->
+                rs.getBytes(columnName)?.let { IDV7.from(it) }
+            }
+
+            else -> error("Unsupported database type '${databaseManager.dbType}'")
+        }
+    }
 
     /**
      * The name of the database table associated with this repository.
