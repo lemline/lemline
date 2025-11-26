@@ -2,14 +2,15 @@
 package com.lemline.core.nodes
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.nodes.Token.BRANCHES
-import com.lemline.core.nodes.Token.CATCH
-import com.lemline.core.nodes.Token.DO
-import com.lemline.core.nodes.Token.FOREACH
-import com.lemline.core.nodes.Token.FORK
-import com.lemline.core.nodes.Token.SUBSCRIPTION
-import com.lemline.core.nodes.Token.TRY
-import com.lemline.core.nodes.Token.WITH
+import com.lemline.common.values.NodePosition
+import com.lemline.common.values.Token.BRANCHES
+import com.lemline.common.values.Token.CATCH
+import com.lemline.common.values.Token.DO
+import com.lemline.common.values.Token.FOREACH
+import com.lemline.common.values.Token.FORK
+import com.lemline.common.values.Token.SUBSCRIPTION
+import com.lemline.common.values.Token.TRY
+import com.lemline.common.values.Token.WITH
 import io.serverlessworkflow.api.types.CallAsyncAPI
 import io.serverlessworkflow.api.types.CallFunction
 import io.serverlessworkflow.api.types.CallGRPC
@@ -40,7 +41,7 @@ import kotlinx.serialization.json.JsonObject
  * @property parent The parent node of this task node, or null if it is a root node.
  */
 data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name: String, val parent: Node<*>? = null) {
-    val definition: JsonObject = LemlineJson.encodeToElement(task)
+    val definition: JsonObject by lazy { LemlineJson.encodeToElement(task) }
 
     /**
      * The list of task nodes depending on this one

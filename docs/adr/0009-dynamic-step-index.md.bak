@@ -43,10 +43,6 @@ The challenge is to create a step identifier that:
 
 We will introduce a **Dynamic WorkflowStep** that extends the existing JSON Pointer notation with **visit counts**.
 
-**Format Choice:** We use comma-separated `name,count` pairs (e.g., `/do,0/taskA,0`) instead of alternating segments
-(e.g., `/do/0/taskA/0`). The comma format is more explicit, easier to parse, and clearer to read - it's immediately
-obvious which count belongs to which node name.
-
 ### Static NodePosition vs. Dynamic WorkflowStep
 
 **Static NodePosition** (existing - identifies node in workflow definition):
@@ -62,22 +58,22 @@ Used in lemline-core to look up nodes in the workflow definition tree.
 **Dynamic WorkflowStep** (new - identifies specific execution instance):
 
 ```
-/do,0/taskA
-/fork,0/branch1,0/do,0/task1
-/foreach,2/do,0/processItem,0
+/do/0/taskA
+/fork/0/branch1/0/do/0/task1
+/foreach/2/do/0/processItem
 ```
 
 Used in lemline-runner for deduplication, message IDs, execution tracking.
 
 ### Structure
 
-The workflowStep follows the pattern: `/{nodeName},{visitCount}/{nodeName},{visitCount}/...`
+The workflowStep follows the pattern: `/{nodeName}/{visitCount}/{nodeName}/{visitCount}/...`
 
 **Rules:**
 
 1. **All nodes** (containers and leaf nodes): Include visit count
-    - Container examples: `/do/0`, `/foreach,2`, `/try,1`
-    - Leaf examples: `/do,0/taskA,0`, `/foreach,2/processItem,0`
+    - Container examples: `/do/0`, `/foreach/2`, `/try/1`
+    - Leaf examples: `/do/0/taskA/0`, `/foreach/2/processItem/0`
     - Note: While leaf nodes currently can only be retried when their parent try node is retried, single task retries
       will likely be introduced in the future, requiring individual visit counts
 
@@ -87,7 +83,7 @@ The workflowStep follows the pattern: `/{nodeName},{visitCount}/{nodeName},{visi
 
 3. **Navigation is always up or down** (never sideways)
     - Moving from task1 to task2 in sequential do block:
-    - `/do/0` → `/do,0/task1,0` (down) → `/do/1` (up) → `/do,1/task2,0` (down)
+    - `/do/0` → `/do/0/task1/0` (down) → `/do/1` (up) → `/do/1/task2/0` (down)
 
 ### Examples
 
@@ -104,11 +100,11 @@ do:
 Execution workflowStep:
 
 ```
-1. /do,0             ← Enter do (first visit)
-2. /do,0/taskA,0     ← Go down into taskA
-3. /do,1             ← Go up to do (second visit)
-4. /do,1/taskB,0     ← Go down into taskB
-5. /do,2             ← Go up to do (third visit, complete)
+1. /do/0             ← Enter do (first visit)
+2. /do/0/taskA/0     ← Go down into taskA
+3. /do/1             ← Go up to do (second visit)
+4. /do/1/taskB/0     ← Go down into taskB
+5. /do/2             ← Go up to do (third visit, complete)
 ```
 
 **Foreach loop:**
@@ -127,12 +123,12 @@ Execution workflowStep:
 
 ```
 Iteration 0:
-  /for,0/do,0/task1,0
-  /for/0/do,1/task2,0
+  /for/0/do/0/task1/0
+  /for/0/do/1/task2/0
 
 Iteration 1:
-  /for,1/do,0/task1,0
-  /for/1/do,1/task2,0
+  /for/1/do/0/task1/0
+  /for/1/do/1/task2/0
 ```
 
 **Fork (parallel branches):**
@@ -153,8 +149,8 @@ fork:
 Execution workflowStep:
 
 ```
-Branch 1: /fork,0/branch1/0/do,0/task1,0
-Branch 2: /fork,0/branch2/0/do,0/task2,0
+Branch 1: /fork/0/branch1/0/do/0/task1/0
+Branch 2: /fork/0/branch2/0/do/0/task2/0
 ```
 
 **Try with retry:**
@@ -177,8 +173,8 @@ Execution workflowStep:
 Attempt 0:
   /try/0             ← Enter try
   /try/0/first/0     ← Execute first task
-  /try,1             ← Go up
-  /try,1/failing/0   ← Execute failing task (fails)
+  /try/1             ← Go up
+  /try/1/failing/0   ← Execute failing task (fails)
 
 Retry (attempt 1):
   /try/2             ← Go up, re-enter try (retry)
@@ -196,7 +192,7 @@ Retry (attempt 1):
 data class WorkflowStep(private val path: String) {
     /**
      * Convert to static NodePosition by removing visit counts.
-     * Example: "/do,0/taskA,0" → "/do/taskA"
+     * Example: "/do/0/taskA/0" → "/do/taskA"
      */
     fun toStaticPosition(): NodePosition {
         val segments = path.split("/")
@@ -313,7 +309,7 @@ taskStates = mapOf(
 )
 ```
 
-**Step 2:** Enter taskA → `workflowStep = /do,0/taskA,0`
+**Step 2:** Enter taskA → `workflowStep = /do/0/taskA/0`
 
 ```kotlin
 taskStates = mapOf(
@@ -331,7 +327,7 @@ taskStates = mapOf(
 )
 ```
 
-**Step 4:** Enter taskB → `workflowStep = /do,1/taskB,0`
+**Step 4:** Enter taskB → `workflowStep = /do/1/taskB/0`
 
 ```kotlin
 taskStates = mapOf(
@@ -502,7 +498,7 @@ VALUES (uuid_from_namespace(workflow_id, '/for/do/wait'), -- Same ID!
     - Existing node lookup logic works without changes
 
 5. **Human-readable**: Path shows execution flow
-    - `/for,2/do,1/processItem,0` clearly indicates "3rd foreach iteration, 2nd task, first execution"
+    - `/for/2/do/1/processItem/0` clearly indicates "3rd foreach iteration, 2nd task, first execution"
     - Visit counts on leaf nodes enable tracking single task retries
     - Debugging and troubleshooting easier
 
@@ -532,7 +528,7 @@ VALUES (uuid_from_namespace(workflow_id, '/for/do/wait'), -- Same ID!
 
 1. **Uniform visit count tracking**: All nodes (container and leaf) include visit counts
     - Simpler building logic (no special cases for leaf nodes)
-    - Slightly longer paths (e.g., `/do,0/taskA,0` vs `/do,0/taskA`)
+    - Slightly longer paths (e.g., `/do/0/taskA/0` vs `/do/0/taskA`)
     - Enables future features like single task retries
 
 ## Alternatives Considered
@@ -601,7 +597,7 @@ class WorkflowStepTracker {
 
 ### 5. Leaf Nodes Without Visit Counts
 
-Omit visit counts from leaf nodes (e.g., `/do,0/taskA` instead of `/do,0/taskA,0`):
+Omit visit counts from leaf nodes (e.g., `/do/0/taskA` instead of `/do/0/taskA/0`):
 
 **Rejected because:**
 

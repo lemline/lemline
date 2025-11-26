@@ -63,8 +63,8 @@ Used in lemline-core to look up nodes in the workflow definition tree.
 
 ```
 /do,0/taskA
-/fork,0/branch1,0/do,0/task1
-/foreach,2/do,0/processItem,0
+/fork/0/branch1/0/do/0/task1
+/foreach/2/do/0/processItem
 ```
 
 Used in lemline-runner for deduplication, message IDs, execution tracking.
@@ -76,7 +76,7 @@ The workflowStep follows the pattern: `/{nodeName},{visitCount}/{nodeName},{visi
 **Rules:**
 
 1. **All nodes** (containers and leaf nodes): Include visit count
-    - Container examples: `/do/0`, `/foreach,2`, `/try,1`
+    - Container examples: `/do/0`, `/foreach/2`, `/try/1`
     - Leaf examples: `/do,0/taskA,0`, `/foreach,2/processItem,0`
     - Note: While leaf nodes currently can only be retried when their parent try node is retried, single task retries
       will likely be introduced in the future, requiring individual visit counts
@@ -104,11 +104,11 @@ do:
 Execution workflowStep:
 
 ```
-1. /do,0             ← Enter do (first visit)
+1. /do/0             ← Enter do (first visit)
 2. /do,0/taskA,0     ← Go down into taskA
-3. /do,1             ← Go up to do (second visit)
-4. /do,1/taskB,0     ← Go down into taskB
-5. /do,2             ← Go up to do (third visit, complete)
+3. /do/1             ← Go up to do (second visit)
+4. /do/1/taskB/0     ← Go down into taskB
+5. /do/2             ← Go up to do (third visit, complete)
 ```
 
 **Foreach loop:**
@@ -127,11 +127,11 @@ Execution workflowStep:
 
 ```
 Iteration 0:
-  /for,0/do,0/task1,0
+  /for/0/do,0/task1,0
   /for/0/do,1/task2,0
 
 Iteration 1:
-  /for,1/do,0/task1,0
+  /for/1/do,0/task1,0
   /for/1/do,1/task2,0
 ```
 
@@ -153,8 +153,8 @@ fork:
 Execution workflowStep:
 
 ```
-Branch 1: /fork,0/branch1/0/do,0/task1,0
-Branch 2: /fork,0/branch2/0/do,0/task2,0
+Branch 1: /fork/0/branch1/0/do,0/task1,0
+Branch 2: /fork/0/branch2/0/do,0/task2,0
 ```
 
 **Try with retry:**
@@ -177,8 +177,8 @@ Execution workflowStep:
 Attempt 0:
   /try/0             ← Enter try
   /try/0/first/0     ← Execute first task
-  /try,1             ← Go up
-  /try,1/failing/0   ← Execute failing task (fails)
+  /try/1             ← Go up
+  /try/1/failing/0   ← Execute failing task (fails)
 
 Retry (attempt 1):
   /try/2             ← Go up, re-enter try (retry)
@@ -331,7 +331,7 @@ taskStates = mapOf(
 )
 ```
 
-**Step 4:** Enter taskB → `workflowStep = /do,1/taskB,0`
+**Step 4:** Enter taskB → `workflowStep = /do/1/taskB/0`
 
 ```kotlin
 taskStates = mapOf(

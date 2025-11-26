@@ -11,7 +11,7 @@ import com.lemline.common.values.name
 import com.lemline.common.values.namespace
 import com.lemline.common.values.version
 import com.lemline.core.nodes.Node
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.values.NodePosition
 import com.lemline.core.nodes.RootTask
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader

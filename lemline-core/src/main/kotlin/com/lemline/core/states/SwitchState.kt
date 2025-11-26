@@ -11,4 +11,5 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class SwitchState(
     override val startedAt: Instant = Clock.System.now(),
+    override val visitCount: Int = 0,
 ) : TaskState()

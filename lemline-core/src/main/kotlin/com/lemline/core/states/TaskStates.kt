@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.values.NodePosition
 import kotlinx.serialization.json.JsonObject
 
 typealias TaskStates = Map<NodePosition, TaskState>

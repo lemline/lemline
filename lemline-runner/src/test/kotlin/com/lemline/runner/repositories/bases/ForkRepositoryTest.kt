@@ -3,12 +3,12 @@ package com.lemline.runner.repositories.bases
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.nodes.NodePosition
 import com.lemline.core.states.ForkState
 import com.lemline.core.states.RootState
 import com.lemline.core.states.WorkflowEvent

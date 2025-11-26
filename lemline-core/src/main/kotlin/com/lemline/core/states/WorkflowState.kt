@@ -2,10 +2,11 @@
 package com.lemline.core.states
 
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowStep
 import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.errors.InternalException
 import com.lemline.core.json.LemlineJson
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.values.NodePosition
 import com.lemline.core.workflows.FlowDirective
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -36,6 +37,20 @@ sealed class WorkflowState {
     val workflowId: WorkflowId get() = (taskStates[NodePosition.root] as RootState).workflowId
 
     val hasWaitingParent: Boolean get() = (taskStates[NodePosition.root] as RootState).hasWaitingParent
+
+    /**
+     * Dynamic workflow step including visit counts.
+     * Computed on-demand from current position and task states.
+     * Used for generating unique database IDs for outbox tables.
+     *
+     * Unlike [nodePosition] which is static (e.g., "/for/do/task"), this includes
+     * visit counts for uniqueness (e.g., "/for,2/do,1/task,0" for 3rd iteration).
+     *
+     * @see WorkflowStepBuilder
+     */
+    val workflowStep: WorkflowStep by lazy {
+        WorkflowStepBuilder.buildWorkflowStep(nodePosition, taskStates)
+    }
 }
 
 @Serializable

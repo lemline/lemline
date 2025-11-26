@@ -10,5 +10,6 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class DoState(
     override val startedAt: Instant = Clock.System.now(),
+    override val visitCount: Int = 0,
     val index: Int = -1
 ) : TaskState()

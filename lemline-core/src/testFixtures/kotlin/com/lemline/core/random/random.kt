@@ -11,7 +11,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.errors.InternalException
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.values.NodePosition
 import com.lemline.core.states.CallState
 import com.lemline.core.states.DoState
 import com.lemline.core.states.ForState

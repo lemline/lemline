@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.nodes
+package com.lemline.common.values
 
 enum class Token(val token: String) {
     DO("do"),

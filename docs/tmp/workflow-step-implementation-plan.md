@@ -11,6 +11,9 @@ collisions when the same node is visited multiple times (loops, retries, paralle
 **Problem Being Solved:** Using `(workflowId, NodePosition)` for database primary keys causes collisions when the same
 node is executed multiple times. WorkflowStep includes visit counts to make each execution unique.
 
+**Format Decision:** WorkflowStep uses comma-separated name,count pairs (e.g., `/for,5/do,3/task,2`) instead of
+alternating segments. This format is more explicit, easier to parse, and clearer to read.
+
 ## Implementation Phases
 
 ### Phase 0: Simplify NodePosition (lemline-core)
@@ -291,38 +294,59 @@ import kotlinx.serialization.Serializable
  * execution instance, even when the same node is visited multiple times
  * (loops, retries, parallel branches).
  *
- * Format: /{nodeName}/{visitCount}/{nodeName}/{visitCount}/...
- * Example: /do/0/taskA/0 or /for/2/do/1/processItem/0
+ * Format: /{nodeName},{visitCount}/{nodeName},{visitCount}/...
+ * Example: /do,0/taskA,0 or /for,2/do,1/processItem,0
+ *
+ * The comma-separated format makes it explicit which count belongs to which node,
+ * simplifies parsing, and improves readability.
  */
-@Serializable
+@Serializable(with = WorkflowStepSerializer::class)
 data class WorkflowStep(private val path: String) {
+
+    init {
+        require(path.startsWith("/")) {
+            "WorkflowStep path must start with '/', got: '$path'"
+        }
+        // Validate format: each segment should be name,count
+        val segments = path.substring(1).split("/")
+        require(segments.isNotEmpty()) {
+            "WorkflowStep must have at least one segment"
+        }
+        segments.forEach { segment ->
+            val parts = segment.split(",")
+            require(parts.size == 2) {
+                "Each segment must be in format 'name,count', got: '$segment'"
+            }
+            val (name, count) = parts
+            require(name.isNotEmpty()) { "Name must not be empty" }
+            require(count.all { it.isDigit() }) { "Visit count must be numeric" }
+        }
+    }
 
     /**
      * Convert to static NodePosition by removing visit counts.
      *
-     * Example: "/do/0/taskA/0" → "/do/taskA"
+     * Example: "/do,0/taskA,0" → "/do/taskA"
      */
-    fun toStaticPosition(): NodePosition {
-        val segments = path.split("/")
-            .filter { it.isNotEmpty() && !it.all { c -> c.isDigit() } }
-        return NodePosition.parse("/" + segments.joinToString("/"))
+    fun toNodePosition(): NodePosition {
+        val segments = path.substring(1).split("/")
+        val nameSegments = segments.map { it.substringBefore(',') }
+        return NodePosition.parse("/" + nameSegments.joinToString("/"))
     }
 
     /**
      * Get compact string representation for ID generation.
      */
-    fun toCompactString(): String = path
+    fun toJsonString(): String = path
 
     override fun toString(): String = path
 
     companion object {
         /**
-         * Parse a workflow step from string path.
+         * Deserialize from JSON string.
          */
-        fun parse(path: String): WorkflowStep {
-            require(path.startsWith("/")) { "WorkflowStep must start with /" }
-            return WorkflowStep(path)
-        }
+        fun fromJsonString(jsonString: String): WorkflowStep =
+            LemlineJson.decodeFromString(jsonString)
     }
 }
 ```
@@ -338,7 +362,7 @@ data class WorkflowStep(private val path: String) {
 
 ### Phase 2: Add Visit Counts to TaskState (lemline-core)
 
-#### 2.1 Update TaskState Base Class
+a#### 2.1 Update TaskState Base Class
 
 **File:** `lemline-core/src/main/kotlin/com/lemline/core/state/TaskState.kt`
 
@@ -445,24 +469,21 @@ object WorkflowStepBuilder {
             val state = taskStates[pos]
             val visitCount = state?.visitCount ?: 0
 
-            // Add visit count for all nodes (containers and leaf nodes)
-            segments.add(0, visitCount.toString())
-
-            // Add node name
-            segments.add(0, pos.nodeName)
+            // Add name,count pair as single segment
+            segments.add(0, "${pos.nodeName},$visitCount")
 
             pos = pos.parent
         }
 
-        return WorkflowStep.parse("/" + segments.joinToString("/"))
+        return WorkflowStep("/" + segments.joinToString("/"))
     }
 }
 ```
 
 **Tests:** `WorkflowStepBuilderTest.kt`
 
-- Test building from simple position: `/do/taskA` → `/do/0/taskA/0`
-- Test building from nested position: `/do/taskA/try/failing` → `/do/0/taskA/0/try/0/failing/0`
+- Test building from simple position: `/do/taskA` → `/do,0/taskA,0`
+- Test building from nested position: `/do/taskA/try/failing` → `/do,0/taskA,0/try,0/failing,0`
 - Test building with non-zero visit counts
 - Test with foreach iterations
 - Test with retry attempts
@@ -670,19 +691,19 @@ fun `sequential tasks increment visitCount correctly`() = runTest {
 
         // Step 1: Enter do
         processor.run()
-        assertEquals("/do/0", processor.state.workflowStep.toCompactString())
+        assertEquals("/do,0", processor.state.workflowStep.toJsonString())
 
         // Step 2: Enter taskA
         processor.run()
-        assertEquals("/do/0/taskA/0", processor.state.workflowStep.toCompactString())
+        assertEquals("/do,0/taskA,0", processor.state.workflowStep.toJsonString())
 
         // Step 3: Complete taskA, go up to do
         processor.run()
-        assertEquals("/do/1", processor.state.workflowStep.toCompactString())
+        assertEquals("/do,1", processor.state.workflowStep.toJsonString())
 
         // Step 4: Enter taskB
         processor.run()
-        assertEquals("/do/1/taskB/0", processor.state.workflowStep.toCompactString())
+        assertEquals("/do,1/taskB,0", processor.state.workflowStep.toJsonString())
     }
 
 @Test
@@ -703,9 +724,9 @@ fun `foreach loop creates unique workflowStep per iteration`() = runTest {
     }
 
     // Verify each iteration has unique workflowStep
-    assertTrue(steps.contains("/for/0/do/0/task/0"))  // Iteration 0
-    assertTrue(steps.contains("/for/1/do/0/task/0"))  // Iteration 1
-    assertTrue(steps.contains("/for/2/do/0/task/0"))  // Iteration 2
+    assertTrue(steps.contains("/for,0/do,0/task,0"))  // Iteration 0
+    assertTrue(steps.contains("/for,1/do,0/task,0"))  // Iteration 1
+    assertTrue(steps.contains("/for,2/do,0/task,0"))  // Iteration 2
 }
 
 @Test
@@ -720,8 +741,8 @@ fun `retry increments visitCount for try and task`() = runTest {
     """.trimIndent()
 
     // Track workflowSteps across retries
-    // First attempt: /try/0/failing/0
-    // Retry 1: /try/2/failing/1 (try visitCount = 2, task visitCount = 1)
+    // First attempt: /try,0/failing,0
+    // Retry 1: /try,2/failing,1 (try visitCount = 2, task visitCount = 1)
     // Verify both increment
 }
 ```
@@ -769,7 +790,7 @@ class WorkflowStepIntegrationTest : FunSpec({
         val firstId = waits.first().id
         val regeneratedId = IDV7.fromNamespace(
             namespace = workflowId,
-            name = "/for/0/do/0/wait/0"
+            name = "/for,0/do,0/wait,0"
         )
         assertEquals(firstId, regeneratedId)
     }
@@ -830,7 +851,8 @@ Add WorkflowStep to architecture section:
 #### Workflow Step Identification
 
 - **NodePosition**: Static position in workflow definition tree (e.g., `/do/taskA`)
-- **WorkflowStep**: Dynamic execution identifier with visit counts (e.g., `/do/0/taskA/0`)
+- **WorkflowStep**: Dynamic execution identifier with visit counts (e.g., `/do,0/taskA,0`)
+    - Uses comma-separated name,count pairs for clarity
     - Used for generating unique database IDs
     - Prevents collisions when same node visited multiple times (loops, retries)
     - Computed from `(nodePosition, taskStates)` on-demand

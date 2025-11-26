@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.nodes
+package com.lemline.common.values
 
 import com.lemline.common.json.LemlineJson
 import kotlinx.serialization.KSerializer

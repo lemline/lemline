@@ -44,6 +44,7 @@ import kotlinx.serialization.json.encodeToJsonElement
 @Serializable
 data class TryState(
     override val startedAt: Instant,
+    override val visitCount: Int = 0,
     val transformedInput: JsonElement,
     val attemptIndex: Int,
     val runningCatch: Boolean,
@@ -53,11 +54,13 @@ data class TryState(
 
     fun newAttemptState(error: InternalException.Error? = null): TryState = copy(
         attemptIndex = attemptIndex + 1,
+        visitCount = visitCount + 1,
         runningCatch = false,
         lastError = error
     )
 
     fun toCatchState(error: InternalException.Error): TryState = copy(
+        visitCount = visitCount + 1,
         runningCatch = true,
         lastError = error
     )

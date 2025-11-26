@@ -2,6 +2,8 @@
 package com.lemline.core.nodes
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.NodePosition
+import com.lemline.common.values.Token
 import com.lemline.core.random.random
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull

@@ -3,7 +3,7 @@ package com.lemline.runner.repositories
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.values.NodePosition
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.ForkBranchModel

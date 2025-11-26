@@ -2,7 +2,7 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.core.nodes.Node
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.values.NodePosition
 import com.lemline.core.states.TaskState
 import io.serverlessworkflow.api.types.FlowDirective
 import kotlin.time.ExperimentalTime

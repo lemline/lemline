@@ -4,7 +4,7 @@
 package com.lemline.core.errors
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.values.NodePosition
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.Test

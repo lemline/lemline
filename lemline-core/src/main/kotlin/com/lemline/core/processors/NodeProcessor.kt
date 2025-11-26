@@ -13,7 +13,7 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.orchestrator.context.TaskContext
+import com.lemline.core.orchestrator.context.TaskScope
 import com.lemline.core.orchestrator.context.merge
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.TaskState
@@ -95,7 +95,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         val now = Clock.System.now()
 
         // create a mutable local task context
-        var context = TaskContext(startedAt = now)
+        var context = TaskScope(startedAt = now)
 
         // Validate input against schema (throws ValidationException)
         validateInput(rawInput)
@@ -134,20 +134,29 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         flowDirective: FlowDirective?,
         datasetFromChild: JsonElement,
         parentScope: Scope
-    ): StepResult = when (val directive = flowDirective?.get()) {
-        is FlowDirectiveEnum -> when (directive) {
-            // END: Workflow complete - recursive unwinding
-            FlowDirectiveEnum.END -> continueToEnd(datasetFromChild)
-            // EXIT: exit current node
-            FlowDirectiveEnum.EXIT -> continueToParent(state, datasetFromChild, getFlowDirective(), parentScope, null)
-            // CONTINUE: continue
-            FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild, parentScope, null)
+    ): StepResult {
+
+        return when (val directive = flowDirective?.get()) {
+            is FlowDirectiveEnum -> when (directive) {
+                // END: Workflow complete - recursive unwinding
+                FlowDirectiveEnum.END -> continueToEnd(datasetFromChild)
+                // EXIT: exit current node
+                FlowDirectiveEnum.EXIT -> continueToParent(
+                    state,
+                    datasetFromChild,
+                    getFlowDirective(),
+                    parentScope,
+                    null
+                )
+                // CONTINUE: continue
+                FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild, parentScope, null)
+            }
+
+            // Goto named sibling or null
+            is String, null -> continueTo(state, datasetFromChild, parentScope, null, directive)
+
+            else -> throw IllegalArgumentException("Unknown flow directive: $directive")
         }
-
-        // Goto named sibling or null
-        is String, null -> continueTo(state, datasetFromChild, parentScope, null, directive)
-
-        else -> throw IllegalArgumentException("Unknown flow directive: $directive")
     }
 
     // ========================================
@@ -157,17 +166,21 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         state: S,
         transformedInput: JsonElement,
         parentScope: Scope,
-        taskContext: TaskContext?,
+        taskScope: TaskScope?,
         namedNode: String? = null
     ): StepResult {
         // get the next node and an updated state for the current node
-        val (updatedState, nextNode, currentFlowDirective) =
-            getNextStepInfo(state, transformedInput, mergeScope(parentScope, taskContext), namedNode)
+        val (updatedState, nextNode, currentFlowDirective) = getNextStepInfo(
+            state = state,
+            dataset = transformedInput,
+            scope = mergeScope(parentScope, taskScope),
+            namedNode = namedNode
+        )
 
         // check if we should return to parent
         return when (nextNode == node.parent) {
             // case of leaf (activities, switch, ...) OR end of a control flow
-            true -> continueToParent(updatedState, transformedInput, currentFlowDirective, parentScope, taskContext)
+            true -> continueToParent(updatedState, transformedInput, currentFlowDirective, parentScope, taskScope)
 
             // control flows that are not completed (do, for, ...), going to a child
             false -> continueToChild(nextNode, transformedInput, updatedState)
@@ -193,17 +206,14 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         transformedInput: JsonElement,
         currentFlowDirective: FlowDirective?,
         parentScope: Scope,
-        taskContext: TaskContext?
+        taskScope: TaskScope?
     ): StepResult {
-        // create a mutable local task context
-        val context = taskContext
-
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
-        val rawOutput = execute(transformedInput, mergeScope(parentScope, context), state)
+        val rawOutput = execute(transformedInput, mergeScope(parentScope, taskScope), state)
 
         // Complete the task with the raw output
-        return completeTask(rawOutput, currentFlowDirective, parentScope, context)
+        return completeTask(rawOutput, currentFlowDirective, parentScope, taskScope)
     }
 
     /**
@@ -216,9 +226,9 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         rawOutput: JsonElement,
         currentFlowDirective: FlowDirective?,
         parentScope: Scope,
-        taskContext: TaskContext?
+        taskScope: TaskScope?
     ): StepResult {
-        var context = taskContext
+        var context = taskScope
 
         // Update context with raw output
         context = context?.copy(rawOutput = rawOutput)
@@ -259,8 +269,8 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // Scope Method
     // ========================================
 
-    private fun mergeScope(parentScope: Scope, taskContext: TaskContext?) =
-        parentScope.merge(taskContext?.toScope(node))
+    private fun mergeScope(parentScope: Scope, taskScope: TaskScope?) =
+        parentScope.merge(taskScope?.toScope(node))
 
     // ========================================
     // Instance Methods (Scope-Dependent Operations)

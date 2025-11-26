@@ -127,11 +127,11 @@ Execution workflowStep:
 
 ```
 Iteration 0:
-  /for,0/do,0/task1,0
+  /for/0/do,0/task1,0
   /for/0/do,1/task2,0
 
 Iteration 1:
-  /for,1/do,0/task1,0
+  /for/1/do,0/task1,0
   /for/1/do,1/task2,0
 ```
 

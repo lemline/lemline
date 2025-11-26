@@ -6,7 +6,7 @@ package com.lemline.core.processors
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.values.NodePosition
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.orchestrator.context.Scope
@@ -102,9 +102,9 @@ class TryProcessor(
             nextNode = getDoTry(),
             nextDirective = null
         )
-        // completed, go to parent
+        // completed, go to parent (increment visitCount when going up)
         false -> NextStepInfo(
-            updatedState = state,
+            updatedState = state.copy(visitCount = state.visitCount + 1),
             nextNode = node.parent,
             nextDirective = getFlowDirective()
         )

@@ -57,7 +57,11 @@ class DoProcessor(
         namedNode: String?,
     ): NextStepInfo<DoState> {
         val nextIndex = getNextIndex(state, namedNode)
-        val updatedState = state.copy(index = nextIndex)
+        // Increment visitCount when re-entering from child (going up in the tree)
+        val updatedState = state.copy(
+            index = nextIndex,
+            visitCount = state.visitCount + 1
+        )
         return when (nextIndex >= (node.children?.size ?: 0)) {
             true -> NextStepInfo(
                 updatedState = updatedState,

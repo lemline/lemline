@@ -2,6 +2,7 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.AsyncTaskException
@@ -10,7 +11,6 @@ import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.errors.AsyncTaskException.WaitStartedException
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
-import com.lemline.core.nodes.NodePosition
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.orchestrator.context.merge
 import com.lemline.core.processors.TryProcessor
@@ -470,7 +470,7 @@ object StepByStepOrchestrator {
             rawOutput = rawOutput,
             currentFlowDirective = processor.getFlowDirective(),
             parentScope = scope,
-            taskContext = null
+            taskScope = null
         )
     }
 

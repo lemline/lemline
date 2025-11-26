@@ -16,5 +16,5 @@ typealias Scope = JsonObject
 internal fun Scope.merge(other: Scope?): Scope =
     buildJsonObject {
         this@merge.forEach { put(it.key, it.value) }  // Put base scope first
-        other?.forEach { put(it.key, it.value) }      // Then overwrite with other scope
+        other?.forEach { put(it.key, it.value) }      // Then overwrite with another scope
     }

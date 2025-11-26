@@ -91,8 +91,10 @@ class ForProcessor(
     }
 
     // At each iteration, we remove the first item from the collection and increment the index
+    // Also increment visitCount when re-entering from child
     private fun getNextState(state: ForState): ForState = ForState(
         startedAt = state.startedAt,
+        visitCount = state.visitCount + 1,
         collection = if (state.index >= 0) state.collection.drop(1) else state.collection,
         index = state.index + 1,
         forEach = node.task.`for`.each ?: "item",

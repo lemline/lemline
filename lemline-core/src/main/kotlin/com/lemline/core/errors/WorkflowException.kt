@@ -2,7 +2,7 @@
 package com.lemline.core.errors
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.values.NodePosition
 import kotlinx.serialization.Serializable
 
 
