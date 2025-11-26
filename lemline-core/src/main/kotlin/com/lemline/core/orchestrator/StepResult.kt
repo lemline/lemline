@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.orchestrator
 
-import com.lemline.core.nodes.Node
 import com.lemline.common.values.NodePosition
-import com.lemline.core.states.TaskState
+import com.lemline.core.nodes.Node
+import com.lemline.core.states.BaseState
 import io.serverlessworkflow.api.types.FlowDirective
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -32,7 +32,7 @@ import kotlinx.serialization.json.JsonObject
 data class StepResult(
     val nextNode: Node<*>?,
     val nextInput: JsonElement,
-    val stateUpdates: Map<NodePosition, TaskState?>,
+    val stateUpdates: Map<NodePosition, BaseState?>,
     val nextDirective: FlowDirective? = null,
     val nextContext: JsonObject? = null,
     val retryAt: Instant? = null

@@ -9,7 +9,7 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.TaskState
+import com.lemline.core.states.BaseState
 import com.lemline.core.states.TryState
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration
@@ -249,7 +249,7 @@ class TryProcessor(
     private fun cleanStateUpdates(
         failingNode: Node<*>,
         updatedState: TryState,
-    ): Map<NodePosition, TaskState?> {
+    ): Map<NodePosition, BaseState?> {
         var previous = failingNode
         return buildMap {
             // Clean state of all nodes up to the try node

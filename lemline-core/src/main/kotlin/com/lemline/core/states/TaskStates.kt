@@ -4,7 +4,7 @@ package com.lemline.core.states
 import com.lemline.common.values.NodePosition
 import kotlinx.serialization.json.JsonObject
 
-typealias TaskStates = Map<NodePosition, TaskState>
+typealias TaskStates = Map<NodePosition, BaseState>
 
 /**
  * Applies a set of state updates to the current `States` map and optionally replaces the root context.
@@ -16,7 +16,7 @@ typealias TaskStates = Map<NodePosition, TaskState>
  * @return A new States map with the updates applied.
  */
 internal fun TaskStates.updateWith(
-    stateUpdates: Map<NodePosition, TaskState?>,
+    stateUpdates: Map<NodePosition, BaseState?>,
     newContext: JsonObject?
 ): TaskStates {
     val updatedStates = this.toMutableMap()

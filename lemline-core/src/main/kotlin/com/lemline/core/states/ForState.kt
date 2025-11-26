@@ -19,7 +19,7 @@ data class ForState(
     val index: Int = -1,
     val forEach: String,
     val forAt: String
-) : TaskState() {
+) : BaseState() {
 
     override val scope: Scope
         get() = buildJsonObject {

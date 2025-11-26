@@ -48,7 +48,7 @@ object WorkflowStepBuilder {
      */
     fun buildWorkflowStep(
         currentPosition: NodePosition,
-        taskStates: Map<NodePosition, TaskState>
+        taskStates: Map<NodePosition, BaseState>
     ): WorkflowStep {
         val segments = mutableListOf<String>()
 

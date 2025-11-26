@@ -17,7 +17,7 @@ import com.lemline.core.processors.SetProcessor
 import com.lemline.core.processors.SwitchProcessor
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.processors.WaitProcessor
-import com.lemline.core.states.TaskState
+import com.lemline.core.states.BaseState
 import io.serverlessworkflow.api.types.CallHTTP
 import io.serverlessworkflow.api.types.DoTask
 import io.serverlessworkflow.api.types.ForTask
@@ -51,7 +51,7 @@ internal object ProcessorFactory {
      */
     @Suppress("UNCHECKED_CAST")
     @ExperimentalTime
-    fun <T : TaskBase> getProcessor(node: Node<T>): NodeProcessor<T, TaskState> {
+    fun <T : TaskBase> getProcessor(node: Node<T>): NodeProcessor<T, BaseState> {
         return when (node.task) {
             is RootTask -> RootProcessor(node as Node<RootTask>)
             is DoTask -> DoProcessor(node as Node<DoTask>)
@@ -77,6 +77,6 @@ internal object ProcessorFactory {
             }
 
             else -> throw IllegalArgumentException("Unknown task type: ${node.task::class.simpleName}")
-        } as NodeProcessor<T, TaskState>
+        } as NodeProcessor<T, BaseState>
     }
 }

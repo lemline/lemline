@@ -16,7 +16,7 @@ import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.orchestrator.context.TaskScope
 import com.lemline.core.orchestrator.context.merge
 import com.lemline.core.schemas.SchemaValidator
-import com.lemline.core.states.TaskState
+import com.lemline.core.states.BaseState
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
@@ -36,7 +36,7 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
 
 @ExperimentalTime
-abstract class NodeProcessor<T : TaskBase, S : TaskState>(
+abstract class NodeProcessor<T : TaskBase, S : BaseState>(
     val node: Node<T>
 ) {
     val logger = logger()
@@ -226,7 +226,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     internal fun continueToChild(
         childNode: Node<*>?,
         childRawInput: JsonElement,
-        updatedState: TaskState
+        updatedState: BaseState
     ) = StepResult(
         childNode,
         childRawInput,
@@ -493,7 +493,7 @@ data class NavigationInfo(
  * @deprecated Use NavigationInfo for navigation decisions and updateState() for state updates
  */
 @Deprecated("Use NavigationInfo and updateState() separately")
-data class NextStepInfo<T : TaskState>(
+data class NextStepInfo<T : BaseState>(
     val updatedState: T,
     val nextNode: Node<*>?,
     val nextDirective: FlowDirective?

@@ -50,7 +50,7 @@ data class TryState(
     val runningCatch: Boolean,
     val lastError: InternalException.Error? = null,
     val errorAs: String
-) : TaskState() {
+) : BaseState() {
 
     /**
      * If it exists, add the error to the scope
