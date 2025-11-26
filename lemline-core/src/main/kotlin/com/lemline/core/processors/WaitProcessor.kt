@@ -45,7 +45,7 @@ class WaitProcessor(
     node: Node<WaitTask>,
 ) : NodeProcessor<WaitTask, WaitState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = WaitState()
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = WaitState()
 
     /**
      * Execute wait action - returns input unchanged.

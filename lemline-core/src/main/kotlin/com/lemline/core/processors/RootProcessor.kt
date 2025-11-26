@@ -46,18 +46,19 @@ class RootProcessor(
 ) : NodeProcessor<RootTask, RootState>(node) {
 
     // the RootProcessor should not create the root state
-    override fun createState(
+    override fun stateEnterFromParent(
         transformedInput: JsonElement,
         scope: Scope
     ): RootState = throw IllegalStateException("RootProcessor does not create state")
 
-    override fun getNextStepInfo(
+    // RootProcessor doesn't need updateState - root never re-enters from a child
+    // The default implementation is sufficient
+
+    override fun getNextNode(
         state: RootState,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String?,
-    ): NextStepInfo<RootState> = NextStepInfo(
-        updatedState = state,
+    ): NavigationInfo = NavigationInfo(
         nextNode = null,
         nextDirective = null
     )

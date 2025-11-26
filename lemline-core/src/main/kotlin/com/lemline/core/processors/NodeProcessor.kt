@@ -49,7 +49,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
      * Create the initial state for this node.
      * Subclasses override to create their specific state type.
      */
-    abstract fun createState(transformedInput: JsonElement, scope: Scope): S
+    abstract fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): S
 
     /**
      * Execute node action (for activity tasks).
@@ -72,20 +72,34 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     }
 
     /**
-     * Determine:
-     * - the updated state of current node
-     * - the next node (parent or child)
-     * - the flow directive for the parent (if any)
-     *
-     * The default implementation is the implementation for a leaf (activity, switch, ...)
-     * Other tasks MUST redefine this method.
+     * Update state when re-entering from child.
+     * Default: just increment visitCount.
      */
-    open fun getNextStepInfo(
+    open fun stateEnterFromChild(
+        state: S,
+        output: JsonElement,
+        scope: Scope,
+        nodeName: String? = null
+    ): S {
+        // Default implementation for leaf nodes - just increment visitCount
+        @Suppress("UNCHECKED_CAST")
+        return state
+    }
+
+    /**
+     * Determine where to go next based on current state.
+     * Default: go to parent (leaf node behavior - activities, switch, etc.)
+     */
+    open fun getNextNode(
         state: S,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String? = null,
-    ): NextStepInfo<S> = NextStepInfo(state, node.parent, getFlowDirective())
+    ): NavigationInfo {
+        return NavigationInfo(
+            nextNode = node.parent,
+            nextDirective = getFlowDirective()
+        )
+    }
 
     // ========================================
     // Entering a Node for the first time
@@ -118,7 +132,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         context = context.copy(transformedInput = transformedInput)
 
         // state creation
-        val state = createState(transformedInput, mergeScope(parentScope, context))
+        val state = stateEnterFromParent(transformedInput, mergeScope(parentScope, context))
 
         // get the next node and an updated state for the current node
         return continueTo(state, transformedInput, parentScope, context)
@@ -128,32 +142,49 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // ReEntering a Control flow Node from a child
     // ========================================
 
+    private val FlowDirective?.nodeName
+        get() = when (val nodeName = this?.get()) {
+            is String -> nodeName
+            else -> null
+        }
+
     // here we process the current node, knowing that we come from a child node that output dataset and flow directive
-    suspend fun enterFromChild(
+    internal suspend fun enterFromChild(
         state: S,
         flowDirective: FlowDirective?,
-        datasetFromChild: JsonElement,
+        output: JsonElement,
         parentScope: Scope
     ): StepResult {
+        val updatedState = stateEnterFromChild(state, output, parentScope, flowDirective.nodeName)
 
         return when (val directive = flowDirective?.get()) {
             is FlowDirectiveEnum -> when (directive) {
                 // END: Workflow complete - recursive unwinding
-                FlowDirectiveEnum.END -> continueToEnd(datasetFromChild)
+                FlowDirectiveEnum.END -> continueToEnd(dataset = output)
                 // EXIT: exit current node
                 FlowDirectiveEnum.EXIT -> continueToParent(
-                    state,
-                    datasetFromChild,
-                    getFlowDirective(),
-                    parentScope,
-                    null
+                    state = updatedState,
+                    transformedInput = output,
+                    currentFlowDirective = getFlowDirective(),
+                    parentScope = parentScope,
+                    taskScope = null
                 )
                 // CONTINUE: continue
-                FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild, parentScope, null)
+                FlowDirectiveEnum.CONTINUE -> continueTo(
+                    state = updatedState,
+                    transformedInput = output,
+                    parentScope = parentScope,
+                    taskScope = null
+                )
             }
 
             // Goto named sibling or null
-            is String, null -> continueTo(state, datasetFromChild, parentScope, null, directive)
+            is String, null -> continueTo(
+                state = updatedState,
+                transformedInput = output,
+                parentScope = parentScope,
+                taskScope = null,
+            )
 
             else -> throw IllegalArgumentException("Unknown flow directive: $directive")
         }
@@ -162,28 +193,33 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // ========================================
     // CONTINUE
     // ========================================
-    suspend fun continueTo(
+    private suspend fun continueTo(
         state: S,
         transformedInput: JsonElement,
         parentScope: Scope,
         taskScope: TaskScope?,
-        namedNode: String? = null
     ): StepResult {
-        // get the next node and an updated state for the current node
-        val (updatedState, nextNode, currentFlowDirective) = getNextStepInfo(
-            state = state,
-            dataset = transformedInput,
-            scope = mergeScope(parentScope, taskScope),
-            namedNode = namedNode
-        )
+        // Pure navigation - determine where to go next
+        val scope = mergeScope(parentScope, taskScope)
+        val navigation = getNextNode(state, transformedInput, scope)
 
         // check if we should return to parent
-        return when (nextNode == node.parent) {
+        return when (navigation.nextNode == node.parent) {
             // case of leaf (activities, switch, ...) OR end of a control flow
-            true -> continueToParent(updatedState, transformedInput, currentFlowDirective, parentScope, taskScope)
+            true -> continueToParent(
+                state = state,
+                transformedInput = transformedInput,
+                currentFlowDirective = navigation.nextDirective,
+                parentScope = parentScope,
+                taskScope = taskScope
+            )
 
             // control flows that are not completed (do, for, ...), going to a child
-            false -> continueToChild(nextNode, transformedInput, updatedState)
+            false -> continueToChild(
+                childNode = navigation.nextNode,
+                childRawInput = transformedInput,
+                updatedState = state
+            )
         }
     }
 
@@ -435,13 +471,28 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
 }
 
 /**
+ * Represents the navigation decision within a workflow.
+ *
+ * Components:
+ * - A `Node<*>?`: The next node to navigate to, null indicates navigation ends
+ * - A `FlowDirective?`: Directives influencing the parent execution flow (if any)
+ */
+data class NavigationInfo(
+    val nextNode: Node<*>?,
+    val nextDirective: FlowDirective?
+)
+
+/**
  * Represents the result of determining the next navigation step within a workflow or process.
  *
  * Components:
  * - A `NodeState?`: The updated state of the *current* node
  * - A `Node<*>?`: The next node to navigate to, null indicates navigation ends
  * - A `FlowDirective?`: Directives influencing the parent execution flow (if any)
+ *
+ * @deprecated Use NavigationInfo for navigation decisions and updateState() for state updates
  */
+@Deprecated("Use NavigationInfo and updateState() separately")
 data class NextStepInfo<T : TaskState>(
     val updatedState: T,
     val nextNode: Node<*>?,

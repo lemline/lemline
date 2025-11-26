@@ -53,14 +53,16 @@ class ForkProcessor(
     node: Node<ForkTask>
 ) : NodeProcessor<ForkTask, ForkState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = ForkState()
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = ForkState()
 
-    override fun getNextStepInfo(
+    // ForkProcessor doesn't need updateState - it throws exception on first entry
+    // The default implementation is enough
+
+    override fun getNextNode(
         state: ForkState,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String?
-    ): NextStepInfo<ForkState> {
+    ): NavigationInfo {
         // First entry
         // Throws exception to trigger fork execution via orchestrator
         // The orchestrator will derive fork config from the current Node<ForkTask>

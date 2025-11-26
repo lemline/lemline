@@ -71,7 +71,7 @@ class CallHttpProcessor(
     node: Node<CallHTTP>,
 ) : NodeProcessor<CallHTTP, CallState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = CallState()
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = CallState()
 
     /**
      * Execute HTTP call action.

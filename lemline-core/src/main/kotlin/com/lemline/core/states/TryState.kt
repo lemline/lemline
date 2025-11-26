@@ -19,7 +19,7 @@ import kotlinx.serialization.json.encodeToJsonElement
  * consistent input for retries and catch blocks. This is the only flow task that stores input.
  *
  * Created with
- * - attemptIndex = -1
+ * - attemptIndex = 0
  * - runningCatch = false
  *
  * Has Entered the Try Block:
@@ -51,19 +51,6 @@ data class TryState(
     val lastError: InternalException.Error? = null,
     val errorAs: String
 ) : TaskState() {
-
-    fun newAttemptState(error: InternalException.Error? = null): TryState = copy(
-        attemptIndex = attemptIndex + 1,
-        visitCount = visitCount + 1,
-        runningCatch = false,
-        lastError = error
-    )
-
-    fun toCatchState(error: InternalException.Error): TryState = copy(
-        visitCount = visitCount + 1,
-        runningCatch = true,
-        lastError = error
-    )
 
     /**
      * If it exists, add the error to the scope

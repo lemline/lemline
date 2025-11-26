@@ -71,7 +71,7 @@ class RunScriptProcessor(
     node: Node<RunTask>,
 ) : NodeProcessor<RunTask, RunState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): RunState = RunState()
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): RunState = RunState()
 
     /**
      * Execute script action.

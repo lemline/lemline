@@ -45,33 +45,35 @@ class DoProcessor(
     node: Node<DoTask>
 ) : NodeProcessor<DoTask, DoState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): DoState = DoState(
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): DoState = DoState(
         startedAt = Clock.System.now(),
-        index = -1
+        index = 0  // Start at first child
     )
 
-    override fun getNextStepInfo(
+    override fun stateEnterFromChild(
+        state: DoState,
+        output: JsonElement,
+        scope: Scope,
+        nodeName: String?
+    ): DoState = state.copy(
+        index = getNextIndex(state, nodeName),
+        visitCount = state.visitCount + 1
+    )
+
+    override fun getNextNode(
         state: DoState,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String?,
-    ): NextStepInfo<DoState> {
-        val nextIndex = getNextIndex(state, namedNode)
-        // Increment visitCount when re-entering from child (going up in the tree)
-        val updatedState = state.copy(
-            index = nextIndex,
-            visitCount = state.visitCount + 1
-        )
-        return when (nextIndex >= (node.children?.size ?: 0)) {
-            true -> NextStepInfo(
-                updatedState = updatedState,
+    ): NavigationInfo {
+        // state.index already points to the next child to execute
+        return when (state.index >= (node.children?.size ?: 0)) {
+            true -> NavigationInfo(
                 nextNode = node.parent,
                 nextDirective = getFlowDirective()
             )
 
-            false -> NextStepInfo(
-                updatedState = updatedState,
-                nextNode = getChildByIndex(nextIndex),
+            false -> NavigationInfo(
+                nextNode = getChildByIndex(state.index),
                 nextDirective = null
             )
         }

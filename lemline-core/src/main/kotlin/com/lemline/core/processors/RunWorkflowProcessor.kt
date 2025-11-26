@@ -57,7 +57,7 @@ class RunWorkflowProcessor(
     node: Node<RunTask>,
 ) : NodeProcessor<RunTask, RunState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = RunState()
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = RunState()
 
     /**
      * Execute sub-workflow action.

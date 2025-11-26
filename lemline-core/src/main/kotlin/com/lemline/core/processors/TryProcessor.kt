@@ -4,10 +4,9 @@
 package com.lemline.core.processors
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.values.NodePosition
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
-import com.lemline.common.values.NodePosition
-import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.orchestrator.context.Scope
 import com.lemline.core.states.TaskState
@@ -75,36 +74,48 @@ class TryProcessor(
     /**
      * This state is initialized when entering the TryTask node for the first time
      */
-    override fun createState(transformedInput: JsonElement, scope: Scope): TryState = TryState(
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): TryState = TryState(
         startedAt = Clock.System.now(),
         transformedInput = transformedInput,  // Store for retries/catch
-        attemptIndex = -1,
+        attemptIndex = 0,  // Ready for first attempt
         runningCatch = false,
         errorAs = node.task.catch?.`as` ?: "error"
     )
 
     /**
-     * Determines the next step information based on the current `TryState`, dataset, node name, and scope.
+     * Update state when re-entering from child after successful execution of the try block or the catch block.
+     */
+    override fun stateEnterFromChild(
+        state: TryState,
+        output: JsonElement,
+        scope: Scope,
+        nodeName: String?
+    ): TryState = state.copy(
+        visitCount = state.visitCount + 1,
+    )
+
+    /**
+     * Determines the next node based on the current `TryState`.
      * This method handles both the first attempt (down) and the completion (up) of the `TryState` node.
      *
-     * This method is used in "normal" execution.
-     * This is bypassed by [StepByStepOrchestrator] when this node caught an exception.
+     * For navigation purposes:
+     * - visitCount == 0: First attempt, go to try block
+     * - visitCount > 0: Completed (after retry or catch), go to parent
+     *
+     * This is bypassed by [handleError] when this node caught an exception.
      */
-    override fun getNextStepInfo(
+    override fun getNextNode(
         state: TryState,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String?,
-    ) = when (state.attemptIndex < 0) {
-        // first attempt
-        true -> NextStepInfo(
-            updatedState = state.newAttemptState(),
+    ): NavigationInfo = when (state.visitCount == 0) {
+        // First attempt - go to try block
+        true -> NavigationInfo(
             nextNode = getDoTry(),
             nextDirective = null
         )
-        // completed, go to parent (increment visitCount when going up)
-        false -> NextStepInfo(
-            updatedState = state.copy(visitCount = state.visitCount + 1),
+        // Completed - go to parent
+        false -> NavigationInfo(
             nextNode = node.parent,
             nextDirective = getFlowDirective()
         )
@@ -165,23 +176,37 @@ class TryProcessor(
         state: TryState,
         scope: Scope
     ): StepResult {
+
         // Check if we should retry
         val shouldRetry = shouldRetry(state, scope)
 
-        return when {
+        return when (shouldRetry) {
             // Retry if attempts remain
-            shouldRetry -> StepResult(
-                nextNode = getDoTry(),  // Re-enter try body
-                nextInput = state.transformedInput,  // Original input
-                stateUpdates = cleanStateUpdates(failingNode, state.newAttemptState(error)),
-                retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(state.attemptIndex)
-            )
+            true -> {
+                val updatedState = state.copy(
+                    attemptIndex = state.attemptIndex + 1,
+                    visitCount = state.visitCount + 1,
+                )
+                StepResult(
+                    nextNode = getDoTry(),  // Re-enter try body
+                    nextInput = state.transformedInput,  // Original input
+                    stateUpdates = cleanStateUpdates(failingNode, updatedState),
+                    retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(updatedState.attemptIndex)
+                )
+            }
             // Otherwise, enter the catch block
-            else -> StepResult(
-                nextNode = getCatchNode(),  // Re-enter try body
-                nextInput = state.transformedInput,  // Original input
-                stateUpdates = cleanStateUpdates(failingNode, state.toCatchState(error)),
-            )
+            false -> {
+                val updatedState = state.copy(
+                    visitCount = state.visitCount + 1,
+                    runningCatch = true,
+                    lastError = error
+                )
+                StepResult(
+                    nextNode = getCatchNode(),  // Re-enter try body
+                    nextInput = state.transformedInput,  // Original input
+                    stateUpdates = cleanStateUpdates(failingNode, updatedState),
+                )
+            }
         }
     }
 
