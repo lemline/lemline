@@ -60,7 +60,7 @@ data class TaskContext(
     fun toTaskDescriptor(node: Node<*>): TaskDescriptor {
         return TaskDescriptor(
             name = node.name,
-            reference = node.reference,
+            reference = node.position.toString(),
             definition = node.definition,
             startedAt = LemlineJson.encodeToElement(
                 DateTimeDescriptor.from(startedAt.toJavaInstant())

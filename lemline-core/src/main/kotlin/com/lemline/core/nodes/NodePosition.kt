@@ -11,39 +11,60 @@ import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 
 /**
- * Represents a task initialPosition in the workflow.
+ * Represents a static position in the workflow definition tree.
  *
- * This class is used to represent the initialPosition of a task in the workflow.
+ * Uses JSON Pointer notation (RFC 6901) to identify nodes.
+ * Examples: "/do/taskA", "/for/do/processItem", "/try/failing"
  *
- * @property path The list of path components.
+ * This is the STATIC position in the definition tree, without execution context.
+ * For dynamic execution tracking with visit counts, see WorkflowStep (to be implemented).
+ *
+ * @property path The path string representing the position in JSON Pointer format.
  */
 @Serializable(with = NodePositionSerializer::class)
-data class NodePosition(private val path: List<String> = listOf()) {
-    /**
-     * Json pointer representation. (e.g., "/do/0/do")
-     */
-    val positionPointer by lazy {
-        when (path.isEmpty()) {
-            true -> PositionPointer.root
-            else -> PositionPointer("/${path.joinToString("/")}")
+data class NodePosition(private val path: String) {
+
+    init {
+        require(path.isEmpty() || path.startsWith("/")) {
+            "NodePosition path must start with '/' or be empty for root, got: '$path'"
         }
     }
 
     /**
-     * Gets the string representation of the JSON pointer.
-     *
-     * @return The JSON pointer string (e.g., "/do/0/do")
+     * Get the node name (last segment of path).
+     * Example: "/do/taskA" → "taskA"
      */
-    override fun toString() = positionPointer.toString()
+    val nodeName: String
+        get() = if (path.isEmpty()) "" else path.substringAfterLast('/')
+
+    /**
+     * Get parent position by removing last segment.
+     * Example: "/do/taskA" → "/do"
+     * Returns null for root position.
+     */
+    val parent: NodePosition?
+        get() = when {
+            !path.contains('/') -> null // Should not happen with valid paths
+            path.lastIndexOf('/') == 0 -> root // Direct child of root
+            else -> NodePosition(path.substringBeforeLast('/'))
+        }
+
+    /**
+     * Get the segments of the path.
+     * Example: "/do/taskA" → ["do", "taskA"]
+     */
+    fun segments(): List<String> =
+        if (path.isEmpty()) emptyList()
+        else path.substring(1).split('/')
 
     /**
      * Adds a name component to the JSON pointer path.
      *
      * This function ensures that the name does not contain a slash ('/'),
-     * is not an integer, and is not one of the reserved tokens defined in TaskToken.
+     * is not an integer, and is not one of the reserved tokens defined in Token.
      *
      * @param name The name component to add to the path.
-     * @return A new TaskPosition with the added name component.
+     * @return A new NodePosition with the added name component.
      * @throws IllegalArgumentException if the name contains a slash, is an integer, or is a reserved token.
      */
     fun addName(name: String): NodePosition {
@@ -52,48 +73,62 @@ data class NodePosition(private val path: List<String> = listOf()) {
         Token.entries.map { it.token }.let {
             require(!it.contains(name)) { "Task name $name must not be one of ${it.joinToString()}" }
         }
-        return NodePosition(path + name)
+        return NodePosition(if (path.isEmpty()) "/$name" else "$path/$name")
     }
 
     /**
-     * Adds a token property to the path.
+     * Adds a token to the path.
+     * Example: "/do" + Token.TRY → "/do/try"
      *
-     * @param token The property name to add
-     * @return A new Position with the added property
+     * @param token The token to add
+     * @return A new NodePosition with the added token
      */
-    fun addToken(token: Token): NodePosition = NodePosition(path + token.token)
+    fun addToken(token: Token): NodePosition =
+        NodePosition(if (path.isEmpty()) "/${token.token}" else "$path/${token.token}")
 
     /**
-     * Adds an childIndex to the path.
+     * Gets the string representation of the JSON pointer.
      *
-     * @param index The numeric childIndex to add
-     * @return A new Position with the added childIndex
+     * @return The JSON pointer string (e.g., "/do/taskA", or "/" for root)
      */
-    fun addIndex(index: Int): NodePosition = NodePosition(path + index.toString())
-
-    /**
-     * Gets the parent path by removing the last component.
-     *
-     * @return A new Position with the parent path, or null if this is the root
-     */
-    val parent: NodePosition?
-        get() = if (path.isEmpty()) null else NodePosition(path.dropLast(1))
+    override fun toString(): String = path.ifEmpty { "/" }
 
     companion object {
-        val root = NodePosition(listOf())
+        /**
+         * Root position (empty path).
+         */
+        val root = NodePosition("")
 
-        val doRoot = NodePosition(listOf(Token.DO.token))
+        /**
+         * Common position: /do
+         */
+        val doRoot = NodePosition("/do")
 
-        fun from(path: String) = PositionPointer(path).toPosition()
+        /**
+         * Parse a NodePosition from a string path.
+         *
+         * @param path The path string (e.g., "/do/taskA" or "/" for root)
+         * @return A NodePosition instance
+         */
+        fun parse(path: String): NodePosition {
+            val normalized = path.trim()
+            return when {
+                normalized.isEmpty() || normalized == "/" -> root
+                else -> NodePosition(normalized)
+            }
+        }
 
-        fun fromJsonString(jsonString: String): NodePosition = LemlineJson.decodeFromString(jsonString)
-
+        /**
+         * Deserialize from JSON string.
+         */
+        fun fromJsonString(jsonString: String): NodePosition =
+            LemlineJson.decodeFromString(jsonString)
     }
 }
 
 /**
- * Custom kotlinx.serialization serializer for [com.lemline.core.nodes.NodePosition].
- * Serializes to/from the string representation of its JsonPointer.
+ * Custom kotlinx.serialization serializer for [NodePosition].
+ * Serializes to/from the string representation of the JSON Pointer.
  */
 internal object NodePositionSerializer : KSerializer<NodePosition> {
 
@@ -101,12 +136,10 @@ internal object NodePositionSerializer : KSerializer<NodePosition> {
         PrimitiveSerialDescriptor("NodePosition", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: NodePosition) {
-        // Use the jsonPointer's string representation for serialization
         encoder.encodeString(value.toString())
     }
 
     override fun deserialize(decoder: Decoder): NodePosition {
-        // Read the string, create a JsonPointer, then convert to NodePosition
-        return NodePosition.from(decoder.decodeString())
+        return NodePosition.parse(decoder.decodeString())
     }
 }

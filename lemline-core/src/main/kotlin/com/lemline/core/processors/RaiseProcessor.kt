@@ -47,7 +47,7 @@ class RaiseProcessor(
         val error = InternalException.Error(
             type = errorDef.getErrorType(),
             status = errorDef.status,
-            instance = node.position.positionPointer.toString(),
+            instance = node.position.toString(),
             title = errorDef.title,
             details = errorDef.detail
         )

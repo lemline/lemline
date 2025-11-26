@@ -41,7 +41,6 @@ import kotlinx.serialization.json.JsonObject
  */
 data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name: String, val parent: Node<*>? = null) {
     val definition: JsonObject = LemlineJson.encodeToElement(task)
-    val reference: String = position.positionPointer.toString()
 
     /**
      * The list of task nodes depending on this one
@@ -101,9 +100,9 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
         val nodes = mutableSetOf<String>()
         val edges = mutableSetOf<String>()
 
-        fun processNode(node: Node<*>, parentId: PositionPointer? = null) {
+        fun processNode(node: Node<*>, parentId: NodePosition? = null) {
             val taskType = node.task.javaClass.simpleName
-            val nodeId = node.position.positionPointer
+            val nodeId = node.position
 
             // Add node with task type and initialPosition
             val nodeLabel = "\"${node.name}\n($taskType)\""
@@ -149,9 +148,9 @@ private fun RootTask.parseChildren(parent: Node<*>?): List<Node<*>> = listOf(
 )
 
 private fun DoTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>> =
-    `do`.mapIndexed { index, taskItem ->
+    `do`.map { taskItem ->
         val child = taskItem.toTask()
-        val childPosition = position.addIndex(index).addName(taskItem.name).let {
+        val childPosition = position.addName(taskItem.name).let {
             if (child is DoTask) it.addToken(DO) else it
         }
 
@@ -194,9 +193,9 @@ private fun TryTask.parseChildren(position: NodePosition, parent: Node<*>?): Lis
 }
 
 private fun ForkTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>>? =
-    fork.branches?.mapIndexed { index, taskItem ->
+    fork.branches?.map { taskItem ->
         Node(
-            position = position.addToken(FORK).addToken(BRANCHES).addIndex(index).addName(taskItem.name),
+            position = position.addToken(FORK).addToken(BRANCHES).addName(taskItem.name),
             task = taskItem.toTask(),
             name = taskItem.name,
             parent = parent,

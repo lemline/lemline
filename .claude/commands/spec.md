@@ -48,41 +48,10 @@ Create a detailed technical specification for a new feature in the Lemline workf
    ## Data Model
 
    ### Entity: [EntityName]
-   ```kotlin
-   data class EntityModel(
-       val id: IDV7 = IDV7.generate(),
-       val workflowId: IDV7,
-       // ... fields ...
-       val status: EntityStatus = EntityStatus.PENDING,
-       val createdAt: Instant = Instant.now(),
-       val updatedAt: Instant = Instant.now()
-   )
-   ```
 
    ### Repository
-   ```kotlin
-   interface EntityRepository : WithUUIDRepository<EntityModel> {
-       suspend fun findByUUID(uuid: IDV7): EntityModel?
-       suspend fun findByWorkflowId(workflowId: IDV7): List<EntityModel>
-       suspend fun insertBatch(entities: List<EntityModel>)
-   }
-   ```
 
    ## Database Migration
-
-   **V[N]__[description].sql** (for each supported database)
-   ```sql
-   CREATE TABLE lemline_[entity] (
-       id UUID PRIMARY KEY,
-       workflow_id UUID NOT NULL,
-       -- ... fields ...
-       status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-       created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-       updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-   );
-   CREATE INDEX idx_lemline_[entity]_workflow ON lemline_[entity](workflow_id);
-   CREATE INDEX idx_lemline_[entity]_status ON lemline_[entity](status);
-   ```
 
    ## Implementation Files
 

@@ -209,13 +209,13 @@ class TryProcessor(
      * Retrieves the "try" child node from the current node's children.
      */
     private fun getDoTry(): Node<*> = node.children?.getOrNull(0)
-        ?: throw IllegalStateException("No try child found in TryTask ${node.reference}")
+        ?: throw IllegalStateException("No try child found in TryTask ${node.position}")
 
     /**
      * Retrieves the "catch" child node from the current node's children.
      */
     private fun getCatchNode(): Node<*> = node.children?.getOrNull(1)
-        ?: throw IllegalStateException("No catch child found in TryTask ${node.reference}")
+        ?: throw IllegalStateException("No catch child found in TryTask ${node.position}")
 
     /**
      * Updates the state of nodes to reflect a clean state, starting from a given failing node
@@ -231,7 +231,7 @@ class TryProcessor(
             do {
                 put(previous.position, null)
                 previous = previous.parent
-                    ?: throw IllegalStateException("Current try node ${node.reference} not found on path of node ${failingNode.name}")
+                    ?: throw IllegalStateException("Current try node ${node.position} not found on path of node ${failingNode.name}")
             } while (previous != node)
             // add the updated state of the Try node
             put(node.position, updatedState)

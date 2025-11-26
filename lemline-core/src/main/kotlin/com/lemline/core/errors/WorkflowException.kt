@@ -50,7 +50,7 @@ data class InternalException(
         ) : this(
             type = "$URI_BASE/${errorType.type}",
             status = status,
-            instance = position.positionPointer.toString(),
+            instance = position.toString(),
             title = title,
             details = details,
         )

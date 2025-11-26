@@ -77,7 +77,7 @@ class DoTaskExecutionTest : FunSpec() {
             val output = executeWorkflow(yaml, JsonPrimitive(42)) as JsonObject
 
             output["taskName"]?.jsonPrimitive?.content shouldBe "taskWithMetadata"
-            output["taskRef"]?.jsonPrimitive?.content shouldBe "/do/0/taskWithMetadata"
+            output["taskRef"]?.jsonPrimitive?.content shouldBe "/do/taskWithMetadata"
         }
 
         test("do task can transform input in first task") {

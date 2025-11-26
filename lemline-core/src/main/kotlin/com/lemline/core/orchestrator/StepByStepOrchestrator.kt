@@ -208,7 +208,7 @@ object StepByStepOrchestrator {
         node: Node<*>,
         rawOutput: JsonElement,
     ): WorkflowEvent = try {
-        logger.debug { "resumeFromCompletedTask  In: node=${node.reference}, output=$rawOutput, states=$taskStates" }
+        logger.debug { "resumeFromCompletedTask  In: node=${node.position}, output=$rawOutput, states=$taskStates" }
 
         // Resume the completed task (transforms output, updates state)
         val stepResult = tryCatch(node, taskStates) {
@@ -241,7 +241,7 @@ object StepByStepOrchestrator {
         node: Node<*>,
         error: InternalException.Error,
     ): WorkflowEvent = try {
-        logger.debug { "resumeFromFailedTask  In: node=${node.reference}, error=$error, states=$taskStates" }
+        logger.debug { "resumeFromFailedTask  In: node=${node.position}, error=$error, states=$taskStates" }
 
         // Resume the failed task (hopefully, the error can be handled)
         val stepResult = tryCatch(node, taskStates) {
@@ -441,12 +441,12 @@ object StepByStepOrchestrator {
         val processor = ProcessorFactory.getProcessor(node)
 
         return if (state == null) {
-            logger.debug { "Entering Down  node=${node.reference} - ${node.task::class.simpleName}(input=$rawInput)" }
+            logger.debug { "Entering Down  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput)" }
             // First time entering this node
             processor.enterFromParent(rawInput, scope)
         } else {
             logger.debug {
-                "ReEntering Up  node=${node.reference} - ${node.task::class.simpleName}(input=$rawInput${
+                "ReEntering Up  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput${
                     flowDirective?.get()?.let { ", flow=$it" } ?: ""
                 }), state=$state"
             }

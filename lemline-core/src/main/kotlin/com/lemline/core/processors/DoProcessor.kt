@@ -79,13 +79,13 @@ class DoProcessor(
     }
 
     private fun getChildByIndex(index: Int): Node<*> = node.children?.getOrNull(index) ?: throw NoSuchElementException(
-        "No child with index '$index' found in node ${node.reference}"
+        "No child with index '$index' found in node ${node.position}"
     )
 
     private fun getChildIndexByName(name: String): Int {
         val index = node.children?.indexOfFirst { it.name == name } ?: -1
         if (index < 0) {
-            throw NoSuchElementException("No child with name '$name' found in node ${node.reference}")
+            throw NoSuchElementException("No child with name '$name' found in node ${node.position}")
         }
         return index
     }

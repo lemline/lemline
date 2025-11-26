@@ -145,7 +145,7 @@ internal object FullOrchestrator {
         val forkNode = workflow.getNode(event.nodePosition) as Node<ForkTask>
 
         val branches = forkNode.children
-            ?: throw IllegalStateException("Fork node in ${forkNode.reference} has no branches")
+            ?: throw IllegalStateException("Fork node in ${forkNode.position} has no branches")
 
         // Execute branches and get the result
         return try {

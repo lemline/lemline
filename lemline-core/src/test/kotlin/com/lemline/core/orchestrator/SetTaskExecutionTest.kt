@@ -167,7 +167,7 @@ class SetTaskExecutionTest : FunSpec() {
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
             assertEquals("myTask", output["taskName"]?.jsonPrimitive?.content)
-            assertEquals("/do/0/myTask", output["taskRef"]?.jsonPrimitive?.content)
+            assertEquals("/do/myTask", output["taskRef"]?.jsonPrimitive?.content)
         }
 
         test("set task can use string concatenation") {

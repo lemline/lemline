@@ -16,28 +16,25 @@ class NodePositionTest {
     fun `root pointer and toString should be empty`() {
         val root = NodePosition.root
         assertEquals("/", root.toString())
-        // Also via PositionPointer root
-        assertEquals(NodePosition.root, PositionPointer.root.toPosition())
+        // Also via parse
+        assertEquals(NodePosition.root, NodePosition.parse("/"))
         assertNull(root.parent)
     }
 
     @Test
-    fun `building path with addName addIndex and addToken`() {
+    fun `building path with addName and addToken`() {
         val pos = NodePosition.root
             .addToken(Token.DO)
-            .addIndex(0)
             .addToken(Token.RUN)
             .addName("custom")
 
-        assertEquals("/do/0/run/custom", pos.toString())
-        assertEquals("/do/0/run/custom", pos.positionPointer.toString())
+        assertEquals("/do/run/custom", pos.toString())
 
         // Parent chain
-        assertEquals("/do/0/run", pos.parent!!.toString())
-        assertEquals("/do/0", pos.parent!!.parent!!.toString())
-        assertEquals("/do", pos.parent!!.parent!!.parent!!.toString())
-        assertEquals("/", pos.parent!!.parent!!.parent!!.parent!!.toString())
-        assertNull(pos.parent!!.parent!!.parent!!.parent!!.parent)
+        assertEquals("/do/run", pos.parent!!.toString())
+        assertEquals("/do", pos.parent!!.parent!!.toString())
+        assertEquals("/", pos.parent!!.parent!!.parent!!.toString())
+        assertNull(pos.parent!!.parent!!.parent!!.parent)
     }
 
     @Nested
@@ -75,13 +72,28 @@ class NodePositionTest {
     }
 
     @Test
-    fun `addIndex appends numeric index as path segment`() {
-        val pos = NodePosition.root.addIndex(42)
-        assertEquals("/42", pos.toString())
-        val neg = NodePosition.root.addIndex(-1)
-        assertEquals("/-1", neg.toString())
-        val zero = NodePosition.root.addIndex(0)
-        assertEquals("/0", zero.toString())
+    fun `nodeName returns last segment`() {
+        assertEquals("taskA", NodePosition.parse("/do/taskA").nodeName)
+        assertEquals("do", NodePosition.parse("/do").nodeName)
+        assertEquals("", NodePosition.root.nodeName)
+        assertEquals("custom", NodePosition.parse("/do/run/custom").nodeName)
+    }
+
+    @Test
+    fun `segments returns path components`() {
+        assertEquals(listOf("do", "taskA"), NodePosition.parse("/do/taskA").segments())
+        assertEquals(listOf("do"), NodePosition.parse("/do").segments())
+        assertEquals(emptyList<String>(), NodePosition.root.segments())
+        assertEquals(listOf("do", "run", "custom"), NodePosition.parse("/do/run/custom").segments())
+    }
+
+    @Test
+    fun `parse handles various formats`() {
+        assertEquals(NodePosition.root, NodePosition.parse("/"))
+        assertEquals(NodePosition.root, NodePosition.parse(""))
+        assertEquals("/do", NodePosition.parse("/do").toString())
+        assertEquals("/do/taskA", NodePosition.parse("/do/taskA").toString())
+        assertEquals("/do/taskA", NodePosition.parse(" /do/taskA ").toString()) // with whitespace
     }
 
     @Nested
