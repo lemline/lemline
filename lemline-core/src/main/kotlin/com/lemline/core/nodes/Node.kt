@@ -11,6 +11,21 @@ import com.lemline.common.values.Token.FORK
 import com.lemline.common.values.Token.SUBSCRIPTION
 import com.lemline.common.values.Token.TRY
 import com.lemline.common.values.Token.WITH
+import com.lemline.core.processors.CallHttpProcessor
+import com.lemline.core.processors.DoProcessor
+import com.lemline.core.processors.ForProcessor
+import com.lemline.core.processors.ForkProcessor
+import com.lemline.core.processors.NodeProcessor
+import com.lemline.core.processors.RaiseProcessor
+import com.lemline.core.processors.RootProcessor
+import com.lemline.core.processors.RunScriptProcessor
+import com.lemline.core.processors.RunShellProcessor
+import com.lemline.core.processors.RunWorkflowProcessor
+import com.lemline.core.processors.SetProcessor
+import com.lemline.core.processors.SwitchProcessor
+import com.lemline.core.processors.TryProcessor
+import com.lemline.core.processors.WaitProcessor
+import com.lemline.core.states.BaseState
 import io.serverlessworkflow.api.types.CallAsyncAPI
 import io.serverlessworkflow.api.types.CallFunction
 import io.serverlessworkflow.api.types.CallGRPC
@@ -23,13 +38,17 @@ import io.serverlessworkflow.api.types.ForTask
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.RaiseTask
+import io.serverlessworkflow.api.types.RunScript
+import io.serverlessworkflow.api.types.RunShell
 import io.serverlessworkflow.api.types.RunTask
+import io.serverlessworkflow.api.types.RunWorkflow
 import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TaskItem
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.WaitTask
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -42,6 +61,37 @@ import kotlinx.serialization.json.JsonObject
  */
 data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name: String, val parent: Node<*>? = null) {
     val definition: JsonObject by lazy { LemlineJson.encodeToElement(task) }
+
+    @Suppress("UNCHECKED_CAST")
+    @ExperimentalTime
+    val processor by lazy {
+        when (task) {
+            is RootTask -> RootProcessor(this as Node<RootTask>)
+            is DoTask -> DoProcessor(this as Node<DoTask>)
+            is ForTask -> ForProcessor(this as Node<ForTask>)
+            is SetTask -> SetProcessor(this as Node<SetTask>)
+            is SwitchTask -> SwitchProcessor(this as Node<SwitchTask>)
+            is TryTask -> TryProcessor(this as Node<TryTask>)
+            is RaiseTask -> RaiseProcessor(this as Node<RaiseTask>)
+            is CallHTTP -> CallHttpProcessor(this as Node<CallHTTP>)
+            is WaitTask -> WaitProcessor(this as Node<WaitTask>)
+            is ForkTask -> ForkProcessor(this as Node<ForkTask>)
+            is RunTask -> {
+                // Dispatch to the appropriate run processor based on the type
+                val runTask = this as Node<RunTask>
+                when (runTask.task.run.get()) {
+                    is RunShell -> RunShellProcessor(runTask)
+                    is RunScript -> RunScriptProcessor(runTask)
+                    is RunWorkflow -> RunWorkflowProcessor(runTask)
+                    else -> throw IllegalArgumentException(
+                        "Unknown run task type: ${runTask.task.run.get()?.javaClass?.simpleName}"
+                    )
+                }
+            }
+
+            else -> throw IllegalArgumentException("Unknown task type: ${task::class.simpleName}")
+        } as NodeProcessor<T, BaseState>
+    }
 
     /**
      * The list of task nodes depending on this one

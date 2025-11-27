@@ -391,12 +391,9 @@ object StepByStepOrchestrator {
             // if we reached a try task, we check if this error can be handled by it
             // if yes, we continue from there (retry or catch)
             if (current!!.task is TryTask) {
-                @Suppress("UNCHECKED_CAST")
-                current as Node<TryTask>
                 // current state of the try node
                 val tryState = taskStates[current.position] as TryState
-                // processor for the try node
-                val processor = TryProcessor(current)
+                val processor = current.processor as TryProcessor
                 // check that this node actually can handle this error
                 if (processor.isCatching(exception.error, tryState, taskStates.scope)) {
                     return processor.handleError(
@@ -429,12 +426,11 @@ object StepByStepOrchestrator {
         flowDirective: FlowDirective?,
     ): StepResult {
         val state = taskStates[node.position]
-        val processor = ProcessorFactory.getProcessor(node)
 
         return if (state == null) {
             logger.debug { "Entering Down  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput)" }
             // First time entering this node
-            processor.enterFromParent(rawInput, taskStates.scope, taskStates)
+            node.processor.enterFromParent(rawInput, taskStates.scope, taskStates)
         } else {
             logger.debug {
                 "ReEntering Up  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput${
@@ -442,7 +438,7 @@ object StepByStepOrchestrator {
                 }), state=$state"
             }
             // Re-entering after a child completed
-            processor.enterFromChild(state, flowDirective, rawInput, taskStates.scope, taskStates)
+            node.processor.enterFromChild(state, flowDirective, rawInput, taskStates.scope, taskStates)
         }
     }
 
@@ -454,11 +450,9 @@ object StepByStepOrchestrator {
         node: Node<*>,
         rawOutput: JsonElement
     ): StepResult {
-        val processor = ProcessorFactory.getProcessor(node)
-
-        return processor.completeTask(
+        return node.processor.completeTask(
             rawOutput = rawOutput,
-            currentFlowDirective = processor.getFlowDirective(),
+            currentFlowDirective = node.processor.getFlowDirective(),
             parentScope = taskStates.scope,
             taskScope = null,
             taskStates = taskStates
