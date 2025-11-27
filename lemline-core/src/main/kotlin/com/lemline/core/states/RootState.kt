@@ -27,7 +27,7 @@ data class RootState(
     val context: Scope = buildJsonObject {},
     val hasWaitingParent: Boolean = false,
     val workflowStep: Int = 0,
-) : BaseState() {
+) : NodeState() {
 
     @Transient
     lateinit var secrets: Map<String, String>

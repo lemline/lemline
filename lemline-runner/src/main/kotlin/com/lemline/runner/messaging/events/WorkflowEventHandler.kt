@@ -364,7 +364,7 @@ internal class WorkflowEventHandler(
             val branchMessage = InstanceMessage(
                 workflowInfo = instance.workflowInfo,
                 workflowState = WorkflowCommand.ResumeFromTask(
-                    taskStates = instance.workflowState.taskStates,
+                    nodeStack = instance.workflowState.nodeStack,
                     nodePosition = branchNode.position,
                     rawInput = instance.workflowState.rawInput
                 ),
@@ -457,7 +457,7 @@ internal class WorkflowEventHandler(
                     val resumeMessage = InstanceMessage(
                         workflowInfo = instance.workflowInfo,
                         workflowState = WorkflowCommand.ResumeWithCompletedTask(
-                            taskStates = instance.workflowState.taskStates,
+                            nodeStack = instance.workflowState.nodeStack,
                             nodePosition = forkPosition,
                             rawOutput = outputJson,
                         ),
@@ -555,7 +555,7 @@ internal class WorkflowEventHandler(
                     val resumeMessage = InstanceMessage(
                         workflowInfo = instance.workflowInfo,
                         workflowState = WorkflowCommand.ResumeWithFailedTask(
-                            taskStates = instance.workflowState.taskStates,
+                            nodeStack = instance.workflowState.nodeStack,
                             nodePosition = forkPosition,
                             error = error,
                         ),

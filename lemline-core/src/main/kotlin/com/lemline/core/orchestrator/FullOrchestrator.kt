@@ -7,7 +7,7 @@ import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
-import com.lemline.core.states.TaskStates
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.utils.mapAwaitAllFailFast
@@ -150,20 +150,20 @@ internal object FullOrchestrator {
         // Execute branches and get the result
         return try {
             val output = if (forkNode.task.fork.isCompete) {
-                workflow.executeCompete(event.taskStates, branches, event.rawInput)
+                workflow.executeCompete(event.nodeStack, branches, event.rawInput)
             } else {
-                workflow.executeCooperative(event.taskStates, branches, event.rawInput)
+                workflow.executeCooperative(event.nodeStack, branches, event.rawInput)
             }
             logger.debug { "Fork completed: output=$output" }
             WorkflowCommand.ResumeWithCompletedTask(
-                taskStates = event.taskStates,
+                nodeStack = event.nodeStack,
                 nodePosition = forkNode.position,
                 rawOutput = output,
             )
         } catch (e: InternalException) {
             logger.error { "Fork failed: error=$e" }
             WorkflowCommand.ResumeWithFailedTask(
-                taskStates = event.taskStates,
+                nodeStack = event.nodeStack,
                 nodePosition = forkNode.position,
                 error = InternalException.Error.from(e, forkNode.position)
             )
@@ -177,7 +177,7 @@ internal object FullOrchestrator {
      * Throws an exception if all branches fail.
      */
     private suspend fun Workflow.executeCompete(
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         branches: List<Node<*>>,
         rawInput: JsonElement,
     ): JsonElement {
@@ -186,7 +186,7 @@ internal object FullOrchestrator {
             resume(
                 workflow = this,
                 command = WorkflowCommand.ResumeFromTask(
-                    taskStates = taskStates,
+                    nodeStack = nodeStack,
                     nodePosition = branchNode.position,
                     rawInput = rawInput,
                     flowDirective = null
@@ -202,7 +202,7 @@ internal object FullOrchestrator {
      * Throws an exception for the first branch failing.
      */
     private suspend fun Workflow.executeCooperative(
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         branches: List<Node<*>>,
         rawInput: JsonElement,
     ): JsonArray {
@@ -212,7 +212,7 @@ internal object FullOrchestrator {
                 resume(
                     workflow = this,
                     command = WorkflowCommand.ResumeFromTask(
-                        taskStates = taskStates,
+                        nodeStack = nodeStack,
                         nodePosition = branchNode.position,
                         rawInput = rawInput,
                         flowDirective = null

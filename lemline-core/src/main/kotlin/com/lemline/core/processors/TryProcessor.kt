@@ -4,12 +4,11 @@
 package com.lemline.core.processors
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.common.values.NodePosition
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.processors.scope.Scope
-import com.lemline.core.states.TaskStates
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.TryState
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration
@@ -175,7 +174,7 @@ class TryProcessor(
         error: InternalException.Error,
         state: TryState,
         scope: Scope,
-        taskStates: TaskStates
+        nodeStack: NodeStack
     ): StepResult {
 
         // Check if we should retry
@@ -188,9 +187,9 @@ class TryProcessor(
                     attemptIndex = state.attemptIndex + 1
                 )
                 StepResult(
-                    nextNode = getDoTry(),  // Re-enter try body
-                    nextInput = state.transformedInput,  // Original input
-                    taskStates = cleanTaskStates(failingNode, updatedState, taskStates),
+                    nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),  // Re-enter try body
+                    nextNode = getDoTry(),  // Original input
+                    nextInput = state.transformedInput,
                     retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(updatedState.attemptIndex)
                 )
             }
@@ -201,9 +200,9 @@ class TryProcessor(
                     lastError = error
                 )
                 StepResult(
-                    nextNode = getCatchNode(),  // Re-enter try body
-                    nextInput = state.transformedInput,  // Original input
-                    taskStates = cleanTaskStates(failingNode, updatedState, taskStates),
+                    nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),  // Re-enter try body
+                    nextNode = getCatchNode(),  // Original input
+                    nextInput = state.transformedInput,
                 )
             }
         }
@@ -242,24 +241,16 @@ class TryProcessor(
         ?: throw IllegalStateException("No catch child found in TryTask ${node.position}")
 
     /**
-     * Updates the task states by cleaning states from failing node up to the try node,
-     * then setting the updated try state.
+     * Updates the state stack by popping states from failing node up to the try node,
+     * then updating the try state.
      */
-    private fun cleanTaskStates(
+    private fun cleanStateStack(
         failingNode: Node<*>,
         updatedState: TryState,
-        taskStates: TaskStates
-    ): TaskStates {
-        val positionsToRemove = mutableSetOf<NodePosition>()
-        var previous = failingNode
-        // Clean state of all nodes up to the try node
-        do {
-            positionsToRemove.add(previous.position)
-            previous = previous.parent
-                ?: throw IllegalStateException("Current try node ${node.position} not found on path of node ${failingNode.name}")
-        } while (previous != node)
-        // Remove positions and add the updated state of the Try node
-        return (taskStates - positionsToRemove) + (node.position to updatedState)
+        nodeStack: NodeStack
+    ): NodeStack {
+        // Pop all states up to but not including the try node, then update the try state
+        return nodeStack.popExcluding(node.position).push(node.position to updatedState)
     }
 
     /**

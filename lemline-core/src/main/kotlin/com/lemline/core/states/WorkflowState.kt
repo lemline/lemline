@@ -24,7 +24,7 @@ import kotlinx.serialization.json.JsonElement
  */
 @Serializable
 sealed class WorkflowState {
-    abstract val taskStates: TaskStates
+    abstract val nodeStack: NodeStack
     abstract val nodePosition: NodePosition
 
     open fun toJsonString(): String = LemlineJson.encodeToString(this)
@@ -33,9 +33,9 @@ sealed class WorkflowState {
         fun fromJsonString(jsonString: String): WorkflowState = LemlineJson.decodeFromString(jsonString)
     }
 
-    val workflowId: WorkflowId get() = (taskStates[NodePosition.root] as RootState).workflowId
+    val workflowId: WorkflowId get() = (nodeStack[NodePosition.root] as RootState).workflowId
 
-    val hasWaitingParent: Boolean get() = (taskStates[NodePosition.root] as RootState).hasWaitingParent
+    val hasWaitingParent: Boolean get() = (nodeStack[NodePosition.root] as RootState).hasWaitingParent
 
     /**
      * Simple integer counter that increments each time we enter a task.
@@ -44,7 +44,7 @@ sealed class WorkflowState {
      * Unlike [nodePosition] which is static (e.g., "/for/do/task"), this is a simple
      * counter that ensures uniqueness across multiple visits to the same node.
      */
-    val workflowStep: Int get() = (taskStates[NodePosition.root] as RootState).workflowStep
+    val workflowStep: Int get() = (nodeStack[NodePosition.root] as RootState).workflowStep
 }
 
 @Serializable
@@ -55,7 +55,7 @@ sealed class WorkflowCommand : WorkflowState() {
      */
     @Serializable
     data class ResumeFromTask(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
         val flowDirective: FlowDirective? = null
@@ -64,14 +64,14 @@ sealed class WorkflowCommand : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         @ExperimentalTime
         fun duplicate(workflowId: WorkflowId): ResumeFromTask {
-            val rootState = taskStates[NodePosition.root] as RootState
+            val rootState = nodeStack[NodePosition.root] as RootState
             return copy(
-                taskStates = taskStates + (NodePosition.root to rootState.copy(workflowId = workflowId))
+                nodeStack = nodeStack.withRootState(rootState.copy(workflowId = workflowId))
             )
         }
     }
@@ -81,14 +81,14 @@ sealed class WorkflowCommand : WorkflowState() {
      */
     @Serializable
     data class ResumeWithCompletedTask(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val rawOutput: JsonElement,
     ) : WorkflowCommand() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 
@@ -97,14 +97,14 @@ sealed class WorkflowCommand : WorkflowState() {
      */
     @Serializable
     data class ResumeWithFailedTask(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val error: InternalException.Error,
     ) : WorkflowCommand() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", error=$error" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 }
@@ -136,7 +136,7 @@ sealed class WorkflowEvent : WorkflowState() {
     data class WorkflowCompleted(
         val output: JsonElement,
         val completedAt: Instant,
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
     ) : Outcome() {
         override val nodePosition: NodePosition = NodePosition.root
 
@@ -154,7 +154,7 @@ sealed class WorkflowEvent : WorkflowState() {
     @ExperimentalTime
     @Serializable
     data class WorkflowFailed(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement?,
         val rawOutput: JsonElement?,
@@ -166,7 +166,7 @@ sealed class WorkflowEvent : WorkflowState() {
         val exception: Exception get() = InternalException(error)
 
         constructor(
-            taskStates: TaskStates,
+            nodeStack: NodeStack,
             nodePosition: NodePosition,
             rawInput: JsonElement?,
             rawOutput: JsonElement?,
@@ -174,7 +174,7 @@ sealed class WorkflowEvent : WorkflowState() {
             exception: Exception,
             failedAt: Instant = Clock.System.now(),
         ) : this(
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             nodePosition = nodePosition,
             rawInput = rawInput,
             rawOutput = rawOutput,
@@ -189,7 +189,7 @@ sealed class WorkflowEvent : WorkflowState() {
             ", rawOutput=$rawOutput" +
             ", flowDirective=$flowDirective" +
             ", error=$error" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 
@@ -199,7 +199,7 @@ sealed class WorkflowEvent : WorkflowState() {
     @ExperimentalTime
     @Serializable
     data class BranchCompleted(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val branchName: String,
         val output: JsonElement,
@@ -211,7 +211,7 @@ sealed class WorkflowEvent : WorkflowState() {
             ", branchName=$branchName" +
             ", transformedInput=$output" +
             ", flowDirective=$flowDirective" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 
@@ -221,7 +221,7 @@ sealed class WorkflowEvent : WorkflowState() {
     @ExperimentalTime
     @Serializable
     data class BranchFailed(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val branchName: String,
         val error: InternalException.Error,
@@ -234,7 +234,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", branchName=$branchName" +
             ", error=$error" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 
@@ -245,7 +245,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     @Serializable
     data class TaskScheduled(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
         val flowDirective: FlowDirective?
@@ -254,11 +254,11 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         fun resume() = WorkflowCommand.ResumeFromTask(
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             nodePosition = nodePosition,
             rawInput = rawInput,
             flowDirective = flowDirective,
@@ -271,7 +271,7 @@ sealed class WorkflowEvent : WorkflowState() {
     @Serializable
     @ExperimentalTime
     data class WaitStarted(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val waitState: WaitState,
         val rawOutput: JsonElement,
@@ -281,11 +281,11 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
             ", waitUntil=$waitUntil" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         fun resume() = WorkflowCommand.ResumeWithCompletedTask(
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             nodePosition = nodePosition,
             rawOutput = rawOutput,
         )
@@ -297,7 +297,7 @@ sealed class WorkflowEvent : WorkflowState() {
     @Serializable
     @ExperimentalTime
     data class RetryScheduled(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
         val flowDirective: FlowDirective?,
@@ -308,11 +308,11 @@ sealed class WorkflowEvent : WorkflowState() {
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
             ", retryAt=$retryAt" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         fun resume() = WorkflowCommand.ResumeFromTask(
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             nodePosition = nodePosition,
             rawInput = rawInput,
             flowDirective = flowDirective,
@@ -325,7 +325,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     @Serializable
     data class RunWorkflowStarted(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val runState: RunState,
         val rawInput: JsonElement,
@@ -336,23 +336,23 @@ sealed class WorkflowEvent : WorkflowState() {
             ", runState=$runState" +
             ", transformedInput=$rawInput" +
             ", childConfig=$childConfig" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         fun resumeAsCompleted(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             nodePosition = nodePosition,
             rawOutput = rawOutput,
         )
 
         fun resumeAsFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             nodePosition = nodePosition,
             error = error,
         )
 
         fun resumeAsync() = WorkflowCommand.ResumeWithCompletedTask(
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             nodePosition = nodePosition,
             rawOutput = rawInput,
         )
@@ -364,7 +364,7 @@ sealed class WorkflowEvent : WorkflowState() {
      */
     @Serializable
     data class ForkStarted(
-        override val taskStates: TaskStates,
+        override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val forkState: ForkState,
         val rawInput: JsonElement,
@@ -373,11 +373,11 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", forkState=$forkState" +
             ", rawInput=$rawInput" +
-            ", states=${taskStates.map { it.key.toString() + "=" + it.value }}" +
+            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         fun resume(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             nodePosition = nodePosition,
             rawOutput = rawOutput,
         )

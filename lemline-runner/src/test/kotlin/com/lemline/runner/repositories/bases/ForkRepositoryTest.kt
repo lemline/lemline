@@ -10,8 +10,8 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.ForkState
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
-import com.lemline.core.states.TaskStates
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.ForkBranchModel
@@ -397,8 +397,8 @@ internal abstract class ForkWaitingRepositoryTest {
                 workflowVersion = WorkflowVersion("1.0")
             ),
             workflowState = WorkflowEvent.ForkStarted(
-                taskStates = TaskStates(
-                    mapOf(
+                nodeStack = NodeStack(
+                    listOf(
                         NodePosition.root to RootState(
                             startedAt = Clock.System.now(),
                             workflowId = testWorkflowId,

@@ -15,7 +15,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class TaskState(
     override val startedAt: Instant = Clock.System.now(),
-) : BaseState()
+) : NodeState()
 
 // Type aliases for semantic clarity - each represents a specific task type
 typealias CallState = TaskState

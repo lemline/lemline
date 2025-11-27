@@ -2,7 +2,7 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.core.nodes.Node
-import com.lemline.core.states.TaskStates
+import com.lemline.core.states.NodeStack
 import io.serverlessworkflow.api.types.FlowDirective
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -17,7 +17,7 @@ import kotlinx.serialization.json.JsonElement
  *
  * @property nextNode The next node in the workflow to process. Null if there is no next node.
  * @property nextInput The raw JSON input provided for execution of the current node.
- * @property taskStates The complete updated state map for all nodes in the workflow.
+ * @property stateStack The complete updated state stack for all nodes in the workflow.
  * @property nextDirective An optional directive providing instructions for controlling the
  * next steps in the workflow's execution, such as retry or skip.
  * @property retryAt An optional timestamp indicating when the current task should be retried.
@@ -25,9 +25,9 @@ import kotlinx.serialization.json.JsonElement
  */
 @ExperimentalTime
 data class StepResult(
+    val nodeStack: NodeStack,
     val nextNode: Node<*>?,
     val nextInput: JsonElement,
-    val taskStates: TaskStates,
     val nextDirective: FlowDirective? = null,
     val retryAt: Instant? = null
 )

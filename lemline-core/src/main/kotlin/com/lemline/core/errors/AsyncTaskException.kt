@@ -4,8 +4,8 @@ package com.lemline.core.errors
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.states.BaseState
 import com.lemline.core.states.ForkState
+import com.lemline.core.states.NodeState
 import com.lemline.core.states.RunState
 import com.lemline.core.states.WaitState
 import kotlin.time.ExperimentalTime
@@ -16,7 +16,7 @@ import kotlinx.serialization.json.JsonElement
 
 sealed class AsyncTaskException : RuntimeException() {
 
-    abstract val state: BaseState
+    abstract val state: NodeState
 
     /**
      * Exception indicating that a child workflow should be started.

@@ -25,7 +25,7 @@ import com.lemline.core.processors.SetProcessor
 import com.lemline.core.processors.SwitchProcessor
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.processors.WaitProcessor
-import com.lemline.core.states.BaseState
+import com.lemline.core.states.NodeState
 import io.serverlessworkflow.api.types.CallAsyncAPI
 import io.serverlessworkflow.api.types.CallFunction
 import io.serverlessworkflow.api.types.CallGRPC
@@ -89,7 +89,7 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
             }
 
             else -> throw IllegalArgumentException("Unknown task type: ${task::class.simpleName}")
-        } as NodeProcessor<T, BaseState>
+        } as NodeProcessor<T, NodeState>
     }
 
     /**
