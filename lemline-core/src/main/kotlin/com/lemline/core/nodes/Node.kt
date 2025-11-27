@@ -77,7 +77,6 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
             is WaitTask -> WaitProcessor(this as Node<WaitTask>)
             is ForkTask -> ForkProcessor(this as Node<ForkTask>)
             is RunTask -> {
-                // Dispatch to the appropriate run processor based on the type
                 val runTask = this as Node<RunTask>
                 when (runTask.task.run.get()) {
                     is RunShell -> RunShellProcessor(runTask)

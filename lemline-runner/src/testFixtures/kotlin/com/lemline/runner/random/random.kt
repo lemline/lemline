@@ -37,11 +37,13 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
 // Helper function to create task states with RootState
-private fun randomTaskStates(): TaskStates = mapOf(
-    NodePosition.root to RootState(
-        startedAt = Clock.System.now(),
-        workflowId = WorkflowId.random(),
-        workflowInput = JsonElement.random()
+private fun TaskStates.Companion.random(): TaskStates = TaskStates(
+    mapOf(
+        NodePosition.root to RootState(
+            startedAt = Clock.System.now(),
+            workflowId = WorkflowId.random(),
+            workflowInput = JsonElement.random()
+        )
     )
 )
 
@@ -57,20 +59,20 @@ fun WorkflowCommand.Companion.random() = when (Random.nextBoolean()) {
 }
 
 fun WorkflowCommand.ResumeFromTask.Companion.random() = WorkflowCommand.ResumeFromTask(
-    taskStates = randomTaskStates(),
+    taskStates = TaskStates.Companion.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
     flowDirective = null
 )
 
 fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand.ResumeWithCompletedTask(
-    taskStates = randomTaskStates(),
+    taskStates = TaskStates.Companion.random(),
     nodePosition = NodePosition.random(),
     rawOutput = JsonElement.random(),
 )
 
 fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFailed(
-    taskStates = randomTaskStates(),
+    taskStates = TaskStates.Companion.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
     rawOutput = JsonElement.random(),
@@ -86,7 +88,7 @@ fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFail
 )
 
 fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkflowStarted(
-    taskStates = randomTaskStates(),
+    taskStates = TaskStates.Companion.random(),
     nodePosition = NodePosition.random(),
     runState = RunState(),
     rawInput = JsonElement.random(),
@@ -100,7 +102,7 @@ fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkf
 )
 
 fun WorkflowEvent.RetryScheduled.Companion.random() = WorkflowEvent.RetryScheduled(
-    taskStates = randomTaskStates(),
+    taskStates = TaskStates.Companion.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
     flowDirective = null,
@@ -108,7 +110,7 @@ fun WorkflowEvent.RetryScheduled.Companion.random() = WorkflowEvent.RetrySchedul
 )
 
 fun WorkflowEvent.WaitStarted.Companion.random() = WorkflowEvent.WaitStarted(
-    taskStates = randomTaskStates(),
+    taskStates = TaskStates.Companion.random(),
     nodePosition = NodePosition.random(),
     waitState = WaitState(),
     rawOutput = JsonElement.random(),
