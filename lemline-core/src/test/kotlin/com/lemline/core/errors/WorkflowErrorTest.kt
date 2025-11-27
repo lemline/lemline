@@ -17,7 +17,7 @@ class WorkflowErrorTest {
             title = "Invalid_input",
             status = 400,
             details = "The_input_data_does_not_match_the_required_schema",
-            position = NodePosition.parse("/do/0"),
+            position = NodePosition("/do/0"),
         )
 
         val json = LemlineJson.encodeToString(error)
@@ -61,7 +61,7 @@ class WorkflowErrorTest {
             errorType = WorkflowErrorType.RUNTIME,
             title = "Internal_error",
             details = "An_unexpected_error_occurred",
-            position = NodePosition.parse("/do/2"),
+            position = NodePosition("/do/2"),
         )
 
         val json = LemlineJson.encodeToString(error)

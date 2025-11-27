@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.common.values
 
-import com.lemline.common.json.LemlineJson
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.descriptors.PrimitiveKind
@@ -25,37 +24,21 @@ import kotlinx.serialization.encoding.Encoder
 data class NodePosition(private val path: String) {
 
     init {
-        require(path.isEmpty() || path.startsWith("/")) {
-            "NodePosition path must start with '/' or be empty for root, got: '$path'"
+        require(path.startsWith("/")) {
+            "NodePosition path must start with '/', got: '$path'"
         }
     }
 
     /**
+     * Check if this is the root position.
+     */
+    val isRoot: Boolean by lazy { path == root.path }
+
+    /**
      * Get the node name (last segment of path).
-     * Example: "/do/taskA" → "taskA"
+     * Example: "/do/taskA" → "taskA", "/" → ""
      */
-    val nodeName: String
-        get() = if (path.isEmpty()) "" else path.substringAfterLast('/')
-
-    /**
-     * Get parent position by removing last segment.
-     * Example: "/do/taskA" → "/do"
-     * Returns null for root position.
-     */
-    val parent: NodePosition?
-        get() = when {
-            !path.contains('/') -> null // Should not happen with valid paths
-            path.lastIndexOf('/') == 0 -> root // Direct child of root
-            else -> NodePosition(path.substringBeforeLast('/'))
-        }
-
-    /**
-     * Get the segments of the path.
-     * Example: "/do/taskA" → ["do", "taskA"]
-     */
-    fun segments(): List<String> =
-        if (path.isEmpty()) emptyList()
-        else path.substring(1).split('/')
+    val nodeName: String by lazy { path.substringAfterLast('/') }
 
     /**
      * Adds a name component to the JSON pointer path.
@@ -73,7 +56,7 @@ data class NodePosition(private val path: String) {
         Token.entries.map { it.token }.let {
             require(!it.contains(name)) { "Task name $name must not be one of ${it.joinToString()}" }
         }
-        return NodePosition(if (path.isEmpty()) "/$name" else "$path/$name")
+        return NodePosition(if (isRoot) "/$name" else "$path/$name")
     }
 
     /**
@@ -84,45 +67,25 @@ data class NodePosition(private val path: String) {
      * @return A new NodePosition with the added token
      */
     fun addToken(token: Token): NodePosition =
-        NodePosition(if (path.isEmpty()) "/${token.token}" else "$path/${token.token}")
+        NodePosition(if (isRoot) "/${token.token}" else "$path/${token.token}")
 
     /**
      * Gets the string representation of the JSON pointer.
      *
      * @return The JSON pointer string (e.g., "/do/taskA", or "/" for root)
      */
-    override fun toString(): String = path.ifEmpty { "/" }
+    override fun toString(): String = path
 
     companion object {
         /**
-         * Root position (empty path).
+         * Root position ("/").
          */
-        val root = NodePosition("")
+        val root = NodePosition("/")
 
         /**
          * Common position: /do
          */
-        val doRoot = NodePosition("/do")
-
-        /**
-         * Parse a NodePosition from a string path.
-         *
-         * @param path The path string (e.g., "/do/taskA" or "/" for root)
-         * @return A NodePosition instance
-         */
-        fun parse(path: String): NodePosition {
-            val normalized = path.trim()
-            return when {
-                normalized.isEmpty() || normalized == "/" -> root
-                else -> NodePosition(normalized)
-            }
-        }
-
-        /**
-         * Deserialize from JSON string.
-         */
-        fun fromJsonString(jsonString: String): NodePosition =
-            LemlineJson.decodeFromString(jsonString)
+        val doRoot = NodePosition(root.path + Token.DO.token)
     }
 }
 
@@ -140,6 +103,6 @@ internal object NodePositionSerializer : KSerializer<NodePosition> {
     }
 
     override fun deserialize(decoder: Decoder): NodePosition {
-        return NodePosition.parse(decoder.decodeString())
+        return NodePosition(decoder.decodeString())
     }
 }

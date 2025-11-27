@@ -182,8 +182,9 @@ internal object NodeStackSerializer : KSerializer<NodeStack> {
             currentPosition = if (segment.isEmpty()) {
                 NodePosition.root
             } else {
-                // Use addName for regular names, but need to handle Token segments too
-                NodePosition.parse(currentPosition.toString().let { if (it == "/") "" else it } + "/$segment")
+                // Build path: for root "/" → "/$segment", for "/do" → "/do/$segment"
+                val basePath = if (currentPosition.isRoot) "" else currentPosition.toString()
+                NodePosition("$basePath/$segment")
             }
             currentPosition to state
         }
