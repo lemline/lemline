@@ -9,7 +9,7 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.BaseState
+import com.lemline.core.states.TaskStates
 import com.lemline.core.states.TryState
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration
@@ -174,7 +174,8 @@ class TryProcessor(
         failingNode: Node<*>,
         error: InternalException.Error,
         state: TryState,
-        scope: Scope
+        scope: Scope,
+        taskStates: TaskStates
     ): StepResult {
 
         // Check if we should retry
@@ -189,7 +190,7 @@ class TryProcessor(
                 StepResult(
                     nextNode = getDoTry(),  // Re-enter try body
                     nextInput = state.transformedInput,  // Original input
-                    stateUpdates = cleanStateUpdates(failingNode, updatedState),
+                    taskStates = cleanTaskStates(failingNode, updatedState, taskStates),
                     retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(updatedState.attemptIndex)
                 )
             }
@@ -202,7 +203,7 @@ class TryProcessor(
                 StepResult(
                     nextNode = getCatchNode(),  // Re-enter try body
                     nextInput = state.transformedInput,  // Original input
-                    stateUpdates = cleanStateUpdates(failingNode, updatedState),
+                    taskStates = cleanTaskStates(failingNode, updatedState, taskStates),
                 )
             }
         }
@@ -241,24 +242,25 @@ class TryProcessor(
         ?: throw IllegalStateException("No catch child found in TryTask ${node.position}")
 
     /**
-     * Updates the state of nodes to reflect a clean state, starting from a given failing node
-     * up to a higher-level try node in the hierarchy.
+     * Updates the task states by cleaning states from failing node up to the try node,
+     * then setting the updated try state.
      */
-    private fun cleanStateUpdates(
+    private fun cleanTaskStates(
         failingNode: Node<*>,
         updatedState: TryState,
-    ): Map<NodePosition, BaseState?> {
+        taskStates: TaskStates
+    ): TaskStates {
+        val result = taskStates.toMutableMap()
         var previous = failingNode
-        return buildMap {
-            // Clean state of all nodes up to the try node
-            do {
-                put(previous.position, null)
-                previous = previous.parent
-                    ?: throw IllegalStateException("Current try node ${node.position} not found on path of node ${failingNode.name}")
-            } while (previous != node)
-            // add the updated state of the Try node
-            put(node.position, updatedState)
-        }
+        // Clean state of all nodes up to the try node
+        do {
+            result.remove(previous.position)
+            previous = previous.parent
+                ?: throw IllegalStateException("Current try node ${node.position} not found on path of node ${failingNode.name}")
+        } while (previous != node)
+        // add the updated state of the Try node
+        result[node.position] = updatedState
+        return result
     }
 
     /**
