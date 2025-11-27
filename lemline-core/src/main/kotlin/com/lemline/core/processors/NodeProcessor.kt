@@ -4,6 +4,7 @@ package com.lemline.core.processors
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonElement
 import com.lemline.common.logger.logger
+import com.lemline.common.values.NodePosition
 import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
@@ -12,13 +13,12 @@ import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.orchestrator.StepResult
-import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.orchestrator.context.TaskScope
-import com.lemline.core.orchestrator.context.merge
+import com.lemline.core.orchestrator.scope.Scope
+import com.lemline.core.orchestrator.scope.TaskScope
+import com.lemline.core.orchestrator.scope.merge
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.BaseState
 import com.lemline.core.states.TaskStates
-import com.lemline.common.values.NodePosition
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum

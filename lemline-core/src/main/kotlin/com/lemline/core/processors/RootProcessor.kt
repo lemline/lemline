@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.orchestrator.scope.Scope
 import com.lemline.core.states.RootState
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement

@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.core.errors.AsyncTaskException
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.orchestrator.scope.Scope
 import com.lemline.core.states.ForkState
 import io.serverlessworkflow.api.types.ForkTask
 import kotlin.time.ExperimentalTime

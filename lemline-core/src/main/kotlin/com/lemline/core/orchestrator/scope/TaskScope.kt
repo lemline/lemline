@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.orchestrator.context
+package com.lemline.core.orchestrator.scope
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.expressions.scopes.TaskDescriptor

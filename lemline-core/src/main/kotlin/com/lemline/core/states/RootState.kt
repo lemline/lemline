@@ -6,7 +6,7 @@ package com.lemline.core.states
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.orchestrator.scope.Scope
 import com.lemline.core.workflows.RuntimeDescriptor
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlin.time.ExperimentalTime
