@@ -204,12 +204,20 @@ fun WorkflowEvent.Companion.random(): WorkflowEvent {
     }
 }
 
-fun NodeStack.Companion.random() = NodeStack(
-    listOf(
-        NodePosition.root to RootState.random(),
-        NodePosition.random() to NodeState.random()
+fun NodeStack.Companion.random(): NodeStack {
+    // Build a hierarchical stack where each frame is a child of the previous
+    val rootPosition = NodePosition.root
+    val childPosition = rootPosition.addName(String.random())
+    val grandchildPosition = childPosition.addName(String.random())
+
+    return NodeStack(
+        listOf(
+            rootPosition to RootState.random(),
+            childPosition to NodeState.random(),
+            grandchildPosition to NodeState.random()
+        )
     )
-)
+}
 
 fun WorkflowEvent.WorkflowCompleted.Companion.random() = WorkflowEvent.WorkflowCompleted(
     output = JsonElement.random(),

@@ -7,7 +7,15 @@ import com.lemline.common.values.NodePosition
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.PairSerializer
+import kotlinx.serialization.builtins.serializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.buildJsonObject
 
 /**
@@ -21,10 +29,15 @@ import kotlinx.serialization.json.buildJsonObject
  * - Position is implicit in stack order
  * - Hierarchical state access is natural (iterate from top to bottom)
  *
- * @property frames The list of (NodePosition, BaseState) pairs representing the state stack.
+ * Serialization optimization:
+ * - Since the stack is hierarchical, we only store the last segment of each position
+ * - Full paths are reconstructed during deserialization
+ * - Example: [("/", R), ("/do", D), ("/do/task", T)] → [("", R), ("do", D), ("task", T)]
+ *
+ * @property frames The list of (NodePosition, NodeState) pairs representing the state stack.
  *                  First element is root, last element is the deepest active node.
  */
-@Serializable
+@Serializable(with = NodeStackSerializer::class)
 data class NodeStack(
     private val frames: List<Pair<NodePosition, NodeState>> = emptyList()
 ) {
@@ -135,4 +148,46 @@ data class NodeStack(
                 override val value: NodeState = state
             })
         }
+}
+
+/**
+ * Custom serializer for [NodeStack] that optimizes storage by only storing
+ * the last segment of each position instead of the full path.
+ *
+ * During serialization: [("/", R), ("/do", D), ("/do/task", T)] → [("", R), ("do", D), ("task", T)]
+ * During deserialization: paths are reconstructed by building up incrementally
+ */
+@OptIn(ExperimentalSerializationApi::class)
+internal object NodeStackSerializer : KSerializer<NodeStack> {
+
+    // Serialize as List<Pair<String, NodeState>> where String is just the segment name
+    private val delegateSerializer = ListSerializer(PairSerializer(String.serializer(), NodeState.serializer()))
+
+    override val descriptor: SerialDescriptor = delegateSerializer.descriptor
+
+    override fun serialize(encoder: Encoder, value: NodeStack) {
+        // Convert frames to (segment, state) pairs
+        val compactFrames = value.map { entry ->
+            entry.key.nodeName to entry.value
+        }
+        delegateSerializer.serialize(encoder, compactFrames)
+    }
+
+    override fun deserialize(decoder: Decoder): NodeStack {
+        val compactFrames = delegateSerializer.deserialize(decoder)
+
+        // Reconstruct full positions from segments
+        var currentPosition = NodePosition.root
+        val frames = compactFrames.map { (segment, state) ->
+            currentPosition = if (segment.isEmpty()) {
+                NodePosition.root
+            } else {
+                // Use addName for regular names, but need to handle Token segments too
+                NodePosition.parse(currentPosition.toString().let { if (it == "/") "" else it } + "/$segment")
+            }
+            currentPosition to state
+        }
+
+        return NodeStack(frames)
+    }
 }

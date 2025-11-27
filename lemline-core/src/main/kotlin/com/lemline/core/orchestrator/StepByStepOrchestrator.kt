@@ -424,10 +424,10 @@ object StepByStepOrchestrator {
 
         return if (!isReEntering) {
             logger.debug { "Entering Down  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput)" }
-            // First time entering this node - push new frame
+            // First time entering this node - push a new frame
             node.processor.enterFromParent(rawInput, nodeStack.lastScope, nodeStack)
         } else {
-            val state = nodeStack.lastState!!
+            val state = nodeStack.lastState
             logger.debug {
                 "ReEntering Up  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput${
                     flowDirective?.get()?.let { ", flow=$it" } ?: ""
