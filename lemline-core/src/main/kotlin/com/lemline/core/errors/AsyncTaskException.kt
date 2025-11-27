@@ -90,14 +90,10 @@ sealed class AsyncTaskException : RuntimeException() {
      * Exception indicating that fork branches should be executed.
      *
      * This exception is thrown when a fork task needs to execute its branches.
-     * The orchestrator catches this and either:
-     * - ExecutionMode.Complete: Executes branches in parallel using coroutines
-     * - ExecutionMode.Async: Returns WorkflowState.RunningFork for runner to schedule
+     * The runner catches this and schedules branches for parallel execution.
      *
      * All fork configuration (compete mode, branches) is derived from the Node<ForkTask>
      * that threw this exception. Only the transformedInput needs to be carried.
-     *
-     * Similar to WaitWorkflowException pattern.
      */
     @ExperimentalTime
     data class ForkStartedException(
