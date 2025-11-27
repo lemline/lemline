@@ -8,7 +8,7 @@ import com.lemline.common.values.NodePosition
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepResult
-import com.lemline.core.orchestrator.scope.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.TaskStates
 import com.lemline.core.states.TryState
 import com.lemline.core.utils.toDuration

@@ -4,7 +4,7 @@
 package com.lemline.core.states
 
 import com.lemline.core.errors.InternalException
-import com.lemline.core.orchestrator.scope.Scope
+import com.lemline.core.processors.scope.Scope
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json

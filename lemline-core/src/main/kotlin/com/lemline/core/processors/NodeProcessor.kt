@@ -13,9 +13,9 @@ import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.orchestrator.StepResult
-import com.lemline.core.orchestrator.scope.Scope
-import com.lemline.core.orchestrator.scope.TaskScope
-import com.lemline.core.orchestrator.scope.merge
+import com.lemline.core.processors.scope.Scope
+import com.lemline.core.processors.scope.TaskScope
+import com.lemline.core.processors.scope.merge
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.BaseState
 import com.lemline.core.states.TaskStates

@@ -4,7 +4,7 @@
 package com.lemline.core.processors
 
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.scope.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ForState
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Clock

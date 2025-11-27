@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.core.errors.AsyncTaskException.WaitStartedException
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.scope.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.WaitState
 import com.lemline.core.utils.toDuration
 import io.serverlessworkflow.api.types.WaitTask

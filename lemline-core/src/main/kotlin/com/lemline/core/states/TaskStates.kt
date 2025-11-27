@@ -4,8 +4,8 @@
 package com.lemline.core.states
 
 import com.lemline.common.values.NodePosition
-import com.lemline.core.orchestrator.scope.Scope
-import com.lemline.core.orchestrator.scope.merge
+import com.lemline.core.processors.scope.Scope
+import com.lemline.core.processors.scope.merge
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable

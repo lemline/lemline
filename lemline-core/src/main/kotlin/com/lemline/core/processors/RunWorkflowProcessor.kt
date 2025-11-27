@@ -8,7 +8,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.scope.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.RunState
 import io.serverlessworkflow.api.types.RunTask
 import kotlin.time.ExperimentalTime
