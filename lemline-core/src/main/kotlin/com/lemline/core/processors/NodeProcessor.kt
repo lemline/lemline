@@ -17,7 +17,6 @@ import com.lemline.core.orchestrator.context.TaskScope
 import com.lemline.core.orchestrator.context.merge
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.BaseState
-import com.lemline.core.states.RootState
 import com.lemline.core.states.TaskStates
 import com.lemline.common.values.NodePosition
 import io.serverlessworkflow.api.types.ExportAs
@@ -295,14 +294,12 @@ abstract class NodeProcessor<T : TaskBase, S : BaseState>(
         val exportedContext = exportToContext(transformedOutput, mergeScope(parentScope, context))
 
         // Build the updated task states: remove current node's state (but never root), update context if needed
-        val updatedStates = taskStates.toMutableMap().apply {
-            if (node.position != NodePosition.root) {
-                remove(node.position)
-            }
-            if (exportedContext != null) {
-                val rootState = this[NodePosition.root] as RootState
-                this[NodePosition.root] = rootState.copyWithContext(exportedContext)
-            }
+        var updatedStates = taskStates
+        if (node.position != NodePosition.root) {
+            updatedStates -= node.position
+        }
+        if (exportedContext != null) {
+            updatedStates = updatedStates.setContext(exportedContext)
         }
 
         return StepResult(

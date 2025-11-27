@@ -250,17 +250,16 @@ class TryProcessor(
         updatedState: TryState,
         taskStates: TaskStates
     ): TaskStates {
-        val result = taskStates.toMutableMap()
+        val positionsToRemove = mutableSetOf<NodePosition>()
         var previous = failingNode
         // Clean state of all nodes up to the try node
         do {
-            result.remove(previous.position)
+            positionsToRemove.add(previous.position)
             previous = previous.parent
                 ?: throw IllegalStateException("Current try node ${node.position} not found on path of node ${failingNode.name}")
         } while (previous != node)
-        // add the updated state of the Try node
-        result[node.position] = updatedState
-        return result
+        // Remove positions and add the updated state of the Try node
+        return (taskStates - positionsToRemove) + (node.position to updatedState)
     }
 
     /**

@@ -11,8 +11,6 @@ import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.errors.AsyncTaskException.WaitStartedException
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.orchestrator.context.merge
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.states.ForkState
 import com.lemline.core.states.RootState
@@ -71,7 +69,7 @@ object StepByStepOrchestrator {
             workflowInput = workflowInput,
             hasWaitingParent = hasWaitingParent,
         )
-        val taskStates: TaskStates = mapOf(NodePosition.root to rootState)
+        val taskStates = TaskStates(mapOf(NodePosition.root to rootState))
 
         return WorkflowCommand.ResumeFromTask(
             nodePosition = NodePosition.doRoot,
@@ -146,10 +144,7 @@ object StepByStepOrchestrator {
         flowDirective: FlowDirective? = null,
     ): WorkflowEvent {
         // Increment workflow step counter
-        val rootState = taskStates[NodePosition.root] as RootState
-        val updatedTaskStates = taskStates + (NodePosition.root to rootState.copy(
-            workflowStep = rootState.workflowStep + 1
-        ))
+        val updatedTaskStates = taskStates.incrementStep()
 
         try {
             val stepResult: StepResult = try {
@@ -193,7 +188,7 @@ object StepByStepOrchestrator {
             forkBranchFailed(updatedTaskStates, node, e)?.let { return it }
             // Uncaught task failure
             return WorkflowFailed(
-                taskStates = updatedTaskStates.toMap(),
+                taskStates = updatedTaskStates,
                 nodePosition = node.position,
                 rawInput = rawInput,
                 rawOutput = null,
@@ -318,15 +313,14 @@ object StepByStepOrchestrator {
 
             if (forkNode.task is ForkTask) {
                 // Clean state of all nodes up to the fork node
-                val cleanedStates = taskStates.toMutableMap().apply {
-                    var node = failingNode
-                    do {
-                        remove(node.position)
-                        node = node.parent!!
-                    } while (node != forkNode)
-                }
+                val positionsToRemove = mutableSetOf<NodePosition>()
+                var node = failingNode
+                do {
+                    positionsToRemove.add(node.position)
+                    node = node.parent!!
+                } while (node != forkNode)
                 return BranchFailed(
-                    taskStates = cleanedStates,
+                    taskStates = taskStates - positionsToRemove,
                     nodePosition = forkNode.position,
                     branchName = current.name,
                     error = InternalException.Error.from(exception, failingNode.position),
@@ -399,19 +393,17 @@ object StepByStepOrchestrator {
             if (current!!.task is TryTask) {
                 @Suppress("UNCHECKED_CAST")
                 current as Node<TryTask>
-                // current scope of the try node
-                val tryScope = getScope(current, taskStates)
                 // current state of the try node
                 val tryState = taskStates[current.position] as TryState
                 // processor for the try node
                 val processor = TryProcessor(current)
                 // check that this node actually can handle this error
-                if (processor.isCatching(exception.error, tryState, tryScope)) {
+                if (processor.isCatching(exception.error, tryState, taskStates.scope)) {
                     return processor.handleError(
                         failingNode = failingNode,
                         error = exception.error,
                         state = tryState,
-                        scope = tryScope,
+                        scope = taskStates.scope,
                         taskStates = taskStates
                     )
                 }
@@ -437,13 +429,12 @@ object StepByStepOrchestrator {
         flowDirective: FlowDirective?,
     ): StepResult {
         val state = taskStates[node.position]
-        val scope = getScope(node, taskStates)
         val processor = ProcessorFactory.getProcessor(node)
 
         return if (state == null) {
             logger.debug { "Entering Down  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput)" }
             // First time entering this node
-            processor.enterFromParent(rawInput, scope, taskStates)
+            processor.enterFromParent(rawInput, taskStates.scope, taskStates)
         } else {
             logger.debug {
                 "ReEntering Up  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput${
@@ -451,7 +442,7 @@ object StepByStepOrchestrator {
                 }), state=$state"
             }
             // Re-entering after a child completed
-            processor.enterFromChild(state, flowDirective, rawInput, scope, taskStates)
+            processor.enterFromChild(state, flowDirective, rawInput, taskStates.scope, taskStates)
         }
     }
 
@@ -464,23 +455,13 @@ object StepByStepOrchestrator {
         rawOutput: JsonElement
     ): StepResult {
         val processor = ProcessorFactory.getProcessor(node)
-        val scope = getScope(node, taskStates)
 
         return processor.completeTask(
             rawOutput = rawOutput,
             currentFlowDirective = processor.getFlowDirective(),
-            parentScope = scope,
+            parentScope = taskStates.scope,
             taskScope = null,
             taskStates = taskStates
         )
     }
-
-    /**
-     * Retrieves the `Scope` associated with the given node by combining its own expression arguments
-     * with those of its parent nodes in the tree, if present.
-     */
-    private fun getScope(current: Node<*>, taskStates: TaskStates): Scope =
-        (taskStates[current.position]?.scope ?: buildJsonObject { })
-            // Recursively merge with parent scope
-            .merge(current.parent?.let { getScope(it, taskStates) })
 }

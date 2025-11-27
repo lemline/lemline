@@ -22,6 +22,7 @@ import com.lemline.core.states.RunState
 import com.lemline.core.states.SetState
 import com.lemline.core.states.SwitchState
 import com.lemline.core.states.TaskState
+import com.lemline.core.states.TaskStates
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WaitState
 import com.lemline.core.states.WorkflowCommand
@@ -178,14 +179,14 @@ fun WorkflowCommand.Companion.random(): WorkflowCommand {
 }
 
 fun WorkflowCommand.ResumeFromTask.Companion.random() = WorkflowCommand.ResumeFromTask(
-    taskStates = randomStates(),
+    taskStates = TaskStates.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
     flowDirective = randomFlowDirective(),
 )
 
 fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand.ResumeWithCompletedTask(
-    taskStates = randomStates(),
+    taskStates = TaskStates.random(),
     nodePosition = NodePosition.random(),
     rawOutput = JsonElement.random(),
 )
@@ -203,19 +204,21 @@ fun WorkflowEvent.Companion.random(): WorkflowEvent {
     }
 }
 
-fun randomStates() = mapOf(
-    NodePosition.root to RootState.random(),
-    NodePosition.random() to BaseState.random()
+fun TaskStates.Companion.random() = TaskStates(
+    mapOf(
+        NodePosition.root to RootState.random(),
+        NodePosition.random() to BaseState.random()
+    )
 )
 
 fun WorkflowEvent.WorkflowCompleted.Companion.random() = WorkflowEvent.WorkflowCompleted(
     output = JsonElement.random(),
     completedAt = Clock.System.now(),
-    taskStates = randomStates()
+    taskStates = TaskStates.random()
 )
 
 fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFailed(
-    taskStates = randomStates(),
+    taskStates = TaskStates.random(),
     nodePosition = NodePosition.random(),
     rawInput = when (Random.nextBoolean()) {
         true -> JsonElement.random()
@@ -234,7 +237,7 @@ fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFail
 )
 
 fun WorkflowEvent.TaskScheduled.Companion.random() = WorkflowEvent.TaskScheduled(
-    taskStates = randomStates(),
+    taskStates = TaskStates.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
     flowDirective = when (Random.nextBoolean()) {
@@ -244,7 +247,7 @@ fun WorkflowEvent.TaskScheduled.Companion.random() = WorkflowEvent.TaskScheduled
 )
 
 fun WorkflowEvent.WaitStarted.Companion.random() = WorkflowEvent.WaitStarted(
-    taskStates = randomStates(),
+    taskStates = TaskStates.random(),
     nodePosition = NodePosition.random(),
     waitState = WaitState.random(),
     rawOutput = JsonElement.random(),
@@ -252,7 +255,7 @@ fun WorkflowEvent.WaitStarted.Companion.random() = WorkflowEvent.WaitStarted(
 )
 
 fun WorkflowEvent.RetryScheduled.Companion.random() = WorkflowEvent.RetryScheduled(
-    taskStates = randomStates(),
+    taskStates = TaskStates.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
     flowDirective = when (Random.nextBoolean()) {
@@ -263,7 +266,7 @@ fun WorkflowEvent.RetryScheduled.Companion.random() = WorkflowEvent.RetrySchedul
 )
 
 fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkflowStarted(
-    taskStates = randomStates(),
+    taskStates = TaskStates.random(),
     nodePosition = NodePosition.random(),
     runState = RunState.random(),
     rawInput = JsonElement.random(),
@@ -271,7 +274,7 @@ fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkf
 )
 
 fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(
-    taskStates = randomStates(),
+    taskStates = TaskStates.random(),
     nodePosition = NodePosition.random(),
     forkState = ForkState.random(),
     rawInput = JsonElement.random(),
@@ -279,7 +282,7 @@ fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(
 
 fun WorkflowEvent.BranchCompleted.Companion.random() =
     WorkflowEvent.BranchCompleted(
-        taskStates = randomStates(),
+        taskStates = TaskStates.random(),
         nodePosition = NodePosition.random(),
         branchName = String.random(),
         output = JsonElement.random(),
