@@ -15,10 +15,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class TaskState(
     override val startedAt: Instant = Clock.System.now(),
-    override val visitCount: Int = 0,
-) : BaseState() {
-    companion object
-}
+) : BaseState()
 
 // Type aliases for semantic clarity - each represents a specific task type
 typealias CallState = TaskState

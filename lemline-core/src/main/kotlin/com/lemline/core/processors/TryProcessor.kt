@@ -91,7 +91,7 @@ class TryProcessor(
         scope: Scope,
         nodeName: String?
     ): TryState = state.copy(
-        visitCount = state.visitCount + 1,
+        hasStarted = true
     )
 
     /**
@@ -99,8 +99,8 @@ class TryProcessor(
      * This method handles both the first attempt (down) and the completion (up) of the `TryState` node.
      *
      * For navigation purposes:
-     * - visitCount == 0: First attempt, go to try block
-     * - visitCount > 0: Completed (after retry or catch), go to parent
+     * - !hasStarted: First attempt, go to try block
+     * - hasStarted: Completed (after retry or catch), go to parent
      *
      * This is bypassed by [handleError] when this node caught an exception.
      */
@@ -108,14 +108,14 @@ class TryProcessor(
         state: TryState,
         dataset: JsonElement,
         scope: Scope,
-    ): NavigationInfo = when (state.visitCount == 0) {
+    ): NavigationInfo = when (state.hasStarted) {
         // First attempt - go to try block
-        true -> NavigationInfo(
+        false -> NavigationInfo(
             nextNode = getDoTry(),
             nextDirective = null
         )
         // Completed - go to parent
-        false -> NavigationInfo(
+        true -> NavigationInfo(
             nextNode = node.parent,
             nextDirective = getFlowDirective()
         )
@@ -184,8 +184,7 @@ class TryProcessor(
             // Retry if attempts remain
             true -> {
                 val updatedState = state.copy(
-                    attemptIndex = state.attemptIndex + 1,
-                    visitCount = state.visitCount + 1,
+                    attemptIndex = state.attemptIndex + 1
                 )
                 StepResult(
                     nextNode = getDoTry(),  // Re-enter try body
@@ -197,7 +196,6 @@ class TryProcessor(
             // Otherwise, enter the catch block
             false -> {
                 val updatedState = state.copy(
-                    visitCount = state.visitCount + 1,
                     runningCatch = true,
                     lastError = error
                 )

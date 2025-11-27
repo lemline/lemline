@@ -44,12 +44,12 @@ import kotlinx.serialization.json.encodeToJsonElement
 @Serializable
 data class TryState(
     override val startedAt: Instant,
-    override val visitCount: Int = 0,
     val transformedInput: JsonElement,
     val attemptIndex: Int,
     val runningCatch: Boolean,
     val lastError: InternalException.Error? = null,
-    val errorAs: String
+    val errorAs: String,
+    val hasStarted: Boolean = false
 ) : BaseState() {
 
     /**

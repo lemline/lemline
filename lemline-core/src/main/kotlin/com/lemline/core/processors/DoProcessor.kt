@@ -56,8 +56,7 @@ class DoProcessor(
         scope: Scope,
         nodeName: String?
     ): DoState = state.copy(
-        index = getNextIndex(state, nodeName),
-        visitCount = state.visitCount + 1
+        index = getNextIndex(state, nodeName)
     )
 
     override fun getNextNode(

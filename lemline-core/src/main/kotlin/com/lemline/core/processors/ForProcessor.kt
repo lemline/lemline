@@ -74,7 +74,6 @@ class ForProcessor(
         // Move to next iteration: remove first item and increment index
         return ForState(
             startedAt = state.startedAt,
-            visitCount = state.visitCount + 1,
             collection = state.collection.drop(1),
             index = state.index + 1,
             forEach = node.task.`for`.each ?: "item",

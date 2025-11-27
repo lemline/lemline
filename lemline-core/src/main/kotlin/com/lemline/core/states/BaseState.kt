@@ -17,18 +17,6 @@ sealed class BaseState {
     @ExperimentalTime
     abstract val startedAt: Instant
 
-    /**
-     * Number of times this node has been visited during execution.
-     * Increments each time control flow returns to the parent after executing a child.
-     * Used to build unique WorkflowStep identifiers for database operations.
-     *
-     * Examples:
-     * - Sequential tasks: increments as each task completes
-     * - Loops: increments with each iteration
-     * - Retries: increments with each retry attempt
-     */
-    abstract val visitCount: Int
-
     @Transient
     open val scope: Scope = JsonObject(mapOf())
 }

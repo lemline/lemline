@@ -146,15 +146,21 @@ object StepByStepOrchestrator {
         rawInput: JsonElement,
         flowDirective: FlowDirective? = null,
     ): WorkflowEvent {
+        // Increment workflow step counter
+        val rootState = taskStates[NodePosition.root] as RootState
+        val updatedTaskStates = taskStates + (NodePosition.root to rootState.copy(
+            workflowStep = rootState.workflowStep + 1
+        ))
+
         try {
             val stepResult: StepResult = try {
                 // run the next task within a try-catch block to handle workflow-caught exceptions
-                tryCatch(node, taskStates) {
-                    startTask(taskStates, node, rawInput, flowDirective)
+                tryCatch(node, updatedTaskStates) {
+                    startTask(updatedTaskStates, node, rawInput, flowDirective)
                 }
             } catch (e: AsyncTaskException) {
                 // Update states of the current node, even if not completed yet
-                val states = taskStates.updateWith(mapOf(node.position to e.state), null)
+                val states = updatedTaskStates.updateWith(mapOf(node.position to e.state), null)
                 // Return immediately with an event
                 return when (e) {
                     is RunWorkflowStartedException -> RunWorkflowStarted(
@@ -182,13 +188,13 @@ object StepByStepOrchestrator {
                 }
             }
 
-            return getNextEvent(taskStates, stepResult, node)
+            return getNextEvent(updatedTaskStates, stepResult, node)
         } catch (e: Exception) {
             // Are we within a fork?
-            forkBranchFailed(taskStates, node, e)?.let { return it }
+            forkBranchFailed(updatedTaskStates, node, e)?.let { return it }
             // Uncaught task failure
             return WorkflowFailed(
-                taskStates = taskStates.toMap(),
+                taskStates = updatedTaskStates.toMap(),
                 nodePosition = node.position,
                 rawInput = rawInput,
                 rawOutput = null,

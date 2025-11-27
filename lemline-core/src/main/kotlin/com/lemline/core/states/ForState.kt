@@ -14,7 +14,6 @@ import kotlinx.serialization.json.buildJsonObject
 @ExperimentalTime
 data class ForState(
     override val startedAt: Instant = Clock.System.now(),
-    override val visitCount: Int = 0,
     val collection: List<JsonElement>,
     val index: Int = -1,
     val forEach: String,

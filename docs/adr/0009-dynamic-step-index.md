@@ -1,4 +1,4 @@
-# [ADR-0009] Dynamic JSON Pointer for Step Indexing
+# [ADR-0009] Simple Integer Step Counter
 
 ## Status
 
@@ -29,65 +29,25 @@ for:
         -   wait: PT1M  # Same NodePosition "/for/do/wait" on every iteration!
 ```
 
-Without visit counts, all three wait tasks would generate the same ID, causing database constraint violations.
+Without a unique step identifier, all three wait tasks would generate the same ID, causing database constraint violations.
 
 The challenge is to create a step identifier that:
 
 - Is deterministic (same execution path → same identifier)
 - Distinguishes between multiple visits to the same node
-- Aligns with Lemline's tree navigation model (up/down traversal)
-- Enables conversion back to static position for node lookup
-- Minimizes database usage (follows Lemline's core philosophy)
+- Is simple and easy to implement correctly
+- Minimizes complexity (follows Lemline's core philosophy of pragmatism)
 
 ## Decision
 
-We will introduce a **Dynamic WorkflowStep** that extends the existing JSON Pointer notation with **visit counts**.
+We will add a simple **integer counter (`workflowStep: Int`)** to `WorkflowState` that increments each time we enter a task.
 
-**Format Choice:** We use comma-separated `name,count` pairs (e.g., `/do,0/taskA,0`) instead of alternating segments
-(e.g., `/do/0/taskA/0`). The comma format is more explicit, easier to parse, and clearer to read - it's immediately
-obvious which count belongs to which node name.
+### How It Works
 
-### Static NodePosition vs. Dynamic WorkflowStep
-
-**Static NodePosition** (existing - identifies node in workflow definition):
-
-```
-/do/taskA
-/fork/branch1/do/task1
-/foreach/do/processItem
-```
-
-Used in lemline-core to look up nodes in the workflow definition tree.
-
-**Dynamic WorkflowStep** (new - identifies specific execution instance):
-
-```
-/do,0/taskA
-/fork,0/branch1,0/do,0/task1
-/foreach,2/do,0/processItem,0
-```
-
-Used in lemline-runner for deduplication, message IDs, execution tracking.
-
-### Structure
-
-The workflowStep follows the pattern: `/{nodeName},{visitCount}/{nodeName},{visitCount}/...`
-
-**Rules:**
-
-1. **All nodes** (containers and leaf nodes): Include visit count
-    - Container examples: `/do/0`, `/foreach,2`, `/try,1`
-    - Leaf examples: `/do,0/taskA,0`, `/foreach,2/processItem,0`
-    - Note: While leaf nodes currently can only be retried when their parent try node is retried, single task retries
-      will likely be introduced in the future, requiring individual visit counts
-
-2. **Visit count increments** on each entry to a node
-    - Entering a node for the first time: visit count = 0
-    - Re-entering after going up: visit count increments
-
-3. **Navigation is always up or down** (never sideways)
-    - Moving from task1 to task2 in sequential do block:
-    - `/do/0` → `/do,0/task1,0` (down) → `/do/1` (up) → `/do,1/task2,0` (down)
+1. **Initialization**: `workflowStep` starts at 0 when workflow begins
+2. **Task Entry**: Increment `workflowStep` each time we enter a task (from parent or child)
+3. **Fork Branches**: Each branch initializes its own counter, which is restored when the branch completes
+4. **Uniqueness**: `(workflowId, workflowStep)` creates a unique identifier for each execution step
 
 ### Examples
 
@@ -101,21 +61,19 @@ do:
             set: { y: 2 }
 ```
 
-Execution workflowStep:
+Execution steps:
 
 ```
-1. /do,0             ← Enter do (first visit)
-2. /do,0/taskA,0     ← Go down into taskA
-3. /do,1             ← Go up to do (second visit)
-4. /do,1/taskB,0     ← Go down into taskB
-5. /do,2             ← Go up to do (third visit, complete)
+1. workflowStep=0  ← Enter taskA
+2. workflowStep=1  ← Enter taskB
+3. workflowStep=2  ← Complete workflow
 ```
 
 **Foreach loop:**
 
 ```yaml
 for:
-    in: [ 1, 2 ]
+    in: [ 1, 2, 3 ]
     do:
         -   task1:
                 set: { x: . }
@@ -123,16 +81,20 @@ for:
                 set: { y: . }
 ```
 
-Execution workflowStep:
+Execution steps:
 
 ```
 Iteration 0:
-  /for,0/do,0/task1,0
-  /for/0/do,1/task2,0
+  workflowStep=0  ← task1 (iteration 0)
+  workflowStep=1  ← task2 (iteration 0)
 
 Iteration 1:
-  /for,1/do,0/task1,0
-  /for/1/do,1/task2,0
+  workflowStep=2  ← task1 (iteration 1)
+  workflowStep=3  ← task2 (iteration 1)
+
+Iteration 2:
+  workflowStep=4  ← task1 (iteration 2)
+  workflowStep=5  ← task2 (iteration 2)
 ```
 
 **Fork (parallel branches):**
@@ -150,19 +112,21 @@ fork:
                         set: { y: 2 }
 ```
 
-Execution workflowStep:
+Execution steps (branches execute independently):
 
 ```
-Branch 1: /fork,0/branch1/0/do,0/task1,0
-Branch 2: /fork,0/branch2/0/do,0/task2,0
+Parent: workflowStep=0  ← Enter fork
+
+Branch 1: workflowStep=0  ← task1 (new counter for branch)
+Branch 2: workflowStep=0  ← task2 (new counter for branch)
+
+Parent: workflowStep=1  ← Resume after fork completes
 ```
 
 **Try with retry:**
 
 ```yaml
 try:
-    -   first:
-            call: { http: ... }
     -   failing:
             call: { http: ... }
 catch:
@@ -171,216 +135,89 @@ catch:
         maxAttempts: 3
 ```
 
-Execution workflowStep:
+Execution steps:
 
 ```
 Attempt 0:
-  /try/0             ← Enter try
-  /try/0/first/0     ← Execute first task
-  /try,1             ← Go up
-  /try,1/failing/0   ← Execute failing task (fails)
+  workflowStep=0  ← failing task (fails)
 
 Retry (attempt 1):
-  /try/2             ← Go up, re-enter try (retry)
-  /try/2/first/1     ← Execute first task again (visit count 1)
-  /try/3             ← Go up
-  /try/3/failing/1   ← Execute failing task again (visit count 1)
+  workflowStep=1  ← failing task retry (fails)
+
+Retry (attempt 2):
+  workflowStep=2  ← failing task retry (succeeds)
 ```
 
 ### Implementation
 
-**1. WorkflowStep Data Structure**
+**1. Add workflowStep to RootState**
 
 ```kotlin
 @Serializable
-data class WorkflowStep(private val path: String) {
-    /**
-     * Convert to static NodePosition by removing visit counts.
-     * Example: "/do,0/taskA,0" → "/do/taskA"
-     */
-    fun toStaticPosition(): NodePosition {
-        val segments = path.split("/")
-            .filter { it.isNotEmpty() && !it.all { c -> c.isDigit() } }
-        return NodePosition.parse("/" + segments.joinToString("/"))
-    }
-
-    fun toCompactString(): String = path
-
-    companion object {
-        fun parse(path: String) = WorkflowStep(path)
-    }
-}
+data class RootState(
+    override val startedAt: Instant,
+    val workflowId: WorkflowId,
+    val workflowInput: JsonElement,
+    val hasWaitingParent: Boolean = false,
+    val workflowStep: Int = 0,  // NEW! Simple counter
+) : BaseState()
 ```
 
-**2. TaskState Enhancement**
-
-Add `visitCount` to `TaskState`:
-
-```kotlin
-abstract class TaskState {
-    abstract val visitCount: Int
-    // ... existing fields
-}
-```
-
-**visitCount Increment Logic**
-
-The visitCount is incremented by the Processor during tree navigation:
-
-- **`enterFromChild()`**: When navigating UP from a child node, deletes child state and increments parent's visitCount
-- **`enterFromParent()`**: When navigating DOWN into a child node, creates/updates child state
-
-This logic ensures visitCount accurately tracks how many times each node has been entered during execution.
-
-**Critical: TaskStates Map Structure**
-
-The `taskStates` map uses **static NodePositions** as keys (topological positions), NOT dynamic workflowStep:
-
-```kotlin
-// ✅ Correct - keys are static positions
-taskStates: Map<NodePosition, TaskState> = mapOf(
-NodePosition("/do") to DoState(visitCount = 2),
-NodePosition("/do/taskA") to TaskState(visitCount = 0),
-)
-
-// ❌ Wrong - keys should not include visit counts
-taskStates: Map<NodePosition, TaskState> = mapOf(
-NodePosition("/do/2") to DoState(...),
-NodePosition("/do/2/taskA") to TaskState(...),
-)
-```
-
-**Benefits:**
-
-- Single state entry per topological position (map doesn't explode)
-- State reused on re-entry (loops, retries update the same entry)
-- visitCount inside state tracks execution progress
-
-When navigating **up** from a node, its `TaskState` is deleted from `taskStates` map → `visitCount` is automatically
-cleaned up.
-
-**3. Building WorkflowStep**
-
-The workflowStep is built by walking up the tree from the current position, collecting node names and visit counts from
-the state map:
-
-```kotlin
-fun buildWorkflowStep(
-    currentPosition: NodePosition,  // Static position (map key)
-    taskStates: Map<NodePosition, TaskState>
-): WorkflowStep {
-    val segments = mutableListOf<String>()
-
-    // Walk up from current position to root
-    var pos: NodePosition? = currentPosition
-    do {
-        // Look up state using STATIC position key
-        val state = taskStates[pos]
-        val visitCount = state?.visitCount ?: 0
-
-        // Add visit count for all nodes (containers and leaf nodes)
-        segments.add(1, visitCount.toString())
-
-        // Add node name
-        segments.add(0, pos.nodeName)
-
-        pos = pos.parent
-    } while (pos != Position.root)
-
-    return WorkflowStep("/" + segments.reverse().joinToString("/"))
-}
-```
-
-**Example: TaskStates Evolution During Execution**
-
-Given this workflow:
-
-```yaml
-do:
-    -   taskA:
-            set: { x: 1 }
-    -   taskB:
-            set: { y: 2 }
-```
-
-Step-by-step evolution of `taskStates` map:
-
-**Step 1:** Enter do → `workflowStep = /do/0`
-
-```kotlin
-taskStates = mapOf(
-    NodePosition("/do") to DoState(visitCount = 0)
-)
-```
-
-**Step 2:** Enter taskA → `workflowStep = /do,0/taskA,0`
-
-```kotlin
-taskStates = mapOf(
-    NodePosition("/do") to DoState(visitCount = 0),
-    NodePosition("/do/taskA") to TaskAState(visitCount = 0)
-)
-```
-
-**Step 3:** Complete taskA, go up to do → `workflowStep = /do/1`
-
-```kotlin
-taskStates = mapOf(
-    NodePosition("/do") to DoState(visitCount = 1),  // Incremented!
-    // /do/taskA deleted when navigating up
-)
-```
-
-**Step 4:** Enter taskB → `workflowStep = /do,1/taskB,0`
-
-```kotlin
-taskStates = mapOf(
-    NodePosition("/do") to DoState(visitCount = 1),
-    NodePosition("/do/taskB") to TaskBState(visitCount = 0)
-)
-```
-
-**Step 5:** Complete taskB, go up to do → `workflowStep = /do/2`
-
-```kotlin
-taskStates = mapOf(
-    NodePosition("/do") to DoState(visitCount = 2),  // Incremented again!
-    // /do/taskB deleted when navigating up
-)
-```
-
-Notice how:
-
-- Map keys are always **static NodePosition** (no visit counts)
-- Same state entry is reused (e.g., `NodePosition("/do")` entry updated, not recreated)
-- Visit counts increment inside the state
-- Child states are deleted when navigating up (automatic cleanup)
-
-**4. Integration with WorkflowState**
-
-Add `workflowStep` as a **computed property** to `WorkflowState`:
+**2. Add convenience property to WorkflowState**
 
 ```kotlin
 @Serializable
 sealed class WorkflowState {
-    abstract val taskStates: TaskStates  // Keys are static NodePosition
+    abstract val taskStates: TaskStates
     abstract val nodePosition: NodePosition
 
-    val workflowId: IDV7 get() = (taskStates[NodePosition.root] as RootState).workflowId
-
-    // NEW! Computed on-demand (not stored/serialized)
-    val workflowStep: WorkflowStep by lazy {
-        buildWorkflowStep(nodePosition, taskStates)
-    }
+    val workflowId: WorkflowId get() = (taskStates[NodePosition.root] as RootState).workflowId
+    val hasWaitingParent: Boolean get() = (taskStates[NodePosition.root] as RootState).hasWaitingParent
+    val workflowStep: Int get() = (taskStates[NodePosition.root] as RootState).workflowStep  // NEW!
 }
 ```
 
-**Why computed, not stored:**
+**3. Increment Logic**
 
-- **No redundancy**: Derived from existing taskStates (visitCount) and nodePosition
-- **Always consistent**: Can't get out of sync with taskStates
-- **Minimal overhead**: Quick operation (walks up tree to root)
-- **Smaller serialization**: Not added to WorkflowState JSON (derived on-demand)
+The `workflowStep` is incremented in `StepByStepOrchestrator.resumeFromTask()` at the start of each task execution:
+
+```kotlin
+internal suspend fun resumeFromTask(
+    taskStates: TaskStates,
+    node: Node<*>,
+    rawInput: JsonElement,
+    flowDirective: FlowDirective? = null,
+): WorkflowEvent {
+    // Increment workflow step counter
+    val rootState = taskStates[NodePosition.root] as RootState
+    val updatedTaskStates = taskStates + (NodePosition.root to rootState.copy(
+        workflowStep = rootState.workflowStep + 1
+    ))
+
+    // Continue with execution using updatedTaskStates...
+}
+```
+
+**Key behaviors:**
+- **Task entry**: Counter increments each time `resumeFromTask` is called (entering or re-entering any node)
+- **Async operations**: `resumeFromCompletedTask` and `resumeFromFailedTask` do NOT increment (they resume existing tasks)
+- **Fork branches**: Each branch starts with parent's counter value, continues incrementing independently
+- **Branch completion**: Parent resumes with its last counter value, continues incrementing from there
+
+**4. Remove visitCount from BaseState**
+
+The old `visitCount` field is no longer needed:
+
+```kotlin
+// REMOVE this from BaseState:
+abstract val visitCount: Int
+
+// REMOVE increment logic from all processors:
+// DoProcessor.stateEnterFromChild() - remove visitCount increment
+// ForProcessor.stateEnterFromChild() - remove visitCount increment
+// TryProcessor.stateEnterFromChild() - remove visitCount increment
+// etc.
+```
 
 **5. Deterministic Message and Database IDs**
 
@@ -390,34 +227,24 @@ Use `(workflowId, workflowStep)` to generate unique, deterministic IDs for datab
 // For message IDs (broker deduplication)
 val messageId = IDV7.fromNamespace(
     namespace = workflowId,
-    name = workflowStep.toCompactString()  // Includes visit counts!
+    name = workflowStep.toString()
 )
 
 // For outbox table IDs (waits, retries, parents)
 val waitId = IDV7.fromNamespace(
     namespace = workflowId,
-    name = workflowStep.toCompactString()  // e.g., "/for/0/do/0/wait/0"
+    name = workflowStep.toString()
 )
 ```
 
 **Why this works:**
 
-- **Unique per execution**: Visit counts distinguish multiple executions of same node
-    - Loop iteration 0: `/for/0/do/0/wait/0` → unique ID
-    - Loop iteration 1: `/for/1/do/0/wait/0` → different ID
-    - Loop iteration 2: `/for/2/do/0/wait/0` → different ID
-- **Deterministic**: Same execution path → same workflowStep → same UUID
+- **Unique per execution**: Counter increments on each task entry
+    - Loop iteration 0, task 1: `workflowStep=0` → unique ID
+    - Loop iteration 0, task 2: `workflowStep=1` → different ID
+    - Loop iteration 1, task 1: `workflowStep=2` → different ID
+- **Deterministic**: Same execution path → same sequence of workflowStep values → same UUIDs
 - **No collisions**: Each wait/retry/parent gets unique database row
-
-Compare to static position approach:
-
-```kotlin
-// ❌ WRONG: Using static NodePosition causes collisions
-val waitId = IDV7.fromNamespace(
-    namespace = workflowId,
-    name = nodePosition.toCompactString()  // Always "/for/do/wait" → collision!
-)
-```
 
 **Example: lemline_waits table with loop**
 
@@ -430,7 +257,7 @@ for:
         -   wait: PT1M
 ```
 
-With WorkflowStep (visit counts included):
+With workflowStep counter:
 
 ```sql
 -- ✅ Each iteration gets unique row
@@ -438,177 +265,100 @@ CREATE TABLE lemline_waits
 (
     id            UUID PRIMARY KEY, -- Derived from (workflowId, workflowStep)
     workflow_id   UUID NOT NULL,
-    workflow_step TEXT NOT NULL,    -- Includes visit counts!
-    .
-    .
-    .
+    workflow_step INT NOT NULL,
+    node_position TEXT NOT NULL,  -- Still stored for context/debugging
+    ...
 );
 
-INSERT INTO lemline_waits
-VALUES (uuid_from_namespace(workflow_id, '/for/0/do/0/wait/0'),
-        workflow_id,
-        '/for/0/do/0/wait/0', -- Iteration 0
-           ...);
+INSERT INTO lemline_waits VALUES
+  (uuid_from_namespace(workflow_id, '0'), workflow_id, 0, '/for/do/wait', ...);  -- Iteration 0
 
-INSERT INTO lemline_waits
-VALUES (uuid_from_namespace(workflow_id, '/for/1/do/0/wait/0'),
-        workflow_id,
-        '/for/1/do/0/wait/0', -- Iteration 1 - different ID!
-           ...);
+INSERT INTO lemline_waits VALUES
+  (uuid_from_namespace(workflow_id, '1'), workflow_id, 1, '/for/do/wait', ...);  -- Iteration 1
 
-INSERT INTO lemline_waits
-VALUES (uuid_from_namespace(workflow_id, '/for/2/do/0/wait/0'),
-        workflow_id,
-        '/for/2/do/0/wait/0', -- Iteration 2 - different ID!
-           ...);
-```
-
-Without WorkflowStep (static position only):
-
-```sql
--- ❌ All iterations try to use same ID → PRIMARY KEY violation!
-INSERT INTO lemline_waits
-VALUES (uuid_from_namespace(workflow_id, '/for/do/wait'), -- Same ID!
-        workflow_id,
-        '/for/do/wait', -- Static position
-           ...);
--- Next iteration fails with: ERROR: duplicate key value violates unique constraint "lemline_waits_pkey"
+INSERT INTO lemline_waits VALUES
+  (uuid_from_namespace(workflow_id, '2'), workflow_id, 2, '/for/do/wait', ...);  -- Iteration 2
 ```
 
 ## Consequences
 
 ### Positive
 
-1. **Unique identification without collisions**: `(workflowId, workflowStep)` creates unique IDs for each execution
-    - **Prevents database collisions**: Wait task in loop iteration 0 gets different ID than iteration 1
-    - **Enables deterministic reprocessing**: Same execution path → same workflowStep → same UUID
-    - **Broker-level deduplication**: Kafka idempotent producer, RabbitMQ dedup plugin can use message IDs
-    - **Database-level idempotency**: Primary key `(workflowId, workflowStep)` prevents duplicate rows
+1. **Simplicity**: Just an integer - easy to understand, implement, and debug
+    - No complex path building logic
+    - No visit count tracking per node
+    - Minimal risk of implementation bugs
 
-2. **Natural retry handling**: Retries automatically get incremented visit counts
-    - First attempt: `/try/0/first/0`
-    - Retry: `/try/2/first/1` (both try and task visit counts incremented)
-    - Each retry attempt has unique workflowStep for tracking
-    - Supports future single task retries independently of try blocks
+2. **Unique identification without collisions**: `(workflowId, workflowStep)` creates unique IDs for each execution
+    - Prevents database collisions
+    - Enables deterministic reprocessing
+    - Broker-level deduplication via message IDs
+    - Database-level idempotency via primary keys
 
-3. **Aligns with Lemline architecture**:
-    - Mirrors tree navigation model (up/down traversal)
-    - Minimal database usage (only for necessary business events)
-    - State carried in messages (workflowStep in WorkflowState)
+3. **Natural retry handling**: Each retry gets a new step number
+    - First attempt: `workflowStep=0`
+    - Retry: `workflowStep=1`
+    - Each retry has unique identifier
 
-4. **Backward compatible**:
-    - Static NodePosition unchanged in lemline-core
-    - Easy conversion: `workflowStep.toStaticPosition()` strips visit counts
-    - Existing node lookup logic works without changes
+4. **Aligns with Lemline architecture**:
+    - Minimal complexity (pragmatic approach)
+    - State carried in messages
+    - Node states already track relevant execution context
 
-5. **Human-readable**: Path shows execution flow
-    - `/for,2/do,1/processItem,0` clearly indicates "3rd foreach iteration, 2nd task, first execution"
-    - Visit counts on leaf nodes enable tracking single task retries
-    - Debugging and troubleshooting easier
-
-6. **Minimal overhead**:
-    - Visit count stored in existing `TaskState` (no separate tracking)
-    - Automatic cleanup when navigating up (state deletion)
-    - No additional database queries
+5. **Fork isolation**: Each branch gets its own counter
+    - No coordination needed between parallel branches
+    - Natural isolation via separate WorkflowState instances
+    - Parent counter restored after fork completes
 
 ### Negative
 
-1. **Computation overhead**: workflowStep computed on every access (walks tree to root)
-    - Mitigation: Simple operation (O(depth) where depth is typically < 10)
-    - Called only when creating messages/database records (not frequently)
-    - Typical workflowStep length: ~20-100 characters depending on nesting depth
+1. **Loss of structural information**: Step number doesn't encode position in workflow tree
+    - `workflowStep=47` doesn't tell you where in the workflow you are
+    - Mitigation: `NodePosition` is still stored in WorkflowState and database tables for context
 
-2. **Implementation complexity**: Need to track visit counts correctly
-    - Must increment on each entry (handled in `enterFromChild` / `enterFromParent`)
-    - Must handle retries, loops, branches correctly
-    - Risk of bugs if navigation logic is incorrect
-
-3. **Concurrency consideration for parallel branches**:
-    - Branch execution is handled specially in StepByStepRunner
-    - Branches never navigate "up" during execution (synchronization handled separately)
-    - **Warning**: Implementation must ensure branch processing doesn't violate this assumption
+2. **Debugging**: Need to look at NodePosition separately to understand location
+    - Can't infer execution path from step number alone
+    - Mitigation: All node states already contain relevant execution context (startedAt, etc.)
 
 ### Neutral
 
-1. **Uniform visit count tracking**: All nodes (container and leaf) include visit counts
-    - Simpler building logic (no special cases for leaf nodes)
-    - Slightly longer paths (e.g., `/do,0/taskA,0` vs `/do,0/taskA`)
-    - Enables future features like single task retries
+1. **No impact on existing NodePosition usage**: Static positions still used for node lookup in lemline-core
+2. **Database schema**: Already stores both workflowStep and nodePosition for debugging
 
 ## Alternatives Considered
 
-### 1. Segment-Based WorkflowStep
+### 1. Dynamic JSON Pointer with Visit Counts (Previous Design)
 
-Use hierarchical segments like `[Sequential(0), Branch(1), Iteration(2)]`:
-
-```kotlin
-data class WorkflowStep(
-    val segments: List<Segment>
-) {
-    sealed class Segment {
-        data class Sequential(val index: Int) : Segment()
-        data class Branch(val branchIndex: Int) : Segment()
-        data class Iteration(val iterationIndex: Int) : Segment()
-    }
-}
-```
+Use hierarchical path with visit counts like `/do,0/taskA,0`:
 
 **Rejected because:**
 
-- More complex data structure
-- Doesn't align with existing NodePosition concept
-- Harder to convert to/from static position
-- Less human-readable
+- Much more complex implementation
+- Requires tracking visit counts per node in state
+- More code to maintain and debug
+- Path building logic adds overhead
+- Over-engineered for the core requirement (unique IDs)
+- Most debugging info already available in node states
 
-### 2. Global Sequential Counter
+### 2. Global Sequential Counter with Path Encoding
 
-Use a simple incrementing counter for each step: `workflowStep = 0, 1, 2, 3, ...`
+Combine both: increment counter AND track path.
 
 **Rejected because:**
 
-- Doesn't encode position in workflow tree
-- Can't convert back to static position for node lookup
-- Parallel branches would conflict (need complex coordination)
-- Loses semantic information about execution flow
+- Adds complexity without clear benefit
+- Redundant information (path already in NodePosition)
+- More state to serialize and carry in messages
 
 ### 3. Hash-Based Identifier
 
-Hash the execution path: `hash(workflowId + nodePosition + iterationCounts + timestamp)`
+Hash the execution path: `hash(workflowId + nodePosition + timestamp)`
 
 **Rejected because:**
 
-- Not human-readable
-- Can't extract static position
 - Timestamp makes it non-deterministic
+- Can't guarantee uniqueness without collision handling
 - Doesn't help with debugging
-
-### 4. Store visitCount Separately
-
-Keep visitCount in a separate map, not in `TaskState`:
-
-```kotlin
-class WorkflowStepTracker {
-    private val visitCounts = mutableMapOf<NodePosition, Int>()
-}
-```
-
-**Rejected because:**
-
-- Duplicates state tracking (already have `taskStates`)
-- No automatic cleanup when navigating up
-- Need to serialize and carry in `WorkflowState`
-- More memory overhead
-
-### 5. Leaf Nodes Without Visit Counts
-
-Omit visit counts from leaf nodes (e.g., `/do,0/taskA` instead of `/do,0/taskA,0`):
-
-**Rejected because:**
-
-- Doesn't support future single task retries feature
-- More complex building logic (need to distinguish container vs. leaf nodes)
-- Inconsistent pattern (some nodes have visit counts, others don't)
-- Leaf nodes could become retryable independently in the future, requiring migration
 
 ## References
 
@@ -618,14 +368,12 @@ Omit visit counts from leaf nodes (e.g., `/do,0/taskA` instead of `/do,0/taskA,0
     - [ADR-0004: Database Storage Strategy](0004-database-storage-strategy.md)
 
 - **Related Concepts**:
-    - JSON Pointer (RFC 6901): https://tools.ietf.org/html/rfc6901
     - Serverless Workflow DSL: https://serverlessworkflow.io/
 
 - **Design Documents**:
-    - `/docs/step-index-design.md` - Detailed implementation design (broker-based deduplication)
     - `/docs/orchestrator-architecture.md` - Processor and tree navigation model
     - `/docs/runner-architecture.md` - Messaging and outbox patterns
 
-- **UUID v5 (Deterministic)**:
+- **UUID v7 (Deterministic)**:
     - RFC 4122, Section 4.3: https://tools.ietf.org/html/rfc4122#section-4.3
     - Used for generating deterministic IDs from workflowStep

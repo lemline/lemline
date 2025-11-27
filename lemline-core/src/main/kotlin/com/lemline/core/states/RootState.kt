@@ -22,11 +22,11 @@ import kotlinx.serialization.json.encodeToJsonElement
 @Serializable
 data class RootState(
     override val startedAt: Instant,
-    override val visitCount: Int = 0,
     val workflowId: WorkflowId,
     val workflowInput: JsonElement = buildJsonObject {},
     val context: Scope = buildJsonObject {},
     val hasWaitingParent: Boolean = false,
+    val workflowStep: Int = 0,
 ) : BaseState() {
 
     @Transient
