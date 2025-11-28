@@ -210,12 +210,15 @@ sealed class WorkflowEvent : WorkflowState() {
     @Serializable
     data class BranchCompleted(
         override val nodeStack: NodeStack,
-        override val nodePosition: NodePosition,
         val branchName: String,
         val output: JsonElement,
         val completedAt: Instant,
         val flowDirective: FlowDirective?
     ) : Outcome() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
+
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", branchName=$branchName" +
@@ -232,13 +235,14 @@ sealed class WorkflowEvent : WorkflowState() {
     @Serializable
     data class BranchFailed(
         override val nodeStack: NodeStack,
-        override val nodePosition: NodePosition,
         val branchName: String,
         val error: InternalException.Error,
         val failedAt: Instant
     ) : Outcome() {
-        val exception: InternalException
-            get() = InternalException(error)
+        val exception: InternalException by lazy { InternalException(error) }
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -282,11 +286,14 @@ sealed class WorkflowEvent : WorkflowState() {
     @ExperimentalTime
     data class WaitStarted(
         override val nodeStack: NodeStack,
-        override val nodePosition: NodePosition,
         val waitState: WaitState,
         val rawOutput: JsonElement,
         @Contextual val waitUntil: Instant
     ) : Suspension() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
+
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
@@ -312,6 +319,7 @@ sealed class WorkflowEvent : WorkflowState() {
         val flowDirective: FlowDirective?,
         val retryAt: Instant
     ) : Suspension() {
+
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
@@ -335,11 +343,14 @@ sealed class WorkflowEvent : WorkflowState() {
     @Serializable
     data class RunWorkflowStarted(
         override val nodeStack: NodeStack,
-        override val nodePosition: NodePosition,
         val runState: RunState,
         val rawInput: JsonElement,
         val childConfig: RunWorkflowStartedException.Config,
     ) : Suspension() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
+
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", runState=$runState" +

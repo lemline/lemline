@@ -159,7 +159,6 @@ object StepByStepOrchestrator {
                 return when (e) {
                     is RunWorkflowStartedException -> RunWorkflowStarted(
                         nodeStack = states,
-                        nodePosition = node.position,
                         runState = e.state,
                         rawInput = e.transformedInput,
                         childConfig = e.config,
@@ -167,7 +166,6 @@ object StepByStepOrchestrator {
 
                     is WaitStartedException -> WaitStarted(
                         nodeStack = states,
-                        nodePosition = node.position,
                         waitState = e.state,
                         rawOutput = e.transformedInput,
                         waitUntil = e.config.waitUntil,
@@ -315,7 +313,6 @@ object StepByStepOrchestrator {
                 // Pop all states up to and including the fork node
                 return BranchFailed(
                     nodeStack = nodeStack.popUntil(forkNode.position),
-                    nodePosition = forkNode.position,
                     branchName = current.name,
                     error = InternalException.Error.from(exception, failingNode.position),
                     failedAt = Clock.System.now(),
@@ -340,7 +337,6 @@ object StepByStepOrchestrator {
 
             return BranchCompleted(
                 nodeStack = stepResult.nodeStack,
-                nodePosition = nextNode.position,
                 branchName = branchName,
                 output = stepResult.nextInput,
                 completedAt = Clock.System.now(),
