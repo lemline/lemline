@@ -458,7 +458,6 @@ internal class WorkflowEventHandler(
                         workflowInfo = instance.workflowInfo,
                         workflowState = WorkflowCommand.ResumeWithCompletedTask(
                             nodeStack = instance.workflowState.nodeStack,
-                            nodePosition = forkPosition,
                             rawOutput = outputJson,
                         ),
                     )
@@ -556,7 +555,6 @@ internal class WorkflowEventHandler(
                         workflowInfo = instance.workflowInfo,
                         workflowState = WorkflowCommand.ResumeWithFailedTask(
                             nodeStack = instance.workflowState.nodeStack,
-                            nodePosition = forkPosition,
                             error = error,
                         ),
                     )

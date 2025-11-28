@@ -406,7 +406,6 @@ internal abstract class ForkWaitingRepositoryTest {
                         )
                     )
                 ),
-                nodePosition = testPosition,
                 forkState = ForkState(),
                 rawInput = JsonPrimitive("test-input")
             ),

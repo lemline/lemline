@@ -134,7 +134,6 @@ internal class WorkflowCommandHandler(
             workflowInfo = workflowInfo,
             workflowState = WorkflowEvent.WorkflowFailed(
                 nodeStack = workflowState.nodeStack,
-                nodePosition = workflowState.nodeStack.lastPosition,
                 rawInput = null,
                 rawOutput = null,
                 flowDirective = null,

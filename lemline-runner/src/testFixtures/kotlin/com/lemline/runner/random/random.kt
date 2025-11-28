@@ -67,13 +67,11 @@ fun WorkflowCommand.ResumeFromTask.Companion.random() = WorkflowCommand.ResumeFr
 
 fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand.ResumeWithCompletedTask(
     nodeStack = NodeStack.random(),
-    nodePosition = NodePosition.random(),
     rawOutput = JsonElement.random(),
 )
 
 fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFailed(
     nodeStack = NodeStack.random(),
-    nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
     rawOutput = JsonElement.random(),
     flowDirective = null,
@@ -89,7 +87,6 @@ fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFail
 
 fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkflowStarted(
     nodeStack = NodeStack.random(),
-    nodePosition = NodePosition.random(),
     runState = RunState(),
     rawInput = JsonElement.random(),
     childConfig = AsyncTaskException.RunWorkflowStartedException.Config(
@@ -111,7 +108,6 @@ fun WorkflowEvent.TaskRetryScheduled.Companion.random() = WorkflowEvent.TaskRetr
 
 fun WorkflowEvent.WaitStarted.Companion.random() = WorkflowEvent.WaitStarted(
     nodeStack = NodeStack.random(),
-    nodePosition = NodePosition.random(),
     waitState = WaitState(),
     rawOutput = JsonElement.random(),
     waitUntil = Clock.System.now()
