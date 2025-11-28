@@ -199,7 +199,7 @@ fun WorkflowEvent.Companion.random(): WorkflowEvent {
         4 -> WorkflowEvent.TaskRetryScheduled.random()
         5 -> WorkflowEvent.RunWorkflowStarted.random()
         6 -> WorkflowEvent.ForkStarted.random()
-        else -> WorkflowEvent.ForkCompleted.random()
+        else -> WorkflowEvent.ForkBranchCompleted.random()
     }
 }
 
@@ -283,8 +283,8 @@ fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(
     rawInput = JsonElement.random(),
 )
 
-fun WorkflowEvent.ForkCompleted.Companion.random() =
-    WorkflowEvent.ForkCompleted(
+fun WorkflowEvent.ForkBranchCompleted.Companion.random() =
+    WorkflowEvent.ForkBranchCompleted(
         nodeStack = NodeStack.random(),
         branchName = String.random(),
         output = JsonElement.random(),

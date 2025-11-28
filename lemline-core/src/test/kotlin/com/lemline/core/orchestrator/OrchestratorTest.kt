@@ -10,6 +10,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -76,7 +77,7 @@ class OrchestratorTest : FunSpec() {
         val outcome = FullOrchestrator.resume(
             workflow = workflow,
             command = startState,
-            testSerialization = false,
+            serde = true,
         )
 
         return outcome.value()
@@ -368,7 +369,7 @@ class OrchestratorTest : FunSpec() {
         }
 
         // ========================================
-        // Fork Task Tests
+        // Fork Tests
         // ========================================
 
         test("should execute fork task in cooperative mode (compete=false)") {
@@ -417,6 +418,8 @@ class OrchestratorTest : FunSpec() {
 
             // Compete mode returns only the first completed branch result
             assertEquals("fast", output["winner"]?.jsonPrimitive?.content)
+
+            delay(1000)
         }
 
         // ========================================

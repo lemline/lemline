@@ -13,6 +13,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
@@ -57,6 +58,7 @@ sealed class WorkflowCommand : WorkflowState() {
      * Command to resume workflow execution from a specific task (possibly not yet in nodeStack).
      */
     @Serializable
+    @SerialName("resumeFromTask")
     data class ResumeFromTask(
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
@@ -83,6 +85,7 @@ sealed class WorkflowCommand : WorkflowState() {
      * Command to resume execution with a task completed asynchronously.
      */
     @Serializable
+    @SerialName("resumeWithCompletedTask")
     data class ResumeWithCompletedTask(
         override val nodeStack: NodeStack,
         val rawOutput: JsonElement,
@@ -102,6 +105,7 @@ sealed class WorkflowCommand : WorkflowState() {
      * Command to resume execution with a task failed asynchronously.
      */
     @Serializable
+    @SerialName("resumeWithFailedTask")
     data class ResumeWithFailedTask(
         override val nodeStack: NodeStack,
         val error: InternalException.Error,
@@ -131,9 +135,9 @@ sealed class WorkflowEvent : WorkflowState() {
 
         internal fun value(): JsonElement = when (this) {
             is WorkflowCompleted -> output
-            is ForkCompleted -> output
+            is ForkBranchCompleted -> output
             is WorkflowFailed -> throw exception
-            is ForkFailed -> throw exception
+            is ForkBranchFailed -> throw exception
         }
     }
 
@@ -141,6 +145,7 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when a workflow completes.
      */
     @Serializable
+    @SerialName("workflowCompleted")
     data class WorkflowCompleted(
         val output: JsonElement,
         val completedAt: Instant,
@@ -162,6 +167,7 @@ sealed class WorkflowEvent : WorkflowState() {
      * If rawOutput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromCompletedTask] method
      */
     @Serializable
+    @SerialName("workflowFailed")
     data class WorkflowFailed(
         override val nodeStack: NodeStack,
         val rawInput: JsonElement?,
@@ -207,7 +213,8 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when a fork branch execution completes.
      */
     @Serializable
-    data class ForkCompleted(
+    @SerialName("forkBranchCompleted")
+    data class ForkBranchCompleted(
         override val nodeStack: NodeStack,
         val branchName: String,
         val output: JsonElement,
@@ -231,7 +238,8 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when a fork branch execution fails.
      */
     @Serializable
-    data class ForkFailed(
+    @SerialName("forkBranchFailed")
+    data class ForkBranchFailed(
         override val nodeStack: NodeStack,
         val branchName: String,
         val error: InternalException.Error,
@@ -256,6 +264,7 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when the next task (possibly not yet in nodeStack) is scheduled.
      */
     @Serializable
+    @SerialName("taskScheduled")
     data class TaskScheduled(
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
@@ -282,6 +291,7 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when a wait task is scheduled.
      */
     @Serializable
+    @SerialName("waitStarted")
     data class WaitStarted(
         override val nodeStack: NodeStack,
         val waitState: WaitState,
@@ -309,6 +319,7 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when the retry of a task (possibly not yet in nodeStack) is scheduled.
      */
     @Serializable
+    @SerialName("taskRetryScheduled")
     data class TaskRetryScheduled(
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
@@ -338,6 +349,7 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when a child workflow is scheduled.
      */
     @Serializable
+    @SerialName("runWorkflowStarted")
     data class RunWorkflowStarted(
         override val nodeStack: NodeStack,
         val runState: RunState,
@@ -377,6 +389,7 @@ sealed class WorkflowEvent : WorkflowState() {
      * (each branch is processed separately)
      */
     @Serializable
+    @SerialName("forkStarted")
     data class ForkStarted(
         override val nodeStack: NodeStack,
         val forkState: ForkState,

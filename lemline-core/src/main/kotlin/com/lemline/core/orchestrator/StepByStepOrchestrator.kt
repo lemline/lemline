@@ -18,8 +18,8 @@ import com.lemline.core.states.RootState
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.states.WorkflowEvent.ForkCompleted
-import com.lemline.core.states.WorkflowEvent.ForkFailed
+import com.lemline.core.states.WorkflowEvent.ForkBranchCompleted
+import com.lemline.core.states.WorkflowEvent.ForkBranchFailed
 import com.lemline.core.states.WorkflowEvent.ForkStarted
 import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
 import com.lemline.core.states.WorkflowEvent.TaskRetryScheduled
@@ -301,7 +301,7 @@ object StepByStepOrchestrator {
         nodeStack: NodeStack,
         failingNode: Node<*>,
         exception: Exception
-    ): ForkFailed? {
+    ): ForkBranchFailed? {
         // Find the nearest Fork task up the current node
         var current: Node<*> = failingNode
 
@@ -310,7 +310,7 @@ object StepByStepOrchestrator {
 
             if (forkNode.task is ForkTask) {
                 // Pop all states up to and including the fork node
-                return ForkFailed(
+                return ForkBranchFailed(
                     nodeStack = nodeStack.popUntil(forkNode.position),
                     branchName = current.name,
                     error = InternalException.Error.from(exception, failingNode.position),
@@ -325,7 +325,7 @@ object StepByStepOrchestrator {
     private fun forkBranchCompleted(
         stepResult: StepResult,
         node: Node<*>
-    ): ForkCompleted? {
+    ): ForkBranchCompleted? {
         val nextNode = stepResult.nextNode!!
         val nextState = stepResult.nodeStack[nextNode.position]
         // Is NextNode a fork? Do we enter from Child?
@@ -334,7 +334,7 @@ object StepByStepOrchestrator {
             val branchName = nextNode.children?.find { it.name == node.name }?.name
                 ?: throw IllegalStateException("Fork - can not find ${node.name} in ${nextNode.children?.joinToString { it.name }}")
 
-            return ForkCompleted(
+            return ForkBranchCompleted(
                 nodeStack = stepResult.nodeStack,
                 branchName = branchName,
                 output = stepResult.nextInput,
