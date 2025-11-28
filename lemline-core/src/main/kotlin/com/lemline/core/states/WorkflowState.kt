@@ -255,7 +255,7 @@ sealed class WorkflowEvent : WorkflowState() {
     sealed class Suspension : WorkflowEvent()
 
     /**
-     * Event emitted when the next task is scheduled.
+     * Event emitted when the next task (possibly not yet in nodeStack) is scheduled.
      */
     @Serializable
     data class TaskScheduled(
@@ -264,6 +264,7 @@ sealed class WorkflowEvent : WorkflowState() {
         val rawInput: JsonElement,
         val flowDirective: FlowDirective?
     ) : Suspension() {
+
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
@@ -382,10 +383,13 @@ sealed class WorkflowEvent : WorkflowState() {
     @Serializable
     data class ForkStarted(
         override val nodeStack: NodeStack,
-        override val nodePosition: NodePosition,
         val forkState: ForkState,
         val rawInput: JsonElement,
     ) : Suspension() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
+
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", forkState=$forkState" +

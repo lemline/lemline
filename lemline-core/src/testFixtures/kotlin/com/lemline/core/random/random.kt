@@ -279,7 +279,6 @@ fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkf
 
 fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(
     nodeStack = NodeStack.random(),
-    nodePosition = NodePosition.random(),
     forkState = ForkState.random(),
     rawInput = JsonElement.random(),
 )

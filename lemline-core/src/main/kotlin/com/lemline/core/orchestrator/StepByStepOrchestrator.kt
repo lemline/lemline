@@ -173,7 +173,6 @@ object StepByStepOrchestrator {
 
                     is ForkStartedException -> ForkStarted(
                         nodeStack = states,
-                        nodePosition = node.position,
                         forkState = e.state,
                         rawInput = e.transformedInput,
                     )
