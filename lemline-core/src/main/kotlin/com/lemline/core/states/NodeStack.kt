@@ -106,36 +106,28 @@ data class NodeStack(
 
     /**
      * Push a new frame onto the stack or update an existing frame.
-     * If position already exists, updates that frame.
-     * If position is null, removes the frame at the given position.
      */
     fun push(pair: Pair<NodePosition, NodeState>): NodeStack = NodeStack(frames + pair)
 
     /**
      * Pop the top frame from the stack.
-     * Returns a new StateStack without the top frame.
-     * If the stack is empty, returns an empty stack.
      */
     fun pop(): NodeStack = NodeStack(frames.dropLast(1))
 
     /**
-     * Pop frames until reaching the specified position (exclusive).
-     * The frame at the specified position is kept.
      * Returns a new StateStack with frames from root up to and including the position.
      */
     fun popUntil(position: NodePosition): NodeStack {
         val index = frames.indexOfFirst { it.first == position }
-        return if (index < 0) this else copy(frames = frames.take(index + 1))
+        return if (index < 0) this else NodeStack(frames.take(index + 1))
     }
 
     /**
-     * Removes all frames from the stack that are located after
-     * the specified position (exclusive). If the specified position
-     * does not exist in the stack, the original stack is returned.
+     * Returns a new StateStack with frames from root up to and excluding the position.
      */
     fun popExcluding(position: NodePosition): NodeStack {
         val index = frames.indexOfFirst { it.first == position }
-        return if (index < 0) this else copy(frames = frames.take(index))
+        return if (index < 0) this else NodeStack(frames.take(index))
     }
 
     /**

@@ -12,6 +12,7 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -82,9 +83,12 @@ sealed class WorkflowCommand : WorkflowState() {
     @Serializable
     data class ResumeWithCompletedTask(
         override val nodeStack: NodeStack,
-        override val nodePosition: NodePosition,
         val rawOutput: JsonElement,
     ) : WorkflowCommand() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
+
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
@@ -98,9 +102,12 @@ sealed class WorkflowCommand : WorkflowState() {
     @Serializable
     data class ResumeWithFailedTask(
         override val nodeStack: NodeStack,
-        override val nodePosition: NodePosition,
         val error: InternalException.Error,
     ) : WorkflowCommand() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
+
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", error=$error" +
@@ -138,7 +145,9 @@ sealed class WorkflowEvent : WorkflowState() {
         val completedAt: Instant,
         override val nodeStack: NodeStack,
     ) : Outcome() {
-        override val nodePosition: NodePosition = NodePosition.root
+
+        @Transient
+        override val nodePosition = NodePosition.root
 
         override fun toString() = "${this::class.simpleName}(" +
             "output=$output" +
@@ -155,13 +164,15 @@ sealed class WorkflowEvent : WorkflowState() {
     @Serializable
     data class WorkflowFailed(
         override val nodeStack: NodeStack,
-        override val nodePosition: NodePosition,
         val rawInput: JsonElement?,
         val rawOutput: JsonElement?,
         val flowDirective: FlowDirective?,
         val error: InternalException.Error,
         val failedAt: Instant,
     ) : Outcome() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
 
         val exception: Exception get() = InternalException(error)
 
@@ -175,7 +186,6 @@ sealed class WorkflowEvent : WorkflowState() {
             failedAt: Instant = Clock.System.now(),
         ) : this(
             nodeStack = nodeStack,
-            nodePosition = nodePosition,
             rawInput = rawInput,
             rawOutput = rawOutput,
             flowDirective = flowDirective,
@@ -286,7 +296,6 @@ sealed class WorkflowEvent : WorkflowState() {
 
         fun resume() = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack,
-            nodePosition = nodePosition,
             rawOutput = rawOutput,
         )
     }
@@ -341,19 +350,16 @@ sealed class WorkflowEvent : WorkflowState() {
 
         fun resumeAsCompleted(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack,
-            nodePosition = nodePosition,
             rawOutput = rawOutput,
         )
 
         fun resumeAsFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
             nodeStack = nodeStack,
-            nodePosition = nodePosition,
             error = error,
         )
 
         fun resumeAsync() = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack,
-            nodePosition = nodePosition,
             rawOutput = rawInput,
         )
     }
@@ -378,7 +384,6 @@ sealed class WorkflowEvent : WorkflowState() {
 
         fun resume(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack,
-            nodePosition = nodePosition,
             rawOutput = rawOutput,
         )
     }

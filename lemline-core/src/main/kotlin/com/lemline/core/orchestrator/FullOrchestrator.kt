@@ -157,14 +157,12 @@ internal object FullOrchestrator {
             logger.debug { "Fork completed: output=$output" }
             WorkflowCommand.ResumeWithCompletedTask(
                 nodeStack = event.nodeStack,
-                nodePosition = forkNode.position,
                 rawOutput = output,
             )
         } catch (e: InternalException) {
             logger.error { "Fork failed: error=$e" }
             WorkflowCommand.ResumeWithFailedTask(
                 nodeStack = event.nodeStack,
-                nodePosition = forkNode.position,
                 error = InternalException.Error.from(e, forkNode.position)
             )
         }

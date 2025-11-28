@@ -187,7 +187,6 @@ fun WorkflowCommand.ResumeFromTask.Companion.random() = WorkflowCommand.ResumeFr
 
 fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand.ResumeWithCompletedTask(
     nodeStack = NodeStack.random(),
-    nodePosition = NodePosition.random(),
     rawOutput = JsonElement.random(),
 )
 
@@ -227,7 +226,6 @@ fun WorkflowEvent.WorkflowCompleted.Companion.random() = WorkflowEvent.WorkflowC
 
 fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFailed(
     nodeStack = NodeStack.random(),
-    nodePosition = NodePosition.random(),
     rawInput = when (Random.nextBoolean()) {
         true -> JsonElement.random()
         false -> null
