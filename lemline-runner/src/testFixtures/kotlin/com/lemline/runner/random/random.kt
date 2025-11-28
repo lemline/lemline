@@ -101,7 +101,7 @@ fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkf
     )
 )
 
-fun WorkflowEvent.RetryScheduled.Companion.random() = WorkflowEvent.RetryScheduled(
+fun WorkflowEvent.TaskRetryScheduled.Companion.random() = WorkflowEvent.TaskRetryScheduled(
     nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
@@ -179,7 +179,7 @@ fun RetryModel.Companion.random() = RetryModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
-        workflowState = WorkflowEvent.RetryScheduled.random(),
+        workflowState = WorkflowEvent.TaskRetryScheduled.random(),
     ),
     outboxScheduledFor = Instant.random(),
     errorReason = String.random(),

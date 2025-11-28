@@ -62,7 +62,7 @@ class RetryRepository : OutboxRepository<RetryModel>() {
 
     override fun createModel(rs: ResultSet) = RetryModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage<WorkflowEvent.RetryScheduled>()!!,
+        instanceMessage = rs.getInstanceMessage<WorkflowEvent.TaskRetryScheduled>()!!,
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN)!!,
         errorReason = rs.getString(ERROR_REASON_COLUMN),
         errorClass = rs.getString(ERROR_CLASS_COLUMN),

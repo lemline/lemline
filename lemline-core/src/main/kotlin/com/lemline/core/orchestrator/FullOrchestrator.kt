@@ -57,7 +57,7 @@ internal object FullOrchestrator {
         return when (val event = StepByStepOrchestrator.runByTask(workflow, command)) {
             is WorkflowEvent.WaitStarted -> resume(workflow, handle(event))
             is WorkflowEvent.TaskScheduled -> resume(workflow, handle(event))
-            is WorkflowEvent.RetryScheduled -> resume(workflow, handle(event))
+            is WorkflowEvent.TaskRetryScheduled -> resume(workflow, handle(event))
             is WorkflowEvent.RunWorkflowStarted -> resume(workflow, handle(event))
             is WorkflowEvent.ForkStarted -> resume(workflow, handle(workflow, event))
             is WorkflowEvent.Outcome -> return event
@@ -68,7 +68,7 @@ internal object FullOrchestrator {
      * Handles a retry event by delaying execution until the scheduled retry time
      * and then resuming the workflow from the specified task.
      */
-    private suspend fun handle(event: WorkflowEvent.RetryScheduled): WorkflowCommand {
+    private suspend fun handle(event: WorkflowEvent.TaskRetryScheduled): WorkflowCommand {
         val delayDuration = event.retryAt - Clock.System.now()
         logger.debug { "Retrying in $delayDuration" }
         if (delayDuration > Duration.ZERO) delay(delayDuration)
@@ -97,9 +97,9 @@ internal object FullOrchestrator {
                 logger.debug { "Child workflow completed" }
                 when (result) {
                     is WorkflowEvent.WorkflowCompleted -> event.resumeAsCompleted(result.output)
-                    is WorkflowEvent.BranchCompleted -> event.resumeAsCompleted(result.output)
+                    is WorkflowEvent.ForkCompleted -> event.resumeAsCompleted(result.output)
                     is WorkflowEvent.WorkflowFailed -> event.resumeAsFailed(result.error)
-                    is WorkflowEvent.BranchFailed -> event.resumeAsFailed(result.error)
+                    is WorkflowEvent.ForkFailed -> event.resumeAsFailed(result.error)
                 }
             }
 

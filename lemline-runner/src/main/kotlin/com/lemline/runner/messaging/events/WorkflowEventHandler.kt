@@ -136,12 +136,12 @@ internal class WorkflowEventHandler(
      * Handles workflow events by pattern matching on WorkflowEvent types.
      * Routes different events to appropriate repositories:
      * - [WorkflowEvent.WaitStarted] → waits table
-     * - [WorkflowEvent.RetryScheduled] → retries table
+     * - [WorkflowEvent.TaskRetryScheduled] → retries table
      * - [WorkflowEvent.WorkflowFailed] → failures table
      * - [WorkflowEvent.RunWorkflowStarted] → parents table + child creation
      * - [WorkflowEvent.WorkflowCompleted] → parent completion
      * - [WorkflowEvent.ForkStarted] → forks table + branch creation
-     * - [WorkflowEvent.BranchCompleted] → branch completion
+     * - [WorkflowEvent.ForkCompleted] → branch completion
      *
      * Database operations fail fast - if they fail, the message will be NACKed
      * and redelivered by the broker.
@@ -152,15 +152,15 @@ internal class WorkflowEventHandler(
         when (val state = current.workflowState) {
             is WorkflowEvent.WaitStarted -> handleWaitStarted(current as InstanceMessage<WorkflowEvent.WaitStarted>)
 
-            is WorkflowEvent.RetryScheduled -> handleRetryScheduled(current as InstanceMessage<WorkflowEvent.RetryScheduled>)
+            is WorkflowEvent.TaskRetryScheduled -> handleRetryScheduled(current as InstanceMessage<WorkflowEvent.TaskRetryScheduled>)
 
             is WorkflowEvent.RunWorkflowStarted -> handleRunWorkflowStarted(current as InstanceMessage<WorkflowEvent.RunWorkflowStarted>)
 
             is WorkflowEvent.ForkStarted -> handleForkStarted(current as InstanceMessage<WorkflowEvent.ForkStarted>)
 
-            is WorkflowEvent.BranchCompleted -> handleBranchCompleted(current as InstanceMessage<WorkflowEvent.BranchCompleted>)
+            is WorkflowEvent.ForkCompleted -> handleBranchCompleted(current as InstanceMessage<WorkflowEvent.ForkCompleted>)
 
-            is WorkflowEvent.BranchFailed -> handleBranchFailed(current as InstanceMessage<WorkflowEvent.BranchFailed>)
+            is WorkflowEvent.ForkFailed -> handleBranchFailed(current as InstanceMessage<WorkflowEvent.ForkFailed>)
 
             is WorkflowEvent.WorkflowCompleted -> handleWorkflowCompleted(current as InstanceMessage<WorkflowEvent.WorkflowCompleted>)
 
@@ -180,7 +180,7 @@ internal class WorkflowEventHandler(
         )
     }
 
-    private suspend fun handleRetryScheduled(instance: InstanceMessage<WorkflowEvent.RetryScheduled>) {
+    private suspend fun handleRetryScheduled(instance: InstanceMessage<WorkflowEvent.TaskRetryScheduled>) {
         retryRepository.insert(
             RetryModel.from(
                 instance = instance,
@@ -383,7 +383,7 @@ internal class WorkflowEventHandler(
      * 4. If complete, assembling output and resuming parent workflow
      * 5. If not complete, waiting for more branches
      */
-    private suspend fun handleBranchCompleted(instance: InstanceMessage<WorkflowEvent.BranchCompleted>) {
+    private suspend fun handleBranchCompleted(instance: InstanceMessage<WorkflowEvent.ForkCompleted>) {
         val state = instance.workflowState
         val forkPosition = state.nodePosition
         val branchOutput = state.output
@@ -484,7 +484,7 @@ internal class WorkflowEventHandler(
      *
      * Similar pattern to handleForkBranchCompleted but with error handling logic.
      */
-    private suspend fun handleBranchFailed(instance: InstanceMessage<WorkflowEvent.BranchFailed>) {
+    private suspend fun handleBranchFailed(instance: InstanceMessage<WorkflowEvent.ForkFailed>) {
         val state = instance.workflowState
         val forkPosition = state.nodePosition
         val branchError = state.error

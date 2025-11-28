@@ -196,10 +196,10 @@ fun WorkflowEvent.Companion.random(): WorkflowEvent {
         1 -> WorkflowEvent.WorkflowFailed.random()
         2 -> WorkflowEvent.TaskScheduled.random()
         3 -> WorkflowEvent.WaitStarted.random()
-        4 -> WorkflowEvent.RetryScheduled.random()
+        4 -> WorkflowEvent.TaskRetryScheduled.random()
         5 -> WorkflowEvent.RunWorkflowStarted.random()
         6 -> WorkflowEvent.ForkStarted.random()
-        else -> WorkflowEvent.BranchCompleted.random()
+        else -> WorkflowEvent.ForkCompleted.random()
     }
 }
 
@@ -259,7 +259,7 @@ fun WorkflowEvent.WaitStarted.Companion.random() = WorkflowEvent.WaitStarted(
     waitUntil = Clock.System.now() + Random.nextLong(100, 10000).milliseconds
 )
 
-fun WorkflowEvent.RetryScheduled.Companion.random() = WorkflowEvent.RetryScheduled(
+fun WorkflowEvent.TaskRetryScheduled.Companion.random() = WorkflowEvent.TaskRetryScheduled(
     nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
@@ -283,8 +283,8 @@ fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(
     rawInput = JsonElement.random(),
 )
 
-fun WorkflowEvent.BranchCompleted.Companion.random() =
-    WorkflowEvent.BranchCompleted(
+fun WorkflowEvent.ForkCompleted.Companion.random() =
+    WorkflowEvent.ForkCompleted(
         nodeStack = NodeStack.random(),
         branchName = String.random(),
         output = JsonElement.random(),

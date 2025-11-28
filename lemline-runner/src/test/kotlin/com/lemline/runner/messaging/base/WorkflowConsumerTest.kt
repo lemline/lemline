@@ -278,7 +278,7 @@ internal abstract class WorkflowConsumerTest {
         receivedEvent().shouldNotBeNull {
             val instance = InstanceMessage.fromJsonString<WorkflowEvent>(this)
             instance.workflowState.nodePosition.toString() shouldBe "/do/retryCase/try"
-            val retryingState = instance.workflowState as WorkflowEvent.RetryScheduled
+            val retryingState = instance.workflowState as WorkflowEvent.TaskRetryScheduled
             retryingState.retryAt shouldNotBe null
         }
     }

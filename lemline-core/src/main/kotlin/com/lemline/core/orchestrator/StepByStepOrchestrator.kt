@@ -18,11 +18,11 @@ import com.lemline.core.states.RootState
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.states.WorkflowEvent.BranchCompleted
-import com.lemline.core.states.WorkflowEvent.BranchFailed
+import com.lemline.core.states.WorkflowEvent.ForkCompleted
+import com.lemline.core.states.WorkflowEvent.ForkFailed
 import com.lemline.core.states.WorkflowEvent.ForkStarted
-import com.lemline.core.states.WorkflowEvent.RetryScheduled
 import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
+import com.lemline.core.states.WorkflowEvent.TaskRetryScheduled
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WaitStarted
 import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
@@ -127,7 +127,7 @@ object StepByStepOrchestrator {
             }
 
             is WaitStarted -> event
-            is RetryScheduled -> event
+            is TaskRetryScheduled -> event
             is RunWorkflowStarted -> event
             is ForkStarted -> event
             is WorkflowEvent.Outcome -> event
@@ -277,7 +277,7 @@ object StepByStepOrchestrator {
         }
 
         // The current task must be retried
-        if (result.retryAt != null) return RetryScheduled(
+        if (result.retryAt != null) return TaskRetryScheduled(
             nodeStack = result.nodeStack,
             nodePosition = result.nextNode.position,
             rawInput = result.nextInput,
@@ -301,7 +301,7 @@ object StepByStepOrchestrator {
         nodeStack: NodeStack,
         failingNode: Node<*>,
         exception: Exception
-    ): BranchFailed? {
+    ): ForkFailed? {
         // Find the nearest Fork task up the current node
         var current: Node<*> = failingNode
 
@@ -310,7 +310,7 @@ object StepByStepOrchestrator {
 
             if (forkNode.task is ForkTask) {
                 // Pop all states up to and including the fork node
-                return BranchFailed(
+                return ForkFailed(
                     nodeStack = nodeStack.popUntil(forkNode.position),
                     branchName = current.name,
                     error = InternalException.Error.from(exception, failingNode.position),
@@ -325,7 +325,7 @@ object StepByStepOrchestrator {
     private fun forkBranchCompleted(
         stepResult: StepResult,
         node: Node<*>
-    ): BranchCompleted? {
+    ): ForkCompleted? {
         val nextNode = stepResult.nextNode!!
         val nextState = stepResult.nodeStack[nextNode.position]
         // Is NextNode a fork? Do we enter from Child?
@@ -334,7 +334,7 @@ object StepByStepOrchestrator {
             val branchName = nextNode.children?.find { it.name == node.name }?.name
                 ?: throw IllegalStateException("Fork - can not find ${node.name} in ${nextNode.children?.joinToString { it.name }}")
 
-            return BranchCompleted(
+            return ForkCompleted(
                 nodeStack = stepResult.nodeStack,
                 branchName = branchName,
                 output = stepResult.nextInput,

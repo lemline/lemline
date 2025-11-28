@@ -279,7 +279,7 @@ internal class WorkflowCommandHandler(
                 }
             }
 
-            is WorkflowEvent.RetryScheduled -> {
+            is WorkflowEvent.TaskRetryScheduled -> {
                 // Check if the retry time has already been reached
                 if (event.retryAt <= Clock.System.now()) {
                     logger.debug { "Retry time reached, retrying immediately" }
@@ -326,13 +326,13 @@ internal class WorkflowCommandHandler(
                 null  // Terminal
             }
 
-            is WorkflowEvent.BranchCompleted -> {
+            is WorkflowEvent.ForkCompleted -> {
                 // Send to database for branch completion tracking
                 sendToDatabase(this, event)
                 null  // Terminal
             }
 
-            is WorkflowEvent.BranchFailed -> {
+            is WorkflowEvent.ForkFailed -> {
                 // Send to database for branch failure tracking
                 sendToDatabase(this, event)
                 null  // Terminal

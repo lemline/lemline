@@ -46,7 +46,7 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryModel>() {
         id = IDV7.random(),
         instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo.random(),
-            workflowState = WorkflowEvent.RetryScheduled.random(),
+            workflowState = WorkflowEvent.TaskRetryScheduled.random(),
         ),
         outboxScheduledFor = Clock.System.now(),
         errorReason = "test-error-reason",

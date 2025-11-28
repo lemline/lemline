@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.core.states
 
 import com.lemline.common.values.NodePosition
@@ -52,7 +54,7 @@ sealed class WorkflowState {
 sealed class WorkflowCommand : WorkflowState() {
 
     /**
-     * Command to resume workflow execution from a specific task.
+     * Command to resume workflow execution from a specific task (possibly not yet in nodeStack).
      */
     @Serializable
     data class ResumeFromTask(
@@ -65,10 +67,10 @@ sealed class WorkflowCommand : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
-        @ExperimentalTime
+
         fun duplicate(workflowId: WorkflowId): ResumeFromTask {
             val rootState = nodeStack[NodePosition.root] as RootState
             return copy(
@@ -92,7 +94,7 @@ sealed class WorkflowCommand : WorkflowState() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 
@@ -111,7 +113,7 @@ sealed class WorkflowCommand : WorkflowState() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", error=$error" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 }
@@ -126,19 +128,18 @@ sealed class WorkflowEvent : WorkflowState() {
         /**
          * Extracts the associated value from the [WorkflowEvent.Outcome] based on its type.
          */
-        @ExperimentalTime
+
         internal fun value(): JsonElement = when (this) {
             is WorkflowCompleted -> output
-            is BranchCompleted -> output
+            is ForkCompleted -> output
             is WorkflowFailed -> throw exception
-            is BranchFailed -> throw exception
+            is ForkFailed -> throw exception
         }
     }
 
     /**
      * Event emitted when a workflow completes.
      */
-    @ExperimentalTime
     @Serializable
     data class WorkflowCompleted(
         val output: JsonElement,
@@ -160,7 +161,6 @@ sealed class WorkflowEvent : WorkflowState() {
      * If rawInput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromTask] method
      * If rawOutput is not null, this error comes from the [com.lemline.core.orchestrator.StepByStepOrchestrator.resumeFromCompletedTask] method
      */
-    @ExperimentalTime
     @Serializable
     data class WorkflowFailed(
         override val nodeStack: NodeStack,
@@ -199,16 +199,15 @@ sealed class WorkflowEvent : WorkflowState() {
             ", rawOutput=$rawOutput" +
             ", flowDirective=$flowDirective" +
             ", error=$error" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 
     /**
      * Event emitted when a fork branch execution completes.
      */
-    @ExperimentalTime
     @Serializable
-    data class BranchCompleted(
+    data class ForkCompleted(
         override val nodeStack: NodeStack,
         val branchName: String,
         val output: JsonElement,
@@ -217,23 +216,22 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Outcome() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.lastPosition // Fork position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", branchName=$branchName" +
             ", transformedInput=$output" +
             ", flowDirective=$flowDirective" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 
     /**
      * Event emitted when a fork branch execution fails.
      */
-    @ExperimentalTime
     @Serializable
-    data class BranchFailed(
+    data class ForkFailed(
         override val nodeStack: NodeStack,
         val branchName: String,
         val error: InternalException.Error,
@@ -242,13 +240,13 @@ sealed class WorkflowEvent : WorkflowState() {
         val exception: InternalException by lazy { InternalException(error) }
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.lastPosition // Fork position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", branchName=$branchName" +
             ", error=$error" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
 
@@ -269,7 +267,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         fun resume() = WorkflowCommand.ResumeFromTask(
@@ -284,7 +282,6 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when a wait task is scheduled.
      */
     @Serializable
-    @ExperimentalTime
     data class WaitStarted(
         override val nodeStack: NodeStack,
         val waitState: WaitState,
@@ -293,13 +290,13 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Suspension() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.lastPosition // Wait position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
             ", waitUntil=$waitUntil" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         fun resume() = WorkflowCommand.ResumeWithCompletedTask(
@@ -309,11 +306,10 @@ sealed class WorkflowEvent : WorkflowState() {
     }
 
     /**
-     * Event emitted when a task retry is scheduled.
+     * Event emitted when the retry of a task (possibly not yet in nodeStack) is scheduled.
      */
     @Serializable
-    @ExperimentalTime
-    data class RetryScheduled(
+    data class TaskRetryScheduled(
         override val nodeStack: NodeStack,
         override val nodePosition: NodePosition,
         val rawInput: JsonElement,
@@ -326,7 +322,7 @@ sealed class WorkflowEvent : WorkflowState() {
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
             ", retryAt=$retryAt" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         fun resume() = WorkflowCommand.ResumeFromTask(
@@ -350,14 +346,14 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Suspension() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.lastPosition // RunWorkflow position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", runState=$runState" +
             ", transformedInput=$rawInput" +
             ", childConfig=$childConfig" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         fun resumeAsCompleted(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
@@ -388,13 +384,13 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Suspension() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.lastPosition // Fork position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", forkState=$forkState" +
             ", rawInput=$rawInput" +
-            ", states=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
         fun resume(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
