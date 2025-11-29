@@ -11,7 +11,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
-import kotlinx.serialization.builtins.PairSerializer
+import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
@@ -143,24 +143,37 @@ data class NodeStack(
 }
 
 /**
- * Custom serializer for [NodeStack] that optimizes storage by only storing
- * the last segment of each position instead of the full path.
+ * Custom serializer for [NodeStack] that optimizes storage by storing
+ * the relative path suffix from the previous position instead of the full path.
  *
- * During serialization: [("/", R), ("/do", D), ("/do/task", T)] → [("", R), ("do", D), ("task", T)]
- * During deserialization: paths are reconstructed by building up incrementally
+ * Serialization format: [{"": RootState}, {"do": DoState}, {"catch/do": DoState}]
+ * Each frame is a single-entry object where the key is the relative path suffix.
+ *
+ * During serialization: [("/", R), ("/do", D), ("/do/task", T)] → [{"": R}, {"do": D}, {"task": T}]
+ * For skipped segments: [("/do/tryBlock", T), ("/do/tryBlock/catch/do", D)] → [{"tryBlock": T}, {"catch/do": D}]
+ * During deserialization: paths are reconstructed by appending the suffix to the previous position
  */
 @OptIn(ExperimentalSerializationApi::class)
 internal object NodeStackSerializer : KSerializer<NodeStack> {
 
-    // Serialize as List<Pair<String, NodeState>> where String is just the segment name
-    private val delegateSerializer = ListSerializer(PairSerializer(String.serializer(), NodeState.serializer()))
+    // Serialize as List<Map<String, NodeState>> where each map has exactly one entry
+    private val delegateSerializer = ListSerializer(MapSerializer(String.serializer(), NodeState.serializer()))
 
     override val descriptor: SerialDescriptor = delegateSerializer.descriptor
 
     override fun serialize(encoder: Encoder, value: NodeStack) {
-        // Convert frames to (segment, state) pairs
+        // Convert frames to single-entry maps {relativeSuffix: state}
+        var previousPath = ""
         val compactFrames = value.map { entry ->
-            entry.key.nodeName to entry.value
+            val currentPath = entry.key.toString()
+            // Compute the relative suffix by removing the previous path prefix
+            val suffix = if (previousPath.isEmpty() || previousPath == "/") {
+                currentPath.removePrefix("/")
+            } else {
+                currentPath.removePrefix("$previousPath/")
+            }
+            previousPath = currentPath
+            mapOf(suffix to entry.value)
         }
         delegateSerializer.serialize(encoder, compactFrames)
     }
@@ -168,15 +181,18 @@ internal object NodeStackSerializer : KSerializer<NodeStack> {
     override fun deserialize(decoder: Decoder): NodeStack {
         val compactFrames = delegateSerializer.deserialize(decoder)
 
-        // Reconstruct full positions from segments
+        // Reconstruct full positions from relative suffixes
         var currentPosition = NodePosition.root
-        val frames = compactFrames.map { (segment, state) ->
-            currentPosition = if (segment.isEmpty()) {
+        val frames = compactFrames.map { singleEntryMap ->
+            val entry = singleEntryMap.entries.first()
+            val suffix = entry.key
+            val state = entry.value
+            currentPosition = if (suffix.isEmpty()) {
                 NodePosition.root
             } else {
-                // Build path: for root "/" → "/$segment", for "/do" → "/do/$segment"
+                // Append suffix to current position
                 val basePath = if (currentPosition.isRoot) "" else currentPosition.toString()
-                NodePosition("$basePath/$segment")
+                NodePosition("$basePath/$suffix")
             }
             currentPosition to state
         }

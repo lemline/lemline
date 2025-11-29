@@ -135,4 +135,42 @@ class NodeStackTest {
         // Then
         assertEquals(stack, deserialized)
     }
+
+    @Test
+    fun `should handle paths with skipped segments`() {
+        // Given - a stack that skips segment (common in try/catch execution)
+        // This happens when entering catch block: /do/tryBlock -> /do/tryBlock/catch/do
+        val root = NodePosition.root
+        val aPos = NodePosition("/do")
+        val bPos = NodePosition("/do/a/aBis")
+        val cPos = NodePosition("/do/a/aBis/b/bBis/b/Ter")
+
+        val stack = NodeStack(
+            listOf(
+                root to RootState(
+                    startedAt = Clock.System.now(),
+                    workflowId = WorkflowId.random(),
+                    workflowInput = JsonPrimitive("test")
+                ),
+                aPos to DoState(startedAt = Clock.System.now(), index = 0),
+                bPos to TryState(
+                    startedAt = Clock.System.now(),
+                    transformedInput = JsonPrimitive("input"),
+                    attemptIndex = 0,
+                    runningCatch = true,
+                    lastError = null,
+                    errorAs = "error"
+                ),
+                cPos to DoState(startedAt = Clock.System.now(), index = 0)
+            )
+        )
+
+        // When
+        val serialized = LemlineJson.encodeToString(stack)
+        val deserialized = LemlineJson.decodeFromString<NodeStack>(serialized)
+
+        // Then - the catch/do path should be preserved, not become just /do/tryBlock/do
+        assertEquals(stack, deserialized)
+        assertEquals(cPos, deserialized.lastPosition)
+    }
 }
