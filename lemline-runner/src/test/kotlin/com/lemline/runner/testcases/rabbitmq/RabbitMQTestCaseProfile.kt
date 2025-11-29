@@ -7,6 +7,7 @@ import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LemlineConfigConstants
 import com.lemline.runner.config.MESSAGING_TYPE
+import com.lemline.runner.config.ORCHESTRATOR_MODE
 import com.lemline.runner.tests.resources.RabbitMQTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -33,6 +34,9 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
             COMMANDS_PRODUCER_ENABLED to "true",
             EVENTS_CONSUMER_ENABLED to "true",
             EVENTS_PRODUCER_ENABLED to "true",
+
+            // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
+            ORCHESTRATOR_MODE to "all",
 
             // Loopback configuration using shared exchanges
             // Commands: input queue binds to the same exchange that output publishes to

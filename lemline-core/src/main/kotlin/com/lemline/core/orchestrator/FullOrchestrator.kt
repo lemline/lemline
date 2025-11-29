@@ -112,8 +112,10 @@ internal object FullOrchestrator {
         return when (event.childConfig.sync) {
             true -> {
                 // synchronous execution
-                val initCmd =
-                    StepByStepOrchestrator.initCmd(workflowInput = event.childConfig.input, hasWaitingParent = true)
+                val initCmd = StepByStepOrchestrator.initCmd(
+                    workflowInput = event.childConfig.input,
+                    hasWaitingParent = true
+                )
                 val result = resume(childWorkflow, initCmd, serde)
                 logger.debug { "Child workflow completed" }
                 when (result) {
@@ -127,8 +129,10 @@ internal object FullOrchestrator {
             false -> {
                 // asynchronous execution
                 CoroutineScope(currentCoroutineContext()).launch {
-                    val initCmd =
-                        StepByStepOrchestrator.initCmd(workflowInput = event.childConfig.input, hasWaitingParent = true)
+                    val initCmd = StepByStepOrchestrator.initCmd(
+                        workflowInput = event.childConfig.input,
+                        hasWaitingParent = false
+                    )
                     resume(childWorkflow, initCmd, serde) // <= output is not handled
                     logger.debug { "Child workflow completed" }
                 }

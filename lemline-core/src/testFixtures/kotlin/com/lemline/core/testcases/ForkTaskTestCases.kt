@@ -41,23 +41,28 @@ object ForkTaskTestCases {
         ),
 
         WorkflowTestCase(
-            name = "fork task returns first completed branch in compete mode",
+            name = "the fork task returns first completed branch in compete mode",
             yaml = """
                 do:
                   - raceWork:
                       fork:
                         compete: true
                         branches:
-                          - branch1:
-                              set:
-                                winner: "first"
-                          - branch2:
+                          - slowBranch:
+                              do:
+                                - waiting:
+                                    wait:
+                                      seconds: 1
+                                - first:
+                                    set:
+                                        winner: "first"
+                          - fastBranch:
                               set:
                                 winner: "second"
             """.trimIndent(),
             validate = expectOutputMatching("single result with winner") { output ->
                 val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["winner"]?.jsonPrimitive?.content == "first"
+                obj["winner"]?.jsonPrimitive?.content == "second"
             }
         ),
 

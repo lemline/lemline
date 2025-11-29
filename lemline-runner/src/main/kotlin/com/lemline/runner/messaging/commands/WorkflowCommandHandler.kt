@@ -9,6 +9,7 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
@@ -46,6 +47,7 @@ internal class WorkflowCommandHandler(
     private val definitionRepository: DefinitionRepository,
     private val failureRepository: FailureRepository,
     override val metrics: WorkflowCommandSubscriberMetrics,
+    private val config: LemlineConfiguration,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
 
@@ -239,8 +241,12 @@ internal class WorkflowCommandHandler(
     /**
      * Executes one step of the workflow using WorkflowOrchestrator.
      *
-     * This method calls the functional WorkflowOrchestrator to execute one activity,
+     * This method calls the functional WorkflowOrchestrator to execute one step,
      * then pattern matches on the returned WorkflowState to determine the next action.
+     *
+     * The step granularity is controlled by [LemlineConfiguration.OrchestratorConfig.mode]:
+     * - ACTION: Batches control flow nodes, emits message only for action tasks (default)
+     * - ALL: Emits a message for every task including control flow nodes
      *
      * @return InstanceMessage to emit for next step, or null if paused/terminal
      */
@@ -248,10 +254,10 @@ internal class WorkflowCommandHandler(
 
         // Execute using StepByStepOrchestrator
         logger.debug { "resumeFromTask state=$workflowState" }
-        val event = StepByStepOrchestrator.runByActivity(
-            workflow = workflow,
-            command = workflowState,
-        )
+        val event = when (config.orchestrator().mode()) {
+            LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(workflow, workflowState)
+            LemlineConfiguration.OrchestratorMode.ACTION -> StepByStepOrchestrator.runByActivity(workflow, workflowState)
+        }
 
         // Handle the outcome
         return handleEvent(workflow, event)

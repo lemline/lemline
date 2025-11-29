@@ -1,12 +1,10 @@
-// SPDX-License-Identifier: BUSL-1.1
-@file:OptIn(ExperimentalTime::class)
-
 package com.lemline.core.testcases
 
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
+import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -22,6 +20,7 @@ import kotlinx.serialization.json.JsonElement
  */
 class FullOrchestratorExecutor : WorkflowTestExecutor {
 
+    @ExperimentalTime
     override suspend fun execute(
         yaml: String,
         input: JsonElement,
@@ -75,7 +74,7 @@ class FullOrchestratorExecutor : WorkflowTestExecutor {
             namespace: String = "test",
             name: String = "workflow-${doYaml.hashCode()}",
             version: String = "0.1.0"
-        ): io.serverlessworkflow.api.types.Workflow {
+        ): Workflow {
             val document = """
                 document:
                   dsl: '1.0.0'
