@@ -141,7 +141,7 @@ internal class WorkflowEventHandler(
      * - [WorkflowEvent.RunWorkflowStarted] → parents table + child creation
      * - [WorkflowEvent.WorkflowCompleted] → parent completion
      * - [WorkflowEvent.ForkStarted] → forks table + branch creation
-     * - [WorkflowEvent.ForkCompleted] → branch completion
+     * - [WorkflowEvent.ForkBranchCompleted] → branch completion
      *
      * Database operations fail fast - if they fail, the message will be NACKed
      * and redelivered by the broker.
@@ -158,9 +158,9 @@ internal class WorkflowEventHandler(
 
             is WorkflowEvent.ForkStarted -> handleForkStarted(current as InstanceMessage<WorkflowEvent.ForkStarted>)
 
-            is WorkflowEvent.ForkCompleted -> handleBranchCompleted(current as InstanceMessage<WorkflowEvent.ForkCompleted>)
+            is WorkflowEvent.ForkBranchCompleted -> handleBranchCompleted(current as InstanceMessage<WorkflowEvent.ForkBranchCompleted>)
 
-            is WorkflowEvent.ForkFailed -> handleBranchFailed(current as InstanceMessage<WorkflowEvent.ForkFailed>)
+            is WorkflowEvent.ForkBranchFailed -> handleBranchFailed(current as InstanceMessage<WorkflowEvent.ForkBranchFailed>)
 
             is WorkflowEvent.WorkflowCompleted -> handleWorkflowCompleted(current as InstanceMessage<WorkflowEvent.WorkflowCompleted>)
 
@@ -296,7 +296,7 @@ internal class WorkflowEventHandler(
             instance.workflowInfo.workflowVersion
         )
             ?: error("CRITICAL - Unable to find definition of workflow ${instance.workflowInfo.workflowNamespace}/${instance.workflowInfo.workflowName}/${instance.workflowInfo.workflowVersion}.")
-        if (workflow.schedule.after != null) {
+        if (workflow.schedule?.after != null) {
             scheduleRepository.findByWorkflowId(instance.workflowId)?.let { schedule ->
                 schedule.scheduleAfterCompletion()
                 scheduleRepository.update(schedule)
@@ -383,7 +383,7 @@ internal class WorkflowEventHandler(
      * 4. If complete, assembling output and resuming parent workflow
      * 5. If not complete, waiting for more branches
      */
-    private suspend fun handleBranchCompleted(instance: InstanceMessage<WorkflowEvent.ForkCompleted>) {
+    private suspend fun handleBranchCompleted(instance: InstanceMessage<WorkflowEvent.ForkBranchCompleted>) {
         val state = instance.workflowState
         val forkPosition = state.nodePosition
         val branchOutput = state.output
@@ -483,7 +483,7 @@ internal class WorkflowEventHandler(
      *
      * Similar pattern to handleForkBranchCompleted but with error handling logic.
      */
-    private suspend fun handleBranchFailed(instance: InstanceMessage<WorkflowEvent.ForkFailed>) {
+    private suspend fun handleBranchFailed(instance: InstanceMessage<WorkflowEvent.ForkBranchFailed>) {
         val state = instance.workflowState
         val forkPosition = state.nodePosition
         val branchError = state.error

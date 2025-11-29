@@ -111,6 +111,7 @@ dependencies {
     // 4) Testing
     // ─────────────────────────────────────────────────────────────────────────
     testImplementation(testFixtures(project(":lemline-common")))
+    testImplementation(testFixtures(project(":lemline-core")))
 
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform(libs.kotest.bom))

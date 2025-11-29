@@ -325,13 +325,13 @@ internal class WorkflowCommandHandler(
                 null  // Terminal
             }
 
-            is WorkflowEvent.ForkCompleted -> {
+            is WorkflowEvent.ForkBranchCompleted -> {
                 // Send to database for branch completion tracking
                 sendToDatabase(this, event)
                 null  // Terminal
             }
 
-            is WorkflowEvent.ForkFailed -> {
+            is WorkflowEvent.ForkBranchFailed -> {
                 // Send to database for branch failure tracking
                 sendToDatabase(this, event)
                 null  // Terminal
