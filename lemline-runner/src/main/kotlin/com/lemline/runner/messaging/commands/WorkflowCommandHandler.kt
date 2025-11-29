@@ -55,6 +55,13 @@ internal class WorkflowCommandHandler(
     @TestOnly
     override var onFailureTest = { _: Message<String>, _: Throwable? -> }
 
+    /**
+     * Test callback invoked when a terminal workflow event is produced.
+     * Used by broker tests to capture completion without relying on the events channel.
+     */
+    @TestOnly
+    var onEventProducedTest: (InstanceMessage<WorkflowCommand>, WorkflowEvent) -> Unit = { _, _ -> }
+
     // ========================================
     // Deserialization
     // ========================================
@@ -312,6 +319,9 @@ internal class WorkflowCommandHandler(
                 // Only persist if parent or scheduled workflow
                 logger.debug { "Workflow completed with output: ${event.output}" }
 
+                // Notify test callback (before potentially sending to database)
+                onEventProducedTest(this, event)
+
                 // Determine if this workflow has a parent or need to be scheduled after completion
                 if (event.hasWaitingParent || workflow.schedule?.after != null) {
                     sendToDatabase(this, event)
@@ -320,6 +330,9 @@ internal class WorkflowCommandHandler(
             }
 
             is WorkflowEvent.WorkflowFailed -> {
+                // Notify test callback (before sending to database)
+                onEventProducedTest(this, event)
+
                 // Send to database for failure persistence
                 sendToDatabase(this, event)
                 null  // Terminal

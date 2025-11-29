@@ -66,7 +66,7 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
     @PostConstruct
     override fun init() {
         if (!enabled) {
-            logger.debug { "🚫 Relay disabled by config" }
+            logger.debug { "🚫 Outbox disabled by config" }
             return
         }
 
@@ -78,7 +78,7 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
                 period,
                 TimeUnit.SECONDS
             )
-            logger.info { "⏱️ Relay processing scheduled every ${period}s" }
+            logger.info { "⏱️ Outbox processing scheduled every ${period}s" }
         }
 
         // Schedule cleanup (inherited from AbstractCleaner)

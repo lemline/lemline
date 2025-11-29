@@ -1,8 +1,7 @@
-// SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.testcases
+package com.lemline.runner.testcases.inMemory
 
 import com.lemline.core.testcases.WorkflowTestCase
-import com.lemline.core.testcases.WorkflowTestResult
+import com.lemline.runner.testcases.RunnerWorkflowTestExecutor
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
@@ -13,7 +12,7 @@ import org.junit.jupiter.api.TestFactory
 /**
  * Abstract base class for runner workflow execution tests.
  *
- * This class uses JUnit5's dynamic tests to execute shared [WorkflowTestCase]s
+ * This class uses JUnit5's dynamic tests to execute shared [com.lemline.core.testcases.WorkflowTestCase]s
  * from lemline-core's testFixtures against the runner's messaging infrastructure.
  *
  * Subclasses must:
@@ -26,7 +25,7 @@ import org.junit.jupiter.api.TestFactory
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class AbstractRunnerWorkflowTest(
+internal abstract class InMemoryRunnerWorkflowTest(
     private val testCases: List<WorkflowTestCase>,
     private val excludeTags: Set<String> = emptySet()
 ) {
@@ -66,9 +65,11 @@ internal abstract class AbstractRunnerWorkflowTest(
             "unix-only" in case.tags -> {
                 osName.contains("mac") || osName.contains("linux")
             }
+
             "windows-only" in case.tags -> {
                 osName.contains("windows")
             }
+
             else -> true
         }
     }
