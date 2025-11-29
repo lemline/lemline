@@ -3,7 +3,7 @@ package com.lemline.core.nodes
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.NodePosition
-import com.lemline.common.values.Token.BRANCHES
+import com.lemline.common.values.Token
 import com.lemline.common.values.Token.CATCH
 import com.lemline.common.values.Token.DO
 import com.lemline.common.values.Token.FOREACH
@@ -233,9 +233,9 @@ private fun TryTask.parseChildren(position: NodePosition, parent: Node<*>?): Lis
     `catch`.`do`?.let {
         add(
             Node(
-                position = position.addToken(CATCH).addToken(DO),
+                position = position.addToken(CATCH),
                 task = DoTask(it),
-                name = "$CATCH.$DO",
+                name = "$CATCH",
                 parent = parent,
             ),
         )
@@ -245,7 +245,7 @@ private fun TryTask.parseChildren(position: NodePosition, parent: Node<*>?): Lis
 private fun ForkTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>>? =
     fork.branches?.map { taskItem ->
         Node(
-            position = position.addToken(FORK).addToken(BRANCHES).addName(taskItem.name),
+            position = position.addToken(FORK).addName(taskItem.name),
             task = taskItem.toTask(),
             name = taskItem.name,
             parent = parent,
@@ -255,9 +255,9 @@ private fun ForkTask.parseChildren(position: NodePosition, parent: Node<*>?): Li
 private fun ListenTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>>? = foreach?.`do`?.let {
     listOf(
         Node(
-            position = position.addToken(FOREACH).addToken(DO),
+            position = position.addToken(Token.FOR),
             task = DoTask(it),
-            name = "$FOREACH.$DO",
+            name = "${Token.FOR}",
             parent = parent,
         ),
     )
