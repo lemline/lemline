@@ -4,6 +4,7 @@ package com.lemline.core.processors
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.json.LemlineJson.toJsonElement
 import com.lemline.common.logger.logger
+import com.lemline.common.values.NodePosition
 import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
@@ -12,11 +13,12 @@ import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.orchestrator.StepResult
-import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.orchestrator.context.TaskContext
-import com.lemline.core.orchestrator.context.merge
+import com.lemline.core.processors.scope.Scope
+import com.lemline.core.processors.scope.TaskScope
+import com.lemline.core.processors.scope.merge
 import com.lemline.core.schemas.SchemaValidator
-import com.lemline.core.states.TaskState
+import com.lemline.core.states.NodeStack
+import com.lemline.core.states.NodeState
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
@@ -36,7 +38,7 @@ import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.booleanOrNull
 
 @ExperimentalTime
-abstract class NodeProcessor<T : TaskBase, S : TaskState>(
+abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     val node: Node<T>
 ) {
     val logger = logger()
@@ -49,7 +51,7 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
      * Create the initial state for this node.
      * Subclasses override to create their specific state type.
      */
-    abstract fun createState(transformedInput: JsonElement, scope: Scope): S
+    abstract fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): S
 
     /**
      * Execute node action (for activity tasks).
@@ -72,30 +74,44 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     }
 
     /**
-     * Determine:
-     * - the updated state of current node
-     * - the next node (parent or child)
-     * - the flow directive for the parent (if any)
-     *
-     * The default implementation is the implementation for a leaf (activity, switch, ...)
-     * Other tasks MUST redefine this method.
+     * Update state when re-entering from child.
+     * Default: just increment visitCount.
      */
-    open fun getNextStepInfo(
+    open fun stateEnterFromChild(
+        state: S,
+        output: JsonElement,
+        scope: Scope,
+        nodeName: String? = null
+    ): S {
+        // Default implementation for leaf nodes - just increment visitCount
+        @Suppress("UNCHECKED_CAST")
+        return state
+    }
+
+    /**
+     * Determine where to go next based on current state.
+     * Default: go to parent (leaf node behavior - activities, switch, etc.)
+     */
+    open fun getNextNode(
         state: S,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String? = null,
-    ): NextStepInfo<S> = NextStepInfo(state, node.parent, getFlowDirective())
+    ): NavigationInfo {
+        return NavigationInfo(
+            nextNode = node.parent,
+            nextDirective = getFlowDirective()
+        )
+    }
 
     // ========================================
     // Entering a Node for the first time
     // ========================================
-    suspend fun enterFromParent(rawInput: JsonElement, parentScope: Scope): StepResult {
+    suspend fun enterFromParent(rawInput: JsonElement, parentScope: Scope, nodeStack: NodeStack): StepResult {
         // Create execution context
         val now = Clock.System.now()
 
         // create a mutable local task context
-        var context = TaskContext(startedAt = now)
+        var context = TaskScope(startedAt = now)
 
         // Validate input against schema (throws ValidationException)
         validateInput(rawInput)
@@ -105,10 +121,9 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
 
         // if this node is conditional, check if it should be executed, if not return to parent
         if (!checkIf(rawInput, mergeScope(parentScope, context))) return StepResult(
+            nodeStack = nodeStack,
             nextNode = node.parent,
-            nextInput = rawInput,
-            stateUpdates = emptyMap(),
-            nextDirective = null  // Continue to next sibling
+            nextInput = rawInput  // Continue to next sibling
         )
 
         // Apply input transformation (throws ExpressionException)
@@ -117,72 +132,115 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         // Update context with transformed input
         context = context.copy(transformedInput = transformedInput)
 
-        // state creation
-        val state = createState(transformedInput, mergeScope(parentScope, context))
+        // state creation and push to stack
+        val state = stateEnterFromParent(transformedInput, mergeScope(parentScope, context))
+        val updatedStack = nodeStack.push(node.position to state)
 
         // get the next node and an updated state for the current node
-        return continueTo(state, transformedInput, parentScope, context)
+        return continueTo(state, transformedInput, parentScope, context, updatedStack)
     }
 
     // ========================================
     // ReEntering a Control flow Node from a child
     // ========================================
 
-    // here we process the current node, knowing that we come from a child node that output dataset and flow directive
-    suspend fun enterFromChild(
-        state: S,
-        flowDirective: FlowDirective?,
-        datasetFromChild: JsonElement,
-        parentScope: Scope
-    ): StepResult = when (val directive = flowDirective?.get()) {
-        is FlowDirectiveEnum -> when (directive) {
-            // END: Workflow complete - recursive unwinding
-            FlowDirectiveEnum.END -> continueToEnd(datasetFromChild)
-            // EXIT: exit current node
-            FlowDirectiveEnum.EXIT -> continueToParent(state, datasetFromChild, getFlowDirective(), parentScope, null)
-            // CONTINUE: continue
-            FlowDirectiveEnum.CONTINUE -> continueTo(state, datasetFromChild, parentScope, null)
+    private val FlowDirective?.nodeName
+        get() = when (val nodeName = this?.get()) {
+            is String -> nodeName
+            else -> null
         }
 
-        // Goto named sibling or null
-        is String, null -> continueTo(state, datasetFromChild, parentScope, null, directive)
+    // here we process the current node, knowing that we come from a child node that output dataset and flow directive
+    internal suspend fun enterFromChild(
+        state: S,
+        flowDirective: FlowDirective?,
+        output: JsonElement,
+        parentScope: Scope,
+        nodeStack: NodeStack
+    ): StepResult {
+        val updatedState = stateEnterFromChild(state, output, parentScope, flowDirective.nodeName)
 
-        else -> throw IllegalArgumentException("Unknown flow directive: $directive")
+        return when (val directive = flowDirective?.get()) {
+            is FlowDirectiveEnum -> when (directive) {
+                // END: Workflow complete - recursive unwinding
+                FlowDirectiveEnum.END -> continueToEnd(dataset = output, nodeStack = nodeStack)
+                // EXIT: exit current node
+                FlowDirectiveEnum.EXIT -> continueToParent(
+                    state = updatedState,
+                    transformedInput = output,
+                    currentFlowDirective = getFlowDirective(),
+                    parentScope = parentScope,
+                    taskScope = null,
+                    nodeStack = nodeStack
+                )
+                // CONTINUE: continue
+                FlowDirectiveEnum.CONTINUE -> continueTo(
+                    state = updatedState,
+                    transformedInput = output,
+                    parentScope = parentScope,
+                    taskScope = null,
+                    nodeStack = nodeStack
+                )
+            }
+
+            // Goto named sibling or null
+            is String, null -> continueTo(
+                state = updatedState,
+                transformedInput = output,
+                parentScope = parentScope,
+                taskScope = null,
+                nodeStack = nodeStack
+            )
+
+            else -> throw IllegalArgumentException("Unknown flow directive: $directive")
+        }
     }
 
     // ========================================
     // CONTINUE
     // ========================================
-    suspend fun continueTo(
+    private suspend fun continueTo(
         state: S,
         transformedInput: JsonElement,
         parentScope: Scope,
-        taskContext: TaskContext?,
-        namedNode: String? = null
+        taskScope: TaskScope?,
+        nodeStack: NodeStack
     ): StepResult {
-        // get the next node and an updated state for the current node
-        val (updatedState, nextNode, currentFlowDirective) =
-            getNextStepInfo(state, transformedInput, mergeScope(parentScope, taskContext), namedNode)
+        // Pure navigation - determine where to go next
+        val scope = mergeScope(parentScope, taskScope)
+        val navigation = getNextNode(state, transformedInput, scope)
 
         // check if we should return to parent
-        return when (nextNode == node.parent) {
+        return when (navigation.nextNode == node.parent) {
             // case of leaf (activities, switch, ...) OR end of a control flow
-            true -> continueToParent(updatedState, transformedInput, currentFlowDirective, parentScope, taskContext)
+            true -> continueToParent(
+                state = state,
+                transformedInput = transformedInput,
+                currentFlowDirective = navigation.nextDirective,
+                parentScope = parentScope,
+                taskScope = taskScope,
+                nodeStack = nodeStack
+            )
 
             // control flows that are not completed (do, for, ...), going to a child
-            false -> continueToChild(nextNode, transformedInput, updatedState)
+            false -> continueToChild(
+                childNode = navigation.nextNode,
+                childRawInput = transformedInput,
+                updatedState = state,
+                nodeStack = nodeStack
+            )
         }
     }
 
     internal fun continueToChild(
         childNode: Node<*>?,
         childRawInput: JsonElement,
-        updatedState: TaskState
+        updatedState: NodeState,
+        nodeStack: NodeStack
     ) = StepResult(
-        childNode,
-        childRawInput,
-        mapOf(node.position to updatedState),
-        null
+        nodeStack = nodeStack.pop().push(node.position to updatedState),
+        nextNode = childNode,
+        nextInput = childRawInput
     )
 
     // ========================================
@@ -193,17 +251,15 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         transformedInput: JsonElement,
         currentFlowDirective: FlowDirective?,
         parentScope: Scope,
-        taskContext: TaskContext?
+        taskScope: TaskScope?,
+        nodeStack: NodeStack
     ): StepResult {
-        // create a mutable local task context
-        val context = taskContext
-
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
-        val rawOutput = execute(transformedInput, mergeScope(parentScope, context), state)
+        val rawOutput = execute(transformedInput, mergeScope(parentScope, taskScope), state)
 
         // Complete the task with the raw output
-        return completeTask(rawOutput, currentFlowDirective, parentScope, context)
+        return completeTask(rawOutput, currentFlowDirective, parentScope, taskScope, nodeStack)
     }
 
     /**
@@ -216,9 +272,10 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         rawOutput: JsonElement,
         currentFlowDirective: FlowDirective?,
         parentScope: Scope,
-        taskContext: TaskContext?
+        taskScope: TaskScope?,
+        nodeStack: NodeStack
     ): StepResult {
-        var context = taskContext
+        var context = taskScope
 
         // Update context with raw output
         context = context?.copy(rawOutput = rawOutput)
@@ -235,12 +292,18 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
         // Export to context if export.as is defined (throws ExpressionException or ValidationException)
         val exportedContext = exportToContext(transformedOutput, mergeScope(parentScope, context))
 
+        // Build the updated state stack: pop current node's state (but never root)
+        // State was pushed in enterFromParent, so it's always on the stack
+        var updatedStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop()
+        if (exportedContext != null) {
+            updatedStack = updatedStack.setContext(exportedContext)
+        }
+
         return StepResult(
-            node.parent,
-            transformedOutput,
-            mapOf(node.position to null),
-            currentFlowDirective,
-            exportedContext,
+            nodeStack = updatedStack,
+            nextNode = node.parent,
+            nextInput = transformedOutput,
+            nextDirective = currentFlowDirective,
         )
     }
 
@@ -248,10 +311,11 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // END
     // ========================================
 
-    internal fun continueToEnd(dataset: JsonElement) = StepResult(
+    internal fun continueToEnd(dataset: JsonElement, nodeStack: NodeStack) = StepResult(
+        nodeStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop(),
         nextNode = node.parent,
+        // Pop current node's state (but never root) - state was pushed in enterFromParent
         nextInput = dataset,
-        stateUpdates = mapOf(node.position to null), // clear the state of the current node
         nextDirective = FlowDirective().apply { setFlowDirectiveEnum(FlowDirectiveEnum.END) } // Pass END up the chain
     )
 
@@ -259,8 +323,8 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
     // Scope Method
     // ========================================
 
-    private fun mergeScope(parentScope: Scope, taskContext: TaskContext?) =
-        parentScope.merge(taskContext?.toScope(node))
+    private fun mergeScope(parentScope: Scope, taskScope: TaskScope?) =
+        parentScope.merge(taskScope?.toScope(node))
 
     // ========================================
     // Instance Methods (Scope-Dependent Operations)
@@ -425,14 +489,29 @@ abstract class NodeProcessor<T : TaskBase, S : TaskState>(
 }
 
 /**
+ * Represents the navigation decision within a workflow.
+ *
+ * Components:
+ * - A `Node<*>?`: The next node to navigate to, null indicates navigation ends
+ * - A `FlowDirective?`: Directives influencing the parent execution flow (if any)
+ */
+data class NavigationInfo(
+    val nextNode: Node<*>?,
+    val nextDirective: FlowDirective?
+)
+
+/**
  * Represents the result of determining the next navigation step within a workflow or process.
  *
  * Components:
  * - A `NodeState?`: The updated state of the *current* node
  * - A `Node<*>?`: The next node to navigate to, null indicates navigation ends
  * - A `FlowDirective?`: Directives influencing the parent execution flow (if any)
+ *
+ * @deprecated Use NavigationInfo for navigation decisions and updateState() for state updates
  */
-data class NextStepInfo<T : TaskState>(
+@Deprecated("Use NavigationInfo and updateState() separately")
+data class NextStepInfo<T : NodeState>(
     val updatedState: T,
     val nextNode: Node<*>?,
     val nextDirective: FlowDirective?

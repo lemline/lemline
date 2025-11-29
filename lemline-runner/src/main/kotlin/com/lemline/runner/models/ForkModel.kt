@@ -18,8 +18,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalTime
 @ExperimentalSerializationApi
 data class ForkModel(
-    /** Unique identifier for this fork execution */
-    override val id: IDV7 = IDV7.random(),
+    /** Unique identifier for this fork execution - must be derived from position + step for idempotency */
+    override val id: IDV7,
 
     /** Parent workflow state when the fork started */
     override val instanceMessage: InstanceMessage<WorkflowEvent.ForkStarted>,

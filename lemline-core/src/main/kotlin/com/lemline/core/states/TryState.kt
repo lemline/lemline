@@ -4,7 +4,7 @@
 package com.lemline.core.states
 
 import com.lemline.core.errors.InternalException
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -19,7 +19,7 @@ import kotlinx.serialization.json.encodeToJsonElement
  * consistent input for retries and catch blocks. This is the only flow task that stores input.
  *
  * Created with
- * - attemptIndex = -1
+ * - attemptIndex = 0
  * - runningCatch = false
  *
  * Has Entered the Try Block:
@@ -48,19 +48,9 @@ data class TryState(
     val attemptIndex: Int,
     val runningCatch: Boolean,
     val lastError: InternalException.Error? = null,
-    val errorAs: String
-) : TaskState() {
-
-    fun newAttemptState(error: InternalException.Error? = null): TryState = copy(
-        attemptIndex = attemptIndex + 1,
-        runningCatch = false,
-        lastError = error
-    )
-
-    fun toCatchState(error: InternalException.Error): TryState = copy(
-        runningCatch = true,
-        lastError = error
-    )
+    val errorAs: String,
+    val hasStarted: Boolean = false
+) : NodeState() {
 
     /**
      * If it exists, add the error to the scope

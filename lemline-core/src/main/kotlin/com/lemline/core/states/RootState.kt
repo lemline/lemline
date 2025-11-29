@@ -6,7 +6,7 @@ package com.lemline.core.states
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.expressions.scopes.WorkflowDescriptor
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.workflows.RuntimeDescriptor
 import io.serverlessworkflow.impl.expressions.DateTimeDescriptor
 import kotlin.time.ExperimentalTime
@@ -26,7 +26,8 @@ data class RootState(
     val workflowInput: JsonElement = buildJsonObject {},
     val context: Scope = buildJsonObject {},
     val hasWaitingParent: Boolean = false,
-) : TaskState() {
+    val workflowStep: Int = 0,
+) : NodeState() {
 
     @Transient
     lateinit var secrets: Map<String, String>

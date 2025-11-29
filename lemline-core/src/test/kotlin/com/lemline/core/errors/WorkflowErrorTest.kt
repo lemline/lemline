@@ -4,7 +4,7 @@
 package com.lemline.core.errors
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.nodes.PositionPointer
+import com.lemline.common.values.NodePosition
 import kotlin.test.assertEquals
 import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.Test
@@ -17,7 +17,7 @@ class WorkflowErrorTest {
             title = "Invalid_input",
             status = 400,
             details = "The_input_data_does_not_match_the_required_schema",
-            position = PositionPointer("/do/0").toPosition(),
+            position = NodePosition("/do/0"),
         )
 
         val json = LemlineJson.encodeToString(error)
@@ -61,7 +61,7 @@ class WorkflowErrorTest {
             errorType = WorkflowErrorType.RUNTIME,
             title = "Internal_error",
             details = "An_unexpected_error_occurred",
-            position = PositionPointer("/do/2").toPosition(),
+            position = NodePosition("/do/2"),
         )
 
         val json = LemlineJson.encodeToString(error)

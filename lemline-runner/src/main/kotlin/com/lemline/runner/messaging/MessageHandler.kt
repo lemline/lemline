@@ -3,6 +3,7 @@ package com.lemline.runner.messaging
 
 import com.lemline.common.logger.Logger
 import com.lemline.common.logger.withSuspendLoggingContext
+import com.lemline.common.values.IDV7
 import com.lemline.common.values.WithOptionalWorkflowInfo
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
@@ -31,8 +32,21 @@ internal interface MessageHandler<T> {
     /**
      * Emits the serialized payload to the message broker.
      * This is called with retry logic, so just perform the send operation.
+     *
+     * @param payload The serialized message payload
+     * @param idempotentKey Optional deterministic ID for message deduplication.
+     *                      If null, a random ID will be generated.
      */
-    suspend fun emit(payload: String)
+    suspend fun emit(payload: String, idempotentKey: IDV7)
+
+    /**
+     * Derives an idempotent key for the given message.
+     * Override to provide deterministic IDs based on message content.
+     *
+     * @param next The message to derive the key for
+     * @return An IDV7 for deduplication, or null for random ID
+     */
+    fun deriveIdempotentKey(next: T): IDV7
 
     val logger: Logger
 
@@ -68,7 +82,10 @@ internal interface MessageHandler<T> {
                     serialize(msg, it)
                 }
             }
-            nextPayload?.let { emit(it) }
+            // Derive idempotent key and emit with it
+            nextPayload?.let { payload ->
+                emit(payload, deriveIdempotentKey(next))
+            }
 
             onCompleteTest(message, next)
 

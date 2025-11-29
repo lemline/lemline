@@ -7,9 +7,10 @@ import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
-import com.lemline.core.states.TaskStates
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowState
 import com.lemline.core.utils.mapAwaitAllFailFast
 import com.lemline.core.utils.mapAwaitFirstFailSlow
 import io.serverlessworkflow.api.types.ForkTask
@@ -43,24 +44,44 @@ internal object FullOrchestrator {
         workflowInput: JsonElement = buildJsonObject { },
         hasWaitingParent: Boolean = false,
         startedAt: Instant = Clock.System.now(),
+        serde: Boolean = false
     ): JsonElement {
         val cmd = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
 
-        return resume(workflow, cmd).value()
+        return resume(workflow, cmd, serde).value()
     }
 
     suspend fun resume(
         workflow: Workflow,
         command: WorkflowCommand,
+        serde: Boolean,
     ): WorkflowEvent.Outcome {
 
-        return when (val event = StepByStepOrchestrator.runByTask(workflow, command)) {
-            is WorkflowEvent.WaitStarted -> resume(workflow, handle(event))
-            is WorkflowEvent.TaskScheduled -> resume(workflow, handle(event))
-            is WorkflowEvent.RetryScheduled -> resume(workflow, handle(event))
-            is WorkflowEvent.RunWorkflowStarted -> resume(workflow, handle(event))
-            is WorkflowEvent.ForkStarted -> resume(workflow, handle(workflow, event))
-            is WorkflowEvent.Outcome -> return event
+        val serdeCommand = when (serde) {
+            true -> WorkflowState.fromJsonString(command.toJsonString()) as WorkflowCommand
+            false -> command
+        }
+
+        if (command != serdeCommand)
+            throw IllegalStateException("Command mismatch\ncommand     : $command\nserdeCommand: $serdeCommand")
+
+        val event = StepByStepOrchestrator.runByTask(workflow, serdeCommand)
+
+        val serdeEvent = when (serde) {
+            true -> WorkflowState.fromJsonString(event.toJsonString()) as WorkflowEvent
+            false -> event
+        }
+
+        if (event != serdeEvent)
+            throw IllegalStateException("Event mismatch\nevent     : $event\nserdeEvent: $serdeEvent")
+
+        return when (serdeEvent) {
+            is WorkflowEvent.WaitStarted -> resume(workflow, handle(serdeEvent), serde)
+            is WorkflowEvent.TaskScheduled -> resume(workflow, handle(serdeEvent), serde)
+            is WorkflowEvent.TaskRetryScheduled -> resume(workflow, handle(serdeEvent), serde)
+            is WorkflowEvent.RunWorkflowStarted -> resume(workflow, handle(serdeEvent, serde), serde)
+            is WorkflowEvent.ForkStarted -> resume(workflow, handle(workflow, serdeEvent, serde), serde)
+            is WorkflowEvent.Outcome -> serdeEvent
         }
     }
 
@@ -68,7 +89,7 @@ internal object FullOrchestrator {
      * Handles a retry event by delaying execution until the scheduled retry time
      * and then resuming the workflow from the specified task.
      */
-    private suspend fun handle(event: WorkflowEvent.RetryScheduled): WorkflowCommand {
+    private suspend fun handle(event: WorkflowEvent.TaskRetryScheduled): WorkflowCommand {
         val delayDuration = event.retryAt - Clock.System.now()
         logger.debug { "Retrying in $delayDuration" }
         if (delayDuration > Duration.ZERO) delay(delayDuration)
@@ -80,7 +101,7 @@ internal object FullOrchestrator {
      * Handles a `RunWorkflowStarted` event by initiating the corresponding child workflow either
      * synchronously or asynchronously, depending on its configuration.
      */
-    private suspend fun handle(event: WorkflowEvent.RunWorkflowStarted): WorkflowCommand {
+    private suspend fun handle(event: WorkflowEvent.RunWorkflowStarted, serde: Boolean): WorkflowCommand {
         // Retrieve child workflow definition
         val childWorkflow = DefinitionCache.getWorkflow(
             namespace = event.childConfig.namespace,
@@ -91,24 +112,28 @@ internal object FullOrchestrator {
         return when (event.childConfig.sync) {
             true -> {
                 // synchronous execution
-                val initCmd =
-                    StepByStepOrchestrator.initCmd(workflowInput = event.childConfig.input, hasWaitingParent = true)
-                val result = resume(childWorkflow, initCmd)
+                val initCmd = StepByStepOrchestrator.initCmd(
+                    workflowInput = event.childConfig.input,
+                    hasWaitingParent = true
+                )
+                val result = resume(childWorkflow, initCmd, serde)
                 logger.debug { "Child workflow completed" }
                 when (result) {
                     is WorkflowEvent.WorkflowCompleted -> event.resumeAsCompleted(result.output)
-                    is WorkflowEvent.BranchCompleted -> event.resumeAsCompleted(result.output)
+                    is WorkflowEvent.ForkBranchCompleted -> event.resumeAsCompleted(result.output)
                     is WorkflowEvent.WorkflowFailed -> event.resumeAsFailed(result.error)
-                    is WorkflowEvent.BranchFailed -> event.resumeAsFailed(result.error)
+                    is WorkflowEvent.ForkBranchFailed -> event.resumeAsFailed(result.error)
                 }
             }
 
             false -> {
                 // asynchronous execution
                 CoroutineScope(currentCoroutineContext()).launch {
-                    val initCmd =
-                        StepByStepOrchestrator.initCmd(workflowInput = event.childConfig.input, hasWaitingParent = true)
-                    resume(childWorkflow, initCmd) // <= output is not handled
+                    val initCmd = StepByStepOrchestrator.initCmd(
+                        workflowInput = event.childConfig.input,
+                        hasWaitingParent = false
+                    )
+                    resume(childWorkflow, initCmd, serde) // <= output is not handled
                     logger.debug { "Child workflow completed" }
                 }
                 // Immediate resuming
@@ -140,31 +165,29 @@ internal object FullOrchestrator {
      * operation (compete or cooperative), executing the corresponding branches, and resuming
      * the workflow with the computed output.
      */
-    private suspend fun handle(workflow: Workflow, event: WorkflowEvent.ForkStarted): WorkflowCommand {
+    private suspend fun handle(workflow: Workflow, event: WorkflowEvent.ForkStarted, serde: Boolean): WorkflowCommand {
         @Suppress("UNCHECKED_CAST")
         val forkNode = workflow.getNode(event.nodePosition) as Node<ForkTask>
 
         val branches = forkNode.children
-            ?: throw IllegalStateException("Fork node in ${forkNode.reference} has no branches")
+            ?: throw IllegalStateException("Fork node in ${forkNode.position} has no branches")
 
         // Execute branches and get the result
         return try {
             val output = if (forkNode.task.fork.isCompete) {
-                workflow.executeCompete(event.taskStates, branches, event.rawInput)
+                workflow.executeCompete(event.nodeStack, branches, event.rawInput, serde)
             } else {
-                workflow.executeCooperative(event.taskStates, branches, event.rawInput)
+                workflow.executeCooperative(event.nodeStack, branches, event.rawInput, serde)
             }
             logger.debug { "Fork completed: output=$output" }
             WorkflowCommand.ResumeWithCompletedTask(
-                taskStates = event.taskStates,
-                nodePosition = forkNode.position,
+                nodeStack = event.nodeStack,
                 rawOutput = output,
             )
         } catch (e: InternalException) {
             logger.error { "Fork failed: error=$e" }
             WorkflowCommand.ResumeWithFailedTask(
-                taskStates = event.taskStates,
-                nodePosition = forkNode.position,
+                nodeStack = event.nodeStack,
                 error = InternalException.Error.from(e, forkNode.position)
             )
         }
@@ -177,20 +200,22 @@ internal object FullOrchestrator {
      * Throws an exception if all branches fail.
      */
     private suspend fun Workflow.executeCompete(
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         branches: List<Node<*>>,
         rawInput: JsonElement,
+        serde: Boolean
     ): JsonElement {
         // Get the first success - if all branches failed, the last exception will be rethrown from here
         return branches.mapAwaitFirstFailSlow { branchNode ->
             resume(
                 workflow = this,
                 command = WorkflowCommand.ResumeFromTask(
-                    taskStates = taskStates,
+                    nodeStack = nodeStack,
                     nodePosition = branchNode.position,
                     rawInput = rawInput,
                     flowDirective = null
-                )
+                ),
+                serde = serde
             ).value()
         }
     }
@@ -202,9 +227,10 @@ internal object FullOrchestrator {
      * Throws an exception for the first branch failing.
      */
     private suspend fun Workflow.executeCooperative(
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         branches: List<Node<*>>,
         rawInput: JsonElement,
+        serde: Boolean
     ): JsonArray {
         // Get all results - If a branch failed, the first exception will be rethrown from here
         return JsonArray(
@@ -212,11 +238,12 @@ internal object FullOrchestrator {
                 resume(
                     workflow = this,
                     command = WorkflowCommand.ResumeFromTask(
-                        taskStates = taskStates,
+                        nodeStack = nodeStack,
                         nodePosition = branchNode.position,
                         rawInput = rawInput,
                         flowDirective = null
-                    )
+                    ),
+                    serde = serde
                 ).value()
             })
     }

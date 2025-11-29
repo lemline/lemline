@@ -8,14 +8,12 @@ Lemline Core implements a robust workflow engine that emphasizes:
 
 *   **Pure Functional Design**: The orchestrator is stateless. It takes the current state and an event/input, and returns the next state and side effects. State is managed externally.
 *   **Serverless Workflow Support**: Native support for the [Serverless Workflow Specification](https://serverlessworkflow.io/), allowing you to define workflows using standard JSON or YAML.
-*   **Flexible Execution**:
-    *   **Continuous (Sync)**: For immediate execution, useful for short-lived workflows or testing.
-    *   **Async**: For distributed, long-running processes where state can be persisted and resumed.
+*   **Step-by-Step Execution**: The orchestrator executes one step at a time, returning control after each step. This enables distributed execution where state can be persisted and resumed.
 
 ## Key Components
 
-### WorkflowOrchestrator
-The `WorkflowOrchestrator` is the main entry point. It handles:
+### StepByStepOrchestrator
+The `StepByStepOrchestrator` is the main entry point. It handles:
 *   Starting new workflow instances.
 *   Resuming workflows from a specific task or state.
 *   Managing the flow of data (inputs/outputs) between nodes.
@@ -62,28 +60,26 @@ implementation(project(":lemline-core"))
 ### Starting a Workflow
 
 ```kotlin
-import com.lemline.core.orchestrator.WorkflowOrchestrator
-import com.lemline.core.orchestrator.ExecutionMode
+import com.lemline.core.orchestrator.StepByStepOrchestrator
 
 val workflow = ... // Load your Serverless Workflow definition
 val input = buildJsonObject { put("key", "value") }
 
-// Start synchronously
-val result = WorkflowOrchestrator.start(
+// Execute one step
+val result = StepByStepOrchestrator.start(
     workflow = workflow,
-    workflowInput = input,
-    executionMode = ExecutionMode.CONTINUOUS
+    workflowInput = input
 )
 ```
 
 ### Resuming a Workflow
 
 ```kotlin
-// Resume from a saved state
-val event = WorkflowOrchestrator.resume(
+// Resume from a saved state and execute next step
+val result = StepByStepOrchestrator.resume(
     workflow = workflow,
-    state = savedWorkflowCommand, // e.g., ResumeFromTask
-    executionMode = ExecutionMode.ASYNC
+    taskStates = savedTaskStates,
+    rawInput = input
 )
 ```
 

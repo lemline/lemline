@@ -9,6 +9,7 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
@@ -46,6 +47,7 @@ internal class WorkflowCommandHandler(
     private val definitionRepository: DefinitionRepository,
     private val failureRepository: FailureRepository,
     override val metrics: WorkflowCommandSubscriberMetrics,
+    private val config: LemlineConfiguration,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
 
@@ -54,6 +56,13 @@ internal class WorkflowCommandHandler(
 
     @TestOnly
     override var onFailureTest = { _: Message<String>, _: Throwable? -> }
+
+    /**
+     * Test callback invoked when a terminal workflow event is produced.
+     * Used by broker tests to capture completion without relying on the events channel.
+     */
+    @TestOnly
+    var onEventProducedTest: (InstanceMessage<WorkflowCommand>, WorkflowEvent) -> Unit = { _, _ -> }
 
     // ========================================
     // Deserialization
@@ -133,8 +142,7 @@ internal class WorkflowCommandHandler(
         return InstanceMessage(
             workflowInfo = workflowInfo,
             workflowState = WorkflowEvent.WorkflowFailed(
-                taskStates = workflowState.taskStates,
-                nodePosition = workflowState.nodePosition,
+                nodeStack = workflowState.nodeStack,
                 rawInput = null,
                 rawOutput = null,
                 flowDirective = null,
@@ -151,10 +159,20 @@ internal class WorkflowCommandHandler(
     /**
      * Emits the serialized payload to the instance message broker.
      * MessageEmitter.send() handles retries internally.
+     *
+     * @param payload The serialized message payload
+     * @param idempotentKey Optional deterministic ID for message deduplication
      */
-    override suspend fun emit(payload: String) {
-        commandEmitter.sendPayload(payload)
+    override suspend fun emit(payload: String, idempotentKey: IDV7) {
+        commandEmitter.sendPayload(payload, idempotentKey)
     }
+
+    /**
+     * Derives an idempotent key for command messages.
+     * Uses position + step to ensure deterministic IDs across redeliveries.
+     */
+    override fun deriveIdempotentKey(next: InstanceMessage<WorkflowCommand>): IDV7 =
+        next.workflowState.nodeStack.deriveIdempotentId("-command")
 
     // ========================================
     // Handling
@@ -233,8 +251,12 @@ internal class WorkflowCommandHandler(
     /**
      * Executes one step of the workflow using WorkflowOrchestrator.
      *
-     * This method calls the functional WorkflowOrchestrator to execute one activity,
+     * This method calls the functional WorkflowOrchestrator to execute one step,
      * then pattern matches on the returned WorkflowState to determine the next action.
+     *
+     * The step granularity is controlled by [LemlineConfiguration.OrchestratorConfig.mode]:
+     * - ACTION: Batches control flow nodes, emits message only for action tasks (default)
+     * - ALL: Emits a message for every task including control flow nodes
      *
      * @return InstanceMessage to emit for next step, or null if paused/terminal
      */
@@ -242,10 +264,13 @@ internal class WorkflowCommandHandler(
 
         // Execute using StepByStepOrchestrator
         logger.debug { "resumeFromTask state=$workflowState" }
-        val event = StepByStepOrchestrator.runByActivity(
-            workflow = workflow,
-            command = workflowState,
-        )
+        val event = when (config.orchestrator().mode()) {
+            LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(workflow, workflowState)
+            LemlineConfiguration.OrchestratorMode.ACTION -> StepByStepOrchestrator.runByActivity(
+                workflow,
+                workflowState
+            )
+        }
 
         // Handle the outcome
         return handleEvent(workflow, event)
@@ -279,7 +304,7 @@ internal class WorkflowCommandHandler(
                 }
             }
 
-            is WorkflowEvent.RetryScheduled -> {
+            is WorkflowEvent.TaskRetryScheduled -> {
                 // Check if the retry time has already been reached
                 if (event.retryAt <= Clock.System.now()) {
                     logger.debug { "Retry time reached, retrying immediately" }
@@ -313,6 +338,9 @@ internal class WorkflowCommandHandler(
                 // Only persist if parent or scheduled workflow
                 logger.debug { "Workflow completed with output: ${event.output}" }
 
+                // Notify test callback (before potentially sending to database)
+                onEventProducedTest(this, event)
+
                 // Determine if this workflow has a parent or need to be scheduled after completion
                 if (event.hasWaitingParent || workflow.schedule?.after != null) {
                     sendToDatabase(this, event)
@@ -321,18 +349,21 @@ internal class WorkflowCommandHandler(
             }
 
             is WorkflowEvent.WorkflowFailed -> {
+                // Notify test callback (before sending to database)
+                onEventProducedTest(this, event)
+
                 // Send to database for failure persistence
                 sendToDatabase(this, event)
                 null  // Terminal
             }
 
-            is WorkflowEvent.BranchCompleted -> {
+            is WorkflowEvent.ForkBranchCompleted -> {
                 // Send to database for branch completion tracking
                 sendToDatabase(this, event)
                 null  // Terminal
             }
 
-            is WorkflowEvent.BranchFailed -> {
+            is WorkflowEvent.ForkBranchFailed -> {
                 // Send to database for branch failure tracking
                 sendToDatabase(this, event)
                 null  // Terminal

@@ -6,6 +6,7 @@ package com.lemline.runner.random
 import com.lemline.common.random.nullableRandom
 import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
@@ -13,11 +14,10 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.AsyncTaskException
 import com.lemline.core.errors.InternalException
-import com.lemline.core.nodes.NodePosition
 import com.lemline.core.random.random
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.RunState
-import com.lemline.core.states.TaskStates
 import com.lemline.core.states.WaitState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
@@ -36,12 +36,14 @@ import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
-// Helper function to create task states with RootState
-private fun randomTaskStates(): TaskStates = mapOf(
-    NodePosition.root to RootState(
-        startedAt = Clock.System.now(),
-        workflowId = WorkflowId.random(),
-        workflowInput = JsonElement.random()
+// Helper function to create state stack with RootState
+private fun NodeStack.Companion.random(): NodeStack = NodeStack(
+    listOf(
+        NodePosition.root to RootState(
+            startedAt = Clock.System.now(),
+            workflowId = WorkflowId.random(),
+            workflowInput = JsonElement.random()
+        )
     )
 )
 
@@ -57,21 +59,19 @@ fun WorkflowCommand.Companion.random() = when (Random.nextBoolean()) {
 }
 
 fun WorkflowCommand.ResumeFromTask.Companion.random() = WorkflowCommand.ResumeFromTask(
-    taskStates = randomTaskStates(),
+    nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
     flowDirective = null
 )
 
 fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand.ResumeWithCompletedTask(
-    taskStates = randomTaskStates(),
-    nodePosition = NodePosition.random(),
+    nodeStack = NodeStack.random(),
     rawOutput = JsonElement.random(),
 )
 
 fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFailed(
-    taskStates = randomTaskStates(),
-    nodePosition = NodePosition.random(),
+    nodeStack = NodeStack.random(),
     rawInput = JsonElement.random(),
     rawOutput = JsonElement.random(),
     flowDirective = null,
@@ -86,8 +86,7 @@ fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFail
 )
 
 fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkflowStarted(
-    taskStates = randomTaskStates(),
-    nodePosition = NodePosition.random(),
+    nodeStack = NodeStack.random(),
     runState = RunState(),
     rawInput = JsonElement.random(),
     childConfig = AsyncTaskException.RunWorkflowStartedException.Config(
@@ -99,8 +98,8 @@ fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkf
     )
 )
 
-fun WorkflowEvent.RetryScheduled.Companion.random() = WorkflowEvent.RetryScheduled(
-    taskStates = randomTaskStates(),
+fun WorkflowEvent.TaskRetryScheduled.Companion.random() = WorkflowEvent.TaskRetryScheduled(
+    nodeStack = NodeStack.random(),
     nodePosition = NodePosition.random(),
     rawInput = JsonElement.random(),
     flowDirective = null,
@@ -108,8 +107,7 @@ fun WorkflowEvent.RetryScheduled.Companion.random() = WorkflowEvent.RetrySchedul
 )
 
 fun WorkflowEvent.WaitStarted.Companion.random() = WorkflowEvent.WaitStarted(
-    taskStates = randomTaskStates(),
-    nodePosition = NodePosition.random(),
+    nodeStack = NodeStack.random(),
     waitState = WaitState(),
     rawOutput = JsonElement.random(),
     waitUntil = Clock.System.now()
@@ -177,7 +175,7 @@ fun RetryModel.Companion.random() = RetryModel(
     id = IDV7.random(),
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
-        workflowState = WorkflowEvent.RetryScheduled.random(),
+        workflowState = WorkflowEvent.TaskRetryScheduled.random(),
     ),
     outboxScheduledFor = Instant.random(),
     errorReason = String.random(),

@@ -41,6 +41,8 @@ const val EVENTS_PRODUCER_ENABLED = "lemline.messaging.events.producer.enabled"
 const val EVENTS_CONSUMER_ENABLED = "lemline.messaging.events.consumer.enabled"
 const val EVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.events.consumer.concurrency"
 
+const val ORCHESTRATOR_MODE = "lemline.orchestrator.mode"
+
 /**
  * Type-safe configuration mapping for Lemline.
  * This interface defines the structure of Lemline's configuration using Quarkus's @ConfigMapping.
@@ -72,6 +74,7 @@ interface LemlineConfiguration {
     fun config(): Optional<String>
     fun database(): DatabaseConfig
     fun messaging(): MessagingConfig
+    fun orchestrator(): OrchestratorConfig
     fun outbox(): OutboxConfig
     fun metrics(): MetricsConfig
 
@@ -413,5 +416,31 @@ interface LemlineConfiguration {
 
         @WithDefault(METRICS_PATH_DEFAULT)
         fun path(): String
+    }
+
+    /**
+     * Orchestrator configuration.
+     * Controls workflow execution behavior.
+     */
+    interface OrchestratorConfig {
+        /**
+         * Step execution mode:
+         * - ACTION: Batches control flow nodes, emits message only for action tasks (default)
+         * - ALL: Emits a message for every task including control flow nodes
+         *
+         * Use ALL mode for end-to-end testing to generate more broker messages.
+         */
+        @WithDefault("action")
+        fun mode(): OrchestratorMode
+    }
+
+    /**
+     * Orchestrator execution mode.
+     */
+    enum class OrchestratorMode {
+        /** Batches control flow nodes, emits message only for action tasks (call, run, emit, etc.) */
+        ACTION,
+        /** Emits a message for every task including control flow nodes */
+        ALL
     }
 }

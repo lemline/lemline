@@ -2,7 +2,7 @@
 package com.lemline.core.errors
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.nodes.NodePosition
+import com.lemline.common.values.NodePosition
 import kotlinx.serialization.Serializable
 
 
@@ -50,7 +50,7 @@ data class InternalException(
         ) : this(
             type = "$URI_BASE/${errorType.type}",
             status = status,
-            instance = position.positionPointer.toString(),
+            instance = position.toString(),
             title = title,
             details = details,
         )

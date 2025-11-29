@@ -6,11 +6,9 @@ package com.lemline.core.processors
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
-import com.lemline.core.nodes.NodePosition
-import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.orchestrator.StepResult
-import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.states.TaskState
+import com.lemline.core.processors.scope.Scope
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.TryState
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration
@@ -75,36 +73,48 @@ class TryProcessor(
     /**
      * This state is initialized when entering the TryTask node for the first time
      */
-    override fun createState(transformedInput: JsonElement, scope: Scope): TryState = TryState(
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): TryState = TryState(
         startedAt = Clock.System.now(),
         transformedInput = transformedInput,  // Store for retries/catch
-        attemptIndex = -1,
+        attemptIndex = 0,  // Ready for first attempt
         runningCatch = false,
         errorAs = node.task.catch?.`as` ?: "error"
     )
 
     /**
-     * Determines the next step information based on the current `TryState`, dataset, node name, and scope.
+     * Update state when re-entering from child after successful execution of the try block or the catch block.
+     */
+    override fun stateEnterFromChild(
+        state: TryState,
+        output: JsonElement,
+        scope: Scope,
+        nodeName: String?
+    ): TryState = state.copy(
+        hasStarted = true
+    )
+
+    /**
+     * Determines the next node based on the current `TryState`.
      * This method handles both the first attempt (down) and the completion (up) of the `TryState` node.
      *
-     * This method is used in "normal" execution.
-     * This is bypassed by [StepByStepOrchestrator] when this node caught an exception.
+     * For navigation purposes:
+     * - !hasStarted: First attempt, go to try block
+     * - hasStarted: Completed (after retry or catch), go to parent
+     *
+     * This is bypassed by [handleError] when this node caught an exception.
      */
-    override fun getNextStepInfo(
+    override fun getNextNode(
         state: TryState,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String?,
-    ) = when (state.attemptIndex < 0) {
-        // first attempt
-        true -> NextStepInfo(
-            updatedState = state.newAttemptState(),
+    ): NavigationInfo = when (state.hasStarted) {
+        // First attempt - go to try block
+        false -> NavigationInfo(
             nextNode = getDoTry(),
             nextDirective = null
         )
-        // completed, go to parent
-        false -> NextStepInfo(
-            updatedState = state,
+        // Completed - go to parent
+        true -> NavigationInfo(
             nextNode = node.parent,
             nextDirective = getFlowDirective()
         )
@@ -163,25 +173,38 @@ class TryProcessor(
         failingNode: Node<*>,
         error: InternalException.Error,
         state: TryState,
-        scope: Scope
+        scope: Scope,
+        nodeStack: NodeStack
     ): StepResult {
+
         // Check if we should retry
         val shouldRetry = shouldRetry(state, scope)
 
-        return when {
+        return when (shouldRetry) {
             // Retry if attempts remain
-            shouldRetry -> StepResult(
-                nextNode = getDoTry(),  // Re-enter try body
-                nextInput = state.transformedInput,  // Original input
-                stateUpdates = cleanStateUpdates(failingNode, state.newAttemptState(error)),
-                retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(state.attemptIndex)
-            )
+            true -> {
+                val updatedState = state.copy(
+                    attemptIndex = state.attemptIndex + 1
+                )
+                StepResult(
+                    nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),  // Re-enter try body
+                    nextNode = getDoTry(),  // Original input
+                    nextInput = state.transformedInput,
+                    retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(updatedState.attemptIndex)
+                )
+            }
             // Otherwise, enter the catch block
-            else -> StepResult(
-                nextNode = getCatchNode(),  // Re-enter try body
-                nextInput = state.transformedInput,  // Original input
-                stateUpdates = cleanStateUpdates(failingNode, state.toCatchState(error)),
-            )
+            false -> {
+                val updatedState = state.copy(
+                    runningCatch = true,
+                    lastError = error
+                )
+                StepResult(
+                    nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),  // Re-enter try body
+                    nextNode = getCatchNode(),  // Original input
+                    nextInput = state.transformedInput,
+                )
+            }
         }
     }
 
@@ -209,33 +232,25 @@ class TryProcessor(
      * Retrieves the "try" child node from the current node's children.
      */
     private fun getDoTry(): Node<*> = node.children?.getOrNull(0)
-        ?: throw IllegalStateException("No try child found in TryTask ${node.reference}")
+        ?: throw IllegalStateException("No try child found in TryTask ${node.position}")
 
     /**
      * Retrieves the "catch" child node from the current node's children.
      */
     private fun getCatchNode(): Node<*> = node.children?.getOrNull(1)
-        ?: throw IllegalStateException("No catch child found in TryTask ${node.reference}")
+        ?: throw IllegalStateException("No catch child found in TryTask ${node.position}")
 
     /**
-     * Updates the state of nodes to reflect a clean state, starting from a given failing node
-     * up to a higher-level try node in the hierarchy.
+     * Updates the state stack by popping states from failing node up to the try node,
+     * then updating the try state.
      */
-    private fun cleanStateUpdates(
+    private fun cleanStateStack(
         failingNode: Node<*>,
         updatedState: TryState,
-    ): Map<NodePosition, TaskState?> {
-        var previous = failingNode
-        return buildMap {
-            // Clean state of all nodes up to the try node
-            do {
-                put(previous.position, null)
-                previous = previous.parent
-                    ?: throw IllegalStateException("Current try node ${node.reference} not found on path of node ${failingNode.name}")
-            } while (previous != node)
-            // add the updated state of the Try node
-            put(node.position, updatedState)
-        }
+        nodeStack: NodeStack
+    ): NodeStack {
+        // Pop all states up to but not including the try node, then update the try state
+        return nodeStack.popExcluding(node.position).push(node.position to updatedState)
     }
 
     /**

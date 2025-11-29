@@ -10,7 +10,5 @@ value class WorkflowId(val value: IDV7) {
 
     companion object {
         fun random(): WorkflowId = WorkflowId(IDV7.random())
-
-        fun from(str: String): WorkflowId = WorkflowId(IDV7.from(str))
     }
 }

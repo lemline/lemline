@@ -11,4 +11,4 @@ import kotlinx.serialization.Serializable
 data class DoState(
     override val startedAt: Instant = Clock.System.now(),
     val index: Int = -1
-) : TaskState()
+) : NodeState()

@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.SetState
 import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SetTaskConfiguration
@@ -51,7 +51,7 @@ class SetProcessor(
     node: Node<SetTask>,
 ) : NodeProcessor<SetTask, SetState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = SetState()
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = SetState()
 
     /**
      * Execute SetTask action.

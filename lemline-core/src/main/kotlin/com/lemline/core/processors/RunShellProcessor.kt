@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.RunState
 import com.lemline.core.tasks.runs.Shell
 import io.serverlessworkflow.api.types.RunTask
@@ -57,7 +57,7 @@ class RunShellProcessor(
     node: Node<RunTask>,
 ) : NodeProcessor<RunTask, RunState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope): RunState = RunState()
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): RunState = RunState()
 
     /**
      * Execute shell command action.

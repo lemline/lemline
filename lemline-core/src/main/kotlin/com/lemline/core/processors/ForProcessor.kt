@@ -4,7 +4,7 @@
 package com.lemline.core.processors
 
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ForState
 import io.serverlessworkflow.api.types.ForTask
 import kotlin.time.Clock
@@ -57,50 +57,52 @@ class ForProcessor(
     node: Node<ForTask>
 ) : NodeProcessor<ForTask, ForState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = ForState(
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = ForState(
         startedAt = Clock.System.now(),
         collection = evalForIn(transformedInput, scope),
-        index = -1,
+        index = 0,  // Start at first iteration
         forEach = node.task.`for`.each ?: "item",
         forAt = node.task.`for`.at ?: "index"
     )
 
-    override fun getNextStepInfo(
+    override fun stateEnterFromChild(
+        state: ForState,
+        output: JsonElement,
+        scope: Scope,
+        nodeName: String?
+    ): ForState {
+        // Move to next iteration: remove first item and increment index
+        return ForState(
+            startedAt = state.startedAt,
+            collection = state.collection.drop(1),
+            index = state.index + 1,
+            forEach = node.task.`for`.each ?: "item",
+            forAt = node.task.`for`.at ?: "index"
+        )
+    }
+
+    override fun getNextNode(
         state: ForState,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String?,
-    ): NextStepInfo<ForState> {
-        // get an updated state for the current node
-        val updatedState = getNextState(state)
-
+    ): NavigationInfo {
+        // state already reflects the current iteration to execute
         // Check if we should continue looping (while condition and collection bounds)
-        return when (shouldContinue(updatedState, dataset, scope)) {
-            false -> NextStepInfo(
-                updatedState = updatedState,
+        return when (shouldContinue(state, dataset, scope)) {
+            false -> NavigationInfo(
                 nextNode = node.parent,
                 nextDirective = getFlowDirective()
             )
 
-            true -> NextStepInfo(
-                updatedState = updatedState,
+            true -> NavigationInfo(
                 nextNode = getDoNode(),
                 nextDirective = null
             )
         }
     }
 
-    // At each iteration, we remove the first item from the collection and increment the index
-    private fun getNextState(state: ForState): ForState = ForState(
-        startedAt = state.startedAt,
-        collection = if (state.index >= 0) state.collection.drop(1) else state.collection,
-        index = state.index + 1,
-        forEach = node.task.`for`.each ?: "item",
-        forAt = node.task.`for`.at ?: "index"
-    )
-
-    private fun shouldContinue(updatedState: ForState, transformedInput: JsonElement, scope: Scope) =
-        updatedState.collection.isNotEmpty() && evalWhile(transformedInput, scope)
+    private fun shouldContinue(state: ForState, transformedInput: JsonElement, scope: Scope) =
+        state.collection.isNotEmpty() && evalWhile(transformedInput, scope)
 
     private fun evalWhile(dataset: JsonElement, scope: Scope): Boolean {
         val whileCondition = node.task.`while` ?: return true

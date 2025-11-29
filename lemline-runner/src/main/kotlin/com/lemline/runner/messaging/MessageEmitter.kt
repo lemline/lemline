@@ -30,8 +30,15 @@ internal abstract class MessageEmitter<T : JsonSerializable> {
     // Retrieve workflowInfo if present
     private val T?.workflowInfo get() = (this as? WithOptionalWorkflowInfo)?.workflowInfo
 
-    suspend fun sendPayload(payload: String) {
-        val md = MetaData(messageId = IDV7.random())
+    /**
+     * Sends a pre-serialized payload with an optional idempotent key.
+     *
+     * @param payload The serialized message payload
+     * @param idempotentKey Optional deterministic ID for message deduplication.
+     *                      If null, a random IDV7 is generated.
+     */
+    suspend fun sendPayload(payload: String, idempotentKey: IDV7? = null) {
+        val md = MetaData(messageId = idempotentKey ?: IDV7.random())
         retry(
             logger = logger,
             label = "Emit message",
@@ -43,11 +50,18 @@ internal abstract class MessageEmitter<T : JsonSerializable> {
         }
     }
 
-    suspend fun send(msg: T) {
+    /**
+     * Sends a message with an optional idempotent key.
+     *
+     * @param msg The message to send
+     * @param idempotentKey Optional deterministic ID for message deduplication.
+     *                      If null, a random IDV7 is generated.
+     */
+    suspend fun send(msg: T, idempotentKey: IDV7? = null) {
         val payload = metrics.recordSerializationDuration(msg.workflowInfo) {
             msg.toJsonString()
         }
-        sendPayload(payload)
+        sendPayload(payload, idempotentKey)
     }
 
     private suspend fun emit(payload: String, metadata: MetaData) {

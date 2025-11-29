@@ -1,22 +1,27 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.core.states
 
-import com.lemline.core.orchestrator.context.Scope
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.Transient
-import kotlinx.serialization.json.JsonObject
 
+/**
+ * Default task state implementation for simple tasks that don't require additional state tracking.
+ * Used by: Call, Run, Raise, Wait, Set, Fork, and Switch tasks.
+ */
 @Serializable
-sealed class TaskState {
-    /**
-     * When the node started execution.
-     * Common to all state types.
-     */
-    @ExperimentalTime
-    abstract val startedAt: Instant
+data class TaskState(
+    override val startedAt: Instant = Clock.System.now(),
+) : NodeState()
 
-    @Transient
-    open val scope: Scope = JsonObject(mapOf())
-}
+// Type aliases for semantic clarity - each represents a specific task type
+typealias CallState = TaskState
+typealias RunState = TaskState
+typealias RaiseState = TaskState
+typealias WaitState = TaskState
+typealias SetState = TaskState
+typealias ForkState = TaskState
+typealias SwitchState = TaskState

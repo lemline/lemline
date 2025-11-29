@@ -8,7 +8,7 @@ import com.lemline.common.json.LemlineJson.toJsonPrimitive
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.CallState
 import com.lemline.core.tasks.calls.HttpCall
 import io.ktor.http.*
@@ -71,7 +71,7 @@ class CallHttpProcessor(
     node: Node<CallHTTP>,
 ) : NodeProcessor<CallHTTP, CallState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = CallState()
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = CallState()
 
     /**
      * Execute HTTP call action.

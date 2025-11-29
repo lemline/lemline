@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.orchestrator
 
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.getWorkflowToTest
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.delay
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -49,6 +56,32 @@ import kotlinx.serialization.json.jsonPrimitive
  */
 @ExperimentalTime
 class OrchestratorTest : FunSpec() {
+
+    @OptIn(ExperimentalTime::class)
+    internal suspend fun executeWorkflow(
+        yaml: String,
+        input: JsonElement = buildJsonObject { },
+        namespace: String = "default",
+        name: String = "test",
+        version: String = "0.1.0",
+    ): JsonElement {
+        val workflow = getWorkflowToTest(yaml, namespace, name, version)
+
+        val startState = StepByStepOrchestrator.initCmd(
+            workflowId = WorkflowId.random(),
+            workflowInput = input,
+            hasWaitingParent = false,
+            startedAt = Clock.System.now()
+        )
+
+        val outcome = FullOrchestrator.resume(
+            workflow = workflow,
+            command = startState,
+            serde = true,
+        )
+
+        return outcome.value()
+    }
 
     init {
         afterEach {
@@ -333,6 +366,60 @@ class OrchestratorTest : FunSpec() {
             val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
 
             assertEquals(6, output["sum"]?.jsonPrimitive?.int)
+        }
+
+        // ========================================
+        // Fork Tests
+        // ========================================
+
+        test("should execute fork task in cooperative mode (compete=false)") {
+            val yaml = """
+                do:
+                  - parallelWork:
+                      fork:
+                        compete: false
+                        branches:
+                          - branch1:
+                              set:
+                                result: "A"
+                          - branch2:
+                              set:
+                                result: "B"
+            """
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()))
+
+            // Cooperative mode returns an array with all branch results
+            val arr = output as JsonArray
+            assertEquals(2, arr.size)
+            assertEquals("A", arr[0].jsonObject["result"]?.jsonPrimitive?.content)
+            assertEquals("B", arr[1].jsonObject["result"]?.jsonPrimitive?.content)
+        }
+
+        test("should execute fork task in compete mode (compete=true)") {
+            val yaml = """
+                do:
+                  - raceWork:
+                      fork:
+                        compete: true
+                        branches:
+                          - slowBranch:
+                              do:
+                                - delay:
+                                    wait:
+                                      seconds: 1
+                                - result:
+                                    set:
+                                      winner: "slow"
+                          - fastBranch:
+                              set:
+                                winner: "fast"
+            """
+            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+
+            // Compete mode returns only the first completed branch result
+            assertEquals("fast", output["winner"]?.jsonPrimitive?.content)
+
+            delay(1000)
         }
 
         // ========================================

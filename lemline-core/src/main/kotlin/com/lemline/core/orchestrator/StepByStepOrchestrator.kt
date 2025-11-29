@@ -2,6 +2,7 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.AsyncTaskException
@@ -10,26 +11,22 @@ import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.errors.AsyncTaskException.WaitStartedException
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
-import com.lemline.core.nodes.NodePosition
-import com.lemline.core.orchestrator.context.Scope
-import com.lemline.core.orchestrator.context.merge
 import com.lemline.core.processors.TryProcessor
 import com.lemline.core.states.ForkState
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
-import com.lemline.core.states.TaskStates
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.states.WorkflowEvent.BranchCompleted
-import com.lemline.core.states.WorkflowEvent.BranchFailed
+import com.lemline.core.states.WorkflowEvent.ForkBranchCompleted
+import com.lemline.core.states.WorkflowEvent.ForkBranchFailed
 import com.lemline.core.states.WorkflowEvent.ForkStarted
-import com.lemline.core.states.WorkflowEvent.RetryScheduled
 import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
+import com.lemline.core.states.WorkflowEvent.TaskRetryScheduled
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WaitStarted
 import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
 import com.lemline.core.states.WorkflowEvent.WorkflowFailed
-import com.lemline.core.states.updateWith
 import com.lemline.core.workflows.toJava
 import com.lemline.core.workflows.toKotlin
 import io.serverlessworkflow.api.types.FlowDirective
@@ -72,12 +69,12 @@ object StepByStepOrchestrator {
             workflowInput = workflowInput,
             hasWaitingParent = hasWaitingParent,
         )
-        val taskStates: TaskStates = mapOf(NodePosition.root to rootState)
+        val nodeStack = NodeStack(listOf(NodePosition.root to rootState))
 
         return WorkflowCommand.ResumeFromTask(
             nodePosition = NodePosition.doRoot,
             rawInput = workflowInput,
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             flowDirective = null,
         )
     }
@@ -93,20 +90,20 @@ object StepByStepOrchestrator {
 
         return when (command) {
             is WorkflowCommand.ResumeFromTask -> resumeFromTask(
-                taskStates = command.taskStates,
+                nodeStack = command.nodeStack,
                 node = node,
                 rawInput = command.rawInput,
                 flowDirective = command.flowDirective?.toJava(),
             )
 
             is WorkflowCommand.ResumeWithCompletedTask -> resumeFromCompletedTask(
-                taskStates = command.taskStates,
+                nodeStack = command.nodeStack,
                 node = node,
                 rawOutput = command.rawOutput,
             )
 
             is WorkflowCommand.ResumeWithFailedTask -> resumeFromFailedTask(
-                taskStates = command.taskStates,
+                nodeStack = command.nodeStack,
                 node = node,
                 error = command.error,
             )
@@ -130,7 +127,7 @@ object StepByStepOrchestrator {
             }
 
             is WaitStarted -> event
-            is RetryScheduled -> event
+            is TaskRetryScheduled -> event
             is RunWorkflowStarted -> event
             is ForkStarted -> event
             is WorkflowEvent.Outcome -> event
@@ -141,54 +138,54 @@ object StepByStepOrchestrator {
      * Resumes the workflow execution from a specific task.
      */
     internal suspend fun resumeFromTask(
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         node: Node<*>,
         rawInput: JsonElement,
         flowDirective: FlowDirective? = null,
     ): WorkflowEvent {
+        // Increment workflow step counter
+        val updatedStateStack = nodeStack.incrementStep()
+
         try {
             val stepResult: StepResult = try {
                 // run the next task within a try-catch block to handle workflow-caught exceptions
-                tryCatch(node, taskStates) {
-                    startTask(taskStates, node, rawInput, flowDirective)
+                tryCatch(node, updatedStateStack) {
+                    startTask(updatedStateStack, node, rawInput, flowDirective)
                 }
             } catch (e: AsyncTaskException) {
                 // Update states of the current node, even if not completed yet
-                val states = taskStates.updateWith(mapOf(node.position to e.state), null)
+                val states = updatedStateStack.push(node.position to e.state)
                 // Return immediately with an event
                 return when (e) {
                     is RunWorkflowStartedException -> RunWorkflowStarted(
-                        taskStates = states,
-                        nodePosition = node.position,
+                        nodeStack = states,
                         runState = e.state,
                         rawInput = e.transformedInput,
                         childConfig = e.config,
                     )
 
                     is WaitStartedException -> WaitStarted(
-                        taskStates = states,
-                        nodePosition = node.position,
+                        nodeStack = states,
                         waitState = e.state,
                         rawOutput = e.transformedInput,
                         waitUntil = e.config.waitUntil,
                     )
 
                     is ForkStartedException -> ForkStarted(
-                        taskStates = states,
-                        nodePosition = node.position,
+                        nodeStack = states,
                         forkState = e.state,
                         rawInput = e.transformedInput,
                     )
                 }
             }
 
-            return getNextEvent(taskStates, stepResult, node)
+            return getNextEvent(stepResult, node)
         } catch (e: Exception) {
             // Are we within a fork?
-            forkBranchFailed(taskStates, node, e)?.let { return it }
+            forkBranchFailed(updatedStateStack, node, e)?.let { return it }
             // Uncaught task failure
             return WorkflowFailed(
-                taskStates = taskStates.toMap(),
+                nodeStack = updatedStateStack,
                 nodePosition = node.position,
                 rawInput = rawInput,
                 rawOutput = null,
@@ -204,24 +201,24 @@ object StepByStepOrchestrator {
      * (transitioning the current task from an incomplete state to the next expected state.)
      */
     internal suspend fun resumeFromCompletedTask(
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         node: Node<*>,
         rawOutput: JsonElement,
     ): WorkflowEvent = try {
-        logger.debug { "resumeFromCompletedTask  In: node=${node.reference}, output=$rawOutput, states=$taskStates" }
+        logger.debug { "resumeFromCompletedTask  In: node=${node.position}, output=$rawOutput, states=$nodeStack" }
 
         // Resume the completed task (transforms output, updates state)
-        val stepResult = tryCatch(node, taskStates) {
-            completeTask(taskStates, node, rawOutput)
+        val stepResult = tryCatch(node, nodeStack) {
+            completeTask(nodeStack, node, rawOutput)
         }
 
-        getNextEvent(taskStates, stepResult, node)
+        getNextEvent(stepResult, node)
     } catch (e: Exception) {
         // if we are within a fork
-        forkBranchFailed(taskStates, node, e)?.let { return it }
+        forkBranchFailed(nodeStack, node, e)?.let { return it }
         // Uncaught task failure
         WorkflowFailed(
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             nodePosition = node.position,
             rawInput = null,
             rawOutput = rawOutput,
@@ -237,24 +234,24 @@ object StepByStepOrchestrator {
      * (hopefully catching the error, if not returns a ForkBranchFailed or TaskFailed event on the same node)
      */
     internal suspend fun resumeFromFailedTask(
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         node: Node<*>,
         error: InternalException.Error,
     ): WorkflowEvent = try {
-        logger.debug { "resumeFromFailedTask  In: node=${node.reference}, error=$error, states=$taskStates" }
+        logger.debug { "resumeFromFailedTask  In: node=${node.position}, error=$error, states=$nodeStack" }
 
         // Resume the failed task (hopefully, the error can be handled)
-        val stepResult = tryCatch(node, taskStates) {
+        val stepResult = tryCatch(node, nodeStack) {
             throw InternalException(error)
         }
 
-        getNextEvent(taskStates, stepResult, node)
+        getNextEvent(stepResult, node)
     } catch (e: Exception) {
         // if we are within a fork
-        forkBranchFailed(taskStates, node, e)?.let { return it }
+        forkBranchFailed(nodeStack, node, e)?.let { return it }
         // Uncaught task failure
         WorkflowFailed(
-            taskStates = taskStates,
+            nodeStack = nodeStack,
             nodePosition = node.position,
             rawInput = null,
             rawOutput = null,
@@ -266,26 +263,22 @@ object StepByStepOrchestrator {
     }
 
     private fun getNextEvent(
-        taskStates: TaskStates,
         result: StepResult,
         node: Node<*>
     ): WorkflowEvent {
-        // Update states
-        val newStates = taskStates.updateWith(result.stateUpdates, result.nextContext)
-
         // Workflow completed
         if (result.nextNode == null) {
             logger.debug { "Workflow completed with output: ${result.nextInput}" }
             return WorkflowCompleted(
                 output = result.nextInput,
                 completedAt = Clock.System.now(),
-                taskStates = newStates,
+                nodeStack = result.nodeStack,
             )
         }
 
         // The current task must be retried
-        if (result.retryAt != null) return RetryScheduled(
-            taskStates = newStates,
+        if (result.retryAt != null) return TaskRetryScheduled(
+            nodeStack = result.nodeStack,
             nodePosition = result.nextNode.position,
             rawInput = result.nextInput,
             flowDirective = result.nextDirective?.toKotlin(),
@@ -293,11 +286,11 @@ object StepByStepOrchestrator {
         )
 
         // Are we now completing a fork branch?
-        forkBranchCompleted(newStates, result, node)?.let { return it }
+        forkBranchCompleted(result, node)?.let { return it }
 
         // Next Task
         return TaskScheduled(
-            taskStates = newStates,
+            nodeStack = result.nodeStack,
             nodePosition = result.nextNode.position,
             rawInput = result.nextInput,
             flowDirective = result.nextDirective?.toKotlin(),
@@ -305,10 +298,10 @@ object StepByStepOrchestrator {
     }
 
     private fun forkBranchFailed(
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         failingNode: Node<*>,
         exception: Exception
-    ): BranchFailed? {
+    ): ForkBranchFailed? {
         // Find the nearest Fork task up the current node
         var current: Node<*> = failingNode
 
@@ -316,18 +309,9 @@ object StepByStepOrchestrator {
             val forkNode = current.parent
 
             if (forkNode.task is ForkTask) {
-                // Clean state of all nodes up to the fork node
-                val cleanUpdateStates = buildMap {
-                    var node = failingNode
-                    do {
-                        put(node.position, null)
-                        node = node.parent!!
-                    } while (node != forkNode)
-                }
-                //
-                return BranchFailed(
-                    taskStates = taskStates.updateWith(cleanUpdateStates, null),
-                    nodePosition = forkNode.position,
+                // Pop all states up to and including the fork node
+                return ForkBranchFailed(
+                    nodeStack = nodeStack.popUntil(forkNode.position),
                     branchName = current.name,
                     error = InternalException.Error.from(exception, failingNode.position),
                     failedAt = Clock.System.now(),
@@ -339,21 +323,19 @@ object StepByStepOrchestrator {
     }
 
     private fun forkBranchCompleted(
-        taskStates: TaskStates,
         stepResult: StepResult,
         node: Node<*>
-    ): BranchCompleted? {
+    ): ForkBranchCompleted? {
         val nextNode = stepResult.nextNode!!
-        val nextState = taskStates[nextNode.position]
+        val nextState = stepResult.nodeStack[nextNode.position]
         // Is NextNode a fork? Do we enter from Child?
         if (nextNode.task is ForkTask && nextState != null && nextState is ForkState) {
             // Find the branch name
             val branchName = nextNode.children?.find { it.name == node.name }?.name
                 ?: throw IllegalStateException("Fork - can not find ${node.name} in ${nextNode.children?.joinToString { it.name }}")
 
-            return BranchCompleted(
-                taskStates = taskStates,
-                nodePosition = nextNode.position,
+            return ForkBranchCompleted(
+                nodeStack = stepResult.nodeStack,
                 branchName = branchName,
                 output = stepResult.nextInput,
                 completedAt = Clock.System.now(),
@@ -371,12 +353,12 @@ object StepByStepOrchestrator {
      */
     suspend fun tryCatch(
         current: Node<*>,
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         block: suspend () -> StepResult
     ): StepResult = try {
         block()
     } catch (e: InternalException) {
-        processInternalWorkflowException(e, current, taskStates)
+        processInternalWorkflowException(e, current, nodeStack)
     }
 
     /**
@@ -389,7 +371,7 @@ object StepByStepOrchestrator {
     private fun processInternalWorkflowException(
         exception: InternalException,
         failingNode: Node<*>,
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
     ): StepResult {
         // Find the nearest TryTask - within the same fork branch - that can handle this error
         var current: Node<*>? = failingNode
@@ -398,21 +380,17 @@ object StepByStepOrchestrator {
             // if we reached a try task, we check if this error can be handled by it
             // if yes, we continue from there (retry or catch)
             if (current!!.task is TryTask) {
-                @Suppress("UNCHECKED_CAST")
-                current as Node<TryTask>
-                // current scope of the try node
-                val tryScope = getScope(current, taskStates)
                 // current state of the try node
-                val tryState = taskStates[current.position] as TryState
-                // processor for the try node
-                val processor = TryProcessor(current)
+                val tryState = nodeStack[current.position] as TryState
+                val processor = current.processor as TryProcessor
                 // check that this node actually can handle this error
-                if (processor.isCatching(exception.error, tryState, tryScope)) {
+                if (processor.isCatching(exception.error, tryState, nodeStack.lastScope)) {
                     return processor.handleError(
                         failingNode = failingNode,
                         error = exception.error,
                         state = tryState,
-                        scope = tryScope
+                        scope = nodeStack.lastScope,
+                        nodeStack = nodeStack
                     )
                 }
             }
@@ -426,32 +404,32 @@ object StepByStepOrchestrator {
     /**
      * Execute a single step of workflow execution - pure function.
      *
-     * Determines whether we enter the node for the first time (no state)
-     * or re-enter after child completion (state exists).
+     * Determines whether we enter the node for the first time (stack top is parent)
+     * or re-enter after child completion (stack top is this node).
      */
     @Suppress("UNCHECKED_CAST")
     suspend fun startTask(
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         node: Node<*>,
         rawInput: JsonElement,
         flowDirective: FlowDirective?,
     ): StepResult {
-        val state = taskStates[node.position]
-        val scope = getScope(node, taskStates)
-        val processor = ProcessorFactory.getProcessor(node)
+        // Check stack top: if it matches this node's position, we're re-entering from child
+        val isReEntering = nodeStack.lastPosition == node.position
 
-        return if (state == null) {
-            logger.debug { "Entering Down  node=${node.reference} - ${node.task::class.simpleName}(input=$rawInput)" }
-            // First time entering this node
-            processor.enterFromParent(rawInput, scope)
+        return if (!isReEntering) {
+            logger.debug { "Entering Down  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput)" }
+            // First time entering this node - push a new frame
+            node.processor.enterFromParent(rawInput, nodeStack.lastScope, nodeStack)
         } else {
+            val state = nodeStack.lastState
             logger.debug {
-                "ReEntering Up  node=${node.reference} - ${node.task::class.simpleName}(input=$rawInput${
+                "ReEntering Up  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput${
                     flowDirective?.get()?.let { ", flow=$it" } ?: ""
                 }), state=$state"
             }
-            // Re-entering after a child completed
-            processor.enterFromChild(state, flowDirective, rawInput, scope)
+            // Re-entering after a child completed - top of stack is this node's state
+            node.processor.enterFromChild(state, flowDirective, rawInput, nodeStack.lastScope, nodeStack)
         }
     }
 
@@ -459,27 +437,16 @@ object StepByStepOrchestrator {
      * Completes an interrupted task by processing the output through the current node's processor.
      */
     internal fun completeTask(
-        taskStates: TaskStates,
+        nodeStack: NodeStack,
         node: Node<*>,
         rawOutput: JsonElement
     ): StepResult {
-        val processor = ProcessorFactory.getProcessor(node)
-        val scope = getScope(node, taskStates)
-
-        return processor.completeTask(
+        return node.processor.completeTask(
             rawOutput = rawOutput,
-            currentFlowDirective = processor.getFlowDirective(),
-            parentScope = scope,
-            taskContext = null
+            currentFlowDirective = node.processor.getFlowDirective(),
+            parentScope = nodeStack.lastScope,
+            taskScope = null,
+            nodeStack = nodeStack
         )
     }
-
-    /**
-     * Retrieves the `Scope` associated with the given node by combining its own expression arguments
-     * with those of its parent nodes in the tree, if present.
-     */
-    private fun getScope(current: Node<*>, taskStates: TaskStates): Scope =
-        (taskStates[current.position]?.scope ?: buildJsonObject { })
-            // Recursively merge with parent scope
-            .merge(current.parent?.let { getScope(it, taskStates) })
 }

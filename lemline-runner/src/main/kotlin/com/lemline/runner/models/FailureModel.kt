@@ -42,8 +42,13 @@ data class FailureModel(
     override val workflowState: WorkflowState? get() = instanceMessage?.workflowState
 
     companion object {
+        /**
+         * Creates a FailureModel from a workflow instance.
+         *
+         * @param id Must be derived from position + step for idempotency
+         */
         fun from(
-            id: IDV7 = IDV7.random(),
+            id: IDV7,
             instance: InstanceMessage<out WorkflowState>,
             exception: Exception,
             reason: String = getFailureReason(exception)
@@ -57,6 +62,10 @@ data class FailureModel(
             errorStackTrace = exception.stackTraceToString()
         )
 
+        /**
+         * Creates a FailureModel from a raw payload (deserialization failure).
+         * Uses random ID since we don't have a valid instance to derive from.
+         */
         fun from(
             id: IDV7 = IDV7.random(),
             payload: String,

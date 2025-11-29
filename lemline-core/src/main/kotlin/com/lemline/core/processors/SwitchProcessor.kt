@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.SwitchState
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.SwitchItem
@@ -61,14 +61,16 @@ class SwitchProcessor(
     node: Node<SwitchTask>,
 ) : NodeProcessor<SwitchTask, SwitchState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = SwitchState()
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = SwitchState()
 
-    override fun getNextStepInfo(
+    // SwitchProcessor doesn't need updateState - it's a leaf node that evaluates once
+    // The default implementation (returning state unchanged) is sufficient
+
+    override fun getNextNode(
         state: SwitchState,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String?,
-    ): NextStepInfo<SwitchState> {
+    ): NavigationInfo {
 
         var directive: FlowDirective? = null
 
@@ -93,8 +95,7 @@ class SwitchProcessor(
             raiseError(WorkflowErrorType.EXPRESSION, "No case matches in switch statement")
         }
 
-        return NextStepInfo(
-            updatedState = state,
+        return NavigationInfo(
             nextNode = node.parent,
             nextDirective = directive
         )

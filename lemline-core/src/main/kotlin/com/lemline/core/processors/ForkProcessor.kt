@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.core.errors.AsyncTaskException
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ForkState
 import io.serverlessworkflow.api.types.ForkTask
 import kotlin.time.ExperimentalTime
@@ -20,11 +20,9 @@ import kotlinx.serialization.json.JsonElement
  *
  * ## Execution Model
  *
- * Fork follows the ChildWorkflow pattern:
- * 1. First entry: Throw ForkException with branch configuration
- * 2. Orchestrator catches exception:
- *    - ExecutionMode.Complete: Execute branches in parallel using coroutines
- *    - ExecutionMode.Async: Return WorkflowState.RunningFork for runner
+ * Fork follows the async task pattern:
+ * 1. First entry: Throw ForkStartedException with branch configuration
+ * 2. Runner catches exception and schedules branches for parallel execution
  * 3. Branches execute as independent workflows (can pause/resume)
  * 4. On branch completion: Re-enter fork processor with branch output
  * 5. Check if fork complete (based on compete mode)
@@ -53,14 +51,16 @@ class ForkProcessor(
     node: Node<ForkTask>
 ) : NodeProcessor<ForkTask, ForkState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = ForkState()
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = ForkState()
 
-    override fun getNextStepInfo(
+    // ForkProcessor doesn't need updateState - it throws exception on first entry
+    // The default implementation is enough
+
+    override fun getNextNode(
         state: ForkState,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String?
-    ): NextStepInfo<ForkState> {
+    ): NavigationInfo {
         // First entry
         // Throws exception to trigger fork execution via orchestrator
         // The orchestrator will derive fork config from the current Node<ForkTask>

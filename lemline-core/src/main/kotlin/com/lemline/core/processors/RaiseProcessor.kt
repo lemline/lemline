@@ -6,7 +6,7 @@ package com.lemline.core.processors
 import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.RaiseState
 import io.serverlessworkflow.api.types.RaiseTask
 import io.serverlessworkflow.api.types.RaiseTaskError
@@ -36,7 +36,7 @@ class RaiseProcessor(
     node: Node<RaiseTask>
 ) : NodeProcessor<RaiseTask, RaiseState>(node) {
 
-    override fun createState(transformedInput: JsonElement, scope: Scope) = RaiseState(
+    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = RaiseState(
         startedAt = Clock.System.now()
     )
 
@@ -47,7 +47,7 @@ class RaiseProcessor(
         val error = InternalException.Error(
             type = errorDef.getErrorType(),
             status = errorDef.status,
-            instance = node.position.positionPointer.toString(),
+            instance = node.position.toString(),
             title = errorDef.title,
             details = errorDef.detail
         )

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.states
 
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -18,7 +18,7 @@ data class ForState(
     val index: Int = -1,
     val forEach: String,
     val forAt: String
-) : TaskState() {
+) : NodeState() {
 
     override val scope: Scope
         get() = buildJsonObject {

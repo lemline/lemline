@@ -2,14 +2,30 @@
 package com.lemline.core.nodes
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.nodes.Token.BRANCHES
-import com.lemline.core.nodes.Token.CATCH
-import com.lemline.core.nodes.Token.DO
-import com.lemline.core.nodes.Token.FOREACH
-import com.lemline.core.nodes.Token.FORK
-import com.lemline.core.nodes.Token.SUBSCRIPTION
-import com.lemline.core.nodes.Token.TRY
-import com.lemline.core.nodes.Token.WITH
+import com.lemline.common.values.NodePosition
+import com.lemline.common.values.Token
+import com.lemline.common.values.Token.CATCH
+import com.lemline.common.values.Token.DO
+import com.lemline.common.values.Token.FOREACH
+import com.lemline.common.values.Token.FORK
+import com.lemline.common.values.Token.SUBSCRIPTION
+import com.lemline.common.values.Token.TRY
+import com.lemline.common.values.Token.WITH
+import com.lemline.core.processors.CallHttpProcessor
+import com.lemline.core.processors.DoProcessor
+import com.lemline.core.processors.ForProcessor
+import com.lemline.core.processors.ForkProcessor
+import com.lemline.core.processors.NodeProcessor
+import com.lemline.core.processors.RaiseProcessor
+import com.lemline.core.processors.RootProcessor
+import com.lemline.core.processors.RunScriptProcessor
+import com.lemline.core.processors.RunShellProcessor
+import com.lemline.core.processors.RunWorkflowProcessor
+import com.lemline.core.processors.SetProcessor
+import com.lemline.core.processors.SwitchProcessor
+import com.lemline.core.processors.TryProcessor
+import com.lemline.core.processors.WaitProcessor
+import com.lemline.core.states.NodeState
 import io.serverlessworkflow.api.types.CallAsyncAPI
 import io.serverlessworkflow.api.types.CallFunction
 import io.serverlessworkflow.api.types.CallGRPC
@@ -22,13 +38,17 @@ import io.serverlessworkflow.api.types.ForTask
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.RaiseTask
+import io.serverlessworkflow.api.types.RunScript
+import io.serverlessworkflow.api.types.RunShell
 import io.serverlessworkflow.api.types.RunTask
+import io.serverlessworkflow.api.types.RunWorkflow
 import io.serverlessworkflow.api.types.SetTask
 import io.serverlessworkflow.api.types.SwitchTask
 import io.serverlessworkflow.api.types.TaskBase
 import io.serverlessworkflow.api.types.TaskItem
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.WaitTask
+import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonObject
 
 /**
@@ -40,8 +60,37 @@ import kotlinx.serialization.json.JsonObject
  * @property parent The parent node of this task node, or null if it is a root node.
  */
 data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name: String, val parent: Node<*>? = null) {
-    val definition: JsonObject = LemlineJson.encodeToElement(task)
-    val reference: String = position.positionPointer.toString()
+    val definition: JsonObject by lazy { LemlineJson.encodeToElement(task) }
+
+    @Suppress("UNCHECKED_CAST")
+    @ExperimentalTime
+    val processor by lazy {
+        when (task) {
+            is RootTask -> RootProcessor(this as Node<RootTask>)
+            is DoTask -> DoProcessor(this as Node<DoTask>)
+            is ForTask -> ForProcessor(this as Node<ForTask>)
+            is SetTask -> SetProcessor(this as Node<SetTask>)
+            is SwitchTask -> SwitchProcessor(this as Node<SwitchTask>)
+            is TryTask -> TryProcessor(this as Node<TryTask>)
+            is RaiseTask -> RaiseProcessor(this as Node<RaiseTask>)
+            is CallHTTP -> CallHttpProcessor(this as Node<CallHTTP>)
+            is WaitTask -> WaitProcessor(this as Node<WaitTask>)
+            is ForkTask -> ForkProcessor(this as Node<ForkTask>)
+            is RunTask -> {
+                val runTask = this as Node<RunTask>
+                when (runTask.task.run.get()) {
+                    is RunShell -> RunShellProcessor(runTask)
+                    is RunScript -> RunScriptProcessor(runTask)
+                    is RunWorkflow -> RunWorkflowProcessor(runTask)
+                    else -> throw IllegalArgumentException(
+                        "Unknown run task type: ${runTask.task.run.get()?.javaClass?.simpleName}"
+                    )
+                }
+            }
+
+            else -> throw IllegalArgumentException("Unknown task type: ${task::class.simpleName}")
+        } as NodeProcessor<T, NodeState>
+    }
 
     /**
      * The list of task nodes depending on this one
@@ -101,9 +150,9 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
         val nodes = mutableSetOf<String>()
         val edges = mutableSetOf<String>()
 
-        fun processNode(node: Node<*>, parentId: PositionPointer? = null) {
+        fun processNode(node: Node<*>, parentId: NodePosition? = null) {
             val taskType = node.task.javaClass.simpleName
-            val nodeId = node.position.positionPointer
+            val nodeId = node.position
 
             // Add node with task type and initialPosition
             val nodeLabel = "\"${node.name}\n($taskType)\""
@@ -149,9 +198,9 @@ private fun RootTask.parseChildren(parent: Node<*>?): List<Node<*>> = listOf(
 )
 
 private fun DoTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>> =
-    `do`.mapIndexed { index, taskItem ->
+    `do`.map { taskItem ->
         val child = taskItem.toTask()
-        val childPosition = position.addIndex(index).addName(taskItem.name).let {
+        val childPosition = position.addName(taskItem.name).let {
             if (child is DoTask) it.addToken(DO) else it
         }
 
@@ -184,9 +233,9 @@ private fun TryTask.parseChildren(position: NodePosition, parent: Node<*>?): Lis
     `catch`.`do`?.let {
         add(
             Node(
-                position = position.addToken(CATCH).addToken(DO),
+                position = position.addToken(CATCH),
                 task = DoTask(it),
-                name = "$CATCH.$DO",
+                name = "$CATCH",
                 parent = parent,
             ),
         )
@@ -194,9 +243,9 @@ private fun TryTask.parseChildren(position: NodePosition, parent: Node<*>?): Lis
 }
 
 private fun ForkTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>>? =
-    fork.branches?.mapIndexed { index, taskItem ->
+    fork.branches?.map { taskItem ->
         Node(
-            position = position.addToken(FORK).addToken(BRANCHES).addIndex(index).addName(taskItem.name),
+            position = position.addToken(FORK).addName(taskItem.name),
             task = taskItem.toTask(),
             name = taskItem.name,
             parent = parent,
@@ -206,9 +255,9 @@ private fun ForkTask.parseChildren(position: NodePosition, parent: Node<*>?): Li
 private fun ListenTask.parseChildren(position: NodePosition, parent: Node<*>?): List<Node<*>>? = foreach?.`do`?.let {
     listOf(
         Node(
-            position = position.addToken(FOREACH).addToken(DO),
+            position = position.addToken(Token.FOR),
             task = DoTask(it),
-            name = "$FOREACH.$DO",
+            name = "${Token.FOR}",
             parent = parent,
         ),
     )

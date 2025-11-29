@@ -11,8 +11,8 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalSerializationApi
 @ExperimentalTime
 data class WaitModel(
-    /** Unique identifier for this wait operation */
-    override val id: IDV7 = IDV7.random(),
+    /** Unique identifier for this wait operation - must be derived from position + step for idempotency */
+    override val id: IDV7,
 
     /** Workflow state when the wait was initiated */
     override val instanceMessage: InstanceMessage<WorkflowEvent.WaitStarted>,

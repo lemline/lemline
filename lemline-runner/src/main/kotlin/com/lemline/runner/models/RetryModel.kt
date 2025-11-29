@@ -17,7 +17,7 @@ data class RetryModel(
     override val id: IDV7,
 
     /** Workflow state when the retry was scheduled */
-    override val instanceMessage: InstanceMessage<WorkflowEvent.RetryScheduled>,
+    override val instanceMessage: InstanceMessage<WorkflowEvent.TaskRetryScheduled>,
 
     /** Timestamp when the retry should be attempted */
     override val outboxScheduledFor: Instant,
@@ -55,9 +55,14 @@ data class RetryModel(
     override var outboxFailedAt: Instant? = null
 
     companion object Companion {
+        /**
+         * Creates a RetryModel from a retry scheduled event.
+         *
+         * @param id Must be derived from position + step for idempotency
+         */
         fun from(
-            id: IDV7 = IDV7.random(),
-            instance: InstanceMessage<WorkflowEvent.RetryScheduled>,
+            id: IDV7,
+            instance: InstanceMessage<WorkflowEvent.TaskRetryScheduled>,
             scheduledFor: Instant,
             error: Throwable,
             reason: String

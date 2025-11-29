@@ -78,6 +78,11 @@ dependencies {
 
     // Tests Fixtures
     testFixturesImplementation(enforcedPlatform(libs.kotest.bom))
+    testFixturesImplementation("io.kotest:kotest-runner-junit5")
+    testFixturesImplementation("io.kotest:kotest-assertions-core")
+    testFixturesImplementation("io.kotest:kotest-framework-api")
     testFixturesImplementation(libs.bundles.kotlinxEcosystem)
     testFixturesImplementation(testFixtures(project(":lemline-common")))
+    // Required for FullOrchestratorExecutor
+    testFixturesImplementation(libs.serverlessworkflow.api)
 }

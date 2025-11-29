@@ -5,7 +5,7 @@ package com.lemline.core.processors
 
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
-import com.lemline.core.orchestrator.context.Scope
+import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.RootState
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -46,18 +46,19 @@ class RootProcessor(
 ) : NodeProcessor<RootTask, RootState>(node) {
 
     // the RootProcessor should not create the root state
-    override fun createState(
+    override fun stateEnterFromParent(
         transformedInput: JsonElement,
         scope: Scope
     ): RootState = throw IllegalStateException("RootProcessor does not create state")
 
-    override fun getNextStepInfo(
+    // RootProcessor doesn't need updateState - root never re-enters from a child
+    // The default implementation is sufficient
+
+    override fun getNextNode(
         state: RootState,
         dataset: JsonElement,
         scope: Scope,
-        namedNode: String?,
-    ): NextStepInfo<RootState> = NextStepInfo(
-        updatedState = state,
+    ): NavigationInfo = NavigationInfo(
         nextNode = null,
         nextDirective = null
     )
