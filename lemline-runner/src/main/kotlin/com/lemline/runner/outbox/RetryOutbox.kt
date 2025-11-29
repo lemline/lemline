@@ -58,13 +58,20 @@ internal class RetryOutbox : AbstractOutbox<RetryModel>() {
     /**
      * Transform RetryScheduled Event → ResumeFromTask Command before sending.
      * This ensures the workflow handler receives a command it can process.
+     *
+     * Uses idempotent message ID derived from the retry model's ID to ensure
+     * duplicate processing produces the same message ID.
      */
     override suspend fun process(entity: RetryModel) {
+        // Derive message ID from the retry model's ID
+        val messageId = entity.id.derive("-resume")
+
         instanceEmitter.send(
             InstanceMessage(
                 workflowInfo = entity.instanceMessage.workflowInfo,
                 workflowState = entity.instanceMessage.workflowState.resume(),
-            )
+            ),
+            messageId
         )
     }
 }

@@ -26,13 +26,12 @@ class WorkflowIdTest {
 
     @Test
     fun `WorkflowName JSON roundtrip with LemlineJson`() {
-        val idstr = "019923d5-0d46-78ed-a2b5-8f54704b4a1e"
-        val workflowId = WorkflowId.from(idstr)
+        val workflowId = WorkflowId.random()
 
         val serialized: String = LemlineJson.encodeToString(workflowId)
 
         // Encoded as JSON strings
-        assertEquals("\"$idstr\"", serialized)
+        assertEquals("\"$workflowId\"", serialized)
 
         // Decoding
         val decoded = LemlineJson.decodeFromString<WorkflowId>(serialized)

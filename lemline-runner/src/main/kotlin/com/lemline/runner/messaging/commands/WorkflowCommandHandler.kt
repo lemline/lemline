@@ -159,10 +159,20 @@ internal class WorkflowCommandHandler(
     /**
      * Emits the serialized payload to the instance message broker.
      * MessageEmitter.send() handles retries internally.
+     *
+     * @param payload The serialized message payload
+     * @param idempotentKey Optional deterministic ID for message deduplication
      */
-    override suspend fun emit(payload: String) {
-        commandEmitter.sendPayload(payload)
+    override suspend fun emit(payload: String, idempotentKey: IDV7) {
+        commandEmitter.sendPayload(payload, idempotentKey)
     }
+
+    /**
+     * Derives an idempotent key for command messages.
+     * Uses position + step to ensure deterministic IDs across redeliveries.
+     */
+    override fun deriveIdempotentKey(next: InstanceMessage<WorkflowCommand>): IDV7 =
+        next.workflowState.nodeStack.deriveIdempotentId("-command")
 
     // ========================================
     // Handling
@@ -256,7 +266,10 @@ internal class WorkflowCommandHandler(
         logger.debug { "resumeFromTask state=$workflowState" }
         val event = when (config.orchestrator().mode()) {
             LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(workflow, workflowState)
-            LemlineConfiguration.OrchestratorMode.ACTION -> StepByStepOrchestrator.runByActivity(workflow, workflowState)
+            LemlineConfiguration.OrchestratorMode.ACTION -> StepByStepOrchestrator.runByActivity(
+                workflow,
+                workflowState
+            )
         }
 
         // Handle the outcome

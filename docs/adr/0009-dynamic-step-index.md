@@ -1,379 +1,375 @@
-# [ADR-0009] Simple Integer Step Counter
+# [ADR-0009] Idempotent Message and Database IDs
 
 ## Status
 
-Proposed
+Accepted
 
 ## Context
 
-Lemline needs a way to uniquely identify each step in a workflow execution for:
+Lemline needs idempotent identification for two critical purposes:
 
-1. **Message deduplication** - Prevent double-processing when brokers redeliver messages
-2. **Database idempotency** - Prevent duplicate rows in outbox tables (waits, retries, parents)
-3. **Deterministic identification** - Same execution path always produces same identifier
+1. **Broker message deduplication** - Prevent double-processing when Kafka/RabbitMQ redeliver messages
+2. **Database idempotency** - Prevent duplicate rows in outbox tables when the same event is processed twice
 
-Currently, Lemline uses `NodePosition` (static JSON Pointer) to identify nodes in the workflow definition tree (e.g.,
-`/do/taskA`). However, using `(workflowId, NodePosition)` for database primary keys causes **ID collisions** when the
-same node is visited multiple times:
+### The Problem
 
-- **Wait task in a loop**: Each iteration creates a new wait, but all have the same `NodePosition` → collision
-- **Retry task**: Each retry attempt needs its own database row, but shares the same `NodePosition` → collision
-- **Parallel branch tasks**: Multiple concurrent executions of same branch → collision
+Currently, Lemline generates random `IDV7` values for:
 
-Example collision scenario:
+- Message IDs in `MessageEmitter.sendPayload()`
+- Database primary keys in outbox models (`WaitModel`, `RetryModel`, `ParentModel`, `ForkModel`, `FailureModel`)
 
-```yaml
-for:
-    in: [ 1, 2, 3 ]
-    do:
-        -   wait: PT1M  # Same NodePosition "/for/do/wait" on every iteration!
+This causes issues when messages are redelivered:
+
+```
+Message delivered → ID=abc123 → Processed successfully
+Message redelivered → ID=xyz789 → Processed AGAIN (duplicate!)
 ```
 
-Without a unique step identifier, all three wait tasks would generate the same ID, causing database constraint violations.
+The same problem affects database inserts. While `ON CONFLICT DO NOTHING` exists, it doesn't help when IDs are random.
 
-The challenge is to create a step identifier that:
+### Uniqueness Requirements
 
-- Is deterministic (same execution path → same identifier)
-- Distinguishes between multiple visits to the same node
-- Is simple and easy to implement correctly
-- Minimizes complexity (follows Lemline's core philosophy of pragmatism)
+The challenge is creating identifiers that are:
+
+- **Deterministic**: Same execution context → same identifier (enables idempotency)
+- **Unique across positions**: Different tasks get different IDs
+- **Unique across time**: Multiple visits to the same node (loops, retries) get different IDs
+- **Unique across branches**: Parallel fork branches get different IDs
+
+Example collision scenarios without proper identification:
+
+```yaml
+# Loop: Same NodePosition "/for/do/wait" on every iteration
+for:
+  in: [ 1, 2, 3 ]
+  do:
+    - wait: PT1M
+
+# Fork: Same step counter in parallel branches
+fork:
+  branches:
+    - name: branchA
+      do:
+        - taskA: { set: { x: 1 } }
+    - name: branchB
+      do:
+        - taskB: { set: { y: 2 } }
+```
 
 ## Decision
 
-We will add a simple **integer counter (`workflowStep: Int`)** to `WorkflowState` that increments each time we enter a task.
+We use a combination of **`NodePosition`** and **`workflowStep`** counter to generate deterministic, idempotent IDs.
 
-### How It Works
+### Key Insight
 
-1. **Initialization**: `workflowStep` starts at 0 when workflow begins
-2. **Task Entry**: Increment `workflowStep` each time we enter a task (from parent or child)
-3. **Fork Branches**: Each branch initializes its own counter, which is restored when the branch completes
-4. **Uniqueness**: `(workflowId, workflowStep)` creates a unique identifier for each execution step
+The `NodePosition` encodes the full path in the workflow tree, including branch names:
+
+```
+/do/forkTask/fork/branchA/do/task1  (step=N)
+/do/forkTask/fork/branchB/do/task1  (step=N)  ← same step, different position
+```
+
+Fork branches share the same `nodeStack` (including `workflowStep`), but the position path makes them distinct.
+
+### ID Derivation Formula
+
+```
+idempotentId = derive(workflowId, position + ":" + workflowStep + suffix)
+```
+
+Where:
+
+- `workflowId`: The workflow instance's unique IDV7
+- `position`: The `NodePosition` (e.g., `/do/task1`)
+- `workflowStep`: Integer counter that increments on each task entry
+- `suffix`: Type-specific string (e.g., `-wait`, `-retry`, `-parent`)
 
 ### Examples
 
-**Sequential tasks:**
+| Context         | Position                   | Step | Salt                          | Unique? |
+|-----------------|----------------------------|------|-------------------------------|---------|
+| Main workflow   | `/do/task1`                | 0    | `/do/task1:0`                 | ✓       |
+| Main workflow   | `/do/task2`                | 1    | `/do/task2:1`                 | ✓       |
+| Loop iteration  | `/for/do/wait`             | 0    | `/for/do/wait:0`              | ✓       |
+| Loop iteration  | `/for/do/wait`             | 1    | `/for/do/wait:1`              | ✓       |
+| Fork branch A   | `/do/fork/a/do/task`       | 5    | `/do/fork/a/do/task:5`        | ✓       |
+| Fork branch B   | `/do/fork/b/do/task`       | 5    | `/do/fork/b/do/task:5`        | ✓       |
+| Retry attempt 1 | `/try/do/failing`          | 3    | `/try/do/failing:3`           | ✓       |
+| Retry attempt 2 | `/try/do/failing`          | 4    | `/try/do/failing:4`           | ✓       |
 
-```yaml
-do:
-    -   taskA:
-            set: { x: 1 }
-    -   taskB:
-            set: { y: 2 }
-```
+## Implementation
 
-Execution steps:
+### 1. Workflow Step Counter
 
-```
-1. workflowStep=0  ← Enter taskA
-2. workflowStep=1  ← Enter taskB
-3. workflowStep=2  ← Complete workflow
-```
-
-**Foreach loop:**
-
-```yaml
-for:
-    in: [ 1, 2, 3 ]
-    do:
-        -   task1:
-                set: { x: . }
-        -   task2:
-                set: { y: . }
-```
-
-Execution steps:
-
-```
-Iteration 0:
-  workflowStep=0  ← task1 (iteration 0)
-  workflowStep=1  ← task2 (iteration 0)
-
-Iteration 1:
-  workflowStep=2  ← task1 (iteration 1)
-  workflowStep=3  ← task2 (iteration 1)
-
-Iteration 2:
-  workflowStep=4  ← task1 (iteration 2)
-  workflowStep=5  ← task2 (iteration 2)
-```
-
-**Fork (parallel branches):**
-
-```yaml
-fork:
-    branches:
-        -   name: branch1
-            do:
-                -   task1:
-                        set: { x: 1 }
-        -   name: branch2
-            do:
-                -   task2:
-                        set: { y: 2 }
-```
-
-Execution steps (branches execute independently):
-
-```
-Parent: workflowStep=0  ← Enter fork
-
-Branch 1: workflowStep=0  ← task1 (new counter for branch)
-Branch 2: workflowStep=0  ← task2 (new counter for branch)
-
-Parent: workflowStep=1  ← Resume after fork completes
-```
-
-**Try with retry:**
-
-```yaml
-try:
-    -   failing:
-            call: { http: ... }
-catch:
-    errors: ...
-    retry:
-        maxAttempts: 3
-```
-
-Execution steps:
-
-```
-Attempt 0:
-  workflowStep=0  ← failing task (fails)
-
-Retry (attempt 1):
-  workflowStep=1  ← failing task retry (fails)
-
-Retry (attempt 2):
-  workflowStep=2  ← failing task retry (succeeds)
-```
-
-### Implementation
-
-**1. Add workflowStep to RootState**
+The `workflowStep` counter in `RootState` increments each time a task is entered:
 
 ```kotlin
 @Serializable
 data class RootState(
-    override val startedAt: Instant,
     val workflowId: WorkflowId,
-    val workflowInput: JsonElement,
-    val hasWaitingParent: Boolean = false,
-    val workflowStep: Int = 0,  // NEW! Simple counter
-) : BaseState()
+    val workflowStep: Int = 0,  // Increments on each task entry
+    // ...
+) : NodeState()
 ```
 
-**2. Add convenience property to WorkflowState**
+**Increment logic** (in `NodeStack`):
 
 ```kotlin
-@Serializable
-sealed class WorkflowState {
-    abstract val taskStates: TaskStates
-    abstract val nodePosition: NodePosition
-
-    val workflowId: WorkflowId get() = (taskStates[NodePosition.root] as RootState).workflowId
-    val hasWaitingParent: Boolean get() = (taskStates[NodePosition.root] as RootState).hasWaitingParent
-    val workflowStep: Int get() = (taskStates[NodePosition.root] as RootState).workflowStep  // NEW!
-}
-```
-
-**3. Increment Logic**
-
-The `workflowStep` is incremented in `StepByStepOrchestrator.resumeFromTask()` at the start of each task execution:
-
-```kotlin
-internal suspend fun resumeFromTask(
-    taskStates: TaskStates,
-    node: Node<*>,
-    rawInput: JsonElement,
-    flowDirective: FlowDirective? = null,
-): WorkflowEvent {
-    // Increment workflow step counter
-    val rootState = taskStates[NodePosition.root] as RootState
-    val updatedTaskStates = taskStates + (NodePosition.root to rootState.copy(
-        workflowStep = rootState.workflowStep + 1
-    ))
-
-    // Continue with execution using updatedTaskStates...
-}
+fun incrementStep(): NodeStack = withRootState(
+    rootState.copy(workflowStep = rootState.workflowStep + 1)
+)
 ```
 
 **Key behaviors:**
-- **Task entry**: Counter increments each time `resumeFromTask` is called (entering or re-entering any node)
-- **Async operations**: `resumeFromCompletedTask` and `resumeFromFailedTask` do NOT increment (they resume existing tasks)
-- **Fork branches**: Each branch starts with parent's counter value, continues incrementing independently
-- **Branch completion**: Parent resumes with its last counter value, continues incrementing from there
 
-**4. Remove visitCount from BaseState**
+- **Task entry**: Counter increments each time `Processor.run()` enters a task
+- **Async resume**: Counter increments when resuming from wait/retry (new execution step)
+- **Fork branches**: Branches share the parent's `nodeStack` - uniqueness comes from position
 
-The old `visitCount` field is no longer needed:
+### 2. ID Derivation Helper
 
-```kotlin
-// REMOVE this from BaseState:
-abstract val visitCount: Int
-
-// REMOVE increment logic from all processors:
-// DoProcessor.stateEnterFromChild() - remove visitCount increment
-// ForProcessor.stateEnterFromChild() - remove visitCount increment
-// TryProcessor.stateEnterFromChild() - remove visitCount increment
-// etc.
-```
-
-**5. Deterministic Message and Database IDs**
-
-Use `(workflowId, workflowStep)` to generate unique, deterministic IDs for database tables:
+**In `IDV7.kt`:**
 
 ```kotlin
-// For message IDs (broker deduplication)
-val messageId = IDV7.fromNamespace(
-    namespace = workflowId,
-    name = workflowStep.toString()
-)
+companion object {
+    /**
+     * Derives a deterministic IDV7 from a base ID, position, step, and suffix.
+     */
+    fun deriveFromPositionAndStep(
+        baseId: IDV7,
+        position: NodePosition,
+        step: Int,
+        suffix: String = ""
+    ): IDV7 {
+        val salt = "$position:$step$suffix"
+        return IDV7(IdGenerator.deriveUuidV7FromV7(baseId.value, salt))
+    }
+}
 
-// For outbox table IDs (waits, retries, parents)
-val waitId = IDV7.fromNamespace(
-    namespace = workflowId,
-    name = workflowStep.toString()
-)
+/**
+ * Derives a new IDV7 from this ID with the given suffix.
+ */
+fun derive(suffix: String): IDV7 {
+    return IDV7(IdGenerator.deriveUuidV7FromV7(value, suffix))
+}
 ```
 
-**Why this works:**
+**In `NodeStack.kt`:**
 
-- **Unique per execution**: Counter increments on each task entry
-    - Loop iteration 0, task 1: `workflowStep=0` → unique ID
-    - Loop iteration 0, task 2: `workflowStep=1` → different ID
-    - Loop iteration 1, task 1: `workflowStep=2` → different ID
-- **Deterministic**: Same execution path → same sequence of workflowStep values → same UUIDs
-- **No collisions**: Each wait/retry/parent gets unique database row
+```kotlin
+/**
+ * Derives a deterministic IDV7 for the current execution context.
+ */
+fun deriveIdempotentId(suffix: String = ""): IDV7 {
+    return IDV7.deriveFromPositionAndStep(
+        baseId = rootState.workflowId,
+        position = lastPosition,
+        step = rootState.workflowStep,
+        suffix = suffix
+    )
+}
+```
 
-**Example: lemline_waits table with loop**
+### 3. Message ID Generation
 
-Given this workflow:
+**Commands channel** (`WorkflowCommandHandler`):
+
+```kotlin
+val messageId = current.nodeStack.deriveIdempotentId()
+commandEmitter.sendPayload(payload, messageId)
+```
+
+**Events channel** - derived from model IDs (see below).
+
+### 4. Database Model IDs
+
+Each outbox model uses a type-specific suffix:
+
+| Model        | Suffix      | Example Salt                    |
+|--------------|-------------|---------------------------------|
+| WaitModel    | `-wait`     | `/do/wait:3-wait`               |
+| RetryModel   | `-retry`    | `/try/do/task:5-retry`          |
+| ParentModel  | `-parent`   | `/do/runWorkflow:2-parent`      |
+| ForkModel    | `-fork`     | `/do/fork:7-fork`               |
+| FailureModel | `-failure`  | `/do/task:4-failure`            |
+
+```kotlin
+// In WorkflowEventHandler
+val waitId = instance.nodeStack.deriveIdempotentId("-wait")
+WaitModel(id = waitId, ...)
+
+val retryId = instance.nodeStack.deriveIdempotentId("-retry")
+RetryModel(id = retryId, ...)
+```
+
+### 5. Outbox Processor Message IDs
+
+When outbox processors emit messages, they derive message IDs from the entity's ID:
+
+```kotlin
+// In WaitOutbox
+val messageId = entity.id.derive("-resume")
+instanceEmitter.send(resumeMessage, messageId)
+
+// In RetryOutbox
+val messageId = entity.id.derive("-resume")
+instanceEmitter.send(resumeMessage, messageId)
+```
+
+### 6. Transaction-Scoped Emissions
+
+Messages sent inside database transactions derive IDs from the parent model:
+
+```kotlin
+// Parent resume after child completes
+parentRepository.withTransaction { conn ->
+    val parent = parentRepository.findByChildId(childId, conn)
+    val resumeMessageId = parent.id.derive("-resume")
+    instanceEmitter.send(resumeMessage, resumeMessageId)
+}
+
+// Fork branch messages
+branches.forEach { branchNode ->
+    val branchMessageId = IDV7.deriveFromPositionAndStep(
+        baseId = instance.workflowId,
+        position = branchNode.position,
+        step = instance.workflowStep,
+        suffix = "-branch-init"
+    )
+    instanceEmitter.send(branchMessage, branchMessageId)
+}
+```
+
+## Execution Examples
+
+### Sequential Tasks
+
+```yaml
+do:
+  - taskA: { set: { x: 1 } }
+  - taskB: { set: { y: 2 } }
+```
+
+| Step | Position    | Salt           |
+|------|-------------|----------------|
+| 0    | `/do/taskA` | `/do/taskA:0`  |
+| 1    | `/do/taskB` | `/do/taskB:1`  |
+
+### Foreach Loop
 
 ```yaml
 for:
-    in: [ 1, 2, 3 ]
-    do:
-        -   wait: PT1M
+  in: [ 1, 2, 3 ]
+  do:
+    - wait: PT1M
 ```
 
-With workflowStep counter:
+| Iteration | Step | Position       | Salt              |
+|-----------|------|----------------|-------------------|
+| 0         | 0    | `/for/do/wait` | `/for/do/wait:0`  |
+| 1         | 1    | `/for/do/wait` | `/for/do/wait:1`  |
+| 2         | 2    | `/for/do/wait` | `/for/do/wait:2`  |
 
-```sql
--- ✅ Each iteration gets unique row
-CREATE TABLE lemline_waits
-(
-    id            UUID PRIMARY KEY, -- Derived from (workflowId, workflowStep)
-    workflow_id   UUID NOT NULL,
-    workflow_step INT NOT NULL,
-    node_position TEXT NOT NULL,  -- Still stored for context/debugging
-    ...
-);
+### Fork (Parallel Branches)
 
-INSERT INTO lemline_waits VALUES
-  (uuid_from_namespace(workflow_id, '0'), workflow_id, 0, '/for/do/wait', ...);  -- Iteration 0
-
-INSERT INTO lemline_waits VALUES
-  (uuid_from_namespace(workflow_id, '1'), workflow_id, 1, '/for/do/wait', ...);  -- Iteration 1
-
-INSERT INTO lemline_waits VALUES
-  (uuid_from_namespace(workflow_id, '2'), workflow_id, 2, '/for/do/wait', ...);  -- Iteration 2
+```yaml
+fork:
+  branches:
+    - name: branchA
+      do:
+        - taskA: { set: { x: 1 } }
+    - name: branchB
+      do:
+        - taskB: { set: { y: 2 } }
 ```
+
+| Context   | Step | Position                     | Salt                             |
+|-----------|------|------------------------------|----------------------------------|
+| Fork      | 5    | `/do/fork`                   | `/do/fork:5-fork`                |
+| Branch A  | 5    | `/do/fork/branchA/do/taskA`  | `/do/fork/branchA/do/taskA:5`    |
+| Branch B  | 5    | `/do/fork/branchB/do/taskB`  | `/do/fork/branchB/do/taskB:5`    |
+
+Note: Branches share the same `workflowStep` (5) but have different positions.
+
+### Try with Retry
+
+```yaml
+try:
+  - failing: { call: { http: ... } }
+catch:
+  errors: ...
+  retry:
+    maxAttempts: 3
+```
+
+| Attempt | Step | Position          | Salt                   |
+|---------|------|-------------------|------------------------|
+| 1       | 0    | `/try/do/failing` | `/try/do/failing:0`    |
+| 2       | 1    | `/try/do/failing` | `/try/do/failing:1`    |
+| 3       | 2    | `/try/do/failing` | `/try/do/failing:2`    |
+
+## Intentional Exclusions
+
+The following use random IDs intentionally:
+
+| Item                   | Reason                                                   |
+|------------------------|----------------------------------------------------------|
+| `ScheduleModel.id`     | Each scheduled execution is a new workflow instance      |
+| `DefinitionModel`      | Uses composite key (namespace, name, version)            |
+| `ForkBranchModel`      | Uses composite key (fork_id, branch_name)                |
+| CLI-initiated workflows| User starts a new workflow - random WorkflowId is correct|
 
 ## Consequences
 
 ### Positive
 
-1. **Simplicity**: Just an integer - easy to understand, implement, and debug
-    - No complex path building logic
-    - No visit count tracking per node
-    - Minimal risk of implementation bugs
-
-2. **Unique identification without collisions**: `(workflowId, workflowStep)` creates unique IDs for each execution
-    - Prevents database collisions
-    - Enables deterministic reprocessing
-    - Broker-level deduplication via message IDs
-    - Database-level idempotency via primary keys
-
-3. **Natural retry handling**: Each retry gets a new step number
-    - First attempt: `workflowStep=0`
-    - Retry: `workflowStep=1`
-    - Each retry has unique identifier
-
-4. **Aligns with Lemline architecture**:
-    - Minimal complexity (pragmatic approach)
-    - State carried in messages
-    - Node states already track relevant execution context
-
-5. **Fork isolation**: Each branch gets its own counter
-    - No coordination needed between parallel branches
-    - Natural isolation via separate WorkflowState instances
-    - Parent counter restored after fork completes
+1. **True idempotency**: Redelivered messages produce the same IDs → no duplicate processing
+2. **Database safety**: `ON CONFLICT DO NOTHING` now works correctly with deterministic IDs
+3. **No new state fields**: Position already exists, step counter is minimal overhead
+4. **Fork-safe**: Position-based uniqueness handles parallel branches naturally
+5. **Retry-safe**: Step counter distinguishes retry attempts
 
 ### Negative
 
-1. **Loss of structural information**: Step number doesn't encode position in workflow tree
-    - `workflowStep=47` doesn't tell you where in the workflow you are
-    - Mitigation: `NodePosition` is still stored in WorkflowState and database tables for context
-
-2. **Debugging**: Need to look at NodePosition separately to understand location
-    - Can't infer execution path from step number alone
-    - Mitigation: All node states already contain relevant execution context (startedAt, etc.)
-
-### Neutral
-
-1. **No impact on existing NodePosition usage**: Static positions still used for node lookup in lemline-core
-2. **Database schema**: Already stores both workflowStep and nodePosition for debugging
+1. **Longer salts**: Position strings can be long for deeply nested workflows
+    - Mitigation: SHA-256 handles arbitrary length; no functional impact
+2. **Position changes break idempotency**: Renaming tasks changes positions
+    - Mitigation: Expected - renamed tasks are semantically different
 
 ## Alternatives Considered
 
-### 1. Dynamic JSON Pointer with Visit Counts (Previous Design)
+### 1. Random IDs with Deduplication Table
 
-Use hierarchical path with visit counts like `/do,0/taskA,0`:
-
-**Rejected because:**
-
-- Much more complex implementation
-- Requires tracking visit counts per node in state
-- More code to maintain and debug
-- Path building logic adds overhead
-- Over-engineered for the core requirement (unique IDs)
-- Most debugging info already available in node states
-
-### 2. Global Sequential Counter with Path Encoding
-
-Combine both: increment counter AND track path.
+Track processed message IDs in a separate table.
 
 **Rejected because:**
 
-- Adds complexity without clear benefit
-- Redundant information (path already in NodePosition)
-- More state to serialize and carry in messages
+- Requires additional database table and queries
+- Doesn't solve database primary key collisions
+- More complex to implement correctly
 
-### 3. Hash-Based Identifier
+### 2. Synthetic Fork ID
 
-Hash the execution path: `hash(workflowId + nodePosition + timestamp)`
+Add a `forkId` field to `RootState` that gets derived for each branch.
+
+**Rejected because:**
+
+- Adds complexity to state management
+- Breaking serialization change
+- Position already contains branch information
+
+### 3. Hash-Based with Timestamp
+
+`hash(workflowId + position + timestamp)`
 
 **Rejected because:**
 
 - Timestamp makes it non-deterministic
-- Can't guarantee uniqueness without collision handling
-- Doesn't help with debugging
+- Can't guarantee idempotency on redelivery
 
 ## References
 
-- **Existing Architecture**:
-    - [ADR-0002: Workflow Execution Model](0002-workflow-execution-model.md)
-    - [ADR-0003: Messaging Architecture](0003-messaging-architecture.md)
-    - [ADR-0004: Database Storage Strategy](0004-database-storage-strategy.md)
-
-- **Related Concepts**:
-    - Serverless Workflow DSL: https://serverlessworkflow.io/
-
-- **Design Documents**:
-    - `/docs/orchestrator-architecture.md` - Processor and tree navigation model
-    - `/docs/runner-architecture.md` - Messaging and outbox patterns
-
-- **UUID v7 (Deterministic)**:
-    - RFC 4122, Section 4.3: https://tools.ietf.org/html/rfc4122#section-4.3
-    - Used for generating deterministic IDs from workflowStep
+- [ADR-0003: Messaging Architecture](0003-messaging-architecture.md) - Dual-channel design
+- [ADR-0004: Database Storage Strategy](0004-database-storage-strategy.md) - Outbox pattern
+- `IdGenerator.deriveUuidV7FromV7()` - Deterministic UUID derivation using SHA-256
+- Serverless Workflow DSL: https://serverlessworkflow.io/

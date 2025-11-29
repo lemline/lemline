@@ -58,11 +58,23 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     /**
      * Process scheduled workflow by updating next execution time and sending command.
      * No transformation needed - ScheduleOutboxModel already stores WorkflowCommand.
+     *
+     * Uses idempotent message ID derived from the schedule model's ID + scheduled time
+     * to ensure duplicate processing produces the same message ID and workflow ID.
      */
     override suspend fun process(entity: ScheduleModel) {
+        // Derive a deterministic workflow ID from schedule ID + scheduled time
+        // This ensures the same schedule entry always produces the same workflow ID
+        val scheduledTime = entity.outboxScheduledFor.toString()
+        val deterministicWorkflowId = WorkflowId(entity.id.derive("-wf-$scheduledTime"))
+
         // Update the schedule model with the next instant to be processed
-        entity.prepareNextScheduled(WorkflowId.random())
+        entity.prepareNextScheduled(deterministicWorkflowId)
+
+        // Derive message ID from schedule ID + scheduled time
+        val messageId = entity.id.derive("-msg-$scheduledTime")
+
         // Start a new instance of the workflow (instanceMessage already contains WorkflowCommand)
-        instanceEmitter.send(entity.instanceMessage)
+        instanceEmitter.send(entity.instanceMessage, messageId)
     }
 }

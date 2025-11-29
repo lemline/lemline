@@ -101,13 +101,15 @@ class ForkRepository : CleanerRepository<ForkModel>() {
     /**
      * Insert fork with all branches atomically.
      * Uses idempotent inserts (ON CONFLICT DO NOTHING / INSERT IGNORE) to handle message replays.
+     *
+     * @return The number of rows inserted for the fork model (0 if already exists, 1 if new)
      */
     suspend fun insertForkWithBranches(
         fork: ForkModel,
         branches: List<ForkBranchModel>
-    ) = withTransaction { conn ->
+    ): Int = withTransaction { conn ->
         // 1. Insert fork metadata (idempotent via base Repository)
-        insert(fork, conn)
+        val forkRowsInserted = insert(fork, conn)
 
         // 2. Batch insert all branches (idempotent via ForkBranchRepository)
         if (branches.isNotEmpty()) {
@@ -115,6 +117,8 @@ class ForkRepository : CleanerRepository<ForkModel>() {
         }
 
         log.debug { "Inserted fork ${fork.id} at ${fork.position} with ${branches.size} branches" }
+
+        forkRowsInserted
     }
 
     /**

@@ -3,6 +3,7 @@
 
 package com.lemline.core.states
 
+import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
@@ -86,6 +87,25 @@ data class NodeStack(
      * @return A new StateStack with workflowStep incremented by 1
      */
     fun incrementStep(): NodeStack = withRootState(rootState.copy(workflowStep = rootState.workflowStep + 1))
+
+    /**
+     * Derives a deterministic IDV7 for the current execution context.
+     *
+     * Uses workflowId + position + step to ensure uniqueness across:
+     * - Different positions in the workflow (each task has unique position)
+     * - Multiple executions of the same position (via step counter for loops/retries)
+     * - Parallel fork branches (position contains branch name)
+     *
+     * @param suffix Optional type discriminator (e.g., "-wait", "-retry", "-parent")
+     * @return A deterministic IDV7 unique to this execution context
+     */
+    fun deriveIdempotentId(suffix: String = ""): IDV7 =
+        IDV7.deriveFromPositionAndStep(
+            baseId = rootState.workflowId.value,
+            position = lastPosition,
+            step = rootState.workflowStep,
+            suffix = suffix
+        )
 
     /**
      * Creates a new TaskStack with updated context in the root state.

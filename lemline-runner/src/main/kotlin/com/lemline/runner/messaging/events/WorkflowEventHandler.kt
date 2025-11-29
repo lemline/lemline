@@ -122,11 +122,20 @@ internal class WorkflowEventHandler(
     // ========================================
 
     /**
-     * WorkflowEventHandler does not reemit.
+     * WorkflowEventHandler does not reemit via the standard pipeline.
+     * Message emissions are handled directly in handlers with explicit idempotent keys.
      */
-    override suspend fun emit(payload: String) {
+    override suspend fun emit(payload: String, idempotentKey: IDV7) {
         error("WorkflowEventHandler should not emit - it doesn't chain to other messages")
     }
+
+    /**
+     * Derives an idempotent key for event messages.
+     * Note: This is not used in the standard pipeline since WorkflowEventHandler
+     * handles emissions directly with explicit idempotent keys.
+     */
+    override fun deriveIdempotentKey(next: InstanceMessage<WorkflowEvent>): IDV7 =
+        next.workflowState.nodeStack.deriveIdempotentId("-event")
 
     // ========================================
     // Handling
@@ -172,48 +181,74 @@ internal class WorkflowEventHandler(
     }
 
     private suspend fun handleWaitStarted(instance: InstanceMessage<WorkflowEvent.WaitStarted>) {
-        waitRepository.insert(
+        val waitId = instance.workflowState.nodeStack.deriveIdempotentId("-wait")
+        val rowsInserted = waitRepository.insert(
             WaitModel(
+                id = waitId,
                 instanceMessage = instance,
                 outboxScheduledFor = instance.workflowState.waitUntil
             )
         )
+        if (rowsInserted == 0) {
+            logger.info { "Wait model $waitId already exists (idempotent insert)" }
+        }
     }
 
     private suspend fun handleRetryScheduled(instance: InstanceMessage<WorkflowEvent.TaskRetryScheduled>) {
-        retryRepository.insert(
+        val retryId = instance.workflowState.nodeStack.deriveIdempotentId("-retry")
+        val rowsInserted = retryRepository.insert(
             RetryModel.from(
+                id = retryId,
                 instance = instance,
                 scheduledFor = instance.workflowState.retryAt,
                 error = IllegalStateException("Task failed and will be retried"), // TODO this is not the correct exception
                 reason = "Task retry"
             )
         )
+        if (rowsInserted == 0) {
+            logger.info { "Retry model $retryId already exists (idempotent insert)" }
+        }
     }
 
     private suspend fun handleWorkflowFailed(instance: InstanceMessage<WorkflowEvent.WorkflowFailed>) {
+        val failureId = instance.workflowState.nodeStack.deriveIdempotentId("-failure")
         failureRepository.withTransaction { conn ->
             val exception = InternalException(instance.workflowState.error)
-            failureRepository.insert(
+            val rowsInserted = failureRepository.insert(
                 FailureModel.from(
+                    id = failureId,
                     instance = instance,
                     exception = exception,
                     reason = getFailureReason(exception)
                 ),
                 conn
             )
+            if (rowsInserted == 0) {
+                logger.info { "Failure model $failureId already exists (idempotent insert), skipping" }
+                return@withTransaction
+            }
             // If this workflow has a parent, resume it with the child exception, in case
             if (instance.hasWaitingParent) {
                 parentRepository.findByChildId(instance.workflowId, conn)?.let { parent ->
+                    // Check if already processed (defense in depth - failure insert check above should catch this)
+                    if (parent.outboxCompletedAt != null) {
+                        logger.info { "Parent ${parent.id} already resumed for child ${instance.workflowId} (idempotent), skipping" }
+                        return@withTransaction
+                    }
+
                     // Parent state
                     val state = parent.instanceMessage.workflowState
+
+                    // Derive resume message ID from parent model ID
+                    val resumeMessageId = parent.id.derive("-resume-failed")
 
                     // restart parent
                     instanceEmitter.send(
                         InstanceMessage(
                             workflowInfo = parent.instanceMessage.workflowInfo,
                             workflowState = state.resumeAsFailed(instance.workflowState.error),
-                        )
+                        ),
+                        resumeMessageId
                     )
 
                     // mark parent as completed for cleanup (event-driven state - processed once)
@@ -221,7 +256,7 @@ internal class WorkflowEventHandler(
                     parentRepository.update(parent, conn)
 
                     logger.debug {
-                        "Parent workflow $parent resumed after child ${instance.workflowId} completion"
+                        "Parent workflow $parent resumed after child ${instance.workflowId} failure"
                     }
                 } ?: error("CRITICAL - Unable to find parent for child ${instance.workflowId}")
             }
@@ -229,19 +264,26 @@ internal class WorkflowEventHandler(
     }
 
     private suspend fun handleRunWorkflowStarted(instance: InstanceMessage<WorkflowEvent.RunWorkflowStarted>) {
+        // Derive parent model ID from position + step
+        val parentId = instance.workflowState.nodeStack.deriveIdempotentId("-parent")
+
         parentRepository.withTransaction { conn ->
-            // Generate child workflow ID
-            val childWorkflowId = WorkflowId.random()
+            // Generate child workflow ID (deterministic from parent ID)
+            val childWorkflowId = WorkflowId(parentId.derive("-child"))
 
             // Insert parent with child_id
-            parentRepository.insert(
+            val rowsInserted = parentRepository.insert(
                 entity = ParentModel(
-                    id = IDV7.random(),
+                    id = parentId,
                     instanceMessage = instance,
                     childId = childWorkflowId
                 ),
                 connection = conn
             )
+            if (rowsInserted == 0) {
+                logger.info { "Parent model $parentId already exists (idempotent insert), skipping" }
+                return@withTransaction
+            }
 
             // Create the child + optional schedule
             val (child, schedule) = starter.getStartingMessages(
@@ -257,52 +299,74 @@ internal class WorkflowEventHandler(
             // Insert schedule if present
             schedule?.let { scheduleRepository.insert(it, conn) }
 
-            // Emit child to the workflow channel
-            child?.let { instanceEmitter.send(it) }
+            // Emit child to the workflow channel with idempotent message ID
+            child?.let {
+                val childMessageId = parentId.derive("-child-init")
+                instanceEmitter.send(it, childMessageId)
+            }
         }
     }
 
     private suspend fun handleWorkflowCompleted(instance: InstanceMessage<WorkflowEvent.WorkflowCompleted>) {
-        // If this workflow has a parent, resume it
-        if (instance.hasWaitingParent) {
-            parentRepository.withTransaction { conn ->
-                parentRepository.findByChildId(instance.workflowId, conn)?.let { parent ->
-                    // Parent state
-                    val state = parent.instanceMessage.workflowState
-
-                    // restart parent
-                    instanceEmitter.send(
-                        InstanceMessage(
-                            workflowInfo = parent.instanceMessage.workflowInfo,
-                            workflowState = state.resumeAsCompleted(instance.workflowState.output),
-                        )
-                    )
-
-                    // mark parent as completed for cleanup (event-driven state - processed once)
-                    parent.outboxCompletedAt = Clock.System.now()
-                    parentRepository.update(parent, conn)
-
-                    logger.debug {
-                        "Parent workflow $parent resumed after child ${instance.workflowId} completion"
-                    }
-                } ?: error("CRITICAL - Unable to find parent for child ${instance.workflowId}")
-            }
-        }
-
-        // Handle schedule completion
+        // Get workflow definition for schedule check (read-only, outside transaction)
         val workflow = definitions.get(
             instance.workflowInfo.workflowNamespace,
             instance.workflowInfo.workflowName,
             instance.workflowInfo.workflowVersion
         )
             ?: error("CRITICAL - Unable to find definition of workflow ${instance.workflowInfo.workflowNamespace}/${instance.workflowInfo.workflowName}/${instance.workflowInfo.workflowVersion}.")
-        if (workflow.schedule?.after != null) {
-            scheduleRepository.findByWorkflowId(instance.workflowId)?.let { schedule ->
-                schedule.scheduleAfterCompletion()
-                scheduleRepository.update(schedule)
-                logger.debug { "Scheduled workflow ${schedule.workflowName} for ${schedule.outboxDelayedUntil}" }
+
+        val hasScheduleAfter = workflow.schedule?.after != null
+
+        // If no parent and no schedule, nothing to do
+        if (!instance.hasWaitingParent && !hasScheduleAfter) {
+            return
+        }
+
+        // Single transaction for all operations
+        parentRepository.withTransaction { conn ->
+            // Handle parent resume if needed
+            if (instance.hasWaitingParent) {
+                parentRepository.findByChildId(instance.workflowId, conn)?.let { parent ->
+                    // Check if already processed (idempotent handling)
+                    if (parent.outboxCompletedAt != null) {
+                        logger.info { "Parent ${parent.id} already resumed for child ${instance.workflowId} (idempotent), skipping" }
+                        // Continue to schedule check - don't return
+                    } else {
+                        // Parent state
+                        val state = parent.instanceMessage.workflowState
+
+                        // Derive resume message ID from parent model ID
+                        val resumeMessageId = parent.id.derive("-resume-completed")
+
+                        // restart parent
+                        instanceEmitter.send(
+                            InstanceMessage(
+                                workflowInfo = parent.instanceMessage.workflowInfo,
+                                workflowState = state.resumeAsCompleted(instance.workflowState.output),
+                            ),
+                            resumeMessageId
+                        )
+
+                        // mark parent as completed for cleanup (event-driven state - processed once)
+                        parent.outboxCompletedAt = Clock.System.now()
+                        parentRepository.update(parent, conn)
+
+                        logger.debug {
+                            "Parent workflow $parent resumed after child ${instance.workflowId} completion"
+                        }
+                    }
+                } ?: error("CRITICAL - Unable to find parent for child ${instance.workflowId}")
             }
-                ?: error("CRITICAL - Unable to find workflow ${instance.workflowId} in schedules table.")
+
+            // Handle schedule completion if needed
+            if (hasScheduleAfter) {
+                scheduleRepository.findByWorkflowId(instance.workflowId, conn)?.let { schedule ->
+                    schedule.scheduleAfterCompletion()
+                    scheduleRepository.update(schedule, conn)
+                    logger.debug { "Scheduled workflow ${schedule.workflowName} for ${schedule.outboxDelayedUntil}" }
+                } ?: error("CRITICAL - Unable to find workflow ${instance.workflowId} in schedules table.")
+            }
         }
     }
 
@@ -319,6 +383,9 @@ internal class WorkflowEventHandler(
     private suspend fun handleForkStarted(instance: InstanceMessage<WorkflowEvent.ForkStarted>) {
         val state = instance.workflowState
 
+        // Derive fork model ID from position + step
+        val forkId = instance.workflowState.nodeStack.deriveIdempotentId("-fork")
+
         // Get fork node from workflow definition to extract fork configuration
         val workflowInfo = instance.workflowInfo
         val workflow = DefinitionCache.getWorkflow(
@@ -333,8 +400,9 @@ internal class WorkflowEventHandler(
         val isCompete = forkNode.task.fork.isCompete
         val branches = forkNode.children ?: emptyList()
 
-        // 1. Create fork metadata model
+        // 1. Create fork metadata model with deterministic ID
         val forkModel = ForkModel(
+            id = forkId,
             instanceMessage = instance,
             position = state.nodePosition.toString(),
             compete = isCompete
@@ -352,14 +420,19 @@ internal class WorkflowEventHandler(
         }
 
         // 3. Insert fork and branches atomically (already uses transaction internally)
-        forkRepository.insertForkWithBranches(forkModel, forkBranchModels)
+        val rowsInserted = forkRepository.insertForkWithBranches(forkModel, forkBranchModels)
+        if (rowsInserted == 0) {
+            logger.info { "Fork model $forkId already exists (idempotent insert), skipping" }
+            return
+        }
 
         logger.debug {
             "Fork started for instance ${instance.workflowId}, position ${state.nodePosition}, " +
                 "compete=$isCompete, branches=${branches.size}"
         }
 
-        // 4. Emit instance messages for each branch
+        // 4. Emit instance messages for each branch with idempotent message IDs
+        // Branch position contains branch name, making IDs unique across branches
         branches.forEach { branchNode ->
             val branchMessage = InstanceMessage(
                 workflowInfo = instance.workflowInfo,
@@ -370,8 +443,16 @@ internal class WorkflowEventHandler(
                 ),
             )
 
+            // Derive message ID using branch position (unique per branch)
+            val branchMessageId = IDV7.deriveFromPositionAndStep(
+                baseId = instance.workflowId.value,
+                position = branchNode.position,
+                step = instance.workflowState.nodeStack.rootState.workflowStep,
+                suffix = "-branch-init"
+            )
+
             logger.debug { "Scheduling branch ${branchNode.name} at ${branchNode.position}" }
-            instanceEmitter.send(branchMessage)
+            instanceEmitter.send(branchMessage, branchMessageId)
         }
     }
 
@@ -462,8 +543,11 @@ internal class WorkflowEventHandler(
                         ),
                     )
 
+                    // Derive resume message ID from fork model ID
+                    val resumeMessageId = fork.id.derive("-resume-completed")
+
                     // Emit resume message to workflow channel
-                    instanceEmitter.send(resumeMessage)
+                    instanceEmitter.send(resumeMessage, resumeMessageId)
                 } else {
                     logger.debug { "Fork not yet completed at $forkPosition" }
                     // Waiting for more branches - nothing to do
@@ -546,8 +630,8 @@ internal class WorkflowEventHandler(
                     fork.errorMessage = branchError.title
                     fork.errorStackTrace = branchError.details
 
-                    // Save the updated branch in the transaction
-                    forkRepository.updateBranch(branch, conn)
+                    // Save the updated fork in the transaction
+                    forkRepository.update(fork, conn)
 
                     // we do not know yet if the workflow will be failing after this fork failure
                     // this exception can be caught above the fork, that's why we restart from there
@@ -558,8 +642,10 @@ internal class WorkflowEventHandler(
                             error = error,
                         ),
                     )
-                    instanceEmitter.send(resumeMessage)
 
+                    // Derive resume message ID from fork model ID
+                    val resumeMessageId = fork.id.derive("-resume-failed")
+                    instanceEmitter.send(resumeMessage, resumeMessageId)
                 }
             }
         }

@@ -55,8 +55,13 @@ data class RetryModel(
     override var outboxFailedAt: Instant? = null
 
     companion object Companion {
+        /**
+         * Creates a RetryModel from a retry scheduled event.
+         *
+         * @param id Must be derived from position + step for idempotency
+         */
         fun from(
-            id: IDV7 = IDV7.random(),
+            id: IDV7,
             instance: InstanceMessage<WorkflowEvent.TaskRetryScheduled>,
             scheduledFor: Instant,
             error: Throwable,

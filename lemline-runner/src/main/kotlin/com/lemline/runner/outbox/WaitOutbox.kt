@@ -54,13 +54,20 @@ internal class WaitOutbox : AbstractOutbox<WaitModel>() {
     /**
      * Transform WaitStarted Event → ResumeFromStartedTask Command before sending.
      * This ensures the workflow handler receives a command it can process.
+     *
+     * Uses idempotent message ID derived from the wait model's ID to ensure
+     * duplicate processing produces the same message ID.
      */
     override suspend fun process(entity: WaitModel) {
+        // Derive message ID from the wait model's ID
+        val messageId = entity.id.derive("-resume")
+
         instanceEmitter.send(
             InstanceMessage(
                 workflowInfo = entity.instanceMessage.workflowInfo,
                 workflowState = entity.instanceMessage.workflowState.resume(),
-            )
+            ),
+            messageId
         )
     }
 }
