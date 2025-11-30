@@ -176,6 +176,8 @@ internal class WorkflowEventHandler(
             is WorkflowEvent.WorkflowFailed -> handleWorkflowFailed(current as InstanceMessage<WorkflowEvent.WorkflowFailed>)
 
             is WorkflowEvent.TaskScheduled -> error("Unexpected state in workflow event handler: $state")
+
+            is WorkflowEvent.EmitStarted -> error("EmitStarted should not be sent to events channel - it's fire-and-forget: $state")
         }
         return null
     }

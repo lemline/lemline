@@ -17,11 +17,13 @@ import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
+import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.FailureRepository
+import io.quarkus.arc.Arc
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.Clock
@@ -50,6 +52,14 @@ internal class WorkflowCommandHandler(
     private val config: LemlineConfiguration,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
+
+    /**
+     * Lazy-loaded CloudEvents emitter. May be null if CloudEvents producer is not enabled.
+     * Uses Arc to look up the bean since it's conditionally created.
+     */
+    private val cloudEventsEmitter: CloudEventsEmitter? by lazy {
+        Arc.container().instance(CloudEventsEmitter::class.java).orElse(null)
+    }
 
     @TestOnly
     override var onCompleteTest = { _: Message<String>, _: InstanceMessage<WorkflowCommand>? -> }
@@ -334,6 +344,13 @@ internal class WorkflowCommandHandler(
                 null  // Paused - waiting for branches to complete
             }
 
+            is WorkflowEvent.EmitStarted -> {
+                // Emit CloudEvent to external channel (fire-and-forget)
+                emitCloudEvent(this, event)
+                // Immediately continue workflow execution
+                event.resume()
+            }
+
             is WorkflowEvent.WorkflowCompleted -> {
                 // Only persist if parent or scheduled workflow
                 logger.debug { "Workflow completed with output: ${event.output}" }
@@ -383,6 +400,32 @@ internal class WorkflowCommandHandler(
                 workflowInfo = message.workflowInfo,
                 workflowState = event,
             )
+        )
+    }
+
+    /**
+     * Emits a CloudEvent to the external cloudevents channel.
+     * This is fire-and-forget - the workflow continues immediately.
+     */
+    private suspend fun emitCloudEvent(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent.EmitStarted) {
+        val emitter = cloudEventsEmitter
+        if (emitter == null) {
+            logger.warn { "CloudEvents emitter not available - emit task will not publish event. Enable cloudevents.producer to emit CloudEvents." }
+            return
+        }
+
+        val cloudEvent = event.cloudEvent
+        if (cloudEvent == null) {
+            logger.error { "EmitStarted event has null cloudEvent - this should not happen" }
+            return
+        }
+
+        emitter.send(
+            cloudEvent = cloudEvent,
+            workflowId = message.workflowId.toString(),
+            workflowNamespace = message.workflowNamespace.toString(),
+            workflowName = message.workflowName.toString(),
+            workflowVersion = message.workflowVersion.toString(),
         )
     }
 }

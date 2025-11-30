@@ -411,4 +411,39 @@ sealed class WorkflowEvent : WorkflowState() {
             rawOutput = rawOutput,
         )
     }
+
+    /**
+     * Event emitted when an emit task publishes a CloudEvent.
+     *
+     * The CloudEvent is built using the official CloudEvents SDK (io.cloudevents)
+     * for proper CloudEvents v1.0 compliance. This event is handled inline by
+     * WorkflowCommandHandler and never flows through broker messages, so the
+     * CloudEvent doesn't need to be serializable.
+     *
+     * The workflow continues immediately after publishing (fire-and-forget).
+     */
+    @Serializable
+    @SerialName("emitStarted")
+    data class EmitStarted(
+        override val nodeStack: NodeStack,
+        val emitState: EmitState,
+        @Transient val cloudEvent: io.cloudevents.CloudEvent? = null,  // Not serialized - handled inline
+        val rawOutput: JsonElement   // Pass-through: output = input for emit task
+    ) : Suspension() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition // Emit position
+
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", cloudEvent=${cloudEvent?.let { "id=${it.id}, source=${it.source}, type=${it.type}" }}" +
+            ", rawOutput=$rawOutput" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+
+        fun resume() = WorkflowCommand.ResumeWithCompletedTask(
+            nodeStack = nodeStack,
+            rawOutput = rawOutput,
+        )
+    }
 }

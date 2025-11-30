@@ -13,6 +13,7 @@ import com.lemline.common.values.Token.TRY
 import com.lemline.common.values.Token.WITH
 import com.lemline.core.processors.CallHttpProcessor
 import com.lemline.core.processors.DoProcessor
+import com.lemline.core.processors.EmitProcessor
 import com.lemline.core.processors.ForProcessor
 import com.lemline.core.processors.ForkProcessor
 import com.lemline.core.processors.NodeProcessor
@@ -76,6 +77,7 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
             is CallHTTP -> CallHttpProcessor(this as Node<CallHTTP>)
             is WaitTask -> WaitProcessor(this as Node<WaitTask>)
             is ForkTask -> ForkProcessor(this as Node<ForkTask>)
+            is EmitTask -> EmitProcessor(this as Node<EmitTask>)
             is RunTask -> {
                 val runTask = this as Node<RunTask>
                 when (runTask.task.run.get()) {

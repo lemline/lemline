@@ -6,6 +6,7 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.AsyncTaskException
+import com.lemline.core.errors.AsyncTaskException.EmitStartedException
 import com.lemline.core.errors.AsyncTaskException.ForkStartedException
 import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.errors.AsyncTaskException.WaitStartedException
@@ -18,6 +19,7 @@ import com.lemline.core.states.RootState
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowEvent.EmitStarted
 import com.lemline.core.states.WorkflowEvent.ForkBranchCompleted
 import com.lemline.core.states.WorkflowEvent.ForkBranchFailed
 import com.lemline.core.states.WorkflowEvent.ForkStarted
@@ -130,6 +132,7 @@ object StepByStepOrchestrator {
             is TaskRetryScheduled -> event
             is RunWorkflowStarted -> event
             is ForkStarted -> event
+            is EmitStarted -> event
             is WorkflowEvent.Outcome -> event
         }
     }
@@ -175,6 +178,13 @@ object StepByStepOrchestrator {
                         nodeStack = states,
                         forkState = e.state,
                         rawInput = e.transformedInput,
+                    )
+
+                    is EmitStartedException -> EmitStarted(
+                        nodeStack = states,
+                        emitState = e.state,
+                        cloudEvent = e.cloudEvent,
+                        rawOutput = e.transformedInput,
                     )
                 }
             }

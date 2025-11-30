@@ -328,6 +328,11 @@ internal class RunnerWorkflowTestExecutor : WorkflowTestExecutor {
                     is WorkflowEvent.TaskScheduled -> {
                         // This shouldn't appear in events channel
                     }
+
+                    is WorkflowEvent.EmitStarted -> {
+                        // EmitStarted shouldn't appear in events channel either
+                        // The emit is handled in the commands channel (fire-and-forget)
+                    }
                 }
             }
         }

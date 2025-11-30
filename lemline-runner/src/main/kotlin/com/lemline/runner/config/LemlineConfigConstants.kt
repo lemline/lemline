@@ -33,6 +33,7 @@ object LemlineConfigConstants {
 
     const val COMMANDS_TOPIC_DEFAULT = "lemline-commands"
     const val EVENTS_TOPIC_DEFAULT = "lemline-events"
+    const val CLOUDEVENTS_TOPIC_DEFAULT = "lemline-cloudevents"
 
     // Postgres
     const val POSTGRES_HOST_DEFAULT = "localhost"

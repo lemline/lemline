@@ -4,6 +4,7 @@ package com.lemline.core.errors
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.states.EmitState
 import com.lemline.core.states.ForkState
 import com.lemline.core.states.NodeState
 import com.lemline.core.states.RunState
@@ -99,5 +100,26 @@ sealed class AsyncTaskException : RuntimeException() {
     data class ForkStartedException(
         override val state: ForkState,
         val transformedInput: JsonElement
+    ) : AsyncTaskException()
+
+    /**
+     * Exception indicating that a CloudEvent should be emitted.
+     *
+     * This exception is thrown when an emit task needs to publish a CloudEvent
+     * to an external messaging system. The runner catches this, publishes the
+     * CloudEvent to the cloudevents channel, and immediately resumes the workflow.
+     *
+     * The CloudEvent is built using the official CloudEvents SDK (io.cloudevents)
+     * for proper CloudEvents v1.0 compliance.
+     *
+     * @property state The emit task state
+     * @property transformedInput The input that will be passed through as output
+     * @property cloudEvent The CloudEvent built with the official SDK
+     */
+    @ExperimentalTime
+    data class EmitStartedException(
+        override val state: EmitState,
+        val transformedInput: JsonElement,
+        val cloudEvent: io.cloudevents.CloudEvent
     ) : AsyncTaskException()
 }

@@ -72,7 +72,8 @@ internal object FullOrchestrator {
             false -> event
         }
 
-        if (event != serdeEvent)
+        // Skip serde check for EmitStarted - cloudEvent is @Transient (handled inline, never serialized)
+        if (event !is WorkflowEvent.EmitStarted && event != serdeEvent)
             throw IllegalStateException("Event mismatch\nevent     : $event\nserdeEvent: $serdeEvent")
 
         return when (serdeEvent) {
@@ -81,6 +82,8 @@ internal object FullOrchestrator {
             is WorkflowEvent.TaskRetryScheduled -> resume(workflow, handle(serdeEvent), serde)
             is WorkflowEvent.RunWorkflowStarted -> resume(workflow, handle(serdeEvent, serde), serde)
             is WorkflowEvent.ForkStarted -> resume(workflow, handle(workflow, serdeEvent, serde), serde)
+            // Use original event for EmitStarted to preserve cloudEvent (which is @Transient)
+            is WorkflowEvent.EmitStarted -> resume(workflow, handle(event as WorkflowEvent.EmitStarted), serde)
             is WorkflowEvent.Outcome -> serdeEvent
         }
     }
@@ -94,6 +97,16 @@ internal object FullOrchestrator {
         logger.debug { "Retrying in $delayDuration" }
         if (delayDuration > Duration.ZERO) delay(delayDuration)
         logger.debug { "Retrying" }
+        return event.resume()
+    }
+
+    /**
+     * Handles an emit event by immediately resuming the workflow.
+     * In the full orchestrator, we don't actually emit CloudEvents - that's handled by the runner.
+     * This is fire-and-forget semantics.
+     */
+    private fun handle(event: WorkflowEvent.EmitStarted): WorkflowCommand {
+        logger.debug { "Emit task completed (CloudEvent emitted)" }
         return event.resume()
     }
 

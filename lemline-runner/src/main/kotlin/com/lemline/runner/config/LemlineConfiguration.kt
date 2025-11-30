@@ -41,6 +41,8 @@ const val EVENTS_PRODUCER_ENABLED = "lemline.messaging.events.producer.enabled"
 const val EVENTS_CONSUMER_ENABLED = "lemline.messaging.events.consumer.enabled"
 const val EVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.events.consumer.concurrency"
 
+const val CLOUDEVENTS_PRODUCER_ENABLED = "lemline.messaging.cloudevents.producer.enabled"
+
 const val ORCHESTRATOR_MODE = "lemline.orchestrator.mode"
 
 /**
@@ -169,6 +171,8 @@ interface LemlineConfiguration {
 
         fun events(): Optional<ChannelConfig>
 
+        fun cloudevents(): Optional<CloudEventsChannelConfig>
+
         /**
          * Optional Kafka configuration
          */
@@ -196,6 +200,14 @@ interface LemlineConfiguration {
 
         @WithDefault(CONSUMER_CONCURRENCY_DEFAULT)
         fun concurrency(): Long
+    }
+
+    /**
+     * CloudEvents channel configuration (producer-only).
+     * Used for emitting CloudEvents to external consumers.
+     */
+    interface CloudEventsChannelConfig {
+        fun producer(): ProducerConfig
     }
 
     /**
