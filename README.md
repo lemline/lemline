@@ -200,14 +200,11 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 
 - [x] PostgreSQL
 - [x] MySQL
-- [ ] Oracle
-- [ ] SQL Server
 
 ### Message Brokers
 
 - [x] Kafka
 - [x] RabbitMQ
-- [ ] Pulsar
 - [ ] Amazon SQS
 - [ ] Google Pub/Sub
 - [ ] Azure Service Bus
@@ -220,7 +217,7 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 - [x] Raise
 - [x] For
 - [ ] Listen
-- [ ] Emit
+- [x] Emit
 - [x] Fork
 
 - Try:
