@@ -3,12 +3,14 @@ package com.lemline.runner.messaging.commands
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.activities.RunnerActivityExecutor
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
@@ -48,6 +50,7 @@ internal class WorkflowCommandHandler(
     private val failureRepository: FailureRepository,
     override val metrics: WorkflowCommandSubscriberMetrics,
     private val config: LemlineConfiguration,
+    private val activityExecutor: RunnerActivityExecutor,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
 
@@ -294,7 +297,7 @@ internal class WorkflowCommandHandler(
 
             is WorkflowEvent.WaitStarted -> {
                 // Check if the wait time has already been reached (optimization)
-                if (event.waitUntil <= Clock.System.now()) {
+                if (event.config.waitUntil <= Clock.System.now()) {
                     logger.debug { "Wait time already reached, continuing immediately" }
                     event.resume()
                 } else {
@@ -320,7 +323,7 @@ internal class WorkflowCommandHandler(
                 // Send to the database for parent storage + child creation
                 sendToDatabase(this, event)
 
-                when (event.childConfig.sync) {
+                when (event.config.sync) {
                     // waiting for synchronous completion
                     true -> null
                     // Not waiting for sub-workflow completion
@@ -332,6 +335,11 @@ internal class WorkflowCommandHandler(
                 // Send to the database for fork persistence + branch scheduling
                 sendToDatabase(this, event)
                 null  // Paused - waiting for branches to complete
+            }
+
+            is WorkflowEvent.ActivityStarted -> {
+                // Execute the activity and resume with the result
+                executeActivity(event)
             }
 
             is WorkflowEvent.WorkflowCompleted -> {
@@ -384,5 +392,23 @@ internal class WorkflowCommandHandler(
                 workflowState = event,
             )
         )
+    }
+
+    /**
+     * Executes an activity via the ActivityExecutor and returns the resume command.
+     *
+     * Activities include HTTP calls, script execution, shell commands, and CloudEvent emission.
+     * On success, resumes with the activity output. On failure, resumes with the error.
+     */
+    private suspend fun executeActivity(event: WorkflowEvent.ActivityStarted): WorkflowCommand {
+        logger.debug { "Executing activity: ${event::class.simpleName} at ${event.nodePosition}" }
+        return try {
+            val output = activityExecutor.execute(event)
+            logger.debug { "Activity completed: ${event::class.simpleName}" }
+            event.resumeCompleted(output)
+        } catch (e: Exception) {
+            logger.error(e) { "Activity failed: ${event::class.simpleName}" }
+            event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
+        }
     }
 }

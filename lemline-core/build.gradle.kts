@@ -63,6 +63,9 @@ dependencies {
     // Auth0 for JWT token generation and validation
     implementation("com.auth0:java-jwt:4.4.0")
 
+    // CloudEvents SDK for building CloudEvents (serialization done in lemline-runner)
+    implementation(libs.cloudevents.core)
+
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform(libs.kotest.bom))

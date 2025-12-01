@@ -328,6 +328,11 @@ internal class RunnerWorkflowTestExecutor : WorkflowTestExecutor {
                     is WorkflowEvent.TaskScheduled -> {
                         // This shouldn't appear in events channel
                     }
+
+                    is WorkflowEvent.ActivityStarted -> {
+                        // ActivityStarted events shouldn't appear in events channel
+                        // Activities are executed inline in the commands channel
+                    }
                 }
             }
         }

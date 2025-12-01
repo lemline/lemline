@@ -6,10 +6,12 @@ package com.lemline.core.processors
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
-import com.lemline.core.orchestrator.StepResult
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.TryState
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowEvent.TaskRetryScheduled
+import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration
 import io.serverlessworkflow.api.types.ConstantBackoff
@@ -173,12 +175,11 @@ class TryProcessor(
         failingNode: Node<*>,
         error: InternalException.Error,
         state: TryState,
-        scope: Scope,
         nodeStack: NodeStack
-    ): StepResult {
+    ): WorkflowEvent {
 
         // Check if we should retry
-        val shouldRetry = shouldRetry(state, scope)
+        val shouldRetry = shouldRetry(state, nodeStack.stateScope)
 
         return when (shouldRetry) {
             // Retry if attempts remain
@@ -186,10 +187,11 @@ class TryProcessor(
                 val updatedState = state.copy(
                     attemptIndex = state.attemptIndex + 1
                 )
-                StepResult(
-                    nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),  // Re-enter try body
-                    nextNode = getDoTry(),  // Original input
-                    nextInput = state.transformedInput,
+                TaskRetryScheduled(
+                    nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),
+                    nodePosition = getDoTry().position,
+                    rawInput = state.transformedInput,
+                    flowDirective = null,
                     retryAt = Clock.System.now() + retryPolicy!!.getRetryDelay(updatedState.attemptIndex)
                 )
             }
@@ -199,10 +201,11 @@ class TryProcessor(
                     runningCatch = true,
                     lastError = error
                 )
-                StepResult(
+                TaskScheduled(
                     nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),  // Re-enter try body
-                    nextNode = getCatchNode(),  // Original input
-                    nextInput = state.transformedInput,
+                    nodePosition = getCatchNode().position,
+                    rawInput = state.transformedInput, // Original input
+                    flowDirective = null,
                 )
             }
         }

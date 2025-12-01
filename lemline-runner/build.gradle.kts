@@ -81,6 +81,10 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
 
+    // CloudEvents SDK with Jackson serialization for emitting CloudEvents
+    implementation(libs.cloudevents.core)
+    implementation(libs.cloudevents.json.jackson)
+
     // Logging
 //    implementation("net.logstash.logback:logstash-logback-encoder:8.1")
 //    implementation("ch.qos.logback:logback-classic:1.5.18")

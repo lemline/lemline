@@ -8,6 +8,7 @@ import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEF
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
+import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
@@ -44,6 +45,7 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
+import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
@@ -226,6 +228,7 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             configureKafkaTopic(props, TopicType.COMMANDS)
             configureKafkaTopic(props, TopicType.EVENTS)
+            configureKafkaCloudEventsTopic(props)
         }
 
         private fun MutableMap<String, String>.configureKafkaTopic(
@@ -260,6 +263,24 @@ class LemlineConfigSource : PropertiesConfigSource(
             }
         }
 
+        /**
+         * Configures the CloudEvents Kafka topic (producer-only).
+         * CloudEvents are emitted to external consumers and don't need a consumer.
+         */
+        private fun MutableMap<String, String>.configureKafkaCloudEventsTopic(props: Map<String, String>) {
+            if (!props[CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) return
+
+            val type = "lemline.messaging.kafka.cloudevents"
+            val topic = props["$type.topic"] ?: CLOUDEVENTS_TOPIC_DEFAULT
+
+            val producer = "$type.producer"
+            val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
+            set("$outgoing.connector", KAFKA_CONNECTOR)
+            set("$outgoing.topic", props["$producer.topic-out"] ?: topic)
+            set("$outgoing.value.serializer", KAFKA_STRING_SERIALIZER)
+            set("$outgoing.acks", "all")
+        }
+
         private fun MutableMap<String, String>.configureRabbit(props: Map<String, String>) {
             val rabbit = "lemline.messaging.rabbitmq"
             // Values with Default
@@ -273,6 +294,7 @@ class LemlineConfigSource : PropertiesConfigSource(
 
             configureRabbitQueue(props, TopicType.COMMANDS)
             configureRabbitQueue(props, TopicType.EVENTS)
+            configureRabbitCloudEventsQueue(props)
         }
 
         private fun MutableMap<String, String>.configureRabbitQueue(
@@ -313,12 +335,34 @@ class LemlineConfigSource : PropertiesConfigSource(
             }
         }
 
+        /**
+         * Configures the CloudEvents RabbitMQ queue (producer-only).
+         * CloudEvents are emitted to external consumers and don't need a consumer.
+         */
+        private fun MutableMap<String, String>.configureRabbitCloudEventsQueue(props: Map<String, String>) {
+            if (!props[CLOUDEVENTS_PRODUCER_ENABLED].toBoolean()) return
+
+            val type = "lemline.messaging.rabbitmq.cloudevents"
+            val queue = props["$type.queue"] ?: CLOUDEVENTS_TOPIC_DEFAULT
+
+            val producer = "$type.producer"
+            val outgoing = "mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL"
+            set("$outgoing.connector", RABBITMQ_CONNECTOR)
+            set("$outgoing.queue.name", props["$producer.queue-out"] ?: queue)
+            set("$outgoing.serializer", RABBITMQ_STRING_SERIALIZER)
+            set("$outgoing.delivery-mode", "persistent")
+            props["$producer.exchange-name"]?.let { set("$outgoing.exchange.name", it) }
+        }
+
         private fun MutableMap<String, String>.configureInMemory() {
             set("mp.messaging.incoming.$COMMANDS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
             set("mp.messaging.outgoing.$COMMANDS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
 
             set("mp.messaging.incoming.$EVENTS_IN_CHANNEL.connector", IN_MEMORY_CONNECTOR)
             set("mp.messaging.outgoing.$EVENTS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
+
+            // CloudEvents channel (producer-only, for emit task)
+            set("mp.messaging.outgoing.$CLOUDEVENTS_OUT_CHANNEL.connector", IN_MEMORY_CONNECTOR)
         }
 
         private fun generateMetricsProperties(props: Map<String, String>): Map<String, String> {

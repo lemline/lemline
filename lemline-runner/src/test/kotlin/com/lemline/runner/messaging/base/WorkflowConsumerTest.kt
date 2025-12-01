@@ -321,7 +321,7 @@ internal abstract class WorkflowConsumerTest {
             val instance = InstanceMessage.fromJsonString<WorkflowEvent>(this)
             instance.workflowState.nodePosition.toString() shouldBe "/do/waitCase"
             val waitState = instance.workflowState as WorkflowEvent.WaitStarted
-            waitState.waitUntil shouldNotBe null
+            waitState.config.waitUntil shouldNotBe null
         }
     }
 

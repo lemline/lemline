@@ -6,13 +6,14 @@ package com.lemline.core.processors
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RunState
-import com.lemline.core.tasks.runs.Script
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowEvent.RunScriptStarted
 import io.serverlessworkflow.api.types.ExternalScript
 import io.serverlessworkflow.api.types.InlineScript
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
-import java.io.File
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -71,24 +72,27 @@ class RunScriptProcessor(
     node: Node<RunTask>,
 ) : NodeProcessor<RunTask, RunState>(node) {
 
+    override val isAsync = true
+
     override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): RunState = RunState()
 
     /**
-     * Execute script action.
+     * Build the script execution configuration.
      *
-     * Executes a script with the configured parameters and returns the result
-     * according to the specified return type.
+     * Extracts and resolves all script parameters from the task definition,
+     * including code content, language, arguments, and environment.
      *
+     * @param nodeStack The stack of nodes currently being processed
      * @param transformedInput Transformed input from parent
      * @param scope Expression evaluation scope
-     * @return Script execution result as JsonElement based on return type
+     * @return RunScriptStarted event with the resolved configuration
      */
-    override suspend fun execute(
+    override fun startedEvent(
+        nodeStack: NodeStack,
         transformedInput: JsonElement,
         scope: Scope,
-        state: RunState,
-    ): JsonElement {
-        logger.debug { "Executing script: ${node.name}" }
+    ): WorkflowEvent {
+        logger.debug { "Building script config for task: ${node.name}" }
 
         // Extract script configuration
         val runConfig = node.task.run.runScript
@@ -96,7 +100,7 @@ class RunScriptProcessor(
         val scriptConfig = scriptUnion.get()
 
         // Get script content based on the script type (inline or external)
-        val scriptContent: String = when (scriptConfig) {
+        val code: String = when (scriptConfig) {
             is InlineScript -> {
                 // Evaluate code expression
                 evaluateString(transformedInput, scriptConfig.code, "script.code", scope)
@@ -139,9 +143,6 @@ class RunScriptProcessor(
         // Get script language
         val language = scriptConfig.language.lowercase()
 
-        logger.debug { "Script language: $language" }
-        logger.debug { "Script content length: ${scriptContent.length} characters" }
-
         // Evaluate arguments if present
         val arguments = scriptConfig.arguments?.additionalProperties
             ?.mapValues { (_, value) ->
@@ -156,48 +157,23 @@ class RunScriptProcessor(
             evaluateString(transformedInput, value.toString(), "script.environment", scope)
         }
 
-        logger.debug { "Arguments: $arguments" }
-        logger.debug { "Environment: $environment" }
+        val await = runConfig.isAwait
+        val returnType = runConfig.`return` ?: ProcessReturnType.STDOUT
 
-        val awaitCompletion = runConfig.isAwait
-        val returnType = runConfig.`return` ?: ProcessReturnType.STDOUT  // Default to stdout return type
+        val config = RunScriptConfig(
+            language = language,
+            code = code,
+            arguments = arguments,
+            environment = environment,
+            await = await,
+            returnType = returnType
+        )
 
-        logger.debug { "Await: $awaitCompletion" }
-        logger.debug { "Return: $returnType" }
-
-        return try {
-            val script = Script(
-                script = scriptContent,
-                language = language,
-                arguments = arguments,
-                environment = environment,
-                workingDir = File(".").toPath()
-            )
-
-            if (!awaitCompletion) {
-                val process = script.executeAsync()
-                logger.debug { "Launched script asynchronously with PID: ${process.pid()}" }
-                // As per DSL, output for await: false is the transformed input
-                return transformedInput
-            }
-
-            val processResult = script.execute()
-
-            logger.debug { "Script execution completed with exit code: ${processResult.code}" }
-            logger.debug { "stdout: ${processResult.stdout}" }
-            logger.debug { "stderr: ${processResult.stderr}" }
-
-            // Configure output based on the return type
-            processResult.get(returnType)
-        } catch (e: IllegalArgumentException) {
-            // Handle unsupported language error specifically
-            logger.error(e) { "Unsupported script language" }
-            raiseError(WorkflowErrorType.CONFIGURATION, "Script language error: ${e.message}", e.stackTraceToString())
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to execute script" }
-            val errorMsg = "Script execution failed: ${e.message}"
-            raiseError(WorkflowErrorType.COMMUNICATION, errorMsg, e.stackTraceToString())
-        }
+        return RunScriptStarted(
+            nodeStack = nodeStack,
+            input = transformedInput,
+            config = config
+        )
     }
 
     /**

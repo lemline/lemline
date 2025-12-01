@@ -529,5 +529,118 @@ class OrchestratorTest : FunSpec() {
             assertEquals("success", output["status"]?.jsonPrimitive?.content)
             assertEquals(JsonPrimitive(60), output["sum"])
         }
+
+        // ========================================
+        // Emit Task Tests
+        // ========================================
+
+        test("should execute emit task and continue workflow") {
+            val yaml = $$"""
+                do:
+                  - setValue:
+                      set:
+                        orderId: "12345"
+                  - emitOrderPlaced:
+                      emit:
+                        event:
+                          with:
+                            source: https://petstore.com
+                            type: com.petstore.order.placed.v1
+                            data:
+                              orderId: ${ .orderId }
+                  - confirmOrder:
+                      set:
+                        status: "order_emitted"
+                        orderId: ${ .orderId }
+            """
+            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+
+            // Should continue execution after emit task (fire-and-forget)
+            assertEquals("order_emitted", output["status"]?.jsonPrimitive?.content)
+            assertEquals("12345", output["orderId"]?.jsonPrimitive?.content)
+        }
+
+        test("should emit CloudEvent with expression-evaluated properties") {
+            val yaml = $$"""
+                do:
+                  - prepareEvent:
+                      set:
+                        eventType: "com.example.test"
+                        eventSource: "https://example.com"
+                        payload:
+                          key: "value"
+                  - emitEvent:
+                      emit:
+                        event:
+                          with:
+                            source: ${ .eventSource }
+                            type: ${ .eventType }
+                            subject: "test-subject"
+                            data: ${ .payload }
+                  - setComplete:
+                      set:
+                        completed: true
+            """
+            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+
+            // Should complete after emitting
+            assertEquals(true, output["completed"]?.jsonPrimitive?.boolean)
+        }
+
+        test("should execute multiple emit tasks in sequence") {
+            val yaml = """
+                do:
+                  - emit1:
+                      emit:
+                        event:
+                          with:
+                            source: https://example.com
+                            type: com.example.event1
+                  - emit2:
+                      emit:
+                        event:
+                          with:
+                            source: https://example.com
+                            type: com.example.event2
+                  - done:
+                      set:
+                        eventCount: 2
+            """
+            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+
+            // Both emit tasks should complete
+            assertEquals(2, output["eventCount"]?.jsonPrimitive?.int)
+        }
+
+        test("should emit task in a loop") {
+            val yaml = $$"""
+                do:
+                  - initialize:
+                      set:
+                        items: ["a", "b", "c"]
+                        count: 0
+                  - emitLoop:
+                      for:
+                        in: ${ .items }
+                      do:
+                        - emitItem:
+                            emit:
+                              event:
+                                with:
+                                  source: https://example.com
+                                  type: com.example.item.processed
+                                  data:
+                                    item: ${ $item }
+                        - incrementCount:
+                            set:
+                              count: ${ .count + 1 }
+                      output:
+                        as: ${ . }
+            """
+            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+
+            // Should emit for each item
+            assertEquals(3, output["count"]?.jsonPrimitive?.int)
+        }
     }
 }

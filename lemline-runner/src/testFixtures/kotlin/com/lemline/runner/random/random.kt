@@ -12,13 +12,12 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.errors.AsyncTaskException
 import com.lemline.core.errors.InternalException
+import com.lemline.core.processors.RunWorkflowConfig
+import com.lemline.core.processors.WaitConfig
 import com.lemline.core.random.random
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
-import com.lemline.core.states.RunState
-import com.lemline.core.states.WaitState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
@@ -87,15 +86,8 @@ fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFail
 
 fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkflowStarted(
     nodeStack = NodeStack.random(),
-    runState = RunState(),
     rawInput = JsonElement.random(),
-    childConfig = AsyncTaskException.RunWorkflowStartedException.Config(
-        namespace = WorkflowNamespace("test"),
-        name = WorkflowName("test"),
-        version = WorkflowVersion("1.0"),
-        input = JsonElement.random(),
-        sync = true
-    )
+    config = RunWorkflowConfig.random()
 )
 
 fun WorkflowEvent.TaskRetryScheduled.Companion.random() = WorkflowEvent.TaskRetryScheduled(
@@ -108,9 +100,8 @@ fun WorkflowEvent.TaskRetryScheduled.Companion.random() = WorkflowEvent.TaskRetr
 
 fun WorkflowEvent.WaitStarted.Companion.random() = WorkflowEvent.WaitStarted(
     nodeStack = NodeStack.random(),
-    waitState = WaitState(),
     rawOutput = JsonElement.random(),
-    waitUntil = Clock.System.now()
+    config = WaitConfig.random()
 )
 
 fun WorkflowState.Companion.random(): WorkflowState = WorkflowCommand.random()

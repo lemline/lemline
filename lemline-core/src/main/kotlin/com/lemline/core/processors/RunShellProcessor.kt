@@ -6,8 +6,10 @@ package com.lemline.core.processors
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RunState
-import com.lemline.core.tasks.runs.Shell
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowEvent.RunShellStarted
 import io.serverlessworkflow.api.types.RunTask
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
 import kotlin.time.ExperimentalTime
@@ -57,24 +59,27 @@ class RunShellProcessor(
     node: Node<RunTask>,
 ) : NodeProcessor<RunTask, RunState>(node) {
 
+    override val isAsync = true
+
     override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): RunState = RunState()
 
     /**
-     * Execute shell command action.
+     * Build the shell command execution configuration.
      *
-     * Executes a shell command with the configured parameters and returns the result
-     * according to the specified return type.
+     * Extracts and resolves all shell parameters from the task definition,
+     * including command, arguments, and environment.
      *
+     * @param nodeStack The stack of nodes currently being processed
      * @param transformedInput Transformed input from parent
      * @param scope Expression evaluation scope
-     * @return Shell execution result as JsonElement based on return type
+     * @return RunShellStarted event with the resolved configuration
      */
-    override suspend fun execute(
+    override fun startedEvent(
+        nodeStack: NodeStack,
         transformedInput: JsonElement,
         scope: Scope,
-        state: RunState,
-    ): JsonElement {
-        logger.debug { "Executing shell command: ${node.name}" }
+    ): WorkflowEvent {
+        logger.debug { "Building shell config for task: ${node.name}" }
 
         // Extract shell configuration
         val runConfig = node.task.run.runShell
@@ -82,8 +87,6 @@ class RunShellProcessor(
 
         // Evaluate command through expression evaluator
         val command = evaluateString(transformedInput, shellConfig.command, "shell.command", scope)
-
-        logger.debug { "Evaluated command: $command" }
 
         // Evaluate arguments if present
         val arguments = shellConfig.arguments?.additionalProperties
@@ -99,43 +102,22 @@ class RunShellProcessor(
             evaluateString(transformedInput, value.toString(), "shell.environment", scope)
         }
 
-        logger.debug { "Shell command: $command" }
-        logger.debug { "Arguments: $arguments" }
-        logger.debug { "Environment: $environment" }
+        val await = runConfig.isAwait
+        val returnType = runConfig.`return` ?: ProcessReturnType.STDOUT
 
-        val awaitCompletion = runConfig.isAwait
-        val returnType = runConfig.`return` ?: ProcessReturnType.STDOUT  // Default to stdout return type
+        val config = RunShellConfig(
+            command = command,
+            arguments = arguments,
+            environment = environment,
+            await = await,
+            returnType = returnType
+        )
 
-        logger.debug { "Await: $awaitCompletion" }
-        logger.debug { "Return: $returnType" }
-
-        return try {
-            val shell = Shell(
-                command = command,
-                arguments = arguments,
-                environment = environment
-            )
-
-            if (!awaitCompletion) {
-                val process = shell.executeAsync()
-                logger.debug { "Launched shell command asynchronously with PID: ${process.pid()}" }
-                // As per DSL, output for await: false is the transformed input
-                return transformedInput
-            }
-
-            val processResult = shell.execute()
-
-            logger.debug { "Shell execution completed with exit code: ${processResult.code}" }
-            logger.debug { "stdout: ${processResult.stdout}" }
-            logger.debug { "stderr: ${processResult.stderr}" }
-
-            // Configure output based on the return type
-            processResult.get(returnType)
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to execute shell command" }
-            val errorMsg = "Shell command execution failed: ${e.message}"
-            raiseError(WorkflowErrorType.COMMUNICATION, errorMsg, e.stackTraceToString())
-        }
+        return RunShellStarted(
+            nodeStack = nodeStack,
+            input = transformedInput,
+            config = config
+        )
     }
 
     /**

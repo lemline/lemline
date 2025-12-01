@@ -19,6 +19,7 @@ kotest = "5.9.1"
 mockk = "1.13.9"
 testcontainers = "1.21.3"
 spotless = "7.0.3"
+cloudevents = "4.0.1"
 
 [libraries]
 spotlessPlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
@@ -38,6 +39,8 @@ jackson-bom = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "jac
 kotest-bom = { module = "io.kotest:kotest-bom", version.ref = "kotest" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
+cloudevents-core = { module = "io.cloudevents:cloudevents-core", version.ref = "cloudevents" }
+cloudevents-json-jackson = { module = "io.cloudevents:cloudevents-json-jackson", version.ref = "cloudevents" }
 
 # Libraries bundled together for easier import
 [bundles]
