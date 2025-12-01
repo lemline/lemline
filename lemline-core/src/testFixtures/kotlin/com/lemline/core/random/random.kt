@@ -10,8 +10,9 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.errors.InternalException
+import com.lemline.core.processors.RunWorkflowConfig
+import com.lemline.core.processors.WaitConfig
 import com.lemline.core.states.DoState
 import com.lemline.core.states.ForState
 import com.lemline.core.states.ForkState
@@ -158,7 +159,7 @@ fun randomFlowDirective(): FlowDirective = when (Random.nextInt(4)) {
     else -> FlowDirectiveGoto(String.random())
 }
 
-fun RunWorkflowStartedException.Config.Companion.random() = RunWorkflowStartedException.Config(
+fun RunWorkflowConfig.Companion.random() = RunWorkflowConfig(
     namespace = WorkflowNamespace.random(),
     name = WorkflowName.random(),
     version = WorkflowVersion.random(),
@@ -252,11 +253,14 @@ fun WorkflowEvent.TaskScheduled.Companion.random() = WorkflowEvent.TaskScheduled
     }
 )
 
+fun WaitConfig.Companion.random() = WaitConfig(
+    waitUntil = Clock.System.now() + Random.nextLong(100, 10000).milliseconds
+)
+
 fun WorkflowEvent.WaitStarted.Companion.random() = WorkflowEvent.WaitStarted(
     nodeStack = NodeStack.random(),
-    waitState = WaitState.random(),
     rawOutput = JsonElement.random(),
-    waitUntil = Clock.System.now() + Random.nextLong(100, 10000).milliseconds
+    config = WaitConfig.random()
 )
 
 fun WorkflowEvent.TaskRetryScheduled.Companion.random() = WorkflowEvent.TaskRetryScheduled(
@@ -272,14 +276,12 @@ fun WorkflowEvent.TaskRetryScheduled.Companion.random() = WorkflowEvent.TaskRetr
 
 fun WorkflowEvent.RunWorkflowStarted.Companion.random() = WorkflowEvent.RunWorkflowStarted(
     nodeStack = NodeStack.random(),
-    runState = RunState.random(),
     rawInput = JsonElement.random(),
-    childConfig = RunWorkflowStartedException.Config.random()
+    config = RunWorkflowConfig.random()
 )
 
 fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(
     nodeStack = NodeStack.random(),
-    forkState = ForkState.random(),
     rawInput = JsonElement.random(),
 )
 

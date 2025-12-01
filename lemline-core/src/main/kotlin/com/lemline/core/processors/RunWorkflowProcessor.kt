@@ -6,12 +6,15 @@ package com.lemline.core.processors
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RunState
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
 import io.serverlessworkflow.api.types.RunTask
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -57,26 +60,28 @@ class RunWorkflowProcessor(
     node: Node<RunTask>,
 ) : NodeProcessor<RunTask, RunState>(node) {
 
+    override val isAsync = true
+
     override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = RunState()
 
     /**
-     * Execute sub-workflow action.
+     * Prepares and handles the event for starting a sub-workflow.
      *
-     * This method transforms the input and throws ChildWorkflowStartedException to signal
-     * that a child workflow should be started. The orchestrator catches this exception,
-     * resolves the workflow definition from the cache, and handles execution appropriately
-     * (CompleteOrchestrator vs PausableOrchestrator).
+     * This method processes a sub-workflow's configuration, input transformation,
+     * and execution behavior (such as whether it awaits completion). It encapsulates
+     * these details into a `WorkflowEvent`, which is returned to signify the start of the sub-workflow.
      *
-     * @param transformedInput Transformed input from parent
-     * @param scope Expression evaluation scope
-     * @return This method always throws ChildWorkflowStartedException
-     * @throws RunWorkflowStartedException Always thrown to signal child workflow initiation
+     * @param nodeStack The current stack representing the workflow's task state hierarchy.
+     * @param transformedInput The transformed input data for the current workflow node.
+     * @param scope The execution context and variable bindings available to this workflow step.
+     * @param state The current call state representing runtime and execution metadata for the node.
+     * @return A `WorkflowEvent` instance representing the start of a sub-workflow.
      */
-    override suspend fun execute(
+    override fun startedEvent(
+        nodeStack: NodeStack,
         transformedInput: JsonElement,
         scope: Scope,
-        state: RunState,
-    ): JsonElement {
+    ): WorkflowEvent {
         logger.debug { "Preparing sub-workflow: ${node.name}" }
 
         // Extract workflow configuration
@@ -93,7 +98,7 @@ class RunWorkflowProcessor(
 
         val awaitCompletion = runWorkflow.isAwait
 
-        val childWorkflowConfig = RunWorkflowStartedException.Config(
+        val childWorkflowConfig = RunWorkflowConfig(
             namespace = subWorkflowNamespace,
             name = subWorkflowName,
             version = subWorkflowVersion,
@@ -101,12 +106,32 @@ class RunWorkflowProcessor(
             sync = awaitCompletion
         )
 
-        // The orchestrator will resolve the definition and handle execution appropriately
-        logger.debug { "Throwing ${RunWorkflowStartedException::class.simpleName} for orchestrator to handle:  $childWorkflowConfig" }
-        throw RunWorkflowStartedException(
-            state = state,
-            transformedInput = transformedInput,
-            config = childWorkflowConfig
+        // returns RunWorkflowStarted event for an asynchronous execution
+        return RunWorkflowStarted(
+            nodeStack = nodeStack,
+            rawInput = transformedInput,
+            config = childWorkflowConfig,
         )
     }
 }
+
+/**
+ * Configuration details required to initiate a child workflow.
+ *
+ * This data class encapsulates the metadata and input parameters needed to
+ * start a child workflow instance within a larger workflow process.
+ *
+ * @property namespace The namespace of the child workflow, used to scope workflows within an environment.
+ * @property name The name of the child workflow to be executed.
+ * @property version The version of the child workflow.
+ * @property input The input provided to the child workflow.
+ * @property sync Indicates whether the parent workflow should wait for the child workflow to complete.
+ */
+@Serializable
+data class RunWorkflowConfig(
+    val namespace: WorkflowNamespace,
+    val name: WorkflowName,
+    val version: WorkflowVersion,
+    val input: JsonElement,
+    val sync: Boolean
+)

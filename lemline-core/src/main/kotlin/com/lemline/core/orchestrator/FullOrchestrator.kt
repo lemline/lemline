@@ -117,16 +117,16 @@ internal object FullOrchestrator {
     private suspend fun handle(event: WorkflowEvent.RunWorkflowStarted, serde: Boolean): WorkflowCommand {
         // Retrieve child workflow definition
         val childWorkflow = DefinitionCache.getWorkflow(
-            namespace = event.childConfig.namespace,
-            name = event.childConfig.name,
-            version = event.childConfig.version
+            namespace = event.config.namespace,
+            name = event.config.name,
+            version = event.config.version
         ) ?: throw IllegalStateException("Workflow definition not found")
 
-        return when (event.childConfig.sync) {
+        return when (event.config.sync) {
             true -> {
                 // synchronous execution
                 val initCmd = StepByStepOrchestrator.initCmd(
-                    workflowInput = event.childConfig.input,
+                    workflowInput = event.config.input,
                     hasWaitingParent = true
                 )
                 val result = resume(childWorkflow, initCmd, serde)
@@ -143,7 +143,7 @@ internal object FullOrchestrator {
                 // asynchronous execution
                 CoroutineScope(currentCoroutineContext()).launch {
                     val initCmd = StepByStepOrchestrator.initCmd(
-                        workflowInput = event.childConfig.input,
+                        workflowInput = event.config.input,
                         hasWaitingParent = false
                     )
                     resume(childWorkflow, initCmd, serde) // <= output is not handled
@@ -165,7 +165,7 @@ internal object FullOrchestrator {
      * and then resumes the workflow from the started task.
      */
     private suspend fun handle(event: WorkflowEvent.WaitStarted): WorkflowCommand {
-        val delayDuration = event.waitUntil - Clock.System.now()
+        val delayDuration = event.config.waitUntil - Clock.System.now()
         logger.debug { "Waiting for $delayDuration" }
         if (delayDuration > Duration.ZERO) delay(delayDuration)
         logger.debug { "Waiting completed" }

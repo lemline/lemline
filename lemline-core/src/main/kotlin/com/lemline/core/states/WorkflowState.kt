@@ -5,9 +5,10 @@ package com.lemline.core.states
 
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
-import com.lemline.core.errors.AsyncTaskException.RunWorkflowStartedException
 import com.lemline.core.errors.InternalException
 import com.lemline.core.json.LemlineJson
+import com.lemline.core.processors.RunWorkflowConfig
+import com.lemline.core.processors.WaitConfig
 import com.lemline.core.workflows.FlowDirective
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -124,6 +125,11 @@ sealed class WorkflowCommand : WorkflowState() {
 
 @Serializable
 sealed class WorkflowEvent : WorkflowState() {
+
+
+    // ========================================
+    // Outcome Events
+    // ========================================
 
     /**
      * Represents the result of a workflow's progression.
@@ -258,6 +264,10 @@ sealed class WorkflowEvent : WorkflowState() {
             ")"
     }
 
+    // ========================================
+    // Suspension Events
+    // ========================================
+
     sealed class Suspension : WorkflowEvent()
 
     /**
@@ -294,9 +304,8 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("waitStarted")
     data class WaitStarted(
         override val nodeStack: NodeStack,
-        val waitState: WaitState,
         val rawOutput: JsonElement,
-        @Contextual val waitUntil: Instant
+        @Contextual val config: WaitConfig
     ) : Suspension() {
 
         @Transient
@@ -305,7 +314,7 @@ sealed class WorkflowEvent : WorkflowState() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
-            ", waitUntil=$waitUntil" +
+            ", config=$config" +
             ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
@@ -352,9 +361,8 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("runWorkflowStarted")
     data class RunWorkflowStarted(
         override val nodeStack: NodeStack,
-        val runState: RunState,
         val rawInput: JsonElement,
-        val childConfig: RunWorkflowStartedException.Config,
+        val config: RunWorkflowConfig,
     ) : Suspension() {
 
         @Transient
@@ -362,9 +370,8 @@ sealed class WorkflowEvent : WorkflowState() {
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
-            ", runState=$runState" +
             ", transformedInput=$rawInput" +
-            ", childConfig=$childConfig" +
+            ", childConfig=$config" +
             ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
 
@@ -392,7 +399,6 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("forkStarted")
     data class ForkStarted(
         override val nodeStack: NodeStack,
-        val forkState: ForkState,
         val rawInput: JsonElement,
     ) : Suspension() {
 
@@ -401,7 +407,6 @@ sealed class WorkflowEvent : WorkflowState() {
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
-            ", forkState=$forkState" +
             ", rawInput=$rawInput" +
             ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
@@ -426,7 +431,6 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("emitStarted")
     data class EmitStarted(
         override val nodeStack: NodeStack,
-        val emitState: EmitState,
         @Transient val cloudEvent: io.cloudevents.CloudEvent? = null,  // Not serialized - handled inline
         val rawOutput: JsonElement   // Pass-through: output = input for emit task
     ) : Suspension() {

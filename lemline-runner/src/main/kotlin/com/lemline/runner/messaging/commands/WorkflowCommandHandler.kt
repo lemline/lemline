@@ -304,7 +304,7 @@ internal class WorkflowCommandHandler(
 
             is WorkflowEvent.WaitStarted -> {
                 // Check if the wait time has already been reached (optimization)
-                if (event.waitUntil <= Clock.System.now()) {
+                if (event.config.waitUntil <= Clock.System.now()) {
                     logger.debug { "Wait time already reached, continuing immediately" }
                     event.resume()
                 } else {
@@ -330,7 +330,7 @@ internal class WorkflowCommandHandler(
                 // Send to the database for parent storage + child creation
                 sendToDatabase(this, event)
 
-                when (event.childConfig.sync) {
+                when (event.config.sync) {
                     // waiting for synchronous completion
                     true -> null
                     // Not waiting for sub-workflow completion

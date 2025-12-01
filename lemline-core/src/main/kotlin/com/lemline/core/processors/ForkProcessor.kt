@@ -3,10 +3,11 @@
 
 package com.lemline.core.processors
 
-import com.lemline.core.errors.AsyncTaskException
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ForkState
+import com.lemline.core.states.NodeStack
+import com.lemline.core.states.WorkflowEvent.ForkStarted
 import io.serverlessworkflow.api.types.ForkTask
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -51,19 +52,16 @@ class ForkProcessor(
     node: Node<ForkTask>
 ) : NodeProcessor<ForkTask, ForkState>(node) {
 
+    override val isAsync = true
+
     override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = ForkState()
 
-    // ForkProcessor doesn't need updateState - it throws exception on first entry
-    // The default implementation is enough
-
-    override fun getNextNode(
-        state: ForkState,
-        dataset: JsonElement,
+    override fun startedEvent(
+        nodeStack: NodeStack,
+        transformedInput: JsonElement,
         scope: Scope,
-    ): NavigationInfo {
-        // First entry
-        // Throws exception to trigger fork execution via orchestrator
-        // The orchestrator will derive fork config from the current Node<ForkTask>
-        throw AsyncTaskException.ForkStartedException(state = state, transformedInput = dataset)
-    }
+    ) = ForkStarted(
+        nodeStack = nodeStack,
+        rawInput = transformedInput,
+    )
 }

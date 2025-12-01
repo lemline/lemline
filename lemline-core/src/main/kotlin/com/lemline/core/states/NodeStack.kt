@@ -67,7 +67,7 @@ data class NodeStack(
      * The combined scope from all states in the stack.
      * Scopes are merged from bottom to top, so deeper nodes can override parent scope values.
      */
-    val lastScope: Scope by lazy {
+    val stateScope: Scope by lazy {
         frames.fold(buildJsonObject {}) { acc: Scope, (_, state) ->
             acc.merge(state.scope)
         }

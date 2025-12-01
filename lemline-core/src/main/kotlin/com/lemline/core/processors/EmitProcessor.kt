@@ -4,12 +4,14 @@
 package com.lemline.core.processors
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.errors.AsyncTaskException.EmitStartedException
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
 import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.EmitState
+import com.lemline.core.states.NodeStack
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowEvent.EmitStarted
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.EmitTask
 import io.serverlessworkflow.api.types.EventData
@@ -20,7 +22,7 @@ import io.serverlessworkflow.api.types.UriTemplate
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
 import java.time.OffsetDateTime
-import java.util.UUID
+import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -66,25 +68,26 @@ class EmitProcessor(
     node: Node<EmitTask>,
 ) : NodeProcessor<EmitTask, EmitState>(node) {
 
+    override val isAsync = true
+
     override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = EmitState()
 
     /**
-     * Execute emit action - builds CloudEvent using official SDK and throws EmitStartedException.
+     * Handles the event triggered when a workflow emit task is started.
      *
-     * The orchestrator catches this exception and routes it to the runner,
-     * which publishes the CloudEvent to the external channel and immediately
-     * resumes the workflow (fire-and-forget).
+     * This method creates and returns the corresponding `WorkflowEvent` by resolving the properties
+     * of the emit task to construct a CloudEvent instance using the CloudEvents SDK.
      *
-     * @param transformedInput Transformed input from parent
-     * @param scope Expression evaluation scope
-     * @param state Current emit state
-     * @return Never returns - always throws EmitStartedException
+     * @param nodeStack The stack of nodes currently being processed for this workflow execution.
+     * @param transformedInput The transformed JSON input that serves as the context or data for the event.
+     * @param scope The scope of the current workflow execution, used for resolving runtime expressions.
+     * @return A `WorkflowEvent` that represents the starting event of a workflow emit task.
      */
-    override suspend fun execute(
+    override fun startedEvent(
+        nodeStack: NodeStack,
         transformedInput: JsonElement,
         scope: Scope,
-        state: EmitState,
-    ): JsonElement {
+    ): WorkflowEvent {
         logger.debug { "Executing emit task: ${node.name}" }
 
         val eventProps = node.task.emit?.event?.with
@@ -128,8 +131,11 @@ class EmitProcessor(
 
         val cloudEvent = builder.build()
 
-        logger.debug { "Throwing EmitStartedException for orchestrator to handle: source=$source, type=$type" }
-        throw EmitStartedException(state, transformedInput, cloudEvent)
+        return EmitStarted(
+            nodeStack = nodeStack,
+            cloudEvent = cloudEvent,
+            rawOutput = transformedInput,
+        )
     }
 
     /**
@@ -246,6 +252,7 @@ class EmitProcessor(
                     JsonPrimitive(value)
                 }
             }
+
             else -> {
                 // Object - convert to JsonElement
                 with(LemlineJson) { value.toJsonElement() }

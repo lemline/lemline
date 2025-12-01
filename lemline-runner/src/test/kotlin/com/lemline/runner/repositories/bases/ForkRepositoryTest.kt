@@ -9,7 +9,6 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.states.ForkState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.WorkflowEvent
@@ -406,7 +405,6 @@ internal abstract class ForkWaitingRepositoryTest {
                         )
                     )
                 ),
-                forkState = ForkState(),
                 rawInput = JsonPrimitive("test-input")
             ),
         )

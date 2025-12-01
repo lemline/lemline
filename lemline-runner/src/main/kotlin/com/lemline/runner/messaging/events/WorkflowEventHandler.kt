@@ -188,7 +188,7 @@ internal class WorkflowEventHandler(
             WaitModel(
                 id = waitId,
                 instanceMessage = instance,
-                outboxScheduledFor = instance.workflowState.waitUntil
+                outboxScheduledFor = instance.workflowState.config.waitUntil
             )
         )
         if (rowsInserted == 0) {
@@ -290,11 +290,11 @@ internal class WorkflowEventHandler(
             // Create the child + optional schedule
             val (child, schedule) = starter.getStartingMessages(
                 workflowId = childWorkflowId,
-                workflowNamespace = instance.workflowState.childConfig.namespace,
-                workflowName = instance.workflowState.childConfig.name,
-                optionalVersion = instance.workflowState.childConfig.version,
-                workflowInput = instance.workflowState.childConfig.input,
-                hasWaitingParent = instance.workflowState.childConfig.sync, // <= true only for sync child
+                workflowNamespace = instance.workflowState.config.namespace,
+                workflowName = instance.workflowState.config.name,
+                optionalVersion = instance.workflowState.config.version,
+                workflowInput = instance.workflowState.config.input,
+                hasWaitingParent = instance.workflowState.config.sync, // <= true only for sync child
                 zoneId = null
             ) { error(it) }
 
