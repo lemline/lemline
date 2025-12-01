@@ -12,7 +12,6 @@ import com.lemline.core.states.EmitState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.EmitStarted
-import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.EmitTask
 import io.serverlessworkflow.api.types.EventData
 import io.serverlessworkflow.api.types.EventDataschema
@@ -76,7 +75,8 @@ class EmitProcessor(
      * Handles the event triggered when a workflow emit task is started.
      *
      * This method creates and returns the corresponding `WorkflowEvent` by resolving the properties
-     * of the emit task to construct a CloudEvent instance using the CloudEvents SDK.
+     * of the emit task to construct an EmitConfig. The actual CloudEvent is built by the
+     * ActivityExecutor using the CloudEvents SDK.
      *
      * @param nodeStack The stack of nodes currently being processed for this workflow execution.
      * @param transformedInput The transformed JSON input that serves as the context or data for the event.
@@ -88,53 +88,43 @@ class EmitProcessor(
         transformedInput: JsonElement,
         scope: Scope,
     ): WorkflowEvent {
-        logger.debug { "Executing emit task: ${node.name}" }
+        logger.debug { "Building emit config for task: ${node.name}" }
 
         val eventProps = node.task.emit?.event?.with
             ?: raiseError(CONFIGURATION, "Emit task missing 'emit.event.with' configuration")
 
-        // Build CloudEvent using official CloudEvents SDK
+        // Resolve all CloudEvent properties
         val source = resolveSource(eventProps.source, transformedInput, scope)
         val type = resolveType(eventProps.type, transformedInput, scope)
+        val id = eventProps.id ?: UUID.randomUUID().toString()
+        val time = resolveTime(eventProps.time, transformedInput, scope)
+            ?: OffsetDateTime.now().toString()
+        val subject = resolveString(eventProps.subject, transformedInput, scope)
+        val dataschema = resolveDataschema(eventProps.dataschema, transformedInput, scope)
+        val datacontenttype = eventProps.datacontenttype ?: "application/json"
+        val data = resolveData(eventProps.data, transformedInput, scope)
 
-        val builder = CloudEventBuilder.v1()
-            .withId(eventProps.id ?: UUID.randomUUID().toString())
-            .withSource(URI.create(source))
-            .withType(type)
+        // Resolve extension attributes
+        val extensions = eventProps.additionalProperties
+            ?.mapValues { (_, value) -> value?.toString() ?: "" }
+            ?.filterValues { it.isNotEmpty() }
 
-        // Set optional time
-        resolveTime(eventProps.time, transformedInput, scope)?.let {
-            builder.withTime(OffsetDateTime.parse(it))
-        } ?: builder.withTime(OffsetDateTime.now())
-
-        // Set optional subject
-        resolveString(eventProps.subject, transformedInput, scope)?.let {
-            builder.withSubject(it)
-        }
-
-        // Set optional dataschema
-        resolveDataschema(eventProps.dataschema, transformedInput, scope)?.let {
-            builder.withDataSchema(URI.create(it))
-        }
-
-        // Set data with content type
-        resolveData(eventProps.data, transformedInput, scope)?.let { data ->
-            val contentType = eventProps.datacontenttype ?: "application/json"
-            builder.withDataContentType(contentType)
-            builder.withData(contentType, data.toString().toByteArray())
-        }
-
-        // Add any custom extension attributes
-        eventProps.additionalProperties?.forEach { (key, value) ->
-            value?.let { builder.withExtension(key, it.toString()) }
-        }
-
-        val cloudEvent = builder.build()
+        val config = EmitConfig(
+            id = id,
+            source = source,
+            type = type,
+            time = time,
+            subject = subject,
+            dataschema = dataschema,
+            datacontenttype = datacontenttype,
+            data = data,
+            extensions = extensions
+        )
 
         return EmitStarted(
             nodeStack = nodeStack,
-            cloudEvent = cloudEvent,
-            rawOutput = transformedInput,
+            input = transformedInput,
+            config = config,
         )
     }
 

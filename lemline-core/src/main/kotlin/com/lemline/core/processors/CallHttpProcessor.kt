@@ -10,15 +10,22 @@ import com.lemline.core.errors.WorkflowErrorType.RUNTIME
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.CallState
-import com.lemline.core.tasks.calls.HttpCall
-import io.ktor.http.*
+import com.lemline.core.states.NodeStack
+import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowEvent.CallHttpStarted
 import io.serverlessworkflow.api.types.AuthenticationPolicy
 import io.serverlessworkflow.api.types.AuthenticationPolicyReference
 import io.serverlessworkflow.api.types.AuthenticationPolicyUnion
+import io.serverlessworkflow.api.types.BasicAuthenticationPolicy
+import io.serverlessworkflow.api.types.BasicAuthenticationProperties
+import io.serverlessworkflow.api.types.BearerAuthenticationPolicy
+import io.serverlessworkflow.api.types.BearerAuthenticationProperties
 import io.serverlessworkflow.api.types.CallHTTP
 import io.serverlessworkflow.api.types.Endpoint
 import io.serverlessworkflow.api.types.EndpointConfiguration
 import io.serverlessworkflow.api.types.HTTPArguments
+import io.serverlessworkflow.api.types.OAuth2AuthenticationPolicy
+import io.serverlessworkflow.api.types.OAuth2AuthenticationPolicyConfiguration
 import io.serverlessworkflow.api.types.UriTemplate
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
@@ -71,35 +78,46 @@ class CallHttpProcessor(
     node: Node<CallHTTP>,
 ) : NodeProcessor<CallHTTP, CallState>(node) {
 
+    override val isAsync = true
+
     override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = CallState()
 
     /**
-     * Execute HTTP call action.
+     * Build the HTTP call configuration.
      *
-     * Makes an HTTP request to the specified endpoint with the configured parameters.
+     * Extracts and resolves all HTTP parameters from the task definition,
+     * including endpoint URL, headers, body, and authentication.
      *
+     * @param nodeStack The stack of nodes currently being processed
      * @param transformedInput Transformed input from parent
      * @param scope Expression evaluation scope
-     * @return HTTP response as JsonElement based on output format
+     * @return CallHttpStarted event with the resolved configuration
      */
-    override suspend fun execute(
+    override fun startedEvent(
+        nodeStack: NodeStack,
         transformedInput: JsonElement,
         scope: Scope,
-        state: CallState,
-    ): JsonElement {
-        logger.debug { "Executing HTTP call: ${node.name}" }
+    ): WorkflowEvent {
+        logger.debug { "Building HTTP call config for task: ${node.name}" }
 
         val httpArgs = node.task.with
 
         // Extract method
-        val method = parseHttpMethod(httpArgs.method)
+        val method = httpArgs.method.uppercase()
 
-        // Extract endpoint and authentication
+        // Extract endpoint URL
         val endpoint = toUrl(httpArgs.endpoint, transformedInput, scope)
-        val authentication = toAuthenticationPolicy(httpArgs.endpoint)
+
+        // Extract and resolve authentication
+        val authentication = resolveAuthentication(httpArgs.endpoint)
 
         // Extract headers
         val headers = httpArgs.headers?.additionalProperties?.mapValues {
+            it.value.toJsonPrimitive().content
+        } ?: emptyMap()
+
+        // Extract query parameters
+        val query = httpArgs.query?.additionalProperties?.mapValues {
             it.value.toJsonPrimitive().content
         } ?: emptyMap()
 
@@ -109,52 +127,77 @@ class CallHttpProcessor(
         }
 
         // Extract output format
-        val output: HTTPArguments.HTTPOutput = httpArgs.output ?: HTTPArguments.HTTPOutput.CONTENT
+        val output = httpArgs.output ?: HTTPArguments.HTTPOutput.CONTENT
 
         // Extract redirect setting
         val redirect = httpArgs.isRedirect
 
-        // Build the URL with query parameters
-        val urlBuilder = URLBuilder(endpoint)
-        httpArgs.query
-            ?.additionalProperties
-            ?.mapValues { it.value.toJsonPrimitive().content }
-            ?.forEach { (key, value) ->
-                urlBuilder.parameters.append(key, value)
-            }
-        val url = urlBuilder.build()
-
-        // Create HttpCall helper
-        val httpCall = HttpCall(
-            getSecretByName = ::getSecretByName,
-            getAuthenticationPolicyByName = ::getAuthenticationPolicyByName,
-            raiseError = ::raiseError,
-        )
-
-        // Execute the call
-        return httpCall.execute(
+        val config = CallHttpConfig(
             method = method,
-            url = url,
+            url = endpoint,
             headers = headers,
+            query = query,
             body = body,
             output = output,
             redirect = redirect,
-            authentication = authentication,
+            authentication = authentication
+        )
+
+        return CallHttpStarted(
+            nodeStack = nodeStack,
+            input = transformedInput,
+            config = config
         )
     }
 
     /**
-     * Parse HTTP method string to HttpMethod.
+     * Resolves authentication policy to HttpAuthentication.
+     * Returns null if no authentication is configured.
      */
-    private fun parseHttpMethod(methodStr: String): HttpMethod = when (methodStr.uppercase()) {
-        "GET" -> HttpMethod.Get
-        "POST" -> HttpMethod.Post
-        "PUT" -> HttpMethod.Put
-        "DELETE" -> HttpMethod.Delete
-        "PATCH" -> HttpMethod.Patch
-        "HEAD" -> HttpMethod.Head
-        "OPTIONS" -> HttpMethod.Options
-        else -> raiseError(CONFIGURATION, "Unsupported HTTP method: $methodStr")
+    private fun resolveAuthentication(endpointUnion: Endpoint): HttpAuthentication? {
+        val authPolicy = toAuthenticationPolicy(endpointUnion) ?: return null
+
+        return when (authPolicy) {
+            is BasicAuthenticationPolicy -> {
+                when (val props = authPolicy.basic.get()) {
+                    is BasicAuthenticationProperties -> {
+                        val username = props.username
+                            ?: raiseError(CONFIGURATION, "Basic authentication requires username")
+                        val password = props.password
+                            ?: raiseError(CONFIGURATION, "Basic authentication requires password")
+                        HttpAuthentication.Basic(username, password)
+                    }
+
+                    else -> raiseError(RUNTIME, "Unsupported basic authentication: ${props?.javaClass?.name}")
+                }
+            }
+
+            is BearerAuthenticationPolicy -> {
+                when (val props = authPolicy.bearer.get()) {
+                    is BearerAuthenticationProperties -> {
+                        val token = props.token
+                            ?: raiseError(CONFIGURATION, "Bearer authentication requires token")
+                        HttpAuthentication.Bearer(token)
+                    }
+
+                    else -> raiseError(RUNTIME, "Unsupported bearer authentication: ${props?.javaClass?.name}")
+                }
+            }
+
+            is OAuth2AuthenticationPolicy -> {
+                when (val props = authPolicy.oauth2.get()) {
+                    is OAuth2AuthenticationPolicyConfiguration -> {
+                        // OAuth2 requires token resolution which is complex
+                        // For now, we only support pre-resolved tokens
+                        raiseError(CONFIGURATION, "OAuth2 authentication requires pre-resolved token")
+                    }
+
+                    else -> raiseError(RUNTIME, "Unsupported OAuth2 authentication: ${props?.javaClass?.name}")
+                }
+            }
+
+            else -> raiseError(RUNTIME, "Unsupported authentication type: ${authPolicy.javaClass.name}")
+        }
     }
 
     /**
@@ -243,16 +286,5 @@ class CallHttpProcessor(
     private fun getAuthenticationPolicyByName(name: String): AuthenticationPolicy {
         return use?.authentications?.additionalProperties?.get(name)?.get()
             ?: raiseError(CONFIGURATION, "Named authentication not found: $name")
-    }
-
-    /**
-     * Retrieves secret by name.
-     *
-     * NOTE: Secret handling is not yet implemented in the new execution model.
-     * For now, this will raise an error if secrets are needed.
-     */
-    private fun getSecretByName(name: String): String {
-        // TODO: Implement secret resolution once the new execution model supports it
-        raiseError(CONFIGURATION, "Secret resolution not yet implemented: $name")
     }
 }

@@ -329,9 +329,9 @@ internal class RunnerWorkflowTestExecutor : WorkflowTestExecutor {
                         // This shouldn't appear in events channel
                     }
 
-                    is WorkflowEvent.EmitStarted -> {
-                        // EmitStarted shouldn't appear in events channel either
-                        // The emit is handled in the commands channel (fire-and-forget)
+                    is WorkflowEvent.ActivityStarted -> {
+                        // ActivityStarted events shouldn't appear in events channel
+                        // Activities are executed inline in the commands channel
                     }
                 }
             }

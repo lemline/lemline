@@ -177,7 +177,7 @@ internal class WorkflowEventHandler(
 
             is WorkflowEvent.TaskScheduled -> error("Unexpected state in workflow event handler: $state")
 
-            is WorkflowEvent.EmitStarted -> error("EmitStarted should not be sent to events channel - it's fire-and-forget: $state")
+            is WorkflowEvent.ActivityStarted -> error("ActivityStarted should not be sent to events channel - activities are executed inline: $state")
         }
         return null
     }

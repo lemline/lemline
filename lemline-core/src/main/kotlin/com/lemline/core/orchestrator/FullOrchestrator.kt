@@ -3,6 +3,8 @@ package com.lemline.core.orchestrator
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
+import com.lemline.core.activities.ActivityExecutor
+import com.lemline.core.activities.DefaultActivityExecutor
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
@@ -28,15 +30,23 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 
 /**
- * Handles execution of fork tasks (parallel branch execution).
+ * Full orchestrator for synchronous workflow execution.
  *
- * This executor manages both compete (race) and cooperative (all) fork modes,
+ * This orchestrator executes workflows in a single pass, handling all events
+ * (activities, waits, forks, child workflows) directly without external coordination.
+ *
+ * It manages both compete (race) and cooperative (all) fork modes,
  * coordinating parallel execution of multiple workflow branches.
+ *
+ * @property activityExecutor Executor for activity tasks (HTTP, scripts, emit, etc.)
  */
 @ExperimentalTime
 internal object FullOrchestrator {
 
     private val logger = logger()
+
+    /** Default activity executor for real I/O operations */
+    private val defaultActivityExecutor = DefaultActivityExecutor()
 
     suspend fun start(
         workflow: Workflow,
@@ -44,17 +54,19 @@ internal object FullOrchestrator {
         workflowInput: JsonElement = buildJsonObject { },
         hasWaitingParent: Boolean = false,
         startedAt: Instant = Clock.System.now(),
-        serde: Boolean = false
+        serde: Boolean = false,
+        activityExecutor: ActivityExecutor = defaultActivityExecutor
     ): JsonElement {
         val cmd = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
 
-        return resume(workflow, cmd, serde).value()
+        return resume(workflow, cmd, serde, activityExecutor).value()
     }
 
     suspend fun resume(
         workflow: Workflow,
         command: WorkflowCommand,
         serde: Boolean,
+        activityExecutor: ActivityExecutor = defaultActivityExecutor
     ): WorkflowEvent.Outcome {
 
         val serdeCommand = when (serde) {
@@ -72,19 +84,38 @@ internal object FullOrchestrator {
             false -> event
         }
 
-        // Skip serde check for EmitStarted - cloudEvent is @Transient (handled inline, never serialized)
-        if (event !is WorkflowEvent.EmitStarted && event != serdeEvent)
+        if (event != serdeEvent)
             throw IllegalStateException("Event mismatch\nevent     : $event\nserdeEvent: $serdeEvent")
 
         return when (serdeEvent) {
-            is WorkflowEvent.WaitStarted -> resume(workflow, handle(serdeEvent), serde)
-            is WorkflowEvent.TaskScheduled -> resume(workflow, handle(serdeEvent), serde)
-            is WorkflowEvent.TaskRetryScheduled -> resume(workflow, handle(serdeEvent), serde)
-            is WorkflowEvent.RunWorkflowStarted -> resume(workflow, handle(serdeEvent, serde), serde)
-            is WorkflowEvent.ForkStarted -> resume(workflow, handle(workflow, serdeEvent, serde), serde)
-            // Use original event for EmitStarted to preserve cloudEvent (which is @Transient)
-            is WorkflowEvent.EmitStarted -> resume(workflow, handle(event as WorkflowEvent.EmitStarted), serde)
+            is WorkflowEvent.ActivityStarted -> resume(workflow, handle(serdeEvent, activityExecutor), serde, activityExecutor)
+            is WorkflowEvent.WaitStarted -> resume(workflow, handle(serdeEvent), serde, activityExecutor)
+            is WorkflowEvent.TaskScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor)
+            is WorkflowEvent.TaskRetryScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor)
+            is WorkflowEvent.RunWorkflowStarted -> resume(workflow, handle(serdeEvent, serde, activityExecutor), serde, activityExecutor)
+            is WorkflowEvent.ForkStarted -> resume(workflow, handle(workflow, serdeEvent, serde, activityExecutor), serde, activityExecutor)
             is WorkflowEvent.Outcome -> serdeEvent
+        }
+    }
+
+    /**
+     * Handles an ActivityStarted event by executing the activity and resuming with the result.
+     *
+     * Activities are executed via the ActivityExecutor interface, which allows for
+     * different implementations (real I/O vs mocks for testing).
+     */
+    private suspend fun handle(
+        event: WorkflowEvent.ActivityStarted,
+        activityExecutor: ActivityExecutor
+    ): WorkflowCommand {
+        logger.debug { "Executing activity: ${event::class.simpleName}" }
+        return try {
+            val output = activityExecutor.execute(event)
+            logger.debug { "Activity completed: ${event::class.simpleName}" }
+            event.resumeCompleted(output)
+        } catch (e: Exception) {
+            logger.error(e) { "Activity failed: ${event::class.simpleName}" }
+            event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
         }
     }
 
@@ -101,20 +132,14 @@ internal object FullOrchestrator {
     }
 
     /**
-     * Handles an emit event by immediately resuming the workflow.
-     * In the full orchestrator, we don't actually emit CloudEvents - that's handled by the runner.
-     * This is fire-and-forget semantics.
-     */
-    private fun handle(event: WorkflowEvent.EmitStarted): WorkflowCommand {
-        logger.debug { "Emit task completed (CloudEvent emitted)" }
-        return event.resume()
-    }
-
-    /**
      * Handles a `RunWorkflowStarted` event by initiating the corresponding child workflow either
      * synchronously or asynchronously, depending on its configuration.
      */
-    private suspend fun handle(event: WorkflowEvent.RunWorkflowStarted, serde: Boolean): WorkflowCommand {
+    private suspend fun handle(
+        event: WorkflowEvent.RunWorkflowStarted,
+        serde: Boolean,
+        activityExecutor: ActivityExecutor
+    ): WorkflowCommand {
         // Retrieve child workflow definition
         val childWorkflow = DefinitionCache.getWorkflow(
             namespace = event.config.namespace,
@@ -129,7 +154,7 @@ internal object FullOrchestrator {
                     workflowInput = event.config.input,
                     hasWaitingParent = true
                 )
-                val result = resume(childWorkflow, initCmd, serde)
+                val result = resume(childWorkflow, initCmd, serde, activityExecutor)
                 logger.debug { "Child workflow completed" }
                 when (result) {
                     is WorkflowEvent.WorkflowCompleted -> event.resumeAsCompleted(result.output)
@@ -146,7 +171,7 @@ internal object FullOrchestrator {
                         workflowInput = event.config.input,
                         hasWaitingParent = false
                     )
-                    resume(childWorkflow, initCmd, serde) // <= output is not handled
+                    resume(childWorkflow, initCmd, serde, activityExecutor) // <= output is not handled
                     logger.debug { "Child workflow completed" }
                 }
                 // Immediate resuming
@@ -178,7 +203,12 @@ internal object FullOrchestrator {
      * operation (compete or cooperative), executing the corresponding branches, and resuming
      * the workflow with the computed output.
      */
-    private suspend fun handle(workflow: Workflow, event: WorkflowEvent.ForkStarted, serde: Boolean): WorkflowCommand {
+    private suspend fun handle(
+        workflow: Workflow,
+        event: WorkflowEvent.ForkStarted,
+        serde: Boolean,
+        activityExecutor: ActivityExecutor
+    ): WorkflowCommand {
         @Suppress("UNCHECKED_CAST")
         val forkNode = workflow.getNode(event.nodePosition) as Node<ForkTask>
 
@@ -188,9 +218,9 @@ internal object FullOrchestrator {
         // Execute branches and get the result
         return try {
             val output = if (forkNode.task.fork.isCompete) {
-                workflow.executeCompete(event.nodeStack, branches, event.rawInput, serde)
+                workflow.executeCompete(event.nodeStack, branches, event.rawInput, serde, activityExecutor)
             } else {
-                workflow.executeCooperative(event.nodeStack, branches, event.rawInput, serde)
+                workflow.executeCooperative(event.nodeStack, branches, event.rawInput, serde, activityExecutor)
             }
             logger.debug { "Fork completed: output=$output" }
             WorkflowCommand.ResumeWithCompletedTask(
@@ -216,7 +246,8 @@ internal object FullOrchestrator {
         nodeStack: NodeStack,
         branches: List<Node<*>>,
         rawInput: JsonElement,
-        serde: Boolean
+        serde: Boolean,
+        activityExecutor: ActivityExecutor
     ): JsonElement {
         // Get the first success - if all branches failed, the last exception will be rethrown from here
         return branches.mapAwaitFirstFailSlow { branchNode ->
@@ -228,7 +259,8 @@ internal object FullOrchestrator {
                     rawInput = rawInput,
                     flowDirective = null
                 ),
-                serde = serde
+                serde = serde,
+                activityExecutor = activityExecutor
             ).value()
         }
     }
@@ -243,7 +275,8 @@ internal object FullOrchestrator {
         nodeStack: NodeStack,
         branches: List<Node<*>>,
         rawInput: JsonElement,
-        serde: Boolean
+        serde: Boolean,
+        activityExecutor: ActivityExecutor
     ): JsonArray {
         // Get all results - If a branch failed, the first exception will be rethrown from here
         return JsonArray(
@@ -256,7 +289,8 @@ internal object FullOrchestrator {
                         rawInput = rawInput,
                         flowDirective = null
                     ),
-                    serde = serde
+                    serde = serde,
+                    activityExecutor = activityExecutor
                 ).value()
             })
     }

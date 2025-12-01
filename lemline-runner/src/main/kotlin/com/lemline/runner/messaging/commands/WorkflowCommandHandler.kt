@@ -3,12 +3,14 @@ package com.lemline.runner.messaging.commands
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.activities.RunnerActivityExecutor
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
@@ -17,13 +19,11 @@ import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.FailureRepository
-import io.quarkus.arc.Arc
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.Clock
@@ -50,16 +50,9 @@ internal class WorkflowCommandHandler(
     private val failureRepository: FailureRepository,
     override val metrics: WorkflowCommandSubscriberMetrics,
     private val config: LemlineConfiguration,
+    private val activityExecutor: RunnerActivityExecutor,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
-
-    /**
-     * Lazy-loaded CloudEvents emitter. May be null if CloudEvents producer is not enabled.
-     * Uses Arc to look up the bean since it's conditionally created.
-     */
-    private val cloudEventsEmitter: CloudEventsEmitter? by lazy {
-        Arc.container().instance(CloudEventsEmitter::class.java).orElse(null)
-    }
 
     @TestOnly
     override var onCompleteTest = { _: Message<String>, _: InstanceMessage<WorkflowCommand>? -> }
@@ -344,11 +337,9 @@ internal class WorkflowCommandHandler(
                 null  // Paused - waiting for branches to complete
             }
 
-            is WorkflowEvent.EmitStarted -> {
-                // Emit CloudEvent to external channel (fire-and-forget)
-                emitCloudEvent(this, event)
-                // Immediately continue workflow execution
-                event.resume()
+            is WorkflowEvent.ActivityStarted -> {
+                // Execute the activity and resume with the result
+                executeActivity(event)
             }
 
             is WorkflowEvent.WorkflowCompleted -> {
@@ -404,28 +395,20 @@ internal class WorkflowCommandHandler(
     }
 
     /**
-     * Emits a CloudEvent to the external cloudevents channel.
-     * This is fire-and-forget - the workflow continues immediately.
+     * Executes an activity via the ActivityExecutor and returns the resume command.
+     *
+     * Activities include HTTP calls, script execution, shell commands, and CloudEvent emission.
+     * On success, resumes with the activity output. On failure, resumes with the error.
      */
-    private suspend fun emitCloudEvent(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent.EmitStarted) {
-        val emitter = cloudEventsEmitter
-        if (emitter == null) {
-            logger.warn { "CloudEvents emitter not available - emit task will not publish event. Enable cloudevents.producer to emit CloudEvents." }
-            return
+    private suspend fun executeActivity(event: WorkflowEvent.ActivityStarted): WorkflowCommand {
+        logger.debug { "Executing activity: ${event::class.simpleName} at ${event.nodePosition}" }
+        return try {
+            val output = activityExecutor.execute(event)
+            logger.debug { "Activity completed: ${event::class.simpleName}" }
+            event.resumeCompleted(output)
+        } catch (e: Exception) {
+            logger.error(e) { "Activity failed: ${event::class.simpleName}" }
+            event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
         }
-
-        val cloudEvent = event.cloudEvent
-        if (cloudEvent == null) {
-            logger.error { "EmitStarted event has null cloudEvent - this should not happen" }
-            return
-        }
-
-        emitter.send(
-            cloudEvent = cloudEvent,
-            workflowId = message.workflowId.toString(),
-            workflowNamespace = message.workflowNamespace.toString(),
-            workflowName = message.workflowName.toString(),
-            workflowVersion = message.workflowVersion.toString(),
-        )
     }
 }

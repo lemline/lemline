@@ -7,6 +7,10 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
 import com.lemline.core.json.LemlineJson
+import com.lemline.core.processors.CallHttpConfig
+import com.lemline.core.processors.EmitConfig
+import com.lemline.core.processors.RunScriptConfig
+import com.lemline.core.processors.RunShellConfig
 import com.lemline.core.processors.RunWorkflowConfig
 import com.lemline.core.processors.WaitConfig
 import com.lemline.core.workflows.FlowDirective
@@ -265,7 +269,36 @@ sealed class WorkflowEvent : WorkflowState() {
     }
 
     // ========================================
-    // Suspension Events
+    // Activity Events (execute and continue)
+    // ========================================
+
+    /**
+     * Base class for events that represent activities to be executed.
+     *
+     * Unlike Suspension events which require async coordination (timers, child workflows,
+     * parallel branches), ActivityStarted events represent work that can be executed
+     * immediately and resumed with the result.
+     *
+     * The orchestrator executes the activity via an ActivityExecutor and resumes
+     * with the output (or error).
+     */
+    sealed class ActivityStarted : WorkflowEvent() {
+        /** Pass-through output for resume (usually equals transformedInput) */
+        abstract val input: JsonElement
+
+        fun resumeCompleted(output: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
+            nodeStack = nodeStack,
+            rawOutput = output,
+        )
+
+        fun resumeFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
+            nodeStack = nodeStack,
+            error = error,
+        )
+    }
+
+    // ========================================
+    // Suspension Events (require async coordination)
     // ========================================
 
     sealed class Suspension : WorkflowEvent()
@@ -418,12 +451,10 @@ sealed class WorkflowEvent : WorkflowState() {
     }
 
     /**
-     * Event emitted when an emit task publishes a CloudEvent.
+     * Event emitted when an emit task needs to publish a CloudEvent.
      *
-     * The CloudEvent is built using the official CloudEvents SDK (io.cloudevents)
-     * for proper CloudEvents v1.0 compliance. This event is handled inline by
-     * WorkflowCommandHandler and never flows through broker messages, so the
-     * CloudEvent doesn't need to be serializable.
+     * The config contains all data needed to build a CloudEvent. The actual
+     * CloudEvent is built by the ActivityExecutor using the CloudEvents SDK.
      *
      * The workflow continues immediately after publishing (fire-and-forget).
      */
@@ -431,23 +462,93 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("emitStarted")
     data class EmitStarted(
         override val nodeStack: NodeStack,
-        @Transient val cloudEvent: io.cloudevents.CloudEvent? = null,  // Not serialized - handled inline
-        val rawOutput: JsonElement   // Pass-through: output = input for emit task
-    ) : Suspension() {
+        override val input: JsonElement,   // Pass-through: output = input for emit task
+        val config: EmitConfig
+    ) : ActivityStarted() {
 
         @Transient
         override val nodePosition = nodeStack.lastPosition // Emit position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
-            ", cloudEvent=${cloudEvent?.let { "id=${it.id}, source=${it.source}, type=${it.type}" }}" +
-            ", rawOutput=$rawOutput" +
+            ", config=$config" +
+            ", rawOutput=$input" +
             ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
+    }
 
-        fun resume() = WorkflowCommand.ResumeWithCompletedTask(
-            nodeStack = nodeStack,
-            rawOutput = rawOutput,
-        )
+    /**
+     * Event emitted when an HTTP call task needs to be executed.
+     *
+     * The config contains all data needed to make the HTTP request,
+     * including resolved authentication.
+     */
+    @Serializable
+    @SerialName("callHttpStarted")
+    data class CallHttpStarted(
+        override val nodeStack: NodeStack,
+        override val input: JsonElement,
+        val config: CallHttpConfig
+    ) : ActivityStarted() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
+
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", config=$config" +
+            ", input=$input" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+    }
+
+    /**
+     * Event emitted when a script task needs to be executed.
+     *
+     * The config contains all data needed to run the script,
+     * including resolved code, arguments, and environment.
+     */
+    @Serializable
+    @SerialName("runScriptStarted")
+    data class RunScriptStarted(
+        override val nodeStack: NodeStack,
+        override val input: JsonElement,
+        val config: RunScriptConfig
+    ) : ActivityStarted() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
+
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", config=$config" +
+            ", input=$input" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+    }
+
+    /**
+     * Event emitted when a shell command task needs to be executed.
+     *
+     * The config contains all data needed to run the shell command,
+     * including resolved command, arguments, and environment.
+     */
+    @Serializable
+    @SerialName("runShellStarted")
+    data class RunShellStarted(
+        override val nodeStack: NodeStack,
+        override val input: JsonElement,
+        val config: RunShellConfig
+    ) : ActivityStarted() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition
+
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", config=$config" +
+            ", input=$input" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ")"
     }
 }

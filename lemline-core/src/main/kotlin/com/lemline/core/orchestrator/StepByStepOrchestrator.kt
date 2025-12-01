@@ -121,11 +121,11 @@ object StepByStepOrchestrator {
                 runByActivity(workflow, event.resume())
             }
 
+            is WorkflowEvent.ActivityStarted -> event
             is WaitStarted -> event
             is TaskRetryScheduled -> event
             is RunWorkflowStarted -> event
             is ForkStarted -> event
-            is EmitStarted -> event
             is WorkflowEvent.Outcome -> event
         }
     }
