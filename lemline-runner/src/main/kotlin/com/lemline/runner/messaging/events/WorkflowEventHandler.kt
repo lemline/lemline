@@ -22,15 +22,19 @@ import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.ForkBranchModel
 import com.lemline.runner.models.ForkModel
+import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.models.ParentModel
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ForkRepository
+import com.lemline.runner.repositories.ListenerRepository
 import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.repositories.WaitRepository
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import com.lemline.runner.starters.Starter
 import io.serverlessworkflow.api.types.ForkTask
 import jakarta.enterprise.context.ApplicationScoped
@@ -54,6 +58,7 @@ import org.jetbrains.annotations.TestOnly
  * - WorkflowCompleted → parent completion
  * - ForkStarted → forks table + branch creation
  * - ForkBranchCompleted → branch completion
+ * - ListenStarted → listeners table (for CloudEvent consumption)
  */
 @ExperimentalTime
 @ApplicationScoped
@@ -66,6 +71,7 @@ internal class WorkflowEventHandler(
     private val waitRepository: WaitRepository,
     private val failureRepository: FailureRepository,
     private val forkRepository: ForkRepository,
+    private val listenerRepository: ListenerRepository,
     private val instanceEmitter: WorkflowCommandEmitter,
     private val starter: Starter,
     override val metrics: WorkflowEventSubscriberMetrics,
@@ -214,23 +220,48 @@ internal class WorkflowEventHandler(
         }
     }
 
-    @Suppress("UNUSED_PARAMETER")
+    /**
+     * Handles ListenStarted events by creating a listener row in the database.
+     *
+     * The listener stores all data needed for CloudEvent matching:
+     * - Workflow identity (for resuming when events match)
+     * - Listen configuration (strategy, filters, correlation, timeout)
+     * - Progress tracking (for ALL strategy and accumulation mode)
+     *
+     * CloudEvents are processed by a separate handler that queries listeners
+     * by definition identity and correlation values.
+     */
     private suspend fun handleListenStarted(instance: InstanceMessage<WorkflowEvent.ListenStarted>) {
-        // TODO: Implement in Phase 6-7
-        // 1. Create ListenerModel from the instance
-        // 2. Insert into lemline_listeners table
-        // 3. The listener will be matched against incoming CloudEvents
-        val listenerId = instance.workflowState.nodeStack.deriveIdempotentId("-listen")
-        logger.debug { "Listen task started: $listenerId (implementation pending)" }
+        val state = instance.workflowState
+        val config = state.config
+        val listenerId = state.nodeStack.deriveIdempotentId("-listen")
 
-        // For now, we just log and store nothing - the workflow will pause here
-        // Actual implementation will:
-        // - Store listener state in lemline_listeners table
-        // - CloudEvent processor will find and resume matching listeners
-        throw UnsupportedOperationException(
-            "Listen task handling not yet implemented. " +
-                "ListenStarted events require the listener storage (Phase 6) to be implemented first."
+        // Create listener model
+        val listener = ListenerModel(
+            id = listenerId,
+            instanceMessage = instance,
+            workflowId = instance.workflowId,
+            workflowNamespace = instance.workflowInfo.workflowNamespace,
+            workflowName = instance.workflowInfo.workflowName,
+            workflowVersion = instance.workflowInfo.workflowVersion,
+            workflowPosition = state.nodePosition,
+            strategy = config.strategy,
+            readAs = config.readAs,
+            config = Json.encodeToString(config),
+            timeoutAt = config.timeoutAt,
+            outboxScheduledFor = Clock.System.now(),
         )
+
+        // Insert listener into database
+        val rowsInserted = listenerRepository.insert(listener)
+        if (rowsInserted == 0) {
+            logger.info { "Listener $listenerId already exists (idempotent insert)" }
+        } else {
+            logger.debug {
+                "Listen task started: $listenerId for workflow ${instance.workflowId} " +
+                    "at position ${state.nodePosition}, strategy=${config.strategy}"
+            }
+        }
     }
 
     private suspend fun handleWorkflowFailed(instance: InstanceMessage<WorkflowEvent.WorkflowFailed>) {
