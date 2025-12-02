@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache as Workflows
 import com.lemline.runner.cli.GlobalMixin
+import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.matchers.ints.shouldBeGreaterThan
@@ -22,6 +23,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import java.lang.reflect.Field
+import kotlin.time.ExperimentalTime
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -29,10 +31,12 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import picocli.CommandLine
 
+@ExperimentalTime
 class DefinitionPostCommandTest {
 
     private lateinit var command: DefinitionPostCommand
     private lateinit var definitionRepository: DefinitionRepository
+    private lateinit var definitionListenService: DefinitionListenService
     private lateinit var cmd: CommandLine
     private lateinit var outStream: ByteArrayOutputStream
     private lateinit var errStream: ByteArrayOutputStream
@@ -53,6 +57,7 @@ class DefinitionPostCommandTest {
     fun setup() {
         // Create mocks
         definitionRepository = mockk()
+        definitionListenService = mockk()
 
         // Mock static methods
         mockkStatic(Workflows::class)
@@ -61,7 +66,11 @@ class DefinitionPostCommandTest {
         // Create command and inject mocks
         command = DefinitionPostCommand()
         injectField(command, "definitionRepository", definitionRepository)
+        injectField(command, "definitionListenService", definitionListenService)
         injectField(command, "mixin", GlobalMixin())
+
+        // Mock listen service to return 0 filters extracted by default
+        coEvery { definitionListenService.syncListenDefinitions(any()) } returns 0
 
         workflowNamespace = WorkflowNamespace("test")
         workflowName = WorkflowName("testWorkflow")

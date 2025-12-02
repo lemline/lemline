@@ -11,8 +11,14 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.InternalException
+import com.lemline.core.processors.CorrelationDef
+import com.lemline.core.processors.EventFilter
+import com.lemline.core.processors.ListenConfig
+import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.processors.RunWorkflowConfig
+import com.lemline.core.processors.UntilCondition
 import com.lemline.core.processors.WaitConfig
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import com.lemline.core.states.DoState
 import com.lemline.core.states.ForState
 import com.lemline.core.states.ForkState
@@ -192,7 +198,7 @@ fun WorkflowCommand.ResumeWithCompletedTask.Companion.random() = WorkflowCommand
 )
 
 fun WorkflowEvent.Companion.random(): WorkflowEvent {
-    return when (Random.nextInt(8)) {
+    return when (Random.nextInt(9)) {
         0 -> WorkflowEvent.WorkflowCompleted.random()
         1 -> WorkflowEvent.WorkflowFailed.random()
         2 -> WorkflowEvent.TaskScheduled.random()
@@ -200,7 +206,8 @@ fun WorkflowEvent.Companion.random(): WorkflowEvent {
         4 -> WorkflowEvent.TaskRetryScheduled.random()
         5 -> WorkflowEvent.RunWorkflowStarted.random()
         6 -> WorkflowEvent.ForkStarted.random()
-        else -> WorkflowEvent.ForkBranchCompleted.random()
+        7 -> WorkflowEvent.ForkBranchCompleted.random()
+        else -> WorkflowEvent.ListenStarted.random()
     }
 }
 
@@ -296,3 +303,88 @@ fun WorkflowEvent.ForkBranchCompleted.Companion.random() =
             false -> null
         }
     )
+
+// Listen task random generators
+
+fun randomListenStrategy(): ListenStrategy = ListenStrategy.entries.random()
+
+fun randomListenAndReadAs(): ListenAndReadAs = ListenAndReadAs.entries.toTypedArray().random()
+
+fun randomCorrelationDef() = CorrelationDef(
+    from = "\${ .${String.random()} }",
+    expect = when (Random.nextBoolean()) {
+        true -> "\${ \$input.${String.random()} }"
+        false -> null
+    }
+)
+
+fun randomEventFilter() = EventFilter(
+    type = when (Random.nextBoolean()) {
+        true -> "com.example.${String.random()}"
+        false -> null
+    },
+    source = when (Random.nextBoolean()) {
+        true -> "https://example.com/${String.random()}"
+        false -> null
+    },
+    subject = when (Random.nextBoolean()) {
+        true -> String.random()
+        false -> null
+    },
+    id = when (Random.nextBoolean()) {
+        true -> String.random()
+        false -> null
+    },
+    datacontenttype = when (Random.nextBoolean()) {
+        true -> "application/json"
+        false -> null
+    },
+    dataschema = when (Random.nextBoolean()) {
+        true -> "https://schema.example.com/${String.random()}"
+        false -> null
+    },
+    time = when (Random.nextBoolean()) {
+        true -> Clock.System.now().toString()
+        false -> null
+    },
+    dataFilter = when (Random.nextBoolean()) {
+        true -> ".${String.random()} == true"
+        false -> null
+    },
+    correlations = when (Random.nextBoolean()) {
+        true -> mapOf(String.random() to randomCorrelationDef())
+        false -> null
+    }
+)
+
+fun randomUntilCondition(): UntilCondition = when (Random.nextBoolean()) {
+    true -> UntilCondition.Expression(". | length >= ${Random.nextInt(1, 10)}")
+    false -> UntilCondition.Event(randomEventFilter())
+}
+
+fun randomListenConfig() = ListenConfig(
+    strategy = randomListenStrategy(),
+    filters = List(Random.nextInt(1, 4)) { randomEventFilter() },
+    until = when (Random.nextBoolean()) {
+        true -> randomUntilCondition()
+        false -> null
+    },
+    readAs = randomListenAndReadAs(),
+    timeoutAt = when (Random.nextBoolean()) {
+        true -> Clock.System.now() + Random.nextLong(100, 10000).milliseconds
+        false -> null
+    },
+    correlationContext = when (Random.nextBoolean()) {
+        true -> buildJsonObject {
+            put("input", JsonElement.random())
+            put("context", buildJsonObject { put(String.random(), JsonElement.random()) })
+        }
+        false -> null
+    }
+)
+
+fun WorkflowEvent.ListenStarted.Companion.random() = WorkflowEvent.ListenStarted(
+    nodeStack = NodeStack.random(),
+    rawOutput = JsonElement.random(),
+    config = randomListenConfig()
+)

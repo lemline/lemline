@@ -139,6 +139,7 @@ dependencies {
     testFixturesImplementation(libs.bundles.kotlinxEcosystem)
     testFixturesImplementation(testFixtures(project(":lemline-common")))
     testFixturesImplementation(testFixtures(project(":lemline-core")))
+    testFixturesImplementation(libs.serverlessworkflow.api)
 }
 
 // ────────────────────────────────────────────────────────────────────────────

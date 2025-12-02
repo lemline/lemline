@@ -3,11 +3,13 @@ package com.lemline.runner.cli.definitions
 
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.runner.cli.GlobalMixin
+import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import java.io.File
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
 import picocli.CommandLine
 import picocli.CommandLine.Command
@@ -15,6 +17,7 @@ import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
 
 @Unremovable
+@ExperimentalTime
 @Command(
     name = "post",
     description = ["Create or update workflows from definition files."],
@@ -47,6 +50,9 @@ class DefinitionPostCommand : Runnable {
 
     @Inject
     lateinit var definitionRepository: DefinitionRepository
+
+    @Inject
+    lateinit var definitionListenService: DefinitionListenService
 
     @Option(
         names = ["--force", "-F"],
@@ -141,11 +147,19 @@ class DefinitionPostCommand : Runnable {
             val model = DefinitionModel.from(workflow)
             val workflowName = "'${model.name}' (version '${model.version}')"
             when (definitionRepository.insert(model)) {
-                1 -> println("$prefix Workflow successfully created: $workflowName")
+                1 -> {
+                    println("$prefix Workflow successfully created: $workflowName")
+                    // Extract and store listen task filters
+                    definitionListenService.syncListenDefinitions(workflow)
+                }
 
                 0 -> when (force) {
                     true -> when (definitionRepository.update(model)) {
-                        1 -> println("$prefix Workflow successfully updated: $workflowName")
+                        1 -> {
+                            println("$prefix Workflow successfully updated: $workflowName")
+                            // Extract and store listen task filters
+                            definitionListenService.syncListenDefinitions(workflow)
+                        }
                         0 -> System.err.println("$prefix Failed to update workflow: $workflowName") // this should not happen
                     }
 

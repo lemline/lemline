@@ -94,6 +94,10 @@ internal object FullOrchestrator {
             is WorkflowEvent.TaskRetryScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor)
             is WorkflowEvent.RunWorkflowStarted -> resume(workflow, handle(serdeEvent, serde, activityExecutor), serde, activityExecutor)
             is WorkflowEvent.ForkStarted -> resume(workflow, handle(workflow, serdeEvent, serde, activityExecutor), serde, activityExecutor)
+            is WorkflowEvent.ListenStarted -> throw UnsupportedOperationException(
+                "ListenStarted events require external CloudEvent coordination and cannot be handled by FullOrchestrator. " +
+                    "Use StepByStepOrchestrator with runner infrastructure instead."
+            )
             is WorkflowEvent.Outcome -> serdeEvent
         }
     }

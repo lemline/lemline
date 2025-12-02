@@ -26,3 +26,4 @@ typealias SetState = TaskState
 typealias ForkState = TaskState
 typealias SwitchState = TaskState
 typealias EmitState = TaskState
+typealias ListenState = TaskState

@@ -123,6 +123,7 @@ object StepByStepOrchestrator {
 
             is WorkflowEvent.ActivityStarted -> event
             is WaitStarted -> event
+            is WorkflowEvent.ListenStarted -> event
             is TaskRetryScheduled -> event
             is RunWorkflowStarted -> event
             is ForkStarted -> event

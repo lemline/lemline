@@ -16,6 +16,7 @@ import com.lemline.core.processors.DoProcessor
 import com.lemline.core.processors.EmitProcessor
 import com.lemline.core.processors.ForProcessor
 import com.lemline.core.processors.ForkProcessor
+import com.lemline.core.processors.ListenProcessor
 import com.lemline.core.processors.NodeProcessor
 import com.lemline.core.processors.RaiseProcessor
 import com.lemline.core.processors.RootProcessor
@@ -78,6 +79,7 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
             is WaitTask -> WaitProcessor(this as Node<WaitTask>)
             is ForkTask -> ForkProcessor(this as Node<ForkTask>)
             is EmitTask -> EmitProcessor(this as Node<EmitTask>)
+            is ListenTask -> ListenProcessor(this as Node<ListenTask>)
             is RunTask -> {
                 val runTask = this as Node<RunTask>
                 when (runTask.task.run.get()) {

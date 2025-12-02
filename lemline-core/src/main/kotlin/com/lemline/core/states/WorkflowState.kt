@@ -9,6 +9,7 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.json.LemlineJson
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
+import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.RunScriptConfig
 import com.lemline.core.processors.RunShellConfig
 import com.lemline.core.processors.RunWorkflowConfig
@@ -21,6 +22,7 @@ import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -447,6 +449,48 @@ sealed class WorkflowEvent : WorkflowState() {
         fun resume(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = nodeStack,
             rawOutput = rawOutput,
+        )
+    }
+
+    /**
+     * Event emitted when a listen task is waiting for CloudEvents.
+     *
+     * The config contains all data needed to set up an event listener.
+     * The runner creates a listener row in the database and waits for
+     * matching events to arrive via the CloudEvent channel.
+     *
+     * The workflow is resumed when:
+     * - Strategy ONE: First matching event arrives
+     * - Strategy ANY: First matching event (or until condition met if accumulating)
+     * - Strategy ALL: One event per filter has been received
+     * - Timeout: If timeoutAt is set and exceeded
+     */
+    @Serializable
+    @SerialName("listenStarted")
+    data class ListenStarted(
+        override val nodeStack: NodeStack,
+        val rawOutput: JsonElement,
+        val config: ListenConfig
+    ) : Suspension() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition // Listen position
+
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", rawOutput=$rawOutput" +
+            ", config=$config" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+
+        fun resumeCompleted(events: JsonArray) = WorkflowCommand.ResumeWithCompletedTask(
+            nodeStack = nodeStack,
+            rawOutput = events,
+        )
+
+        fun resumeFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
+            nodeStack = nodeStack,
+            error = error,
         )
     }
 

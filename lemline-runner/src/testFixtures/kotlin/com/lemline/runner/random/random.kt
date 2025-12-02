@@ -22,12 +22,18 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.models.DefinitionListenModel
 import com.lemline.runner.models.FailureModel
+import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.models.OutboxModel
 import com.lemline.runner.models.ParentModel
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.ScheduleModel
 import com.lemline.runner.models.WaitModel
+import com.lemline.core.random.random
+import com.lemline.core.random.randomListenConfig
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -192,4 +198,72 @@ fun WaitModel.Companion.random() = WaitModel(
     it.outboxAttemptCount = Int.random()
     it.outboxErrorClass = String.nullableRandom()
     it.outboxErrorMessage = String.nullableRandom()
+}
+
+fun DefinitionListenModel.Companion.random(): DefinitionListenModel {
+    return DefinitionListenModel(
+        id = IDV7.random(),
+        workflowNamespace = WorkflowNamespace.random(),
+        workflowName = WorkflowName.random(),
+        workflowVersion = WorkflowVersion.random(),
+        nodePosition = NodePosition.random(),
+        filterIndex = Random.nextInt(0, 10),
+        eventType = when (Random.nextBoolean()) {
+            true -> "com.example.${String.random()}"
+            false -> null
+        },
+        eventSource = when (Random.nextBoolean()) {
+            true -> "https://example.com/${String.random()}"
+            false -> null
+        },
+        eventSubject = when (Random.nextBoolean()) {
+            true -> String.random()
+            false -> null
+        },
+        correlations = when (Random.nextBoolean()) {
+            true -> """{"${String.random()}":{"from":".\$${String.random()}"}}"""
+            false -> null
+        }
+    )
+}
+
+fun ListenerModel.Companion.random(): ListenerModel {
+    val workflowInfo = WorkflowInfo.random()
+    val listenStarted = WorkflowEvent.ListenStarted.random()
+    val config = listenStarted.config
+
+    return ListenerModel(
+        id = IDV7.random(),
+        instanceMessage = InstanceMessage(
+            workflowInfo = workflowInfo,
+            workflowState = listenStarted,
+        ),
+        workflowId = listenStarted.nodeStack.rootState?.workflowId ?: WorkflowId.random(),
+        workflowNamespace = workflowInfo.workflowNamespace,
+        workflowName = workflowInfo.workflowName,
+        workflowVersion = workflowInfo.workflowVersion,
+        workflowPosition = listenStarted.nodePosition,
+        strategy = config.strategy,
+        readAs = config.readAs,
+        config = Json.encodeToString(config),
+        timeoutAt = config.timeoutAt,
+        outboxScheduledFor = Instant.random(),
+    ).also {
+        // Don't call randomize() as outboxDelayedUntil cannot be null for ListenerModel
+        it.outboxAttemptCount = Int.random()
+        it.outboxErrorClass = String.nullableRandom()
+        it.outboxErrorMessage = String.nullableRandom()
+        it.correlationValues = when (Random.nextBoolean()) {
+            true -> """{"${String.random()}":"${String.random()}"}"""
+            false -> null
+        }
+        it.accumulatedEvents = when (Random.nextBoolean()) {
+            true -> """[{"type":"com.example.${String.random()}"}]"""
+            false -> null
+        }
+        it.matchedFilterIndices = when (Random.nextBoolean()) {
+            true -> """[${Random.nextInt(0, 5)}]"""
+            false -> null
+        }
+    }
 }

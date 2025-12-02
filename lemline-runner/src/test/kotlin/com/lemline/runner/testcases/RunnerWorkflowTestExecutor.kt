@@ -308,6 +308,12 @@ internal class RunnerWorkflowTestExecutor : WorkflowTestExecutor {
                         commandsSource.send(resumeCommand.toJsonString())
                     }
 
+                    is WorkflowEvent.ListenStarted -> {
+                        // For tests: listen tasks need CloudEvent delivery which isn't implemented in tests
+                        // We would need to mock CloudEvent delivery to test this properly
+                        eventsSource.send(eventMsg.payload)
+                    }
+
                     is WorkflowEvent.TaskRetryScheduled -> {
                         // For tests: immediately create resume command (bypass DB persistence)
                         val resumeCommand = InstanceMessage(

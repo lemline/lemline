@@ -337,6 +337,13 @@ internal class WorkflowCommandHandler(
                 null  // Paused - waiting for branches to complete
             }
 
+            is WorkflowEvent.ListenStarted -> {
+                // Send to the database for listener persistence
+                // The listener will be stored and CloudEvents will be matched against it
+                sendToDatabase(this, event)
+                null  // Paused - waiting for matching CloudEvents
+            }
+
             is WorkflowEvent.ActivityStarted -> {
                 // Execute the activity and resume with the result
                 executeActivity(event)

@@ -167,6 +167,8 @@ internal class WorkflowEventHandler(
 
             is WorkflowEvent.ForkStarted -> handleForkStarted(current as InstanceMessage<WorkflowEvent.ForkStarted>)
 
+            is WorkflowEvent.ListenStarted -> handleListenStarted(current as InstanceMessage<WorkflowEvent.ListenStarted>)
+
             is WorkflowEvent.ForkBranchCompleted -> handleBranchCompleted(current as InstanceMessage<WorkflowEvent.ForkBranchCompleted>)
 
             is WorkflowEvent.ForkBranchFailed -> handleBranchFailed(current as InstanceMessage<WorkflowEvent.ForkBranchFailed>)
@@ -210,6 +212,25 @@ internal class WorkflowEventHandler(
         if (rowsInserted == 0) {
             logger.info { "Retry model $retryId already exists (idempotent insert)" }
         }
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    private suspend fun handleListenStarted(instance: InstanceMessage<WorkflowEvent.ListenStarted>) {
+        // TODO: Implement in Phase 6-7
+        // 1. Create ListenerModel from the instance
+        // 2. Insert into lemline_listeners table
+        // 3. The listener will be matched against incoming CloudEvents
+        val listenerId = instance.workflowState.nodeStack.deriveIdempotentId("-listen")
+        logger.debug { "Listen task started: $listenerId (implementation pending)" }
+
+        // For now, we just log and store nothing - the workflow will pause here
+        // Actual implementation will:
+        // - Store listener state in lemline_listeners table
+        // - CloudEvent processor will find and resume matching listeners
+        throw UnsupportedOperationException(
+            "Listen task handling not yet implemented. " +
+                "ListenStarted events require the listener storage (Phase 6) to be implemented first."
+        )
     }
 
     private suspend fun handleWorkflowFailed(instance: InstanceMessage<WorkflowEvent.WorkflowFailed>) {

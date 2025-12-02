@@ -2,8 +2,19 @@
 package com.lemline.core.processors
 
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.RunTaskConfiguration.ProcessReturnType
+import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
+import kotlinx.serialization.Contextual
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -89,4 +100,126 @@ data class RunShellConfig(
     val environment: Map<String, String>? = null,
     val await: Boolean = true,
     val returnType: ProcessReturnType = ProcessReturnType.STDOUT
+)
+
+// ========================================
+// Listen Task Configuration
+// ========================================
+
+/**
+ * Strategy for consuming events in a listen task.
+ */
+@Serializable
+enum class ListenStrategy {
+    /** Wait for a single event matching the filter */
+    @SerialName("one")
+    ONE,
+
+    /** Wait for first event matching any filter, or accumulate with until */
+    @SerialName("any")
+    ANY,
+
+    /** Wait for one event per filter */
+    @SerialName("all")
+    ALL
+}
+
+/**
+ * Custom serializer for [ListenAndReadAs] Java enum.
+ * Serializes to/from the string value ("data", "envelope", "raw").
+ */
+internal object ListenAndReadAsSerializer : KSerializer<ListenAndReadAs> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("ListenAndReadAs", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: ListenAndReadAs) {
+        encoder.encodeString(value.value())
+    }
+
+    override fun deserialize(decoder: Decoder): ListenAndReadAs {
+        return ListenAndReadAs.fromValue(decoder.decodeString())
+    }
+}
+
+/**
+ * Correlation definition for linking events to workflow instances.
+ *
+ * @property from JQ expression to extract correlation value from event data
+ * @property expect Optional expected value expression evaluated against workflow context.
+ *                  If absent, first event sets the baseline (Mode 2).
+ */
+@Serializable
+data class CorrelationDef(
+    val from: String,
+    val expect: String? = null
+)
+
+/**
+ * Event filter for matching CloudEvents.
+ *
+ * @property type CloudEvent type (exact match)
+ * @property source CloudEvent source URI or expression
+ * @property subject CloudEvent subject
+ * @property id CloudEvent id
+ * @property datacontenttype Content type filter
+ * @property dataschema Data schema URI or expression
+ * @property time Event timestamp expression
+ * @property dataFilter JQ expression evaluated against event.data
+ * @property correlations Map of correlation definitions by key name
+ */
+@Serializable
+data class EventFilter(
+    val type: String? = null,
+    val source: String? = null,
+    val subject: String? = null,
+    val id: String? = null,
+    val datacontenttype: String? = null,
+    val dataschema: String? = null,
+    val time: String? = null,
+    val dataFilter: String? = null,
+    val correlations: Map<String, CorrelationDef>? = null
+)
+
+/**
+ * Until condition for accumulation mode.
+ * Can be either an expression evaluated against accumulated events,
+ * or an event filter that terminates when matched.
+ */
+@Serializable
+sealed class UntilCondition {
+    /** Expression evaluated against accumulated events array (e.g., ". | any(.temp > 38)") */
+    @Serializable
+    @SerialName("expression")
+    data class Expression(val expression: String) : UntilCondition()
+
+    /** Event filter - stop when this event arrives */
+    @Serializable
+    @SerialName("event")
+    data class Event(val filter: EventFilter) : UntilCondition()
+}
+
+/**
+ * Configuration for listening to CloudEvents.
+ *
+ * Contains all data needed to set up an event listener. The runner uses this
+ * config to create listener entries in the database.
+ *
+ * @property strategy Event consumption strategy (one, any, all)
+ * @property filters List of event filters. Empty list = wildcard (any event matches)
+ * @property until Optional accumulation termination condition
+ * @property readAs How to extract event content (data, envelope, raw)
+ * @property timeoutAt Optional absolute timeout timestamp
+ * @property correlationContext Workflow context data for evaluating correlate.expect expressions.
+ *                              Only values needed for correlation are included.
+ */
+@OptIn(ExperimentalTime::class)
+@Serializable
+data class ListenConfig(
+    val strategy: ListenStrategy,
+    val filters: List<EventFilter>,
+    val until: UntilCondition? = null,
+    @Serializable(with = ListenAndReadAsSerializer::class)
+    val readAs: ListenAndReadAs = ListenAndReadAs.DATA,
+    @Contextual val timeoutAt: Instant? = null,
+    val correlationContext: JsonElement? = null
 )
