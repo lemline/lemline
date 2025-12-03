@@ -3,6 +3,7 @@ package com.lemline.common.values
 
 import com.lemline.common.json.JsonSerializable
 import com.lemline.common.json.LemlineJson
+import io.serverlessworkflow.api.types.Workflow
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -30,3 +31,5 @@ data class WorkflowInfo(
         fun fromJsonString(json: String): WorkflowInfo = LemlineJson.decodeFromString(json)
     }
 }
+
+val Workflow.info get() = WorkflowInfo(namespace, name, version)

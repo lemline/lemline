@@ -2,6 +2,7 @@
 package com.lemline.runner.repositories.bases
 
 import com.lemline.common.random.random
+import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -26,9 +27,9 @@ import org.junit.jupiter.api.Test
  * Abstract base class for testing DefinitionListenRepository implementations.
  *
  * Tests cover:
- * - Basic CRUD operations
- * - Finding filters by definition
- * - Finding filters by event type
+ * - Basic CRUD operations for listen task definitions
+ * - Finding listen tasks by definition
+ * - Finding listen tasks by definition and position
  * - Deletion by definition
  */
 @ExperimentalTime
@@ -98,11 +99,8 @@ internal abstract class DefinitionListenRepositoryTest {
         retrieved?.workflowName shouldBe model.workflowName
         retrieved?.workflowVersion shouldBe model.workflowVersion
         retrieved?.nodePosition shouldBe model.nodePosition
-        retrieved?.filterIndex shouldBe model.filterIndex
-        retrieved?.eventType shouldBe model.eventType
-        retrieved?.eventSource shouldBe model.eventSource
-        retrieved?.eventSubject shouldBe model.eventSubject
-        retrieved?.correlations shouldBe model.correlations
+        retrieved?.strategy shouldBe model.strategy
+        retrieved?.readAs shouldBe model.readAs
     }
 
     @Test
@@ -115,36 +113,36 @@ internal abstract class DefinitionListenRepositoryTest {
     }
 
     @Test
-    fun `findByDefinition should return filters for a specific definition`() = runTest {
-        // Create definition and filters
+    fun `findByDefinition should return listen tasks for a specific definition`() = runTest {
+        // Create definition and listen tasks
         val namespace = WorkflowNamespace.random()
         val name = WorkflowName.random()
         val version = WorkflowVersion.random()
         createDefinition(namespace, name, version)
 
-        val filter1 = DefinitionListenModel.random().copy(
+        val task1 = DefinitionListenModel.random().copy(
             workflowNamespace = namespace,
             workflowName = name,
             workflowVersion = version,
-            filterIndex = 0
+            nodePosition = NodePosition("/do/listen1")
         )
-        val filter2 = DefinitionListenModel.random().copy(
+        val task2 = DefinitionListenModel.random().copy(
             workflowNamespace = namespace,
             workflowName = name,
             workflowVersion = version,
-            filterIndex = 1
+            nodePosition = NodePosition("/do/listen2")
         )
 
-        repository.insert(filter1)
-        repository.insert(filter2)
+        repository.insert(task1)
+        repository.insert(task2)
 
-        // Create another definition with different filters
+        // Create another definition with different listen tasks
         val otherModel = createRandomModelWithDefinition()
         repository.insert(otherModel)
 
         val results = repository.findByDefinition(namespace, name, version)
         results shouldHaveSize 2
-        results.map { it.id } shouldContainExactlyInAnyOrder listOf(filter1.id, filter2.id)
+        results.map { it.id } shouldContainExactlyInAnyOrder listOf(task1.id, task2.id)
     }
 
     @Test
@@ -158,79 +156,85 @@ internal abstract class DefinitionListenRepositoryTest {
     }
 
     @Test
-    fun `findByEventType should return filters matching the event type`() = runTest {
-        val eventType = "com.example.test-event"
-
-        // Create filter with specific event type
-        val model1 = createRandomModelWithDefinition().copy(eventType = eventType)
-        repository.insert(model1)
-
-        // Create filter with different event type
-        val model2 = createRandomModelWithDefinition().copy(eventType = "com.example.other-event")
-        repository.insert(model2)
-
-        // Create wildcard filter (no event type)
-        val model3 = createRandomModelWithDefinition().copy(eventType = null)
-        repository.insert(model3)
-
-        val results = repository.findByEventType(eventType)
-        results shouldHaveSize 1
-        results[0].id shouldBe model1.id
-    }
-
-    @Test
-    fun `findWildcardFilters should return filters with no event type`() = runTest {
-        // Create filter with event type
-        val model1 = createRandomModelWithDefinition().copy(eventType = "com.example.test")
-        repository.insert(model1)
-
-        // Create wildcard filters
-        val model2 = createRandomModelWithDefinition().copy(eventType = null)
-        repository.insert(model2)
-        val model3 = createRandomModelWithDefinition().copy(eventType = null)
-        repository.insert(model3)
-
-        val results = repository.findWildcardFilters()
-        results shouldHaveSize 2
-        results.map { it.id } shouldContainExactlyInAnyOrder listOf(model2.id, model3.id)
-    }
-
-    @Test
-    fun `deleteByDefinition should remove all filters for a definition`() = runTest {
+    fun `findByDefinitionAndPosition should return specific listen task`() = runTest {
         val namespace = WorkflowNamespace.random()
         val name = WorkflowName.random()
         val version = WorkflowVersion.random()
         createDefinition(namespace, name, version)
 
-        // Insert multiple filters for the same definition
-        val filter1 = DefinitionListenModel.random().copy(
+        val position = NodePosition("/do/myListenTask")
+        val task = DefinitionListenModel.random().copy(
             workflowNamespace = namespace,
             workflowName = name,
             workflowVersion = version,
-            filterIndex = 0
+            nodePosition = position
         )
-        val filter2 = DefinitionListenModel.random().copy(
-            workflowNamespace = namespace,
-            workflowName = name,
-            workflowVersion = version,
-            filterIndex = 1
-        )
-        repository.insert(filter1)
-        repository.insert(filter2)
+        repository.insert(task)
 
-        // Insert a filter for a different definition
+        val result = repository.findByDefinitionAndPosition(namespace, name, version, position)
+        result shouldNotBe null
+        result?.id shouldBe task.id
+        result?.nodePosition shouldBe position
+    }
+
+    @Test
+    fun `findByDefinitionAndPosition should return null for non-existent position`() = runTest {
+        val namespace = WorkflowNamespace.random()
+        val name = WorkflowName.random()
+        val version = WorkflowVersion.random()
+        createDefinition(namespace, name, version)
+
+        val task = DefinitionListenModel.random().copy(
+            workflowNamespace = namespace,
+            workflowName = name,
+            workflowVersion = version,
+            nodePosition = NodePosition("/do/listen1")
+        )
+        repository.insert(task)
+
+        val result = repository.findByDefinitionAndPosition(
+            namespace, name, version,
+            NodePosition("/do/nonExistent")
+        )
+        result shouldBe null
+    }
+
+    @Test
+    fun `deleteByDefinition should remove all listen tasks for a definition`() = runTest {
+        val namespace = WorkflowNamespace.random()
+        val name = WorkflowName.random()
+        val version = WorkflowVersion.random()
+        createDefinition(namespace, name, version)
+
+        // Insert multiple listen tasks for the same definition
+        val task1 = DefinitionListenModel.random().copy(
+            workflowNamespace = namespace,
+            workflowName = name,
+            workflowVersion = version,
+            nodePosition = NodePosition("/do/listen1")
+        )
+        val task2 = DefinitionListenModel.random().copy(
+            workflowNamespace = namespace,
+            workflowName = name,
+            workflowVersion = version,
+            nodePosition = NodePosition("/do/listen2")
+        )
+        repository.insert(task1)
+        repository.insert(task2)
+
+        // Insert a listen task for a different definition
         val otherModel = createRandomModelWithDefinition()
         repository.insert(otherModel)
 
-        // Delete filters for the first definition
+        // Delete listen tasks for the first definition
         val deleted = repository.deleteByDefinition(namespace, name, version)
         deleted shouldBe 2
 
         // Verify deletion
-        repository.findById(filter1.id) shouldBe null
-        repository.findById(filter2.id) shouldBe null
+        repository.findById(task1.id) shouldBe null
+        repository.findById(task2.id) shouldBe null
 
-        // Verify other definition's filter is intact
+        // Verify other definition's listen task is intact
         repository.findById(otherModel.id) shouldNotBe null
     }
 
@@ -251,16 +255,16 @@ internal abstract class DefinitionListenRepositoryTest {
         val version = WorkflowVersion.random()
         createDefinition(namespace, name, version)
 
-        val filters = List(5) { index ->
+        val tasks = List(5) { index ->
             DefinitionListenModel.random().copy(
                 workflowNamespace = namespace,
                 workflowName = name,
                 workflowVersion = version,
-                filterIndex = index
+                nodePosition = NodePosition("/do/listen$index")
             )
         }
 
-        repository.insert(filters) shouldBe 5
+        repository.insert(tasks) shouldBe 5
 
         val retrieved = repository.findByDefinition(namespace, name, version)
         retrieved shouldHaveSize 5

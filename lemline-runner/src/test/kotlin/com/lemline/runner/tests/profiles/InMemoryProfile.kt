@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
+import com.lemline.runner.config.CLOUDEVENTS_CONSUMER_ENABLED
+import com.lemline.runner.config.CLOUDEVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
 import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_TYPE
@@ -30,7 +32,9 @@ class InMemoryProfile : QuarkusTestProfile {
             COMMANDS_CONSUMER_ENABLED to "true",
             COMMANDS_PRODUCER_ENABLED to "true",
             EVENTS_CONSUMER_ENABLED to "true",
-            EVENTS_PRODUCER_ENABLED to "true"
+            EVENTS_PRODUCER_ENABLED to "true",
+            CLOUDEVENTS_CONSUMER_ENABLED to "true",
+            CLOUDEVENTS_PRODUCER_ENABLED to "true"
         )
     }
 

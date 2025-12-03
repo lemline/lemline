@@ -4,13 +4,9 @@ package com.lemline.runner.repositories
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
-import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
-import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
+import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.ListenerModel
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -21,7 +17,6 @@ import java.sql.Timestamp
 import java.sql.Types
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
-import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -44,9 +39,7 @@ const val LISTENER_TABLE = "lemline_listeners"
 internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     companion object Companion {
-        const val STRATEGY_COLUMN = "strategy"
-        const val READ_MODE_COLUMN = "read_mode"
-        const val CONFIG_COLUMN = "config"
+        const val LISTEN_DEFINITION_ID_COLUMN = "listen_definition_id"
         const val TIMEOUT_AT_COLUMN = "timeout_at"
         const val CORRELATION_VALUES_COLUMN = "correlation_values"
         const val ACCUMULATED_EVENTS_COLUMN = "accumulated_events"
@@ -60,15 +53,19 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
     override val tableName = LISTENER_TABLE
 
     override val prepareStatementMap: Map<String, (PreparedStatement, ListenerModel, Int) -> Unit> by lazy {
-        super.prepareStatementMap + mapOf(
-            STRATEGY_COLUMN to { stmt, entity, idx ->
-                stmt.setString(idx, entity.strategy.name)
+        // Remove workflow info columns that are not in the listeners table
+        // (workflow info is stored in workflow_state JSON as part of InstanceMessage)
+        (super.prepareStatementMap - setOf(
+            WORKFLOW_NAMESPACE_COLUMN,
+            WORKFLOW_NAME_COLUMN,
+            WORKFLOW_VERSION_COLUMN
+        )) + mapOf(
+            // Override WORKFLOW_STATE_COLUMN to store the full InstanceMessage (includes workflowInfo)
+            WORKFLOW_STATE_COLUMN to { stmt, entity, idx ->
+                stmt.setString(idx, entity.instanceMessage.toJsonString())
             },
-            READ_MODE_COLUMN to { stmt, entity, idx ->
-                stmt.setString(idx, entity.readAs.value())
-            },
-            CONFIG_COLUMN to { stmt, entity, idx ->
-                stmt.setString(idx, entity.config)
+            LISTEN_DEFINITION_ID_COLUMN to { stmt, entity, idx ->
+                setIDV7(stmt, idx, entity.listenDefinitionId)
             },
             TIMEOUT_AT_COLUMN to { stmt, entity, idx ->
                 entity.timeoutAt?.let {
@@ -89,15 +86,11 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     override fun createModel(rs: ResultSet): ListenerModel = ListenerModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage<WorkflowEvent.ListenStarted>()!!,
+        listenDefinitionId = getIDV7(rs, LISTEN_DEFINITION_ID_COLUMN)!!,
+        // Deserialize full InstanceMessage (includes workflowInfo) from workflow_state column
+        instanceMessage = InstanceMessage.fromJsonString(rs.getString(WORKFLOW_STATE_COLUMN)),
         workflowId = WorkflowId(getIDV7(rs, WORKFLOW_ID_COLUMN)!!),
-        workflowNamespace = WorkflowNamespace(rs.getString(WORKFLOW_NAMESPACE_COLUMN)),
-        workflowName = WorkflowName(rs.getString(WORKFLOW_NAME_COLUMN)),
-        workflowVersion = WorkflowVersion(rs.getString(WORKFLOW_VERSION_COLUMN)),
         workflowPosition = NodePosition(rs.getString(WORKFLOW_POSITION_COLUMN)),
-        strategy = ListenStrategy.valueOf(rs.getString(STRATEGY_COLUMN)),
-        readAs = ListenAndReadAs.fromValue(rs.getString(READ_MODE_COLUMN)),
-        config = rs.getString(CONFIG_COLUMN),
         timeoutAt = rs.getInstant(TIMEOUT_AT_COLUMN),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN)!!,
     ).apply {
@@ -114,55 +107,29 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
     }
 
     /**
-     * Finds active listeners by workflow definition identity.
-     * Used in CloudEvent routing step 3.
+     * Finds active listeners by listen definition ID.
+     * Used in CloudEvent routing to find listeners for a specific listen task.
      *
-     * @param namespace Workflow namespace
-     * @param name Workflow name
-     * @param version Workflow version
-     * @param position Optional position to filter by
+     * @param listenDefinitionId The listen task definition ID
      * @param connection Optional database connection
      * @return List of matching active listeners
      */
-    suspend fun findByDefinition(
-        namespace: WorkflowNamespace,
-        name: WorkflowName,
-        version: WorkflowVersion,
-        position: NodePosition? = null,
+    suspend fun findByListenDefinitionId(
+        listenDefinitionId: IDV7,
         connection: Connection? = null
     ): List<ListenerModel> = withConnection(connection) { conn ->
-        val sql = if (position != null) findByDefinitionWithPositionSql else findByDefinitionSql
-        conn.prepareStatement(sql).use { stmt ->
-            stmt.setString(1, namespace.toString())
-            stmt.setString(2, name.toString())
-            stmt.setString(3, version.toString())
-            if (position != null) {
-                stmt.setString(4, position.toString())
-            }
+        conn.prepareStatement(findByListenDefinitionIdSql).use { stmt ->
+            setIDV7(stmt, 1, listenDefinitionId)
             stmt.executeQuery().use { it.toModels() }
         }
     }
 
-    private val findByDefinitionSql by lazy {
+    private val findByListenDefinitionIdSql by lazy {
         """
         SELECT * FROM $tableName
         WHERE $OUTBOX_COMPLETED_AT_COLUMN IS NULL
           AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-          AND $WORKFLOW_NAMESPACE_COLUMN = ?
-          AND $WORKFLOW_NAME_COLUMN = ?
-          AND $WORKFLOW_VERSION_COLUMN = ?
-        """.trimIndent()
-    }
-
-    private val findByDefinitionWithPositionSql by lazy {
-        """
-        SELECT * FROM $tableName
-        WHERE $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-          AND $WORKFLOW_NAMESPACE_COLUMN = ?
-          AND $WORKFLOW_NAME_COLUMN = ?
-          AND $WORKFLOW_VERSION_COLUMN = ?
-          AND $WORKFLOW_POSITION_COLUMN = ?
+          AND $LISTEN_DEFINITION_ID_COLUMN = ?
         """.trimIndent()
     }
 

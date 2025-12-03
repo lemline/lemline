@@ -2,16 +2,16 @@
 package com.lemline.core.definitions
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.common.values.WorkflowIndex
+import com.lemline.common.values.NodePosition
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.common.values.index
+import com.lemline.common.values.info
 import com.lemline.common.values.name
 import com.lemline.common.values.namespace
 import com.lemline.common.values.version
 import com.lemline.core.nodes.Node
-import com.lemline.common.values.NodePosition
 import com.lemline.core.nodes.RootTask
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader
@@ -21,8 +21,8 @@ import org.jetbrains.annotations.TestOnly
 
 object DefinitionCache {
 
-    private val workflowCache = ConcurrentHashMap<WorkflowIndex, Workflow>()
-    private val nodesMapCache = ConcurrentHashMap<WorkflowIndex, Map<NodePosition, Node<*>>>()
+    private val workflowCache = ConcurrentHashMap<WorkflowInfo, Workflow>()
+    private val nodesMapCache = ConcurrentHashMap<WorkflowInfo, Map<NodePosition, Node<*>>>()
 
     private val jsonMapper = LemlineJson.jacksonMapper
     private val yamlMapper = LemlineJson.yamlMapper
@@ -62,12 +62,11 @@ object DefinitionCache {
     fun parseAndPut(definition: String): Workflow =
         try {
             WorkflowReader.validation().read(definition, WorkflowFormat.YAML)
-        } catch (e: Exception) {
-            println(e)
+        } catch (_: Exception) {
             WorkflowReader.validation().read(definition, WorkflowFormat.JSON)
         }.also { workflow ->
-            workflowCache[workflow.index] = workflow
-            nodesMapCache[workflow.index] = getNodesMap(createRootNode(workflow))
+            workflowCache[workflow.info] = workflow
+            nodesMapCache[workflow.info] = getNodesMap(createRootNode(workflow))
         }
 
     /**
@@ -83,7 +82,7 @@ object DefinitionCache {
         namespace: WorkflowNamespace,
         name: WorkflowName,
         version: WorkflowVersion
-    ): Workflow? = workflowCache[WorkflowIndex(namespace, name, version)]
+    ): Workflow? = workflowCache[WorkflowInfo(namespace, name, version)]
 
     /**
      * Retrieves a map of node positions to their corresponding nodes for a given workflow.
@@ -96,8 +95,8 @@ object DefinitionCache {
     @JvmStatic
     fun getNodesMap(
         workflow: Workflow
-    ): Map<NodePosition, Node<*>> = nodesMapCache[workflow.index]
-        ?: throw IllegalStateException("Workflow not found in cache for ${workflow.index}")
+    ): Map<NodePosition, Node<*>> = nodesMapCache[workflow.info]
+        ?: throw IllegalStateException("Workflow not found in cache for ${workflow.info}")
 
 
     /**
@@ -113,11 +112,11 @@ object DefinitionCache {
     fun getRootNode(
         workflow: Workflow
     ): Node<RootTask> {
-        val nodesMap = nodesMapCache[workflow.index]
-            ?: throw IllegalStateException("Nodes map not found in cache for ${workflow.index}")
+        val nodesMap = nodesMapCache[workflow.info]
+            ?: throw IllegalStateException("Nodes map not found in cache for ${workflow.info}")
 
         val rootNode = nodesMap[NodePosition.root]
-            ?: throw IllegalStateException("Root node not found in nodes for ${workflow.index}")
+            ?: throw IllegalStateException("Root node not found in nodes for ${workflow.info}")
 
         @Suppress("UNCHECKED_CAST")
         return rootNode as Node<RootTask>

@@ -103,6 +103,7 @@ internal class BrokerWorkflowTestExecutor : WorkflowTestExecutor {
                         is WorkflowEvent.WorkflowCompleted -> {
                             result = WorkflowTestResult.Success(event.output)
                         }
+
                         is WorkflowEvent.WorkflowFailed -> {
                             val errorMsg = listOfNotNull(event.error.type, event.error.title)
                                 .joinToString(": ")
@@ -111,7 +112,9 @@ internal class BrokerWorkflowTestExecutor : WorkflowTestExecutor {
                                 exception = null
                             )
                         }
-                        else -> { /* Other events don't indicate completion */ }
+
+                        else -> { /* Other events don't indicate completion */
+                        }
                     }
                 }
             }

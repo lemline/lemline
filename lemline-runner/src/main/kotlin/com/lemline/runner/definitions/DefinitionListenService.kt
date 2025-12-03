@@ -5,6 +5,10 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.common.values.name
+import com.lemline.common.values.namespace
+import com.lemline.common.values.version
+import com.lemline.runner.repositories.DefinitionListenFilterRepository
 import com.lemline.runner.repositories.DefinitionListenRepository
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
@@ -12,11 +16,11 @@ import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
 
 /**
- * Service for managing listen task filter definitions extracted from workflows.
+ * Service for managing listen task definitions extracted from workflows.
  *
  * This service provides a high-level interface for:
- * - Extracting and storing listen filters when definitions are created/updated
- * - Removing listen filters when definitions are deleted
+ * - Extracting and storing listen tasks and filters when definitions are created/updated
+ * - Removing listen definitions when definitions are deleted
  * - Keeping the cache in sync with the database
  *
  * ## Usage
@@ -41,28 +45,31 @@ class DefinitionListenService {
     private lateinit var extractor: DefinitionListenExtractor
 
     @Inject
-    private lateinit var repository: DefinitionListenRepository
+    private lateinit var listenRepository: DefinitionListenRepository
+
+    @Inject
+    private lateinit var filterRepository: DefinitionListenFilterRepository
 
     @Inject
     private lateinit var cache: DefinitionListenCache
 
     /**
-     * Extracts listen task filters from a workflow and synchronizes them
+     * Extracts listen tasks and filters from a workflow and synchronizes them
      * to the database and cache.
      *
      * This method:
      * 1. Removes any existing listen definitions for this workflow
-     * 2. Extracts new listen definitions from the workflow
+     * 2. Extracts new listen tasks and filters from the workflow
      * 3. Inserts them into the database
      * 4. Updates the cache
      *
      * @param workflow The parsed workflow definition
-     * @return Number of listen filters extracted and stored
+     * @return Number of listen tasks extracted and stored
      */
     suspend fun syncListenDefinitions(workflow: Workflow): Int {
-        val namespace = WorkflowNamespace(workflow.document.namespace)
-        val name = WorkflowName(workflow.document.name)
-        val version = WorkflowVersion(workflow.document.version)
+        val namespace = workflow.namespace
+        val name = workflow.name
+        val version = workflow.version
 
         logger.debug { "Syncing listen definitions for $namespace/$name:$version" }
 
@@ -70,29 +77,36 @@ class DefinitionListenService {
         removeListenDefinitions(namespace, name, version)
 
         // Extract new definitions
-        val filters = extractor.extract(workflow)
-        if (filters.isEmpty()) {
+        val extractedTasks = extractor.extract(workflow)
+        if (extractedTasks.isEmpty()) {
             logger.debug { "No listen tasks found in $namespace/$name:$version" }
             return 0
         }
 
-        // Insert into database
-        repository.insert(filters)
+        // Insert into database (listen tasks first, then filters)
+        val listenTasks = extractedTasks.map { it.listenTask }
+        val allFilters = extractedTasks.flatMap { it.filters }
+
+        listenRepository.insert(listenTasks)
+        if (allFilters.isNotEmpty()) {
+            filterRepository.insert(allFilters)
+        }
 
         // Update cache
-        cache.addFilters(filters)
+        cache.addExtractedListenTasks(extractedTasks, namespace, name, version)
 
-        logger.info { "Synced ${filters.size} listen filters for $namespace/$name:$version" }
-        return filters.size
+        logger.info { "Synced ${listenTasks.size} listen tasks with ${allFilters.size} filters for $namespace/$name:$version" }
+        return listenTasks.size
     }
 
     /**
      * Removes all listen definitions for a workflow from the database and cache.
+     * Deleting listen tasks will CASCADE to delete associated filters.
      *
      * @param namespace The workflow namespace
      * @param name The workflow name
      * @param version The workflow version
-     * @return Number of filters removed
+     * @return Number of listen tasks removed
      */
     suspend fun removeListenDefinitions(
         namespace: WorkflowNamespace,
@@ -104,11 +118,11 @@ class DefinitionListenService {
         // Remove from cache
         cache.removeByDefinition(namespace, name, version)
 
-        // Remove from database (CASCADE will handle FK references if any)
-        val deleted = repository.deleteByDefinition(namespace, name, version)
+        // Remove from database (CASCADE will delete filters too)
+        val deleted = listenRepository.deleteByDefinition(namespace, name, version)
 
         if (deleted > 0) {
-            logger.debug { "Removed $deleted listen filters for $namespace/$name:$version" }
+            logger.debug { "Removed $deleted listen tasks for $namespace/$name:$version" }
         }
         return deleted
     }

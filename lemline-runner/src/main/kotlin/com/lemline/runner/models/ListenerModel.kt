@@ -4,12 +4,6 @@ package com.lemline.runner.models
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
-import com.lemline.common.values.WorkflowName
-import com.lemline.common.values.WorkflowNamespace
-import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.processors.ListenConfig
-import com.lemline.core.processors.ListenStrategy
-import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
 import kotlin.time.ExperimentalTime
@@ -29,12 +23,12 @@ import kotlinx.serialization.json.jsonPrimitive
  * to wait for external events before continuing execution.
  *
  * The listener stores:
- * - Workflow identity (for resuming the workflow when events match)
- * - Listen configuration (strategy, filters, correlation, timeout)
+ * - Reference to the listen task definition (for strategy, filters, readAs)
+ * - Workflow instance identity (for resuming the workflow when events match)
  * - Progress tracking (accumulated events, matched filter indices)
  * - Outbox fields (for reliable processing and cleanup)
  *
- * ## Strategies
+ * ## Strategies (from listen definition)
  *
  * - **ONE**: Complete on first matching event
  * - **ANY**: Complete on any matching event (or accumulate with `until`)
@@ -46,7 +40,7 @@ import kotlinx.serialization.json.jsonPrimitive
  * For Mode 2 (first-sets-baseline), the first event sets the baseline
  * and subsequent events must match.
  *
- * @see ListenConfig for configuration details
+ * @see DefinitionListenModel for configuration details
  * @see WorkflowEvent.ListenStarted for the triggering event
  */
 @ExperimentalSerializationApi
@@ -55,32 +49,17 @@ data class ListenerModel(
     /** Unique identifier for this listener */
     override val id: IDV7,
 
+    /** Reference to the listen task definition */
+    val listenDefinitionId: IDV7,
+
     /** Workflow instance message containing state for resumption */
     override val instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>,
 
     /** Workflow instance ID (for resuming) */
     val workflowId: WorkflowId,
 
-    /** Workflow definition namespace */
-    override val workflowNamespace: WorkflowNamespace,
-
-    /** Workflow definition name */
-    override val workflowName: WorkflowName,
-
-    /** Workflow definition version */
-    override val workflowVersion: WorkflowVersion,
-
     /** Position of the listen task in the workflow */
     val workflowPosition: NodePosition,
-
-    /** Event consumption strategy */
-    val strategy: ListenStrategy,
-
-    /** How to read event data */
-    val readAs: ListenAndReadAs,
-
-    /** Serialized ListenConfig JSON */
-    val config: String,
 
     /** Timestamp when the listener times out (null = no timeout) */
     val timeoutAt: Instant?,
@@ -133,13 +112,6 @@ data class ListenerModel(
             current.add(index)
         }
         return Json.encodeToString(JsonArray(current.sorted().map { JsonPrimitive(it) }))
-    }
-
-    /**
-     * Parse the listen config from the stored JSON.
-     */
-    fun parseConfig(): ListenConfig {
-        return Json.decodeFromString(config)
     }
 
     companion object Companion

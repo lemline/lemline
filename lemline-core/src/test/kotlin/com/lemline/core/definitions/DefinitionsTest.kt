@@ -4,7 +4,7 @@ package com.lemline.core.definitions
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.common.values.index
+import com.lemline.common.values.info
 import com.lemline.common.values.name
 import com.lemline.common.values.namespace
 import com.lemline.common.values.version
@@ -219,12 +219,12 @@ class DefinitionsTest {
         val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
 
         // When
-        val index = workflow.index
+        val index = workflow.info
 
         // Then
-        index.namespace shouldBe workflow.namespace
-        index.name shouldBe workflow.name
-        index.version shouldBe workflow.version
+        index.workflowNamespace shouldBe workflow.namespace
+        index.workflowName shouldBe workflow.name
+        index.workflowVersion shouldBe workflow.version
 
         // Verify the index is used correctly for caching
         val cachedWorkflow = DefinitionCache.getWorkflow(

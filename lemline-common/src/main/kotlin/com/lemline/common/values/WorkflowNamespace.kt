@@ -10,4 +10,4 @@ value class WorkflowNamespace(private val value: String) {
     override fun toString(): String = value
 }
 
-val Workflow.namespace: WorkflowNamespace get() = WorkflowNamespace(document.namespace)
+val Workflow.namespace get() = WorkflowNamespace(document.namespace)

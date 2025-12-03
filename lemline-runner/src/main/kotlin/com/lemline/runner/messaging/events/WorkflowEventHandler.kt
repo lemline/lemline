@@ -72,6 +72,7 @@ internal class WorkflowEventHandler(
     private val failureRepository: FailureRepository,
     private val forkRepository: ForkRepository,
     private val listenerRepository: ListenerRepository,
+    private val definitionListenRepository: com.lemline.runner.repositories.DefinitionListenRepository,
     private val instanceEmitter: WorkflowCommandEmitter,
     private val starter: Starter,
     override val metrics: WorkflowEventSubscriberMetrics,
@@ -224,8 +225,8 @@ internal class WorkflowEventHandler(
      * Handles ListenStarted events by creating a listener row in the database.
      *
      * The listener stores all data needed for CloudEvent matching:
+     * - Reference to the listen task definition (for strategy, filters, readAs)
      * - Workflow identity (for resuming when events match)
-     * - Listen configuration (strategy, filters, correlation, timeout)
      * - Progress tracking (for ALL strategy and accumulation mode)
      *
      * CloudEvents are processed by a separate handler that queries listeners
@@ -236,18 +237,28 @@ internal class WorkflowEventHandler(
         val config = state.config
         val listenerId = state.nodeStack.deriveIdempotentId("-listen")
 
+        // Find the listen definition for this workflow + position
+        val listenDefinition = definitionListenRepository.findByDefinitionAndPosition(
+            namespace = instance.workflowInfo.workflowNamespace,
+            name = instance.workflowInfo.workflowName,
+            version = instance.workflowInfo.workflowVersion,
+            nodePosition = state.nodePosition
+        ) ?: throw InternalException(
+            InternalException.Error(
+                errorType = com.lemline.core.errors.WorkflowErrorType.RUNTIME,
+                position = state.nodePosition,
+                title = "Listen definition not found",
+                details = "Listen definition not found for ${instance.workflowInfo} at ${state.nodePosition}"
+            )
+        )
+
         // Create listener model
         val listener = ListenerModel(
             id = listenerId,
+            listenDefinitionId = listenDefinition.id,
             instanceMessage = instance,
             workflowId = instance.workflowId,
-            workflowNamespace = instance.workflowInfo.workflowNamespace,
-            workflowName = instance.workflowInfo.workflowName,
-            workflowVersion = instance.workflowInfo.workflowVersion,
             workflowPosition = state.nodePosition,
-            strategy = config.strategy,
-            readAs = config.readAs,
-            config = Json.encodeToString(config),
             timeoutAt = config.timeoutAt,
             outboxScheduledFor = Clock.System.now(),
         )
@@ -259,7 +270,7 @@ internal class WorkflowEventHandler(
         } else {
             logger.debug {
                 "Listen task started: $listenerId for workflow ${instance.workflowId} " +
-                    "at position ${state.nodePosition}, strategy=${config.strategy}"
+                    "at position ${state.nodePosition}, strategy=${listenDefinition.strategy}"
             }
         }
     }

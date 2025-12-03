@@ -42,6 +42,8 @@ const val EVENTS_CONSUMER_ENABLED = "lemline.messaging.events.consumer.enabled"
 const val EVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.events.consumer.concurrency"
 
 const val CLOUDEVENTS_PRODUCER_ENABLED = "lemline.messaging.cloudevents.producer.enabled"
+const val CLOUDEVENTS_CONSUMER_ENABLED = "lemline.messaging.cloudevents.consumer.enabled"
+const val CLOUDEVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.cloudevents.consumer.concurrency"
 
 const val ORCHESTRATOR_MODE = "lemline.orchestrator.mode"
 
@@ -203,11 +205,12 @@ interface LemlineConfiguration {
     }
 
     /**
-     * CloudEvents channel configuration (producer-only).
-     * Used for emitting CloudEvents to external consumers.
+     * CloudEvents channel configuration.
+     * Used for emitting CloudEvents to external systems and consuming CloudEvents for listen tasks.
      */
     interface CloudEventsChannelConfig {
         fun producer(): ProducerConfig
+        fun consumer(): ConsumerConfig
     }
 
     /**
@@ -330,6 +333,7 @@ interface LemlineConfiguration {
         fun wait(): ProcessOutboxConfig
         fun retry(): ProcessOutboxConfig
         fun schedule(): ProcessOutboxConfig
+        fun listener(): Optional<ProcessOutboxConfig>
         fun parent(): CleanupOutboxConfig
         fun fork(): CleanupOutboxConfig
     }

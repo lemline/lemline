@@ -61,6 +61,7 @@ object LemlineConfigConstants {
     const val KAFKA_STRING_DESERIALIZER = "org.apache.kafka.common.serialization.StringDeserializer"
     const val KAFKA_WORKFLOWS_GROUP_ID_DEFAULT = "lemline-group"
     const val KAFKA_DATABASE_GROUP_ID_DEFAULT = "lemline-group"
+    const val KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT = "lemline-cloudevents-group"
 
     // RabbitMQ
     const val RABBITMQ_HOST_DEFAULT = "localhost"

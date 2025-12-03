@@ -2,10 +2,13 @@
 package com.lemline.runner.definitions
 
 import com.lemline.common.logger.logger
+import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.runner.models.DefinitionListenFilterModel
 import com.lemline.runner.models.DefinitionListenModel
+import com.lemline.runner.repositories.DefinitionListenFilterRepository
 import com.lemline.runner.repositories.DefinitionListenRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -14,23 +17,24 @@ import kotlin.time.ExperimentalTime
 import org.jetbrains.annotations.TestOnly
 
 /**
- * Cache for listen filter definitions, optimized for efficient CloudEvent routing.
+ * Cache for listen task and filter definitions, optimized for efficient CloudEvent routing.
  *
- * This cache stores listen filters indexed by:
- * - Event type (most common filter criterion) → fast lookup
+ * This cache stores:
+ * - Listen tasks indexed by ID (for looking up strategy/readAs)
+ * - Filters indexed by event type (most common filter criterion) → fast lookup
  * - Wildcard filters (no type specified) → checked for all events
- * - Definition key (namespace/name/version) → for cache invalidation when definitions change
+ * - Both indexed by definition key (namespace/name/version) → for cache invalidation
  *
  * ## Usage
  *
  * When a CloudEvent arrives:
- * 1. Look up filters by event type: `getByEventType(event.type)`
+ * 1. Look up filters by event type: `getFiltersByEventType(event.type)`
  * 2. Get wildcard filters: `getWildcardFilters()`
- * 3. Match filters against active listeners
+ * 3. For each matching filter, get the listen task: `getListenTask(filter.listenId)`
  *
  * When a definition changes:
- * 1. Remove old filters: `removeByDefinition(namespace, name, version)`
- * 2. Add new filters: `addFilters(newFilters)`
+ * 1. Remove old entries: `removeByDefinition(namespace, name, version)`
+ * 2. Add new entries: `addListenTasks(extractedTasks)`
  *
  * ## Thread Safety
  *
@@ -47,6 +51,9 @@ class DefinitionListenCache {
     @Inject
     private lateinit var definitionListenRepository: DefinitionListenRepository
 
+    @Inject
+    private lateinit var definitionListenFilterRepository: DefinitionListenFilterRepository
+
     /**
      * Key for indexing by definition composite key.
      */
@@ -57,21 +64,35 @@ class DefinitionListenCache {
     )
 
     /**
+     * Listen tasks indexed by ID.
+     */
+    private val listenTasksById = ConcurrentHashMap<IDV7, DefinitionListenModel>()
+
+    /**
      * Filters indexed by event type.
      * Key: event type string, Value: list of filters for that type
      */
-    private val byEventType = ConcurrentHashMap<String, MutableList<DefinitionListenModel>>()
+    private val filtersByEventType = ConcurrentHashMap<String, MutableList<DefinitionListenFilterModel>>()
 
     /**
      * Filters with no event type (wildcards that match any event).
      */
-    private val wildcardFilters = ConcurrentHashMap.newKeySet<DefinitionListenModel>()
+    private val wildcardFilters = ConcurrentHashMap.newKeySet<DefinitionListenFilterModel>()
+
+    /**
+     * Listen tasks indexed by definition key for efficient invalidation.
+     */
+    private val listenTasksByDefinition = ConcurrentHashMap<DefinitionKey, MutableList<DefinitionListenModel>>()
 
     /**
      * Filters indexed by definition key for efficient invalidation.
-     * Key: (namespace, name, version), Value: list of filters for that definition
      */
-    private val byDefinition = ConcurrentHashMap<DefinitionKey, MutableList<DefinitionListenModel>>()
+    private val filtersByDefinition = ConcurrentHashMap<DefinitionKey, MutableList<DefinitionListenFilterModel>>()
+
+    /**
+     * Filters indexed by listen task ID for efficient count lookup (used for ALL strategy).
+     */
+    private val filtersByListenId = ConcurrentHashMap<IDV7, MutableList<DefinitionListenFilterModel>>()
 
     /**
      * Whether the cache has been initialized from the database.
@@ -99,16 +120,47 @@ class DefinitionListenCache {
     }
 
     /**
-     * Loads filters for a specific definition from the database and adds them to the cache.
+     * Loads listen tasks and filters for a specific definition from the database and adds them to the cache.
      */
     suspend fun loadForDefinition(
         namespace: WorkflowNamespace,
         name: WorkflowName,
         version: WorkflowVersion
     ) {
-        val filters = definitionListenRepository.findByDefinition(namespace, name, version)
-        addFilters(filters)
-        logger.debug { "Loaded ${filters.size} listen filters for definition $namespace/$name:$version" }
+        val listenTasks = definitionListenRepository.findByDefinition(namespace, name, version)
+        var totalFilters = 0
+
+        listenTasks.forEach { listenTask ->
+            addListenTask(listenTask, namespace, name, version)
+            val filters = definitionListenFilterRepository.findByListenId(listenTask.id)
+            filters.forEach { filter ->
+                addFilter(filter, namespace, name, version)
+            }
+            totalFilters += filters.size
+        }
+
+        logger.debug { "Loaded ${listenTasks.size} listen tasks with $totalFilters filters for definition $namespace/$name:$version" }
+    }
+
+    /**
+     * Gets a listen task by ID.
+     *
+     * @param listenId The listen task ID
+     * @return The listen task if found, null otherwise
+     */
+    fun getListenTask(listenId: IDV7): DefinitionListenModel? {
+        return listenTasksById[listenId]
+    }
+
+    /**
+     * Gets the total number of filters for a listen task.
+     * Used by ALL strategy to know when all filters have been matched.
+     *
+     * @param listenId The listen task ID
+     * @return The total number of filters for this listen task
+     */
+    fun getFilterCountForListenTask(listenId: IDV7): Int {
+        return filtersByListenId[listenId]?.size ?: 0
     }
 
     /**
@@ -117,8 +169,8 @@ class DefinitionListenCache {
      * @param eventType The CloudEvent type to look up
      * @return List of matching filters (may be empty)
      */
-    fun getByEventType(eventType: String): List<DefinitionListenModel> {
-        return byEventType[eventType]?.toList() ?: emptyList()
+    fun getFiltersByEventType(eventType: String): List<DefinitionListenFilterModel> {
+        return filtersByEventType[eventType]?.toList() ?: emptyList()
     }
 
     /**
@@ -127,7 +179,7 @@ class DefinitionListenCache {
      *
      * @return List of wildcard filters
      */
-    fun getWildcardFilters(): List<DefinitionListenModel> {
+    fun getWildcardFilters(): List<DefinitionListenFilterModel> {
         return wildcardFilters.toList()
     }
 
@@ -138,46 +190,81 @@ class DefinitionListenCache {
      * @param eventType The CloudEvent type
      * @return Combined list of type-specific and wildcard filters
      */
-    fun getPotentialMatches(eventType: String): List<DefinitionListenModel> {
-        val typeFilters = getByEventType(eventType)
+    fun getPotentialMatches(eventType: String): List<DefinitionListenFilterModel> {
+        val typeFilters = getFiltersByEventType(eventType)
         val wildcards = getWildcardFilters()
         return typeFilters + wildcards
     }
 
     /**
+     * Adds extracted listen tasks and their filters to the cache.
+     */
+    fun addExtractedListenTasks(
+        extractedTasks: List<ExtractedListenTask>,
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion
+    ) {
+        extractedTasks.forEach { extracted ->
+            addListenTask(extracted.listenTask, namespace, name, version)
+            extracted.filters.forEach { filter ->
+                addFilter(filter, namespace, name, version)
+            }
+        }
+    }
+
+    /**
+     * Adds a single listen task to the cache.
+     */
+    private fun addListenTask(
+        listenTask: DefinitionListenModel,
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion
+    ) {
+        listenTasksById[listenTask.id] = listenTask
+
+        val key = DefinitionKey(namespace, name, version)
+        listenTasksByDefinition.computeIfAbsent(key) { mutableListOf() }.add(listenTask)
+
+        logger.trace { "Added listen task: id=${listenTask.id}, strategy=${listenTask.strategy}, position=${listenTask.nodePosition}" }
+    }
+
+    /**
      * Adds a single filter to the cache.
      */
-    fun addFilter(filter: DefinitionListenModel) {
+    private fun addFilter(
+        filter: DefinitionListenFilterModel,
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion
+    ) {
         // Index by event type or add to wildcards
         val eventType = filter.eventType
         if (eventType != null) {
-            byEventType.computeIfAbsent(eventType) { mutableListOf() }.add(filter)
+            filtersByEventType.computeIfAbsent(eventType) { mutableListOf() }.add(filter)
         } else {
             wildcardFilters.add(filter)
         }
 
         // Index by definition key for invalidation
-        val key = DefinitionKey(filter.workflowNamespace, filter.workflowName, filter.workflowVersion)
-        byDefinition.computeIfAbsent(key) { mutableListOf() }.add(filter)
+        val key = DefinitionKey(namespace, name, version)
+        filtersByDefinition.computeIfAbsent(key) { mutableListOf() }.add(filter)
 
-        logger.trace { "Added listen filter: type=${filter.eventType}, position=${filter.nodePosition}" }
+        // Index by listen task ID for filter count lookup (used by ALL strategy)
+        filtersByListenId.computeIfAbsent(filter.listenId) { mutableListOf() }.add(filter)
+
+        logger.trace { "Added listen filter: type=${filter.eventType}, listenId=${filter.listenId}" }
     }
 
     /**
-     * Adds multiple filters to the cache.
-     */
-    fun addFilters(filters: List<DefinitionListenModel>) {
-        filters.forEach { addFilter(it) }
-    }
-
-    /**
-     * Removes all filters for a specific definition.
+     * Removes all listen tasks and filters for a specific definition.
      * Call this when a definition is deleted or updated.
      *
      * @param namespace The workflow namespace
      * @param name The workflow name
      * @param version The workflow version
-     * @return Number of filters removed
+     * @return Number of listen tasks removed
      */
     fun removeByDefinition(
         namespace: WorkflowNamespace,
@@ -185,15 +272,21 @@ class DefinitionListenCache {
         version: WorkflowVersion
     ): Int {
         val key = DefinitionKey(namespace, name, version)
-        val filters = byDefinition.remove(key) ?: return 0
 
-        // Remove from type index and wildcards
+        // Remove listen tasks
+        val listenTasks = listenTasksByDefinition.remove(key) ?: emptyList()
+        listenTasks.forEach { listenTask ->
+            listenTasksById.remove(listenTask.id)
+        }
+
+        // Remove filters
+        val filters = filtersByDefinition.remove(key) ?: emptyList()
         filters.forEach { filter ->
             val eventType = filter.eventType
             if (eventType != null) {
-                byEventType[eventType]?.remove(filter)
+                filtersByEventType[eventType]?.remove(filter)
                 // Clean up empty lists
-                byEventType.computeIfPresent(eventType) { _, list ->
+                filtersByEventType.computeIfPresent(eventType) { _, list ->
                     if (list.isEmpty()) null else list
                 }
             } else {
@@ -201,35 +294,55 @@ class DefinitionListenCache {
             }
         }
 
-        logger.debug { "Removed ${filters.size} listen filters for definition $namespace/$name:$version" }
-        return filters.size
+        logger.debug { "Removed ${listenTasks.size} listen tasks and ${filters.size} filters for definition $namespace/$name:$version" }
+        return listenTasks.size
+    }
+
+    /**
+     * Gets all listen tasks for a specific definition.
+     * Useful for debugging and testing.
+     */
+    fun getListenTasksByDefinition(
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion
+    ): List<DefinitionListenModel> {
+        val key = DefinitionKey(namespace, name, version)
+        return listenTasksByDefinition[key]?.toList() ?: emptyList()
     }
 
     /**
      * Gets all filters for a specific definition.
      * Useful for debugging and testing.
      */
-    fun getByDefinition(
+    fun getFiltersByDefinition(
         namespace: WorkflowNamespace,
         name: WorkflowName,
         version: WorkflowVersion
-    ): List<DefinitionListenModel> {
+    ): List<DefinitionListenFilterModel> {
         val key = DefinitionKey(namespace, name, version)
-        return byDefinition[key]?.toList() ?: emptyList()
+        return filtersByDefinition[key]?.toList() ?: emptyList()
     }
 
     /**
      * Checks if any filters exist for a given event type.
      */
     fun hasFiltersForType(eventType: String): Boolean {
-        return byEventType.containsKey(eventType)
+        return filtersByEventType.containsKey(eventType)
     }
 
     /**
      * Returns the total number of filters in the cache.
      */
-    fun size(): Int {
-        return byDefinition.values.sumOf { it.size }
+    fun filterCount(): Int {
+        return filtersByDefinition.values.sumOf { it.size }
+    }
+
+    /**
+     * Returns the total number of listen tasks in the cache.
+     */
+    fun listenTaskCount(): Int {
+        return listenTasksById.size
     }
 
     /**
@@ -237,24 +350,55 @@ class DefinitionListenCache {
      */
     @TestOnly
     fun clear() {
-        byEventType.clear()
+        listenTasksById.clear()
+        filtersByEventType.clear()
         wildcardFilters.clear()
-        byDefinition.clear()
+        listenTasksByDefinition.clear()
+        filtersByDefinition.clear()
+        filtersByListenId.clear()
         initialized = false
         logger.debug { "DefinitionListenCache cleared" }
+    }
+
+    /**
+     * Adds a filter to the cache for testing purposes.
+     */
+    @TestOnly
+    fun addFilterForTesting(
+        filter: DefinitionListenFilterModel,
+        namespace: WorkflowNamespace = WorkflowNamespace("test"),
+        name: WorkflowName = WorkflowName("test"),
+        version: WorkflowVersion = WorkflowVersion("1.0.0")
+    ) {
+        addFilter(filter, namespace, name, version)
+    }
+
+    /**
+     * Adds a listen task to the cache for testing purposes.
+     */
+    @TestOnly
+    fun addListenTaskForTesting(
+        listenTask: DefinitionListenModel,
+        namespace: WorkflowNamespace = listenTask.workflowNamespace,
+        name: WorkflowName = listenTask.workflowName,
+        version: WorkflowVersion = listenTask.workflowVersion
+    ) {
+        addListenTask(listenTask, namespace, name, version)
     }
 
     /**
      * Gets statistics about the cache for monitoring.
      */
     fun getStats(): CacheStats = CacheStats(
-        totalFilters = size(),
-        eventTypes = byEventType.keys.toSet(),
+        totalListenTasks = listenTaskCount(),
+        totalFilters = filterCount(),
+        eventTypes = filtersByEventType.keys.toSet(),
         wildcardCount = wildcardFilters.size,
-        definitionCount = byDefinition.size
+        definitionCount = listenTasksByDefinition.size
     )
 
     data class CacheStats(
+        val totalListenTasks: Int,
         val totalFilters: Int,
         val eventTypes: Set<String>,
         val wildcardCount: Int,

@@ -18,7 +18,6 @@ import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.processors.RunWorkflowConfig
 import com.lemline.core.processors.UntilCondition
 import com.lemline.core.processors.WaitConfig
-import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import com.lemline.core.states.DoState
 import com.lemline.core.states.ForState
 import com.lemline.core.states.ForkState
@@ -38,6 +37,7 @@ import com.lemline.core.states.WorkflowState
 import com.lemline.core.workflows.FlowDirective
 import com.lemline.core.workflows.FlowDirectiveEnum
 import com.lemline.core.workflows.FlowDirectiveGoto
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.milliseconds
@@ -379,6 +379,7 @@ fun randomListenConfig() = ListenConfig(
             put("input", JsonElement.random())
             put("context", buildJsonObject { put(String.random(), JsonElement.random()) })
         }
+
         false -> null
     }
 )

@@ -10,4 +10,4 @@ value class WorkflowVersion(private val value: String) {
     override fun toString(): String = value
 }
 
-val Workflow.version: WorkflowVersion get() = WorkflowVersion(document.version)
+val Workflow.version get() = WorkflowVersion(document.version)
