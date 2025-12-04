@@ -81,6 +81,7 @@ interface LemlineConfiguration {
     fun orchestrator(): OrchestratorConfig
     fun outbox(): OutboxConfig
     fun metrics(): MetricsConfig
+    fun definitions(): Optional<DefinitionsConfig>
 
     /**
      * Database configuration mapping.
@@ -458,5 +459,27 @@ interface LemlineConfiguration {
         ACTION,
         /** Emits a message for every task including control flow nodes */
         ALL
+    }
+
+    /**
+     * Definitions management configuration.
+     */
+    interface DefinitionsConfig {
+        fun cache(): Optional<DefinitionsCacheConfig>
+    }
+
+    /**
+     * Definition cache configuration.
+     * Controls behavior of the definition cache sync process.
+     */
+    interface DefinitionsCacheConfig {
+        /**
+         * Interval for syncing definitions from database to cache.
+         * Default: 10s
+         */
+        @WithDefault("10s")
+        fun syncEvery(): String
+
+        val syncEvery get() = syncEvery().toDuration()
     }
 }

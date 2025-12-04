@@ -2,7 +2,6 @@
 package com.lemline.runner.outbox
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.common.logger.logger
 import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.runner.config.LemlineConfiguration
@@ -10,27 +9,14 @@ import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.repositories.ListenerRepository
-import io.quarkus.runtime.ShutdownEvent
+import com.lemline.runner.scheduled.AbstractScheduledTask
 import io.quarkus.runtime.Startup
-import jakarta.annotation.PostConstruct
 import jakarta.enterprise.context.ApplicationScoped
-import jakarta.enterprise.event.Observes
 import jakarta.inject.Inject
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.jvm.optionals.getOrNull
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
@@ -50,8 +36,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class ListenerTimeoutOutbox {
-    private val logger = logger()
+internal class ListenerTimeoutOutbox : AbstractScheduledTask() {
 
     @Inject
     private lateinit var lemlineConfig: LemlineConfiguration
@@ -62,71 +47,29 @@ internal class ListenerTimeoutOutbox {
     @Inject
     private lateinit var commandEmitter: WorkflowCommandEmitter
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
-    private val processingExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
-    private val processing = AtomicBoolean(false)
-    private val isShuttingDown = AtomicBoolean(false)
-
-    private val gracePeriod = 5000L
+    override val taskName = "Listener timeout processor"
 
     /** Is this processor enabled? */
-    private val enabled by lazy {
+    override val enabled by lazy {
         lemlineConfig.outbox().listener().getOrNull()?.enabled()?.getOrNull()
             ?: lemlineConfig.outbox().enabled().getOrNull()
             ?: lemlineConfig.messaging().commands().getOrNull()?.consumer()?.enabled() ?: false
     }
 
-    /** Processing configuration */
-    private val processingConf by lazy {
-        lemlineConfig.outbox().listener().getOrNull()?.outbox()
+    /** Processing interval */
+    override val interval: Duration by lazy {
+        lemlineConfig.outbox().listener().getOrNull()?.outbox()?.every ?: 10.seconds
     }
 
-    @PostConstruct
-    fun init() {
-        if (!enabled) {
-            logger.debug { "🚫 Listener timeout processor disabled by config" }
-            return
-        }
-
-        processingConf?.every?.inWholeSeconds?.let { period ->
-            processingExecutor.scheduleAtFixedRate(
-                { scope.launch { processTimeouts() } },
-                0,
-                period,
-                TimeUnit.SECONDS
-            )
-            logger.info { "⏱️ Listener timeout processing scheduled every ${period}s" }
-        }
-    }
-
-    /**
-     * Process timed-out listeners.
-     */
-    private suspend fun processTimeouts() {
-        if (isShuttingDown.get()) {
-            logger.debug { "⏹️ Skipping timeout processing: shutdown in progress" }
-            return
-        }
-
-        if (!processing.compareAndSet(false, true)) {
-            logger.warn { "⏭ Skipping scheduled timeout processing: previous execution still running" }
-            return
-        }
-
-        try {
-            doProcessTimeouts()
-        } catch (e: Exception) {
-            logger.error(e) { "💥 Error during listener timeout processing" }
-        } finally {
-            processing.set(false)
-        }
+    /** Batch size for processing */
+    private val batchSize by lazy {
+        lemlineConfig.outbox().listener().getOrNull()?.outbox()?.batchSize ?: 100
     }
 
     /**
      * Find and process timed-out listeners in batches.
      */
-    private suspend fun doProcessTimeouts() {
-        val batchSize = processingConf?.batchSize ?: 100
+    override suspend fun doWork() {
         var totalProcessed = 0
         var batchNumber = 0
 
@@ -194,52 +137,6 @@ internal class ListenerTimeoutOutbox {
         logger.info {
             "Listener ${listener.id} timed out for workflow ${listener.workflowId} " +
                 "at position ${listener.workflowPosition}"
-        }
-    }
-
-    fun onQuarkusShutdown(@Observes event: ShutdownEvent) {
-        logger.info { "🛑 ShutdownEvent received - initiating graceful shutdown" }
-        performGracefulShutdown(gracePeriod)
-    }
-
-    private fun performGracefulShutdown(timeoutMs: Long) {
-        if (!isShuttingDown.compareAndSet(false, true)) {
-            logger.info { "🛑 Shutdown already in progress - ignoring" }
-            return
-        }
-
-        logger.info { "🛑 Shutting down listener timeout processor..." }
-
-        // Shutdown executor
-        try {
-            processingExecutor.shutdown()
-            if (!processingExecutor.awaitTermination(gracePeriod, TimeUnit.MILLISECONDS)) {
-                logger.warn { "⚠️ Forcing shutdown of timeout processing executor" }
-                processingExecutor.shutdownNow()
-            } else {
-                logger.info { "✅ Timeout processing executor stopped gracefully" }
-            }
-        } catch (_: InterruptedException) {
-            logger.error { "💥 Interrupted while shutting down timeout processing executor" }
-            processingExecutor.shutdownNow()
-            Thread.currentThread().interrupt()
-        }
-
-        // Wait for active coroutines to complete
-        try {
-            runBlocking {
-                withTimeout(timeoutMs) {
-                    scope.coroutineContext.job.children.forEach { it.join() }
-                }
-                logger.info { "✅ All timeout processing tasks completed" }
-            }
-        } catch (_: TimeoutCancellationException) {
-            logger.warn { "⚠️ Graceful shutdown timed out with tasks still being processed" }
-        } catch (e: Exception) {
-            logger.error(e) { "💥 Error during graceful shutdown" }
-        } finally {
-            scope.cancel()
-            logger.info { "🏁 Listener timeout processor scope cancelled" }
         }
     }
 }
