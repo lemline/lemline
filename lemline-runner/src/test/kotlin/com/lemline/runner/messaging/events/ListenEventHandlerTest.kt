@@ -18,6 +18,7 @@ import com.lemline.core.states.RootState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.kotest.matchers.shouldBe
@@ -101,12 +102,16 @@ internal class ListenEventHandlerTest {
         workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
 
         // Then
-        val listeners = listenerRepository.findByWorkflowAndPositionWithCorrelation(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
-            position = testNodePosition,
-            correlationValuesJson = null
+        val listeners = listenerRepository.findByKeys(
+            listOf(
+                ListenerQueryKey(
+                    namespace = testNamespace,
+                    name = testName,
+                    version = testVersion,
+                    position = testNodePosition,
+                    correlationValuesJson = null
+                )
+            )
         )
 
         listeners.size shouldBe 1
@@ -136,12 +141,16 @@ internal class ListenEventHandlerTest {
         workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
 
         // Then
-        val listeners = listenerRepository.findByWorkflowAndPositionWithCorrelation(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
-            position = testNodePosition,
-            correlationValuesJson = null
+        val listeners = listenerRepository.findByKeys(
+            listOf(
+                ListenerQueryKey(
+                    namespace = testNamespace,
+                    name = testName,
+                    version = testVersion,
+                    position = testNodePosition,
+                    correlationValuesJson = null
+                )
+            )
         )
 
         listeners.size shouldBe 1
@@ -168,12 +177,16 @@ internal class ListenEventHandlerTest {
         workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
 
         // Then - only one row
-        val listeners = listenerRepository.findByWorkflowAndPositionWithCorrelation(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
-            position = testNodePosition,
-            correlationValuesJson = null
+        val listeners = listenerRepository.findByKeys(
+            listOf(
+                ListenerQueryKey(
+                    namespace = testNamespace,
+                    name = testName,
+                    version = testVersion,
+                    position = testNodePosition,
+                    correlationValuesJson = null
+                )
+            )
         )
         listeners.size shouldBe 1
     }

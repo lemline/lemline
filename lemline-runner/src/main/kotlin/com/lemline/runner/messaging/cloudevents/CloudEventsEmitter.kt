@@ -34,7 +34,7 @@ internal class CloudEventsEmitter {
     private val logger = logger()
 
     @Channel(CLOUDEVENTS_OUT_CHANNEL)
-    lateinit var emitter: MutinyEmitter<String>
+    private lateinit var emitter: MutinyEmitter<String>
 
     private val jsonFormat = JsonFormat()
 

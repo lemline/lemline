@@ -2,7 +2,6 @@
 package com.lemline.runner.testcases
 
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
@@ -16,13 +15,12 @@ import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
-import com.lemline.runner.messaging.commands.WorkflowCommandHandler
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
-import com.lemline.runner.messaging.events.WorkflowEventHandler
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.repositories.DefinitionRepository
+import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.cloudevents.core.builder.CloudEventBuilder
@@ -75,12 +73,6 @@ internal class ListenTaskEndToEndTest {
 
     @Inject
     lateinit var definitionListenService: DefinitionListenService
-
-    @Inject
-    lateinit var commandHandler: WorkflowCommandHandler
-
-    @Inject
-    lateinit var eventHandler: WorkflowEventHandler
 
     @Inject
     @Any
@@ -155,8 +147,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered in database
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(200) // Allow time for database write
+        delay(200) // Allow time for database write
         val listeners = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listeners.size shouldBe 1
 
@@ -167,8 +158,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow time for CloudEvent processing
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(500)
+        delay(500)
 
         // Verify listener was completed by CloudEvent processing
         val listenersAfterEvent = findListenersByWorkflow(testNamespace, workflowName, testVersion)
@@ -218,8 +208,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(200)
+        delay(200)
         val listeners = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listeners.size shouldBe 1
 
@@ -230,8 +219,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow time for CloudEvent processing
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(500)
+        delay(500)
 
         // Process until workflow completes
         val result = processUntilCompletion(workflowId)
@@ -275,8 +263,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(200)
+        delay(200)
         val listenersBeforeEvents = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listenersBeforeEvents.size shouldBe 1
 
@@ -287,8 +274,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow processing
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(300)
+        delay(300)
 
         // Workflow should NOT be complete yet - listener still active
         processMessages(workflowId, maxIterations = 20)
@@ -303,8 +289,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow time for CloudEvent processing
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(500)
+        delay(500)
 
         // Process until workflow completes
         val result = processUntilCompletion(workflowId)
@@ -344,8 +329,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(200)
+        delay(200)
         val listenersInitial = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listenersInitial.size shouldBe 1
 
@@ -356,8 +340,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow processing
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(300)
+        delay(300)
 
         // Process messages
         processMessages(workflowId, maxIterations = 20)
@@ -402,8 +385,7 @@ internal class ListenTaskEndToEndTest {
         listenStarted2 shouldNotBe null
 
         // Verify both listeners are registered
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(300)
+        delay(300)
         val listeners = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listeners.size shouldBe 2
 
@@ -414,8 +396,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow time for CloudEvent processing
-        @Suppress("BlockingMethodInNonBlockingContext")
-        Thread.sleep(500)
+        delay(500)
 
         // Process until both complete
         val result1 = processUntilCompletion(workflowId1)
@@ -444,8 +425,8 @@ internal class ListenTaskEndToEndTest {
             ?: return emptyList()
 
         val listenTasks = definitionListenService.extractListenTasks(workflow)
-        return listenTasks.flatMap { listenTask ->
-            listenerRepository.findByWorkflowAndPositionWithCorrelation(
+        val keys = listenTasks.map { listenTask ->
+            ListenerQueryKey(
                 namespace = namespace,
                 name = name,
                 version = version,
@@ -453,6 +434,7 @@ internal class ListenTaskEndToEndTest {
                 correlationValuesJson = null
             )
         }
+        return listenerRepository.findByKeys(keys)
     }
 
     private suspend fun registerWorkflow(yaml: String, name: WorkflowName) {
@@ -582,9 +564,8 @@ internal class ListenTaskEndToEndTest {
                 if (emptyIterations > maxEmptyIterations) {
                     break
                 }
-                // Use Thread.sleep to allow real async processing
-                @Suppress("BlockingMethodInNonBlockingContext")
-                Thread.sleep(50)
+                // Use delay to allow real async processing
+                delay(50)
             } else {
                 emptyIterations = 0
             }
