@@ -81,7 +81,7 @@ abstract class AbstractScheduledTask {
 
     private val executor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     private val isRunning = AtomicBoolean(false)
-    private val isShuttingDown = AtomicBoolean(false)
+    protected val isShuttingDown = AtomicBoolean(false)
 
     /**
      * The work to perform on each scheduled execution.
@@ -96,6 +96,13 @@ abstract class AbstractScheduledTask {
             return
         }
 
+        scheduleTask()
+    }
+
+    /**
+     * Schedules the main task. Can be overridden by subclasses to add additional scheduling.
+     */
+    protected open fun scheduleTask() {
         val intervalSeconds = interval.inWholeSeconds
         executor.scheduleAtFixedRate(
             { scope.launch { execute() } },
@@ -144,22 +151,24 @@ abstract class AbstractScheduledTask {
 
         logger.debug { "Shutting down $taskName..." }
 
-        // Shutdown executor
-        try {
-            executor.shutdown()
-            if (!executor.awaitTermination(gracePeriod, TimeUnit.MILLISECONDS)) {
-                logger.warn { "Forcing shutdown of $taskName executor" }
-                executor.shutdownNow()
-            } else {
-                logger.debug { "$taskName executor stopped gracefully" }
-            }
-        } catch (_: InterruptedException) {
-            logger.error { "Interrupted while shutting down $taskName executor" }
-            executor.shutdownNow()
-            Thread.currentThread().interrupt()
-        }
+        // Shutdown executors - can be overridden to shutdown additional executors
+        shutdownExecutors()
 
         // Wait for active coroutines to complete
+        gracefulWaitForCompletion()
+    }
+
+    /**
+     * Shuts down executors. Can be overridden by subclasses to shutdown additional executors.
+     */
+    protected open fun shutdownExecutors() {
+        shutdownExecutor(executor, taskName)
+    }
+
+    /**
+     * Waits for active coroutines to complete within the grace period.
+     */
+    protected fun gracefulWaitForCompletion() {
         try {
             runBlocking {
                 withTimeout(gracePeriod) {
@@ -174,6 +183,29 @@ abstract class AbstractScheduledTask {
         } finally {
             scope.cancel()
             logger.debug { "$taskName scope cancelled" }
+        }
+    }
+
+    /**
+     * Shuts down the given ScheduledExecutorService in a controlled manner.
+     *
+     * This method attempts to stop the executor gracefully within the grace period, and if
+     * this fails, it forces the termination of all tasks.
+     */
+    protected fun shutdownExecutor(executor: ScheduledExecutorService, name: String) {
+        try {
+            executor.shutdown()
+
+            if (!executor.awaitTermination(gracePeriod, TimeUnit.MILLISECONDS)) {
+                logger.warn { "Forcing shutdown of $name executor" }
+                executor.shutdownNow()
+            } else {
+                logger.debug { "$name executor stopped gracefully" }
+            }
+        } catch (_: InterruptedException) {
+            logger.error { "Interrupted while shutting down $name executor" }
+            executor.shutdownNow()
+            Thread.currentThread().interrupt()
         }
     }
 }

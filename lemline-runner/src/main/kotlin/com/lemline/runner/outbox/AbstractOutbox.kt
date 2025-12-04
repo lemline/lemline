@@ -23,13 +23,12 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import org.jetbrains.annotations.VisibleForTesting
 
 /**
- * AbstractRelay provides base functionality for outbox pattern implementations.
- * It extends AbstractCleaner to inherit cleanup scheduling and shutdown logic,
- * and adds processing functionality for pending messages.
+ * AbstractOutbox provides base functionality for outbox pattern implementations.
  *
- * It handles scheduling and execution of processing pending messages and sending
- * them to the workflow output channel. Cleanup of old sent messages is handled
- * by the parent AbstractCleaner class.
+ * It extends [AbstractCleaner] to inherit cleanup scheduling and adds processing
+ * functionality for pending messages. This class manages TWO scheduled tasks:
+ * 1. **Outbox processing** - sends pending messages from the database
+ * 2. **Cleanup** - removes old completed/failed messages (inherited from AbstractCleaner)
  *
  * The class uses a scheduled approach with configurable intervals for processing.
  * It ensures thread safety by using SKIP concurrent execution strategy, preventing
@@ -66,7 +65,7 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
     @PostConstruct
     override fun init() {
         if (!enabled) {
-            logger.debug { "🚫 Outbox disabled by config" }
+            logger.debug { "Outbox disabled by config" }
             return
         }
 
@@ -78,11 +77,11 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
                 period,
                 TimeUnit.SECONDS
             )
-            logger.info { "⏱️ Outbox processing scheduled every ${period}s" }
+            logger.info { "Outbox processing scheduled every ${period}s" }
         }
 
-        // Schedule cleanup (inherited from AbstractCleaner)
-        scheduleCleanup()
+        // Schedule cleanup (inherited from AbstractCleaner via AbstractScheduledTask)
+        scheduleTask()
     }
 
     /**
@@ -90,7 +89,7 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
      * Cleanup executor is shut down by the parent class.
      */
     override fun shutdownExecutors() {
-        shutdownExecutor(outboxProcessingExecutor, "processing")
+        shutdownExecutor(outboxProcessingExecutor, "outbox processing")
         super.shutdownExecutors() // Shutdown cleanup executor
     }
 
@@ -100,12 +99,12 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
      */
     private suspend fun outbox() {
         if (isShuttingDown.get()) {
-            logger.debug { "⏹️ Skipping relay processing: shutdown in progress" }
+            logger.debug { "Skipping outbox processing: shutdown in progress" }
             return
         }
 
         if (!outboxProcessing.compareAndSet(false, true)) {
-            logger.warn { "⏭ Skipping scheduled relay processing: previous execution still running" }
+            logger.warn { "Skipping scheduled outbox processing: previous execution still running" }
             return
         }
 
@@ -116,7 +115,7 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
                 initialDelay = outboxConf!!.initialDelay,
             )
         } catch (e: Exception) {
-            logger.error(e) { "💥 Error during relay processing" }
+            logger.error(e) { "Error during outbox processing" }
         } finally {
             outboxProcessing.set(false)
         }
@@ -172,7 +171,7 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
 
         logBatches(totalProcessed, totalToProcess, batchNumber, "processed")
     } catch (e: Exception) {
-        logger.error(e) { "💥Error during scheduled relay processing" }
+        logger.error(e) { "Error during scheduled outbox processing" }
         // Don't throw the exception to prevent scheduler from stopping
         // The next scheduled run will try again
     }
