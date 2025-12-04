@@ -8,6 +8,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.ListenStrategy
@@ -15,10 +16,8 @@ import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.DefinitionListenModel
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.models.ListenerModel
-import com.lemline.runner.repositories.DefinitionListenRepository
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.ListenerRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
@@ -52,57 +51,42 @@ internal class ListenerTimeoutOutboxTest {
     lateinit var listenerRepository: ListenerRepository
 
     @Inject
-    lateinit var definitionListenRepository: DefinitionListenRepository
-
-    @Inject
     lateinit var definitionRepository: DefinitionRepository
 
     private val testNamespace = WorkflowNamespace("test-namespace")
     private val testName = WorkflowName("test-workflow")
     private val testVersion = WorkflowVersion("1.0.0")
 
-    // Use a fixed ID that will be created in setup
-    private val listenDefinitionId = IDV7.random()
-
     @BeforeEach
     fun setup() = runTest {
         listenerRepository.deleteAll()
-        definitionListenRepository.deleteAll()
+        DefinitionCache.clear()
 
-        // Create definition and listen definition (required for foreign key)
+        // Create definition (for cache lookup during listener processing)
+        val definition = """
+            document:
+              dsl: '1.0.0'
+              namespace: $testNamespace
+              name: $testName
+              version: '$testVersion'
+            do:
+              - listenTask:
+                  listen:
+                    to:
+                      one:
+                        with:
+                          type: com.example.TestEvent
+        """.trimIndent()
+
         definitionRepository.insert(
             DefinitionModel(
                 namespace = testNamespace,
                 name = testName,
                 version = testVersion,
-                definition = """
-                    document:
-                      dsl: '1.0.0'
-                      namespace: $testNamespace
-                      name: $testName
-                      version: '$testVersion'
-                    do:
-                      - listenTask:
-                          listen:
-                            to:
-                              one:
-                                with:
-                                  type: com.example.TestEvent
-                """.trimIndent()
+                definition = definition
             )
         )
-
-        definitionListenRepository.insert(
-            DefinitionListenModel(
-                id = listenDefinitionId,
-                workflowNamespace = testNamespace,
-                workflowName = testName,
-                workflowVersion = testVersion,
-                nodePosition = NodePosition("/do/listenTask"),
-                strategy = ListenStrategy.ONE,
-                readAs = ListenAndReadAs.DATA
-            )
-        )
+        DefinitionCache.parseAndPut(definition)
     }
 
     @Test
@@ -264,7 +248,9 @@ internal class ListenerTimeoutOutboxTest {
 
         return ListenerModel(
             id = listenerId,
-            listenDefinitionId = listenDefinitionId, // Use the actual listen definition ID
+            workflowNamespace = testNamespace,
+            workflowName = testName,
+            workflowVersion = testVersion,
             instanceMessage = InstanceMessage(
                 workflowInfo = WorkflowInfo(
                     workflowNamespace = testNamespace,

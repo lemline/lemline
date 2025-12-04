@@ -7,8 +7,10 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.cli.exceptions.CliException
+import com.lemline.runner.definitions.DefinitionService
 import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.repositories.DefinitionRepository
+import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import kotlinx.coroutines.runBlocking
@@ -19,6 +21,8 @@ import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 
 @Unremovable
+@ExperimentalTime
+@ExperimentalSerializationApi
 @Command(
     name = "delete",
     description = [
@@ -37,7 +41,7 @@ open class DefinitionDeleteCommand : Runnable {
     lateinit var mixin: GlobalMixin
 
     @Inject
-    lateinit var definitionRepository: DefinitionRepository
+    lateinit var definitionService: DefinitionService
 
     @Inject // Inject the selector
     lateinit var selector: InteractiveWorkflowSelector
@@ -166,58 +170,66 @@ open class DefinitionDeleteCommand : Runnable {
         }
     }
 
-    // --- Methods used for BOTH Forced & Intercative Deletion --- //
+    // --- Methods used for BOTH Forced & Interactive Deletion --- //
 
     private suspend fun deleteAllWorkflowsInNamespace() {
-        val workflowCount = definitionRepository.countAllInNamespace(workflowNamespace)
+        // Preview count for confirmation
+        val workflowCount = definitionService.countAllInNamespace(workflowNamespace)
         if (workflowCount == 0L) {
             println("No workflows found to delete.")
             return
         }
-        val subject = "ALL $workflowCount workflows"
-        if (!confirmDeletion(subject)) return
+        if (!confirmDeletion("ALL $workflowCount workflows")) return
 
-        val deletedCount = definitionRepository.deleteAllInNamespace(workflowNamespace)
-        println("Successfully deleted $deletedCount workflows." + if (force) " (forced)" else "")
+        when (val result = definitionService.deleteAllInNamespace(workflowNamespace)) {
+            is DefinitionService.DeleteResult.Deleted ->
+                println("Successfully deleted ${result.count} workflows." + if (force) " (forced)" else "")
+            is DefinitionService.DeleteResult.NotFound ->
+                println(result.message)
+        }
     }
 
     private suspend fun deleteAllVersionsByNameInNamespace(workflowName: WorkflowName): Boolean {
-        val workflowsToDelete = definitionRepository.listByName(workflowNamespace, workflowName)
+        // Preview versions for confirmation
+        val workflowsToDelete = definitionService.listByName(workflowNamespace, workflowName)
         if (workflowsToDelete.isEmpty()) {
             println("No workflows found with name '$workflowName'.")
             return false
         }
         val versionsString = workflowsToDelete.joinToString { it.version.toString() }
-        val subject = "all ${workflowsToDelete.size} versions ($versionsString) of workflow '$workflowName'"
-        if (!confirmDeletion(subject)) return false
-
-        val deletedCount = definitionRepository.delete(workflowsToDelete)
-        if (deletedCount == workflowsToDelete.size) {
-            println("Successfully deleted $deletedCount versions of workflow '$workflowName'." + if (force) " (forced)" else "")
-            return true
-        } else {
-            System.err.println("Warning: Expected to delete ${workflowsToDelete.size} workflows, but deleted $deletedCount.")
+        if (!confirmDeletion("all ${workflowsToDelete.size} versions ($versionsString) of workflow '$workflowName'")) {
             return false
+        }
+
+        return when (val result = definitionService.deleteAllVersions(workflowNamespace, workflowName)) {
+            is DefinitionService.DeleteResult.Deleted -> {
+                println("Successfully deleted ${result.details}." + if (force) " (forced)" else "")
+                true
+            }
+            is DefinitionService.DeleteResult.NotFound -> {
+                println(result.message)
+                false
+            }
         }
     }
 
     private suspend fun deleteSpecificVersion(name: WorkflowName, version: WorkflowVersion): Boolean {
-        val workflowToDelete = definitionRepository.findByNameAndVersion(workflowNamespace, name, version)
-            ?: run {
-                println("Workflow '$name' version '$version' not found.")
-                return false
-            }
-
-        val subject = "workflow '$name' version '$version'"
-        if (!confirmDeletion(subject)) return false // confirmDeletion handles 'force'
-
-        val deletedCount = definitionRepository.delete(workflowToDelete)
-        if (deletedCount == 1) {
-            println("Successfully deleted workflow '$name' version '$version'." + if (force) " (forced)" else "")
-            return true
-        } else {
-            System.err.println("Warning: Expected to delete '$name' version '$version'. Deleted concurrently?")
+        // Preview for confirmation
+        if (definitionService.findByNameAndVersion(workflowNamespace, name, version) == null) {
+            println("Workflow '$name' version '$version' not found.")
             return false
+        }
+        if (!confirmDeletion("workflow '$name' version '$version'")) return false
+
+        return when (val result = definitionService.delete(workflowNamespace, name, version)) {
+            is DefinitionService.DeleteResult.Deleted -> {
+                println("Successfully deleted ${result.details}." + if (force) " (forced)" else "")
+                true
+            }
+            is DefinitionService.DeleteResult.NotFound -> {
+                System.err.println("Warning: ${result.message}")
+                false
+            }
         }
     }
 
@@ -235,28 +247,31 @@ open class DefinitionDeleteCommand : Runnable {
             "all $count listed workflows"
         }
 
-        if (confirmDeletion(subject)) { // Will prompt user as force is false
-            try {
-                val deletedCount = if (filterName == null) {
-                    // If no filter was applied, '*' means delete absolutely all
-                    definitionRepository.deleteAllInNamespace(workflowNamespace)
-                } else {
-                    // If a name filter was applied, '*' means delete all versions of that name
-                    definitionRepository.delete(workflowsToDelete)
-                }
+        if (!confirmDeletion(subject)) return false
 
-                if (deletedCount == count) {
-                    println("Successfully deleted $deletedCount workflow(s) as requested by '*' selection.")
-                    return true
-                } else {
-                    System.err.println("Warning: Expected to delete $count workflow(s) via '*' selection, but repository reported $deletedCount deleted.")
-                }
-            } catch (e: Exception) {
-                System.err.println("ERROR deleting selected workflows: ${e.message}")
+        try {
+            val result = if (filterName == null) {
+                // If no filter was applied, '*' means delete absolutely all
+                definitionService.deleteAllInNamespace(workflowNamespace)
+            } else {
+                // If a name filter was applied, '*' means delete all versions of that name
+                definitionService.deleteAllVersions(workflowNamespace, WorkflowName(filterName))
             }
-        }
 
-        return false
+            return when (result) {
+                is DefinitionService.DeleteResult.Deleted -> {
+                    println("Successfully deleted ${result.count} workflow(s) as requested by '*' selection.")
+                    true
+                }
+                is DefinitionService.DeleteResult.NotFound -> {
+                    println(result.message)
+                    false
+                }
+            }
+        } catch (e: Exception) {
+            System.err.println("ERROR deleting selected workflows: ${e.message}")
+            return false
+        }
     }
 
     // --- Common Helper --- //

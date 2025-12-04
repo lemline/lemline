@@ -8,6 +8,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.ListenStrategy
@@ -17,10 +18,6 @@ import com.lemline.core.states.RootState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.DefinitionListenModel
-import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.repositories.DefinitionListenRepository
-import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.ListenerRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.kotest.matchers.shouldBe
@@ -42,9 +39,8 @@ import org.junit.jupiter.api.TestInstance
 /**
  * Tests for the ListenStarted event handling in WorkflowEventHandler.
  *
- * Note: These tests require a listen definition to exist in the database before
- * sending a ListenStarted event, as the handler looks up the definition to get
- * the listenDefinitionId.
+ * The handler creates a listener with workflow identity (namespace, name, version)
+ * which is used to locate the listen task configuration from the cached workflow definition.
  */
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
@@ -59,12 +55,6 @@ internal class ListenEventHandlerTest {
     @Inject
     lateinit var listenerRepository: ListenerRepository
 
-    @Inject
-    lateinit var definitionListenRepository: DefinitionListenRepository
-
-    @Inject
-    lateinit var definitionRepository: DefinitionRepository
-
     private val testNamespace = WorkflowNamespace("test-namespace")
     private val testName = WorkflowName("test-workflow")
     private val testVersion = WorkflowVersion("1.0.0")
@@ -73,55 +63,32 @@ internal class ListenEventHandlerTest {
     @BeforeEach
     fun setup() = runTest {
         listenerRepository.deleteAll()
-        definitionListenRepository.deleteAll()
+        DefinitionCache.clear()
     }
 
-    private suspend fun createDefinition() {
-        val definition = DefinitionModel(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
-            definition = """
-                document:
-                  dsl: '1.0.0'
-                  namespace: $testNamespace
-                  name: $testName
-                  version: '$testVersion'
-                do:
-                  - listenTask:
-                      listen:
-                        to:
-                          one:
-                            with:
-                              type: com.example.OrderCreated
-            """.trimIndent()
-        )
-        definitionRepository.insert(definition)
-    }
-
-    private suspend fun createListenDefinition(
-        strategy: ListenStrategy = ListenStrategy.ONE,
-        readAs: ListenAndReadAs = ListenAndReadAs.DATA,
-        nodePosition: NodePosition = testNodePosition
-    ): DefinitionListenModel {
-        createDefinition()
-        val listenDef = DefinitionListenModel(
-            id = IDV7.random(),
-            workflowNamespace = testNamespace,
-            workflowName = testName,
-            workflowVersion = testVersion,
-            nodePosition = nodePosition,
-            strategy = strategy,
-            readAs = readAs
-        )
-        definitionListenRepository.insert(listenDef)
-        return listenDef
+    private fun cacheWorkflowDefinition() {
+        // Cache the workflow definition so listen task config can be retrieved
+        val definition = """
+            document:
+              dsl: '1.0.0'
+              namespace: $testNamespace
+              name: $testName
+              version: '$testVersion'
+            do:
+              - listenTask:
+                  listen:
+                    to:
+                      one:
+                        with:
+                          type: com.example.OrderCreated
+        """.trimIndent()
+        DefinitionCache.parseAndPut(definition)
     }
 
     @Test
-    fun `ListenStarted creates listener row with listenDefinitionId`() = runTest {
-        // Given: A listen definition exists
-        val listenDef = createListenDefinition(strategy = ListenStrategy.ONE)
+    fun `ListenStarted creates listener row with workflow identity`() = runTest {
+        // Given: A workflow definition is cached
+        cacheWorkflowDefinition()
 
         val instance = createListenStartedInstance(
             strategy = ListenStrategy.ONE,
@@ -134,19 +101,27 @@ internal class ListenEventHandlerTest {
         workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
 
         // Then
-        val listeners = listenerRepository.findByListenDefinitionId(listenDef.id)
+        val listeners = listenerRepository.findByWorkflowAndPositionWithCorrelation(
+            namespace = testNamespace,
+            name = testName,
+            version = testVersion,
+            position = testNodePosition,
+            correlationValuesJson = null
+        )
 
         listeners.size shouldBe 1
         val listener = listeners.first()
         listener.workflowId shouldBe instance.workflowId
         listener.workflowPosition shouldBe instance.workflowState.nodePosition
-        listener.listenDefinitionId shouldBe listenDef.id
+        listener.workflowNamespace shouldBe testNamespace
+        listener.workflowName shouldBe testName
+        listener.workflowVersion shouldBe testVersion
     }
 
     @Test
     fun `ListenStarted with timeout sets timeoutAt`() = runTest {
         // Given
-        val listenDef = createListenDefinition()
+        cacheWorkflowDefinition()
         val timeoutAt = Clock.System.now() + 10.minutes
 
         val instance = createListenStartedInstance(
@@ -161,7 +136,13 @@ internal class ListenEventHandlerTest {
         workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
 
         // Then
-        val listeners = listenerRepository.findByListenDefinitionId(listenDef.id)
+        val listeners = listenerRepository.findByWorkflowAndPositionWithCorrelation(
+            namespace = testNamespace,
+            name = testName,
+            version = testVersion,
+            position = testNodePosition,
+            correlationValuesJson = null
+        )
 
         listeners.size shouldBe 1
         listeners.first().timeoutAt shouldNotBe null
@@ -170,41 +151,9 @@ internal class ListenEventHandlerTest {
     }
 
     @Test
-    fun `ListenStarted with ALL strategy creates listener referencing definition`() = runTest {
-        // Given: A listen definition with ALL strategy exists
-        val listenDef = createListenDefinition(strategy = ListenStrategy.ALL)
-
-        val instance = createListenStartedInstance(
-            strategy = ListenStrategy.ALL,
-            filters = listOf(
-                EventFilter(type = "com.example.Event1"),
-                EventFilter(type = "com.example.Event2"),
-                EventFilter(type = "com.example.Event3")
-            ),
-            nodePosition = testNodePosition
-        )
-
-        // When
-        @Suppress("UNCHECKED_CAST")
-        workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
-
-        // Then
-        val listeners = listenerRepository.findByListenDefinitionId(listenDef.id)
-
-        listeners.size shouldBe 1
-        val listener = listeners.first()
-        listener.listenDefinitionId shouldBe listenDef.id
-
-        // Verify we can look up the strategy from the definition
-        val retrievedDef = definitionListenRepository.findById(listener.listenDefinitionId)
-        retrievedDef shouldNotBe null
-        retrievedDef!!.strategy shouldBe ListenStrategy.ALL
-    }
-
-    @Test
     fun `ListenStarted idempotent - second insert is ignored`() = runTest {
         // Given
-        val listenDef = createListenDefinition()
+        cacheWorkflowDefinition()
 
         val instance = createListenStartedInstance(
             strategy = ListenStrategy.ONE,
@@ -219,39 +168,14 @@ internal class ListenEventHandlerTest {
         workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
 
         // Then - only one row
-        val listeners = listenerRepository.findByListenDefinitionId(listenDef.id)
-        listeners.size shouldBe 1
-    }
-
-    @Test
-    fun `ListenStarted with ENVELOPE readAs`() = runTest {
-        // Given: A definition with ENVELOPE readAs
-        val listenDef = createListenDefinition(
-            strategy = ListenStrategy.ANY,
-            readAs = ListenAndReadAs.ENVELOPE
+        val listeners = listenerRepository.findByWorkflowAndPositionWithCorrelation(
+            namespace = testNamespace,
+            name = testName,
+            version = testVersion,
+            position = testNodePosition,
+            correlationValuesJson = null
         )
-
-        val instance = createListenStartedInstance(
-            strategy = ListenStrategy.ANY,
-            filters = listOf(
-                EventFilter(type = "com.example.Event1"),
-                EventFilter(type = "com.example.Event2")
-            ),
-            readAs = ListenAndReadAs.ENVELOPE,
-            nodePosition = testNodePosition
-        )
-
-        // When
-        @Suppress("UNCHECKED_CAST")
-        workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
-
-        // Then
-        val listeners = listenerRepository.findByListenDefinitionId(listenDef.id)
         listeners.size shouldBe 1
-
-        // Verify the definition has correct readAs
-        val retrievedDef = definitionListenRepository.findById(listeners.first().listenDefinitionId)
-        retrievedDef!!.readAs shouldBe ListenAndReadAs.ENVELOPE
     }
 
     // Helper function to create ListenStarted instance messages

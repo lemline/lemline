@@ -5,6 +5,10 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.common.values.name
+import com.lemline.common.values.namespace
+import com.lemline.common.values.version
+import com.lemline.core.definitions.DefinitionCache
 import io.serverlessworkflow.api.types.Workflow
 
 data class DefinitionModel(
@@ -21,11 +25,29 @@ data class DefinitionModel(
     val definition: String
 ) {
     companion object {
+        /**
+         * Creates a DefinitionModel from a Workflow object.
+         * The definition is re-serialized to YAML.
+         */
         fun from(workflow: Workflow) = DefinitionModel(
-            namespace = WorkflowNamespace(workflow.document.namespace),
-            name = WorkflowName(workflow.document.name),
-            version = WorkflowVersion(workflow.document.version),
+            namespace = workflow.namespace,
+            name = workflow.name,
+            version = workflow.version,
             definition = LemlineJson.yamlMapper.writeValueAsString(workflow)
         )
+
+        /**
+         * Creates a DefinitionModel from a raw definition string (YAML or JSON).
+         * The original content is preserved as-is.
+         */
+        fun from(definition: String): DefinitionModel {
+            val workflow = DefinitionCache.parse(definition)
+            return DefinitionModel(
+                namespace = workflow.namespace,
+                name = workflow.name,
+                version = workflow.version,
+                definition = definition
+            )
+        }
     }
 }

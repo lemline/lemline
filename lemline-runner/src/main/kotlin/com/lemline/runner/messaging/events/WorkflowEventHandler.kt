@@ -8,7 +8,9 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
+import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
+import com.lemline.core.processors.ListenConfig
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.definitions.Definitions
@@ -33,16 +35,22 @@ import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.RetryRepository
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.repositories.WaitRepository
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import com.lemline.runner.starters.Starter
 import io.serverlessworkflow.api.types.ForkTask
+import io.serverlessworkflow.impl.expressions.ExpressionUtils
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.put
 import org.eclipse.microprofile.reactive.messaging.Message
 import org.jetbrains.annotations.TestOnly
 
@@ -72,7 +80,6 @@ internal class WorkflowEventHandler(
     private val failureRepository: FailureRepository,
     private val forkRepository: ForkRepository,
     private val listenerRepository: ListenerRepository,
-    private val definitionListenRepository: com.lemline.runner.repositories.DefinitionListenRepository,
     private val instanceEmitter: WorkflowCommandEmitter,
     private val starter: Starter,
     override val metrics: WorkflowEventSubscriberMetrics,
@@ -225,43 +232,37 @@ internal class WorkflowEventHandler(
      * Handles ListenStarted events by creating a listener row in the database.
      *
      * The listener stores all data needed for CloudEvent matching:
-     * - Reference to the listen task definition (for strategy, filters, readAs)
-     * - Workflow identity (for resuming when events match)
+     * - Workflow identity (namespace, name, version) for locating the listen task in cached workflow definition
+     * - Workflow position for locating the listen task in the workflow tree
+     * - Workflow instance identity (for resuming when events match)
      * - Progress tracking (for ALL strategy and accumulation mode)
      *
+     * Listen task configuration (strategy, filters, readAs) is retrieved from the
+     * cached workflow definition using (workflowNamespace, workflowName, workflowVersion, workflowPosition).
+     *
      * CloudEvents are processed by a separate handler that queries listeners
-     * by definition identity and correlation values.
+     * by workflow identity, position, and correlation values.
      */
     private suspend fun handleListenStarted(instance: InstanceMessage<WorkflowEvent.ListenStarted>) {
         val state = instance.workflowState
         val config = state.config
         val listenerId = state.nodeStack.deriveIdempotentId("-listen")
 
-        // Find the listen definition for this workflow + position
-        val listenDefinition = definitionListenRepository.findByDefinitionAndPosition(
-            namespace = instance.workflowInfo.workflowNamespace,
-            name = instance.workflowInfo.workflowName,
-            version = instance.workflowInfo.workflowVersion,
-            nodePosition = state.nodePosition
-        ) ?: throw InternalException(
-            InternalException.Error(
-                errorType = com.lemline.core.errors.WorkflowErrorType.RUNTIME,
-                position = state.nodePosition,
-                title = "Listen definition not found",
-                details = "Listen definition not found for ${instance.workflowInfo} at ${state.nodePosition}"
-            )
-        )
-
-        // Create listener model
+        // Create listener model with workflow identity (for locating listen task in cache)
         val listener = ListenerModel(
             id = listenerId,
-            listenDefinitionId = listenDefinition.id,
+            workflowNamespace = instance.workflowInfo.workflowNamespace,
+            workflowName = instance.workflowInfo.workflowName,
+            workflowVersion = instance.workflowInfo.workflowVersion,
             instanceMessage = instance,
             workflowId = instance.workflowId,
             workflowPosition = state.nodePosition,
             timeoutAt = config.timeoutAt,
             outboxScheduledFor = Clock.System.now(),
         )
+
+        // Calculate correlation values from expect expressions
+        listener.correlationValues = calculateCorrelationValues(config)
 
         // Insert listener into database
         val rowsInserted = listenerRepository.insert(listener)
@@ -270,7 +271,7 @@ internal class WorkflowEventHandler(
         } else {
             logger.debug {
                 "Listen task started: $listenerId for workflow ${instance.workflowId} " +
-                    "at position ${state.nodePosition}, strategy=${listenDefinition.strategy}"
+                    "at position ${state.nodePosition}"
             }
         }
     }
@@ -714,5 +715,71 @@ internal class WorkflowEventHandler(
                 }
             }
         }
+    }
+
+    /**
+     * Calculates correlation values by evaluating `expect` expressions from filters
+     * against the correlation context.
+     *
+     * Returns a JSON string with sorted keys for consistent database comparison,
+     * or null if no correlations with expect expressions are defined.
+     *
+     * @param config The listen configuration containing filters and correlation context
+     * @return JSON string of correlation values, or null if no correlations
+     */
+    private fun calculateCorrelationValues(config: ListenConfig): String? {
+        val correlationContext = config.correlationContext ?: return null
+        if (correlationContext !is JsonObject) return null
+
+        // Collect all correlation expect expressions from all filters
+        val expectExpressions = mutableMapOf<String, String>()
+        for (filter in config.filters) {
+            filter.correlations?.forEach { (key, correlateValue) ->
+                correlateValue.expect?.let { expectExpr ->
+                    expectExpressions[key] = expectExpr
+                }
+            }
+        }
+
+        if (expectExpressions.isEmpty()) return null
+
+        // Evaluate each expect expression against the correlation context
+        val evaluatedValues = mutableMapOf<String, String>()
+        for ((key, expectExpr) in expectExpressions) {
+            try {
+                val trimmedExpr = if (ExpressionUtils.isExpr(expectExpr)) {
+                    ExpressionUtils.trimExpr(expectExpr)
+                } else {
+                    expectExpr
+                }
+
+                val result = with(LemlineJson) {
+                    val inputNode = correlationContext.toJsonNode()
+                    val scope = JsonObject(emptyMap()).toJsonNode() as com.fasterxml.jackson.databind.node.ObjectNode
+                    JQExpression.eval(inputNode, trimmedExpr, scope).toJsonElement()
+                }
+
+                val value = when (result) {
+                    is JsonPrimitive -> result.contentOrNull
+                    else -> result.toString()
+                }
+
+                if (value != null) {
+                    evaluatedValues[key] = value
+                }
+            } catch (e: Exception) {
+                logger.warn(e) { "Failed to evaluate correlation expect expression '$expectExpr' for key '$key'" }
+            }
+        }
+
+        if (evaluatedValues.isEmpty()) return null
+
+        // Serialize with sorted keys for consistent database comparison
+        val sortedEntries = evaluatedValues.entries.sortedBy { it.key }
+        return buildJsonObject {
+            for ((key, value) in sortedEntries) {
+                put(key, value)
+            }
+        }.let { Json.encodeToString(it) }
     }
 }

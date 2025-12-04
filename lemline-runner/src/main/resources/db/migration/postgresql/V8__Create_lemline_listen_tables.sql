@@ -1,94 +1,16 @@
--- Listen Task Definitions table
--- Stores listen task definitions extracted from workflow definitions
--- One row per listen task in a workflow
-CREATE TABLE lemline_definition_listens
-(
-    id                 UUID PRIMARY KEY,
-    workflow_namespace VARCHAR(255) COLLATE "C" NOT NULL,
-    workflow_name      VARCHAR(255) COLLATE "C" NOT NULL,
-    workflow_version   VARCHAR(255) COLLATE "C" NOT NULL,
-    node_position      TEXT                     NOT NULL,
-
-    -- Listen task configuration
-    strategy           VARCHAR(10)              NOT NULL, -- 'ONE', 'ANY', 'ALL'
-    read_mode          VARCHAR(10)              NOT NULL, -- 'DATA', 'ENVELOPE', 'RAW'
-
-    created_at         TIMESTAMPTZ(6)           NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at         TIMESTAMPTZ(6),
-
-    -- Foreign key to definitions table
-    CONSTRAINT fk_definition_listens_definition
-        FOREIGN KEY (workflow_namespace, workflow_name, workflow_version)
-            REFERENCES lemline_definitions (namespace, name, version)
-            ON DELETE CASCADE,
-
-    -- Unique constraint on definition + position (one listen task per position)
-    CONSTRAINT uk_definition_listens_position
-        UNIQUE (workflow_namespace, workflow_name, workflow_version, node_position)
-);
-
--- Index for efficient lookup by definition
-CREATE INDEX idx_lemline_definition_listens_definition
-    ON lemline_definition_listens (workflow_namespace, workflow_name, workflow_version);
-
--- Listen Filter Definitions table
--- Stores event filters for each listen task
--- One row per event filter in a listen task
-CREATE TABLE lemline_definition_listen_filters
-(
-    id                    UUID PRIMARY KEY,
-
-    -- Reference to parent listen task
-    listen_id             UUID                     NOT NULL,
-
-    -- Filter index within the listen task (for ALL strategy ordering)
-    filter_index          INTEGER                  NOT NULL,
-
-    -- Event matching criteria (CloudEvent attributes)
-    -- Values can be literals (for exact match) or expressions (for runtime evaluation)
-    event_id              VARCHAR(255),
-    event_type            VARCHAR(255),
-    event_source          TEXT,
-    event_subject         VARCHAR(255),
-    event_datacontenttype VARCHAR(255),
-    event_dataschema      TEXT,
-    event_time            VARCHAR(255),
-    event_data            TEXT,
-
-    -- Serialized correlation definitions (JSON)
-    correlations          TEXT,
-
-    created_at            TIMESTAMPTZ(6)           NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at            TIMESTAMPTZ(6),
-
-    -- Foreign key to listen task
-    CONSTRAINT fk_definition_listen_filters_listen
-        FOREIGN KEY (listen_id)
-            REFERENCES lemline_definition_listens (id)
-            ON DELETE CASCADE,
-
-    -- Unique constraint on listen task + filter index
-    CONSTRAINT uk_definition_listen_filters_index
-        UNIQUE (listen_id, filter_index)
-);
-
--- Index for efficient lookup by listen task
-CREATE INDEX idx_lemline_definition_listen_filters_listen
-    ON lemline_definition_listen_filters (listen_id);
-
--- Index for efficient lookup by event type (most common filter)
-CREATE INDEX idx_lemline_definition_listen_filters_event_type
-    ON lemline_definition_listen_filters (event_type)
-    WHERE event_type IS NOT NULL;
-
 -- Listeners table (outbox pattern)
--- Stores active listener instances waiting for events
+-- Stores active listener instances waiting for CloudEvents
+--
+-- Listen task configuration (strategy, filters, readAs) is retrieved on-demand
+-- from the cached workflow definition using (workflow_namespace, workflow_name, workflow_version, workflow_position)
 CREATE TABLE lemline_listeners
 (
     id                      UUID PRIMARY KEY,
 
-    -- Reference to listen task definition
-    listen_definition_id    UUID           NOT NULL,
+    -- Workflow definition reference (for locating listen task in cached workflow)
+    workflow_namespace      VARCHAR(255) COLLATE "C" NOT NULL,
+    workflow_name           VARCHAR(255) COLLATE "C" NOT NULL,
+    workflow_version        VARCHAR(255) COLLATE "C" NOT NULL,
 
     -- Workflow instance information
     workflow_id             UUID           NOT NULL,
@@ -117,22 +39,21 @@ CREATE TABLE lemline_listeners
 
     -- Timestamps
     created_at              TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at              TIMESTAMPTZ(6),
-
-    -- Foreign key to listen definition
-    CONSTRAINT fk_listeners_listen_definition
-        FOREIGN KEY (listen_definition_id)
-            REFERENCES lemline_definition_listens (id)
-            ON DELETE CASCADE
+    updated_at              TIMESTAMPTZ(6)
 );
 
 -- Index for efficient lookup by workflow_id
 CREATE INDEX idx_lemline_listeners_workflow_id
     ON lemline_listeners (workflow_id);
 
--- Index for efficient lookup by listen definition (for event routing)
-CREATE INDEX idx_lemline_listeners_listen_definition
-    ON lemline_listeners (listen_definition_id)
+-- Index for efficient lookup by workflow info + position (for event routing)
+CREATE INDEX idx_lemline_listeners_workflow_position
+    ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position)
+    WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
+
+-- Index for correlation-based lookup
+CREATE INDEX idx_lemline_listeners_correlation
+    ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position, correlation_values)
     WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
 
 -- Index for timeout processing
@@ -153,10 +74,10 @@ CREATE INDEX idx_lemline_listeners_completed
     WHERE outbox_completed_at IS NOT NULL;
 
 -- Comments for documentation
-COMMENT ON TABLE lemline_definition_listens IS 'Listen task definitions extracted from workflow definitions';
-COMMENT ON TABLE lemline_definition_listen_filters IS 'Event filters for listen tasks';
 COMMENT ON TABLE lemline_listeners IS 'Active listener instances waiting for CloudEvents';
-COMMENT ON COLUMN lemline_definition_listens.strategy IS 'Event consumption strategy: ONE, ANY, or ALL';
+COMMENT ON COLUMN lemline_listeners.workflow_namespace IS 'Workflow namespace for locating listen task in cached workflow definition';
+COMMENT ON COLUMN lemline_listeners.workflow_name IS 'Workflow name for locating listen task in cached workflow definition';
+COMMENT ON COLUMN lemline_listeners.workflow_version IS 'Workflow version for locating listen task in cached workflow definition';
 COMMENT ON COLUMN lemline_listeners.correlation_values IS 'Baseline correlation values set by first matching event (Mode 2)';
 COMMENT ON COLUMN lemline_listeners.accumulated_events IS 'Events accumulated so far (for ANY with until condition)';
 COMMENT ON COLUMN lemline_listeners.matched_filter_indices IS 'Filter indices that have been matched (for ALL strategy)';

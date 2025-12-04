@@ -18,10 +18,8 @@ import com.lemline.core.states.RootState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.DefinitionListenModel
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.models.ListenerModel
-import com.lemline.runner.repositories.DefinitionListenRepository
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.ListenerRepository
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
@@ -51,23 +49,16 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Inject
     lateinit var definitionRepository: DefinitionRepository
 
-    @Inject
-    lateinit var definitionListenRepository: DefinitionListenRepository
-
-    // Fixed test values for parent records
+    // Fixed test values for workflow identification
     private val testNamespace = WorkflowNamespace("test-namespace")
     private val testName = WorkflowName("test-workflow")
     private val testVersion = WorkflowVersion("1.0.0")
     private val testNodePosition = NodePosition("/do/listenTask")
 
-    // Will be set during setup after creating parent records
-    private var testListenDefinitionId: IDV7? = null
-
     @BeforeEach
     fun setupParentRecords() = runTest {
         // Clear existing data
         repository.deleteAll()
-        definitionListenRepository.deleteAll()
 
         // Create parent definition record
         val definition = DefinitionModel(
@@ -95,19 +86,6 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         } catch (_: Exception) {
             // Definition already exists, which is fine
         }
-
-        // Create listen definition record
-        testListenDefinitionId = IDV7.random()
-        val listenDefinition = DefinitionListenModel(
-            id = testListenDefinitionId!!,
-            workflowNamespace = testNamespace,
-            workflowName = testName,
-            workflowVersion = testVersion,
-            nodePosition = testNodePosition,
-            strategy = ListenStrategy.ONE,
-            readAs = ListenAndReadAs.DATA
-        )
-        definitionListenRepository.insert(listenDefinition)
     }
 
     override fun createRandomEntity(): ListenerModel {
@@ -147,7 +125,9 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
 
         return ListenerModel(
             id = IDV7.random(),
-            listenDefinitionId = testListenDefinitionId!!,
+            workflowNamespace = testNamespace,
+            workflowName = testName,
+            workflowVersion = testVersion,
             instanceMessage = InstanceMessage(
                 workflowInfo = workflowInfo,
                 workflowState = listenStarted

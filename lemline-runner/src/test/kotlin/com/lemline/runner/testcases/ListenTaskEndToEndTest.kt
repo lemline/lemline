@@ -2,6 +2,7 @@
 package com.lemline.runner.testcases
 
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
@@ -10,7 +11,6 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.runner.definitions.DefinitionListenCache
 import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
@@ -21,7 +21,7 @@ import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.WorkflowEventHandler
 import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.repositories.DefinitionListenRepository
+import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.ListenerRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
@@ -74,12 +74,6 @@ internal class ListenTaskEndToEndTest {
     lateinit var listenerRepository: ListenerRepository
 
     @Inject
-    lateinit var definitionListenRepository: DefinitionListenRepository
-
-    @Inject
-    lateinit var definitionListenCache: DefinitionListenCache
-
-    @Inject
     lateinit var definitionListenService: DefinitionListenService
 
     @Inject
@@ -119,7 +113,6 @@ internal class ListenTaskEndToEndTest {
 
         // Clear database state
         listenerRepository.deleteAll()
-        definitionListenCache.clear()
         DefinitionCache.clear()
 
         // Clear tracked completions
@@ -153,10 +146,6 @@ internal class ListenTaskEndToEndTest {
         """.trimIndent()
 
         registerWorkflow(yaml, workflowName)
-
-        // Verify cache has the event type filter (check immediately after registration)
-        val potentialFilters = definitionListenCache.getPotentialMatches("com.example.TestEvent")
-        potentialFilters.size shouldBe 1
 
         // When: Start the workflow
         val workflowId = startWorkflow(workflowName)
@@ -443,14 +432,28 @@ internal class ListenTaskEndToEndTest {
 
     /**
      * Helper to find listeners by workflow definition.
-     * First looks up listen definitions for the workflow, then queries listeners for those definition IDs.
+     * Queries listeners by workflow identity (namespace, name, version).
      */
     private suspend fun findListenersByWorkflow(
         namespace: WorkflowNamespace,
         name: WorkflowName,
         version: WorkflowVersion
-    ) = definitionListenRepository.findByDefinition(namespace, name, version)
-        .flatMap { listenDef -> listenerRepository.findByListenDefinitionId(listenDef.id) }
+    ): List<ListenerModel> {
+        // Get all listen tasks from the workflow and query listeners for each position
+        val workflow = DefinitionCache.getWorkflow(namespace, name, version)
+            ?: return emptyList()
+
+        val listenTasks = definitionListenService.extractListenTasks(workflow)
+        return listenTasks.flatMap { listenTask ->
+            listenerRepository.findByWorkflowAndPositionWithCorrelation(
+                namespace = namespace,
+                name = name,
+                version = version,
+                position = listenTask.nodePosition,
+                correlationValuesJson = null
+            )
+        }
+    }
 
     private suspend fun registerWorkflow(yaml: String, name: WorkflowName) {
         val existing = definitionRepository.findByNameAndVersion(testNamespace, name, testVersion)
@@ -466,9 +469,9 @@ internal class ListenTaskEndToEndTest {
         )
         definitionRepository.insert(model)
 
-        // Parse workflow and sync listen definitions to cache
-        val workflow = DefinitionCache.parseAndPut(yaml)
-        definitionListenService.syncListenDefinitions(workflow)
+        // Parse and cache workflow definition
+        // Note: Listen task definitions are retrieved on-demand from the cached workflow
+        DefinitionCache.parseAndPut(yaml)
     }
 
     private fun startWorkflow(name: WorkflowName): WorkflowId {

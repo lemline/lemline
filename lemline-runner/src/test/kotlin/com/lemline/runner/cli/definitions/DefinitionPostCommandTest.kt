@@ -6,9 +6,9 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache as Workflows
 import com.lemline.runner.cli.GlobalMixin
-import com.lemline.runner.definitions.DefinitionListenService
+import com.lemline.runner.definitions.DefinitionService
+import com.lemline.runner.definitions.DefinitionService.SaveResult
 import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.matchers.ints.shouldBeGreaterThan
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
@@ -24,6 +24,7 @@ import java.io.File
 import java.io.PrintStream
 import java.lang.reflect.Field
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
@@ -32,11 +33,11 @@ import org.junit.jupiter.api.io.TempDir
 import picocli.CommandLine
 
 @ExperimentalTime
+@ExperimentalSerializationApi
 class DefinitionPostCommandTest {
 
     private lateinit var command: DefinitionPostCommand
-    private lateinit var definitionRepository: DefinitionRepository
-    private lateinit var definitionListenService: DefinitionListenService
+    private lateinit var definitionService: DefinitionService
     private lateinit var cmd: CommandLine
     private lateinit var outStream: ByteArrayOutputStream
     private lateinit var errStream: ByteArrayOutputStream
@@ -56,8 +57,7 @@ class DefinitionPostCommandTest {
     @BeforeEach
     fun setup() {
         // Create mocks
-        definitionRepository = mockk()
-        definitionListenService = mockk()
+        definitionService = mockk()
 
         // Mock static methods
         mockkStatic(Workflows::class)
@@ -65,12 +65,8 @@ class DefinitionPostCommandTest {
 
         // Create command and inject mocks
         command = DefinitionPostCommand()
-        injectField(command, "definitionRepository", definitionRepository)
-        injectField(command, "definitionListenService", definitionListenService)
+        injectField(command, "definitionService", definitionService)
         injectField(command, "mixin", GlobalMixin())
-
-        // Mock listen service to return 0 filters extracted by default
-        coEvery { definitionListenService.syncListenDefinitions(any()) } returns 0
 
         workflowNamespace = WorkflowNamespace("test")
         workflowName = WorkflowName("testWorkflow")
@@ -124,15 +120,14 @@ class DefinitionPostCommandTest {
             workflowFile = File(tempDir, "workflow.yaml")
             workflowFile.writeText(workflowDefinition)
 
-            // Mock the entire chain of calls
-            every { Workflows.parse(any()) } returns workflow
-            every { DefinitionModel.from(any()) } returns workflowModel
+            // Mock DefinitionModel.from(String) to return our workflowModel
+            every { DefinitionModel.from(any<String>()) } returns workflowModel
         }
 
         @Test
         fun `should create workflow from file`() {
             // Given
-            coEvery { definitionRepository.insert(workflowModel) } returns 1
+            coEvery { definitionService.save(workflowModel, false) } returns SaveResult.CREATED
 
             // When
             val exitCode = cmd.execute("--file", workflowFile.absolutePath)
@@ -140,13 +135,13 @@ class DefinitionPostCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "successfully created"
-            coVerify { definitionRepository.insert(workflowModel) }
+            coVerify { definitionService.save(workflowModel, false) }
         }
 
         @Test
         fun `should handle existing workflow without force flag`() {
             // Given
-            coEvery { definitionRepository.insert(workflowModel) } returns 0
+            coEvery { definitionService.save(workflowModel, false) } returns SaveResult.ALREADY_EXISTS
 
             // When
             val exitCode = cmd.execute("--file", workflowFile.absolutePath)
@@ -154,15 +149,13 @@ class DefinitionPostCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "already exists"
-            coVerify { definitionRepository.insert(workflowModel) }
-            coVerify(exactly = 0) { definitionRepository.update(any<DefinitionModel>()) }
+            coVerify { definitionService.save(workflowModel, false) }
         }
 
         @Test
         fun `should update existing workflow with force flag`() {
             // Given
-            coEvery { definitionRepository.insert(workflowModel) } returns 0
-            coEvery { definitionRepository.update(workflowModel) } returns 1
+            coEvery { definitionService.save(workflowModel, true) } returns SaveResult.UPDATED
 
             // When
             val exitCode = cmd.execute("--file", workflowFile.absolutePath, "--force")
@@ -170,8 +163,7 @@ class DefinitionPostCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "successfully updated"
-            coVerify { definitionRepository.insert(workflowModel) }
-            coVerify { definitionRepository.update(workflowModel) }
+            coVerify { definitionService.save(workflowModel, true) }
         }
 
         @Test
@@ -213,10 +205,9 @@ class DefinitionPostCommandTest {
             nestedFile = File(nestedDir, "nested-workflow.yaml")
             nestedFile.writeText(workflowDefinition)
 
-            // Mock the entire chain of calls
-            every { Workflows.parse(any()) } returns workflow
-            every { DefinitionModel.from(any()) } returns workflowModel
-            coEvery { definitionRepository.insert(workflowModel) } returns 1
+            // Mock DefinitionModel.from(String) and DefinitionService.save()
+            every { DefinitionModel.from(any<String>()) } returns workflowModel
+            coEvery { definitionService.save(workflowModel, false) } returns SaveResult.CREATED
         }
 
         @Test
@@ -228,7 +219,7 @@ class DefinitionPostCommandTest {
             exitCode shouldBe 0
             outStream.toString() shouldContain "Processing files in directory"
             // Should process 2 files in the main directory but not the nested one
-            coVerify(exactly = 2) { definitionRepository.insert(workflowModel) }
+            coVerify(exactly = 2) { definitionService.save(workflowModel, false) }
         }
 
         @Test
@@ -240,7 +231,7 @@ class DefinitionPostCommandTest {
             exitCode shouldBe 0
             outStream.toString() shouldContain "recursively"
             // Should process all 3 files (2 in main dir + 1 in nested dir)
-            coVerify(exactly = 3) { definitionRepository.insert(workflowModel) }
+            coVerify(exactly = 3) { definitionService.save(workflowModel, false) }
         }
 
         @Test

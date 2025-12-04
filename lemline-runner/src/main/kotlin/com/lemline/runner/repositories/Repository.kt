@@ -136,32 +136,40 @@ abstract class Repository<T> {
     /**
      * Executes a block of code within a database transaction.
      *
-     * This method acquires a JDBC connection from the datasource, begins a transaction,
-     * executes the provided block of code, and commits the transaction if the block
-     * completes successfully. If an exception occurs during the execution of the block,
-     * the transaction is rolled back to ensure data consistency. The connection is
-     * always closed and returned to the pool after the block is executed.
+     * If a connection is provided, the block is executed using that connection (assuming
+     * it's already part of an existing transaction). If no connection is provided, a new
+     * connection is acquired from the datasource, a transaction is started, and the block
+     * is executed. On success, the transaction is committed; on failure, it is rolled back.
      *
+     * @param connection An optional database connection. If null, a new transaction is started.
      * @param block A lambda function that takes a `Connection` as a parameter and returns a result of type `T`.
      * @return The result of the block execution.
      * @throws Exception If an error occurs during the execution of the block or transaction management.
      */
-    internal suspend fun <T> withTransaction(block: suspend (Connection) -> T): T =
-        withContext(Dispatchers.IO) {
-            databaseManager.datasource.connection.use { connection ->
-                connection.autoCommit = false
-                try {
-                    block(connection).also {
-                        // Commit the transaction to release locks and persist changes
-                        connection.commit()
+    internal suspend fun <T> withTransaction(
+        connection: Connection? = null,
+        block: suspend (Connection) -> T
+    ): T = withContext(Dispatchers.IO) {
+        when (connection) {
+            null -> {
+                // Start a new transaction
+                databaseManager.datasource.connection.use { conn ->
+                    conn.autoCommit = false
+                    try {
+                        block(conn).also {
+                            // Commit the transaction to release locks and persist changes
+                            conn.commit()
+                        }
+                    } catch (t: Throwable) {
+                        // On any error, roll back the transaction to release locks and avoid partial processing
+                        conn.rollback()
+                        throw t
                     }
-                } catch (t: Throwable) {
-                    // On any error, roll back the transaction to release locks and avoid partial processing
-                    connection.rollback()
-                    throw t
                 }
             }
+            else -> block(connection) // Reuse existing transaction context
         }
+    }
 
     /**
      * Creates a model instance from a ResultSet.

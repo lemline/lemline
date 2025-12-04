@@ -8,8 +8,8 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache as Workflows
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
+import com.lemline.runner.definitions.DefinitionService
 import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.coEvery
@@ -24,14 +24,18 @@ import java.io.PrintStream
 import java.lang.reflect.Field
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import picocli.CommandLine
 
+@ExperimentalTime
+@ExperimentalSerializationApi
 class DefinitionGetCommandTest {
 
     private lateinit var command: DefinitionGetCommand
-    private lateinit var definitionRepository: DefinitionRepository
+    private lateinit var definitionService: DefinitionService
     private lateinit var selector: InteractiveWorkflowSelector
     private lateinit var objectMapper: ObjectMapper
 
@@ -48,13 +52,13 @@ class DefinitionGetCommandTest {
     @BeforeEach
     fun setup() {
         // Create mocks
-        definitionRepository = mockk()
+        definitionService = mockk()
         selector = mockk()
         objectMapper = mockk()
 
         // Create command and inject mocks
         command = DefinitionGetCommand()
-        injectField(command, "definitionRepository", definitionRepository)
+        injectField(command, "definitionService", definitionService)
         injectField(command, "selector", selector)
         injectField(command, "objectMapper", objectMapper)
         injectField(command, "mixin", GlobalMixin())
@@ -79,13 +83,12 @@ class DefinitionGetCommandTest {
         )
 
         coEvery {
-            definitionRepository.findByNameAndVersion(
+            definitionService.findByNameAndVersion(
                 workflowNamespace,
                 workflowName,
                 workflowVersion
             )
         } returns workflowDefinition
-        coEvery { definitionRepository.listByName(workflowNamespace, workflowName) } returns listOf(workflowDefinition)
 
         // Save original streams
         originalOut = System.out
@@ -118,7 +121,7 @@ class DefinitionGetCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain workflowDefinition.definition
-            coVerify { definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion) }
+            coVerify { definitionService.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion) }
         }
 
         @Test
@@ -127,7 +130,7 @@ class DefinitionGetCommandTest {
             val nonExistentName = WorkflowName("nonExistentWorkflow")
             val nonExistentVersion = WorkflowVersion("9.9.9")
             coEvery {
-                definitionRepository.findByNameAndVersion(
+                definitionService.findByNameAndVersion(
                     workflowNamespace,
                     nonExistentName,
                     nonExistentVersion
@@ -142,7 +145,7 @@ class DefinitionGetCommandTest {
             exitCode shouldBe 0 // Command doesn't throw, just prints error
             errStream.toString() shouldContain "not found"
             coVerify {
-                definitionRepository.findByNameAndVersion(
+                definitionService.findByNameAndVersion(
                     workflowNamespace,
                     nonExistentName,
                     nonExistentVersion

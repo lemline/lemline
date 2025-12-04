@@ -4,6 +4,9 @@ package com.lemline.runner.models
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
 import kotlin.time.ExperimentalTime
@@ -23,12 +26,18 @@ import kotlinx.serialization.json.jsonPrimitive
  * to wait for external events before continuing execution.
  *
  * The listener stores:
- * - Reference to the listen task definition (for strategy, filters, readAs)
+ * - Workflow identity (namespace, name, version) for matching against cached workflow definitions
+ * - Workflow position (for locating the listen task in the workflow tree)
  * - Workflow instance identity (for resuming the workflow when events match)
  * - Progress tracking (accumulated events, matched filter indices)
  * - Outbox fields (for reliable processing and cleanup)
  *
- * ## Strategies (from listen definition)
+ * ## Listen Task Configuration
+ *
+ * Strategy, filters, and readAs are retrieved from the cached workflow definition
+ * using (workflowNamespace, workflowName, workflowVersion, workflowPosition).
+ *
+ * ## Strategies
  *
  * - **ONE**: Complete on first matching event
  * - **ANY**: Complete on any matching event (or accumulate with `until`)
@@ -40,7 +49,6 @@ import kotlinx.serialization.json.jsonPrimitive
  * For Mode 2 (first-sets-baseline), the first event sets the baseline
  * and subsequent events must match.
  *
- * @see DefinitionListenModel for configuration details
  * @see WorkflowEvent.ListenStarted for the triggering event
  */
 @ExperimentalSerializationApi
@@ -49,8 +57,14 @@ data class ListenerModel(
     /** Unique identifier for this listener */
     override val id: IDV7,
 
-    /** Reference to the listen task definition */
-    val listenDefinitionId: IDV7,
+    /** Workflow namespace (for locating listen task in cached workflow definition) */
+    override val workflowNamespace: WorkflowNamespace,
+
+    /** Workflow name (for locating listen task in cached workflow definition) */
+    override val workflowName: WorkflowName,
+
+    /** Workflow version (for locating listen task in cached workflow definition) */
+    override val workflowVersion: WorkflowVersion,
 
     /** Workflow instance message containing state for resumption */
     override val instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>,

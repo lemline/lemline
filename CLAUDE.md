@@ -381,21 +381,21 @@ lemline:
 
 ### Core Entry Points
 
-- `/lemline-core/src/main/kotlin/com/lemline/core/processor/Processor.kt` - Workflow execution engine
-- `/lemline-core/src/main/kotlin/com/lemline/core/nodes/NodeInstance.kt` - Task execution base
-- `/lemline-core/src/main/kotlin/com/lemline/core/definitions/DefinitionCache.kt` - Definition management
+- Workflow execution engine: lemline-core/src/main/kotlin/com/lemline/core/processor/Processor.kt
+- Task execution base: lemline-core/src/main/kotlin/com/lemline/core/nodes/NodeInstance.kt
+- Definition management: lemline-core/src/main/kotlin/com/lemline/core/definitions/DefinitionCache.kt
 
 ### Runner Entry Points
 
-- `/lemline-runner/src/main/kotlin/com/lemline/runner/cli/LemlineApplication.kt` - CLI entry point
-- `/lemline-runner/src/main/kotlin/com/lemline/runner/StepByStepRunner.kt` - Execution orchestrator
-- `/lemline-runner/src/main/kotlin/com/lemline/runner/messaging/instances/InstanceMessageHandler.kt` - Message processor
+- CLI entry point: lemline-runner/src/main/kotlin/com/lemline/runner/cli/LemlineApplication.kt
+- Execution orchestrator: lemline-runner/src/main/kotlin/com/lemline/runner/StepByStepRunner.kt
+- Message processor: lemline-runner/src/main/kotlin/com/lemline/runner/messaging/instances/InstanceMessageHandler.kt
 
 ### Critical Infrastructure
 
-- `/lemline-runner/src/main/kotlin/com/lemline/runner/messaging/MessageSubscriber.kt` - Reactive consumer base
-- `/lemline-runner/src/main/kotlin/com/lemline/runner/outbox/OutboxRelay.kt` - Outbox processor base
-- `/lemline-runner/src/main/kotlin/com/lemline/runner/repositories/OutboxRepository.kt` - Outbox repository base
+- Reactive consumer base: lemline-runner/src/main/kotlin/com/lemline/runner/messaging/MessageSubscriber.kt
+- Outbox processor base: lemline-runner/src/main/kotlin/com/lemline/runner/outbox/OutboxRelay.kt
+- Outbox repository base: lemline-runner/src/main/kotlin/com/lemline/runner/repositories/OutboxRepository.kt
 
 ## Development Workflow
 

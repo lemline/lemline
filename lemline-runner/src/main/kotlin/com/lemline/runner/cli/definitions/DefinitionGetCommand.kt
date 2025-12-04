@@ -9,17 +9,21 @@ import com.lemline.core.definitions.DefinitionCache
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.cli.exceptions.CliException
+import com.lemline.runner.definitions.DefinitionService
 import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
+import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
 import picocli.CommandLine.Option
 import picocli.CommandLine.Parameters
 
+@ExperimentalTime
+@ExperimentalSerializationApi
 @Unremovable
 @Command(
     name = "get",
@@ -34,7 +38,7 @@ class DefinitionGetCommand : Runnable {
     enum class OutputFormat { JSON, YAML }
 
     @Inject
-    lateinit var definitionRepository: DefinitionRepository
+    lateinit var definitionService: DefinitionService
 
     @Inject
     lateinit var objectMapper: ObjectMapper
@@ -84,7 +88,7 @@ class DefinitionGetCommand : Runnable {
             if (workflowName != null && workflowVersion != null) {
                 // Direct fetch: Both name and version provided - runs once and exits
                 val selectedWorkflow =
-                    definitionRepository.findByNameAndVersion(workflowNamespace, workflowName!!, workflowVersion!!)
+                    definitionService.findByNameAndVersion(workflowNamespace, workflowName!!, workflowVersion!!)
                 if (selectedWorkflow == null) {
                     System.err.println("ERROR: Workflow '$workflowName' version '$workflowVersion' not found in namespace '$workflowNamespace'.")
                     return@runBlocking // Exit if direct fetch fails

@@ -160,6 +160,35 @@ object DefinitionCache {
         return map
     }
 
+    /**
+     * Removes a workflow from the cache.
+     *
+     * @param namespace The namespace of the workflow to remove.
+     * @param name The name of the workflow to remove.
+     * @param version The version of the workflow to remove.
+     */
+    @JvmStatic
+    fun remove(
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion
+    ) {
+        val key = WorkflowInfo(namespace, name, version)
+        workflowCache.remove(key)
+        nodesMapCache.remove(key)
+    }
+
+    /**
+     * Returns all cached workflows.
+     *
+     * This is used for iterating over all workflows, for example when
+     * matching CloudEvents against listen task filters.
+     *
+     * @return A list of all cached workflows.
+     */
+    @JvmStatic
+    fun getAllWorkflows(): List<Workflow> = workflowCache.values.toList()
+
     @TestOnly
     fun clear() {
         workflowCache.clear()

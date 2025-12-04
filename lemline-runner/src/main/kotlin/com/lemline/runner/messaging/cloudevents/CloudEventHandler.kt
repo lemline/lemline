@@ -2,19 +2,21 @@
 package com.lemline.runner.messaging.cloudevents
 
 import com.lemline.common.logger.logger
-import com.lemline.common.values.IDV7
-import com.lemline.core.processors.ListenConfig
+import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.definitions.getNode
 import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.states.WorkflowCommand
-import com.lemline.runner.definitions.DefinitionListenCache
+import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.runner.models.DefinitionListenFilterModel
-import com.lemline.runner.models.DefinitionListenModel
 import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.repositories.ListenerRepository
 import io.cloudevents.CloudEvent
+import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
+import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
+import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
+import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -32,12 +34,10 @@ import kotlinx.serialization.json.put
  *
  * ## Processing Flow
  *
- * 1. **Cache Lookup**: Find definition filters that match the event type
- * 2. **Listen Task Lookup**: Get the parent listen task for each filter
- * 3. **Listener Query**: Find active listeners for matching listen definitions
- * 4. **Filter Matching**: Check if the event matches the listener's filters
- * 5. **Strategy Handling**: Apply ONE/ANY/ALL strategy logic
- * 6. **Completion**: Resume matched workflows with the event data
+ * 1. **Service Query**: Use DefinitionListenService to find matching listeners
+ * 2. **Workflow Lookup**: Get listen task config from cached workflow definition
+ * 3. **Strategy Handling**: Apply ONE/ANY/ALL strategy logic
+ * 4. **Completion**: Resume matched workflows with the event data
  *
  * ## Strategy Behavior
  *
@@ -49,7 +49,7 @@ import kotlinx.serialization.json.put
 @ExperimentalSerializationApi
 @ApplicationScoped
 internal class CloudEventHandler(
-    private val definitionListenCache: DefinitionListenCache,
+    private val definitionListenService: DefinitionListenService,
     private val listenerRepository: ListenerRepository,
     private val commandEmitter: WorkflowCommandEmitter,
 ) {
@@ -66,42 +66,21 @@ internal class CloudEventHandler(
 
         logger.debug { "Processing CloudEvent: type=$eventType, source=${event.source}, id=${event.id}" }
 
-        // Step 1: Find matching definition filters from cache
-        val matchingFilters = definitionListenCache.getPotentialMatches(eventType)
-        if (matchingFilters.isEmpty()) {
-            logger.trace { "No definition filters match event type: $eventType" }
+        // Find all matching listeners using the service
+        val listeners = definitionListenService.findMatchingListeners(event)
+        if (listeners.isEmpty()) {
+            logger.trace { "No matching listeners for event type: $eventType" }
             return 0
         }
 
-        logger.debug { "Found ${matchingFilters.size} potential definition filters for event type: $eventType" }
-
-        // Step 2: Group filters by their parent listen task ID
-        val filtersByListenId = matchingFilters.groupBy { it.listenId }
+        logger.debug { "Found ${listeners.size} matching listeners for event type: $eventType" }
 
         var affectedCount = 0
 
-        // Step 3: For each listen task, find and process matching listeners
-        for ((listenId, filters) in filtersByListenId) {
-            // Get the listen task definition from cache
-            val listenTask = definitionListenCache.getListenTask(listenId)
-            if (listenTask == null) {
-                logger.warn { "Listen task $listenId not found in cache" }
-                continue
-            }
-
-            // Find active listeners for this listen definition
-            val listeners = listenerRepository.findByListenDefinitionId(listenId)
-            if (listeners.isEmpty()) {
-                continue
-            }
-
-            logger.debug { "Found ${listeners.size} active listeners for listen task $listenId" }
-
-            // Process each listener
-            for (listener in listeners) {
-                val affected = processListenerMatch(event, listener, listenTask, filters)
-                if (affected) affectedCount++
-            }
+        // Process each matched listener
+        for (listener in listeners) {
+            val affected = processListener(event, listener)
+            if (affected) affectedCount++
         }
 
         logger.debug { "CloudEvent processing complete: $affectedCount listeners affected" }
@@ -109,72 +88,124 @@ internal class CloudEventHandler(
     }
 
     /**
-     * Processes a potential match between an event and a listener.
+     * Processes a listener that matched the event.
      *
      * @param event The incoming CloudEvent
-     * @param listener The listener to check
-     * @param listenTask The listen task definition
-     * @param definitionFilters Definition-level filters for this listener's listen task
+     * @param listener The listener that matched
      * @return true if the listener was affected (completed or updated)
      */
-    private suspend fun processListenerMatch(
+    private suspend fun processListener(
         event: CloudEvent,
-        listener: ListenerModel,
-        listenTask: DefinitionListenModel,
-        definitionFilters: List<DefinitionListenFilterModel>
+        listener: ListenerModel
     ): Boolean {
-        // Find which filter index (if any) this event matches
-        val matchedFilterIndex = findMatchingFilterIndex(event, definitionFilters)
-        if (matchedFilterIndex == null) {
-            logger.trace { "Event doesn't match any filter for listener ${listener.id}" }
+        // Get listen task configuration from workflow definition
+        val listenTaskConfig = getListenTaskConfig(listener)
+        if (listenTaskConfig == null) {
+            logger.warn { "Could not find listen task for listener ${listener.id}" }
             return false
         }
 
-        logger.debug { "Event matches filter index $matchedFilterIndex for listener ${listener.id}" }
+        val (strategy, readAs, filters) = listenTaskConfig
+
+        logger.debug { "Processing listener ${listener.id}, strategy=$strategy" }
 
         // Apply strategy-specific logic
-        // For ALL strategy, we need the TOTAL filter count, not just the count of filters matching this event
-        val totalFilterCount = definitionListenCache.getFilterCountForListenTask(listenTask.id)
-
-        return when (listenTask.strategy) {
-            ListenStrategy.ONE -> handleOneMatch(event, listener, listenTask.readAs)
-            ListenStrategy.ANY -> handleAnyMatch(event, listener, listenTask, totalFilterCount)
-            ListenStrategy.ALL -> handleAllMatch(event, listener, listenTask, totalFilterCount, matchedFilterIndex)
+        return when (strategy) {
+            ListenStrategy.ONE -> handleOneMatch(event, listener, readAs)
+            ListenStrategy.ANY -> handleAnyMatch(event, listener, readAs)
+            ListenStrategy.ALL -> {
+                // For ALL strategy, find which filter index matched this event
+                val filterIndex = findMatchingFilterIndex(event, filters)
+                if (filterIndex == null) {
+                    logger.warn { "Could not determine filter index for ALL strategy listener ${listener.id}" }
+                    return false
+                }
+                handleAllMatch(event, listener, readAs, filters.size, filterIndex)
+            }
         }
     }
 
     /**
-     * Finds which filter index the event matches (if any).
+     * Listen task configuration retrieved from cached workflow definition.
+     */
+    private data class ListenTaskConfig(
+        val strategy: ListenStrategy,
+        val readAs: ListenAndReadAs,
+        val filters: List<io.serverlessworkflow.api.types.EventFilter>
+    )
+
+    /**
+     * Gets the listen task configuration from the cached workflow definition.
      *
-     * @return The matched filter's filterIndex from the definition, or null if no match
+     * @return ListenTaskConfig or null if not found
+     */
+    private fun getListenTaskConfig(listener: ListenerModel): ListenTaskConfig? {
+        val workflow = DefinitionCache.getWorkflow(
+            namespace = listener.workflowNamespace,
+            name = listener.workflowName,
+            version = listener.workflowVersion
+        ) ?: return null
+
+        val node = try {
+            workflow.getNode(listener.workflowPosition)
+        } catch (e: Exception) {
+            logger.warn(e) { "Node not found at ${listener.workflowPosition} in workflow" }
+            return null
+        }
+
+        val listenTask = node.task as? ListenTask ?: return null
+
+        // Determine strategy and filters from consumption strategy type
+        val listenTo = listenTask.listen?.to?.get()
+        val (strategy, filters) = when (listenTo) {
+            is OneEventConsumptionStrategy -> ListenStrategy.ONE to listOfNotNull(listenTo.one)
+            is AnyEventConsumptionStrategy -> ListenStrategy.ANY to (listenTo.any ?: emptyList())
+            is AllEventConsumptionStrategy -> ListenStrategy.ALL to (listenTo.all ?: emptyList())
+            else -> return null
+        }
+
+        // Get readAs with default
+        val readAs = listenTask.listen?.read ?: ListenAndReadAs.DATA
+
+        return ListenTaskConfig(strategy, readAs, filters)
+    }
+
+    /**
+     * Finds the index of the filter that matches the event (for ALL strategy).
+     *
+     * @return The filter index or null if no match found
      */
     private fun findMatchingFilterIndex(
         event: CloudEvent,
-        filters: List<DefinitionListenFilterModel>
+        filters: List<io.serverlessworkflow.api.types.EventFilter>
     ): Int? {
-        for (filter in filters) {
-            // Check type match (null = wildcard)
-            if (filter.eventType != null && filter.eventType != event.type) {
-                continue
+        for ((index, filter) in filters.withIndex()) {
+            if (filterMatchesEvent(filter, event)) {
+                return index
             }
-
-            // Check source match if specified
-            if (filter.eventSource != null && filter.eventSource != event.source?.toString()) {
-                continue
-            }
-
-            // Check subject match if specified
-            if (filter.eventSubject != null && filter.eventSubject != event.subject) {
-                continue
-            }
-
-            // TODO: Add correlation checking here for Phase 8.3
-            // For now, we skip correlation and match on type/source/subject only
-
-            // Return the filter's defined index, not the list position
-            return filter.filterIndex
         }
         return null
+    }
+
+    /**
+     * Checks if a filter matches the event (simplified matching for filter index detection).
+     */
+    private fun filterMatchesEvent(
+        filter: io.serverlessworkflow.api.types.EventFilter,
+        event: CloudEvent
+    ): Boolean {
+        val props = filter.with ?: return true
+
+        // Check type (most common and fastest check)
+        props.type?.let { if (it != event.type) return false }
+
+        // Check other literal fields
+        props.id?.let { if (it != event.id) return false }
+        props.subject?.let { if (it != event.subject) return false }
+        props.datacontenttype?.let { if (it != event.dataContentType) return false }
+        props.source?.get()?.toString()?.let { if (it != event.source?.toString()) return false }
+
+        return true
     }
 
     /**
@@ -196,10 +227,9 @@ internal class CloudEventHandler(
     private suspend fun handleAnyMatch(
         event: CloudEvent,
         listener: ListenerModel,
-        listenTask: DefinitionListenModel,
-        filterCount: Int
+        readAs: ListenAndReadAs
     ): Boolean {
-        val eventData = extractEventContent(event, listenTask.readAs)
+        val eventData = extractEventContent(event, readAs)
 
         // If no accumulated events yet, complete immediately (no `until` support yet)
         // TODO: Add `until` condition support
@@ -214,11 +244,11 @@ internal class CloudEventHandler(
     private suspend fun handleAllMatch(
         event: CloudEvent,
         listener: ListenerModel,
-        listenTask: DefinitionListenModel,
+        readAs: ListenAndReadAs,
         totalFilters: Int,
         matchedFilterIndex: Int
     ): Boolean {
-        val eventData = extractEventContent(event, listenTask.readAs)
+        val eventData = extractEventContent(event, readAs)
 
         // Parse current matched indices
         val currentIndices = listener.matchedFilterIndices?.let {
@@ -254,6 +284,7 @@ internal class CloudEventHandler(
     /**
      * Accumulates an event into the listener's accumulated events array.
      */
+    @Suppress("unused")
     private fun accumulateEvent(listener: ListenerModel, eventData: JsonElement): JsonArray {
         val existing = listener.accumulatedEvents?.let {
             Json.decodeFromString<JsonArray>(it)

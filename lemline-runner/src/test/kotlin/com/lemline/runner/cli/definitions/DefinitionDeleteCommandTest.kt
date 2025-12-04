@@ -6,8 +6,9 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
+import com.lemline.runner.definitions.DefinitionService
+import com.lemline.runner.definitions.DefinitionService.DeleteResult
 import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.repositories.DefinitionRepository
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.mockk.coEvery
@@ -16,16 +17,20 @@ import io.mockk.mockk
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.lang.reflect.Field
+import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import picocli.CommandLine
 
+@ExperimentalTime
+@ExperimentalSerializationApi
 class DefinitionDeleteCommandTest {
 
     private lateinit var command: DefinitionDeleteCommand
-    private lateinit var definitionRepository: DefinitionRepository
+    private lateinit var definitionService: DefinitionService
     private lateinit var selector: InteractiveWorkflowSelector
     private lateinit var cmd: CommandLine
     private lateinit var outStream: ByteArrayOutputStream
@@ -43,12 +48,12 @@ class DefinitionDeleteCommandTest {
     @BeforeEach
     fun setup() {
         // Create mocks
-        definitionRepository = mockk()
+        definitionService = mockk()
         selector = mockk()
 
         // Create command and inject mocks
         command = DefinitionDeleteCommand()
-        injectField(command, "definitionRepository", definitionRepository)
+        injectField(command, "definitionService", definitionService)
         injectField(command, "selector", selector)
         injectField(command, "mixin", GlobalMixin())
 
@@ -87,13 +92,13 @@ class DefinitionDeleteCommandTest {
         )
 
         coEvery {
-            definitionRepository.findByNameAndVersion(
+            definitionService.findByNameAndVersion(
                 workflowNamespace,
                 workflowName,
                 workflowVersion
             )
         } returns workflowDefinition
-        coEvery { definitionRepository.listByName(workflowNamespace, workflowName) } returns listOf(
+        coEvery { definitionService.listByName(workflowNamespace, workflowName) } returns listOf(
             workflowDefinition,
             workflowDefinition2
         )
@@ -127,7 +132,9 @@ class DefinitionDeleteCommandTest {
         @Test
         fun `should delete specific version when name and version are provided with force flag`() {
             // Given
-            coEvery { definitionRepository.delete(workflowDefinition) } returns 1
+            coEvery {
+                definitionService.delete(workflowNamespace, workflowName, workflowVersion)
+            } returns DeleteResult.Deleted(1, "workflow '$workflowName' version '$workflowVersion'")
 
             // When
             val exitCode = cmd.execute(
@@ -141,32 +148,34 @@ class DefinitionDeleteCommandTest {
             exitCode shouldBe 0
             outStream.toString() shouldContain "Successfully deleted"
             outStream.toString() shouldContain "(forced)"
-            coVerify { definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion) }
-            coVerify { definitionRepository.delete(workflowDefinition) }
+            coVerify { definitionService.delete(workflowNamespace, workflowName, workflowVersion) }
         }
 
         @Test
         fun `should delete all versions of workflow when only name is provided with force flag`() {
             // Given
-            val workflowVersions = listOf(workflowDefinition, workflowDefinition2)
-            coEvery { definitionRepository.delete(workflowVersions) } returns 2
+            coEvery {
+                definitionService.deleteAllVersions(workflowNamespace, workflowName)
+            } returns DeleteResult.Deleted(2, "2 versions (1.0.0, 2.0.0) of workflow '$workflowName'")
 
             // When
             val exitCode = cmd.execute(workflowNamespace.toString(), workflowName.toString(), "--force")
 
             // Then
             exitCode shouldBe 0
-            outStream.toString() shouldContain "Successfully deleted 2 versions"
+            outStream.toString() shouldContain "Successfully deleted"
             outStream.toString() shouldContain "(forced)"
-            coVerify { definitionRepository.listByName(workflowNamespace, workflowName) }
-            coVerify { definitionRepository.delete(workflowVersions) }
+            coVerify { definitionService.listByName(workflowNamespace, workflowName) }
+            coVerify { definitionService.deleteAllVersions(workflowNamespace, workflowName) }
         }
 
         @Test
         fun `should delete all workflows when no args are provided with force flag`() {
             // Given
-            coEvery { definitionRepository.countAllInNamespace(workflowNamespace) } returns 5
-            coEvery { definitionRepository.deleteAllInNamespace(workflowNamespace) } returns 5
+            coEvery { definitionService.countAllInNamespace(workflowNamespace) } returns 5
+            coEvery {
+                definitionService.deleteAllInNamespace(workflowNamespace)
+            } returns DeleteResult.Deleted(5, "5 workflows")
 
             // When
             val exitCode = cmd.execute(workflowNamespace.toString(), "--force")
@@ -175,14 +184,14 @@ class DefinitionDeleteCommandTest {
             exitCode shouldBe 0
             outStream.toString() shouldContain "Successfully deleted 5 workflows"
             outStream.toString() shouldContain "(forced)"
-            coVerify { definitionRepository.countAllInNamespace(workflowNamespace) }
-            coVerify { definitionRepository.deleteAllInNamespace(workflowNamespace) }
+            coVerify { definitionService.countAllInNamespace(workflowNamespace) }
+            coVerify { definitionService.deleteAllInNamespace(workflowNamespace) }
         }
 
         @Test
         fun `should handle no workflows found when deleting all with force flag`() {
             // Given
-            coEvery { definitionRepository.countAllInNamespace(workflowNamespace) } returns 0
+            coEvery { definitionService.countAllInNamespace(workflowNamespace) } returns 0
 
             // When
             val exitCode = cmd.execute(workflowNamespace.toString(), "--force")
@@ -190,8 +199,8 @@ class DefinitionDeleteCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain "No workflows found to delete"
-            coVerify { definitionRepository.countAllInNamespace(workflowNamespace) }
-            coVerify(exactly = 0) { definitionRepository.deleteAllInNamespace(any()) }
+            coVerify { definitionService.countAllInNamespace(workflowNamespace) }
+            coVerify(exactly = 0) { definitionService.deleteAllInNamespace(any()) }
         }
 
         @Test
@@ -200,7 +209,7 @@ class DefinitionDeleteCommandTest {
             val nonExistentName = WorkflowName("nonExistentWorkflow")
             val nonExistentVersion = WorkflowVersion("9.9.9")
             coEvery {
-                definitionRepository.findByNameAndVersion(
+                definitionService.findByNameAndVersion(
                     workflowNamespace,
                     nonExistentName,
                     nonExistentVersion
@@ -219,7 +228,7 @@ class DefinitionDeleteCommandTest {
             exitCode shouldBe 0
             outStream.toString() shouldContain "not found"
             coVerify {
-                definitionRepository.findByNameAndVersion(
+                definitionService.findByNameAndVersion(
                     workflowNamespace,
                     nonExistentName,
                     nonExistentVersion
@@ -233,10 +242,9 @@ class DefinitionDeleteCommandTest {
         @Test
         fun `should delete when using force`() {
             // Given
-            coEvery { definitionRepository.delete(workflowDefinition) } returns 1
             coEvery {
-                definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion)
-            } returns workflowDefinition
+                definitionService.delete(workflowNamespace, workflowName, workflowVersion)
+            } returns DeleteResult.Deleted(1, "workflow '$workflowName' version '$workflowVersion'")
 
             // When - force flag will bypass the confirmation
             val exitCode = cmd.execute(
@@ -248,8 +256,7 @@ class DefinitionDeleteCommandTest {
 
             // Then
             exitCode shouldBe 0
-            coVerify { definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion) }
-            coVerify { definitionRepository.delete(workflowDefinition) }
+            coVerify { definitionService.delete(workflowNamespace, workflowName, workflowVersion) }
         }
 
         // Skip interaction-based test since we can't reliably mock stdin
@@ -262,16 +269,18 @@ class DefinitionDeleteCommandTest {
         @Test
         fun `should delete all when no parameters are provided with force`() {
             // Given
-            coEvery { definitionRepository.countAllInNamespace(workflowNamespace) } returns 5
-            coEvery { definitionRepository.deleteAllInNamespace(workflowNamespace) } returns 5
+            coEvery { definitionService.countAllInNamespace(workflowNamespace) } returns 5
+            coEvery {
+                definitionService.deleteAllInNamespace(workflowNamespace)
+            } returns DeleteResult.Deleted(5, "5 workflows")
 
             // When - using force with no parameters
             val exitCode = cmd.execute(workflowNamespace.toString(), "--force")
 
             // Then
             exitCode shouldBe 0
-            coVerify { definitionRepository.countAllInNamespace(workflowNamespace) }
-            coVerify { definitionRepository.deleteAllInNamespace(workflowNamespace) }
+            coVerify { definitionService.countAllInNamespace(workflowNamespace) }
+            coVerify { definitionService.deleteAllInNamespace(workflowNamespace) }
         }
 
         // This test is covered by 'should use selector when only name is provided'

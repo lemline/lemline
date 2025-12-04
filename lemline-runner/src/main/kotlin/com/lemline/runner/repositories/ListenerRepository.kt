@@ -4,6 +4,9 @@ package com.lemline.runner.repositories
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.messaging.InstanceMessage
@@ -23,6 +26,17 @@ import kotlinx.serialization.ExperimentalSerializationApi
 const val LISTENER_TABLE = "lemline_listeners"
 
 /**
+ * Key for batch querying listeners by workflow identity and correlation.
+ */
+data class ListenerQueryKey(
+    val namespace: WorkflowNamespace,
+    val name: WorkflowName,
+    val version: WorkflowVersion,
+    val position: NodePosition,
+    val correlationValuesJson: String?
+)
+
+/**
  * Repository for managing listener instances in the outbox pattern.
  *
  * This repository handles:
@@ -30,6 +44,9 @@ const val LISTENER_TABLE = "lemline_listeners"
  * - Finding matching listeners for CloudEvent routing
  * - Tracking accumulated events and matched filter indices
  * - Timeout detection
+ *
+ * Listeners are identified by workflow identity (namespace, name, version) and position.
+ * Listen task configuration is retrieved from the cached workflow definition.
  *
  * @see ListenerModel for the entity model
  */
@@ -39,7 +56,6 @@ const val LISTENER_TABLE = "lemline_listeners"
 internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     companion object Companion {
-        const val LISTEN_DEFINITION_ID_COLUMN = "listen_definition_id"
         const val TIMEOUT_AT_COLUMN = "timeout_at"
         const val CORRELATION_VALUES_COLUMN = "correlation_values"
         const val ACCUMULATED_EVENTS_COLUMN = "accumulated_events"
@@ -53,19 +69,20 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
     override val tableName = LISTENER_TABLE
 
     override val prepareStatementMap: Map<String, (PreparedStatement, ListenerModel, Int) -> Unit> by lazy {
-        // Remove workflow info columns that are not in the listeners table
-        // (workflow info is stored in workflow_state JSON as part of InstanceMessage)
-        (super.prepareStatementMap - setOf(
-            WORKFLOW_NAMESPACE_COLUMN,
-            WORKFLOW_NAME_COLUMN,
-            WORKFLOW_VERSION_COLUMN
-        )) + mapOf(
+        super.prepareStatementMap + mapOf(
             // Override WORKFLOW_STATE_COLUMN to store the full InstanceMessage (includes workflowInfo)
             WORKFLOW_STATE_COLUMN to { stmt, entity, idx ->
                 stmt.setString(idx, entity.instanceMessage.toJsonString())
             },
-            LISTEN_DEFINITION_ID_COLUMN to { stmt, entity, idx ->
-                setIDV7(stmt, idx, entity.listenDefinitionId)
+            // Override workflow info columns to use ListenerModel's fields
+            WORKFLOW_NAMESPACE_COLUMN to { stmt, entity, idx ->
+                stmt.setString(idx, entity.workflowNamespace.toString())
+            },
+            WORKFLOW_NAME_COLUMN to { stmt, entity, idx ->
+                stmt.setString(idx, entity.workflowName.toString())
+            },
+            WORKFLOW_VERSION_COLUMN to { stmt, entity, idx ->
+                stmt.setString(idx, entity.workflowVersion.toString())
             },
             TIMEOUT_AT_COLUMN to { stmt, entity, idx ->
                 entity.timeoutAt?.let {
@@ -86,7 +103,9 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     override fun createModel(rs: ResultSet): ListenerModel = ListenerModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        listenDefinitionId = getIDV7(rs, LISTEN_DEFINITION_ID_COLUMN)!!,
+        workflowNamespace = WorkflowNamespace(rs.getString(WORKFLOW_NAMESPACE_COLUMN)),
+        workflowName = WorkflowName(rs.getString(WORKFLOW_NAME_COLUMN)),
+        workflowVersion = WorkflowVersion(rs.getString(WORKFLOW_VERSION_COLUMN)),
         // Deserialize full InstanceMessage (includes workflowInfo) from workflow_state column
         instanceMessage = InstanceMessage.fromJsonString(rs.getString(WORKFLOW_STATE_COLUMN)),
         workflowId = WorkflowId(getIDV7(rs, WORKFLOW_ID_COLUMN)!!),
@@ -107,30 +126,128 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
     }
 
     /**
-     * Finds active listeners by listen definition ID.
-     * Used in CloudEvent routing to find listeners for a specific listen task.
+     * Finds active listeners by workflow info and position with correlation matching.
      *
-     * @param listenDefinitionId The listen task definition ID
+     * This method efficiently queries listeners that match the correlation values:
+     * - If correlationValuesJson is null: returns all listeners for the workflow + position
+     * - If correlationValuesJson is provided: returns listeners where:
+     *   - correlation_values IS NULL (Mode 2: first event sets baseline), OR
+     *   - correlation_values = correlationValuesJson (exact match)
+     *
+     * Note: For exact JSON comparison, the correlationValuesJson must be serialized
+     * with sorted keys to ensure consistent comparison.
+     *
+     * @param namespace Workflow namespace
+     * @param name Workflow name
+     * @param version Workflow version
+     * @param position Listen task position in workflow
+     * @param correlationValuesJson Serialized JSON of correlation values (sorted keys), or null
      * @param connection Optional database connection
      * @return List of matching active listeners
      */
-    suspend fun findByListenDefinitionId(
-        listenDefinitionId: IDV7,
+    suspend fun findByWorkflowAndPositionWithCorrelation(
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion,
+        position: NodePosition,
+        correlationValuesJson: String?,
         connection: Connection? = null
     ): List<ListenerModel> = withConnection(connection) { conn ->
-        conn.prepareStatement(findByListenDefinitionIdSql).use { stmt ->
-            setIDV7(stmt, 1, listenDefinitionId)
-            stmt.executeQuery().use { it.toModels() }
+        if (correlationValuesJson == null) {
+            // No correlation filter - return all listeners for this workflow + position
+            conn.prepareStatement(findByWorkflowAndPositionSql).use { stmt ->
+                stmt.setString(1, namespace.toString())
+                stmt.setString(2, name.toString())
+                stmt.setString(3, version.toString())
+                stmt.setString(4, position.toString())
+                stmt.executeQuery().use { it.toModels() }
+            }
+        } else {
+            // With correlation - match NULL (Mode 2) or exact value
+            conn.prepareStatement(findByWorkflowAndPositionWithCorrelationSql).use { stmt ->
+                stmt.setString(1, namespace.toString())
+                stmt.setString(2, name.toString())
+                stmt.setString(3, version.toString())
+                stmt.setString(4, position.toString())
+                stmt.setString(5, correlationValuesJson)
+                stmt.executeQuery().use { it.toModels() }
+            }
         }
     }
 
-    private val findByListenDefinitionIdSql by lazy {
+    private val findByWorkflowAndPositionSql by lazy {
         """
         SELECT * FROM $tableName
         WHERE $OUTBOX_COMPLETED_AT_COLUMN IS NULL
           AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-          AND $LISTEN_DEFINITION_ID_COLUMN = ?
+          AND $WORKFLOW_NAMESPACE_COLUMN = ?
+          AND $WORKFLOW_NAME_COLUMN = ?
+          AND $WORKFLOW_VERSION_COLUMN = ?
+          AND $WORKFLOW_POSITION_COLUMN = ?
         """.trimIndent()
+    }
+
+    private val findByWorkflowAndPositionWithCorrelationSql by lazy {
+        """
+        SELECT * FROM $tableName
+        WHERE $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+          AND $WORKFLOW_NAMESPACE_COLUMN = ?
+          AND $WORKFLOW_NAME_COLUMN = ?
+          AND $WORKFLOW_VERSION_COLUMN = ?
+          AND $WORKFLOW_POSITION_COLUMN = ?
+          AND ($CORRELATION_VALUES_COLUMN IS NULL OR $CORRELATION_VALUES_COLUMN = ?)
+        """.trimIndent()
+    }
+
+    /**
+     * Batch finds active listeners for multiple query keys in a single database round-trip.
+     *
+     * This method builds a dynamic query with OR conditions to fetch listeners matching
+     * any of the provided keys. Each key specifies workflow identity, position, and
+     * optional correlation values.
+     *
+     * @param keys List of query keys to match
+     * @param connection Optional database connection
+     * @return List of matching active listeners (caller must match back to keys)
+     */
+    suspend fun findByKeys(
+        keys: List<ListenerQueryKey>,
+        connection: Connection? = null
+    ): List<ListenerModel> {
+        if (keys.isEmpty()) return emptyList()
+
+        return withConnection(connection) { conn ->
+            // Build dynamic SQL with OR conditions for each key
+            val conditions = keys.map { key ->
+                if (key.correlationValuesJson == null) {
+                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ?)"
+                } else {
+                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ? AND ($CORRELATION_VALUES_COLUMN IS NULL OR $CORRELATION_VALUES_COLUMN = ?))"
+                }
+            }
+
+            val sql = """
+                SELECT * FROM $tableName
+                WHERE $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND (${conditions.joinToString(" OR ")})
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                var paramIndex = 1
+                for (key in keys) {
+                    stmt.setString(paramIndex++, key.namespace.toString())
+                    stmt.setString(paramIndex++, key.name.toString())
+                    stmt.setString(paramIndex++, key.version.toString())
+                    stmt.setString(paramIndex++, key.position.toString())
+                    if (key.correlationValuesJson != null) {
+                        stmt.setString(paramIndex++, key.correlationValuesJson)
+                    }
+                }
+                stmt.executeQuery().use { it.toModels() }
+            }
+        }
     }
 
     /**
@@ -289,6 +406,39 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         SELECT * FROM $tableName
         WHERE $ID_COLUMN = ?
         FOR UPDATE
+        """.trimIndent()
+    }
+
+    /**
+     * Deletes all listeners for a given workflow definition.
+     * Used when a workflow definition is deleted and all its listeners should be removed.
+     *
+     * @param namespace Workflow namespace
+     * @param name Workflow name
+     * @param version Workflow version
+     * @param connection Optional database connection
+     * @return Number of listeners deleted
+     */
+    suspend fun deleteByWorkflowDefinition(
+        namespace: WorkflowNamespace,
+        name: WorkflowName,
+        version: WorkflowVersion,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        conn.prepareStatement(deleteByWorkflowDefinitionSql).use { stmt ->
+            stmt.setString(1, namespace.toString())
+            stmt.setString(2, name.toString())
+            stmt.setString(3, version.toString())
+            stmt.executeUpdate()
+        }
+    }
+
+    private val deleteByWorkflowDefinitionSql by lazy {
+        """
+        DELETE FROM $tableName
+        WHERE $WORKFLOW_NAMESPACE_COLUMN = ?
+          AND $WORKFLOW_NAME_COLUMN = ?
+          AND $WORKFLOW_VERSION_COLUMN = ?
         """.trimIndent()
     }
 }

@@ -13,7 +13,6 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.errors.InternalException
-import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.processors.RunWorkflowConfig
 import com.lemline.core.processors.WaitConfig
 import com.lemline.core.random.random
@@ -23,8 +22,6 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.DefinitionListenFilterModel
-import com.lemline.runner.models.DefinitionListenModel
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.models.OutboxModel
@@ -32,7 +29,6 @@ import com.lemline.runner.models.ParentModel
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.ScheduleModel
 import com.lemline.runner.models.WaitModel
-import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -199,62 +195,6 @@ fun WaitModel.Companion.random() = WaitModel(
     it.outboxErrorMessage = String.nullableRandom()
 }
 
-fun DefinitionListenModel.Companion.random(): DefinitionListenModel {
-    return DefinitionListenModel(
-        id = IDV7.random(),
-        workflowNamespace = WorkflowNamespace.random(),
-        workflowName = WorkflowName.random(),
-        workflowVersion = WorkflowVersion.random(),
-        nodePosition = NodePosition.random(),
-        strategy = ListenStrategy.entries[Random.nextInt(ListenStrategy.entries.size)],
-        readAs = ListenAndReadAs.entries[Random.nextInt(ListenAndReadAs.entries.size)]
-    )
-}
-
-fun DefinitionListenFilterModel.Companion.random(): DefinitionListenFilterModel {
-    return DefinitionListenFilterModel(
-        id = IDV7.random(),
-        listenId = IDV7.random(),
-        filterIndex = Random.nextInt(0, 10),
-        eventId = when (Random.nextBoolean()) {
-            true -> "evt-${String.random()}"
-            false -> null
-        },
-        eventType = when (Random.nextBoolean()) {
-            true -> "com.example.${String.random()}"
-            false -> null
-        },
-        eventSource = when (Random.nextBoolean()) {
-            true -> "https://example.com/${String.random()}"
-            false -> null
-        },
-        eventSubject = when (Random.nextBoolean()) {
-            true -> String.random()
-            false -> null
-        },
-        eventDatacontenttype = when (Random.nextBoolean()) {
-            true -> "application/json"
-            false -> null
-        },
-        eventDataschema = when (Random.nextBoolean()) {
-            true -> "https://example.com/schema/${String.random()}"
-            false -> null
-        },
-        eventTime = when (Random.nextBoolean()) {
-            true -> "2024-01-15T10:00:00Z"
-            false -> null
-        },
-        eventData = when (Random.nextBoolean()) {
-            true -> """{"${String.random()}":"${String.random()}"}"""
-            false -> null
-        },
-        correlations = when (Random.nextBoolean()) {
-            true -> """{"${String.random()}":{"from":".\$${String.random()}"}}"""
-            false -> null
-        }
-    )
-}
-
 fun ListenerModel.Companion.random(): ListenerModel {
     val workflowInfo = WorkflowInfo.random()
     val listenStarted = WorkflowEvent.ListenStarted.random()
@@ -262,7 +202,9 @@ fun ListenerModel.Companion.random(): ListenerModel {
 
     return ListenerModel(
         id = IDV7.random(),
-        listenDefinitionId = IDV7.random(),
+        workflowNamespace = workflowInfo.workflowNamespace,
+        workflowName = workflowInfo.workflowName,
+        workflowVersion = workflowInfo.workflowVersion,
         instanceMessage = InstanceMessage(
             workflowInfo = workflowInfo,
             workflowState = listenStarted,

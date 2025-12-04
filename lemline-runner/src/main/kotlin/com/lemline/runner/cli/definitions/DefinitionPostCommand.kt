@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cli.definitions
 
-import com.lemline.core.definitions.DefinitionCache
 import com.lemline.runner.cli.GlobalMixin
-import com.lemline.runner.definitions.DefinitionListenService
+import com.lemline.runner.definitions.DefinitionService
+import com.lemline.runner.definitions.DefinitionService.SaveResult
 import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.repositories.DefinitionRepository
 import io.quarkus.arc.Unremovable
 import jakarta.inject.Inject
 import java.io.File
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.ExperimentalSerializationApi
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
@@ -22,6 +22,7 @@ import picocli.CommandLine.Option
     name = "post",
     description = ["Create or update workflows from definition files."],
 )
+@ExperimentalSerializationApi
 class DefinitionPostCommand : Runnable {
 
     @Mixin
@@ -49,10 +50,7 @@ class DefinitionPostCommand : Runnable {
     var recursive: Boolean = false
 
     @Inject
-    lateinit var definitionRepository: DefinitionRepository
-
-    @Inject
-    lateinit var definitionListenService: DefinitionListenService
+    lateinit var definitionService: DefinitionService
 
     @Option(
         names = ["--force", "-F"],
@@ -143,28 +141,14 @@ class DefinitionPostCommand : Runnable {
         val prefix = "  ->"
         try {
             val content = file.readText()
-            val workflow = DefinitionCache.parse(content)
-            val model = DefinitionModel.from(workflow)
+            val model = DefinitionModel.from(content)
             val workflowName = "'${model.name}' (version '${model.version}')"
-            when (definitionRepository.insert(model)) {
-                1 -> {
-                    println("$prefix Workflow successfully created: $workflowName")
-                    // Extract and store listen task filters
-                    definitionListenService.syncListenDefinitions(workflow)
-                }
 
-                0 -> when (force) {
-                    true -> when (definitionRepository.update(model)) {
-                        1 -> {
-                            println("$prefix Workflow successfully updated: $workflowName")
-                            // Extract and store listen task filters
-                            definitionListenService.syncListenDefinitions(workflow)
-                        }
-                        0 -> System.err.println("$prefix Failed to update workflow: $workflowName") // this should not happen
-                    }
-
-                    false -> println("$prefix Workflow already exists (use --force to overwrite): $workflowName")
-                }
+            when (definitionService.save(model, force)) {
+                SaveResult.CREATED -> println("$prefix Workflow successfully created: $workflowName")
+                SaveResult.UPDATED -> println("$prefix Workflow successfully updated: $workflowName")
+                SaveResult.ALREADY_EXISTS -> println("$prefix Workflow already exists (use --force to overwrite): $workflowName")
+                SaveResult.FAILED -> System.err.println("$prefix Failed to save workflow: $workflowName")
             }
         } catch (e: Exception) {
             // Log error for the specific file but continue if processing a directory
