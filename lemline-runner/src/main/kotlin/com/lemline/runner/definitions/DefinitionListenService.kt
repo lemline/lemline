@@ -9,6 +9,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.definitions.CachedUntilCondition
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.ListenStrategy
@@ -40,10 +41,23 @@ data class ListenerMatch(
     val listener: ListenerModel,
     val strategy: ListenStrategy,
     val readAs: ListenTaskConfiguration.ListenAndReadAs,
-    /** Filter index that matched - relevant for ALL strategy */
+    /** Filter index that matched - relevant for ALL and ANY+until strategies */
     val filterIndex: Int,
-    /** Total number of filters - relevant for ALL strategy */
-    val totalFilters: Int
+    /** Total number of filters - relevant for ALL and ANY+until strategies */
+    val totalFilters: Int,
+    /** Until condition for ANY+until accumulation mode (null for ONE, ANY without until, ALL) */
+    val until: CachedUntilCondition? = null
+)
+
+/**
+ * Represents a listener that should be terminated by a termination event.
+ * Used for ANY + until(event) strategy where a specific event type triggers completion.
+ */
+@ExperimentalTime
+@ExperimentalSerializationApi
+data class TerminationMatch(
+    val listener: ListenerModel,
+    val readAs: ListenTaskConfiguration.ListenAndReadAs
 )
 
 /**
@@ -102,7 +116,8 @@ class DefinitionListenService {
         val filterIndex: Int,
         val totalFilters: Int,
         val strategy: ListenStrategy,
-        val readAs: ListenTaskConfiguration.ListenAndReadAs
+        val readAs: ListenTaskConfiguration.ListenAndReadAs,
+        val until: CachedUntilCondition?
     )
 
     /**
@@ -145,7 +160,8 @@ class DefinitionListenService {
                         filterIndex = index,
                         totalFilters = task.filters.size,
                         strategy = task.strategy,
-                        readAs = task.readAs
+                        readAs = task.readAs,
+                        until = task.until
                     )
                 }
             }
@@ -190,8 +206,8 @@ class DefinitionListenService {
 
             val matchingFilters = filterMatchByPosition[positionKey] ?: continue
 
-            // For ONE/ANY: only need one match (first filter)
-            // For ALL: need to emit one ListenerMatch per matched filter
+            // For ONE/ANY (without until): only need one match (first filter)
+            // For ALL and ANY+until: need to emit one ListenerMatch per matched filter
             for (filterMatch in matchingFilters) {
                 results.add(
                     ListenerMatch(
@@ -199,16 +215,102 @@ class DefinitionListenService {
                         strategy = filterMatch.strategy,
                         readAs = filterMatch.readAs,
                         filterIndex = filterMatch.filterIndex,
-                        totalFilters = filterMatch.totalFilters
+                        totalFilters = filterMatch.totalFilters,
+                        until = filterMatch.until
                     )
                 )
 
-                // For ONE/ANY, only need one match per listener
-                if (filterMatch.strategy != ListenStrategy.ALL) break
+                // For ONE/ANY without until, only need one match per listener
+                // For ALL and ANY+until, need all matches for event tracking
+                val needsAllMatches = filterMatch.strategy == ListenStrategy.ALL ||
+                    (filterMatch.strategy == ListenStrategy.ANY && filterMatch.until != null)
+                if (!needsAllMatches) break
             }
         }
 
         logger.debug { "Found ${results.size} listener matches for event type=${event.type}" }
+        return results
+    }
+
+    /**
+     * Finds active listeners that should be terminated by this CloudEvent.
+     *
+     * This is specifically for ANY + until(event) strategy where a termination event
+     * (different from the main event filters) triggers completion of the listener.
+     *
+     * @param event The incoming CloudEvent to match against termination filters
+     * @return List of listeners that should be terminated with their readAs config
+     */
+    suspend fun findTerminationListeners(event: CloudEvent): List<TerminationMatch> {
+        logger.debug { "Finding termination listeners for CloudEvent: type=${event.type}, source=${event.source}" }
+
+        // Parse event data lazily
+        val eventData by lazy { parseEventData(event) }
+
+        // Find listen tasks with termination filters that match this event
+        data class TerminationKey(
+            val workflowInfo: WorkflowInfo,
+            val nodePosition: NodePosition,
+            val readAs: ListenTaskConfiguration.ListenAndReadAs
+        )
+
+        val terminationKeys = mutableListOf<TerminationKey>()
+
+        for (task in DefinitionCache.getAllListenTasks()) {
+            // Only check tasks with termination filters
+            val terminationFilter = task.terminationFilter ?: continue
+
+            // Check if this event matches the termination filter
+            if (!filterMatches(terminationFilter, event, eventData)) continue
+
+            terminationKeys.add(
+                TerminationKey(
+                    workflowInfo = task.workflowInfo,
+                    nodePosition = task.nodePosition,
+                    readAs = task.readAs
+                )
+            )
+        }
+
+        if (terminationKeys.isEmpty()) {
+            logger.trace { "No termination filters match the event" }
+            return emptyList()
+        }
+
+        // Build query keys to find active listeners
+        val queryKeys = terminationKeys.map { key ->
+            ListenerQueryKey(
+                workflowInfo = key.workflowInfo,
+                position = key.nodePosition,
+                correlationValuesJson = null  // Termination doesn't use correlation
+            )
+        }
+
+        // Query active listeners
+        val listeners = listenerRepository.findByKeys(queryKeys)
+
+        if (listeners.isEmpty()) {
+            logger.trace { "No active listeners match the termination filters" }
+            return emptyList()
+        }
+
+        // Create a lookup map for readAs config
+        val readAsByPosition = terminationKeys.associateBy(
+            { Pair(it.workflowInfo, it.nodePosition) },
+            { it.readAs }
+        )
+
+        // Build termination matches
+        val results = listeners.mapNotNull { listener ->
+            val positionKey = Pair(
+                WorkflowInfo(listener.workflowNamespace, listener.workflowName, listener.workflowVersion),
+                listener.nodePosition
+            )
+            val readAs = readAsByPosition[positionKey] ?: return@mapNotNull null
+            TerminationMatch(listener = listener, readAs = readAs)
+        }
+
+        logger.debug { "Found ${results.size} termination matches for event type=${event.type}" }
         return results
     }
 

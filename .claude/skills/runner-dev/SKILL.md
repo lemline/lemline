@@ -20,6 +20,7 @@ handles messaging, persistence, scheduling, and CLI operations.
 - [Configuration](lemline-runner/docs/runner-configuration.md)
 - [Messaging Architecture](lemline-runner/docs/runner-messaging.md)
 - [Database Tables](lemline-runner/docs/runner-tables.md)
+- [Repositories guides](lemline-runner/docs/runner-repositories-guide.md)
 
 ---
 

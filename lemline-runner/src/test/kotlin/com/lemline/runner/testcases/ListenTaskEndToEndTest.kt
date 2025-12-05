@@ -354,6 +354,171 @@ internal class ListenTaskEndToEndTest {
     }
 
     @Test
+    fun `listen task with ANY + until expression accumulates events until condition is met`() = runTest {
+        // Given: A workflow with a listen task that accumulates until expression is true
+        val workflowName = WorkflowName("listen-any-until-expr-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - collectReadings:
+                  listen:
+                    to:
+                      any:
+                        - with:
+                            type: com.example.Reading
+                      until: .[2] != null
+              - complete:
+                  set:
+                    collected: true
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        // When: Start the workflow
+        val workflowId = startWorkflow(workflowName)
+
+        // Process until ListenStarted is emitted
+        val listenStartedEvent = processUntilListenStarted(workflowId)
+        listenStartedEvent shouldNotBe null
+
+        // Verify listener is registered
+        realDelay(200)
+        val listenersBeforeEvents = findListenersByWorkflow(testNamespace, workflowName, testVersion)
+        listenersBeforeEvents.size shouldBe 1
+
+        // Send first event - should accumulate, not complete
+        sendCloudEvent(
+            type = "com.example.Reading",
+            data = """{"value": 1}"""
+        )
+        realDelay(300)
+
+        // Verify listener still active
+        processMessages(workflowId, maxIterations = 20)
+        val listenersAfterFirst = findListenersByWorkflow(testNamespace, workflowName, testVersion)
+            .filter { it.outboxCompletedAt == null }
+        listenersAfterFirst.size shouldBe 1 // Still active
+
+        // Send second event - should accumulate, not complete
+        sendCloudEvent(
+            type = "com.example.Reading",
+            data = """{"value": 2}"""
+        )
+        realDelay(300)
+
+        // Verify listener still active
+        processMessages(workflowId, maxIterations = 20)
+        val listenersAfterSecond = findListenersByWorkflow(testNamespace, workflowName, testVersion)
+            .filter { it.outboxCompletedAt == null }
+        listenersAfterSecond.size shouldBe 1 // Still active
+
+        // Send third event - should trigger completion (length >= 3)
+        sendCloudEvent(
+            type = "com.example.Reading",
+            data = """{"value": 3}"""
+        )
+
+        // Allow time for CloudEvent processing and outbox completion
+        realDelay(3500)
+
+        // Process until workflow completes
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Workflow should complete
+        result shouldNotBe null
+        result!!["collected"]?.jsonPrimitive?.content shouldBe "true"
+    }
+
+    @Test
+    fun `listen task with ANY + until event completes on termination event`() = runTest {
+        // Given: A workflow with a listen task that accumulates until a termination event
+        val workflowName = WorkflowName("listen-any-until-event-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - monitorVitals:
+                  listen:
+                    to:
+                      any:
+                        - with:
+                            type: com.hospital.vitals.temperature
+                        - with:
+                            type: com.hospital.vitals.bpm
+                      until:
+                        one:
+                          with:
+                            type: com.hospital.patient.discharged
+              - complete:
+                  set:
+                    monitored: true
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        // When: Start the workflow
+        val workflowId = startWorkflow(workflowName)
+
+        // Process until ListenStarted is emitted
+        val listenStartedEvent = processUntilListenStarted(workflowId)
+        listenStartedEvent shouldNotBe null
+
+        // Verify listener is registered
+        realDelay(200)
+        val listenersBeforeEvents = findListenersByWorkflow(testNamespace, workflowName, testVersion)
+        listenersBeforeEvents.size shouldBe 1
+
+        // Send temperature reading - should accumulate
+        sendCloudEvent(
+            type = "com.hospital.vitals.temperature",
+            data = """{"temperature": 37.5}"""
+        )
+        realDelay(300)
+
+        // Verify listener still active
+        processMessages(workflowId, maxIterations = 20)
+        val listenersAfterTemp = findListenersByWorkflow(testNamespace, workflowName, testVersion)
+            .filter { it.outboxCompletedAt == null }
+        listenersAfterTemp.size shouldBe 1 // Still active
+
+        // Send bpm reading - should accumulate
+        sendCloudEvent(
+            type = "com.hospital.vitals.bpm",
+            data = """{"bpm": 72}"""
+        )
+        realDelay(300)
+
+        // Verify listener still active
+        processMessages(workflowId, maxIterations = 20)
+        val listenersAfterBpm = findListenersByWorkflow(testNamespace, workflowName, testVersion)
+            .filter { it.outboxCompletedAt == null }
+        listenersAfterBpm.size shouldBe 1 // Still active
+
+        // Send termination event - should trigger completion
+        sendCloudEvent(
+            type = "com.hospital.patient.discharged",
+            data = """{"reason": "recovered"}"""
+        )
+
+        // Allow time for CloudEvent processing and outbox completion
+        realDelay(3500)
+
+        // Process until workflow completes
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Workflow should complete
+        result shouldNotBe null
+        result!!["monitored"]?.jsonPrimitive?.content shouldBe "true"
+    }
+
+    @Test
     fun `multiple workflows can listen for same event type`() = runTest {
         // Given: Two workflow instances listening for the same event type
         val workflowName = WorkflowName("listen-multi-test-${System.currentTimeMillis()}")

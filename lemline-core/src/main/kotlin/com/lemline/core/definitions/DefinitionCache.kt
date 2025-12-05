@@ -18,13 +18,34 @@ import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader
 import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
 import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
+import io.serverlessworkflow.api.types.EventConsumptionStrategy
 import io.serverlessworkflow.api.types.EventFilter
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
+import io.serverlessworkflow.api.types.Until
 import io.serverlessworkflow.api.types.Workflow
+import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.util.concurrent.ConcurrentHashMap
 import org.jetbrains.annotations.TestOnly
+
+/**
+ * Cached until condition for ANY + until accumulation mode.
+ * Pre-parsed from workflow definition for efficient CloudEvent matching.
+ */
+sealed class CachedUntilCondition {
+    /**
+     * Expression evaluated against accumulated events array.
+     * E.g., ". | length > 3" or ". | any(.temperature > 38)"
+     */
+    data class Expression(val expression: String) : CachedUntilCondition()
+
+    /**
+     * Termination event filter - stop accumulating when this event arrives.
+     * Stores the filter to match against incoming events.
+     */
+    data class Event(val filter: EventFilter) : CachedUntilCondition()
+}
 
 /**
  * Cached information about a listen task in a workflow.
@@ -35,8 +56,16 @@ data class CachedListenTask(
     val nodePosition: NodePosition,
     val filters: List<EventFilter>,
     val strategy: ListenStrategy,
-    val readAs: ListenTaskConfiguration.ListenAndReadAs
-)
+    val readAs: ListenTaskConfiguration.ListenAndReadAs,
+    /** Until condition for ANY + until accumulation mode (null for ONE, ANY without until, ALL) */
+    val until: CachedUntilCondition? = null
+) {
+    /**
+     * Returns the termination filter if this is an ANY + until(event) task.
+     */
+    val terminationFilter: EventFilter?
+        get() = (until as? CachedUntilCondition.Event)?.filter
+}
 
 object DefinitionCache {
 
@@ -247,10 +276,22 @@ object DefinitionCache {
             val listenTask = node.task as? ListenTask ?: continue
             val listenTo = listenTask.listen?.to?.get() ?: continue
 
-            val (strategy, filters) = when (listenTo) {
-                is OneEventConsumptionStrategy -> ListenStrategy.ONE to listOfNotNull(listenTo.one)
-                is AnyEventConsumptionStrategy -> ListenStrategy.ANY to (listenTo.any ?: emptyList())
-                is AllEventConsumptionStrategy -> ListenStrategy.ALL to (listenTo.all ?: emptyList())
+            val (strategy, filters, until) = when (listenTo) {
+                is OneEventConsumptionStrategy -> Triple(
+                    ListenStrategy.ONE,
+                    listOfNotNull(listenTo.one),
+                    null
+                )
+                is AnyEventConsumptionStrategy -> Triple(
+                    ListenStrategy.ANY,
+                    listenTo.any ?: emptyList(),
+                    parseUntilCondition(listenTo.until)
+                )
+                is AllEventConsumptionStrategy -> Triple(
+                    ListenStrategy.ALL,
+                    listenTo.all ?: emptyList(),
+                    null
+                )
                 else -> continue
             }
 
@@ -264,13 +305,56 @@ object DefinitionCache {
                         nodePosition = position,
                         filters = filters,
                         strategy = strategy,
-                        readAs = readAs
+                        readAs = readAs,
+                        until = until
                     )
                 )
             }
         }
 
         return listenTasks
+    }
+
+    /**
+     * Parses the until condition from the workflow definition.
+     * Returns null if no until condition is specified.
+     */
+    private fun parseUntilCondition(until: Until?): CachedUntilCondition? {
+        if (until == null) return null
+
+        return when (val value = until.get()) {
+            is String -> {
+                // Expression condition evaluated against accumulated events
+                val expr = if (ExpressionUtils.isExpr(value)) {
+                    ExpressionUtils.trimExpr(value)
+                } else {
+                    value
+                }
+                CachedUntilCondition.Expression(expr)
+            }
+
+            is EventConsumptionStrategy -> {
+                // Event filter - stop when this event arrives
+                val filter = extractUntilEventFilter(value) ?: return null
+                CachedUntilCondition.Event(filter)
+            }
+
+            else -> null
+        }
+    }
+
+    /**
+     * Extracts the event filter from an until EventConsumptionStrategy.
+     * The spec allows nested consumption strategies for until, but we simplify
+     * to a single filter for the termination event.
+     */
+    private fun extractUntilEventFilter(strategy: EventConsumptionStrategy): EventFilter? {
+        return when (val strategyValue = strategy.get()) {
+            is OneEventConsumptionStrategy -> strategyValue.one
+            is AnyEventConsumptionStrategy -> strategyValue.any?.firstOrNull()
+            is AllEventConsumptionStrategy -> strategyValue.all?.firstOrNull()
+            else -> null
+        }
     }
 
     @TestOnly
