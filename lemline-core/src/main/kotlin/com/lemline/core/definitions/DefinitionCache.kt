@@ -13,16 +13,36 @@ import com.lemline.common.values.namespace
 import com.lemline.common.values.version
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.processors.ListenStrategy
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader
+import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
+import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
+import io.serverlessworkflow.api.types.EventFilter
+import io.serverlessworkflow.api.types.ListenTask
+import io.serverlessworkflow.api.types.ListenTaskConfiguration
+import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
 import io.serverlessworkflow.api.types.Workflow
 import java.util.concurrent.ConcurrentHashMap
 import org.jetbrains.annotations.TestOnly
+
+/**
+ * Cached information about a listen task in a workflow.
+ * Used for efficient CloudEvent matching without re-parsing workflow definitions.
+ */
+data class CachedListenTask(
+    val workflowInfo: WorkflowInfo,
+    val nodePosition: NodePosition,
+    val filters: List<EventFilter>,
+    val strategy: ListenStrategy,
+    val readAs: ListenTaskConfiguration.ListenAndReadAs
+)
 
 object DefinitionCache {
 
     private val workflowCache = ConcurrentHashMap<WorkflowInfo, Workflow>()
     private val nodesMapCache = ConcurrentHashMap<WorkflowInfo, Map<NodePosition, Node<*>>>()
+    private val listenTasksCache = ConcurrentHashMap<WorkflowInfo, List<CachedListenTask>>()
 
     private val jsonMapper = LemlineJson.jacksonMapper
     private val yamlMapper = LemlineJson.yamlMapper
@@ -53,7 +73,7 @@ object DefinitionCache {
     /**
      * Parses the given workflow definition string in either YAML or JSON format,
      * validates it, and adds it to the cache. If the definition is successfully parsed,
-     * it is cached along with its root node and nodes map for efficient retrieval.
+     * it is cached along with its root node, nodes map, and listen tasks for efficient retrieval.
      *
      * @param definition The workflow definition as a string, expected to be in YAML or JSON format.
      * @return The parsed and validated Workflow object.
@@ -66,7 +86,9 @@ object DefinitionCache {
             WorkflowReader.validation().read(definition, WorkflowFormat.JSON)
         }.also { workflow ->
             workflowCache[workflow.info] = workflow
-            nodesMapCache[workflow.info] = getNodesMap(createRootNode(workflow))
+            val nodesMap = getNodesMap(createRootNode(workflow))
+            nodesMapCache[workflow.info] = nodesMap
+            listenTasksCache[workflow.info] = extractListenTasks(workflow.info, nodesMap)
         }
 
     /**
@@ -176,6 +198,7 @@ object DefinitionCache {
         val key = WorkflowInfo(namespace, name, version)
         workflowCache.remove(key)
         nodesMapCache.remove(key)
+        listenTasksCache.remove(key)
     }
 
     /**
@@ -189,10 +212,72 @@ object DefinitionCache {
     @JvmStatic
     fun getAllWorkflows(): List<Workflow> = workflowCache.values.toList()
 
+    /**
+     * Returns all cached listen tasks across all workflows.
+     *
+     * This is used for efficient CloudEvent matching without re-parsing
+     * workflow definitions on every event.
+     *
+     * @return A list of all cached listen tasks.
+     */
+    @JvmStatic
+    fun getAllListenTasks(): List<CachedListenTask> = listenTasksCache.values.flatten()
+
+    /**
+     * Returns cached listen tasks for a specific workflow.
+     *
+     * @param workflowInfo The workflow to get listen tasks for.
+     * @return The list of listen tasks, or empty list if workflow not found.
+     */
+    @JvmStatic
+    fun getListenTasks(workflowInfo: WorkflowInfo): List<CachedListenTask> =
+        listenTasksCache[workflowInfo] ?: emptyList()
+
+    /**
+     * Extracts listen tasks from a workflow's nodes map.
+     * Called once when workflow is cached.
+     */
+    private fun extractListenTasks(
+        workflowInfo: WorkflowInfo,
+        nodesMap: Map<NodePosition, Node<*>>
+    ): List<CachedListenTask> {
+        val listenTasks = mutableListOf<CachedListenTask>()
+
+        for ((position, node) in nodesMap) {
+            val listenTask = node.task as? ListenTask ?: continue
+            val listenTo = listenTask.listen?.to?.get() ?: continue
+
+            val (strategy, filters) = when (listenTo) {
+                is OneEventConsumptionStrategy -> ListenStrategy.ONE to listOfNotNull(listenTo.one)
+                is AnyEventConsumptionStrategy -> ListenStrategy.ANY to (listenTo.any ?: emptyList())
+                is AllEventConsumptionStrategy -> ListenStrategy.ALL to (listenTo.all ?: emptyList())
+                else -> continue
+            }
+
+            if (filters.isNotEmpty()) {
+                val readAs = listenTask.listen?.read
+                    ?: ListenTaskConfiguration.ListenAndReadAs.DATA
+
+                listenTasks.add(
+                    CachedListenTask(
+                        workflowInfo = workflowInfo,
+                        nodePosition = position,
+                        filters = filters,
+                        strategy = strategy,
+                        readAs = readAs
+                    )
+                )
+            }
+        }
+
+        return listenTasks
+    }
+
     @TestOnly
     fun clear() {
         workflowCache.clear()
         nodesMapCache.clear()
+        listenTasksCache.clear()
     }
 }
 

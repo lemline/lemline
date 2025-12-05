@@ -20,16 +20,16 @@ CREATE TABLE lemline_listeners
     -- Correlation state (for Mode 2: first-sets-baseline)
     correlation_values      TEXT,                    -- JSON map of correlation key -> baseline value
 
-    -- Accumulated events (for ANY with until)
-    accumulated_events      TEXT,                    -- JSON array of matched events
-    matched_filter_indices  TEXT,                    -- JSON array of matched filter indices (for ALL strategy)
+    -- Single event storage (for ONE and ANY without until)
+    event                   TEXT,                    -- JSON CloudEvent data
 
     -- Timeout handling
     timeout_at              TIMESTAMPTZ(6),
 
     -- Outbox fields
+    -- outbox_delayed_until: NULL = waiting, NOT NULL = ready for processing
     outbox_scheduled_for    TIMESTAMPTZ(6) NOT NULL,
-    outbox_delayed_until    TIMESTAMPTZ(6) NOT NULL,
+    outbox_delayed_until    TIMESTAMPTZ(6),
     outbox_attempt_count    INTEGER        NOT NULL DEFAULT 0,
     outbox_error_class      TEXT,
     outbox_error_message    TEXT,
@@ -73,11 +73,41 @@ CREATE INDEX idx_lemline_listeners_completed
     ON lemline_listeners (outbox_completed_at)
     WHERE outbox_completed_at IS NOT NULL;
 
+-- Listener events table (for ALL and ANY+until strategies)
+-- Stores accumulated CloudEvents for listeners that need multiple events
+CREATE TABLE lemline_listener_events
+(
+    id              UUID PRIMARY KEY,
+
+    -- Reference to parent listener (CASCADE delete for automatic cleanup)
+    listener_id     UUID         NOT NULL REFERENCES lemline_listeners (id) ON DELETE CASCADE,
+
+    -- Filter index: explicit for ALL strategy (0, 1, 2...), NULL for ANY+until
+    filter_index    INT,
+
+    -- CloudEvent data
+    event           TEXT         NOT NULL,
+
+    -- Timestamps
+    created_at      TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMPTZ(6),
+
+    -- Ensure one event per filter index per listener (protects ALL strategy)
+    UNIQUE (listener_id, filter_index)
+);
+
+-- Index for efficient lookup by listener_id
+CREATE INDEX idx_lemline_listener_events_listener_id
+    ON lemline_listener_events (listener_id);
+
 -- Comments for documentation
 COMMENT ON TABLE lemline_listeners IS 'Active listener instances waiting for CloudEvents';
 COMMENT ON COLUMN lemline_listeners.workflow_namespace IS 'Workflow namespace for locating listen task in cached workflow definition';
 COMMENT ON COLUMN lemline_listeners.workflow_name IS 'Workflow name for locating listen task in cached workflow definition';
 COMMENT ON COLUMN lemline_listeners.workflow_version IS 'Workflow version for locating listen task in cached workflow definition';
 COMMENT ON COLUMN lemline_listeners.correlation_values IS 'Baseline correlation values set by first matching event (Mode 2)';
-COMMENT ON COLUMN lemline_listeners.accumulated_events IS 'Events accumulated so far (for ANY with until condition)';
-COMMENT ON COLUMN lemline_listeners.matched_filter_indices IS 'Filter indices that have been matched (for ALL strategy)';
+COMMENT ON COLUMN lemline_listeners.event IS 'Single matched event for ONE/ANY strategies (JSON)';
+
+COMMENT ON TABLE lemline_listener_events IS 'Accumulated CloudEvents for ALL and ANY+until strategies';
+COMMENT ON COLUMN lemline_listener_events.filter_index IS 'Filter index that matched (explicit for ALL, auto-generated for ANY+until)';
+COMMENT ON COLUMN lemline_listener_events.event IS 'CloudEvent data (JSON)';

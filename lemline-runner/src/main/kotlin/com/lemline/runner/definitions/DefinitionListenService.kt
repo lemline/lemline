@@ -5,24 +5,19 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.NodePosition
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.common.values.name
-import com.lemline.common.values.namespace
-import com.lemline.common.values.version
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.expressions.JQExpression
+import com.lemline.core.processors.ListenStrategy
 import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
 import io.cloudevents.CloudEvent
-import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
-import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
 import io.serverlessworkflow.api.types.EventFilter
-import io.serverlessworkflow.api.types.ListenTask
-import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
-import io.serverlessworkflow.api.types.Workflow
+import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -34,20 +29,21 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.put
 
 /**
- * Represents a listen task found in a workflow definition.
+ * Represents a matched listener with context needed for batch processing.
  */
 @ExperimentalTime
-data class ListenTaskInfo(
-    val workflowNamespace: WorkflowNamespace,
-    val workflowName: WorkflowName,
-    val workflowVersion: WorkflowVersion,
-    val nodePosition: NodePosition,
-    val filters: List<EventFilter>
+@ExperimentalSerializationApi
+data class ListenerMatch(
+    val listener: ListenerModel,
+    val strategy: ListenStrategy,
+    val readAs: ListenTaskConfiguration.ListenAndReadAs,
+    /** Filter index that matched - relevant for ALL strategy */
+    val filterIndex: Int,
+    /** Total number of filters - relevant for ALL strategy */
+    val totalFilters: Int
 )
 
 /**
@@ -97,117 +93,130 @@ class DefinitionListenService {
     }
 
     /**
-     * Finds all active listeners that match a CloudEvent, including correlation matching.
+     * Key for grouping filter matches before querying listeners.
+     */
+    private data class FilterMatchKey(
+        val workflowInfo: WorkflowInfo,
+        val nodePosition: NodePosition,
+        val correlationValuesJson: String?,
+        val filterIndex: Int,
+        val totalFilters: Int,
+        val strategy: ListenStrategy,
+        val readAs: ListenTaskConfiguration.ListenAndReadAs
+    )
+
+    /**
+     * Finds all active listeners with full context needed for batch processing.
      *
      * This method:
      * 1. Finds listen tasks with filters that match the CloudEvent attributes
-     * 2. For each matching filter, extracts correlation values from the event
-     * 3. Queries active listeners using correlation values in the database query
+     * 2. For each matching filter, extracts correlation values and filter index
+     * 3. Queries active listeners and enriches them with strategy context
+     *
+     * The returned ListenerMatch includes all information needed for batch updates:
+     * - strategy (ONE/ANY/ALL)
+     * - readAs (DATA/ENVELOPE/RAW)
+     * - filterIndex (which filter matched - important for ALL strategy)
+     * - totalFilters (total number of filters - important for ALL strategy)
      *
      * @param event The incoming CloudEvent to match against
-     * @return List of active listeners interested in this event
+     * @return List of listener matches with full context
      */
-    suspend fun findMatchingListeners(event: CloudEvent): List<ListenerModel> {
+    suspend fun findMatchingListeners(event: CloudEvent): List<ListenerMatch> {
         logger.debug { "Finding matching listeners for CloudEvent: type=${event.type}, source=${event.source}" }
 
         // Parse event data lazily (only if needed for filter evaluation)
         val eventData by lazy { parseEventData(event) }
 
-        // Build unique query keys for matching listen tasks
-        val queryKeys = mutableSetOf<ListenerQueryKey>()
+        // Build filter match keys - tracks which filter index matched for each listen task
+        // Uses cached listen tasks from DefinitionCache (computed once per workflow add)
+        val filterMatchKeys = mutableListOf<FilterMatchKey>()
 
-        for (listenTask in getAllListenTasks()) {
-            for (filter in listenTask.filters) {
-                if (filterMatches(filter, event, eventData)) {
-                    val correlationJson = extractCorrelationValues(filter, eventData)
-                        ?.let { serializeCorrelationValues(it) }
+        filterMatchKeys.addAll(
+            DefinitionCache.getAllListenTasks().flatMap { task ->
+                task.filters.mapIndexedNotNull { index, filter ->
+                    if (!filterMatches(filter, event, eventData)) return@mapIndexedNotNull null
 
-                    queryKeys.add(
-                        ListenerQueryKey(
-                            namespace = listenTask.workflowNamespace,
-                            name = listenTask.workflowName,
-                            version = listenTask.workflowVersion,
-                            position = listenTask.nodePosition,
-                            correlationValuesJson = correlationJson
-                        )
+                    FilterMatchKey(
+                        workflowInfo = task.workflowInfo,
+                        nodePosition = task.nodePosition,
+                        correlationValuesJson = extractCorrelationValues(filter, eventData)
+                            ?.let(::serializeCorrelationValues),
+                        filterIndex = index,
+                        totalFilters = task.filters.size,
+                        strategy = task.strategy,
+                        readAs = task.readAs
                     )
                 }
             }
-        }
+        )
 
-        if (queryKeys.isEmpty()) {
+        if (filterMatchKeys.isEmpty()) {
             logger.trace { "No filters match the event" }
             return emptyList()
         }
 
+        // Build unique query keys (same listener might match multiple filters for ALL strategy)
+        val queryKeys = filterMatchKeys.map { key: FilterMatchKey ->
+            ListenerQueryKey(
+                workflowInfo = key.workflowInfo,
+                position = key.nodePosition,
+                correlationValuesJson = key.correlationValuesJson
+            )
+        }.distinct()
+
         // Batch query all matching listeners
-        val listeners = listenerRepository.findByKeys(queryKeys.toList())
+        val listeners = listenerRepository.findByKeys(queryKeys)
 
-        logger.debug { "Found ${listeners.size} matching listeners for event type=${event.type}" }
-        return listeners
-    }
-
-    /**
-     * Retrieves all listen tasks from all cached workflow definitions.
-     */
-    private fun getAllListenTasks(): List<ListenTaskInfo> {
-        return DefinitionCache.getAllWorkflows().flatMap { workflow ->
-            extractListenTasks(workflow)
+        if (listeners.isEmpty()) {
+            logger.trace { "No active listeners match the filters" }
+            return emptyList()
         }
-    }
 
-    /**
-     * Extracts listen tasks from a single workflow.
-     */
-    fun extractListenTasks(workflow: Workflow): List<ListenTaskInfo> {
-        val listenTasks = mutableListOf<ListenTaskInfo>()
-        val nodesMap = DefinitionCache.getNodesMap(workflow)
+        // Create a lookup map for filter match context
+        // Key: (namespace, name, version, position) -> list of FilterMatchKey
+        val filterMatchByPosition = filterMatchKeys.groupBy { key ->
+            Pair(key.workflowInfo, key.nodePosition)
+        }
 
-        for ((position, node) in nodesMap) {
-            val listenTask = node.task as? ListenTask ?: continue
-            val filters = getFiltersFromListenTask(listenTask)
+        // Build ListenerMatch results by joining listeners with their filter context
+        val results = mutableListOf<ListenerMatch>()
 
-            if (filters.isNotEmpty()) {
-                listenTasks.add(
-                    ListenTaskInfo(
-                        workflowNamespace = workflow.namespace,
-                        workflowName = workflow.name,
-                        workflowVersion = workflow.version,
-                        nodePosition = position,
-                        filters = filters
+        for (listener in listeners) {
+            val positionKey = Pair(
+                WorkflowInfo(listener.workflowNamespace, listener.workflowName, listener.workflowVersion),
+                listener.nodePosition
+            )
+
+            val matchingFilters = filterMatchByPosition[positionKey] ?: continue
+
+            // For ONE/ANY: only need one match (first filter)
+            // For ALL: need to emit one ListenerMatch per matched filter
+            for (filterMatch in matchingFilters) {
+                results.add(
+                    ListenerMatch(
+                        listener = listener,
+                        strategy = filterMatch.strategy,
+                        readAs = filterMatch.readAs,
+                        filterIndex = filterMatch.filterIndex,
+                        totalFilters = filterMatch.totalFilters
                     )
                 )
+
+                // For ONE/ANY, only need one match per listener
+                if (filterMatch.strategy != ListenStrategy.ALL) break
             }
         }
 
-        return listenTasks
-    }
-
-    /**
-     * Gets the list of EventFilters from a ListenTask.
-     */
-    private fun getFiltersFromListenTask(listenTask: ListenTask): List<EventFilter> {
-        val listenTo = listenTask.listen?.to?.get() ?: return emptyList()
-
-        return when (listenTo) {
-            is OneEventConsumptionStrategy -> listOfNotNull(listenTo.one)
-            is AnyEventConsumptionStrategy -> listenTo.any ?: emptyList()
-            is AllEventConsumptionStrategy -> listenTo.all ?: emptyList()
-            else -> emptyList()
-        }
+        logger.debug { "Found ${results.size} listener matches for event type=${event.type}" }
+        return results
     }
 
     /**
      * Serializes correlation values to JSON with sorted keys for consistent database comparison.
      */
-    private fun serializeCorrelationValues(values: Map<String, String>): String {
-        val sortedEntries = values.entries.sortedBy { it.key }
-        return buildJsonObject {
-            for ((key, value) in sortedEntries) {
-                put(key, value)
-            }
-        }.let { Json.encodeToString(it) }
-    }
+    private fun serializeCorrelationValues(values: Map<String, String>) =
+        Json.encodeToString(values.toSortedMap())
 
     /**
      * Extracts correlation values from the event data using the filter's correlation definitions.
@@ -324,32 +333,6 @@ class DefinitionListenService {
             } catch (_: Exception) {
                 null
             } == eventValue
-        }
-    }
-
-    /**
-     * Matches the data filter against the event's data payload.
-     */
-    private fun matchesDataFilter(filterValue: String?, eventData: JsonElement): Boolean {
-        if (filterValue == null) return true
-
-        return try {
-            if (ExpressionUtils.isExpr(filterValue)) {
-                val expression = ExpressionUtils.trimExpr(filterValue)
-                val result = evaluateJqExpression(expression, eventData)
-                (result as? JsonPrimitive)?.booleanOrNull == true
-            } else {
-                // Literal match: parse as JSON and compare
-                try {
-                    val filterData = Json.parseToJsonElement(filterValue)
-                    filterData == eventData
-                } catch (e: Exception) {
-                    filterValue == eventData.toString()
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to evaluate data filter expression: $filterValue" }
-            false
         }
     }
 

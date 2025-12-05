@@ -131,15 +131,10 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
 
         return ListenerModel(
             id = IDV7.random(),
-            workflowNamespace = testNamespace,
-            workflowName = testName,
-            workflowVersion = testVersion,
             instanceMessage = InstanceMessage(
                 workflowInfo = workflowInfo,
                 workflowState = listenStarted
             ),
-            workflowId = workflowId,
-            workflowPosition = testNodePosition,
             timeoutAt = null,
             outboxScheduledFor = now
         ).also {
@@ -173,9 +168,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         repository.insert(listener)
 
         val key = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = null
         )
@@ -197,9 +190,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         repository.insert(listener)
 
         val key = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = """{"orderId":"123"}"""
         )
@@ -222,9 +213,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         repository.insert(listener)
 
         val key = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = correlationJson
         )
@@ -246,9 +235,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         repository.insert(listener)
 
         val key = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = """{"orderId":"456"}"""
         )
@@ -272,16 +259,12 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
 
         val keys = listOf(
             ListenerQueryKey(
-                namespace = testNamespace,
-                name = testName,
-                version = testVersion,
+                workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
                 position = position1,
                 correlationValuesJson = null
             ),
             ListenerQueryKey(
-                namespace = testNamespace,
-                name = testName,
-                version = testVersion,
+                workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
                 position = position2,
                 correlationValuesJson = null
             )
@@ -303,16 +286,12 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
 
         val keys = listOf(
             ListenerQueryKey(
-                namespace = testNamespace,
-                name = testName,
-                version = testVersion,
+                workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
                 position = testNodePosition,
                 correlationValuesJson = null
             ),
             ListenerQueryKey(
-                namespace = WorkflowNamespace("other-namespace"),
-                name = testName,
-                version = testVersion,
+                workflowInfo = WorkflowInfo(WorkflowNamespace("other-namespace"), testName, testVersion),
                 position = testNodePosition,
                 correlationValuesJson = null
             )
@@ -341,9 +320,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         // Key without correlation should find listener1 only (since no correlation filter)
         // Key with correlation should find both (null matches, and exact match)
         val keyWithCorrelation = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = correlationJson
         )
@@ -365,9 +342,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         repository.insert(listener)
 
         val key = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = null
         )
@@ -388,9 +363,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         repository.insert(listener)
 
         val key = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = null
         )
@@ -409,9 +382,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         repository.insert(listener)
 
         val key = ListenerQueryKey(
-            namespace = WorkflowNamespace("non-existent-namespace"),
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(WorkflowNamespace("non-existent-namespace"), testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = null
         )
@@ -431,9 +402,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         repository.insert(listOf(listener1, listener2))
 
         val key = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = null
         )
@@ -456,9 +425,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
 
         // Key WITHOUT correlation should find ALL listeners (no correlation filter)
         val key = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = null
         )
@@ -490,9 +457,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
 
         // Key with correlationA should find: listenerNull (Mode 2) and listenerA (exact match)
         val keyA = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = correlationA
         )
@@ -522,16 +487,12 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
 
         val keys = listOf(
             ListenerQueryKey(
-                namespace = testNamespace,
-                name = testName,
-                version = testVersion,
+                workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
                 position = position1,
                 correlationValuesJson = correlationJson  // matches listener1
             ),
             ListenerQueryKey(
-                namespace = testNamespace,
-                name = testName,
-                version = testVersion,
+                workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
                 position = position2,
                 correlationValuesJson = """{"orderId":"456"}"""  // matches listener2 (null correlation)
             )
@@ -558,9 +519,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         repository.insert(listOf(active, completed, failed))
 
         val key = ListenerQueryKey(
-            namespace = testNamespace,
-            name = testName,
-            version = testVersion,
+            workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
             position = testNodePosition,
             correlationValuesJson = null
         )
@@ -610,15 +569,10 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
 
         return ListenerModel(
             id = IDV7.random(),
-            workflowNamespace = testNamespace,
-            workflowName = testName,
-            workflowVersion = testVersion,
             instanceMessage = InstanceMessage(
                 workflowInfo = workflowInfo,
                 workflowState = listenStarted
             ),
-            workflowId = workflowId,
-            workflowPosition = position,
             timeoutAt = null,
             outboxScheduledFor = now
         ).also {

@@ -136,7 +136,7 @@ internal class ListenerTimeoutOutbox : AbstractScheduledTask() {
 
         logger.info {
             "Listener ${listener.id} timed out for workflow ${listener.workflowId} " +
-                "at position ${listener.workflowPosition}"
+                "at position ${listener.nodePosition}"
         }
     }
 }

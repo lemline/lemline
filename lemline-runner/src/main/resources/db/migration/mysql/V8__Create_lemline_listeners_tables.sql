@@ -20,16 +20,16 @@ CREATE TABLE lemline_listeners
     -- Correlation state (for Mode 2: first-sets-baseline)
     correlation_values      TEXT,                    -- JSON map of correlation key -> baseline value
 
-    -- Accumulated events (for ANY with until)
-    accumulated_events      MEDIUMTEXT,              -- JSON array of matched events
-    matched_filter_indices  TEXT,                    -- JSON array of matched filter indices (for ALL strategy)
+    -- Single event storage (for ONE and ANY without until)
+    event                   MEDIUMTEXT,              -- JSON CloudEvent data
 
     -- Timeout handling
     timeout_at              TIMESTAMP(6),
 
     -- Outbox fields
+    -- outbox_delayed_until: NULL = waiting, NOT NULL = ready for processing
     outbox_scheduled_for    TIMESTAMP(6) NOT NULL,
-    outbox_delayed_until    TIMESTAMP(6) NOT NULL,
+    outbox_delayed_until    TIMESTAMP(6),
     outbox_attempt_count    INTEGER      NOT NULL DEFAULT 0,
     outbox_error_class      TEXT,
     outbox_error_message    TEXT,
@@ -65,3 +65,35 @@ CREATE INDEX idx_lemline_listeners_processing
 -- Index for cleanup queries
 CREATE INDEX idx_lemline_listeners_completed
     ON lemline_listeners (outbox_completed_at);
+
+-- Listener events table (for ALL and ANY+until strategies)
+-- Stores accumulated CloudEvents for listeners that need multiple events
+CREATE TABLE lemline_listener_events
+(
+    id              BINARY(16) PRIMARY KEY,
+
+    -- Reference to parent listener (CASCADE delete for automatic cleanup)
+    listener_id     BINARY(16)   NOT NULL,
+
+    -- Filter index: explicit for ALL strategy (0, 1, 2...), NULL for ANY+until
+    filter_index    INT,
+
+    -- CloudEvent data
+    event           MEDIUMTEXT   NOT NULL,
+
+    -- Timestamps
+    created_at      TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at      TIMESTAMP(6),
+
+    -- Ensure one event per filter index per listener (protects ALL strategy)
+    -- NULL values are excluded from UNIQUE constraint
+    UNIQUE KEY (listener_id, filter_index),
+
+    -- Foreign key with CASCADE delete
+    CONSTRAINT fk_listener_events_listener
+        FOREIGN KEY (listener_id) REFERENCES lemline_listeners (id) ON DELETE CASCADE
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4
+  COLLATE = utf8mb4_0900_as_cs;
+
+-- Index for efficient lookup by listener_id (covered by UNIQUE KEY)

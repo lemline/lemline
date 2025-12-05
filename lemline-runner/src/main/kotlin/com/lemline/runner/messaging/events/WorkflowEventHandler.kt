@@ -38,12 +38,11 @@ import com.lemline.runner.repositories.WaitRepository
 import com.lemline.runner.starters.Starter
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -248,15 +247,10 @@ internal class WorkflowEventHandler(
         val config = state.config
         val listenerId = state.nodeStack.deriveIdempotentId("-listen")
 
-        // Create listener model with workflow identity (for locating listen task in cache)
+        // Create listener model - workflow identity derived from instanceMessage
         val listener = ListenerModel(
             id = listenerId,
-            workflowNamespace = instance.workflowInfo.workflowNamespace,
-            workflowName = instance.workflowInfo.workflowName,
-            workflowVersion = instance.workflowInfo.workflowVersion,
             instanceMessage = instance,
-            workflowId = instance.workflowId,
-            workflowPosition = state.nodePosition,
             timeoutAt = config.timeoutAt,
             outboxScheduledFor = Clock.System.now(),
         )

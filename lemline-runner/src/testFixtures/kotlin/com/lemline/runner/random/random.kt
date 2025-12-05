@@ -202,19 +202,14 @@ fun ListenerModel.Companion.random(): ListenerModel {
 
     return ListenerModel(
         id = IDV7.random(),
-        workflowNamespace = workflowInfo.workflowNamespace,
-        workflowName = workflowInfo.workflowName,
-        workflowVersion = workflowInfo.workflowVersion,
         instanceMessage = InstanceMessage(
             workflowInfo = workflowInfo,
             workflowState = listenStarted,
         ),
-        workflowId = listenStarted.nodeStack.rootState?.workflowId ?: WorkflowId.random(),
-        workflowPosition = listenStarted.nodePosition,
         timeoutAt = config.timeoutAt,
         outboxScheduledFor = Instant.random(),
     ).also {
-        // Don't call randomize() as outboxDelayedUntil cannot be null for ListenerModel
+        // Don't call randomize() as outboxDelayedUntil starts as null for ListenerModel
         it.outboxAttemptCount = Int.random()
         it.outboxErrorClass = String.nullableRandom()
         it.outboxErrorMessage = String.nullableRandom()
@@ -222,12 +217,8 @@ fun ListenerModel.Companion.random(): ListenerModel {
             true -> """{"${String.random()}":"${String.random()}"}"""
             false -> null
         }
-        it.accumulatedEvents = when (Random.nextBoolean()) {
-            true -> """[{"type":"com.example.${String.random()}"}]"""
-            false -> null
-        }
-        it.matchedFilterIndices = when (Random.nextBoolean()) {
-            true -> """[${Random.nextInt(0, 5)}]"""
+        it.event = when (Random.nextBoolean()) {
+            true -> """{"type":"com.example.${String.random()}"}"""
             false -> null
         }
     }

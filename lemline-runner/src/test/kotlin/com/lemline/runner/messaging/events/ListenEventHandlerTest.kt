@@ -105,9 +105,7 @@ internal class ListenEventHandlerTest {
         val listeners = listenerRepository.findByKeys(
             listOf(
                 ListenerQueryKey(
-                    namespace = testNamespace,
-                    name = testName,
-                    version = testVersion,
+                    workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
                     position = testNodePosition,
                     correlationValuesJson = null
                 )
@@ -117,7 +115,7 @@ internal class ListenEventHandlerTest {
         listeners.size shouldBe 1
         val listener = listeners.first()
         listener.workflowId shouldBe instance.workflowId
-        listener.workflowPosition shouldBe instance.workflowState.nodePosition
+        listener.nodePosition shouldBe instance.workflowState.nodePosition
         listener.workflowNamespace shouldBe testNamespace
         listener.workflowName shouldBe testName
         listener.workflowVersion shouldBe testVersion
@@ -144,9 +142,7 @@ internal class ListenEventHandlerTest {
         val listeners = listenerRepository.findByKeys(
             listOf(
                 ListenerQueryKey(
-                    namespace = testNamespace,
-                    name = testName,
-                    version = testVersion,
+                    workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
                     position = testNodePosition,
                     correlationValuesJson = null
                 )
@@ -180,9 +176,7 @@ internal class ListenEventHandlerTest {
         val listeners = listenerRepository.findByKeys(
             listOf(
                 ListenerQueryKey(
-                    namespace = testNamespace,
-                    name = testName,
-                    version = testVersion,
+                    workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
                     position = testNodePosition,
                     correlationValuesJson = null
                 )

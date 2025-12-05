@@ -248,9 +248,6 @@ internal class ListenerTimeoutOutboxTest {
 
         return ListenerModel(
             id = listenerId,
-            workflowNamespace = testNamespace,
-            workflowName = testName,
-            workflowVersion = testVersion,
             instanceMessage = InstanceMessage(
                 workflowInfo = WorkflowInfo(
                     workflowNamespace = testNamespace,
@@ -259,8 +256,6 @@ internal class ListenerTimeoutOutboxTest {
                 ),
                 workflowState = listenStarted
             ),
-            workflowId = workflowId,
-            workflowPosition = listenStarted.nodePosition,
             timeoutAt = timeoutAt,
             outboxScheduledFor = Clock.System.now()
         )

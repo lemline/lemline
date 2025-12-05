@@ -2,24 +2,20 @@
 package com.lemline.runner.messaging.cloudevents
 
 import com.lemline.common.logger.logger
-import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.definitions.getNode
+import com.lemline.common.values.IDV7
 import com.lemline.core.processors.ListenStrategy
-import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.definitions.DefinitionListenService
-import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.runner.models.ListenerModel
+import com.lemline.runner.definitions.ListenerMatch
+import com.lemline.runner.models.ListenerEventModel
+import com.lemline.runner.repositories.ListenerEventRepository
 import com.lemline.runner.repositories.ListenerRepository
 import io.cloudevents.CloudEvent
-import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
-import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
-import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
-import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -30,20 +26,32 @@ import kotlinx.serialization.json.put
 
 /**
  * Handles incoming CloudEvents by matching them against active listeners
- * and completing workflows that are waiting for matching events.
+ * and marking matched listeners ready for completion.
  *
  * ## Processing Flow
  *
- * 1. **Service Query**: Use DefinitionListenService to find matching listeners
- * 2. **Workflow Lookup**: Get listen task config from cached workflow definition
- * 3. **Strategy Handling**: Apply ONE/ANY/ALL strategy logic
- * 4. **Completion**: Resume matched workflows with the event data
+ * 1. **Service Query**: Use DefinitionListenService to find matching listeners with context
+ * 2. **Batch Grouping**: Group matches by strategy and readAs mode
+ * 3. **Strategy-Specific Processing**:
+ *    - ONE/ANY: Single batch UPDATE on listeners table
+ *    - ALL: Batch INSERT into events table + COUNT check + batch UPDATE
+ * 4. **Completion**: ListenerCompletionOutbox sends resume commands
  *
- * ## Strategy Behavior
+ * ## Batch Optimization
  *
- * - **ONE**: First matching event completes the listener
- * - **ANY**: First matching event completes (or accumulates if `until` is set)
- * - **ALL**: All filters must match once; event indices are tracked
+ * Instead of processing listeners one-by-one, this handler:
+ * - Groups ONE/ANY listeners for single batch UPDATE
+ * - Groups ALL listeners by (filterIndex, totalFilters, readAs) for batch INSERT
+ * - Extracts event data once per readAs mode (not per listener)
+ *
+ * For 1000 listeners, this reduces database calls from 1000+ to just a few.
+ *
+ * ## Race Condition Prevention
+ *
+ * - ONE/ANY: Atomic UPDATE with WHERE guards prevents double-completion
+ * - ALL: Idempotent INSERT (ON CONFLICT DO NOTHING) + atomic UPDATE prevents races
+ *
+ * @see ListenerCompletionOutbox for completion processing
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
@@ -51,12 +59,18 @@ import kotlinx.serialization.json.put
 internal class CloudEventHandler(
     private val definitionListenService: DefinitionListenService,
     private val listenerRepository: ListenerRepository,
-    private val commandEmitter: WorkflowCommandEmitter,
 ) {
     private val logger = logger()
 
+    @Inject
+    private lateinit var listenerEventRepository: ListenerEventRepository
+
     /**
      * Processes an incoming CloudEvent by matching it against active listeners.
+     *
+     * Uses batch operations to efficiently handle thousands of listeners:
+     * - ONE/ANY strategy: Single batch UPDATE on listeners table
+     * - ALL strategy: Batch INSERT into events table + COUNT + batch UPDATE
      *
      * @param event The incoming CloudEvent
      * @return Number of listeners that were affected (completed or updated)
@@ -66,21 +80,34 @@ internal class CloudEventHandler(
 
         logger.debug { "Processing CloudEvent: type=$eventType, source=${event.source}, id=${event.id}" }
 
-        // Find all matching listeners using the service
-        val listeners = definitionListenService.findMatchingListeners(event)
-        if (listeners.isEmpty()) {
+        // Find all matching listeners with full context for batch processing
+        val matches = definitionListenService.findMatchingListeners(event)
+        if (matches.isEmpty()) {
             logger.trace { "No matching listeners for event type: $eventType" }
             return 0
         }
 
-        logger.debug { "Found ${listeners.size} matching listeners for event type: $eventType" }
+        logger.debug { "Found ${matches.size} listener matches for event type: $eventType" }
+
+        // Extract event data once per readAs mode (avoid repeated parsing)
+        val eventDataByReadAs = matches.map { it.readAs }.toSet().associateWith { readAs ->
+            extractEventContent(event, readAs)
+        }
 
         var affectedCount = 0
 
-        // Process each matched listener
-        for (listener in listeners) {
-            val affected = processListener(event, listener)
-            if (affected) affectedCount++
+        // Separate matches by strategy
+        val oneAnyMatches = matches.filter { it.strategy in listOf(ListenStrategy.ONE, ListenStrategy.ANY) }
+        val allMatches = matches.filter { it.strategy == ListenStrategy.ALL }
+
+        // Process ONE/ANY - single batch UPDATE (no transaction needed, atomic UPDATEs)
+        if (oneAnyMatches.isNotEmpty()) {
+            affectedCount += processOneAny(oneAnyMatches, eventDataByReadAs)
+        }
+
+        // Process ALL - batch INSERT + COUNT + batch UPDATE
+        if (allMatches.isNotEmpty()) {
+            affectedCount += processAll(allMatches, eventDataByReadAs)
         }
 
         logger.debug { "CloudEvent processing complete: $affectedCount listeners affected" }
@@ -88,209 +115,132 @@ internal class CloudEventHandler(
     }
 
     /**
-     * Processes a listener that matched the event.
+     * Processes ONE/ANY strategy matches.
      *
-     * @param event The incoming CloudEvent
-     * @param listener The listener that matched
-     * @return true if the listener was affected (completed or updated)
+     * Groups listeners by readAs mode and executes one batch UPDATE per group.
+     * All listeners in a group get the same event data stored directly in the listeners table.
+     *
+     * @return Number of listeners that were marked for completion
      */
-    private suspend fun processListener(
-        event: CloudEvent,
-        listener: ListenerModel
-    ): Boolean {
-        // Get listen task configuration from workflow definition
-        val listenTaskConfig = getListenTaskConfig(listener)
-        if (listenTaskConfig == null) {
-            logger.warn { "Could not find listen task for listener ${listener.id}" }
-            return false
+    private suspend fun processOneAny(
+        matches: List<ListenerMatch>,
+        eventDataByReadAs: Map<ListenAndReadAs, JsonElement>,
+    ): Int {
+        // Group by readAs mode (different event data format)
+        val byReadAs = matches.groupBy { it.readAs }
+
+        var totalAffected = 0
+
+        for ((readAs, matchGroup) in byReadAs) {
+            val eventData = eventDataByReadAs[readAs] ?: continue
+            // Store single event as JSON (will be wrapped in array at completion time)
+            val eventJson = Json.encodeToString(eventData)
+
+            // Get unique listener IDs (same listener might match multiple filters, but we only need one)
+            val listenerIds = matchGroup.map { it.listener.id }.distinct()
+
+            val affected = listenerRepository.batchMarkReadyForCompletion(
+                ids = listenerIds,
+                event = eventJson
+            )
+
+            if (affected > 0) {
+                logger.info { "Batch marked $affected ONE/ANY listeners ready for completion (readAs=$readAs)" }
+            }
+            totalAffected += affected
         }
 
-        val (strategy, readAs, filters) = listenTaskConfig
+        return totalAffected
+    }
 
-        logger.debug { "Processing listener ${listener.id}, strategy=$strategy" }
+    /**
+     * Processes ALL strategy matches.
+     *
+     * For ALL strategy:
+     * 1. Batch INSERT events into lemline_listener_events table (idempotent)
+     * 2. Batch COUNT events per listener to check completion
+     * 3. Batch UPDATE listeners that are now complete (COUNT = totalFilters)
+     *
+     * This approach:
+     * - Uses insert-only pattern (no read-modify-write race conditions)
+     * - Idempotent inserts via ON CONFLICT DO NOTHING
+     * - Minimizes database requests (3 requests total regardless of listener count)
+     *
+     * @return Number of listeners that were marked for completion
+     */
+    private suspend fun processAll(
+        matches: List<ListenerMatch>,
+        eventDataByReadAs: Map<ListenAndReadAs, JsonElement>,
+    ): Int {
+        // Group by (filterIndex, totalFilters, readAs) for batch insert
+        data class AllGroupKey(val filterIndex: Int, val totalFilters: Int, val readAs: ListenAndReadAs)
 
-        // Apply strategy-specific logic
-        return when (strategy) {
-            ListenStrategy.ONE -> handleOneMatch(event, listener, readAs)
-            ListenStrategy.ANY -> handleAnyMatch(event, listener, readAs)
-            ListenStrategy.ALL -> {
-                // For ALL strategy, find which filter index matched this event
-                val filterIndex = findMatchingFilterIndex(event, filters)
-                if (filterIndex == null) {
-                    logger.warn { "Could not determine filter index for ALL strategy listener ${listener.id}" }
-                    return false
-                }
-                handleAllMatch(event, listener, readAs, filters.size, filterIndex)
+        val byGroup = matches.groupBy { AllGroupKey(it.filterIndex, it.totalFilters, it.readAs) }
+
+        // Build all event models for batch insert
+        val eventModels = mutableListOf<ListenerEventModel>()
+        val listenerTotalFilters = mutableMapOf<IDV7, Int>()
+
+        for ((groupKey, matchGroup) in byGroup) {
+            val eventData = eventDataByReadAs[groupKey.readAs] ?: continue
+            val eventJson = Json.encodeToString(eventData)
+
+            for (match in matchGroup) {
+                val listenerId = match.listener.id
+
+                // Derive idempotent ID for ALL: listener_id + filter_index
+                val eventId = listenerId.derive("-filter-${groupKey.filterIndex}")
+
+                eventModels.add(
+                    ListenerEventModel(
+                        id = eventId,
+                        listenerId = listenerId,
+                        filterIndex = groupKey.filterIndex,  // Explicit filter index for ALL
+                        event = eventJson
+                    )
+                )
+
+                // Track totalFilters for completion check
+                listenerTotalFilters[listenerId] = groupKey.totalFilters
             }
         }
-    }
 
-    /**
-     * Listen task configuration retrieved from cached workflow definition.
-     */
-    private data class ListenTaskConfig(
-        val strategy: ListenStrategy,
-        val readAs: ListenAndReadAs,
-        val filters: List<io.serverlessworkflow.api.types.EventFilter>
-    )
+        if (eventModels.isEmpty()) return 0
 
-    /**
-     * Gets the listen task configuration from the cached workflow definition.
-     *
-     * @return ListenTaskConfig or null if not found
-     */
-    private fun getListenTaskConfig(listener: ListenerModel): ListenTaskConfig? {
-        val workflow = DefinitionCache.getWorkflow(
-            namespace = listener.workflowNamespace,
-            name = listener.workflowName,
-            version = listener.workflowVersion
-        ) ?: return null
+        // Step 1: Batch INSERT events (idempotent - duplicates ignored)
+        val listenerIds = listenerTotalFilters.keys.toList()
+        val inserted = listenerEventRepository.insert(eventModels)
+        logger.debug { "Inserted $inserted events for ALL strategy listeners" }
 
-        val node = try {
-            workflow.getNode(listener.workflowPosition)
-        } catch (e: Exception) {
-            logger.warn(e) { "Node not found at ${listener.workflowPosition} in workflow" }
-            return null
-        }
+        // Step 2: Fetch all events and filter to completed listeners in code
+        // This combines COUNT + FETCH into a single query - count is derived from list.size()
+        val eventsByListener = listenerEventRepository.batchFindByListenerIds(listenerIds)
 
-        val listenTask = node.task as? ListenTask ?: return null
-
-        // Determine strategy and filters from consumption strategy type
-        val listenTo = listenTask.listen?.to?.get()
-        val (strategy, filters) = when (listenTo) {
-            is OneEventConsumptionStrategy -> ListenStrategy.ONE to listOfNotNull(listenTo.one)
-            is AnyEventConsumptionStrategy -> ListenStrategy.ANY to (listenTo.any ?: emptyList())
-            is AllEventConsumptionStrategy -> ListenStrategy.ALL to (listenTo.all ?: emptyList())
-            else -> return null
-        }
-
-        // Get readAs with default
-        val readAs = listenTask.listen?.read ?: ListenAndReadAs.DATA
-
-        return ListenTaskConfig(strategy, readAs, filters)
-    }
-
-    /**
-     * Finds the index of the filter that matches the event (for ALL strategy).
-     *
-     * @return The filter index or null if no match found
-     */
-    private fun findMatchingFilterIndex(
-        event: CloudEvent,
-        filters: List<io.serverlessworkflow.api.types.EventFilter>
-    ): Int? {
-        for ((index, filter) in filters.withIndex()) {
-            if (filterMatchesEvent(filter, event)) {
-                return index
+        // Step 3: Filter to completed listeners and aggregate events into JSON arrays
+        val listenerEvents = eventsByListener
+            .mapNotNull { (listenerId, events) ->
+                val totalFilters = listenerTotalFilters[listenerId] ?: return@mapNotNull null
+                if (events.size < totalFilters) return@mapNotNull null
+                // Take only first totalFilters events (safety: handle race condition with extra events)
+                // Events are already ordered by filter_index from the query
+                val jsonArray = JsonArray(events.take(totalFilters).map { Json.parseToJsonElement(it.event) })
+                listenerId to Json.encodeToString(jsonArray)
             }
-        }
-        return null
-    }
+            .toMap()
 
-    /**
-     * Checks if a filter matches the event (simplified matching for filter index detection).
-     */
-    private fun filterMatchesEvent(
-        filter: io.serverlessworkflow.api.types.EventFilter,
-        event: CloudEvent
-    ): Boolean {
-        val props = filter.with ?: return true
-
-        // Check type (most common and fastest check)
-        props.type?.let { if (it != event.type) return false }
-
-        // Check other literal fields
-        props.id?.let { if (it != event.id) return false }
-        props.subject?.let { if (it != event.subject) return false }
-        props.datacontenttype?.let { if (it != event.dataContentType) return false }
-        props.source?.get()?.toString()?.let { if (it != event.source?.toString()) return false }
-
-        return true
-    }
-
-    /**
-     * Handles ONE strategy: Complete immediately on first match.
-     */
-    private suspend fun handleOneMatch(
-        event: CloudEvent,
-        listener: ListenerModel,
-        readAs: ListenAndReadAs
-    ): Boolean {
-        val eventData = extractEventContent(event, readAs)
-        completeListener(listener, eventData)
-        return true
-    }
-
-    /**
-     * Handles ANY strategy: Complete on first match, or accumulate if `until` is set.
-     */
-    private suspend fun handleAnyMatch(
-        event: CloudEvent,
-        listener: ListenerModel,
-        readAs: ListenAndReadAs
-    ): Boolean {
-        val eventData = extractEventContent(event, readAs)
-
-        // If no accumulated events yet, complete immediately (no `until` support yet)
-        // TODO: Add `until` condition support
-        completeListener(listener, eventData)
-        return true
-    }
-
-    /**
-     * Handles ALL strategy: Track which filters have been matched.
-     * Complete when all filters have at least one matching event.
-     */
-    private suspend fun handleAllMatch(
-        event: CloudEvent,
-        listener: ListenerModel,
-        readAs: ListenAndReadAs,
-        totalFilters: Int,
-        matchedFilterIndex: Int
-    ): Boolean {
-        val eventData = extractEventContent(event, readAs)
-
-        // Parse current matched indices
-        val currentIndices = listener.matchedFilterIndices?.let {
-            Json.decodeFromString<List<Int>>(it).toMutableSet()
-        } ?: mutableSetOf()
-
-        // Add the newly matched index
-        currentIndices.add(matchedFilterIndex)
-
-        // Check if all filters are now matched
-        if (currentIndices.size >= totalFilters) {
-            // All filters matched - complete with collected data
-            // For simplicity, complete with the last event that completed the set
-            completeListener(listener, eventData)
-            return true
+        if (listenerEvents.isEmpty()) {
+            logger.debug { "No ALL listeners completed yet (filters still pending)" }
+            return 0
         }
 
-        // Not complete yet - update progress
-        listenerRepository.updateProgress(
-            id = listener.id,
-            accumulatedEvents = listener.accumulatedEvents,
-            matchedFilterIndices = Json.encodeToString(currentIndices.toList()),
-            correlationValues = listener.correlationValues
-        )
+        // Step 4: Batch UPDATE completed listeners with aggregated events
+        val completed = listenerRepository.batchMarkReadyForCompletionFromEvents(listenerEvents)
 
-        logger.debug {
-            "Updated ALL progress for listener ${listener.id}: " +
-                "${currentIndices.size}/$totalFilters filters matched"
+        if (completed > 0) {
+            logger.info { "Batch marked $completed ALL listeners ready for completion (all filters matched)" }
         }
-        return true
-    }
 
-    /**
-     * Accumulates an event into the listener's accumulated events array.
-     */
-    @Suppress("unused")
-    private fun accumulateEvent(listener: ListenerModel, eventData: JsonElement): JsonArray {
-        val existing = listener.accumulatedEvents?.let {
-            Json.decodeFromString<JsonArray>(it)
-        } ?: JsonArray(emptyList())
-
-        return JsonArray(existing + eventData)
+        return completed
     }
 
     /**
@@ -322,22 +272,28 @@ internal class CloudEventHandler(
             ListenAndReadAs.ENVELOPE -> {
                 // Return the full event structure
                 buildJsonObject {
+                    // Explicitly set specversion to ensure it's present and first
                     put("specversion", event.specVersion.toString())
-                    put("id", event.id)
-                    put("type", event.type)
-                    event.source?.let { put("source", it.toString()) }
-                    event.subject?.let { put("subject", it) }
-                    event.time?.let { put("time", it.toString()) }
-                    event.dataContentType?.let { put("datacontenttype", it) }
-                    event.dataSchema?.let { put("dataschema", it.toString()) }
+
+                    // Dynamically add all other context attributes (standard + extensions)
+                    event.attributeNames.forEach { name ->
+                        // Skip specversion if it appears in attributes to avoid redundancy
+                        if (name == "specversion") return@forEach
+
+                        when (val value = event.getAttribute(name)) {
+                            is Number -> put(name, value)
+                            is Boolean -> put(name, value)
+                            // Handle URIs, Time, Strings, etc. via toString()
+                            else -> value?.let { put(name, it.toString()) }
+                        }
+                    }
+
                     // Add data
                     event.data?.let { data ->
-                        try {
-                            val parsed = Json.parseToJsonElement(String(data.toBytes()))
-                            put("data", parsed)
-                        } catch (e: Exception) {
-                            put("data", JsonNull)
-                        }
+                        val parsed = runCatching {
+                            Json.parseToJsonElement(String(data.toBytes()))
+                        }.getOrElse { JsonNull }
+                        put("data", parsed)
                     }
                 }
             }
@@ -348,40 +304,6 @@ internal class CloudEventHandler(
                     JsonPrimitive(String(data.toBytes()))
                 } ?: JsonNull
             }
-        }
-    }
-
-    /**
-     * Completes a listener by marking it done and emitting a resume command.
-     *
-     * @param listener The listener to complete
-     * @param eventData The event data to pass to the workflow
-     */
-    private suspend fun completeListener(listener: ListenerModel, eventData: JsonElement) {
-        // Mark listener as completed in database
-        listenerRepository.markCompleted(listener.id)
-
-        // Create resume command from the original ListenStarted state
-        val listenStarted = listener.instanceMessage.workflowState
-        val resumeCommand = WorkflowCommand.ResumeWithCompletedTask(
-            nodeStack = listenStarted.nodeStack,
-            rawOutput = eventData
-        )
-
-        // Emit the resume command to continue the workflow
-        val resumeMessage = InstanceMessage(
-            workflowInfo = listener.instanceMessage.workflowInfo,
-            workflowState = resumeCommand
-        )
-
-        val idempotentKey = listenStarted.nodeStack.deriveIdempotentId("-listen-complete")
-
-        // Use the emitter's send method which handles serialization correctly
-        commandEmitter.send(resumeMessage, idempotentKey)
-
-        logger.info {
-            "Listener ${listener.id} completed for workflow ${listener.workflowId} " +
-                "at position ${listener.workflowPosition}"
         }
     }
 }

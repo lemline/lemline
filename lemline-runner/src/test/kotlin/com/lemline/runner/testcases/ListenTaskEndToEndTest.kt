@@ -37,8 +37,10 @@ import jakarta.inject.Inject
 import java.net.URI
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -147,7 +149,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered in database
-        delay(200) // Allow time for database write
+        realDelay(200) // Allow time for database write
         val listeners = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listeners.size shouldBe 1
 
@@ -157,8 +159,9 @@ internal class ListenTaskEndToEndTest {
             data = """{"message": "hello"}"""
         )
 
-        // Allow time for CloudEvent processing
-        delay(500)
+        // Allow time for CloudEvent processing and outbox completion (1s polling interval)
+        // Uses realDelay because runTest skips virtual delays but outbox runs in real time
+        realDelay(3500)
 
         // Verify listener was completed by CloudEvent processing
         val listenersAfterEvent = findListenersByWorkflow(testNamespace, workflowName, testVersion)
@@ -208,7 +211,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        delay(200)
+        realDelay(200)
         val listeners = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listeners.size shouldBe 1
 
@@ -218,8 +221,8 @@ internal class ListenTaskEndToEndTest {
             data = """{"source": "B"}"""
         )
 
-        // Allow time for CloudEvent processing
-        delay(500)
+        // Allow time for CloudEvent processing and outbox completion
+        realDelay(3500)
 
         // Process until workflow completes
         val result = processUntilCompletion(workflowId)
@@ -263,7 +266,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        delay(200)
+        realDelay(200)
         val listenersBeforeEvents = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listenersBeforeEvents.size shouldBe 1
 
@@ -274,7 +277,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow processing
-        delay(300)
+        realDelay(300)
 
         // Workflow should NOT be complete yet - listener still active
         processMessages(workflowId, maxIterations = 20)
@@ -288,8 +291,8 @@ internal class ListenTaskEndToEndTest {
             data = """{"order": 2}"""
         )
 
-        // Allow time for CloudEvent processing
-        delay(500)
+        // Allow time for CloudEvent processing and outbox completion
+        realDelay(3500)
 
         // Process until workflow completes
         val result = processUntilCompletion(workflowId)
@@ -329,7 +332,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        delay(200)
+        realDelay(200)
         val listenersInitial = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listenersInitial.size shouldBe 1
 
@@ -340,7 +343,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow processing
-        delay(300)
+        realDelay(300)
 
         // Process messages
         processMessages(workflowId, maxIterations = 20)
@@ -385,7 +388,7 @@ internal class ListenTaskEndToEndTest {
         listenStarted2 shouldNotBe null
 
         // Verify both listeners are registered
-        delay(300)
+        realDelay(300)
         val listeners = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listeners.size shouldBe 2
 
@@ -395,8 +398,8 @@ internal class ListenTaskEndToEndTest {
             data = """{"broadcast": true}"""
         )
 
-        // Allow time for CloudEvent processing
-        delay(500)
+        // Allow time for CloudEvent processing and outbox completion
+        realDelay(3500)
 
         // Process until both complete
         val result1 = processUntilCompletion(workflowId1)
@@ -412,6 +415,16 @@ internal class ListenTaskEndToEndTest {
     // Helper functions
 
     /**
+     * Real-time delay that doesn't get skipped by runTest.
+     * Used when waiting for outbox schedulers to process.
+     */
+    private suspend fun realDelay(millis: Long) {
+        withContext(Dispatchers.Default) {
+            delay(millis)
+        }
+    }
+
+    /**
      * Helper to find listeners by workflow definition.
      * Queries listeners by workflow identity (namespace, name, version).
      */
@@ -421,15 +434,13 @@ internal class ListenTaskEndToEndTest {
         version: WorkflowVersion
     ): List<ListenerModel> {
         // Get all listen tasks from the workflow and query listeners for each position
-        val workflow = DefinitionCache.getWorkflow(namespace, name, version)
-            ?: return emptyList()
+        val workflowInfo = WorkflowInfo(namespace, name, version)
+        val listenTasks = DefinitionCache.getListenTasks(workflowInfo)
+        if (listenTasks.isEmpty()) return emptyList()
 
-        val listenTasks = definitionListenService.extractListenTasks(workflow)
         val keys = listenTasks.map { listenTask ->
             ListenerQueryKey(
-                namespace = namespace,
-                name = name,
-                version = version,
+                workflowInfo = WorkflowInfo(namespace, name, version),
                 position = listenTask.nodePosition,
                 correlationValuesJson = null
             )
@@ -483,7 +494,7 @@ internal class ListenTaskEndToEndTest {
         val startTime = System.currentTimeMillis()
 
         // Initial delay to let handlers start processing
-        delay(100)
+        realDelay(100)
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             // Route commands first
@@ -507,7 +518,7 @@ internal class ListenTaskEndToEndTest {
                                 // Forward to events channel for database processing
                                 eventsSource.send(eventMsg.payload)
                                 // Give time for database processing
-                                delay(100)
+                                realDelay(100)
                                 return state
                             }
                         }
@@ -520,7 +531,7 @@ internal class ListenTaskEndToEndTest {
             }
 
             // Wait before next iteration
-            delay(50)
+            realDelay(50)
         }
         return null
     }
@@ -565,7 +576,7 @@ internal class ListenTaskEndToEndTest {
                     break
                 }
                 // Use delay to allow real async processing
-                delay(50)
+                realDelay(50)
             } else {
                 emptyIterations = 0
             }
@@ -596,8 +607,9 @@ internal class ListenTaskEndToEndTest {
                 }
             }
 
-            // Check events
+            // Check events - process ALL events in batch before returning
             val events = eventsSink.received().toList()
+            var foundMainCompletion: JsonObject? = null
             if (events.isNotEmpty()) {
                 eventsSink.clear()
                 hasActivity = true
@@ -608,7 +620,7 @@ internal class ListenTaskEndToEndTest {
                             // Store all completions to avoid losing events in multi-workflow tests
                             completedWorkflows[event.workflowId] = state.output.jsonObject
                             if (event.workflowId == mainWorkflowId) {
-                                return state.output.jsonObject
+                                foundMainCompletion = state.output.jsonObject
                             }
                         }
 
@@ -632,15 +644,22 @@ internal class ListenTaskEndToEndTest {
                         }
                     }
                 }
+                // Return after processing ALL events in the batch
+                if (foundMainCompletion != null) {
+                    return foundMainCompletion
+                }
             }
 
-            // If no activity, allow a tiny wait for messages to appear
+            // If no activity, allow a real-time wait for async handlers to process
             if (!hasActivity) {
-                delay(10)
+                realDelay(50)
                 // Break if still no activity after the wait
                 if (commandsSink.received().isEmpty() && eventsSink.received().isEmpty()) {
                     break
                 }
+            } else {
+                // Give handlers time to process routed messages
+                realDelay(50)
             }
         }
 
