@@ -284,4 +284,57 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
             }
         }
     }
+
+    /**
+     * Bulk inserts events for ALL strategy listeners matching the given query keys.
+     *
+     * Uses INSERT...SELECT to insert events without loading listeners into memory.
+     * This is critical for handling cases where millions of listeners may match.
+     *
+     * For ALL strategy, idempotency is ensured by:
+     * - filter_index column (which filter matched this event)
+     * - UNIQUE(listener_id, filter_index) constraint prevents duplicate events per filter
+     *
+     * @param keys List of query keys identifying listeners to receive the event
+     * @param filterIndex The index of the filter that matched this event
+     * @param eventJson The CloudEvent data as JSON string
+     * @param connection Optional database connection
+     * @return Number of events inserted (may be less than matching listeners if duplicates skipped)
+     */
+    suspend fun bulkInsertEventsForAllStrategy(
+        keys: List<ListenerQueryKey>,
+        filterIndex: Int,
+        eventJson: String,
+        connection: Connection? = null
+    ): Int {
+        if (keys.isEmpty()) return 0
+
+        return withConnection(connection) { conn ->
+            // For ALL strategy: use filter_index for idempotency, cloudevent_id is NULL
+            val selectSql = """
+                SELECT ${databaseManager.randomUuid()}, l.id, ?, NULL, ?, CURRENT_TIMESTAMP
+                FROM $LISTENER_TABLE l
+                WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
+            """.trimIndent()
+
+            val sql = databaseManager.insertIgnoreSelect(
+                tableName = tableName,
+                columns = "$ID_COLUMN, $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $CLOUDEVENT_ID_COLUMN, $EVENT_COLUMN, $CREATED_AT_COLUMN",
+                selectSql = selectSql
+            )
+
+            conn.prepareStatement(sql).use { stmt ->
+                var idx = 1
+                // Bind filter_index and event JSON for the SELECT
+                stmt.setInt(idx++, filterIndex)
+                stmt.setString(idx++, eventJson)
+                // Bind key conditions
+                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
+                stmt.executeUpdate()
+            }
+        }
+    }
 }

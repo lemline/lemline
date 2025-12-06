@@ -11,9 +11,7 @@ import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.ListenStrategy
 import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.definitions.DefinitionMatch
-import com.lemline.runner.definitions.ListenerMatch
 import com.lemline.runner.definitions.TerminationDefinitionMatch
-import com.lemline.runner.models.ListenerEventModel
 import com.lemline.runner.repositories.ListenerEventRepository
 import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
@@ -180,88 +178,16 @@ internal class CloudEventHandler(
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
-        // Strategy: ALL - Requires SELECT for accumulation logic
-        // Query listeners only for ALL strategy that needs filter-index tracking
+        // Strategy: ALL - Direct INSERT...SELECT + UPDATE (no SELECT into memory)
+        // Bulk insert events and check completion without loading listeners into memory
         // ─────────────────────────────────────────────────────────────────────────────
         val allDefinitions = definitionMatches.filter { it.strategy == ListenStrategy.ALL }
-
-        // Query listeners only for ALL strategy
-        val listenerMatches = if (allDefinitions.isNotEmpty()) {
-            queryListenersForDefinitions(allDefinitions)
-        } else {
-            emptyList()
-        }
-
-        // Extract event data once per readAs mode (avoid repeated parsing)
-        val eventDataByReadAs = listenerMatches.map { it.readAs }.toSet().associateWith { readAs ->
-            extractEventContent(event, readAs)
-        }
-
-        // Strategy: ALL - Accumulate events until all filters have matched
-        val allMatches = listenerMatches.filter { it.strategy == ListenStrategy.ALL }
-        if (allMatches.isNotEmpty()) {
-            affectedCount += processAll(allMatches, eventDataByReadAs)
+        if (allDefinitions.isNotEmpty()) {
+            affectedCount += processAllDirect(allDefinitions, event)
         }
 
         logger.debug { "CloudEvent processing complete: $affectedCount listeners affected" }
         return affectedCount
-    }
-
-    /**
-     * Queries active listeners for the given definition matches.
-     *
-     * @param definitions Definition matches from Step 1
-     * @return List of listener matches with full context
-     */
-    private suspend fun queryListenersForDefinitions(definitions: List<DefinitionMatch>): List<ListenerMatch> {
-        // Build unique query keys
-        val queryKeys = definitions.map { it.toQueryKey() }.distinct()
-
-        // Batch query all matching listeners
-        val listeners = listenerRepository.findByKeys(queryKeys)
-
-        if (listeners.isEmpty()) {
-            return emptyList()
-        }
-
-        // Create a lookup map: (workflowInfo, position) -> list of DefinitionMatch
-        val definitionsByPosition = definitions.groupBy { def ->
-            Pair(def.workflowInfo, def.nodePosition)
-        }
-
-        // Build ListenerMatch results by joining listeners with their definition context
-        val results = mutableListOf<ListenerMatch>()
-
-        for (listener in listeners) {
-            val positionKey = Pair(
-                WorkflowInfo(listener.workflowNamespace, listener.workflowName, listener.workflowVersion),
-                listener.nodePosition
-            )
-
-            val matchingDefinitions = definitionsByPosition[positionKey] ?: continue
-
-            // For ONE/ANY (without until): only need one match (first filter)
-            // For ALL and ANY+until: need to emit one ListenerMatch per matched filter
-            for (definition in matchingDefinitions) {
-                results.add(
-                    ListenerMatch(
-                        listener = listener,
-                        strategy = definition.strategy,
-                        readAs = definition.readAs,
-                        filterIndex = definition.filterIndex,
-                        totalFilters = definition.totalFilters,
-                        until = definition.until
-                    )
-                )
-
-                // For ONE/ANY without until, only need one match per listener
-                val needsAllMatches = definition.strategy == ListenStrategy.ALL ||
-                    (definition.strategy == ListenStrategy.ANY && definition.until != null)
-                if (!needsAllMatches) break
-            }
-        }
-
-        return results
     }
 
     /**
@@ -282,6 +208,63 @@ internal class CloudEventHandler(
 
         if (completed > 0) {
             logger.info { "Direct UPDATE marked $completed listeners ready for completion (termination event received)" }
+        }
+
+        return completed
+    }
+
+    /**
+     * Processes ALL strategy using direct INSERT...SELECT + UPDATE (no SELECT into memory).
+     *
+     * This method avoids loading millions of listeners into memory by:
+     * 1. Grouping definitions by (filterIndex, readAs) for batch processing
+     * 2. Bulk INSERT events using INSERT...SELECT (one query per group, no memory load)
+     * 3. Direct UPDATE with subquery to mark complete listeners (COUNT >= total_filters)
+     *
+     * Idempotency is ensured by:
+     * - filter_index column with UNIQUE(listener_id, filter_index) constraint
+     * - WHERE guards on UPDATE prevent double-completion of listeners
+     *
+     * @param definitions Definition matches for ALL strategy
+     * @param event The CloudEvent being processed
+     * @return Number of listeners that were marked for completion
+     */
+    private suspend fun processAllDirect(
+        definitions: List<DefinitionMatch>,
+        event: CloudEvent,
+    ): Int {
+        // Group by (filterIndex, readAs) for batch processing
+        data class AllGroupKey(val filterIndex: Int, val readAs: ListenAndReadAs)
+
+        val byGroup = definitions.groupBy { AllGroupKey(it.filterIndex, it.readAs) }
+
+        // Collect all query keys for the final completion check
+        val allQueryKeys = mutableSetOf<ListenerQueryKey>()
+
+        // Step 1: Bulk INSERT events for each (filterIndex, readAs) group
+        for ((groupKey, defGroup) in byGroup) {
+            val eventData = extractEventContent(event, groupKey.readAs)
+            val eventJson = Json.encodeToString(eventData)
+
+            val queryKeys = defGroup.map { it.toQueryKey() }.distinct()
+            allQueryKeys.addAll(queryKeys)
+
+            val inserted = listenerEventRepository.bulkInsertEventsForAllStrategy(
+                keys = queryKeys,
+                filterIndex = groupKey.filterIndex,
+                eventJson = eventJson
+            )
+
+            logger.debug { "Bulk inserted $inserted events for ALL strategy (filterIndex=${groupKey.filterIndex}, readAs=${groupKey.readAs})" }
+        }
+
+        if (allQueryKeys.isEmpty()) return 0
+
+        // Step 2: Direct UPDATE with subquery to mark completed listeners
+        val completed = listenerRepository.markAllCompletedByKeys(allQueryKeys.toList())
+
+        if (completed > 0) {
+            logger.info { "Direct UPDATE marked $completed ALL listeners ready for completion (all filters matched)" }
         }
 
         return completed
@@ -472,85 +455,6 @@ internal class CloudEventHandler(
             logger.warn(e) { "Failed to evaluate until expression: $expression" }
             false
         }
-    }
-
-    /**
-     * Processes ALL strategy matches.
-     *
-     * For ALL strategy:
-     * 1. Batch INSERT events into lemline_listener_events table (idempotent)
-     * 2. Direct UPDATE with subquery to mark completed listeners (COUNT >= total_filters)
-     *
-     * This approach:
-     * - Uses insert-only pattern (no read-modify-write race conditions)
-     * - Idempotent inserts via ON CONFLICT DO NOTHING
-     * - Direct UPDATE avoids loading accumulated events into memory
-     *
-     * @return Number of listeners that were marked for completion
-     */
-    private suspend fun processAll(
-        matches: List<ListenerMatch>,
-        eventDataByReadAs: Map<ListenAndReadAs, JsonElement>,
-    ): Int {
-        // Group by (filterIndex, readAs) for batch insert
-        data class AllGroupKey(val filterIndex: Int, val readAs: ListenAndReadAs)
-
-        val byGroup = matches.groupBy { AllGroupKey(it.filterIndex, it.readAs) }
-
-        // Build all event models for batch insert
-        val eventModels = mutableListOf<ListenerEventModel>()
-        val queryKeySet = mutableSetOf<ListenerQueryKey>()
-
-        for ((groupKey, matchGroup) in byGroup) {
-            val eventData = eventDataByReadAs[groupKey.readAs] ?: continue
-            val eventJson = Json.encodeToString(eventData)
-
-            for (match in matchGroup) {
-                val listenerId = match.listener.id
-
-                // Derive idempotent ID for ALL: listener_id + filter_index
-                val eventId = listenerId.derive("-filter-${groupKey.filterIndex}")
-
-                eventModels.add(
-                    ListenerEventModel(
-                        id = eventId,
-                        listenerId = listenerId,
-                        filterIndex = groupKey.filterIndex,  // Explicit filter index for ALL
-                        cloudEventId = null,  // null for ALL (idempotency via filter_index)
-                        event = eventJson
-                    )
-                )
-
-                // Collect query keys for completion check
-                queryKeySet.add(
-                    ListenerQueryKey(
-                        workflowInfo = WorkflowInfo(
-                            match.listener.workflowNamespace,
-                            match.listener.workflowName,
-                            match.listener.workflowVersion
-                        ),
-                        position = match.listener.nodePosition!!,
-                        correlationValuesJson = match.listener.correlationValues
-                    )
-                )
-            }
-        }
-
-        if (eventModels.isEmpty()) return 0
-
-        // Step 1: Batch INSERT events (idempotent - duplicates ignored)
-        val inserted = listenerEventRepository.insert(eventModels)
-        logger.debug { "Inserted $inserted events for ALL strategy listeners" }
-
-        // Step 2: Direct UPDATE with subquery to mark completed listeners
-        // The database checks COUNT >= total_filters and aggregates events
-        val completed = listenerRepository.markAllCompletedByKeys(queryKeySet.toList())
-
-        if (completed > 0) {
-            logger.info { "Direct UPDATE marked $completed ALL listeners ready for completion (all filters matched)" }
-        }
-
-        return completed
     }
 
     /**

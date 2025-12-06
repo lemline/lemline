@@ -80,23 +80,6 @@ data class TerminationDefinitionMatch(
 }
 
 /**
- * Represents a matched listener with context needed for batch processing.
- */
-@ExperimentalTime
-@ExperimentalSerializationApi
-data class ListenerMatch(
-    val listener: ListenerModel,
-    val strategy: ListenStrategy,
-    val readAs: ListenTaskConfiguration.ListenAndReadAs,
-    /** Filter index that matched - relevant for ALL and ANY+until strategies */
-    val filterIndex: Int,
-    /** Total number of filters - relevant for ALL and ANY+until strategies */
-    val totalFilters: Int,
-    /** Until condition for ANY+until accumulation mode (null for ONE, ANY without until, ALL) */
-    val until: CachedUntilCondition? = null
-)
-
-/**
  * Represents a listener that should be terminated by a termination event.
  * Used for ANY + until(event) strategy where a specific event type triggers completion.
  */
