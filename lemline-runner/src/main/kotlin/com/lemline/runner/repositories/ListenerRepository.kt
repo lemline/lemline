@@ -340,52 +340,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
           AND $OUTBOX_FAILED_AT_COLUMN IS NULL
         """.trimIndent()
     }
-
-    /**
-     * Batch marks listeners as ready for completion (ONE/ANY without until).
-     *
-     * Executes a single UPDATE for all provided listener IDs with WHERE guards.
-     * Only listeners that are still in waiting state will be updated.
-     *
-     * @param ids List of listener IDs to mark ready
-     * @param event JSON string of the event to store (same for all)
-     * @param connection Optional database connection
-     * @return Number of listeners that were successfully marked for completion
-     */
-    suspend fun batchMarkReadyForCompletion(
-        ids: List<IDV7>,
-        event: String,
-        connection: Connection? = null
-    ): Int {
-        if (ids.isEmpty()) return 0
-
-        return withConnection(connection) { conn ->
-            val now = Timestamp.from(Clock.System.now().toJavaInstant())
-            val placeholders = ids.joinToString(", ") { "?" }
-
-            val sql = """
-                UPDATE $tableName
-                SET $EVENT_COLUMN = ?,
-                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
-                    $UPDATED_AT_COLUMN = ?
-                WHERE $ID_COLUMN IN ($placeholders)
-                  AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                  AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-            """.trimIndent()
-
-            conn.prepareStatement(sql).use { stmt ->
-                stmt.setString(1, event)
-                stmt.setTimestamp(2, now)
-                stmt.setTimestamp(3, now)
-                ids.forEachIndexed { index, id ->
-                    setIDV7(stmt, 4 + index, id)
-                }
-                stmt.executeUpdate()
-            }
-        }
-    }
-
     /**
      * Marks a listener as ready for completion (for ALL/ANY+until after events table is populated).
      *
@@ -420,6 +374,67 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
           AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
           AND $OUTBOX_FAILED_AT_COLUMN IS NULL
         """.trimIndent()
+    }
+
+    /**
+     * Marks listeners as ready for completion by query keys (ONE/ANY strategy).
+     *
+     * This method performs a direct UPDATE without first SELECT, avoiding loading
+     * potentially millions of listeners into memory. It updates all active listeners
+     * matching the provided keys in a single database operation.
+     *
+     * @param keys List of query keys identifying listeners to update
+     * @param event JSON string of the event to store (same for all matched listeners)
+     * @param connection Optional database connection
+     * @return Number of listeners that were successfully marked for completion
+     */
+    suspend fun markReadyForCompletionByKeys(
+        keys: List<ListenerQueryKey>,
+        event: String,
+        connection: Connection? = null
+    ): Int {
+        if (keys.isEmpty()) return 0
+
+        return withConnection(connection) { conn ->
+            val now = Timestamp.from(Clock.System.now().toJavaInstant())
+
+            // Build WHERE conditions from keys
+            val conditions = keys.map { key ->
+                if (key.correlationValuesJson == null) {
+                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ?)"
+                } else {
+                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ? AND ($CORRELATION_VALUES_COLUMN IS NULL OR $CORRELATION_VALUES_COLUMN = ?))"
+                }
+            }
+
+            val sql = """
+                UPDATE $tableName
+                SET $EVENT_COLUMN = ?,
+                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+                    $UPDATED_AT_COLUMN = ?
+                WHERE $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                  AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND (${conditions.joinToString(" OR ")})
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                var idx = 1
+                stmt.setString(idx++, event)
+                stmt.setTimestamp(idx++, now)
+                stmt.setTimestamp(idx++, now)
+                for (key in keys) {
+                    stmt.setString(idx++, key.workflowInfo.workflowNamespace.toString())
+                    stmt.setString(idx++, key.workflowInfo.workflowName.toString())
+                    stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
+                    stmt.setString(idx++, key.position.toString())
+                    if (key.correlationValuesJson != null) {
+                        stmt.setString(idx++, key.correlationValuesJson)
+                    }
+                }
+                stmt.executeUpdate()
+            }
+        }
     }
 
     /**

@@ -125,14 +125,43 @@ internal class CloudEventHandler(
         }
 
         // ═══════════════════════════════════════════════════════════════════════════════
-        // STEP 2: Query active listeners from database
+        // STEP 2: Process each strategy independently
         //
-        // Build query keys from definition matches and fetch active listeners
+        // ONE/ANY (without until): Direct UPDATE without SELECT (avoids loading millions of rows)
+        // ANY+until, ALL: Still requires SELECT for event accumulation logic
         // ═══════════════════════════════════════════════════════════════════════════════
 
-        // Query listeners for regular matches
-        val listenerMatches = if (definitionMatches.isNotEmpty()) {
-            queryListenersForDefinitions(definitionMatches)
+        var affectedCount = 0
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Strategy: ONE - Direct UPDATE (no SELECT needed)
+        // Complete listener immediately on first matching event
+        // ─────────────────────────────────────────────────────────────────────────────
+        val oneDefinitions = definitionMatches.filter { it.strategy == ListenStrategy.ONE }
+        if (oneDefinitions.isNotEmpty()) {
+            affectedCount += processOneAnyDirect(oneDefinitions, event)
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Strategy: ANY (without until) - Direct UPDATE (no SELECT needed)
+        // Complete listener immediately on first matching event from any filter
+        // ─────────────────────────────────────────────────────────────────────────────
+        val anyDefinitions = definitionMatches.filter { it.strategy == ListenStrategy.ANY && it.until == null }
+        if (anyDefinitions.isNotEmpty()) {
+            affectedCount += processOneAnyDirect(anyDefinitions, event)
+        }
+
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Strategy: ANY + until, ALL - Requires SELECT for accumulation logic
+        // Query listeners only for strategies that need event accumulation
+        // ─────────────────────────────────────────────────────────────────────────────
+        val accumulationDefinitions = definitionMatches.filter {
+            it.strategy == ListenStrategy.ALL || (it.strategy == ListenStrategy.ANY && it.until != null)
+        }
+
+        // Query listeners only for accumulation strategies (not ONE/ANY)
+        val listenerMatches = if (accumulationDefinitions.isNotEmpty()) {
+            queryListenersForDefinitions(accumulationDefinitions)
         } else {
             emptyList()
         }
@@ -144,43 +173,9 @@ internal class CloudEventHandler(
             emptyList()
         }
 
-        if (listenerMatches.isEmpty() && listenersUntilEvent.isEmpty()) {
-            logger.trace { "No active listeners for event type: $eventType" }
-            return 0
-        }
-
-        logger.debug {
-            "Listener query complete: ${listenerMatches.size} listener matches, " +
-                "${listenersUntilEvent.size} termination matches"
-        }
-
         // Extract event data once per readAs mode (avoid repeated parsing)
         val eventDataByReadAs = listenerMatches.map { it.readAs }.toSet().associateWith { readAs ->
             extractEventContent(event, readAs)
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // STEP 3: Process each strategy independently
-        // ═══════════════════════════════════════════════════════════════════════════════
-
-        var affectedCount = 0
-
-        // ─────────────────────────────────────────────────────────────────────────────
-        // Strategy: ONE
-        // Complete listener immediately on first matching event
-        // ─────────────────────────────────────────────────────────────────────────────
-        val oneMatches = listenerMatches.filter { it.strategy == ListenStrategy.ONE }
-        if (oneMatches.isNotEmpty()) {
-            affectedCount += processOneAny(oneMatches, eventDataByReadAs)
-        }
-
-        // ─────────────────────────────────────────────────────────────────────────────
-        // Strategy: ANY (without until)
-        // Complete listener immediately on first matching event from any filter
-        // ─────────────────────────────────────────────────────────────────────────────
-        val anyMatches = listenerMatches.filter { it.strategy == ListenStrategy.ANY && it.until == null }
-        if (anyMatches.isNotEmpty()) {
-            affectedCount += processOneAny(anyMatches, eventDataByReadAs)
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
@@ -348,37 +343,46 @@ internal class CloudEventHandler(
     }
 
     /**
-     * Processes ONE/ANY strategy matches.
+     * Processes ONE/ANY strategy using direct UPDATE (no SELECT).
      *
-     * Groups listeners by readAs mode and executes one batch UPDATE per group.
-     * All listeners in a group get the same event data stored directly in the listeners table.
+     * Groups definitions by readAs mode and executes one UPDATE per group directly
+     * on the database without first loading listeners into memory. This avoids
+     * loading potentially millions of listeners.
      *
+     * @param definitions Definition matches for ONE or ANY (without until) strategy
+     * @param event The CloudEvent being processed
      * @return Number of listeners that were marked for completion
      */
-    private suspend fun processOneAny(
-        matches: List<ListenerMatch>,
-        eventDataByReadAs: Map<ListenAndReadAs, JsonElement>,
+    private suspend fun processOneAnyDirect(
+        definitions: List<DefinitionMatch>,
+        event: CloudEvent,
     ): Int {
         // Group by readAs mode (different event data format)
-        val byReadAs = matches.groupBy { it.readAs }
+        val byReadAs = definitions.groupBy { it.readAs }
 
         var totalAffected = 0
 
-        for ((readAs, matchGroup) in byReadAs) {
-            val eventData = eventDataByReadAs[readAs] ?: continue
+        for ((readAs, defGroup) in byReadAs) {
+            val eventData = extractEventContent(event, readAs)
             // Store single event as JSON (will be wrapped in array at completion time)
             val eventJson = Json.encodeToString(eventData)
 
-            // Get unique listener IDs (same listener might match multiple filters, but we only need one)
-            val listenerIds = matchGroup.map { it.listener.id }.distinct()
+            // Build query keys from definitions
+            val queryKeys = defGroup.map { def ->
+                ListenerQueryKey(
+                    workflowInfo = def.workflowInfo,
+                    position = def.nodePosition,
+                    correlationValuesJson = def.correlationValuesJson
+                )
+            }.distinct()
 
-            val affected = listenerRepository.batchMarkReadyForCompletion(
-                ids = listenerIds,
+            val affected = listenerRepository.markReadyForCompletionByKeys(
+                keys = queryKeys,
                 event = eventJson
             )
 
             if (affected > 0) {
-                logger.info { "Batch marked $affected ONE/ANY listeners ready for completion (readAs=$readAs)" }
+                logger.info { "Direct UPDATE marked $affected ONE/ANY listeners ready for completion (readAs=$readAs)" }
             }
             totalAffected += affected
         }
