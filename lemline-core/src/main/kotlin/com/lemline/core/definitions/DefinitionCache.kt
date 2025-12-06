@@ -63,7 +63,7 @@ data class CachedListenTask(
     /**
      * Returns the termination filter if this is an ANY + until(event) task.
      */
-    val terminationFilter: EventFilter?
+    val untilEventFilter: EventFilter?
         get() = (until as? CachedUntilCondition.Event)?.filter
 }
 
@@ -282,16 +282,19 @@ object DefinitionCache {
                     listOfNotNull(listenTo.one),
                     null
                 )
+
                 is AnyEventConsumptionStrategy -> Triple(
                     ListenStrategy.ANY,
                     listenTo.any ?: emptyList(),
                     parseUntilCondition(listenTo.until)
                 )
+
                 is AllEventConsumptionStrategy -> Triple(
                     ListenStrategy.ALL,
                     listenTo.all ?: emptyList(),
                     null
                 )
+
                 else -> continue
             }
 

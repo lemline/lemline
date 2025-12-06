@@ -14,7 +14,6 @@ import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.ListenStrategy
 import com.lemline.runner.models.ListenerModel
-import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.EventFilter
@@ -31,6 +30,39 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
+
+/**
+ * Represents a workflow definition that may listen to an event.
+ * This is the result of matching an event against workflow definitions (no database query).
+ */
+@ExperimentalTime
+@ExperimentalSerializationApi
+data class DefinitionMatch(
+    val workflowInfo: WorkflowInfo,
+    val nodePosition: NodePosition,
+    /** Correlation values extracted from the event using correlate.from expressions */
+    val correlationValuesJson: String?,
+    /** Filter index that matched - relevant for ALL and ANY+until strategies */
+    val filterIndex: Int,
+    /** Total number of filters - relevant for ALL and ANY+until strategies */
+    val totalFilters: Int,
+    val strategy: ListenStrategy,
+    val readAs: ListenTaskConfiguration.ListenAndReadAs,
+    /** Until condition for ANY+until accumulation mode (null for ONE, ANY without until, ALL) */
+    val until: CachedUntilCondition? = null
+)
+
+/**
+ * Represents a workflow definition whose termination filter matches an event.
+ * Used for ANY + until(event) strategy where a specific event type triggers completion.
+ */
+@ExperimentalTime
+@ExperimentalSerializationApi
+data class TerminationDefinitionMatch(
+    val workflowInfo: WorkflowInfo,
+    val nodePosition: NodePosition,
+    val readAs: ListenTaskConfiguration.ListenAndReadAs
+)
 
 /**
  * Represents a matched listener with context needed for batch processing.
@@ -107,211 +139,76 @@ class DefinitionListenService {
     }
 
     /**
-     * Key for grouping filter matches before querying listeners.
-     */
-    private data class FilterMatchKey(
-        val workflowInfo: WorkflowInfo,
-        val nodePosition: NodePosition,
-        val correlationValuesJson: String?,
-        val filterIndex: Int,
-        val totalFilters: Int,
-        val strategy: ListenStrategy,
-        val readAs: ListenTaskConfiguration.ListenAndReadAs,
-        val until: CachedUntilCondition?
-    )
-
-    /**
-     * Finds all active listeners with full context needed for batch processing.
+     * Finds workflow definitions whose listen task filters match the CloudEvent.
      *
-     * This method:
-     * 1. Finds listen tasks with filters that match the CloudEvent attributes
-     * 2. For each matching filter, extracts correlation values and filter index
-     * 3. Queries active listeners and enriches them with strategy context
-     *
-     * The returned ListenerMatch includes all information needed for batch updates:
-     * - strategy (ONE/ANY/ALL)
-     * - readAs (DATA/ENVELOPE/RAW)
-     * - filterIndex (which filter matched - important for ALL strategy)
-     * - totalFilters (total number of filters - important for ALL strategy)
+     * This method only queries the in-memory DefinitionCache, no database access.
+     * For each matching filter, it extracts correlation values using the filter's
+     * `correlate.from` expressions.
      *
      * @param event The incoming CloudEvent to match against
-     * @return List of listener matches with full context
+     * @return List of definition matches with correlation values
      */
-    suspend fun findMatchingListeners(event: CloudEvent): List<ListenerMatch> {
-        logger.debug { "Finding matching listeners for CloudEvent: type=${event.type}, source=${event.source}" }
+    fun findMatchingDefinitions(event: CloudEvent): List<DefinitionMatch> {
+        logger.debug { "Finding matching definitions for CloudEvent: type=${event.type}, source=${event.source}" }
 
         // Parse event data lazily (only if needed for filter evaluation)
         val eventData by lazy { parseEventData(event) }
 
-        // Build filter match keys - tracks which filter index matched for each listen task
-        // Uses cached listen tasks from DefinitionCache (computed once per workflow add)
-        val filterMatchKeys = mutableListOf<FilterMatchKey>()
+        val matches = DefinitionCache.getAllListenTasks().flatMap { task ->
+            task.filters.mapIndexedNotNull { index, filter ->
+                if (!filterMatches(filter, event, eventData)) return@mapIndexedNotNull null
 
-        filterMatchKeys.addAll(
-            DefinitionCache.getAllListenTasks().flatMap { task ->
-                task.filters.mapIndexedNotNull { index, filter ->
-                    if (!filterMatches(filter, event, eventData)) return@mapIndexedNotNull null
-
-                    FilterMatchKey(
-                        workflowInfo = task.workflowInfo,
-                        nodePosition = task.nodePosition,
-                        correlationValuesJson = extractCorrelationValues(filter, eventData)
-                            ?.let(::serializeCorrelationValues),
-                        filterIndex = index,
-                        totalFilters = task.filters.size,
-                        strategy = task.strategy,
-                        readAs = task.readAs,
-                        until = task.until
-                    )
-                }
-            }
-        )
-
-        if (filterMatchKeys.isEmpty()) {
-            logger.trace { "No filters match the event" }
-            return emptyList()
-        }
-
-        // Build unique query keys (same listener might match multiple filters for ALL strategy)
-        val queryKeys = filterMatchKeys.map { key: FilterMatchKey ->
-            ListenerQueryKey(
-                workflowInfo = key.workflowInfo,
-                position = key.nodePosition,
-                correlationValuesJson = key.correlationValuesJson
-            )
-        }.distinct()
-
-        // Batch query all matching listeners
-        val listeners = listenerRepository.findByKeys(queryKeys)
-
-        if (listeners.isEmpty()) {
-            logger.trace { "No active listeners match the filters" }
-            return emptyList()
-        }
-
-        // Create a lookup map for filter match context
-        // Key: (namespace, name, version, position) -> list of FilterMatchKey
-        val filterMatchByPosition = filterMatchKeys.groupBy { key ->
-            Pair(key.workflowInfo, key.nodePosition)
-        }
-
-        // Build ListenerMatch results by joining listeners with their filter context
-        val results = mutableListOf<ListenerMatch>()
-
-        for (listener in listeners) {
-            val positionKey = Pair(
-                WorkflowInfo(listener.workflowNamespace, listener.workflowName, listener.workflowVersion),
-                listener.nodePosition
-            )
-
-            val matchingFilters = filterMatchByPosition[positionKey] ?: continue
-
-            // For ONE/ANY (without until): only need one match (first filter)
-            // For ALL and ANY+until: need to emit one ListenerMatch per matched filter
-            for (filterMatch in matchingFilters) {
-                results.add(
-                    ListenerMatch(
-                        listener = listener,
-                        strategy = filterMatch.strategy,
-                        readAs = filterMatch.readAs,
-                        filterIndex = filterMatch.filterIndex,
-                        totalFilters = filterMatch.totalFilters,
-                        until = filterMatch.until
-                    )
+                DefinitionMatch(
+                    workflowInfo = task.workflowInfo,
+                    nodePosition = task.nodePosition,
+                    correlationValuesJson = extractCorrelationValues(filter, eventData)
+                        ?.let(::serializeCorrelationValues),
+                    filterIndex = index,
+                    totalFilters = task.filters.size,
+                    strategy = task.strategy,
+                    readAs = task.readAs,
+                    until = task.until
                 )
-
-                // For ONE/ANY without until, only need one match per listener
-                // For ALL and ANY+until, need all matches for event tracking
-                val needsAllMatches = filterMatch.strategy == ListenStrategy.ALL ||
-                    (filterMatch.strategy == ListenStrategy.ANY && filterMatch.until != null)
-                if (!needsAllMatches) break
             }
         }
 
-        logger.debug { "Found ${results.size} listener matches for event type=${event.type}" }
-        return results
+        logger.debug { "Found ${matches.size} definition matches for event type=${event.type}" }
+        return matches
     }
 
     /**
-     * Finds active listeners that should be terminated by this CloudEvent.
+     * Finds workflow definitions whose termination filter matches the CloudEvent.
      *
      * This is specifically for ANY + until(event) strategy where a termination event
      * (different from the main event filters) triggers completion of the listener.
      *
+     * This method only queries the in-memory DefinitionCache, no database access.
+     *
      * @param event The incoming CloudEvent to match against termination filters
-     * @return List of listeners that should be terminated with their readAs config
+     * @return List of termination definition matches
      */
-    suspend fun findTerminationListeners(event: CloudEvent): List<TerminationMatch> {
-        logger.debug { "Finding termination listeners for CloudEvent: type=${event.type}, source=${event.source}" }
+    fun findDefinitionsUntilEvent(event: CloudEvent): List<TerminationDefinitionMatch> {
+        logger.debug { "Finding termination definitions for CloudEvent: type=${event.type}, source=${event.source}" }
 
         // Parse event data lazily
         val eventData by lazy { parseEventData(event) }
 
-        // Find listen tasks with termination filters that match this event
-        data class TerminationKey(
-            val workflowInfo: WorkflowInfo,
-            val nodePosition: NodePosition,
-            val readAs: ListenTaskConfiguration.ListenAndReadAs
-        )
-
-        val terminationKeys = mutableListOf<TerminationKey>()
-
-        for (task in DefinitionCache.getAllListenTasks()) {
+        val matches = DefinitionCache.getAllListenTasks().mapNotNull { task ->
             // Only check tasks with termination filters
-            val terminationFilter = task.terminationFilter ?: continue
+            val terminationFilter = task.untilEventFilter ?: return@mapNotNull null
 
             // Check if this event matches the termination filter
-            if (!filterMatches(terminationFilter, event, eventData)) continue
+            if (!filterMatches(terminationFilter, event, eventData)) return@mapNotNull null
 
-            terminationKeys.add(
-                TerminationKey(
-                    workflowInfo = task.workflowInfo,
-                    nodePosition = task.nodePosition,
-                    readAs = task.readAs
-                )
+            TerminationDefinitionMatch(
+                workflowInfo = task.workflowInfo,
+                nodePosition = task.nodePosition,
+                readAs = task.readAs
             )
         }
 
-        if (terminationKeys.isEmpty()) {
-            logger.trace { "No termination filters match the event" }
-            return emptyList()
-        }
-
-        // Build query keys to find active listeners
-        val queryKeys = terminationKeys.map { key ->
-            ListenerQueryKey(
-                workflowInfo = key.workflowInfo,
-                position = key.nodePosition,
-                correlationValuesJson = null  // Termination doesn't use correlation
-            )
-        }
-
-        // Query active listeners
-        val listeners = listenerRepository.findByKeys(queryKeys)
-
-        if (listeners.isEmpty()) {
-            logger.trace { "No active listeners match the termination filters" }
-            return emptyList()
-        }
-
-        // Create a lookup map for readAs config
-        val readAsByPosition = terminationKeys.associateBy(
-            { Pair(it.workflowInfo, it.nodePosition) },
-            { it.readAs }
-        )
-
-        // Build termination matches
-        val results = listeners.mapNotNull { listener ->
-            val positionKey = Pair(
-                WorkflowInfo(listener.workflowNamespace, listener.workflowName, listener.workflowVersion),
-                listener.nodePosition
-            )
-            val readAs = readAsByPosition[positionKey] ?: return@mapNotNull null
-            TerminationMatch(listener = listener, readAs = readAs)
-        }
-
-        logger.debug { "Found ${results.size} termination matches for event type=${event.type}" }
-        return results
+        logger.debug { "Found ${matches.size} termination definition matches for event type=${event.type}" }
+        return matches
     }
 
     /**
