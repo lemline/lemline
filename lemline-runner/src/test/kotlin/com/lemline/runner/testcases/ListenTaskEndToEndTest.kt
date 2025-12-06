@@ -42,8 +42,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.BeforeEach
@@ -90,7 +93,7 @@ internal class ListenTaskEndToEndTest {
     private val testVersion = WorkflowVersion("1.0.0")
 
     // Track completed workflows to avoid losing events during multi-workflow tests
-    private val completedWorkflows = mutableMapOf<WorkflowId, JsonObject>()
+    private val completedWorkflows = mutableMapOf<WorkflowId, JsonElement>()
 
     @BeforeEach
     fun setup() = runTest {
@@ -173,8 +176,8 @@ internal class ListenTaskEndToEndTest {
 
         // Then: Workflow should complete successfully
         result shouldNotBe null
-        result!!["status"]?.jsonPrimitive?.content shouldBe "completed"
-        result["received"]?.jsonPrimitive?.content shouldBe "true"
+        result!!.jsonObject["status"]?.jsonPrimitive?.content shouldBe "completed"
+        result.jsonObject["received"]?.jsonPrimitive?.content shouldBe "true"
     }
 
     @Test
@@ -229,7 +232,7 @@ internal class ListenTaskEndToEndTest {
 
         // Then: Workflow should complete
         result shouldNotBe null
-        result!!["matched"]?.jsonPrimitive?.content shouldBe "true"
+        result!!.jsonObject["matched"]?.jsonPrimitive?.content shouldBe "true"
     }
 
     @Test
@@ -299,7 +302,7 @@ internal class ListenTaskEndToEndTest {
 
         // Then: Workflow should complete
         result shouldNotBe null
-        result!!["allReceived"]?.jsonPrimitive?.content shouldBe "true"
+        result!!.jsonObject["allReceived"]?.jsonPrimitive?.content shouldBe "true"
     }
 
     @Test
@@ -430,7 +433,7 @@ internal class ListenTaskEndToEndTest {
 
         // Then: Workflow should complete
         result shouldNotBe null
-        result!!["collected"]?.jsonPrimitive?.content shouldBe "true"
+        result!!.jsonObject["collected"]?.jsonPrimitive?.content shouldBe "true"
     }
 
     @Test
@@ -515,7 +518,65 @@ internal class ListenTaskEndToEndTest {
 
         // Then: Workflow should complete
         result shouldNotBe null
-        result!!["monitored"]?.jsonPrimitive?.content shouldBe "true"
+        result!!.jsonObject["monitored"]?.jsonPrimitive?.content shouldBe "true"
+    }
+
+    @Test
+    fun `listen task with ALL strategy completes when single event matches multiple filters`() = runTest {
+        // Given: A workflow with ALL strategy where filters can match the same event
+        // This tests the case where one CloudEvent satisfies multiple filter conditions
+        val workflowName = WorkflowName("listen-all-multi-match-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - listenForAllConditions:
+                  listen:
+                    to:
+                      all:
+                        - with:
+                            type: com.example.Order
+                            data: ${'$'}{ .priority == "high" }
+                        - with:
+                            type: com.example.Order
+                            data: ${'$'}{ .amount > 1000 }
+              - complete:
+                  set:
+                    allConditionsMet: true
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        // When: Start the workflow
+        val workflowId = startWorkflow(workflowName)
+
+        // Process until ListenStarted is emitted
+        val listenStartedEvent = processUntilListenStarted(workflowId)
+        listenStartedEvent shouldNotBe null
+
+        // Verify listener is registered
+        realDelay(200)
+        val listenersBeforeEvent = findListenersByWorkflow(testNamespace, workflowName, testVersion)
+        listenersBeforeEvent.size shouldBe 1
+
+        // Send ONE event that matches BOTH filters (priority=high AND amount>1000)
+        sendCloudEvent(
+            type = "com.example.Order",
+            data = """{"priority": "high", "amount": 2000}"""
+        )
+
+        // Allow time for CloudEvent processing and outbox completion
+        realDelay(3500)
+
+        // Process until workflow completes
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Workflow should complete because the single event satisfied both filters
+        result shouldNotBe null
+        result!!.jsonObject["allConditionsMet"]?.jsonPrimitive?.content shouldBe "true"
     }
 
     @Test
@@ -573,8 +634,254 @@ internal class ListenTaskEndToEndTest {
         // Then: Both workflows should complete
         result1 shouldNotBe null
         result2 shouldNotBe null
-        result1!!["received"]?.jsonPrimitive?.content shouldBe "true"
-        result2!!["received"]?.jsonPrimitive?.content shouldBe "true"
+        result1!!.jsonObject["received"]?.jsonPrimitive?.content shouldBe "true"
+        result2!!.jsonObject["received"]?.jsonPrimitive?.content shouldBe "true"
+    }
+
+    // ========================================
+    // Output Format Verification Tests
+    // These tests verify that the listen task output is always an array
+    // as specified in the Serverless Workflow DSL specification.
+    // ========================================
+
+    @Test
+    fun `ONE strategy output is an array with one element`() = runTest {
+        // Given: A workflow with a listen task (output is directly the workflow result)
+        val workflowName = WorkflowName("listen-one-output-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - listenForEvent:
+                  listen:
+                    to:
+                      one:
+                        with:
+                          type: com.example.OutputTest
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(200)
+
+        // Send event with specific data
+        sendCloudEvent(
+            type = "com.example.OutputTest",
+            data = """{"message": "hello", "value": 42}"""
+        )
+
+        realDelay(3500)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be an array with exactly one element
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 1
+        events[0].jsonObject["message"]?.jsonPrimitive?.content shouldBe "hello"
+        events[0].jsonObject["value"]?.jsonPrimitive?.int shouldBe 42
+    }
+
+    @Test
+    fun `ANY strategy output is an array with one element`() = runTest {
+        // Given: A workflow with an ANY listen task (output is directly the workflow result)
+        val workflowName = WorkflowName("listen-any-output-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - listenForAnyEvent:
+                  listen:
+                    to:
+                      any:
+                        - with:
+                            type: com.example.EventTypeA
+                        - with:
+                            type: com.example.EventTypeB
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(200)
+
+        // Send event matching the second filter
+        sendCloudEvent(
+            type = "com.example.EventTypeB",
+            data = """{"source": "B", "priority": 1}"""
+        )
+
+        realDelay(3500)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be an array with exactly one element
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 1
+        events[0].jsonObject["source"]?.jsonPrimitive?.content shouldBe "B"
+        events[0].jsonObject["priority"]?.jsonPrimitive?.int shouldBe 1
+    }
+
+    @Test
+    fun `ALL strategy output is an array with one element per filter`() = runTest {
+        // Given: A workflow with an ALL listen task (output is directly the workflow result)
+        val workflowName = WorkflowName("listen-all-output-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - listenForAllEvents:
+                  listen:
+                    to:
+                      all:
+                        - with:
+                            type: com.example.FirstEvent
+                        - with:
+                            type: com.example.SecondEvent
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(200)
+
+        // Send first event
+        sendCloudEvent(
+            type = "com.example.FirstEvent",
+            data = """{"order": 1, "name": "first"}"""
+        )
+        realDelay(300)
+
+        // Send second event
+        sendCloudEvent(
+            type = "com.example.SecondEvent",
+            data = """{"order": 2, "name": "second"}"""
+        )
+
+        realDelay(3500)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be an array with exactly two elements (one per filter)
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 2
+
+        // Verify both events are present (order may vary based on filter index)
+        val eventNames = events.map { it.jsonObject["name"]?.jsonPrimitive?.content }.toSet()
+        eventNames shouldBe setOf("first", "second")
+    }
+
+    @Test
+    fun `ANY with until expression output is an array with accumulated events`() = runTest {
+        // Given: A workflow with ANY+until expression (output is directly the workflow result)
+        val workflowName = WorkflowName("listen-any-until-output-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - collectReadings:
+                  listen:
+                    to:
+                      any:
+                        - with:
+                            type: com.example.Reading
+                      until: .[2] != null
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(200)
+
+        // Send three events to trigger the until condition
+        sendCloudEvent(type = "com.example.Reading", data = """{"value": 10}""")
+        realDelay(300)
+        sendCloudEvent(type = "com.example.Reading", data = """{"value": 20}""")
+        realDelay(300)
+        sendCloudEvent(type = "com.example.Reading", data = """{"value": 30}""")
+
+        realDelay(3500)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be an array with all accumulated events
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 3
+
+        // Verify all values are present
+        val values = events.map { it.jsonObject["value"]?.jsonPrimitive?.int }.toSet()
+        values shouldBe setOf(10, 20, 30)
+    }
+
+    @Test
+    fun `ANY with until event output is an array with accumulated events excluding termination`() = runTest {
+        // Given: A workflow with ANY+until event (output is directly the workflow result)
+        val workflowName = WorkflowName("listen-any-until-event-output-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - monitorVitals:
+                  listen:
+                    to:
+                      any:
+                        - with:
+                            type: com.example.Measurement
+                      until:
+                        one:
+                          with:
+                            type: com.example.StopMonitoring
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(200)
+
+        // Send measurement events
+        sendCloudEvent(type = "com.example.Measurement", data = """{"reading": 100}""")
+        realDelay(300)
+        sendCloudEvent(type = "com.example.Measurement", data = """{"reading": 200}""")
+        realDelay(300)
+
+        // Send termination event (should NOT be included in output)
+        sendCloudEvent(type = "com.example.StopMonitoring", data = """{"reason": "complete"}""")
+
+        realDelay(3500)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be an array with only the measurement events (not termination)
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 2
+
+        // Verify only measurement events are present (termination event excluded)
+        val readings = events.map { it.jsonObject["reading"]?.jsonPrimitive?.int }.toSet()
+        readings shouldBe setOf(100, 200)
+
+        // Verify termination event data is NOT in output
+        val hasReason = events.any { it.jsonObject.containsKey("reason") }
+        hasReason shouldBe false
     }
 
     // Helper functions
@@ -717,12 +1024,12 @@ internal class ListenTaskEndToEndTest {
     private suspend fun processUntilCompletion(
         mainWorkflowId: WorkflowId,
         timeoutMs: Long = 10000
-    ): JsonObject? {
+    ): JsonElement? {
         // Check if already completed (from previous processing)
         completedWorkflows[mainWorkflowId]?.let { return it }
 
         val startTime = System.currentTimeMillis()
-        var result: JsonObject? = null
+        var result: JsonElement? = null
         var emptyIterations = 0
         val maxEmptyIterations = 50 // Wait up to 2.5 seconds if no messages
 
@@ -754,7 +1061,7 @@ internal class ListenTaskEndToEndTest {
     private suspend fun processMessages(
         mainWorkflowId: WorkflowId,
         maxIterations: Int = 100
-    ): JsonObject? {
+    ): JsonElement? {
         var iterations = 0
         var hasActivity = false
 
@@ -774,7 +1081,7 @@ internal class ListenTaskEndToEndTest {
 
             // Check events - process ALL events in batch before returning
             val events = eventsSink.received().toList()
-            var foundMainCompletion: JsonObject? = null
+            var foundMainCompletion: JsonElement? = null
             if (events.isNotEmpty()) {
                 eventsSink.clear()
                 hasActivity = true
@@ -783,9 +1090,9 @@ internal class ListenTaskEndToEndTest {
                     when (val state = event.workflowState) {
                         is WorkflowEvent.WorkflowCompleted -> {
                             // Store all completions to avoid losing events in multi-workflow tests
-                            completedWorkflows[event.workflowId] = state.output.jsonObject
+                            completedWorkflows[event.workflowId] = state.output
                             if (event.workflowId == mainWorkflowId) {
-                                foundMainCompletion = state.output.jsonObject
+                                foundMainCompletion = state.output
                             }
                         }
 

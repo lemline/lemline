@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 
 const val LISTENER_TABLE = "lemline_listeners"
 
@@ -747,18 +748,21 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
     }.flowOn(Dispatchers.IO)
 
     /**
-     * Parses a JSON array of strings (from json_agg/JSON_ARRAYAGG) into a List<String>.
+     * Parses a JSON array from json_agg/JSON_ARRAYAGG into a List<String>.
      *
-     * The JSON may look like: ["event1_json", "event2_json"] or be null if no events.
+     * The result from the database is a JSON array of JSON objects:
+     * [{"value":10},{"value":20}]
+     *
+     * This method extracts each element and returns it as a JSON string.
      */
     private fun parseJsonArrayToList(json: String?): List<String> {
         if (json == null || json == "null" || json.isBlank()) {
             return emptyList()
         }
         return try {
-            // The events are already JSON strings inside the array
-            // We need to parse them as raw strings, not as nested JSON
-            Json.decodeFromString<List<String>>(json)
+            // Parse as JsonArray, then encode each element back to string
+            val array = Json.parseToJsonElement(json).jsonArray
+            array.map { Json.encodeToString(it) }
         } catch (e: Exception) {
             // If parsing fails, return empty list
             emptyList()

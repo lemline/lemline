@@ -103,15 +103,20 @@ class DatabaseManager {
     /**
      * Returns the database-specific JSON array aggregation function.
      *
-     * - PostgreSQL: json_agg(column)
-     * - MySQL/H2: JSON_ARRAYAGG(column)
+     * This function handles the case where the column contains JSON data stored as a string.
+     * The aggregation properly parses the string as JSON before aggregating.
      *
-     * @param column The column expression to aggregate
+     * - PostgreSQL: json_agg(column::json) - casts string to json before aggregation
+     * - MySQL: JSON_ARRAYAGG(CAST(column AS JSON)) - casts string to JSON
+     * - H2: JSON_ARRAYAGG(column FORMAT JSON) - tells H2 the column is JSON
+     *
+     * @param column The column expression containing JSON strings to aggregate
      * @return SQL fragment for JSON array aggregation
      */
     fun jsonArrayAgg(column: String): String = when (dbType) {
-        DB_TYPE_POSTGRESQL -> "json_agg($column)"
-        else -> "JSON_ARRAYAGG($column)"
+        DB_TYPE_POSTGRESQL -> "json_agg($column::json)"
+        DB_TYPE_MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON))"
+        else -> "JSON_ARRAYAGG($column FORMAT JSON)"
     }
 
     /**

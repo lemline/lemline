@@ -309,8 +309,9 @@ internal class CloudEventHandler(
 
         for ((readAs, defGroup) in byReadAs) {
             val eventData = extractEventContent(event, readAs)
-            // Store single event as JSON (will be wrapped in array at completion time)
-            val eventJson = Json.encodeToString(eventData)
+            // Store as JSON array (spec requires output to be an array even for ONE/ANY)
+            val eventArray = JsonArray(listOf(eventData))
+            val eventJson = Json.encodeToString(eventArray)
 
             val queryKeys = defGroup.map { it.toQueryKey() }.distinct()
 
