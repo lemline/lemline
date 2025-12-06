@@ -14,6 +14,7 @@ import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.ListenStrategy
 import com.lemline.runner.models.ListenerModel
+import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.EventFilter
@@ -50,7 +51,14 @@ data class DefinitionMatch(
     val readAs: ListenTaskConfiguration.ListenAndReadAs,
     /** Until condition for ANY+until accumulation mode (null for ONE, ANY without until, ALL) */
     val until: CachedUntilCondition? = null
-)
+) {
+    /** Converts this definition match to a query key for listener lookup. */
+    fun toQueryKey() = ListenerQueryKey(
+        workflowInfo = workflowInfo,
+        position = nodePosition,
+        correlationValuesJson = correlationValuesJson
+    )
+}
 
 /**
  * Represents a workflow definition whose termination filter matches an event.
@@ -62,7 +70,14 @@ data class TerminationDefinitionMatch(
     val workflowInfo: WorkflowInfo,
     val nodePosition: NodePosition,
     val readAs: ListenTaskConfiguration.ListenAndReadAs
-)
+) {
+    /** Converts this termination match to a query key (without correlation - termination doesn't use it). */
+    fun toQueryKey() = ListenerQueryKey(
+        workflowInfo = workflowInfo,
+        position = nodePosition,
+        correlationValuesJson = null
+    )
+}
 
 /**
  * Represents a matched listener with context needed for batch processing.

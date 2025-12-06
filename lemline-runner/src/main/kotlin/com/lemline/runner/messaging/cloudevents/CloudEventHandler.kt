@@ -18,9 +18,7 @@ import com.lemline.runner.repositories.ListenerEventRepository
 import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
 import io.cloudevents.CloudEvent
-import io.serverlessworkflow.api.types.EventFilter
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
-import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
@@ -217,13 +215,7 @@ internal class CloudEventHandler(
      */
     private suspend fun queryListenersForDefinitions(definitions: List<DefinitionMatch>): List<ListenerMatch> {
         // Build unique query keys
-        val queryKeys = definitions.map { def ->
-            ListenerQueryKey(
-                workflowInfo = def.workflowInfo,
-                position = def.nodePosition,
-                correlationValuesJson = def.correlationValuesJson
-            )
-        }.distinct()
+        val queryKeys = definitions.map { it.toQueryKey() }.distinct()
 
         // Batch query all matching listeners
         val listeners = listenerRepository.findByKeys(queryKeys)
@@ -284,14 +276,7 @@ internal class CloudEventHandler(
     private suspend fun processTerminationEventsDirect(
         definitions: List<TerminationDefinitionMatch>
     ): Int {
-        // Build query keys from termination definitions
-        val queryKeys = definitions.map { def ->
-            ListenerQueryKey(
-                workflowInfo = def.workflowInfo,
-                position = def.nodePosition,
-                correlationValuesJson = null  // Termination doesn't use correlation
-            )
-        }.distinct()
+        val queryKeys = definitions.map { it.toQueryKey() }.distinct()
 
         val completed = listenerRepository.markTerminatedByKeys(queryKeys)
 
@@ -327,14 +312,7 @@ internal class CloudEventHandler(
             // Store single event as JSON (will be wrapped in array at completion time)
             val eventJson = Json.encodeToString(eventData)
 
-            // Build query keys from definitions
-            val queryKeys = defGroup.map { def ->
-                ListenerQueryKey(
-                    workflowInfo = def.workflowInfo,
-                    position = def.nodePosition,
-                    correlationValuesJson = def.correlationValuesJson
-                )
-            }.distinct()
+            val queryKeys = defGroup.map { it.toQueryKey() }.distinct()
 
             val affected = listenerRepository.markReadyForCompletionByKeys(
                 keys = queryKeys,
@@ -380,14 +358,7 @@ internal class CloudEventHandler(
             val eventData = extractEventContent(event, readAs)
             val eventJson = Json.encodeToString(eventData)
 
-            // Build query keys from definitions
-            val queryKeys = defGroup.map { def ->
-                ListenerQueryKey(
-                    workflowInfo = def.workflowInfo,
-                    position = def.nodePosition,
-                    correlationValuesJson = def.correlationValuesJson
-                )
-            }.distinct()
+            val queryKeys = defGroup.map { it.toQueryKey() }.distinct()
 
             // Build map of (workflowInfo, position) -> until expression
             val untilExpressions = defGroup.associate { def ->
@@ -469,20 +440,12 @@ internal class CloudEventHandler(
             val eventData = extractEventContent(event, readAs)
             val eventJson = Json.encodeToString(eventData)
 
-            // Build query keys from definitions
-            val queryKeys = defGroup.map { def ->
-                ListenerQueryKey(
-                    workflowInfo = def.workflowInfo,
-                    position = def.nodePosition,
-                    correlationValuesJson = def.correlationValuesJson
-                )
-            }.distinct()
+            val queryKeys = defGroup.map { it.toQueryKey() }.distinct()
 
             // Bulk INSERT events for all matching listeners (one query, no memory load)
-            val cloudEventId = event.id
             val inserted = listenerEventRepository.bulkInsertEventsForKeys(
                 keys = queryKeys,
-                cloudEventId = cloudEventId,
+                cloudEventId = event.id,
                 eventJson = eventJson
             )
             logger.debug { "Bulk inserted $inserted events for ANY+until(event) listeners (readAs=$readAs, accumulating)" }
@@ -507,95 +470,6 @@ internal class CloudEventHandler(
         } catch (e: Exception) {
             logger.warn(e) { "Failed to evaluate until expression: $expression" }
             false
-        }
-    }
-
-    /**
-     * Checks if the CloudEvent matches the termination filter.
-     */
-    private fun filterMatches(
-        filter: EventFilter,
-        event: CloudEvent,
-        eventData: JsonElement
-    ): Boolean {
-        val eventProps = filter.with ?: return true
-
-        // Literal-only fields: exact string match
-        if (!matchesLiteralField(eventProps.type, event.type)) return false
-        if (!matchesLiteralField(eventProps.id, event.id)) return false
-        if (!matchesLiteralField(eventProps.subject, event.subject)) return false
-        if (!matchesLiteralField(eventProps.datacontenttype, event.dataContentType)) return false
-
-        // Expression-capable fields
-        if (!matchesExprField(eventProps.source?.get()?.toString(), event.source?.toString())) return false
-        if (!matchesExprField(eventProps.dataschema?.get()?.toString(), event.dataSchema?.toString())) return false
-        if (!matchesExprField(eventProps.time?.get()?.toString(), event.time?.toString())) return false
-        if (!matchesExprField(eventProps.data?.get()?.toString(), eventData)) return false
-
-        return true
-    }
-
-    private fun matchesLiteralField(filterValue: String?, eventValue: String?): Boolean {
-        if (filterValue == null) return true
-        return filterValue == eventValue
-    }
-
-    private fun matchesExprField(filterValue: String?, eventValue: String?): Boolean {
-        if (filterValue == null) return true
-
-        return if (ExpressionUtils.isExpr(filterValue)) {
-            evaluateStringAsBoolean(filterValue, eventValue)
-        } else {
-            filterValue == eventValue
-        }
-    }
-
-    private fun matchesExprField(filterValue: String?, eventValue: JsonElement): Boolean {
-        if (filterValue == null) return true
-
-        return if (ExpressionUtils.isExpr(filterValue)) {
-            evaluateJsonElementAsBoolean(filterValue, eventValue)
-        } else {
-            try {
-                Json.parseToJsonElement(filterValue)
-            } catch (_: Exception) {
-                null
-            } == eventValue
-        }
-    }
-
-    private fun evaluateStringAsBoolean(expression: String, value: String?) =
-        evaluateJsonElementAsBoolean(expression, value?.let { JsonPrimitive(it) } ?: JsonNull)
-
-    private fun evaluateJsonElementAsBoolean(expression: String, value: JsonElement): Boolean {
-        if (value == JsonNull) return false
-
-        return try {
-            val trimmedExpr = ExpressionUtils.trimExpr(expression)
-            with(LemlineJson) {
-                val inputNode = value.toJsonNode()
-                val scope = JsonObject(emptyMap()).toJsonNode() as ObjectNode
-                val result = JQExpression.eval(inputNode, trimmedExpr, scope).toJsonElement()
-                (result as? JsonPrimitive)?.booleanOrNull == true
-            }
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to evaluate expression: $expression against value: $value" }
-            false
-        }
-    }
-
-    private fun parseEventData(event: CloudEvent): JsonElement {
-        val data = event.data ?: return JsonNull
-        return try {
-            val bytes = data.toBytes()
-            if (bytes.isEmpty()) {
-                JsonNull
-            } else {
-                Json.parseToJsonElement(String(bytes))
-            }
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to parse CloudEvent data as JSON" }
-            JsonNull
         }
     }
 
