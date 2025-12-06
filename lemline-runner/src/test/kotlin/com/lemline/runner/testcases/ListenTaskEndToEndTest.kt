@@ -70,6 +70,20 @@ import org.junit.jupiter.api.TestInstance
 @ExperimentalSerializationApi
 internal class ListenTaskEndToEndTest {
 
+    companion object {
+        /** Short delay for database writes to complete */
+        private const val DB_WRITE_DELAY_MS = 200L
+
+        /** Short delay between sequential event sends */
+        private const val EVENT_INTERVAL_MS = 300L
+
+        /** Delay for outbox scheduler to process (1s polling + buffer) */
+        private const val OUTBOX_PROCESSING_DELAY_MS = 3500L
+
+        /** Delay between message processing iterations */
+        private const val PROCESSING_INTERVAL_MS = 50L
+    }
+
     @Inject
     lateinit var definitionRepository: DefinitionRepository
 
@@ -92,7 +106,10 @@ internal class ListenTaskEndToEndTest {
     private val testNamespace = WorkflowNamespace("test")
     private val testVersion = WorkflowVersion("1.0.0")
 
-    // Track completed workflows to avoid losing events during multi-workflow tests
+    /**
+     * Tracks completed workflows to avoid losing completion events during multi-workflow tests.
+     * Maps workflow ID to its output JSON.
+     */
     private val completedWorkflows = mutableMapOf<WorkflowId, JsonElement>()
 
     @BeforeEach
@@ -152,7 +169,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered in database
-        realDelay(200) // Allow time for database write
+        realDelay(DB_WRITE_DELAY_MS)
         val listeners = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listeners.size shouldBe 1
 
@@ -164,7 +181,7 @@ internal class ListenTaskEndToEndTest {
 
         // Allow time for CloudEvent processing and outbox completion (1s polling interval)
         // Uses realDelay because runTest skips virtual delays but outbox runs in real time
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
 
         // Verify listener was completed by CloudEvent processing
         val listenersAfterEvent = findListenersByWorkflow(testNamespace, workflowName, testVersion)
@@ -214,7 +231,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
         val listeners = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listeners.size shouldBe 1
 
@@ -225,7 +242,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow time for CloudEvent processing and outbox completion
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
 
         // Process until workflow completes
         val result = processUntilCompletion(workflowId)
@@ -269,7 +286,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
         val listenersBeforeEvents = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listenersBeforeEvents.size shouldBe 1
 
@@ -280,7 +297,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow processing
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
 
         // Workflow should NOT be complete yet - listener still active
         processMessages(workflowId, maxIterations = 20)
@@ -295,7 +312,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow time for CloudEvent processing and outbox completion
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
 
         // Process until workflow completes
         val result = processUntilCompletion(workflowId)
@@ -335,7 +352,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
         val listenersInitial = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listenersInitial.size shouldBe 1
 
@@ -346,7 +363,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow processing
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
 
         // Process messages
         processMessages(workflowId, maxIterations = 20)
@@ -389,7 +406,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
         val listenersBeforeEvents = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listenersBeforeEvents.size shouldBe 1
 
@@ -398,7 +415,7 @@ internal class ListenTaskEndToEndTest {
             type = "com.example.Reading",
             data = """{"value": 1}"""
         )
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
 
         // Verify listener still active
         processMessages(workflowId, maxIterations = 20)
@@ -411,7 +428,7 @@ internal class ListenTaskEndToEndTest {
             type = "com.example.Reading",
             data = """{"value": 2}"""
         )
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
 
         // Verify listener still active
         processMessages(workflowId, maxIterations = 20)
@@ -426,7 +443,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow time for CloudEvent processing and outbox completion
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
 
         // Process until workflow completes
         val result = processUntilCompletion(workflowId)
@@ -474,7 +491,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
         val listenersBeforeEvents = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listenersBeforeEvents.size shouldBe 1
 
@@ -483,7 +500,7 @@ internal class ListenTaskEndToEndTest {
             type = "com.hospital.vitals.temperature",
             data = """{"temperature": 37.5}"""
         )
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
 
         // Verify listener still active
         processMessages(workflowId, maxIterations = 20)
@@ -496,7 +513,7 @@ internal class ListenTaskEndToEndTest {
             type = "com.hospital.vitals.bpm",
             data = """{"bpm": 72}"""
         )
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
 
         // Verify listener still active
         processMessages(workflowId, maxIterations = 20)
@@ -511,7 +528,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow time for CloudEvent processing and outbox completion
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
 
         // Process until workflow completes
         val result = processUntilCompletion(workflowId)
@@ -558,7 +575,7 @@ internal class ListenTaskEndToEndTest {
         listenStartedEvent shouldNotBe null
 
         // Verify listener is registered
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
         val listenersBeforeEvent = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listenersBeforeEvent.size shouldBe 1
 
@@ -569,7 +586,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow time for CloudEvent processing and outbox completion
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
 
         // Process until workflow completes
         val result = processUntilCompletion(workflowId)
@@ -614,7 +631,7 @@ internal class ListenTaskEndToEndTest {
         listenStarted2 shouldNotBe null
 
         // Verify both listeners are registered
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
         val listeners = findListenersByWorkflow(testNamespace, workflowName, testVersion)
         listeners.size shouldBe 2
 
@@ -625,7 +642,7 @@ internal class ListenTaskEndToEndTest {
         )
 
         // Allow time for CloudEvent processing and outbox completion
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
 
         // Process until both complete
         val result1 = processUntilCompletion(workflowId1)
@@ -667,7 +684,7 @@ internal class ListenTaskEndToEndTest {
 
         val workflowId = startWorkflow(workflowName)
         processUntilListenStarted(workflowId)
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
 
         // Send event with specific data
         sendCloudEvent(
@@ -675,7 +692,7 @@ internal class ListenTaskEndToEndTest {
             data = """{"message": "hello", "value": 42}"""
         )
 
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
         val result = processUntilCompletion(workflowId)
 
         // Then: Output should be an array with exactly one element
@@ -711,7 +728,7 @@ internal class ListenTaskEndToEndTest {
 
         val workflowId = startWorkflow(workflowName)
         processUntilListenStarted(workflowId)
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
 
         // Send event matching the second filter
         sendCloudEvent(
@@ -719,7 +736,7 @@ internal class ListenTaskEndToEndTest {
             data = """{"source": "B", "priority": 1}"""
         )
 
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
         val result = processUntilCompletion(workflowId)
 
         // Then: Output should be an array with exactly one element
@@ -755,14 +772,14 @@ internal class ListenTaskEndToEndTest {
 
         val workflowId = startWorkflow(workflowName)
         processUntilListenStarted(workflowId)
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
 
         // Send first event
         sendCloudEvent(
             type = "com.example.FirstEvent",
             data = """{"order": 1, "name": "first"}"""
         )
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
 
         // Send second event
         sendCloudEvent(
@@ -770,7 +787,7 @@ internal class ListenTaskEndToEndTest {
             data = """{"order": 2, "name": "second"}"""
         )
 
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
         val result = processUntilCompletion(workflowId)
 
         // Then: Output should be an array with exactly two elements (one per filter)
@@ -807,16 +824,16 @@ internal class ListenTaskEndToEndTest {
 
         val workflowId = startWorkflow(workflowName)
         processUntilListenStarted(workflowId)
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
 
         // Send three events to trigger the until condition
         sendCloudEvent(type = "com.example.Reading", data = """{"value": 10}""")
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
         sendCloudEvent(type = "com.example.Reading", data = """{"value": 20}""")
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
         sendCloudEvent(type = "com.example.Reading", data = """{"value": 30}""")
 
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
         val result = processUntilCompletion(workflowId)
 
         // Then: Output should be an array with all accumulated events
@@ -856,18 +873,18 @@ internal class ListenTaskEndToEndTest {
 
         val workflowId = startWorkflow(workflowName)
         processUntilListenStarted(workflowId)
-        realDelay(200)
+        realDelay(DB_WRITE_DELAY_MS)
 
         // Send measurement events
         sendCloudEvent(type = "com.example.Measurement", data = """{"reading": 100}""")
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
         sendCloudEvent(type = "com.example.Measurement", data = """{"reading": 200}""")
-        realDelay(300)
+        realDelay(EVENT_INTERVAL_MS)
 
         // Send termination event (should NOT be included in output)
         sendCloudEvent(type = "com.example.StopMonitoring", data = """{"reason": "complete"}""")
 
-        realDelay(3500)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
         val result = processUntilCompletion(workflowId)
 
         // Then: Output should be an array with only the measurement events (not termination)
@@ -884,11 +901,16 @@ internal class ListenTaskEndToEndTest {
         hasReason shouldBe false
     }
 
-    // Helper functions
+    // ========================================
+    // Helper Functions
+    // ========================================
 
     /**
      * Real-time delay that doesn't get skipped by runTest.
-     * Used when waiting for outbox schedulers to process.
+     *
+     * Unlike kotlinx.coroutines.delay which is virtual-time in runTest,
+     * this delay runs in real time - essential for testing outbox schedulers
+     * and other real-time async operations.
      */
     private suspend fun realDelay(millis: Long) {
         withContext(Dispatchers.Default) {
@@ -897,22 +919,25 @@ internal class ListenTaskEndToEndTest {
     }
 
     /**
-     * Helper to find listeners by workflow definition.
-     * Queries listeners by workflow identity (namespace, name, version).
+     * Finds all listeners registered for a workflow definition.
+     *
+     * @param namespace Workflow namespace
+     * @param name Workflow name
+     * @param version Workflow version
+     * @return All listeners (both active and completed) for the workflow
      */
     private suspend fun findListenersByWorkflow(
         namespace: WorkflowNamespace,
         name: WorkflowName,
         version: WorkflowVersion
     ): List<ListenerModel> {
-        // Get all listen tasks from the workflow and query listeners for each position
         val workflowInfo = WorkflowInfo(namespace, name, version)
         val listenTasks = DefinitionCache.getListenTasks(workflowInfo)
         if (listenTasks.isEmpty()) return emptyList()
 
         val keys = listenTasks.map { listenTask ->
             ListenerQueryKey(
-                workflowInfo = WorkflowInfo(namespace, name, version),
+                workflowInfo = workflowInfo,
                 position = listenTask.nodePosition,
                 correlationValuesJson = null
             )
@@ -920,6 +945,12 @@ internal class ListenTaskEndToEndTest {
         return listenerRepository.findByKeys(keys)
     }
 
+    /**
+     * Registers a workflow definition in the repository and cache.
+     *
+     * @param yaml The workflow YAML definition
+     * @param name The workflow name (must match the name in the YAML)
+     */
     private suspend fun registerWorkflow(yaml: String, name: WorkflowName) {
         val existing = definitionRepository.findByNameAndVersion(testNamespace, name, testVersion)
         if (existing != null) {
@@ -939,6 +970,12 @@ internal class ListenTaskEndToEndTest {
         DefinitionCache.parseAndPut(yaml)
     }
 
+    /**
+     * Starts a workflow instance with empty input.
+     *
+     * @param name The workflow name to start
+     * @return The new workflow instance ID
+     */
     private fun startWorkflow(name: WorkflowName): WorkflowId {
         val workflowId = WorkflowId.random()
         val workflowInfo = WorkflowInfo(testNamespace, name, testVersion)
@@ -959,6 +996,16 @@ internal class ListenTaskEndToEndTest {
         return workflowId
     }
 
+    /**
+     * Processes messages until a ListenStarted event is received.
+     *
+     * Routes commands and events between channels until the workflow emits
+     * a ListenStarted event, indicating a listen task has begun waiting.
+     *
+     * @param mainWorkflowId The workflow ID to monitor
+     * @param timeoutMs Maximum time to wait (default: 10 seconds)
+     * @return The ListenStarted event, or null if timeout reached
+     */
     private suspend fun processUntilListenStarted(
         mainWorkflowId: WorkflowId,
         timeoutMs: Long = 10000
@@ -966,7 +1013,7 @@ internal class ListenTaskEndToEndTest {
         val startTime = System.currentTimeMillis()
 
         // Initial delay to let handlers start processing
-        realDelay(100)
+        realDelay(PROCESSING_INTERVAL_MS * 2)
 
         while (System.currentTimeMillis() - startTime < timeoutMs) {
             // Route commands first
@@ -990,7 +1037,7 @@ internal class ListenTaskEndToEndTest {
                                 // Forward to events channel for database processing
                                 eventsSource.send(eventMsg.payload)
                                 // Give time for database processing
-                                realDelay(100)
+                                realDelay(PROCESSING_INTERVAL_MS * 2)
                                 return state
                             }
                         }
@@ -1003,11 +1050,17 @@ internal class ListenTaskEndToEndTest {
             }
 
             // Wait before next iteration
-            realDelay(50)
+            realDelay(PROCESSING_INTERVAL_MS)
         }
         return null
     }
 
+    /**
+     * Sends a CloudEvent to the cloudevents-in channel.
+     *
+     * @param type The CloudEvent type (e.g., "com.example.OrderCreated")
+     * @param data The event data as JSON string
+     */
     private fun sendCloudEvent(type: String, data: String) {
         val cloudEvent = CloudEventBuilder.v1()
             .withId(IDV7.random().toString())
@@ -1021,6 +1074,16 @@ internal class ListenTaskEndToEndTest {
         cloudEventsSource.send(serialized)
     }
 
+    /**
+     * Processes messages until the specified workflow completes.
+     *
+     * Routes messages between channels, handles wait events automatically,
+     * and tracks workflow completions across multiple concurrent workflows.
+     *
+     * @param mainWorkflowId The workflow ID to wait for completion
+     * @param timeoutMs Maximum time to wait (default: 10 seconds)
+     * @return The workflow output, or null if timeout reached
+     */
     private suspend fun processUntilCompletion(
         mainWorkflowId: WorkflowId,
         timeoutMs: Long = 10000
@@ -1031,7 +1094,7 @@ internal class ListenTaskEndToEndTest {
         val startTime = System.currentTimeMillis()
         var result: JsonElement? = null
         var emptyIterations = 0
-        val maxEmptyIterations = 50 // Wait up to 2.5 seconds if no messages
+        val maxEmptyIterations = (2500 / PROCESSING_INTERVAL_MS).toInt()
 
         while (result == null && System.currentTimeMillis() - startTime < timeoutMs) {
             result = processMessages(mainWorkflowId)
@@ -1048,7 +1111,7 @@ internal class ListenTaskEndToEndTest {
                     break
                 }
                 // Use delay to allow real async processing
-                realDelay(50)
+                realDelay(PROCESSING_INTERVAL_MS)
             } else {
                 emptyIterations = 0
             }
@@ -1057,6 +1120,20 @@ internal class ListenTaskEndToEndTest {
         return result
     }
 
+    /**
+     * Routes messages between channels for one processing iteration.
+     *
+     * This method:
+     * 1. Routes commands from sink to source for handler processing
+     * 2. Processes workflow events (completion, failure, wait)
+     * 3. Tracks all workflow completions to handle concurrent workflows
+     * 4. Auto-resumes wait tasks for faster test execution
+     *
+     * @param mainWorkflowId The workflow ID to check for completion
+     * @param maxIterations Maximum routing iterations before returning
+     * @return The workflow output if completed, null otherwise
+     * @throws AssertionError if the main workflow fails
+     */
     @Suppress("NestedBlockDepth")
     private suspend fun processMessages(
         mainWorkflowId: WorkflowId,
@@ -1124,14 +1201,14 @@ internal class ListenTaskEndToEndTest {
 
             // If no activity, allow a real-time wait for async handlers to process
             if (!hasActivity) {
-                realDelay(50)
+                realDelay(PROCESSING_INTERVAL_MS)
                 // Break if still no activity after the wait
                 if (commandsSink.received().isEmpty() && eventsSink.received().isEmpty()) {
                     break
                 }
             } else {
                 // Give handlers time to process routed messages
-                realDelay(50)
+                realDelay(PROCESSING_INTERVAL_MS)
             }
         }
 
