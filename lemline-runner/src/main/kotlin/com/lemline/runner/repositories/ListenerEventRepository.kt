@@ -43,7 +43,18 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
         const val ID_COLUMN = "id"
         const val LISTENER_ID_COLUMN = "listener_id"
         const val FILTER_INDEX_COLUMN = "filter_index"
+        const val CLOUDEVENT_ID_COLUMN = "cloudevent_id"
         const val EVENT_COLUMN = "event"
+
+        // Column names from listener table for SQL building
+        private const val WORKFLOW_NAMESPACE_COLUMN = "workflow_namespace"
+        private const val WORKFLOW_NAME_COLUMN = "workflow_name"
+        private const val WORKFLOW_VERSION_COLUMN = "workflow_version"
+        private const val WORKFLOW_POSITION_COLUMN = "workflow_position"
+        private const val CORRELATION_VALUES_COLUMN = "correlation_values"
+        private const val OUTBOX_DELAYED_UNTIL_COLUMN = "outbox_delayed_until"
+        private const val OUTBOX_COMPLETED_AT_COLUMN = "outbox_completed_at"
+        private const val OUTBOX_FAILED_AT_COLUMN = "outbox_failed_at"
     }
 
     @Inject
@@ -57,6 +68,9 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
             FILTER_INDEX_COLUMN to { stmt, entity, idx ->
                 entity.filterIndex?.let { stmt.setInt(idx, it) } ?: stmt.setNull(idx, Types.INTEGER)
             },
+            CLOUDEVENT_ID_COLUMN to { stmt, entity, idx ->
+                entity.cloudEventId?.let { stmt.setString(idx, it) } ?: stmt.setNull(idx, Types.VARCHAR)
+            },
             EVENT_COLUMN to { stmt, entity, idx -> stmt.setString(idx, entity.event) }
         )
     }
@@ -65,6 +79,7 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
         id = getIDV7(rs, ID_COLUMN)!!,
         listenerId = getIDV7(rs, LISTENER_ID_COLUMN)!!,
         filterIndex = rs.getInt(FILTER_INDEX_COLUMN).takeIf { !rs.wasNull() },
+        cloudEventId = rs.getString(CLOUDEVENT_ID_COLUMN),
         event = rs.getString(EVENT_COLUMN),
         createdAt = rs.getInstant(CREATED_AT_COLUMN)
     )
@@ -221,5 +236,74 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
 
     private val deleteByListenerIdSql by lazy {
         "DELETE FROM $tableName WHERE $LISTENER_ID_COLUMN = ?"
+    }
+
+    /**
+     * Bulk inserts events for all listeners matching the given query keys.
+     *
+     * Uses INSERT...SELECT to insert events without loading listeners into memory.
+     * This is critical for handling cases where millions of listeners may match.
+     *
+     * The cloudevent_id column ensures idempotency:
+     * - If the same CloudEvent is processed twice (retry), duplicates are ignored
+     * - The UNIQUE(listener_id, cloudevent_id) constraint prevents duplicate events
+     *
+     * @param keys List of query keys identifying listeners to receive the event
+     * @param cloudEventId The CloudEvent's ID for idempotency
+     * @param eventJson The CloudEvent data as JSON string
+     * @param connection Optional database connection
+     * @return Number of events inserted (may be less than matching listeners if duplicates skipped)
+     */
+    suspend fun bulkInsertEventsForKeys(
+        keys: List<ListenerQueryKey>,
+        cloudEventId: String,
+        eventJson: String,
+        connection: Connection? = null
+    ): Int {
+        if (keys.isEmpty()) return 0
+
+        return withConnection(connection) { conn ->
+            // Build WHERE conditions from keys
+            val conditions = keys.map { key ->
+                if (key.correlationValuesJson == null) {
+                    "(l.$WORKFLOW_NAMESPACE_COLUMN = ? AND l.$WORKFLOW_NAME_COLUMN = ? AND l.$WORKFLOW_VERSION_COLUMN = ? AND l.$WORKFLOW_POSITION_COLUMN = ?)"
+                } else {
+                    "(l.$WORKFLOW_NAMESPACE_COLUMN = ? AND l.$WORKFLOW_NAME_COLUMN = ? AND l.$WORKFLOW_VERSION_COLUMN = ? AND l.$WORKFLOW_POSITION_COLUMN = ? AND (l.$CORRELATION_VALUES_COLUMN IS NULL OR l.$CORRELATION_VALUES_COLUMN = ?))"
+                }
+            }
+
+            val selectSql = """
+                SELECT ${databaseManager.randomUuid()}, l.$ID_COLUMN, NULL, ?, ?, CURRENT_TIMESTAMP
+                FROM $LISTENER_TABLE l
+                WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND (${conditions.joinToString(" OR ")})
+            """.trimIndent()
+
+            val sql = databaseManager.insertIgnoreSelect(
+                tableName = tableName,
+                columns = "$ID_COLUMN, $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $CLOUDEVENT_ID_COLUMN, $EVENT_COLUMN, $CREATED_AT_COLUMN",
+                selectSql = selectSql
+            )
+
+            conn.prepareStatement(sql).use { stmt ->
+                var idx = 1
+                // Bind cloudevent_id and event JSON for the SELECT
+                stmt.setString(idx++, cloudEventId)
+                stmt.setString(idx++, eventJson)
+                // Bind key conditions
+                for (key in keys) {
+                    stmt.setString(idx++, key.workflowInfo.workflowNamespace.toString())
+                    stmt.setString(idx++, key.workflowInfo.workflowName.toString())
+                    stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
+                    stmt.setString(idx++, key.position.toString())
+                    if (key.correlationValuesJson != null) {
+                        stmt.setString(idx++, key.correlationValuesJson)
+                    }
+                }
+                stmt.executeUpdate()
+            }
+        }
     }
 }

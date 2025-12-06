@@ -151,34 +151,26 @@ internal class CloudEventHandler(
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
-        // Strategy: ANY + until, ALL - Requires SELECT for accumulation logic
-        // Query listeners only for strategies that need event accumulation
+        // Strategy: ANY + until(expression) - Direct INSERT + Streaming
+        // Bulk insert events without loading listeners, then stream for expression eval
         // ─────────────────────────────────────────────────────────────────────────────
-        val accumulationDefinitions = definitionMatches.filter {
-            it.strategy == ListenStrategy.ALL || (it.strategy == ListenStrategy.ANY && it.until != null)
+        val anyUntilExprDefinitions = definitionMatches.filter {
+            it.strategy == ListenStrategy.ANY && it.until is CachedUntilCondition.Expression
         }
-
-        // Query listeners only for accumulation strategies (not ONE/ANY)
-        val listenerMatches = if (accumulationDefinitions.isNotEmpty()) {
-            queryListenersForDefinitions(accumulationDefinitions)
-        } else {
-            emptyList()
-        }
-
-        // Extract event data once per readAs mode (avoid repeated parsing)
-        val eventDataByReadAs = listenerMatches.map { it.readAs }.toSet().associateWith { readAs ->
-            extractEventContent(event, readAs)
+        if (anyUntilExprDefinitions.isNotEmpty()) {
+            affectedCount += processAnyWithUntilExpressionDirect(anyUntilExprDefinitions, event)
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
-        // Strategy: ANY + until
-        // Accumulate events until termination condition is met
-        //   - until(expression): Evaluate expression against accumulated events
-        //   - until(event): Wait for a specific termination event
+        // Strategy: ANY + until(event) - Direct INSERT only (accumulation)
+        // Bulk insert events without loading listeners
+        // Completion happens when termination event arrives (via processTerminationEventsDirect)
         // ─────────────────────────────────────────────────────────────────────────────
-        val anyWithUntilMatches = listenerMatches.filter { it.strategy == ListenStrategy.ANY && it.until != null }
-        if (anyWithUntilMatches.isNotEmpty()) {
-            affectedCount += processAnyWithUntil(anyWithUntilMatches, eventDataByReadAs, event)
+        val anyUntilEventDefinitions = definitionMatches.filter {
+            it.strategy == ListenStrategy.ANY && it.until is CachedUntilCondition.Event
+        }
+        if (anyUntilEventDefinitions.isNotEmpty()) {
+            processAnyWithUntilEventDirect(anyUntilEventDefinitions, event)
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
@@ -190,9 +182,24 @@ internal class CloudEventHandler(
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
-        // Strategy: ALL
-        // Accumulate events until all filters have matched (one event per filter)
+        // Strategy: ALL - Requires SELECT for accumulation logic
+        // Query listeners only for ALL strategy that needs filter-index tracking
         // ─────────────────────────────────────────────────────────────────────────────
+        val allDefinitions = definitionMatches.filter { it.strategy == ListenStrategy.ALL }
+
+        // Query listeners only for ALL strategy
+        val listenerMatches = if (allDefinitions.isNotEmpty()) {
+            queryListenersForDefinitions(allDefinitions)
+        } else {
+            emptyList()
+        }
+
+        // Extract event data once per readAs mode (avoid repeated parsing)
+        val eventDataByReadAs = listenerMatches.map { it.readAs }.toSet().associateWith { readAs ->
+            extractEventContent(event, readAs)
+        }
+
+        // Strategy: ALL - Accumulate events until all filters have matched
         val allMatches = listenerMatches.filter { it.strategy == ListenStrategy.ALL }
         if (allMatches.isNotEmpty()) {
             affectedCount += processAll(allMatches, eventDataByReadAs)
@@ -344,167 +351,145 @@ internal class CloudEventHandler(
     }
 
     /**
-     * Processes ANY + until strategy matches (accumulation mode).
+     * Processes ANY + until(expression) strategy using direct INSERT + cursor streaming.
      *
-     * For ANY + until:
-     * 1. Batch INSERT events into lemline_listener_events table
-     * 2. Check termination condition:
-     *    - Expression: evaluate against accumulated events array
-     *    - Event: check if this event matches termination filter
-     * 3. Batch UPDATE listeners where condition is met
+     * This method avoids loading millions of listeners into memory by:
+     * 1. Bulk INSERT events using INSERT...SELECT (one query, no memory load)
+     * 2. Stream listeners with accumulated events using cursor (constant memory)
+     * 3. Evaluate expression on each streamed listener
+     * 4. Batch UPDATE ready listeners (periodic flushes)
      *
-     * Unlike ALL strategy, events don't have fixed filter indices - they're appended
-     * in arrival order using auto-increment indices.
+     * Idempotency is ensured by:
+     * - cloudevent_id column with UNIQUE constraint prevents duplicate events on retry
+     * - WHERE guards on UPDATE prevent double-completion of listeners
      *
+     * @param definitions Definition matches for ANY + until(expression) strategy
+     * @param event The CloudEvent being processed
      * @return Number of listeners that were marked for completion
      */
-    private suspend fun processAnyWithUntil(
-        matches: List<ListenerMatch>,
-        eventDataByReadAs: Map<ListenAndReadAs, JsonElement>,
+    private suspend fun processAnyWithUntilExpressionDirect(
+        definitions: List<DefinitionMatch>,
         event: CloudEvent
     ): Int {
-        // Group by until condition type and readAs
-        val expressionMatches = matches.filter { it.until is CachedUntilCondition.Expression }
-        val eventTerminationMatches = matches.filter { it.until is CachedUntilCondition.Event }
+        // Group by readAs mode for bulk insert
+        val byReadAs = definitions.groupBy { it.readAs }
 
         var totalAffected = 0
 
-        // Process expression-based until conditions
-        if (expressionMatches.isNotEmpty()) {
-            totalAffected += processAnyWithUntilExpression(expressionMatches, eventDataByReadAs)
-        }
+        for ((readAs, defGroup) in byReadAs) {
+            val eventData = extractEventContent(event, readAs)
+            val eventJson = Json.encodeToString(eventData)
 
-        // Process event-based until conditions (termination events)
-        if (eventTerminationMatches.isNotEmpty()) {
-            totalAffected += processAnyWithUntilEvent(eventTerminationMatches, eventDataByReadAs, event)
+            // Build query keys from definitions
+            val queryKeys = defGroup.map { def ->
+                ListenerQueryKey(
+                    workflowInfo = def.workflowInfo,
+                    position = def.nodePosition,
+                    correlationValuesJson = def.correlationValuesJson
+                )
+            }.distinct()
+
+            // Build map of (workflowInfo, position) -> until expression
+            val untilExpressions = defGroup.associate { def ->
+                Pair(def.workflowInfo, def.nodePosition) to (def.until as CachedUntilCondition.Expression).expression
+            }
+
+            // Step 1: Bulk INSERT events for all matching listeners (one query, no memory load)
+            val cloudEventId = event.id
+            val inserted = listenerEventRepository.bulkInsertEventsForKeys(
+                keys = queryKeys,
+                cloudEventId = cloudEventId,
+                eventJson = eventJson
+            )
+            logger.debug { "Bulk inserted $inserted events for ANY+until(expr) listeners (readAs=$readAs)" }
+
+            // Step 2: Stream listeners with accumulated events and evaluate expressions
+            val readyListeners = mutableMapOf<IDV7, String>()
+            val batchSize = 1000
+
+            listenerRepository.streamListenersWithEvents(queryKeys).collect { (listener, accumulatedEvents) ->
+                val positionKey = Pair(listener.workflowInfo, listener.nodePosition)
+                val untilExpr = untilExpressions[positionKey] ?: return@collect
+
+                // Build JSON array of accumulated events
+                val eventsArray = JsonArray(accumulatedEvents.map { Json.parseToJsonElement(it) })
+
+                // Evaluate the until expression
+                val shouldComplete = try {
+                    evaluateUntilExpression(untilExpr, eventsArray)
+                } catch (e: Exception) {
+                    logger.warn(e) { "Failed to evaluate until expression for listener ${listener.id}: $untilExpr" }
+                    false
+                }
+
+                if (shouldComplete) {
+                    readyListeners[listener.id] = Json.encodeToString(eventsArray)
+                    logger.debug { "ANY+until expression evaluated to true for listener ${listener.id}" }
+
+                    // Flush batch if size reached
+                    if (readyListeners.size >= batchSize) {
+                        val flushed = listenerRepository.batchMarkReadyForCompletionFromEvents(readyListeners.toMap())
+                        totalAffected += flushed
+                        readyListeners.clear()
+                        logger.info { "Flushed $flushed ANY+until(expr) listeners ready for completion" }
+                    }
+                }
+            }
+
+            // Flush remaining
+            if (readyListeners.isNotEmpty()) {
+                val flushed = listenerRepository.batchMarkReadyForCompletionFromEvents(readyListeners)
+                totalAffected += flushed
+                logger.info { "Flushed final $flushed ANY+until(expr) listeners ready for completion" }
+            }
         }
 
         return totalAffected
     }
 
     /**
-     * Processes ANY + until with expression condition.
+     * Processes ANY + until(event) strategy accumulation using direct INSERT.
      *
-     * Events are accumulated and the expression is evaluated after each new event.
-     * When the expression returns true, the listener is marked for completion.
+     * This method only handles event accumulation - completion happens when a
+     * termination event arrives (via processTerminationEventsDirect).
+     *
+     * Uses INSERT...SELECT to bulk insert events without loading listeners into memory.
+     *
+     * @param definitions Definition matches for ANY + until(event) strategy
+     * @param event The CloudEvent being processed
      */
-    private suspend fun processAnyWithUntilExpression(
-        matches: List<ListenerMatch>,
-        eventDataByReadAs: Map<ListenAndReadAs, JsonElement>,
-    ): Int {
-        // Build event models for batch insert
-        val eventModels = mutableListOf<ListenerEventModel>()
-        val listenerUntilExpr = mutableMapOf<IDV7, String>()
+    private suspend fun processAnyWithUntilEventDirect(
+        definitions: List<DefinitionMatch>,
+        event: CloudEvent
+    ) {
+        // Group by readAs mode for bulk insert
+        val byReadAs = definitions.groupBy { it.readAs }
 
-        for (match in matches) {
-            val eventData = eventDataByReadAs[match.readAs] ?: continue
+        for ((readAs, defGroup) in byReadAs) {
+            val eventData = extractEventContent(event, readAs)
             val eventJson = Json.encodeToString(eventData)
-            val listenerId = match.listener.id
-            val untilExpr = (match.until as? CachedUntilCondition.Expression)?.expression ?: continue
 
-            // For ANY+until, use auto-increment index (not filter-based like ALL)
-            // The eventId needs to be unique per event, not per filter
-            // We use a random suffix since events can arrive at any time
-            val eventId = IDV7.random()
-
-            eventModels.add(
-                ListenerEventModel(
-                    id = eventId,
-                    listenerId = listenerId,
-                    filterIndex = null,  // null for accumulation mode (allows multiple events per listener)
-                    event = eventJson
+            // Build query keys from definitions
+            val queryKeys = defGroup.map { def ->
+                ListenerQueryKey(
+                    workflowInfo = def.workflowInfo,
+                    position = def.nodePosition,
+                    correlationValuesJson = def.correlationValuesJson
                 )
+            }.distinct()
+
+            // Bulk INSERT events for all matching listeners (one query, no memory load)
+            val cloudEventId = event.id
+            val inserted = listenerEventRepository.bulkInsertEventsForKeys(
+                keys = queryKeys,
+                cloudEventId = cloudEventId,
+                eventJson = eventJson
             )
-
-            listenerUntilExpr[listenerId] = untilExpr
-        }
-
-        if (eventModels.isEmpty()) return 0
-
-        // Step 1: Batch INSERT events
-        val listenerIds = listenerUntilExpr.keys.toList()
-        val inserted = listenerEventRepository.insert(eventModels)
-        logger.debug { "Inserted $inserted events for ANY+until listeners" }
-
-        // Step 2: Fetch all accumulated events for these listeners
-        val eventsByListener = listenerEventRepository.batchFindByListenerIds(listenerIds)
-
-        // Step 3: Evaluate until expression for each listener
-        val listenerEvents = mutableMapOf<IDV7, String>()
-
-        for ((listenerId, events) in eventsByListener) {
-            val untilExpr = listenerUntilExpr[listenerId] ?: continue
-
-            // Build JSON array of accumulated events
-            val eventsArray = JsonArray(events.map { Json.parseToJsonElement(it.event) })
-
-            // Evaluate the until expression against the events array
-            val shouldComplete = try {
-                evaluateUntilExpression(untilExpr, eventsArray)
-            } catch (e: Exception) {
-                logger.warn(e) { "Failed to evaluate until expression for listener $listenerId: $untilExpr" }
-                false
-            }
-
-            if (shouldComplete) {
-                listenerEvents[listenerId] = Json.encodeToString(eventsArray)
-                logger.debug { "ANY+until expression evaluated to true for listener $listenerId" }
-            }
-        }
-
-        if (listenerEvents.isEmpty()) {
-            logger.debug { "No ANY+until listeners completed yet (expression not satisfied)" }
-            return 0
-        }
-
-        // Step 4: Batch UPDATE completed listeners
-        val completed = listenerRepository.batchMarkReadyForCompletionFromEvents(listenerEvents)
-
-        if (completed > 0) {
-            logger.info { "Batch marked $completed ANY+until listeners ready for completion (expression satisfied)" }
-        }
-
-        return completed
-    }
-
-    /**
-     * Processes ANY + until with event termination condition.
-     *
-     * This method only handles accumulation - the event matched a main filter,
-     * so it should be added to the listener's accumulated events.
-     * Termination events are handled separately by processTerminationEvents().
-     */
-    private suspend fun processAnyWithUntilEvent(
-        matches: List<ListenerMatch>,
-        eventDataByReadAs: Map<ListenAndReadAs, JsonElement>,
-        @Suppress("UNUSED_PARAMETER") event: CloudEvent
-    ): Int {
-        val eventModels = mutableListOf<ListenerEventModel>()
-
-        for (match in matches) {
-            val eventDataJson = eventDataByReadAs[match.readAs] ?: continue
-            val eventJson = Json.encodeToString(eventDataJson)
-            val listenerId = match.listener.id
-            val eventId = IDV7.random()
-
-            eventModels.add(
-                ListenerEventModel(
-                    id = eventId,
-                    listenerId = listenerId,
-                    filterIndex = null,  // null for accumulation mode (allows multiple events per listener)
-                    event = eventJson
-                )
-            )
-        }
-
-        if (eventModels.isNotEmpty()) {
-            val inserted = listenerEventRepository.insert(eventModels)
-            logger.debug { "Inserted $inserted events for ANY+until(event) listeners (accumulating)" }
+            logger.debug { "Bulk inserted $inserted events for ANY+until(event) listeners (readAs=$readAs, accumulating)" }
         }
 
         // Accumulation doesn't complete listeners - just stores events
-        // Completion happens when a termination event arrives (via processTerminationEvents)
-        return 0
+        // Completion happens when a termination event arrives (via processTerminationEventsDirect)
     }
 
     /**
@@ -656,6 +641,7 @@ internal class CloudEventHandler(
                         id = eventId,
                         listenerId = listenerId,
                         filterIndex = groupKey.filterIndex,  // Explicit filter index for ALL
+                        cloudEventId = null,  // null for ALL (idempotency via filter_index)
                         event = eventJson
                     )
                 )

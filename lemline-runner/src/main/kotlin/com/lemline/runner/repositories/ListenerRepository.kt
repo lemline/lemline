@@ -20,7 +20,12 @@ import java.sql.Types
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
 
 const val LISTENER_TABLE = "lemline_listeners"
 
@@ -345,6 +350,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
           AND $OUTBOX_FAILED_AT_COLUMN IS NULL
         """.trimIndent()
     }
+
     /**
      * Marks a listener as ready for completion (for ALL/ANY+until after events table is populated).
      *
@@ -627,6 +633,128 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
                 }
                 stmt.executeUpdate()
             }
+        }
+    }
+
+    // ========================================
+    // Streaming Methods for Memory-Efficient Processing
+    // ========================================
+
+    /**
+     * Data class for streaming listener with accumulated events.
+     */
+    data class ListenerWithEvents(
+        val listener: ListenerModel,
+        val accumulatedEvents: List<String>
+    )
+
+    /**
+     * Streams listeners with their accumulated events for expression evaluation.
+     *
+     * Uses cursor-based streaming to process listeners one at a time without loading
+     * all into memory. This is critical for handling cases where millions of listeners
+     * may match.
+     *
+     * The query JOINs listeners with their accumulated events from lemline_listener_events,
+     * aggregating events into a JSON array per listener.
+     *
+     * ## Memory Efficiency
+     *
+     * - Uses small fetchSize to stream results one at a time
+     * - Each emitted ListenerWithEvents is processed and discarded
+     * - Constant memory regardless of total matching listeners
+     *
+     * ## Connection Lifecycle
+     *
+     * The connection is held open for the duration of the flow collection.
+     * Callers should process items quickly to avoid holding connections too long.
+     *
+     * @param keys List of query keys identifying listeners to stream
+     * @param fetchSize Number of rows to fetch per network round-trip (default: 100)
+     * @return Flow of listeners with their accumulated events
+     */
+    fun streamListenersWithEvents(
+        keys: List<ListenerQueryKey>,
+        fetchSize: Int = 500
+    ): Flow<ListenerWithEvents> = flow {
+        if (keys.isEmpty()) return@flow
+
+        databaseManager.datasource.connection.use { conn ->
+            // Disable auto-commit for cursor to work
+            conn.autoCommit = false
+
+            try {
+                // Build WHERE conditions from keys
+                val conditions = keys.map { key ->
+                    if (key.correlationValuesJson == null) {
+                        "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ?)"
+                    } else {
+                        "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ? AND ($CORRELATION_VALUES_COLUMN IS NULL OR $CORRELATION_VALUES_COLUMN = ?))"
+                    }
+                }
+
+                // Use database-specific JSON aggregation
+                val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
+
+                val sql = """
+                    SELECT l.*,
+                           (SELECT $jsonAgg
+                            FROM $LISTENER_EVENT_TABLE e
+                            WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN) as accumulated_events
+                    FROM $tableName l
+                    WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                      AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                      AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                      AND (${conditions.joinToString(" OR ")})
+                """.trimIndent()
+
+                conn.prepareStatement(sql).use { stmt ->
+                    // Set small fetch size for cursor streaming
+                    stmt.fetchSize = fetchSize
+
+                    var idx = 1
+                    for (key in keys) {
+                        stmt.setString(idx++, key.workflowInfo.workflowNamespace.toString())
+                        stmt.setString(idx++, key.workflowInfo.workflowName.toString())
+                        stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
+                        stmt.setString(idx++, key.position.toString())
+                        if (key.correlationValuesJson != null) {
+                            stmt.setString(idx++, key.correlationValuesJson)
+                        }
+                    }
+
+                    stmt.executeQuery().use { rs ->
+                        while (rs.next()) {
+                            val listener = createModel(rs)
+                            val eventsJson = rs.getString("accumulated_events")
+                            val events = parseJsonArrayToList(eventsJson)
+                            emit(ListenerWithEvents(listener, events))
+                        }
+                    }
+                }
+            } finally {
+                // Reset auto-commit
+                conn.autoCommit = true
+            }
+        }
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Parses a JSON array of strings (from json_agg/JSON_ARRAYAGG) into a List<String>.
+     *
+     * The JSON may look like: ["event1_json", "event2_json"] or be null if no events.
+     */
+    private fun parseJsonArrayToList(json: String?): List<String> {
+        if (json == null || json == "null" || json.isBlank()) {
+            return emptyList()
+        }
+        return try {
+            // The events are already JSON strings inside the array
+            // We need to parse them as raw strings, not as nested JSON
+            Json.decodeFromString<List<String>>(json)
+        } catch (e: Exception) {
+            // If parsing fails, return empty list
+            emptyList()
         }
     }
 }

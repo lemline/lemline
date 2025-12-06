@@ -77,6 +77,10 @@ CREATE TABLE lemline_listener_events
     -- Filter index: explicit for ALL strategy (0, 1, 2...), NULL for ANY+until
     filter_index    INT,
 
+    -- CloudEvent ID for idempotency (prevents duplicate events on retry)
+    -- Used for ANY+until strategy to ensure same CloudEvent isn't added twice
+    cloudevent_id   VARCHAR(255),
+
     -- CloudEvent data
     event           CLOB                     NOT NULL,
 
@@ -85,7 +89,10 @@ CREATE TABLE lemline_listener_events
     updated_at      TIMESTAMP WITH TIME ZONE,
 
     -- Ensure one event per filter index per listener (protects ALL strategy)
-    UNIQUE (listener_id, filter_index)
+    UNIQUE (listener_id, filter_index),
+
+    -- Ensure same CloudEvent isn't added twice for ANY+until strategy
+    UNIQUE (listener_id, cloudevent_id)
 );
 
 -- Index for efficient lookup by listener_id

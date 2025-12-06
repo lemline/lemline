@@ -152,7 +152,8 @@ internal abstract class ListenerEventRepositoryTest {
     private fun createEvent(
         listenerId: IDV7,
         filterIndex: Int? = null,
-        eventData: String = """{"type":"com.example.Event"}"""
+        eventData: String = """{"type":"com.example.Event"}""",
+        cloudEventId: String? = null
     ): ListenerEventModel {
         val id = if (filterIndex != null) {
             listenerId.derive("-filter-$filterIndex")
@@ -163,6 +164,7 @@ internal abstract class ListenerEventRepositoryTest {
             id = id,
             listenerId = listenerId,
             filterIndex = filterIndex,
+            cloudEventId = cloudEventId,
             event = eventData
         )
     }

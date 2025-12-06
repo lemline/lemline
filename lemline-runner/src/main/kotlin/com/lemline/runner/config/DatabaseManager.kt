@@ -113,4 +113,35 @@ class DatabaseManager {
         DB_TYPE_POSTGRESQL -> "json_agg($column)"
         else -> "JSON_ARRAYAGG($column)"
     }
+
+    /**
+     * Returns the database-specific random UUID generation function.
+     *
+     * - PostgreSQL: gen_random_uuid()
+     * - MySQL: UUID_TO_BIN(UUID())
+     * - H2: RANDOM_UUID()
+     *
+     * @return SQL fragment for generating a random UUID
+     */
+    fun randomUuid(): String = when (dbType) {
+        DB_TYPE_POSTGRESQL -> "gen_random_uuid()"
+        DB_TYPE_MYSQL -> "UUID_TO_BIN(UUID())"
+        else -> "RANDOM_UUID()"
+    }
+
+    /**
+     * Returns the database-specific INSERT ON CONFLICT/IGNORE syntax.
+     *
+     * - PostgreSQL/H2: INSERT ... ON CONFLICT DO NOTHING
+     * - MySQL: INSERT IGNORE INTO ...
+     *
+     * @param tableName The table name
+     * @param columns The columns to insert
+     * @param selectSql The SELECT SQL to insert from
+     * @return Full INSERT...SELECT SQL with conflict handling
+     */
+    fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
+        DB_TYPE_MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
+        else -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
+    }
 }

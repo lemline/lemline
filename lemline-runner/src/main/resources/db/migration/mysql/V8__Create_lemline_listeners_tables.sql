@@ -81,6 +81,10 @@ CREATE TABLE lemline_listener_events
     -- Filter index: explicit for ALL strategy (0, 1, 2...), NULL for ANY+until
     filter_index    INT,
 
+    -- CloudEvent ID for idempotency (prevents duplicate events on retry)
+    -- Used for ANY+until strategy to ensure same CloudEvent isn't added twice
+    cloudevent_id   VARCHAR(255),
+
     -- CloudEvent data
     event           MEDIUMTEXT   NOT NULL,
 
@@ -91,6 +95,9 @@ CREATE TABLE lemline_listener_events
     -- Ensure one event per filter index per listener (protects ALL strategy)
     -- NULL values are excluded from UNIQUE constraint
     UNIQUE KEY (listener_id, filter_index),
+
+    -- Ensure same CloudEvent isn't added twice for ANY+until strategy
+    UNIQUE KEY (listener_id, cloudevent_id),
 
     -- Foreign key with CASCADE delete
     CONSTRAINT fk_listener_events_listener
