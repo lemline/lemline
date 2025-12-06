@@ -99,4 +99,18 @@ class DatabaseManager {
             else -> throw IllegalStateException("Unknown database type '$dbType'")
         }
     }
+
+    /**
+     * Returns the database-specific JSON array aggregation function.
+     *
+     * - PostgreSQL: json_agg(column)
+     * - MySQL/H2: JSON_ARRAYAGG(column)
+     *
+     * @param column The column expression to aggregate
+     * @return SQL fragment for JSON array aggregation
+     */
+    fun jsonArrayAgg(column: String): String = when (dbType) {
+        DB_TYPE_POSTGRESQL -> "json_agg($column)"
+        else -> "JSON_ARRAYAGG($column)"
+    }
 }

@@ -494,4 +494,65 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
             }
         }
     }
+
+    /**
+     * Marks listeners as terminated by query keys (ANY + until(event) strategy).
+     *
+     * This method performs a direct UPDATE with a subquery to aggregate accumulated events,
+     * avoiding loading potentially millions of listeners into memory. It updates all active
+     * listeners matching the provided keys in a single database operation.
+     *
+     * The accumulated events from lemline_listener_events are aggregated into a JSON array
+     * and stored in the listener's event column.
+     *
+     * @param keys List of query keys identifying listeners to terminate
+     * @param connection Optional database connection
+     * @return Number of listeners that were successfully marked for completion
+     */
+    suspend fun markTerminatedByKeys(
+        keys: List<ListenerQueryKey>,
+        connection: Connection? = null
+    ): Int {
+        if (keys.isEmpty()) return 0
+
+        return withConnection(connection) { conn ->
+            val now = Timestamp.from(Clock.System.now().toJavaInstant())
+
+            // Build WHERE conditions from keys (termination doesn't use correlation)
+            val conditions = keys.map {
+                "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ?)"
+            }
+
+            // Use database-specific JSON aggregation function
+            val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
+
+            val sql = """
+                UPDATE $tableName l
+                SET $EVENT_COLUMN = (
+                    SELECT $jsonAgg
+                    FROM $LISTENER_EVENT_TABLE e
+                    WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                ),
+                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+                    $UPDATED_AT_COLUMN = ?
+                WHERE $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                  AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND (${conditions.joinToString(" OR ")})
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                var idx = 1
+                stmt.setTimestamp(idx++, now)
+                stmt.setTimestamp(idx++, now)
+                for (key in keys) {
+                    stmt.setString(idx++, key.workflowInfo.workflowNamespace.toString())
+                    stmt.setString(idx++, key.workflowInfo.workflowName.toString())
+                    stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
+                    stmt.setString(idx++, key.position.toString())
+                }
+                stmt.executeUpdate()
+            }
+        }
+    }
 }

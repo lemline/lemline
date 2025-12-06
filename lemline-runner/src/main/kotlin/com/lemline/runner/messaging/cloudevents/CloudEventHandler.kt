@@ -13,7 +13,6 @@ import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.definitions.DefinitionMatch
 import com.lemline.runner.definitions.ListenerMatch
 import com.lemline.runner.definitions.TerminationDefinitionMatch
-import com.lemline.runner.definitions.TerminationMatch
 import com.lemline.runner.models.ListenerEventModel
 import com.lemline.runner.repositories.ListenerEventRepository
 import com.lemline.runner.repositories.ListenerQueryKey
@@ -166,13 +165,6 @@ internal class CloudEventHandler(
             emptyList()
         }
 
-        // Query listeners for termination matches
-        val listenersUntilEvent = if (definitionsUntilEvent.isNotEmpty()) {
-            queryListenersUntilEvent(definitionsUntilEvent)
-        } else {
-            emptyList()
-        }
-
         // Extract event data once per readAs mode (avoid repeated parsing)
         val eventDataByReadAs = listenerMatches.map { it.readAs }.toSet().associateWith { readAs ->
             extractEventContent(event, readAs)
@@ -189,9 +181,12 @@ internal class CloudEventHandler(
             affectedCount += processAnyWithUntil(anyWithUntilMatches, eventDataByReadAs, event)
         }
 
-        // Handle termination events for ANY + until(event) strategy
-        if (listenersUntilEvent.isNotEmpty()) {
-            affectedCount += processTerminationEvents(listenersUntilEvent)
+        // ─────────────────────────────────────────────────────────────────────────────
+        // Handle termination events for ANY + until(event) strategy - Direct UPDATE
+        // Completes listeners with all their accumulated events (excluding termination event)
+        // ─────────────────────────────────────────────────────────────────────────────
+        if (definitionsUntilEvent.isNotEmpty()) {
+            affectedCount += processTerminationEventsDirect(definitionsUntilEvent)
         }
 
         // ─────────────────────────────────────────────────────────────────────────────
@@ -271,72 +266,30 @@ internal class CloudEventHandler(
     }
 
     /**
-     * Queries active listeners for the given termination definition matches.
+     * Processes termination events for ANY + until(event) strategy using direct UPDATE.
      *
-     * @param definitions Termination definition matches from Step 1
-     * @return List of termination matches
+     * Completes listeners with all their accumulated events (excluding the termination event)
+     * in a single UPDATE with subquery, avoiding loading listeners into memory.
+     *
+     * @param definitions Termination definition matches
+     * @return Number of listeners that were completed
      */
-    private suspend fun queryListenersUntilEvent(
+    private suspend fun processTerminationEventsDirect(
         definitions: List<TerminationDefinitionMatch>
-    ): List<TerminationMatch> {
-        // Build query keys
+    ): Int {
+        // Build query keys from termination definitions
         val queryKeys = definitions.map { def ->
             ListenerQueryKey(
                 workflowInfo = def.workflowInfo,
                 position = def.nodePosition,
                 correlationValuesJson = null  // Termination doesn't use correlation
             )
-        }
+        }.distinct()
 
-        // Query active listeners
-        val listeners = listenerRepository.findByKeys(queryKeys)
-
-        if (listeners.isEmpty()) {
-            return emptyList()
-        }
-
-        // Create a lookup map for readAs config
-        val readAsByPosition = definitions.associateBy(
-            { Pair(it.workflowInfo, it.nodePosition) },
-            { it.readAs }
-        )
-
-        // Build termination matches
-        return listeners.mapNotNull { listener ->
-            val positionKey = Pair(
-                WorkflowInfo(listener.workflowNamespace, listener.workflowName, listener.workflowVersion),
-                listener.nodePosition
-            )
-            val readAs = readAsByPosition[positionKey] ?: return@mapNotNull null
-            TerminationMatch(listener = listener, readAs = readAs)
-        }
-    }
-
-    /**
-     * Processes termination events for ANY + until(event) strategy.
-     *
-     * Completes listeners with all their accumulated events (excluding the termination event).
-     *
-     * @return Number of listeners that were completed
-     */
-    private suspend fun processTerminationEvents(matches: List<TerminationMatch>): Int {
-        val listenerIds = matches.map { it.listener.id }
-
-        // Fetch all accumulated events for these listeners
-        val eventsByListener = listenerEventRepository.batchFindByListenerIds(listenerIds)
-
-        val listenerEvents = matches.mapNotNull { match ->
-            val listenerId = match.listener.id
-            val events = eventsByListener[listenerId] ?: emptyList()
-            // Return accumulated events (termination event is NOT included per spec)
-            val eventsArray = JsonArray(events.map { Json.parseToJsonElement(it.event) })
-            listenerId to Json.encodeToString(eventsArray)
-        }.toMap()
-
-        val completed = listenerRepository.batchMarkReadyForCompletionFromEvents(listenerEvents)
+        val completed = listenerRepository.markTerminatedByKeys(queryKeys)
 
         if (completed > 0) {
-            logger.info { "Batch marked $completed listeners ready for completion (termination event received)" }
+            logger.info { "Direct UPDATE marked $completed listeners ready for completion (termination event received)" }
         }
 
         return completed
