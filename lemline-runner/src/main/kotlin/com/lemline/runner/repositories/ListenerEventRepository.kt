@@ -46,12 +46,7 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
         const val CLOUDEVENT_ID_COLUMN = "cloudevent_id"
         const val EVENT_COLUMN = "event"
 
-        // Column names from listener table for SQL building
-        private const val WORKFLOW_NAMESPACE_COLUMN = "workflow_namespace"
-        private const val WORKFLOW_NAME_COLUMN = "workflow_name"
-        private const val WORKFLOW_VERSION_COLUMN = "workflow_version"
-        private const val WORKFLOW_POSITION_COLUMN = "workflow_position"
-        private const val CORRELATION_VALUES_COLUMN = "correlation_values"
+        // Outbox status columns from listener table for INSERT...SELECT WHERE clause
         private const val OUTBOX_DELAYED_UNTIL_COLUMN = "outbox_delayed_until"
         private const val OUTBOX_COMPLETED_AT_COLUMN = "outbox_completed_at"
         private const val OUTBOX_FAILED_AT_COLUMN = "outbox_failed_at"
@@ -263,22 +258,13 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
         if (keys.isEmpty()) return 0
 
         return withConnection(connection) { conn ->
-            // Build WHERE conditions from keys
-            val conditions = keys.map { key ->
-                if (key.correlationValuesJson == null) {
-                    "(l.$WORKFLOW_NAMESPACE_COLUMN = ? AND l.$WORKFLOW_NAME_COLUMN = ? AND l.$WORKFLOW_VERSION_COLUMN = ? AND l.$WORKFLOW_POSITION_COLUMN = ?)"
-                } else {
-                    "(l.$WORKFLOW_NAMESPACE_COLUMN = ? AND l.$WORKFLOW_NAME_COLUMN = ? AND l.$WORKFLOW_VERSION_COLUMN = ? AND l.$WORKFLOW_POSITION_COLUMN = ? AND (l.$CORRELATION_VALUES_COLUMN IS NULL OR l.$CORRELATION_VALUES_COLUMN = ?))"
-                }
-            }
-
             val selectSql = """
-                SELECT ${databaseManager.randomUuid()}, l.$ID_COLUMN, NULL, ?, ?, CURRENT_TIMESTAMP
+                SELECT ${databaseManager.randomUuid()}, l.id, NULL, ?, ?, CURRENT_TIMESTAMP
                 FROM $LISTENER_TABLE l
                 WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
                   AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
                   AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND (${conditions.joinToString(" OR ")})
+                  AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
             """.trimIndent()
 
             val sql = databaseManager.insertIgnoreSelect(
@@ -293,15 +279,7 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
                 stmt.setString(idx++, cloudEventId)
                 stmt.setString(idx++, eventJson)
                 // Bind key conditions
-                for (key in keys) {
-                    stmt.setString(idx++, key.workflowInfo.workflowNamespace.toString())
-                    stmt.setString(idx++, key.workflowInfo.workflowName.toString())
-                    stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
-                    stmt.setString(idx++, key.position.toString())
-                    if (key.correlationValuesJson != null) {
-                        stmt.setString(idx++, key.correlationValuesJson)
-                    }
-                }
+                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
                 stmt.executeUpdate()
             }
         }

@@ -36,7 +36,84 @@ data class ListenerQueryKey(
     val workflowInfo: WorkflowInfo,
     val position: NodePosition,
     val correlationValuesJson: String?
-)
+) {
+    /**
+     * Builds SQL WHERE condition for this key.
+     * Returns condition without correlation check if correlationValuesJson is null.
+     */
+    fun toSqlCondition(tableAlias: String = ""): String {
+        val prefix = if (tableAlias.isNotEmpty()) "$tableAlias." else ""
+        return if (correlationValuesJson == null) {
+            "(${prefix}$WORKFLOW_NAMESPACE_COLUMN = ? AND ${prefix}$WORKFLOW_NAME_COLUMN = ? AND ${prefix}$WORKFLOW_VERSION_COLUMN = ? AND ${prefix}$WORKFLOW_POSITION_COLUMN = ?)"
+        } else {
+            "(${prefix}$WORKFLOW_NAMESPACE_COLUMN = ? AND ${prefix}$WORKFLOW_NAME_COLUMN = ? AND ${prefix}$WORKFLOW_VERSION_COLUMN = ? AND ${prefix}$WORKFLOW_POSITION_COLUMN = ? AND (${prefix}$CORRELATION_VALUES_COLUMN IS NULL OR ${prefix}$CORRELATION_VALUES_COLUMN = ?))"
+        }
+    }
+
+    /**
+     * Binds this key's parameters to a PreparedStatement starting at the given index.
+     * Returns the next parameter index after binding.
+     */
+    fun bindParameters(stmt: PreparedStatement, startIndex: Int): Int {
+        var idx = startIndex
+        stmt.setString(idx++, workflowInfo.workflowNamespace.toString())
+        stmt.setString(idx++, workflowInfo.workflowName.toString())
+        stmt.setString(idx++, workflowInfo.workflowVersion.toString())
+        stmt.setString(idx++, position.toString())
+        if (correlationValuesJson != null) {
+            stmt.setString(idx++, correlationValuesJson)
+        }
+        return idx
+    }
+
+    /**
+     * Builds SQL WHERE condition without correlation check (used for termination events).
+     */
+    fun toSqlConditionWithoutCorrelation(tableAlias: String = ""): String {
+        val prefix = if (tableAlias.isNotEmpty()) "$tableAlias." else ""
+        return "(${prefix}$WORKFLOW_NAMESPACE_COLUMN = ? AND ${prefix}$WORKFLOW_NAME_COLUMN = ? AND ${prefix}$WORKFLOW_VERSION_COLUMN = ? AND ${prefix}$WORKFLOW_POSITION_COLUMN = ?)"
+    }
+
+    /**
+     * Binds parameters without correlation value (used for termination events).
+     * Returns the next parameter index after binding.
+     */
+    fun bindParametersWithoutCorrelation(stmt: PreparedStatement, startIndex: Int): Int {
+        var idx = startIndex
+        stmt.setString(idx++, workflowInfo.workflowNamespace.toString())
+        stmt.setString(idx++, workflowInfo.workflowName.toString())
+        stmt.setString(idx++, workflowInfo.workflowVersion.toString())
+        stmt.setString(idx++, position.toString())
+        return idx
+    }
+
+    companion object {
+        // Column names used in SQL conditions
+        private const val WORKFLOW_NAMESPACE_COLUMN = "workflow_namespace"
+        private const val WORKFLOW_NAME_COLUMN = "workflow_name"
+        private const val WORKFLOW_VERSION_COLUMN = "workflow_version"
+        private const val WORKFLOW_POSITION_COLUMN = "workflow_position"
+        private const val CORRELATION_VALUES_COLUMN = "correlation_values"
+
+        /**
+         * Builds combined WHERE clause for multiple keys using OR.
+         */
+        fun buildWhereClause(keys: List<ListenerQueryKey>, tableAlias: String = ""): String =
+            keys.joinToString(" OR ") { it.toSqlCondition(tableAlias) }
+
+        /**
+         * Binds parameters for all keys to a PreparedStatement.
+         * Returns the next parameter index after binding all keys.
+         */
+        fun bindAllParameters(keys: List<ListenerQueryKey>, stmt: PreparedStatement, startIndex: Int): Int {
+            var idx = startIndex
+            for (key in keys) {
+                idx = key.bindParameters(stmt, idx)
+            }
+            return idx
+        }
+    }
+}
 
 /**
  * Repository for managing listener instances in the outbox pattern.
@@ -66,6 +143,9 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         const val EVENT_COLUMN = "event"
         const val TOTAL_FILTERS_COLUMN = "total_filters"
         const val UPDATED_AT_COLUMN = "updated_at"
+
+        /** Creates a current timestamp for database operations. */
+        private fun nowTimestamp(): Timestamp = Timestamp.from(Clock.System.now().toJavaInstant())
     }
 
     @Inject
@@ -143,33 +223,15 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         if (keys.isEmpty()) return emptyList()
 
         return withConnection(connection) { conn ->
-            // Build dynamic SQL with OR conditions for each key
-            val conditions = keys.map { key ->
-                if (key.correlationValuesJson == null) {
-                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ?)"
-                } else {
-                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ? AND ($CORRELATION_VALUES_COLUMN IS NULL OR $CORRELATION_VALUES_COLUMN = ?))"
-                }
-            }
-
             val sql = """
                 SELECT * FROM $tableName
                 WHERE $OUTBOX_COMPLETED_AT_COLUMN IS NULL
                   AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND (${conditions.joinToString(" OR ")})
+                  AND (${ListenerQueryKey.buildWhereClause(keys)})
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->
-                var paramIndex = 1
-                for (key in keys) {
-                    stmt.setString(paramIndex++, key.workflowInfo.workflowNamespace.toString())
-                    stmt.setString(paramIndex++, key.workflowInfo.workflowName.toString())
-                    stmt.setString(paramIndex++, key.workflowInfo.workflowVersion.toString())
-                    stmt.setString(paramIndex++, key.position.toString())
-                    if (key.correlationValuesJson != null) {
-                        stmt.setString(paramIndex++, key.correlationValuesJson)
-                    }
-                }
+                ListenerQueryKey.bindAllParameters(keys, stmt, 1)
                 stmt.executeQuery().use { it.toModels() }
             }
         }
@@ -185,7 +247,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
     suspend fun findTimedOut(limit: Int, connection: Connection? = null): List<ListenerModel> =
         withConnection(connection) { conn ->
             conn.prepareStatement(findTimedOutSql).use { stmt ->
-                stmt.setTimestamp(1, Timestamp.from(Clock.System.now().toJavaInstant()))
+                stmt.setTimestamp(1, nowTimestamp())
                 stmt.setInt(2, limit)
                 stmt.executeQuery().use { it.toModels() }
             }
@@ -213,8 +275,9 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
     suspend fun markCompleted(id: IDV7, connection: Connection? = null): Int =
         withConnection(connection) { conn ->
             conn.prepareStatement(markCompletedSql).use { stmt ->
-                stmt.setTimestamp(1, Timestamp.from(Clock.System.now().toJavaInstant()))
-                stmt.setTimestamp(2, Timestamp.from(Clock.System.now().toJavaInstant()))
+                val now = nowTimestamp()
+                stmt.setTimestamp(1, now)
+                stmt.setTimestamp(2, now)
                 setIDV7(stmt, 3, id)
                 stmt.executeUpdate()
             }
@@ -247,11 +310,12 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         connection: Connection? = null
     ): Int = withConnection(connection) { conn ->
         conn.prepareStatement(markFailedSql).use { stmt ->
-            stmt.setTimestamp(1, Timestamp.from(Clock.System.now().toJavaInstant()))
+            val now = nowTimestamp()
+            stmt.setTimestamp(1, now)
             stmt.setString(2, errorClass)
             stmt.setString(3, errorMessage)
             stmt.setString(4, errorStackTrace)
-            stmt.setTimestamp(5, Timestamp.from(Clock.System.now().toJavaInstant()))
+            stmt.setTimestamp(5, now)
             setIDV7(stmt, 6, id)
             stmt.executeUpdate()
         }
@@ -327,7 +391,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         event: String,
         connection: Connection? = null
     ): Int = withConnection(connection) { conn ->
-        val now = Timestamp.from(Clock.System.now().toJavaInstant())
+        val now = nowTimestamp()
 
         conn.prepareStatement(markReadyForCompletionSql).use { stmt ->
             stmt.setString(1, event)
@@ -365,7 +429,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         id: IDV7,
         connection: Connection? = null
     ): Int = withConnection(connection) { conn ->
-        val now = Timestamp.from(Clock.System.now().toJavaInstant())
+        val now = nowTimestamp()
 
         conn.prepareStatement(markReadyForCompletionFromEventsSql).use { stmt ->
             stmt.setTimestamp(1, now) // outbox_delayed_until = NOW()
@@ -407,16 +471,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         if (keys.isEmpty()) return 0
 
         return withConnection(connection) { conn ->
-            val now = Timestamp.from(Clock.System.now().toJavaInstant())
-
-            // Build WHERE conditions from keys
-            val conditions = keys.map { key ->
-                if (key.correlationValuesJson == null) {
-                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ?)"
-                } else {
-                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ? AND ($CORRELATION_VALUES_COLUMN IS NULL OR $CORRELATION_VALUES_COLUMN = ?))"
-                }
-            }
+            val now = nowTimestamp()
 
             val sql = """
                 UPDATE $tableName
@@ -426,7 +481,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
                 WHERE $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
                   AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
                   AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND (${conditions.joinToString(" OR ")})
+                  AND (${ListenerQueryKey.buildWhereClause(keys)})
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->
@@ -434,15 +489,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
                 stmt.setString(idx++, event)
                 stmt.setTimestamp(idx++, now)
                 stmt.setTimestamp(idx++, now)
-                for (key in keys) {
-                    stmt.setString(idx++, key.workflowInfo.workflowNamespace.toString())
-                    stmt.setString(idx++, key.workflowInfo.workflowName.toString())
-                    stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
-                    stmt.setString(idx++, key.position.toString())
-                    if (key.correlationValuesJson != null) {
-                        stmt.setString(idx++, key.correlationValuesJson)
-                    }
-                }
+                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
                 stmt.executeUpdate()
             }
         }
@@ -465,7 +512,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         if (listenerEvents.isEmpty()) return 0
 
         return withConnection(connection) { conn ->
-            val now = Timestamp.from(Clock.System.now().toJavaInstant())
+            val now = nowTimestamp()
             val ids = listenerEvents.keys.toList()
             val placeholders = ids.joinToString(", ") { "?" }
 
@@ -527,12 +574,10 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         if (keys.isEmpty()) return 0
 
         return withConnection(connection) { conn ->
-            val now = Timestamp.from(Clock.System.now().toJavaInstant())
+            val now = nowTimestamp()
 
-            // Build WHERE conditions from keys (termination doesn't use correlation)
-            val conditions = keys.map {
-                "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ?)"
-            }
+            // Termination doesn't use correlation - build simpler conditions without correlation check
+            val conditions = keys.map { it.toSqlConditionWithoutCorrelation() }
 
             // Use database-specific JSON aggregation function
             val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
@@ -557,10 +602,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
                 stmt.setTimestamp(idx++, now)
                 stmt.setTimestamp(idx++, now)
                 for (key in keys) {
-                    stmt.setString(idx++, key.workflowInfo.workflowNamespace.toString())
-                    stmt.setString(idx++, key.workflowInfo.workflowName.toString())
-                    stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
-                    stmt.setString(idx++, key.position.toString())
+                    idx = key.bindParametersWithoutCorrelation(stmt, idx)
                 }
                 stmt.executeUpdate()
             }
@@ -587,16 +629,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         if (keys.isEmpty()) return 0
 
         return withConnection(connection) { conn ->
-            val now = Timestamp.from(Clock.System.now().toJavaInstant())
-
-            // Build WHERE conditions from keys
-            val conditions = keys.map { key ->
-                if (key.correlationValuesJson == null) {
-                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ?)"
-                } else {
-                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ? AND ($CORRELATION_VALUES_COLUMN IS NULL OR $CORRELATION_VALUES_COLUMN = ?))"
-                }
-            }
+            val now = nowTimestamp()
 
             // Use database-specific JSON aggregation function with ORDER BY filter_index
             val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
@@ -615,22 +648,14 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
                   AND $OUTBOX_FAILED_AT_COLUMN IS NULL
                   AND $TOTAL_FILTERS_COLUMN IS NOT NULL
                   AND (SELECT COUNT(*) FROM $LISTENER_EVENT_TABLE e WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN) >= $TOTAL_FILTERS_COLUMN
-                  AND (${conditions.joinToString(" OR ")})
+                  AND (${ListenerQueryKey.buildWhereClause(keys)})
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->
                 var idx = 1
                 stmt.setTimestamp(idx++, now)
                 stmt.setTimestamp(idx++, now)
-                for (key in keys) {
-                    stmt.setString(idx++, key.workflowInfo.workflowNamespace.toString())
-                    stmt.setString(idx++, key.workflowInfo.workflowName.toString())
-                    stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
-                    stmt.setString(idx++, key.position.toString())
-                    if (key.correlationValuesJson != null) {
-                        stmt.setString(idx++, key.correlationValuesJson)
-                    }
-                }
+                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
                 stmt.executeUpdate()
             }
         }
@@ -670,7 +695,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
      * Callers should process items quickly to avoid holding connections too long.
      *
      * @param keys List of query keys identifying listeners to stream
-     * @param fetchSize Number of rows to fetch per network round-trip (default: 100)
+     * @param fetchSize Number of rows to fetch per network round-trip (default: 500)
      * @return Flow of listeners with their accumulated events
      */
     fun streamListenersWithEvents(
@@ -684,15 +709,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
             conn.autoCommit = false
 
             try {
-                // Build WHERE conditions from keys
-                val conditions = keys.map { key ->
-                    if (key.correlationValuesJson == null) {
-                        "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ?)"
-                    } else {
-                        "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ? AND ($CORRELATION_VALUES_COLUMN IS NULL OR $CORRELATION_VALUES_COLUMN = ?))"
-                    }
-                }
-
                 // Use database-specific JSON aggregation
                 val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
 
@@ -705,23 +721,14 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
                     WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
                       AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
                       AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
-                      AND (${conditions.joinToString(" OR ")})
+                      AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
                 """.trimIndent()
 
                 conn.prepareStatement(sql).use { stmt ->
                     // Set small fetch size for cursor streaming
                     stmt.fetchSize = fetchSize
 
-                    var idx = 1
-                    for (key in keys) {
-                        stmt.setString(idx++, key.workflowInfo.workflowNamespace.toString())
-                        stmt.setString(idx++, key.workflowInfo.workflowName.toString())
-                        stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
-                        stmt.setString(idx++, key.position.toString())
-                        if (key.correlationValuesJson != null) {
-                            stmt.setString(idx++, key.correlationValuesJson)
-                        }
-                    }
+                    ListenerQueryKey.bindAllParameters(keys, stmt, 1)
 
                     stmt.executeQuery().use { rs ->
                         while (rs.next()) {
