@@ -56,7 +56,7 @@ data class ListenerModel(
 
     /** Timestamp when this listener was scheduled for processing */
     override val outboxScheduledFor: Instant,
-) : OutboxModel(), InstanceModel {
+) : OutboxModel() {
 
     /** Correlation baseline values (Mode 2: first-sets-baseline), JSON map */
     var correlationValues: String? = null
@@ -64,6 +64,9 @@ data class ListenerModel(
     /** Single event for ONE/ANY strategies (JSON CloudEvent data) */
     var event: String? = null
 
+    /** Total number of filters for ALL strategy (null for other strategies) */
+    var totalFilters: Int? = null
+    
     // Outbox fields
     // NOTE: outboxDelayedUntil starts as NULL (waiting state).
     // It gets set to NOW() when a CloudEvent matches, triggering ListenerCompletionOutbox.

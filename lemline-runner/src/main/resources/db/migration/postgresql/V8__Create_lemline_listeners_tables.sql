@@ -23,6 +23,9 @@ CREATE TABLE lemline_listeners
     -- Single event storage (for ONE and ANY without until)
     event                   TEXT,                    -- JSON CloudEvent data
 
+    -- ALL strategy: total number of filters that must match before completion
+    total_filters           INT,
+
     -- Timeout handling
     timeout_at              TIMESTAMPTZ(6),
 

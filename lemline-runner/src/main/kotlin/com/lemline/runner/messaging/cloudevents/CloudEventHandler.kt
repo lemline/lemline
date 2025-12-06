@@ -619,13 +619,12 @@ internal class CloudEventHandler(
      *
      * For ALL strategy:
      * 1. Batch INSERT events into lemline_listener_events table (idempotent)
-     * 2. Batch COUNT events per listener to check completion
-     * 3. Batch UPDATE listeners that are now complete (COUNT = totalFilters)
+     * 2. Direct UPDATE with subquery to mark completed listeners (COUNT >= total_filters)
      *
      * This approach:
      * - Uses insert-only pattern (no read-modify-write race conditions)
      * - Idempotent inserts via ON CONFLICT DO NOTHING
-     * - Minimizes database requests (3 requests total regardless of listener count)
+     * - Direct UPDATE avoids loading accumulated events into memory
      *
      * @return Number of listeners that were marked for completion
      */
@@ -633,14 +632,14 @@ internal class CloudEventHandler(
         matches: List<ListenerMatch>,
         eventDataByReadAs: Map<ListenAndReadAs, JsonElement>,
     ): Int {
-        // Group by (filterIndex, totalFilters, readAs) for batch insert
-        data class AllGroupKey(val filterIndex: Int, val totalFilters: Int, val readAs: ListenAndReadAs)
+        // Group by (filterIndex, readAs) for batch insert
+        data class AllGroupKey(val filterIndex: Int, val readAs: ListenAndReadAs)
 
-        val byGroup = matches.groupBy { AllGroupKey(it.filterIndex, it.totalFilters, it.readAs) }
+        val byGroup = matches.groupBy { AllGroupKey(it.filterIndex, it.readAs) }
 
         // Build all event models for batch insert
         val eventModels = mutableListOf<ListenerEventModel>()
-        val listenerTotalFilters = mutableMapOf<IDV7, Int>()
+        val queryKeySet = mutableSetOf<ListenerQueryKey>()
 
         for ((groupKey, matchGroup) in byGroup) {
             val eventData = eventDataByReadAs[groupKey.readAs] ?: continue
@@ -661,44 +660,33 @@ internal class CloudEventHandler(
                     )
                 )
 
-                // Track totalFilters for completion check
-                listenerTotalFilters[listenerId] = groupKey.totalFilters
+                // Collect query keys for completion check
+                queryKeySet.add(
+                    ListenerQueryKey(
+                        workflowInfo = WorkflowInfo(
+                            match.listener.workflowNamespace,
+                            match.listener.workflowName,
+                            match.listener.workflowVersion
+                        ),
+                        position = match.listener.nodePosition!!,
+                        correlationValuesJson = match.listener.correlationValues
+                    )
+                )
             }
         }
 
         if (eventModels.isEmpty()) return 0
 
         // Step 1: Batch INSERT events (idempotent - duplicates ignored)
-        val listenerIds = listenerTotalFilters.keys.toList()
         val inserted = listenerEventRepository.insert(eventModels)
         logger.debug { "Inserted $inserted events for ALL strategy listeners" }
 
-        // Step 2: Fetch all events and filter to completed listeners in code
-        // This combines COUNT + FETCH into a single query - count is derived from list.size()
-        val eventsByListener = listenerEventRepository.batchFindByListenerIds(listenerIds)
-
-        // Step 3: Filter to completed listeners and aggregate events into JSON arrays
-        val listenerEvents = eventsByListener
-            .mapNotNull { (listenerId, events) ->
-                val totalFilters = listenerTotalFilters[listenerId] ?: return@mapNotNull null
-                if (events.size < totalFilters) return@mapNotNull null
-                // Take only first totalFilters events (safety: handle race condition with extra events)
-                // Events are already ordered by filter_index from the query
-                val jsonArray = JsonArray(events.take(totalFilters).map { Json.parseToJsonElement(it.event) })
-                listenerId to Json.encodeToString(jsonArray)
-            }
-            .toMap()
-
-        if (listenerEvents.isEmpty()) {
-            logger.debug { "No ALL listeners completed yet (filters still pending)" }
-            return 0
-        }
-
-        // Step 4: Batch UPDATE completed listeners with aggregated events
-        val completed = listenerRepository.batchMarkReadyForCompletionFromEvents(listenerEvents)
+        // Step 2: Direct UPDATE with subquery to mark completed listeners
+        // The database checks COUNT >= total_filters and aggregates events
+        val completed = listenerRepository.markAllCompletedByKeys(queryKeySet.toList())
 
         if (completed > 0) {
-            logger.info { "Batch marked $completed ALL listeners ready for completion (all filters matched)" }
+            logger.info { "Direct UPDATE marked $completed ALL listeners ready for completion (all filters matched)" }
         }
 
         return completed

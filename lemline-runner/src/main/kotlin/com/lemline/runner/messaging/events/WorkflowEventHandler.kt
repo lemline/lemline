@@ -11,6 +11,7 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.ListenConfig
+import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.definitions.Definitions
@@ -257,6 +258,11 @@ internal class WorkflowEventHandler(
 
         // Calculate correlation values from expect expressions
         listener.correlationValues = calculateCorrelationValues(config)
+
+        // Set totalFilters for ALL strategy (enables direct UPDATE optimization)
+        if (config.strategy == ListenStrategy.ALL) {
+            listener.totalFilters = config.filters.size
+        }
 
         // Insert listener into database
         val rowsInserted = listenerRepository.insert(listener)

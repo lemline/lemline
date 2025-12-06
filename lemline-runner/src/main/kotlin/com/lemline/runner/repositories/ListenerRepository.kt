@@ -59,6 +59,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         const val TIMEOUT_AT_COLUMN = "timeout_at"
         const val CORRELATION_VALUES_COLUMN = "correlation_values"
         const val EVENT_COLUMN = "event"
+        const val TOTAL_FILTERS_COLUMN = "total_filters"
         const val UPDATED_AT_COLUMN = "updated_at"
     }
 
@@ -93,6 +94,9 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
             },
             EVENT_COLUMN to { stmt, entity, idx ->
                 stmt.setString(idx, entity.event)
+            },
+            TOTAL_FILTERS_COLUMN to { stmt, entity, idx ->
+                entity.totalFilters?.let { stmt.setInt(idx, it) } ?: stmt.setNull(idx, Types.INTEGER)
             }
         )
     }
@@ -106,6 +110,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
     ).apply {
         correlationValues = rs.getString(CORRELATION_VALUES_COLUMN)
         event = rs.getString(EVENT_COLUMN)
+        totalFilters = rs.getInt(TOTAL_FILTERS_COLUMN).takeIf { !rs.wasNull() }
         outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN)
         outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN)
         outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN)
@@ -550,6 +555,75 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
                     stmt.setString(idx++, key.workflowInfo.workflowName.toString())
                     stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
                     stmt.setString(idx++, key.position.toString())
+                }
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    /**
+     * Marks listeners as completed by query keys (ALL strategy).
+     *
+     * This method performs a direct UPDATE with subquery to:
+     * 1. Aggregate accumulated events from lemline_listener_events into JSON array
+     * 2. Only update listeners where event count >= total_filters
+     *
+     * This avoids loading potentially millions of listeners into memory.
+     *
+     * @param keys List of query keys identifying listeners to check for completion
+     * @param connection Optional database connection
+     * @return Number of listeners that were successfully marked for completion
+     */
+    suspend fun markAllCompletedByKeys(
+        keys: List<ListenerQueryKey>,
+        connection: Connection? = null
+    ): Int {
+        if (keys.isEmpty()) return 0
+
+        return withConnection(connection) { conn ->
+            val now = Timestamp.from(Clock.System.now().toJavaInstant())
+
+            // Build WHERE conditions from keys
+            val conditions = keys.map { key ->
+                if (key.correlationValuesJson == null) {
+                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ?)"
+                } else {
+                    "($WORKFLOW_NAMESPACE_COLUMN = ? AND $WORKFLOW_NAME_COLUMN = ? AND $WORKFLOW_VERSION_COLUMN = ? AND $WORKFLOW_POSITION_COLUMN = ? AND ($CORRELATION_VALUES_COLUMN IS NULL OR $CORRELATION_VALUES_COLUMN = ?))"
+                }
+            }
+
+            // Use database-specific JSON aggregation function with ORDER BY filter_index
+            val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
+
+            val sql = """
+                UPDATE $tableName l
+                SET $EVENT_COLUMN = (
+                    SELECT $jsonAgg
+                    FROM $LISTENER_EVENT_TABLE e
+                    WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                ),
+                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+                    $UPDATED_AT_COLUMN = ?
+                WHERE $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                  AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND $TOTAL_FILTERS_COLUMN IS NOT NULL
+                  AND (SELECT COUNT(*) FROM $LISTENER_EVENT_TABLE e WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN) >= $TOTAL_FILTERS_COLUMN
+                  AND (${conditions.joinToString(" OR ")})
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                var idx = 1
+                stmt.setTimestamp(idx++, now)
+                stmt.setTimestamp(idx++, now)
+                for (key in keys) {
+                    stmt.setString(idx++, key.workflowInfo.workflowNamespace.toString())
+                    stmt.setString(idx++, key.workflowInfo.workflowName.toString())
+                    stmt.setString(idx++, key.workflowInfo.workflowVersion.toString())
+                    stmt.setString(idx++, key.position.toString())
+                    if (key.correlationValuesJson != null) {
+                        stmt.setString(idx++, key.correlationValuesJson)
+                    }
                 }
                 stmt.executeUpdate()
             }
