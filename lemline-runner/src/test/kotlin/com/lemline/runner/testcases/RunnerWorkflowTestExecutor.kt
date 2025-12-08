@@ -327,7 +327,10 @@ internal class RunnerWorkflowTestExecutor : WorkflowTestExecutor {
                     is WorkflowEvent.ForkStarted,
                     is WorkflowEvent.ForkBranchCompleted,
                     is WorkflowEvent.ForkBranchFailed,
-                    is WorkflowEvent.ListenForEachCompleted,
+                    is WorkflowEvent.ListenForEachCompleted -> {
+                        // Route to events-in for database handler to persist and process
+                        eventsSource.send(eventMsg.payload)
+                    }
 
                     is WorkflowEvent.TaskScheduled -> {
                         // This shouldn't appear in events channel
