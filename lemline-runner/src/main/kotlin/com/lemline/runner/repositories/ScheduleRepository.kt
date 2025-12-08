@@ -88,7 +88,7 @@ class ScheduleRepository : CrudRepository<ScheduleModel>(),
     // Delegate WithCleanerRepository methods
     override suspend fun findEntitiesToDelete(cutoffDate: Instant, batchSize: Int, connection: Connection?) =
         cleanerRepository.findEntitiesToDelete(cutoffDate, batchSize, connection)
-    
+
     override val columns: ColumnBindings<ScheduleModel> by lazy {
         ColumnBindingsBuilder<ScheduleModel>().apply {
             idColumn(idHelper)

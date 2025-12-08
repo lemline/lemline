@@ -72,7 +72,7 @@ internal class ParentRepository : CrudRepository<ParentModel>(),
     // Delegate WithCleanerRepository methods
     override suspend fun findEntitiesToDelete(cutoffDate: Instant, batchSize: Int, connection: Connection?) =
         cleanerRepository.findEntitiesToDelete(cutoffDate, batchSize, connection)
-    
+
     companion object {
         const val CHILD_ID_COLUMN = "child_id"
     }

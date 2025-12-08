@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cleaner
 
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
-import com.lemline.runner.models.AwaitingCompletionModel
-import com.lemline.runner.repositories.CleanerRepository
+import com.lemline.runner.models.WithCleanup
+import com.lemline.runner.repositories.with.WithCleanerRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
 import com.lemline.runner.scheduled.AbstractScheduledTask
+import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -13,23 +16,29 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * AbstractCleaner provides base functionality for scheduled cleanup operations.
  *
  * This class extends [AbstractScheduledTask] and adds cleanup-specific functionality:
- * - Batch deletion of old entities based on a configurable cutoff date
- * - Works with any [CleanerRepository] implementation
+ * - Batch deletion of entities where cleanup_after < cutoffDate
+ * - Works with any [WithCleanerRepository] implementation
  *
  * Subclasses only need to provide:
  * - [enabled] - whether cleanup is enabled
- * - [cleanerConf] - cleanup configuration (interval, retention period, batch size)
+ * - [cleanerConf] - cleanup configuration (interval, batch size, retention period)
  * - [cleanerRepository] - repository for the entity type to clean
  *
- * @param T The type of entity to clean up (must extend AwaitingCompletionModel)
+ * The retention period is applied at query time: entities are eligible for cleanup
+ * when `cleanup_after < (now - cleanerConf.after)`. This allows changing retention
+ * policy without updating existing records.
+ *
+ * @param T The type of entity to clean up (must implement WithCleanup)
  * @see AbstractScheduledTask for the scheduling infrastructure
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class AbstractCleaner<T : AwaitingCompletionModel> : AbstractScheduledTask() {
+internal abstract class AbstractCleaner<T : WithCleanup> : AbstractScheduledTask() {
 
     protected abstract val cleanerConf: LemlineConfiguration.OutboxCleanupConfig
-    protected abstract val cleanerRepository: CleanerRepository<T>
+    protected abstract val cleanerRepository: WithCleanerRepository<T>
+    protected abstract val crudRepository: WithCrudRepository<T>
+    protected abstract val databaseManager: DatabaseManager
 
     override val taskName: String get() = "Cleaner"
 
@@ -44,25 +53,27 @@ internal abstract class AbstractCleaner<T : AwaitingCompletionModel> : AbstractS
 
     /**
      * Performs the actual cleanup logic using the repository.
-     * Cleans up old entities in batches to prevent long-running transactions.
+     * Cleans up entities where cleanup_after < cutoffDate in batches to prevent long-running transactions.
+     * The cutoffDate is calculated as (now - retention period) to honor the configured retention.
      */
     protected suspend fun doCleanup() = try {
-        val cutoffDate = kotlin.time.Clock.System.now() - cleanerConf.after
-
         var totalToDelete = 0
         var totalDeleted = 0
         var batchNumber = 0
 
+        // Calculate cutoff date by applying retention offset
+        val cutoffDate = Clock.System.now() - cleanerConf.after
+
         do {
             batchNumber++
             var toDelete = 0
-            cleanerRepository.withTransaction { connection ->
+            databaseManager.withTransaction { connection ->
                 val entities = cleanerRepository.findEntitiesToDelete(cutoffDate, cleanerConf.batchSize, connection)
                 toDelete = entities.size
 
                 if (toDelete > 0) {
                     totalToDelete += toDelete
-                    val deleted = cleanerRepository.delete(entities, connection)
+                    val deleted = crudRepository.delete(entities, connection)
                     totalDeleted += deleted
                 }
             }

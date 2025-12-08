@@ -11,9 +11,9 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.ListenConfig
-import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
@@ -26,11 +26,13 @@ import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.ForkBranchModel
 import com.lemline.runner.models.ForkModel
 import com.lemline.runner.models.ListenerModel
+import com.lemline.runner.models.ListenerStrategy
 import com.lemline.runner.models.ParentModel
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ForkRepository
+import com.lemline.runner.repositories.ListenerEventRepository
 import com.lemline.runner.repositories.ListenerRepository
 import com.lemline.runner.repositories.ParentRepository
 import com.lemline.runner.repositories.RetryRepository
@@ -80,9 +82,11 @@ internal class WorkflowEventHandler(
     private val failureRepository: FailureRepository,
     private val forkRepository: ForkRepository,
     private val listenerRepository: ListenerRepository,
+    private val listenerEventRepository: ListenerEventRepository,
     private val instanceEmitter: WorkflowCommandEmitter,
     private val starter: Starter,
     override val metrics: WorkflowEventSubscriberMetrics,
+    private val databaseManager: DatabaseManager,
 ) : MessageHandler<InstanceMessage<WorkflowEvent>> {
 
     override var logger = logger()
@@ -191,11 +195,90 @@ internal class WorkflowEventHandler(
 
             is WorkflowEvent.WorkflowFailed -> handleWorkflowFailed(current as InstanceMessage<WorkflowEvent.WorkflowFailed>)
 
+            is WorkflowEvent.ListenForEachCompleted -> handleListenForEachCompleted(current as InstanceMessage<WorkflowEvent.ListenForEachCompleted>)
+
             is WorkflowEvent.TaskScheduled -> error("Unexpected state in workflow event handler: $state")
 
             is WorkflowEvent.ActivityStarted -> error("ActivityStarted should not be sent to events channel - activities are executed inline: $state")
         }
         return null
+    }
+
+    /**
+     * Handles foreach iteration completion.
+     *
+     * When a foreach.do completes for a single event:
+     * 1. Find listener by workflowId and position
+     * 2. Mark current event as completed and store its output
+     * 3. Increment the foreach iteration index
+     * 4. Clear foreach_processing flag
+     * 5. Check flowDirective for early exit (Exit/End = break from foreach loop)
+     * 6. Check for next pending event or if listener is complete
+     *    - If has next event: trigger next event processing
+     *    - If listener_completed and no more events: aggregate outputs and complete
+     *    - If not completed: wait for more events
+     */
+    private suspend fun handleListenForEachCompleted(message: InstanceMessage<WorkflowEvent.ListenForEachCompleted>) {
+        val state = message.workflowState
+        val listenPosition = state.nodeStack.lastPosition
+        val iterationOutput = state.iterationOutput
+
+        logger.debug { "ListenForEachCompleted: $message" }
+
+        databaseManager.withTransaction { conn ->
+            // Find listener by workflowId and position
+            val listener = listenerRepository.findByWorkflowIdAndPosition(
+                message.workflowId,
+                listenPosition,
+                conn
+            ) ?: error("Listener not found for workflow ${message.workflowId} at position $listenPosition")
+
+            // Find the current event being processed (by iteration index)
+            val currentEvent = listenerEventRepository.findByListenerIdAndIterationIndex(
+                listener.id,
+                message.workflowState.iterationIndex,
+                conn
+            )
+
+            // Mark event as completed with output (if found - may not exist for ONE/ANY)
+            currentEvent?.let {
+                listenerEventRepository.markForeachCompleted(
+                    id = it.id,
+                    output = LemlineJson.encodeToString(iterationOutput),
+                    connection = conn
+                )
+            }
+
+            // Increment foreach index and clear processing flag
+            listenerRepository.incrementForeachIndex(listener.id, conn)
+            listenerRepository.setForeachProcessing(listener.id, false, conn)
+
+            // Check for next pending event
+            val nextEvent = listenerEventRepository.findNextPending(listener.id, conn)
+
+            if (nextEvent != null) {
+                // More events to process: mark next event ready for outbox pickup
+                listenerEventRepository.markReadyForProcessing(nextEvent.id, conn)
+                listenerRepository.setForeachProcessing(listener.id, true, conn)
+                logger.debug { "Next event ${nextEvent.id} ready for foreach processing" }
+            } else if (listener.listenerCompleted) {
+                // All events processed and listener is complete: aggregate outputs and finish
+                val outputs = listenerEventRepository.getAllOutputs(listener.id, conn)
+                val outputArray = JsonArray(outputs.map { Json.parseToJsonElement(it) })
+
+                // Mark listener ready for completion with aggregated outputs
+                listenerRepository.markReadyForCompletionWithOutput(
+                    id = listener.id,
+                    event = LemlineJson.encodeToString(outputArray),
+                    connection = conn
+                )
+
+                logger.info { "Listener ${listener.id} foreach complete with ${outputs.size} outputs" }
+            } else {
+                // No more events and not completed: wait for more events
+                logger.debug { "Listener ${listener.id} waiting for more events" }
+            }
+        }
     }
 
     private suspend fun handleWaitStarted(instance: InstanceMessage<WorkflowEvent.WaitStarted>) {
@@ -252,6 +335,7 @@ internal class WorkflowEventHandler(
         val listener = ListenerModel(
             id = listenerId,
             instanceMessage = instance,
+            strategy = ListenerStrategy.from(config),
             timeoutAt = config.timeoutAt,
             outboxScheduledFor = Clock.System.now(),
         )
@@ -259,10 +343,8 @@ internal class WorkflowEventHandler(
         // Calculate correlation values from expect expressions
         listener.correlationValues = calculateCorrelationValues(config)
 
-        // Set totalFilters for ALL strategy (enables direct UPDATE optimization)
-        if (config.strategy == ListenStrategy.ALL) {
-            listener.totalFilters = config.filters.size
-        }
+        // Set totalFilters (enables direct UPDATE optimization)
+        listener.filtersCount = config.filters.size
 
         // Insert listener into database
         val rowsInserted = listenerRepository.insert(listener)
@@ -278,7 +360,7 @@ internal class WorkflowEventHandler(
 
     private suspend fun handleWorkflowFailed(instance: InstanceMessage<WorkflowEvent.WorkflowFailed>) {
         val failureId = instance.workflowState.nodeStack.deriveIdempotentId("-failure")
-        failureRepository.withTransaction { conn ->
+        databaseManager.withTransaction { conn ->
             val exception = InternalException(instance.workflowState.error)
             val rowsInserted = failureRepository.insert(
                 FailureModel.from(
@@ -297,7 +379,7 @@ internal class WorkflowEventHandler(
             if (instance.hasWaitingParent) {
                 parentRepository.findByChildId(instance.workflowId, conn)?.let { parent ->
                     // Check if already processed (defense in depth - failure insert check above should catch this)
-                    if (parent.outboxCompletedAt != null) {
+                    if (parent.completedAt != null) {
                         logger.info { "Parent ${parent.id} already resumed for child ${instance.workflowId} (idempotent), skipping" }
                         return@withTransaction
                     }
@@ -318,7 +400,9 @@ internal class WorkflowEventHandler(
                     )
 
                     // mark parent as completed for cleanup (event-driven state - processed once)
-                    parent.outboxCompletedAt = Clock.System.now()
+                    val now = Clock.System.now()
+                    parent.completedAt = now
+                    parent.cleanupAfter = now
                     parentRepository.update(parent, conn)
 
                     logger.debug {
@@ -333,7 +417,7 @@ internal class WorkflowEventHandler(
         // Derive parent model ID from position + step
         val parentId = instance.workflowState.nodeStack.deriveIdempotentId("-parent")
 
-        parentRepository.withTransaction { conn ->
+        databaseManager.withTransaction { conn ->
             // Generate child workflow ID (deterministic from parent ID)
             val childWorkflowId = WorkflowId(parentId.derive("-child"))
 
@@ -390,12 +474,12 @@ internal class WorkflowEventHandler(
         }
 
         // Single transaction for all operations
-        parentRepository.withTransaction { conn ->
+        databaseManager.withTransaction { conn ->
             // Handle parent resume if needed
             if (instance.hasWaitingParent) {
                 parentRepository.findByChildId(instance.workflowId, conn)?.let { parent ->
                     // Check if already processed (idempotent handling)
-                    if (parent.outboxCompletedAt != null) {
+                    if (parent.completedAt != null) {
                         logger.info { "Parent ${parent.id} already resumed for child ${instance.workflowId} (idempotent), skipping" }
                         // Continue to schedule check - don't return
                     } else {
@@ -415,7 +499,9 @@ internal class WorkflowEventHandler(
                         )
 
                         // mark parent as completed for cleanup (event-driven state - processed once)
-                        parent.outboxCompletedAt = Clock.System.now()
+                        val now = Clock.System.now()
+                        parent.completedAt = now
+                        parent.cleanupAfter = now
                         parentRepository.update(parent, conn)
 
                         logger.debug {
@@ -536,7 +622,7 @@ internal class WorkflowEventHandler(
         val branchOutput = state.output
         val branchName = state.branchName
 
-        forkRepository.withTransaction { conn ->
+        databaseManager.withTransaction { conn ->
             // Get fork with branches by workflow ID and position (single query)
             val (fork, branches) = forkRepository.findByWorkflowIdAndPositionWithBranches(
                 instance.workflowId,
@@ -572,7 +658,7 @@ internal class WorkflowEventHandler(
             forkRepository.updateBranch(branch, conn)
 
             // Apply business logic: check if the fork is complete based on the compete mode
-            if (fork.outboxCompletedAt == null) {
+            if (fork.completedAt == null) {
                 val completedCount = branches.count { it.completedAt != null }
                 val outputJson = when {
                     fork.compete && completedCount == 1 -> branchOutput
@@ -591,8 +677,10 @@ internal class WorkflowEventHandler(
                 if (outputJson != null) {
                     logger.debug { "Fork completed at $forkPosition with output $outputJson, resuming parent workflow" }
                     // Update fork with completion data
+                    val now = Clock.System.now()
                     fork.output = LemlineJson.encodeToString(outputJson)
-                    fork.outboxCompletedAt = Clock.System.now()
+                    fork.completedAt = now
+                    fork.cleanupAfter = now
                     // Clean error data if fork was previously failed
                     fork.failedAt = null
                     fork.errorReason = null
@@ -639,7 +727,7 @@ internal class WorkflowEventHandler(
         val branchError = state.error
         val branchName = state.branchName
 
-        forkRepository.withTransaction { conn ->
+        databaseManager.withTransaction { conn ->
             // Get fork with branches by workflow ID and position (single query)
             val (fork, branches) = forkRepository.findByWorkflowIdAndPositionWithBranches(
                 instance.workflowId,
@@ -678,7 +766,7 @@ internal class WorkflowEventHandler(
             forkRepository.updateBranch(branch, conn)
 
             // Apply business logic based on compete mode
-            if (fork.outboxCompletedAt == null && fork.failedAt == null) {
+            if (fork.completedAt == null && fork.failedAt == null) {
 
                 val failedCount = branches.count { it.failedAt != null }
                 val error = when {

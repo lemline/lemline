@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cleaner
 
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.models.ParentModel
 import com.lemline.runner.repositories.ParentRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -29,6 +31,11 @@ internal class ParentCleaner : AbstractCleaner<ParentModel>() {
 
     @Inject
     override lateinit var cleanerRepository: ParentRepository
+
+    @Inject
+    override lateinit var databaseManager: DatabaseManager
+
+    override val crudRepository: WithCrudRepository<ParentModel> get() = cleanerRepository
 
     // Is this cleaner enabled?
     override val enabled by lazy {

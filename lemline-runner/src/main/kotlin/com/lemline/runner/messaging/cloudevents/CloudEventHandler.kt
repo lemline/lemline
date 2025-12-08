@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.definitions.CachedUntilCondition
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.ListenStrategy
@@ -219,7 +218,7 @@ internal class CloudEventHandler(
      * This method avoids loading millions of listeners into memory by:
      * 1. Grouping definitions by (filterIndex, readAs) for batch processing
      * 2. Bulk INSERT events using INSERT...SELECT (one query per group, no memory load)
-     * 3. Direct UPDATE with subquery to mark complete listeners (COUNT >= total_filters)
+     * 3. Direct UPDATE with subquery to mark complete listeners (COUNT >= filters_count)
      *
      * Idempotency is ensured by:
      * - filter_index column with UNIQUE(listener_id, filter_index) constraint

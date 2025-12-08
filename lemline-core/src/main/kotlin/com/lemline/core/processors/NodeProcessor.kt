@@ -18,11 +18,11 @@ import com.lemline.core.processors.scope.withTask
 import com.lemline.core.processors.scope.withTransformedInput
 import com.lemline.core.processors.scope.withTransformedOutput
 import com.lemline.core.schemas.SchemaValidator
-import com.lemline.core.states.ForkState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.NodeState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.ForkBranchCompleted
+import com.lemline.core.states.WorkflowEvent.ListenForEachCompleted
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
 import com.lemline.core.workflows.toKotlin
@@ -31,6 +31,7 @@ import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.InputFrom
+import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.api.types.SubflowInput
@@ -370,7 +371,10 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         }
 
         // Are we now completing a fork branch?
-        forkBranchCompleted(nodeStack, nextNode, nextInput, nextDirective)?.let { return it }
+        forkBranchCompleted(nodeStack, nextNode, nextInput)?.let { return it }
+
+        // Are we now completing a listen foreach iteration?
+        listenForEachCompleted(nodeStack, nextNode, nextInput)?.let { return it }
 
         // Next Task
         return TaskScheduled(
@@ -382,29 +386,54 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     }
 
+    /**
+     * Determines if a fork branch has completed successfully based on the current node, its stack, and directive,
+     * and returns the corresponding `ForkBranchCompleted` event if applicable.
+     */
     private fun forkBranchCompleted(
         nodeStack: NodeStack,
         nextNode: Node<*>,
         nextInput: JsonElement,
-        nextDirective: FlowDirective?,
     ): ForkBranchCompleted? {
         val nextState = nodeStack[nextNode.position]
-        // Is NextNode a fork? Do we enter from Child?
-        if (nextNode.task is ForkTask && nextState != null && nextState is ForkState) {
-            // Find the branch name
-            val branchName = nextNode.children?.find { it.name == node.name }?.name
-                ?: throw IllegalStateException("Fork - can not find ${node.name} in ${nextNode.children?.joinToString { it.name }}")
 
-            return ForkBranchCompleted(
-                nodeStack = nodeStack,
-                branchName = branchName,
-                output = nextInput,
-                completedAt = Clock.System.now(),
-                flowDirective = nextDirective?.toKotlin(),
-            )
-        }
+        // if nextNode is not a fork task, or if we are entering for the first time
+        if (nextNode.task !is ForkTask || nextState == null) return null
 
-        return null
+        // Find the branch name
+        val branchName = nextNode.children?.find { it.name == node.name }?.name
+            ?: throw IllegalStateException("Fork - can not find ${node.name} in ${nextNode.children?.joinToString { it.name }}")
+
+        return ForkBranchCompleted(
+            nodeStack = nodeStack,
+            branchName = branchName,
+            output = nextInput,
+            completedAt = Clock.System.now(),
+        )
+    }
+
+    /**
+     * Handles the completion of a "foreach" iteration in a node processing workflow. It verifies whether
+     * the provided node represents a `ListenTask` and whether the node is being re-entered with an existing
+     * state. If these conditions are met, it creates and returns a `ListenForEachCompleted` event.
+     */
+    private fun listenForEachCompleted(
+        nodeStack: NodeStack,
+        nextNode: Node<*>,
+        nextInput: JsonElement,
+    ): ListenForEachCompleted? {
+        val nextState = nodeStack[nextNode.position]
+
+        // if nextNode is not a listen task, or if we are entering for the first time
+        if (nextNode.task !is ListenTask || nextState == null) return null
+
+        // This is a foreach iteration completing
+        // The iteration index is tracked by the runner (ListenerModel.foreachCurrentIndex)
+        return ListenForEachCompleted(
+            nodeStack = nodeStack,
+            iterationOutput = nextInput,
+            iterationIndex = 0
+        )
     }
 
     // ========================================

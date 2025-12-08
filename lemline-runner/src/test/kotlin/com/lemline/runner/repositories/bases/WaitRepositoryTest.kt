@@ -56,7 +56,7 @@ internal abstract class WaitRepositoryTest {
         createEntity = ::createEntity,
         getWorkflowId = { it.instanceMessage.workflowId }
     )
-    
+
     @Nested
     inner class OutboxTests : OutboxRepositoryTest<WaitModel>(
         outboxRepository = { repository },

@@ -18,6 +18,7 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.models.ListenerModel
+import com.lemline.runner.models.ListenerStrategy
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.ListenerRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
@@ -256,6 +257,7 @@ internal class ListenerTimeoutOutboxTest {
                 ),
                 workflowState = listenStarted
             ),
+            strategy = ListenerStrategy.from(config),
             timeoutAt = timeoutAt,
             outboxScheduledFor = Clock.System.now()
         )

@@ -1,24 +1,24 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.WaitModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.WaitRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * `WaitOutbox` specializes `AbstractOutbox` to implement the outbox pattern for wait tasks in workflows.
- *
- * It manages the restart of workflow instances after a wait task.
- * Integration occurs via the `WorkflowInstance.onWait` method in [com.lemline.runner.StepByStepRunner].
  */
 @Startup
 @ApplicationScoped
@@ -37,6 +37,11 @@ internal class WaitOutbox : AbstractOutbox<WaitModel>() {
 
     @Inject
     override lateinit var outboxRepository: WaitRepository
+
+    override val crudRepository: WithCrudRepository<WaitModel> get() = outboxRepository
+
+    @Inject
+    override lateinit var databaseManager: DatabaseManager
 
     // Is this outbox enabled?
     override val enabled by lazy {
@@ -69,5 +74,8 @@ internal class WaitOutbox : AbstractOutbox<WaitModel>() {
             ),
             messageId
         )
+
+        // Mark the wait model to be cleaned up
+        entity.cleanupAfter = Clock.System.now()
     }
 }

@@ -73,7 +73,7 @@ class RetryRepository : CrudRepository<RetryModel>(),
     // Delegate WithInstanceRepository methods
     override suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection?) =
         instanceRepository.findByWorkflowId(workflowId, connection)
-    
+
     // Delegate WithOutboxRepository methods
     override suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection?) =
         outboxRepository.findEntitiesToProcess(maxAttempts, limit, connection)

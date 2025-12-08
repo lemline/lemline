@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox.bases
 
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.runner.models.OutboxModel
+import com.lemline.runner.models.WithId
+import com.lemline.runner.models.WithOutbox
 import com.lemline.runner.outbox.AbstractOutbox
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.OutboxRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
+import com.lemline.runner.repositories.with.WithIdRepository
+import com.lemline.runner.repositories.with.WithOutboxRepository
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -45,13 +49,22 @@ infix fun Instant.shouldBeAfter(date: Instant) = (this > date) shouldBe true
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class OutboxProcessorTest<T : OutboxModel> {
+internal abstract class OutboxProcessorTest<T> where T : WithOutbox, T : WithId {
 
     // Abstract repository to be provided by subclasses
     abstract val failureRepository: FailureRepository
 
-    // Abstract repository to be provided by subclasses
-    abstract val outboxRepository: OutboxRepository<T>
+    // Abstract outbox repository to be provided by subclasses
+    abstract val outboxRepository: WithOutboxRepository<T>
+
+    // Abstract CRUD repository to be provided by subclasses
+    abstract val crudRepository: WithCrudRepository<T>
+
+    // Abstract ID repository to be provided by subclasses
+    abstract val idRepository: WithIdRepository<T>
+
+    // Abstract database manager for transactions
+    abstract val databaseManager: DatabaseManager
 
     // Abstract Kotlin class reference needed for MockK
     abstract val modelClass: KClass<T>
@@ -65,6 +78,8 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         object : AbstractOutbox<T>() {
             override val failureRepository = this@OutboxProcessorTest.failureRepository
             override val outboxRepository = this@OutboxProcessorTest.outboxRepository
+            override val crudRepository = this@OutboxProcessorTest.crudRepository
+            override val databaseManager = this@OutboxProcessorTest.databaseManager
             override val instanceEmitter = mock<WorkflowCommandEmitter>()
             override val outboxConf = null // Not used by test methods
             override val enabled = true
@@ -86,7 +101,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Reset mock before each test, default to success
         coEvery { mockedProcessor(any(modelClass)) } just Runs
 
-        outboxRepository.deleteAll()
+        this@OutboxProcessorTest.crudRepository.deleteAll()
     }
 
     // --- Test methods --- //
@@ -112,7 +127,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun `process should handle successful message processing`() = runTest {
         // Arrange
         val message = createTestModel(payload = "SuccessPayload")
-        outboxRepository.insert(message)
+        this@OutboxProcessorTest.crudRepository.insert(message)
 
         // Act
         outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
@@ -121,7 +136,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
         // Verify the mock was called at least once
         coVerify(exactly = 1) { mockedProcessor(any(modelClass)) }
 
-        val processedMessage = outboxRepository.findById(message.id)
+        val processedMessage = idRepository.findById(message.id)
         processedMessage shouldNotBe null
         processedMessage?.outboxCompletedAt shouldNotBe null
         processedMessage?.outboxFailedAt shouldBe null
@@ -159,7 +174,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun `process should handle retry logic on first failure then success`() = runBlocking(Dispatchers.IO) {
         // Arrange
         val original = createTestModel(payload = "RetryPayload")
-        outboxRepository.insert(original)
+        this@OutboxProcessorTest.crudRepository.insert(original)
 
         val failureException = RuntimeException("Processing failed on purpose!")
         // Setup mock to fail the first time it's called in this sequence
@@ -171,7 +186,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert: First attempt failed - Check DB state
         coVerify(exactly = 1) { mockedProcessor(any(modelClass)) } // Verify it was called once
-        val updated = outboxRepository.findById(original.id)!!
+        val updated = idRepository.findById(original.id)!!
 
         updated.outboxCompletedAt shouldBe null
         updated.outboxFailedAt shouldBe null
@@ -193,7 +208,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert: A second attempt succeeded - Check DB state
         coVerify(exactly = 2) { mockedProcessor(any(modelClass)) } // Verify it was called again
-        val final = outboxRepository.findById(original.id)!!
+        val final = idRepository.findById(original.id)!!
 
         final.outboxCompletedAt shouldNotBe null
         final.outboxFailedAt shouldBe null
@@ -224,7 +239,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun `process should mark message as FAILED after max attempts`() = runBlocking(Dispatchers.IO) {
         // Arrange
         val original = createTestModel(payload = "FailPayload")
-        outboxRepository.insert(original)
+        this@OutboxProcessorTest.crudRepository.insert(original)
         val originalDelayedUntil = original.outboxDelayedUntil!!
 
         val failureException = RuntimeException("Persistent failure!")
@@ -238,7 +253,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
             // when
             outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
             // then
-            val updated = outboxRepository.findById(original.id)!!
+            val updated = idRepository.findById(original.id)!!
             if (attempt < maxAttempts) {
                 updated.outboxCompletedAt shouldBe null
                 updated.outboxFailedAt shouldBe null
@@ -281,14 +296,14 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
     fun `process should handle batch processing correctly`() = runTest {
         // Arrange
         val messages = List(5) { createTestModel("batch_$it") }
-        outboxRepository.insert(messages)
+        this@OutboxProcessorTest.crudRepository.insert(messages)
 
         // Act
         outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
 
         // Assert
         coVerify(exactly = 5) { mockedProcessor(any(modelClass)) }
-        val processedMessages = outboxRepository.listAll()
+        val processedMessages = this@OutboxProcessorTest.crudRepository.listAll()
         processedMessages shouldHaveSize 5
         processedMessages.forEach { msg ->
             msg.outboxCompletedAt shouldNotBe null
@@ -319,7 +334,7 @@ internal abstract class OutboxProcessorTest<T : OutboxModel> {
 
         // Assert
         coVerify(exactly = 0) { mockedProcessor(any(modelClass)) }
-        outboxRepository.countAll() shouldBe 0
+        this@OutboxProcessorTest.crudRepository.countAll() shouldBe 0
     }
 
 }

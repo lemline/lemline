@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cleaner
 
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.repositories.ListenerRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -33,6 +35,11 @@ internal class ListenerCleaner : AbstractCleaner<ListenerModel>() {
 
     @Inject
     override lateinit var cleanerRepository: ListenerRepository
+
+    @Inject
+    override lateinit var databaseManager: DatabaseManager
+
+    override val crudRepository: WithCrudRepository<ListenerModel> get() = cleanerRepository
 
     /** Is this cleaner enabled? */
     override val enabled by lazy {

@@ -4,9 +4,11 @@ package com.lemline.runner.cli.definitions
 import com.lemline.runner.cli.GlobalMixin
 import io.quarkus.arc.Unremovable
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.ExperimentalSerializationApi
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
 
+@ExperimentalSerializationApi
 @Unremovable
 @ExperimentalTime
 @Command(

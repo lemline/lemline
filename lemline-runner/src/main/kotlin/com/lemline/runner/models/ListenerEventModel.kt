@@ -99,7 +99,7 @@ data class ListenerEventModel(
     // ========================================
 
     /** Foreach iteration index (0-based) */
-    val iterationIndex: Int? = null,
+    val iterationIndex: Int = 0,
 
     /** Output from foreach.do for this event (JSON) */
     var iterationOutput: String? = null,

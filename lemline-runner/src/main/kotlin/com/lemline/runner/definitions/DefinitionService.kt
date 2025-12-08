@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import jakarta.enterprise.context.ApplicationScoped
@@ -52,6 +53,9 @@ class DefinitionService {
 
     @Inject
     private lateinit var definitionListenService: DefinitionListenService
+
+    @Inject
+    private lateinit var databaseManager: DatabaseManager
 
     /**
      * Saves a workflow definition and extracts its listen tasks.
@@ -170,7 +174,7 @@ class DefinitionService {
     ): DeleteResult {
         logger.debug { "Deleting workflow definition: $namespace/$name:$version" }
 
-        return definitionRepository.withTransaction(connection) { conn ->
+        return databaseManager.withTransaction(connection) { conn ->
             // Check if workflow exists
             val model = definitionRepository.findByNameAndVersion(namespace, name, version, conn)
                 ?: return@withTransaction DeleteResult.NotFound("Workflow '$name' version '$version' not found")
@@ -204,7 +208,7 @@ class DefinitionService {
         namespace: WorkflowNamespace,
         name: WorkflowName,
         connection: Connection? = null
-    ): DeleteResult = definitionRepository.withTransaction(connection) { conn ->
+    ): DeleteResult = databaseManager.withTransaction(connection) { conn ->
 
         val definitions = definitionRepository.listByName(namespace, name, conn)
 
@@ -239,7 +243,7 @@ class DefinitionService {
     suspend fun deleteAllInNamespace(
         namespace: WorkflowNamespace,
         connection: Connection? = null
-    ): DeleteResult = definitionRepository.withTransaction(connection) { conn ->
+    ): DeleteResult = databaseManager.withTransaction(connection) { conn ->
         val count = definitionRepository.countAllInNamespace(namespace, conn)
         if (count == 0L) {
             return@withTransaction DeleteResult.NotFound("No workflows found in namespace '$namespace'")

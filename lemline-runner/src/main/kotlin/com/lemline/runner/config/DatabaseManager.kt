@@ -14,6 +14,9 @@ import io.quarkus.flyway.FlywayDataSource
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Instance
 import jakarta.inject.Inject
+import java.sql.Connection
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.flywaydb.core.Flyway
 
@@ -148,5 +151,56 @@ class DatabaseManager {
     fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
         DB_TYPE_MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
         else -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
+    }
+
+    /**
+     * Executes a block of code with a database connection.
+     * If an existing connection is provided, it will be reused.
+     * Otherwise, a new connection is obtained from the pool and closed after use.
+     *
+     * @param connection Optional existing connection to reuse
+     * @param block The code block to execute with the connection
+     * @return The result of the block execution
+     */
+    suspend fun <R> withConnection(
+        connection: Connection? = null,
+        block: suspend (Connection) -> R
+    ): R = withContext(Dispatchers.IO) {
+        when (connection) {
+            null -> datasource.connection.use { block(it) }
+            else -> block(connection)
+        }
+    }
+
+    /**
+     * Executes a block of code within a database transaction.
+     * If an existing connection is provided, it will be reused (assuming it's already in a transaction).
+     * Otherwise, a new connection is obtained, auto-commit is disabled, and the transaction
+     * is committed on success or rolled back on failure.
+     *
+     * @param connection Optional existing connection to reuse (must already be in transaction mode)
+     * @param block The code block to execute within the transaction
+     * @return The result of the block execution
+     * @throws Throwable Rethrows any exception after rolling back the transaction
+     */
+    suspend fun <R> withTransaction(
+        connection: Connection? = null,
+        block: suspend (Connection) -> R
+    ): R = withContext(Dispatchers.IO) {
+        when (connection) {
+            null -> {
+                datasource.connection.use { conn ->
+                    conn.autoCommit = false
+                    try {
+                        block(conn).also { conn.commit() }
+                    } catch (t: Throwable) {
+                        conn.rollback()
+                        throw t
+                    }
+                }
+            }
+
+            else -> block(connection)
+        }
     }
 }

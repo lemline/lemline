@@ -14,9 +14,12 @@ import com.lemline.core.states.RootState
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.states.WorkflowEvent.EmitStarted
+import com.lemline.core.states.WorkflowEvent.ActivityStarted
 import com.lemline.core.states.WorkflowEvent.ForkBranchFailed
 import com.lemline.core.states.WorkflowEvent.ForkStarted
+import com.lemline.core.states.WorkflowEvent.ListenForEachCompleted
+import com.lemline.core.states.WorkflowEvent.ListenStarted
+import com.lemline.core.states.WorkflowEvent.Outcome
 import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
 import com.lemline.core.states.WorkflowEvent.TaskRetryScheduled
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
@@ -121,13 +124,14 @@ object StepByStepOrchestrator {
                 runByActivity(workflow, event.resume())
             }
 
-            is WorkflowEvent.ActivityStarted -> event
+            is ActivityStarted -> event
             is WaitStarted -> event
-            is WorkflowEvent.ListenStarted -> event
+            is ListenStarted -> event
+            is ListenForEachCompleted -> event
             is TaskRetryScheduled -> event
             is RunWorkflowStarted -> event
             is ForkStarted -> event
-            is WorkflowEvent.Outcome -> event
+            is Outcome -> event
         }
     }
 

@@ -4,6 +4,7 @@ package com.lemline.runner.outbox
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.InternalException
 import com.lemline.core.errors.WorkflowErrorType
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
@@ -47,6 +48,9 @@ internal class ListenerTimeoutOutbox : AbstractScheduledTask() {
     @Inject
     private lateinit var commandEmitter: WorkflowCommandEmitter
 
+    @Inject
+    private lateinit var databaseManager: DatabaseManager
+
     override val taskName = "Listener timeout processor"
 
     /** Is this processor enabled? */
@@ -77,7 +81,7 @@ internal class ListenerTimeoutOutbox : AbstractScheduledTask() {
             batchNumber++
             var processed = 0
 
-            listenerRepository.withTransaction { connection ->
+            databaseManager.withTransaction { connection ->
                 val timedOut = listenerRepository.findTimedOut(batchSize, connection)
 
                 if (timedOut.isNotEmpty()) {

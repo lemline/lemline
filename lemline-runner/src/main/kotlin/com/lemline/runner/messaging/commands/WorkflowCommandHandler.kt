@@ -3,7 +3,6 @@ package com.lemline.runner.messaging.commands
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
-import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
@@ -382,6 +381,13 @@ internal class WorkflowCommandHandler(
                 // Send to database for branch failure tracking
                 sendToDatabase(this, event)
                 null  // Terminal
+            }
+
+            is WorkflowEvent.ListenForEachCompleted -> {
+                // Send to database for foreach iteration completion handling
+                // The database handler will check for next event or complete the listener
+                sendToDatabase(this, event)
+                null  // Paused - waiting for next event or completion
             }
         }?.let {
             copy(workflowState = it)

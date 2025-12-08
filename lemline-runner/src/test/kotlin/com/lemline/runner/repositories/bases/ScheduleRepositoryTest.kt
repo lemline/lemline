@@ -56,7 +56,7 @@ internal abstract class ScheduleRepositoryTest {
         createEntity = ::createEntity,
         getWorkflowId = { it.instanceMessage.workflowId }
     )
-    
+
     @Nested
     inner class OutboxTests : OutboxRepositoryTest<ScheduleModel>(
         outboxRepository = { repository },

@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.cleaner
 
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.models.ForkModel
 import com.lemline.runner.repositories.ForkRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -29,6 +31,11 @@ internal class ForkCleaner : AbstractCleaner<ForkModel>() {
 
     @Inject
     override lateinit var cleanerRepository: ForkRepository
+
+    @Inject
+    override lateinit var databaseManager: DatabaseManager
+
+    override val crudRepository: WithCrudRepository<ForkModel> get() = cleanerRepository
 
     // Is this cleaner enabled?
     // Note: Fork cleanup uses parent config since fork is a type of parent-child relationship

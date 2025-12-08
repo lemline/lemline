@@ -108,7 +108,7 @@ We implement a **direct database operation architecture** that avoids loading li
 │  │ processAllDirect():                                                      │    │
 │  │   1. Bulk INSERT events with filter_index via INSERT...SELECT            │    │
 │  │   2. Direct UPDATE with COUNT subquery:                                  │    │
-│  │      WHERE (SELECT COUNT(*) FROM events) >= total_filters                │    │
+│  │      WHERE (SELECT COUNT(*) FROM events) >= filters_count                │    │
 │  │                                                                          │    │
 │  └──────────────────────────────────────────────────────────────────────────┘    │
 │                                                                                  │
@@ -157,7 +157,7 @@ CREATE TABLE lemline_listeners
     event                TEXT,
 
     -- ALL strategy completion tracking
-    total_filters        INT,
+    filters_count        INT,
 
     -- Timeout
     timeout_at           TIMESTAMPTZ(6),
@@ -269,10 +269,10 @@ SET event                = (SELECT json_agg(e.event::json)
     outbox_delayed_until = NOW()
 WHERE outbox_delayed_until IS NULL
   AND outbox_completed_at IS NULL
-  AND total_filters IS NOT NULL
+  AND filters_count IS NOT NULL
   AND (SELECT COUNT(*)
        FROM lemline_listener_events e
-       WHERE e.listener_id = l.id) >= total_filters
+       WHERE e.listener_id = l.id) >= filters_count
   AND (workflow conditions...)
 ```
 
@@ -408,7 +408,7 @@ Thread B: Event matches filter_index=1
 
 ```sql
 -- Both threads eventually call:
-UPDATE...WHERE (SELECT COUNT (*) FROM events) >= total_filters
+UPDATE...WHERE (SELECT COUNT (*) FROM events) >= filters_count
 
 -- Database evaluates atomically:
 -- If Thread A sees count=2, Thread B also sees count=2

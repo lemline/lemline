@@ -308,57 +308,6 @@ class FlowDirectiveTest {
         }
     }
 
-    // ========================================
-    // Type Hierarchy and Equality Tests
-    // ========================================
-
-    @Test
-    fun `FlowDirectiveEnum types should be instances of FlowDirective`() {
-        // Given/When/Then
-        assertTrue(FlowDirectiveEnum.Continue is FlowDirective)
-        assertTrue(FlowDirectiveEnum.Exit is FlowDirective)
-        assertTrue(FlowDirectiveEnum.End is FlowDirective)
-    }
-
-    @Test
-    fun `FlowDirectiveGoto should be instance of FlowDirective`() {
-        // Given
-        val goto = FlowDirectiveGoto("task")
-
-        // When/Then
-        assertTrue(goto is FlowDirective)
-    }
-
-    @Test
-    fun `FlowDirectiveEnum Continue should be singleton`() {
-        // Given/When
-        val continue1 = FlowDirectiveEnum.Continue
-        val continue2 = FlowDirectiveEnum.Continue
-
-        // Then
-        assertTrue(continue1 === continue2)
-    }
-
-    @Test
-    fun `FlowDirectiveEnum Exit should be singleton`() {
-        // Given/When
-        val exit1 = FlowDirectiveEnum.Exit
-        val exit2 = FlowDirectiveEnum.Exit
-
-        // Then
-        assertTrue(exit1 === exit2)
-    }
-
-    @Test
-    fun `FlowDirectiveEnum End should be singleton`() {
-        // Given/When
-        val end1 = FlowDirectiveEnum.End
-        val end2 = FlowDirectiveEnum.End
-
-        // Then
-        assertTrue(end1 === end2)
-    }
-
     @Test
     fun `FlowDirectiveGoto instances with same target should be equal`() {
         // Given

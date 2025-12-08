@@ -161,7 +161,7 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = LISTENER_TABLE
-    
+
     // Composed operations - initialized lazily to ensure databaseManager is injected
     val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseManager) }
     val instanceRepository by lazy { InstanceRepository(tableName, idHelper, ::createModel, databaseManager) }
@@ -174,6 +174,37 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
 
     override suspend fun deleteById(id: IDV7, connection: Connection?) =
         idRepository.deleteById(id, connection)
+
+    /**
+     * Batch finds listeners by their IDs in a single query.
+     * Returns a map of ID to ListenerModel for efficient lookup.
+     */
+    suspend fun findByIds(
+        ids: List<IDV7>,
+        connection: Connection? = null
+    ): Map<IDV7, ListenerModel> {
+        if (ids.isEmpty()) return emptyMap()
+
+        return withConnection(connection) { conn ->
+            val uniqueIds = ids.distinct()
+            val placeholders = uniqueIds.joinToString(", ") { "?" }
+            val sql = "SELECT * FROM $tableName WHERE $ID_COLUMN IN ($placeholders)"
+
+            conn.prepareStatement(sql).use { stmt ->
+                uniqueIds.forEachIndexed { index, id ->
+                    setIDV7(stmt, index + 1, id)
+                }
+                stmt.executeQuery().use { rs ->
+                    buildMap {
+                        while (rs.next()) {
+                            val model = createModel(rs)
+                            put(model.id, model)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Delegate WithInstanceRepository methods
     override suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection?) =

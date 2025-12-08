@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
+import com.lemline.common.values.Token
 import com.lemline.core.states.WorkflowCommand
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.ListenerModel
+import com.lemline.runner.models.ListenerStrategy
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ListenerRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -64,6 +69,11 @@ internal class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
     @Inject
     override lateinit var outboxRepository: ListenerRepository
 
+    override val crudRepository: WithCrudRepository<ListenerModel> get() = outboxRepository
+
+    @Inject
+    override lateinit var databaseManager: DatabaseManager
+
     /** Is this outbox enabled? */
     override val enabled by lazy {
         lemlineConfig.outbox().listener().getOrNull()?.enabled()?.getOrNull()
@@ -90,6 +100,26 @@ internal class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
      * The `entity.event` column contains:
      * - ONE/ANY: Single event JSON (wrapped in array for consistent output)
      * - ALL: Already a JSON array of all matched events
+     *
+     * ## Foreach Support
+     *
+     * For ONE/ANY strategies with foreach enabled:
+     * - Instead of completing the listen task, we resume to foreach.do
+     * - The event becomes the input to foreach.do
+     * - When foreach.do completes, ListenForEachCompleted is emitted
+     * - WorkflowEventHandler.handleListenForEachCompleted then completes the listen task
+     *
+     * For ALL/ANY+until with foreach:
+     * - Events are processed via ListenerEventOutbox (not this outbox)
+     * - After all iterations complete, WorkflowEventHandler aggregates outputs
+     *   and triggers this outbox with the aggregated results
+     * - We complete the listen task with the aggregated foreach outputs
+     *
+     * ## Strategy Detection
+     *
+     * Uses explicit strategy enum:
+     * - ONE/ANY: Single event, immediate completion
+     * - ANY_UNTIL_EXPR/ANY_UNTIL_EVENT/ALL: Accumulate events
      */
     override suspend fun process(entity: ListenerModel) {
         val eventJson = requireNotNull(entity.event) {
@@ -99,11 +129,31 @@ internal class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
         // Parse the stored event(s)
         val parsedEvent = Json.parseToJsonElement(eventJson)
 
-        // Create a resume command with parsedEvent as the task output
-        val resumeCommand = WorkflowCommand.ResumeWithCompletedTask(
-            nodeStack = entity.instanceMessage.workflowState.nodeStack,
-            rawOutput = parsedEvent
-        )
+        // ONE and ANY are simple strategies (single event, immediate completion)
+        // ANY_UNTIL_EXPR, ANY_UNTIL_EVENT, and ALL accumulate events
+        val isSimpleStrategy = entity.strategy == ListenerStrategy.ONE ||
+            entity.strategy == ListenerStrategy.ANY
+
+        // For ONE/ANY with foreach: resume to foreach.do instead of completing
+        // For ALL/ANY+until or no foreach: complete the listen task normally
+        val listenPosition = entity.instanceMessage.workflowState.nodePosition
+        val resumeCommand = if (entity.hasForeach && isSimpleStrategy) {
+            // Resume to foreach.do position with the event as input
+            val foreachPosition = listenPosition.addToken(Token.FOR)
+            logger.debug { "Foreach enabled for ONE/ANY - resuming to foreach.do at $foreachPosition" }
+
+            WorkflowCommand.ResumeFromTask(
+                nodeStack = entity.instanceMessage.workflowState.nodeStack,
+                nodePosition = foreachPosition,
+                rawInput = parsedEvent
+            )
+        } else {
+            // Normal completion: complete the listen task with event(s) as output
+            WorkflowCommand.ResumeWithCompletedTask(
+                nodeStack = entity.instanceMessage.workflowState.nodeStack,
+                rawOutput = parsedEvent
+            )
+        }
 
         val resumeMessage = InstanceMessage(
             workflowInfo = entity.instanceMessage.workflowInfo,
@@ -116,8 +166,12 @@ internal class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
         instanceEmitter.send(resumeMessage, messageId)
 
         logger.info {
-            "Resume command sent for listener ${entity.id}, workflow ${entity.workflowId} " +
-                "at position ${entity.nodePosition}"
+            "Resume command sent for listener" +
+                if (entity.hasForeach && isSimpleStrategy) " (foreach.do)" else " (completion)" +
+                    entity
         }
+
+        // Mark the wait model to be cleaned up
+        entity.cleanupAfter = Clock.System.now()
     }
 }

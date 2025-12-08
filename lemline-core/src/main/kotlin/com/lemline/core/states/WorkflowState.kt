@@ -4,6 +4,7 @@
 package com.lemline.core.states
 
 import com.lemline.common.values.NodePosition
+import com.lemline.common.values.Token
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.errors.InternalException
 import com.lemline.core.json.LemlineJson
@@ -231,7 +232,6 @@ sealed class WorkflowEvent : WorkflowState() {
         val branchName: String,
         val output: JsonElement,
         val completedAt: Instant,
-        val flowDirective: FlowDirective?
     ) : Outcome() {
 
         @Transient
@@ -241,7 +241,6 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", branchName=$branchName" +
             ", transformedInput=$output" +
-            ", flowDirective=$flowDirective" +
             ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }
@@ -491,6 +490,58 @@ sealed class WorkflowEvent : WorkflowState() {
         fun resumeFailed(error: InternalException.Error) = WorkflowCommand.ResumeWithFailedTask(
             nodeStack = nodeStack,
             error = error,
+        )
+
+        /**
+         * Resume for foreach processing with a single event.
+         * Creates a ResumeFromTask targeting the foreach.do position.
+         *
+         * @param eventData The CloudEvent data to process
+         * @param iterationIndex The iteration index (0-based) for this foreach execution
+         */
+        fun resumeForeach(eventData: JsonElement, iterationIndex: Int) = WorkflowCommand.ResumeFromTask(
+            nodeStack = nodeStack,
+            nodePosition = nodePosition.addToken(Token.FOR),
+            rawInput = eventData,
+        )
+    }
+
+    /**
+     * Event emitted when a foreach iteration of a listen task completes successfully.
+     *
+     * This event is sent after foreach.do tasks complete for a single CloudEvent.
+     * The runner uses this to:
+     * - Store the iteration output
+     * - Trigger processing of the next queued event (if any)
+     * - Or complete the listener if no more events and completion criteria met
+     *
+     * @see ListenStarted for the initial listen task event
+     */
+    @Serializable
+    @SerialName("listenForEachCompleted")
+    data class ListenForEachCompleted(
+        override val nodeStack: NodeStack,
+        /** Output from foreach.do tasks for this iteration */
+        val iterationOutput: JsonElement,
+        val iterationIndex: Int
+    ) : Suspension() {
+
+        @Transient
+        override val nodePosition = nodeStack.lastPosition // Listen position
+
+        override fun toString() = "${this::class.simpleName}(" +
+            "nodePosition=$nodePosition" +
+            ", iterationOutput=$iterationOutput" +
+            ", iterationIndex=$iterationIndex" +
+            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ")"
+
+        /**
+         * Resume the listen task with the aggregated outputs from all foreach iterations.
+         */
+        fun resumeCompleted(outputs: JsonArray) = WorkflowCommand.ResumeWithCompletedTask(
+            nodeStack = nodeStack,
+            rawOutput = outputs,
         )
     }
 

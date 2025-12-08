@@ -2,11 +2,13 @@
 package com.lemline.runner.outbox
 
 import com.lemline.common.values.WorkflowId
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.ScheduleModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.ScheduleRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -41,6 +43,11 @@ internal class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
 
     @Inject
     override lateinit var outboxRepository: ScheduleRepository
+
+    override val crudRepository: WithCrudRepository<ScheduleModel> get() = outboxRepository
+
+    @Inject
+    override lateinit var databaseManager: DatabaseManager
 
     // Is this outbox enabled?
     override val enabled by lazy {

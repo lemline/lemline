@@ -80,7 +80,7 @@ internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         const val ITERATION_INDEX_COLUMN = "iteration_index"
         const val ITERATION_OUTPUT_COLUMN = "iteration_output"
     }
-    
+
     override val tableName = LISTENER_EVENT_TABLE
 
     override val columns: ColumnBindings<ListenerEventModel> by lazy {
@@ -159,7 +159,7 @@ internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         outboxCompletedAt = rs.getInstant(OUTBOX_COMPLETED_AT_COLUMN),
         outboxFailedAt = rs.getInstant(OUTBOX_FAILED_AT_COLUMN),
         // Foreach iteration tracking
-        iterationIndex = rs.getInt(ITERATION_INDEX_COLUMN).takeIf { !rs.wasNull() },
+        iterationIndex = rs.getInt(ITERATION_INDEX_COLUMN),
         iterationOutput = rs.getString(ITERATION_OUTPUT_COLUMN)
     )
 

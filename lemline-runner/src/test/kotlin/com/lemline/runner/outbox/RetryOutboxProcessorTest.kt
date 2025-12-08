@@ -4,13 +4,16 @@ package com.lemline.runner.outbox
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.outbox.bases.OutboxProcessorTest
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.OutboxRepository
 import com.lemline.runner.repositories.RetryRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
+import com.lemline.runner.repositories.with.WithIdRepository
+import com.lemline.runner.repositories.with.WithOutboxRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -35,8 +38,13 @@ internal class RetryOutboxProcessorTest : OutboxProcessorTest<RetryModel>() {
     @Inject // Inject the failure repository
     override lateinit var failureRepository: FailureRepository
 
-    // Implement the abstract repository property
-    override val outboxRepository: OutboxRepository<RetryModel> by lazy { retryRepository }
+    @Inject // Inject the database manager
+    override lateinit var databaseManager: DatabaseManager
+
+    // Implement the abstract repository properties
+    override val outboxRepository: WithOutboxRepository<RetryModel> by lazy { retryRepository }
+    override val crudRepository: WithCrudRepository<RetryModel> by lazy { retryRepository }
+    override val idRepository: WithIdRepository<RetryModel> by lazy { retryRepository }
 
     // Implement the abstract KClass property
     override val modelClass: KClass<RetryModel> = RetryModel::class

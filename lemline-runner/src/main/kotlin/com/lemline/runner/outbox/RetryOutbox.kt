@@ -1,28 +1,24 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.repositories.FailureRepository
 import com.lemline.runner.repositories.RetryRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * `RetryOutbox` specializes `AbstractOutbox` to implement the outbox pattern for retrying failed operations.
- *
- * This class coordinates retry logic in two main areas:
- * - In workflow execution via [com.lemline.runner.StepByStepRunner]:
- *   - Uses `WorkflowInstance.onRetry()` to handle retries defined by the workflow itself.
- * - In message processing via [com.lemline.runner.messaging.commands.WorkflowCommandHandler]:
- *   - `Message<String>.saveAsFailed()` records non-recoverable failures.
- *   - `Message<String>.saveForRetry()` schedules recoverable failures for future retry attempts.
  */
 @Startup
 @ApplicationScoped
@@ -41,6 +37,11 @@ internal class RetryOutbox : AbstractOutbox<RetryModel>() {
 
     @Inject
     override lateinit var outboxRepository: RetryRepository
+
+    override val crudRepository: WithCrudRepository<RetryModel> get() = outboxRepository
+
+    @Inject
+    override lateinit var databaseManager: DatabaseManager
 
     // Is this outbox enabled?
     override val enabled by lazy {
@@ -73,5 +74,8 @@ internal class RetryOutbox : AbstractOutbox<RetryModel>() {
             ),
             messageId
         )
+
+        // Mark the retry model to be cleaned up
+        entity.cleanupAfter = Clock.System.now()
     }
 }

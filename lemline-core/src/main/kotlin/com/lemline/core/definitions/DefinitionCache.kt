@@ -58,7 +58,9 @@ data class CachedListenTask(
     val strategy: ListenStrategy,
     val readAs: ListenTaskConfiguration.ListenAndReadAs,
     /** Until condition for ANY + until accumulation mode (null for ONE, ANY without until, ALL) */
-    val until: CachedUntilCondition? = null
+    val until: CachedUntilCondition? = null,
+    /** Whether this listen task has foreach enabled for sequential event processing */
+    val hasForeach: Boolean = false
 ) {
     /**
      * Returns the termination filter if this is an ANY + until(event) task.
@@ -309,7 +311,8 @@ object DefinitionCache {
                         filters = filters,
                         strategy = strategy,
                         readAs = readAs,
-                        until = until
+                        until = until,
+                        hasForeach = listenTask.foreach != null
                     )
                 )
             }
