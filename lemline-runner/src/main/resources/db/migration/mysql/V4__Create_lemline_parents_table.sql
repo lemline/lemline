@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS lemline_parents
     workflow_position   TEXT         NOT NULL,
     workflow_state      MEDIUMTEXT   NOT NULL,
     child_id            BINARY(16)   NOT NULL,
-    outbox_completed_at TIMESTAMP(6),
+    completed_at        TIMESTAMP(6),
+    cleanup_after       TIMESTAMP(6),
     created_at          TIMESTAMP(6) NOT NULL,
     updated_at          TIMESTAMP(6)
 ) ENGINE = InnoDB
@@ -24,5 +25,5 @@ CREATE UNIQUE INDEX idx_lemline_parents_child_id
     ON lemline_parents (child_id);
 
 -- Create index for cleanup queries
-CREATE INDEX idx_lemline_parents_completed
-    ON lemline_parents (outbox_completed_at);
+CREATE INDEX idx_lemline_parents_cleanup
+    ON lemline_parents (cleanup_after);

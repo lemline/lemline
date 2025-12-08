@@ -1,12 +1,28 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories
 
+import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.FailureModel
+import com.lemline.runner.repositories.helpers.ColumnBindings
+import com.lemline.runner.repositories.helpers.ColumnBindingsBuilder
+import com.lemline.runner.repositories.ops.CrudRepository
+import com.lemline.runner.repositories.ops.ID_COLUMN
+import com.lemline.runner.repositories.ops.IdRepository
+import com.lemline.runner.repositories.ops.WORKFLOW_ID_COLUMN
+import com.lemline.runner.repositories.ops.WORKFLOW_NAMESPACE_COLUMN
+import com.lemline.runner.repositories.ops.WORKFLOW_NAME_COLUMN
+import com.lemline.runner.repositories.ops.WORKFLOW_POSITION_COLUMN
+import com.lemline.runner.repositories.ops.WORKFLOW_STATE_COLUMN
+import com.lemline.runner.repositories.ops.WORKFLOW_VERSION_COLUMN
+import com.lemline.runner.repositories.ops.getInstanceMessage
+import com.lemline.runner.repositories.ops.idColumn
+import com.lemline.runner.repositories.with.WithIdRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
-import java.sql.PreparedStatement
+import java.sql.Connection
 import java.sql.ResultSet
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -14,49 +30,24 @@ import kotlinx.serialization.ExperimentalSerializationApi
 const val FAILURE_TABLE = "lemline_failures"
 
 /**
- * Repository class for managing `FailureModel` entities.
+ * Repository for managing failure records.
+ * Uses composition to provide instance operations.
  *
- * This class extends `WithInstanceRepository` and provides additional functionalities specific to
- * storing and retrieving failure-related data. It is used to persist details about failures, including
- * error messages, reasons, error class, and stack traces, while associating them with a workflow instance
- * through the `InstanceMessage` information.
- *
- * The `FailureRepository` is abstract and designed to be implemented by concrete repositories.
- *
- * Key Features:
- * - Extends functionality from `WithInstanceRepository`, inheriting its instance-related mapping
- *   and utilities.
- * - Adds prepared statement mappings to store and retrieve failure-specific data from a database.
- *
- * Entity:
- * - Handles entities of type `FailureModel`, which includes the following failure-specific fields:
- *   - `message`: A descriptive message about the failure.
- *   - `reason`: The reason for the failure.
- *   - `errorClass`: The fully qualified class name of the error.
- *   - `errorMessage`: The error message, if available.
- *   - `errorStackTrace`: The stack trace of the error as a single string.
- *
- * Prepared Statement Map:
- * - Defines mappings for failure-specific fields to enable database persistence and retrieval:
- *   - `MESSAGE_COLUMN`: Maps the failure message.
- *   - `REASON_COLUMN`: Maps the failure reason.
- *   - `ERROR_CLASS_COLUMN`: Maps the error class name.
- *   - `ERROR_MESSAGE_COLUMN`: Maps the error message.
- *   - `ERROR_STACKTRACE_COLUMN`: Maps the error stack trace.
- *
- * Notes:
- * - This class is marked with `@ExperimentalTime` to indicate its use of experimental Kotlin time-related APIs.
- * - The `FailureModel` class provides factory methods to create instances directly from exceptions.
+ * @see FailureModel for the entity model
  */
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-class FailureRepository : WithInstanceRepository<FailureModel>() {
+class FailureRepository : CrudRepository<FailureModel>(),
+    WithIdRepository<FailureModel> {
 
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = FAILURE_TABLE
+
+    // Composed operations - initialized lazily to ensure databaseManager is injected
+    val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseManager) }
 
     companion object {
         internal const val PAYLOAD_COLUMN = "payload"
@@ -66,33 +57,79 @@ class FailureRepository : WithInstanceRepository<FailureModel>() {
         internal const val ERROR_STACKTRACE_COLUMN = "error_stacktrace"
     }
 
-    override val prepareStatementMap: Map<String, (PreparedStatement, FailureModel, Int) -> Unit> by lazy {
-        super.prepareStatementMap + mapOf(
-            PAYLOAD_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
+    override val columns: ColumnBindings<FailureModel> by lazy {
+        ColumnBindingsBuilder<FailureModel>().apply {
+            // Composed columns from helper ops
+            idColumn(idHelper)
+
+            column(WORKFLOW_ID_COLUMN) { stmt, entity, idx ->
+                idHelper.set(stmt, idx, entity.instanceMessage?.workflowState?.workflowId?.value)
+            }
+            column(WORKFLOW_NAMESPACE_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.instanceMessage?.workflowNamespace?.toString())
+            }
+            column(WORKFLOW_NAME_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.instanceMessage?.workflowName?.toString())
+            }
+            column(WORKFLOW_VERSION_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.instanceMessage?.workflowVersion?.toString())
+            }
+            column(WORKFLOW_POSITION_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.instanceMessage?.workflowState?.nodePosition?.toString())
+            }
+            column(WORKFLOW_STATE_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.instanceMessage?.workflowState?.toJsonString())
+            }
+
+            // Failure-specific columns
+            column(PAYLOAD_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.payload)
-            },
-            ERROR_REASON_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
+            }
+            column(ERROR_REASON_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.errorReason)
-            },
-            ERROR_CLASS_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
+            }
+            column(ERROR_CLASS_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.errorClass)
-            },
-            ERROR_MESSAGE_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
+            }
+            column(ERROR_MESSAGE_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.errorMessage)
-            },
-            ERROR_STACKTRACE_COLUMN to { stmt: PreparedStatement, entity: FailureModel, idx: Int ->
+            }
+            column(ERROR_STACKTRACE_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.errorStackTrace)
             }
-        )
+        }.build()
     }
 
     override fun createModel(rs: ResultSet) = FailureModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage<WorkflowEvent.WorkflowFailed>(),
+        instanceMessage = rs.getInstanceMessage<WorkflowEvent.WorkflowFailed>(idHelper),
         payload = rs.getString(PAYLOAD_COLUMN),
         errorReason = rs.getString(ERROR_REASON_COLUMN),
         errorClass = rs.getString(ERROR_CLASS_COLUMN),
         errorMessage = rs.getString(ERROR_MESSAGE_COLUMN),
         errorStackTrace = rs.getString(ERROR_STACKTRACE_COLUMN)
     )
+
+    // Delegate WithIdRepository methods
+    override suspend fun findById(id: IDV7, connection: Connection?) =
+        idRepository.findById(id, connection)
+
+    override suspend fun deleteById(id: IDV7, connection: Connection?) =
+        idRepository.deleteById(id, connection)
+
+    /**
+     * Find all failures for a given workflow ID.
+     * Unlike other repositories that have a single entity per workflow, failures can have multiple entries.
+     */
+    suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection? = null): List<FailureModel> =
+        withConnection(connection) { conn ->
+            conn.prepareStatement(findByWorkflowIdSql).use { stmt ->
+                idHelper.set(stmt, 1, workflowId.value)
+                stmt.executeQuery().use { it.toModels() }
+            }
+        }
+
+    private val findByWorkflowIdSql by lazy {
+        "SELECT * FROM $tableName WHERE $WORKFLOW_ID_COLUMN = ?"
+    }
 }

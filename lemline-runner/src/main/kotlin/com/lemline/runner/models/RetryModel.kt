@@ -34,7 +34,7 @@ data class RetryModel(
     /** Stacktrace of the exception that triggered this retry */
     val errorStackTrace: String,
 
-    ) : OutboxModel() {
+    ) : WithId, WithInstanceMessage, WithOutbox, WithCleanup {
 
     override var outboxDelayedUntil: Instant? = outboxScheduledFor
         set(until) {
@@ -53,6 +53,8 @@ data class RetryModel(
     override var outboxCompletedAt: Instant? = null
 
     override var outboxFailedAt: Instant? = null
+
+    override var cleanupAfter: Instant? = null
 
     companion object Companion {
         /**

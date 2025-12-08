@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS lemline_retries
     outbox_error_stacktrace MEDIUMTEXT,
     outbox_completed_at     TIMESTAMP(6),
     outbox_failed_at        TIMESTAMP(6),
+    cleanup_after           TIMESTAMP(6),
     created_at              TIMESTAMP(6) NOT NULL,
     updated_at              TIMESTAMP(6)
 ) ENGINE = InnoDB
@@ -34,5 +35,5 @@ CREATE INDEX idx_lemline_retries_processing
     ON lemline_retries (outbox_completed_at, outbox_failed_at, outbox_delayed_until);
 
 -- Create index for cleanup queries
-CREATE INDEX idx_lemline_retries_completed
-    ON lemline_retries (outbox_completed_at);
+CREATE INDEX idx_lemline_retries_cleanup
+    ON lemline_retries (cleanup_after);

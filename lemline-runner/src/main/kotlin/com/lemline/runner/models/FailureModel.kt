@@ -2,9 +2,7 @@
 package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.states.WorkflowState
-import com.lemline.runner.failures.FailureReasons
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.InstanceMessage
 import kotlin.time.ExperimentalTime
@@ -17,7 +15,7 @@ data class FailureModel(
     override val id: IDV7,
 
     /** Workflow instance state when the failure occurred, null if payload deserialization failed */
-    var instanceMessage: InstanceMessage<out WorkflowState>?,
+    val instanceMessage: InstanceMessage<out WorkflowState>?,
 
     /** Raw message payload if instanceMessage deserialization failed */
     val payload: String?,
@@ -33,13 +31,7 @@ data class FailureModel(
 
     /** Full stack trace of the exception for debugging */
     val errorStackTrace: String,
-) : InstanceModel {
-
-    /** Workflow definition info extracted from the instance message, null if payload deserialization failed */
-    override val workflowInfo: WorkflowInfo? get() = instanceMessage?.workflowInfo
-
-    /** Workflow execution state extracted from the instance message, null if payload deserialization failed */
-    override val workflowState: WorkflowState? get() = instanceMessage?.workflowState
+) : WithId {
 
     companion object {
         /**
@@ -81,18 +73,18 @@ data class FailureModel(
             errorStackTrace = exception.stackTraceToString()
         )
 
-        fun from(outbox: OutboxModel): FailureModel {
-            require(outbox.outboxFailedAt != null) { "The outbox must have FAILED" }
-
-            return FailureModel(
-                id = IDV7.from(outbox.id),
-                instanceMessage = outbox.instanceMessage,
-                payload = null,
-                errorReason = FailureReasons.OUTBOX_FAILURE,
-                errorClass = outbox.outboxErrorClass!!,
-                errorMessage = outbox.outboxErrorMessage,
-                errorStackTrace = outbox.outboxErrorStackTrace!!
-            )
-        }
+//        fun from(outbox: WithOutbox): FailureModel {
+//            require(outbox.outboxFailedAt != null) { "The outbox must have FAILED" }
+//
+//            return FailureModel(
+//                id = IDV7.from(outbox.id),
+//                instanceMessage = outbox.instanceMessage,
+//                payload = null,
+//                errorReason = FailureReasons.OUTBOX_FAILURE,
+//                errorClass = outbox.outboxErrorClass!!,
+//                errorMessage = outbox.outboxErrorMessage,
+//                errorStackTrace = outbox.outboxErrorStackTrace!!
+//            )
+//        }
     }
 }

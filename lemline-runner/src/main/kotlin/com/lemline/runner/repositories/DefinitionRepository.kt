@@ -6,135 +6,110 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.DefinitionModel
+import com.lemline.runner.repositories.helpers.ColumnBindings
+import com.lemline.runner.repositories.helpers.ColumnBindingsBuilder
+import com.lemline.runner.repositories.ops.CrudRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
-import java.sql.PreparedStatement
 import java.sql.ResultSet
 
 const val DEFINITION_TABLE = "lemline_definitions"
 
+/**
+ * Repository for managing workflow definitions.
+ * Uses composition pattern with column bindings.
+ *
+ * @see DefinitionModel for the entity model
+ */
 @ApplicationScoped
-class DefinitionRepository : Repository<DefinitionModel>() {
-
-    companion object {
-        internal const val WORKFLOW_DEFINITION_COLUMN = "definition"
-        internal const val WORKFLOW_NAMESPACE_COLUMN = "namespace"
-        internal const val WORKFLOW_NAME_COLUMN = "name"
-        internal const val WORKFLOW_VERSION_COLUMN = "version"
-    }
+class DefinitionRepository : CrudRepository<DefinitionModel>() {
 
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = DEFINITION_TABLE
 
-    override val prepareStatementMap: Map<String, (PreparedStatement, DefinitionModel, Int) -> Unit> = mapOf(
-        WORKFLOW_DEFINITION_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
-            stmt.setString(idx, entity.definition)
-        },
-        WORKFLOW_NAMESPACE_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
-            stmt.setString(idx, entity.namespace.toString())
-        },
-        WORKFLOW_NAME_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
-            stmt.setString(idx, entity.name.toString())
-        },
-        WORKFLOW_VERSION_COLUMN to { stmt: PreparedStatement, entity: DefinitionModel, idx: Int ->
-            stmt.setString(idx, entity.version.toString())
-        }
-    )
+    companion object {
+        // Local column constants matching lemline_definitions table schema
+        internal const val NAMESPACE_COLUMN = "namespace"
+        internal const val NAME_COLUMN = "name"
+        internal const val VERSION_COLUMN = "version"
+        internal const val DEFINITION_COLUMN = "definition"
+    }
 
-    override val keyColumns: List<String> = listOf(WORKFLOW_NAME_COLUMN, WORKFLOW_VERSION_COLUMN)
+    override val columns: ColumnBindings<DefinitionModel> by lazy {
+        ColumnBindingsBuilder<DefinitionModel>().apply {
+            // Composite key columns (namespace, name, version)
+            key(NAMESPACE_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.namespace.toString())
+            }
+            key(NAME_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.name.toString())
+            }
+            key(VERSION_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.version.toString())
+            }
 
-    /**
-     * Creates a model instance from a ResultSet.
-     * Maps the database columns to the workflow model properties.
-     *
-     * @param rs The ResultSet containing the current row
-     * @return A new workflow model instance populated with data from the ResultSet
-     */
+            // Other columns
+            column(DEFINITION_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.definition)
+            }
+        }.build()
+    }
+
     override fun createModel(rs: ResultSet): DefinitionModel = DefinitionModel(
-        namespace = WorkflowNamespace(rs.getString(WORKFLOW_NAMESPACE_COLUMN)),
-        name = WorkflowName(rs.getString(WORKFLOW_NAME_COLUMN)),
-        version = WorkflowVersion(rs.getString(WORKFLOW_VERSION_COLUMN)),
-        definition = rs.getString(WORKFLOW_DEFINITION_COLUMN)
+        namespace = WorkflowNamespace(rs.getString(NAMESPACE_COLUMN)),
+        name = WorkflowName(rs.getString(NAME_COLUMN)),
+        version = WorkflowVersion(rs.getString(VERSION_COLUMN)),
+        definition = rs.getString(DEFINITION_COLUMN)
     )
 
     /**
-     * Retrieves all workflow definitions within the specified namespace from the database.
-     * This method executes a query to list all records in the namespace and maps the results
-     * to a list of `DefinitionModel` instances.
-     *
-     * @param namespace The namespace to search for workflow definitions.
-     * @param connection An optional database connection. If null, a new connection will be created.
-     * @return A list of `DefinitionModel` instances representing the workflow definitions within the namespace.
+     * Retrieves all workflow definitions within the specified namespace.
      */
     suspend fun listAllInNamespace(
         namespace: WorkflowNamespace,
         connection: Connection? = null
     ): List<DefinitionModel> = withConnection(connection) {
         it.prepareStatement(listAllInNamespaceSql).use { stmt ->
-            stmt.apply {
-                setString(1, namespace.toString())
-            }
-            stmt.executeQuery().use { rs ->
-                buildList {
-                    while (rs.next()) {
-                        add(createModel(rs))
-                    }
-                }
-            }
+            stmt.setString(1, namespace.toString())
+            stmt.executeQuery().use { rs -> rs.toModels() }
         }
     }
 
-    private val listAllInNamespaceSql by lazy { "SELECT * FROM $tableName WHERE namespace = ?" }
+    private val listAllInNamespaceSql by lazy { "SELECT * FROM $tableName WHERE $NAMESPACE_COLUMN = ?" }
 
     /**
-     * Deletes all workflows from the database that belong to the given namespace.
-     * This method is transactional and uses a native SQL query to delete all workflows.
-     * Use with caution as this operation cannot be undone.
-     *
-     * @return The number of workflows deleted
+     * Deletes all workflows belonging to the given namespace.
      */
     suspend fun deleteAllInNamespace(namespace: WorkflowNamespace, connection: Connection? = null): Int =
         withConnection(connection) { conn ->
             conn.prepareStatement(deleteAllInNamespaceSql).use { stmt ->
-                stmt.apply {
-                    setString(1, namespace.toString())
-                }
+                stmt.setString(1, namespace.toString())
                 stmt.executeUpdate()
             }
         }
 
-    private val deleteAllInNamespaceSql by lazy { "DELETE FROM $tableName WHERE namespace = ?" }
+    private val deleteAllInNamespaceSql by lazy { "DELETE FROM $tableName WHERE $NAMESPACE_COLUMN = ?" }
 
     /**
-     * Counts the total number of records in the table for the given namespace.
-     * This method uses a native SQL query to count all records.
-     *
-     * @return The total number of records in the table
+     * Counts records for the given namespace.
      */
     suspend fun countAllInNamespace(namespace: WorkflowNamespace, connection: Connection? = null): Long =
         withConnection(connection) { conn ->
             conn.prepareStatement(countAllInNamespaceSql).use { stmt ->
-                stmt.apply {
-                    setString(1, namespace.toString())
-                }
+                stmt.setString(1, namespace.toString())
                 stmt.executeQuery().use { rs ->
                     if (rs.next()) rs.getLong(1) else 0L
                 }
             }
         }
 
-    private val countAllInNamespaceSql by lazy { "SELECT COUNT(*) FROM $tableName WHERE namespace = ?" }
+    private val countAllInNamespaceSql by lazy { "SELECT COUNT(*) FROM $tableName WHERE $NAMESPACE_COLUMN = ?" }
 
     /**
-     * Finds all versions of a workflow by its namespace and name.
-     * This method retrieves all workflows from the database that match the given name.
-     *
-     * @param name The name of the workflow to search for.
-     * @param connection An optional database connection. If null, a new connection will be created.
-     * @return A list of `WorkflowModel` instances matching the given name.
+     * Finds all versions of a workflow by namespace and name.
      */
     suspend fun listByName(
         namespace: WorkflowNamespace,
@@ -142,29 +117,16 @@ class DefinitionRepository : Repository<DefinitionModel>() {
         connection: Connection? = null
     ): List<DefinitionModel> = withConnection(connection) {
         it.prepareStatement(listByNameSql).use { stmt ->
-            stmt.apply {
-                setString(1, namespace.toString())
-                setString(2, name.toString())
-            }
-            stmt.executeQuery().use { rs ->
-                buildList {
-                    while (rs.next()) {
-                        add(createModel(rs))
-                    }
-                }
-            }
+            stmt.setString(1, namespace.toString())
+            stmt.setString(2, name.toString())
+            stmt.executeQuery().use { rs -> rs.toModels() }
         }
     }
 
-    private val listByNameSql by lazy { "SELECT * FROM $tableName WHERE namespace = ? AND name = ?" }
+    private val listByNameSql by lazy { "SELECT * FROM $tableName WHERE $NAMESPACE_COLUMN = ? AND $NAME_COLUMN = ?" }
 
     /**
-     * Finds a workflow by its name and version.
-     * This method uses a native SQL query to retrieve the workflow from the database.
-     *
-     * @param name The name of the workflow
-     * @param version The version of the workflow
-     * @return The workflow model if found, null otherwise
+     * Finds a workflow by name and version.
      */
     suspend fun findByNameAndVersion(
         namespace: WorkflowNamespace,
@@ -173,16 +135,16 @@ class DefinitionRepository : Repository<DefinitionModel>() {
         connection: Connection? = null
     ): DefinitionModel? = withConnection(connection) {
         it.prepareStatement(findByNameAndVersionSql).use { stmt ->
-            stmt.apply {
-                setString(1, namespace.toString())
-                setString(2, name.toString())
-                setString(3, version.toString())
-            }
+            stmt.setString(1, namespace.toString())
+            stmt.setString(2, name.toString())
+            stmt.setString(3, version.toString())
             stmt.executeQuery().use { rs ->
                 if (rs.next()) createModel(rs) else null
             }
         }
     }
 
-    private val findByNameAndVersionSql by lazy { "SELECT * FROM $tableName WHERE namespace = ? AND name = ? AND version = ? LIMIT 1" }
+    private val findByNameAndVersionSql by lazy {
+        "SELECT * FROM $tableName WHERE $NAMESPACE_COLUMN = ? AND $NAME_COLUMN = ? AND $VERSION_COLUMN = ? LIMIT 1"
+    }
 }

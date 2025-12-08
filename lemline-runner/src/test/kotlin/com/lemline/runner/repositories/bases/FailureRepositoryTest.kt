@@ -8,6 +8,8 @@ import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.random.random
 import com.lemline.runner.repositories.FailureRepository
+import com.lemline.runner.repositories.bases.ops.CrudRepositoryTest
+import com.lemline.runner.repositories.bases.ops.IdRepositoryTest
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -16,6 +18,7 @@ import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 /**
@@ -32,10 +35,33 @@ internal abstract class FailureRepositoryTest {
     @Inject
     protected lateinit var repository: FailureRepository
 
+    // Helper functions for nested tests
+    private fun createEntity() = FailureModel.random()
+    private fun modifyEntity(entity: FailureModel) =
+        entity.copy(payload = "modified-payload-${System.currentTimeMillis()}")
+
     @BeforeEach
     fun clean() = runTest {
         repository.deleteAll()
     }
+
+    // ========== Nested Standard Repository Tests ==========
+
+    @Nested
+    inner class CrudTests : CrudRepositoryTest<FailureModel>(
+        crudRepository = { repository },
+        createEntity = ::createEntity,
+        modifyEntity = ::modifyEntity
+    )
+
+    @Nested
+    inner class IdTests : IdRepositoryTest<FailureModel>(
+        idRepository = { repository },
+        crudRepository = { repository },
+        createEntity = ::createEntity
+    )
+
+    // ========== Custom FailureRepository Tests ==========
 
     @Test
     fun `should insert and retrieve a failure with all fields`() = runTest {
@@ -97,10 +123,10 @@ internal abstract class FailureRepositoryTest {
 
         repository.insert(listOf(f1, f2, f3))
 
-        val found1 = repository.findWithWorkflowId(instance1.workflowId)
+        val found1 = repository.findByWorkflowId(instance1.workflowId)
         found1.map { it.payload }.toSet() shouldBe setOf("m1", "m2")
 
-        val found2 = repository.findWithWorkflowId(instance2.workflowId)
+        val found2 = repository.findByWorkflowId(instance2.workflowId)
         found2.map { it.payload }.toSet() shouldBe setOf("m3")
     }
 

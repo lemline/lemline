@@ -4,11 +4,13 @@ package com.lemline.runner.models
 import com.lemline.common.values.IDV7
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
+import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Database model for individual fork branch execution.
  * One row per branch, tracks branch state and output.
  */
+@OptIn(ExperimentalSerializationApi::class)
 @ExperimentalTime
 data class ForkBranchModel(
     /** Reference to parent fork by ID */
@@ -21,7 +23,7 @@ data class ForkBranchModel(
     var output: String?,
 
     /** Timestamp when the branch completed */
-    var completedAt: Instant?,
+    override var completedAt: Instant?,
 
     /** Timestamp when the branch failed */
     var failedAt: Instant?,
@@ -36,5 +38,8 @@ data class ForkBranchModel(
     var errorMessage: String? = null,
 
     /** Full stack trace of the exception for debugging, null if no failure */
-    var errorStackTrace: String? = null
-)
+    var errorStackTrace: String? = null,
+
+    ) : WithCompletedAt {
+    companion object
+}

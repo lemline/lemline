@@ -23,12 +23,16 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.FailureModel
+import com.lemline.runner.models.ForkBranchModel
+import com.lemline.runner.models.ForkModel
+import com.lemline.runner.models.ListenerEventModel
 import com.lemline.runner.models.ListenerModel
-import com.lemline.runner.models.OutboxModel
+import com.lemline.runner.models.ListenerStrategy
 import com.lemline.runner.models.ParentModel
 import com.lemline.runner.models.RetryModel
 import com.lemline.runner.models.ScheduleModel
 import com.lemline.runner.models.WaitModel
+import com.lemline.runner.models.WithOutbox
 import kotlin.random.Random
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -134,7 +138,7 @@ fun FailureModel.Companion.random() = FailureModel(
     errorStackTrace = String.random(),
 )
 
-fun OutboxModel.randomize(nullableDelayed: Boolean = false) = apply {
+fun WithOutbox.randomize(nullableDelayed: Boolean = false) = apply {
     outboxDelayedUntil = if (nullableDelayed) Instant.nullableRandom() else Instant.random()
     outboxAttemptCount = Int.random()
     outboxErrorClass = String.nullableRandom()
@@ -195,6 +199,32 @@ fun WaitModel.Companion.random() = WaitModel(
     it.outboxErrorMessage = String.nullableRandom()
 }
 
+fun ForkModel.Companion.random() = ForkModel(
+    id = IDV7.random(),
+    instanceMessage = InstanceMessage(
+        workflowInfo = WorkflowInfo.random(),
+        workflowState = WorkflowEvent.ForkStarted.random(),
+    ),
+    position = NodePosition.random().toString(),
+    compete = Random.nextBoolean()
+)
+
+fun ForkBranchModel.Companion.random(forkId: IDV7 = IDV7.random()) = ForkBranchModel(
+    forkId = forkId,
+    name = String.random(),
+    output = null,
+    completedAt = null,
+    failedAt = null
+)
+
+fun ListenerEventModel.Companion.random(listenerId: IDV7 = IDV7.random()) = ListenerEventModel(
+    id = IDV7.random(),
+    listenerId = listenerId,
+    filterIndex = Random.nextInt(0, 10),
+    cloudEventId = String.random(),
+    event = """{"type":"com.example.${String.random()}","data":{"value":${Random.nextInt()}}}"""
+)
+
 fun ListenerModel.Companion.random(): ListenerModel {
     val workflowInfo = WorkflowInfo.random()
     val listenStarted = WorkflowEvent.ListenStarted.random()
@@ -206,6 +236,7 @@ fun ListenerModel.Companion.random(): ListenerModel {
             workflowInfo = workflowInfo,
             workflowState = listenStarted,
         ),
+        strategy = ListenerStrategy.from(config),
         timeoutAt = config.timeoutAt,
         outboxScheduledFor = Instant.random(),
     ).also {

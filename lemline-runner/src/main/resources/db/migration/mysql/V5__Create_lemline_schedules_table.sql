@@ -20,6 +20,7 @@ CREATE TABLE lemline_schedules
     outbox_error_stacktrace MEDIUMTEXT,
     outbox_completed_at     TIMESTAMP(6),
     outbox_failed_at        TIMESTAMP(6),
+    cleanup_after           TIMESTAMP(6),
     created_at              TIMESTAMP(6)      NOT NULL,
     updated_at              TIMESTAMP(6)
 ) ENGINE = InnoDB
@@ -34,5 +35,5 @@ CREATE INDEX idx_lemline_schedules_processing
     ON lemline_schedules (outbox_completed_at, outbox_failed_at, outbox_delayed_until);
 
 -- Create index for cleanup queries
-CREATE INDEX idx_lemline_schedules_completed
-    ON lemline_schedules (outbox_completed_at);
+CREATE INDEX idx_lemline_schedules_cleanup
+    ON lemline_schedules (cleanup_after);

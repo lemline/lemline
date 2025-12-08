@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS lemline_parents
     workflow_position   CLOB                     NOT NULL,
     workflow_state      CLOB                     NOT NULL,
     child_id            UUID                     NOT NULL,
-    outbox_completed_at TIMESTAMP WITH TIME ZONE,
+    completed_at        TIMESTAMP WITH TIME ZONE,
+    cleanup_after       TIMESTAMP WITH TIME ZONE,
     created_at          TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at          TIMESTAMP WITH TIME ZONE
 );
@@ -23,5 +24,5 @@ CREATE UNIQUE INDEX idx_lemline_parents_child_id
     ON lemline_parents (child_id);
 
 -- Create index for cleanup queries
-CREATE INDEX idx_lemline_parents_completed
-    ON lemline_parents (outbox_completed_at);
+CREATE INDEX idx_lemline_parents_cleanup
+    ON lemline_parents (cleanup_after);

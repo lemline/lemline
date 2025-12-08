@@ -3,13 +3,48 @@ package com.lemline.runner.repositories
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
+import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.ListenerModel
+import com.lemline.runner.models.ListenerStrategy
+import com.lemline.runner.repositories.helpers.ColumnBindings
+import com.lemline.runner.repositories.helpers.ColumnBindingsBuilder
+import com.lemline.runner.repositories.ops.CleanerRepository
+import com.lemline.runner.repositories.ops.CrudRepository
+import com.lemline.runner.repositories.ops.ID_COLUMN
+import com.lemline.runner.repositories.ops.IdRepository
+import com.lemline.runner.repositories.ops.InstanceRepository
+import com.lemline.runner.repositories.ops.OUTBOX_COMPLETED_AT_COLUMN
+import com.lemline.runner.repositories.ops.OUTBOX_DELAYED_UNTIL_COLUMN
+import com.lemline.runner.repositories.ops.OUTBOX_ERROR_CLASS_COLUMN
+import com.lemline.runner.repositories.ops.OUTBOX_ERROR_MESSAGE_COLUMN
+import com.lemline.runner.repositories.ops.OUTBOX_ERROR_STACKTRACE_COLUMN
+import com.lemline.runner.repositories.ops.OUTBOX_FAILED_AT_COLUMN
+import com.lemline.runner.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
+import com.lemline.runner.repositories.ops.OutboxRepository
+import com.lemline.runner.repositories.ops.UPDATED_AT_COLUMN
+import com.lemline.runner.repositories.ops.WORKFLOW_ID_COLUMN
+import com.lemline.runner.repositories.ops.WORKFLOW_NAMESPACE_COLUMN
+import com.lemline.runner.repositories.ops.WORKFLOW_NAME_COLUMN
+import com.lemline.runner.repositories.ops.WORKFLOW_POSITION_COLUMN
+import com.lemline.runner.repositories.ops.WORKFLOW_VERSION_COLUMN
+import com.lemline.runner.repositories.ops.cleanupColumns
+import com.lemline.runner.repositories.ops.getInstanceMessage
+import com.lemline.runner.repositories.ops.getInstant
+import com.lemline.runner.repositories.ops.idColumn
+import com.lemline.runner.repositories.ops.instanceColumns
+import com.lemline.runner.repositories.ops.outboxColumns
+import com.lemline.runner.repositories.ops.readCleanupField
+import com.lemline.runner.repositories.ops.readOutboxFields
+import com.lemline.runner.repositories.with.WithCleanerRepository
+import com.lemline.runner.repositories.with.WithIdRepository
+import com.lemline.runner.repositories.with.WithInstanceRepository
+import com.lemline.runner.repositories.with.WithOutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
@@ -19,6 +54,7 @@ import java.sql.Timestamp
 import java.sql.Types
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -33,6 +69,7 @@ const val LISTENER_TABLE = "lemline_listeners"
 /**
  * Key for batch querying listeners by workflow identity and correlation.
  */
+@OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 data class ListenerQueryKey(
     val workflowInfo: WorkflowInfo,
     val position: NodePosition,
@@ -40,20 +77,18 @@ data class ListenerQueryKey(
 ) {
     /**
      * Builds SQL WHERE condition for this key.
-     * Returns condition without correlation check if correlationValuesJson is null.
      */
     fun toSqlCondition(tableAlias: String = ""): String {
         val prefix = if (tableAlias.isNotEmpty()) "$tableAlias." else ""
         return if (correlationValuesJson == null) {
-            "(${prefix}$WORKFLOW_NAMESPACE_COLUMN = ? AND ${prefix}$WORKFLOW_NAME_COLUMN = ? AND ${prefix}$WORKFLOW_VERSION_COLUMN = ? AND ${prefix}$WORKFLOW_POSITION_COLUMN = ?)"
+            "(${prefix}${WORKFLOW_NAMESPACE_COLUMN} = ? AND ${prefix}${WORKFLOW_NAME_COLUMN} = ? AND ${prefix}${WORKFLOW_VERSION_COLUMN} = ? AND ${prefix}${WORKFLOW_POSITION_COLUMN} = ?)"
         } else {
-            "(${prefix}$WORKFLOW_NAMESPACE_COLUMN = ? AND ${prefix}$WORKFLOW_NAME_COLUMN = ? AND ${prefix}$WORKFLOW_VERSION_COLUMN = ? AND ${prefix}$WORKFLOW_POSITION_COLUMN = ? AND (${prefix}$CORRELATION_VALUES_COLUMN IS NULL OR ${prefix}$CORRELATION_VALUES_COLUMN = ?))"
+            "(${prefix}${WORKFLOW_NAMESPACE_COLUMN} = ? AND ${prefix}${WORKFLOW_NAME_COLUMN} = ? AND ${prefix}${WORKFLOW_VERSION_COLUMN} = ? AND ${prefix}${WORKFLOW_POSITION_COLUMN} = ? AND (${prefix}${ListenerRepository.CORRELATION_VALUES_COLUMN} IS NULL OR ${prefix}${ListenerRepository.CORRELATION_VALUES_COLUMN} = ?))"
         }
     }
 
     /**
      * Binds this key's parameters to a PreparedStatement starting at the given index.
-     * Returns the next parameter index after binding.
      */
     fun bindParameters(stmt: PreparedStatement, startIndex: Int): Int {
         var idx = startIndex
@@ -72,12 +107,11 @@ data class ListenerQueryKey(
      */
     fun toSqlConditionWithoutCorrelation(tableAlias: String = ""): String {
         val prefix = if (tableAlias.isNotEmpty()) "$tableAlias." else ""
-        return "(${prefix}$WORKFLOW_NAMESPACE_COLUMN = ? AND ${prefix}$WORKFLOW_NAME_COLUMN = ? AND ${prefix}$WORKFLOW_VERSION_COLUMN = ? AND ${prefix}$WORKFLOW_POSITION_COLUMN = ?)"
+        return "(${prefix}${WORKFLOW_NAMESPACE_COLUMN} = ? AND ${prefix}${WORKFLOW_NAME_COLUMN} = ? AND ${prefix}${WORKFLOW_VERSION_COLUMN} = ? AND ${prefix}${WORKFLOW_POSITION_COLUMN} = ?)"
     }
 
     /**
      * Binds parameters without correlation value (used for termination events).
-     * Returns the next parameter index after binding.
      */
     fun bindParametersWithoutCorrelation(stmt: PreparedStatement, startIndex: Int): Int {
         var idx = startIndex
@@ -89,13 +123,6 @@ data class ListenerQueryKey(
     }
 
     companion object {
-        // Column names used in SQL conditions
-        private const val WORKFLOW_NAMESPACE_COLUMN = "workflow_namespace"
-        private const val WORKFLOW_NAME_COLUMN = "workflow_name"
-        private const val WORKFLOW_VERSION_COLUMN = "workflow_version"
-        private const val WORKFLOW_POSITION_COLUMN = "workflow_position"
-        private const val CORRELATION_VALUES_COLUMN = "correlation_values"
-
         /**
          * Builds combined WHERE clause for multiple keys using OR.
          */
@@ -104,7 +131,6 @@ data class ListenerQueryKey(
 
         /**
          * Binds parameters for all keys to a PreparedStatement.
-         * Returns the next parameter index after binding all keys.
          */
         fun bindAllParameters(keys: List<ListenerQueryKey>, stmt: PreparedStatement, startIndex: Int): Int {
             var idx = startIndex
@@ -118,104 +144,130 @@ data class ListenerQueryKey(
 
 /**
  * Repository for managing listener instances in the outbox pattern.
- *
- * This repository handles:
- * - CRUD operations for listeners
- * - Finding matching listeners for CloudEvent routing
- * - Atomic updates for race-safe event handling
- * - Timeout detection
- *
- * ## Event Storage
- *
- * - **ONE/ANY (without until)**: Single event stored in `event` column
- * - **ALL/ANY+until**: Events accumulated in `lemline_listener_events` table
+ * Uses composition pattern with column bindings.
  *
  * @see ListenerModel for the entity model
- * @see ListenerEventRepository for accumulated events
  */
 @ApplicationScoped
 @ExperimentalSerializationApi
 @ExperimentalTime
-internal class ListenerRepository : OutboxRepository<ListenerModel>() {
-
-    companion object Companion {
-        const val TIMEOUT_AT_COLUMN = "timeout_at"
-        const val CORRELATION_VALUES_COLUMN = "correlation_values"
-        const val EVENT_COLUMN = "event"
-        const val TOTAL_FILTERS_COLUMN = "total_filters"
-        const val UPDATED_AT_COLUMN = "updated_at"
-
-        /** Creates a current timestamp for database operations. */
-        private fun nowTimestamp(): Timestamp = Timestamp.from(Clock.System.now().toJavaInstant())
-    }
+internal class ListenerRepository : CrudRepository<ListenerModel>(),
+    WithIdRepository<ListenerModel>,
+    WithInstanceRepository<ListenerModel>,
+    WithOutboxRepository<ListenerModel>,
+    WithCleanerRepository<ListenerModel> {
 
     @Inject
     override lateinit var databaseManager: DatabaseManager
 
     override val tableName = LISTENER_TABLE
+    
+    // Composed operations - initialized lazily to ensure databaseManager is injected
+    val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseManager) }
+    val instanceRepository by lazy { InstanceRepository(tableName, idHelper, ::createModel, databaseManager) }
+    val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseManager) }
+    val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseManager) }
 
-    override val prepareStatementMap: Map<String, (PreparedStatement, ListenerModel, Int) -> Unit> by lazy {
-        super.prepareStatementMap + mapOf(
-            // Override WORKFLOW_STATE_COLUMN to store the full InstanceMessage (includes workflowInfo)
-            WORKFLOW_STATE_COLUMN to { stmt, entity, idx ->
-                stmt.setString(idx, entity.instanceMessage.toJsonString())
-            },
-            // Override workflow info columns to use ListenerModel's derived fields
-            WORKFLOW_NAMESPACE_COLUMN to { stmt, entity, idx ->
-                stmt.setString(idx, entity.workflowNamespace.toString())
-            },
-            WORKFLOW_NAME_COLUMN to { stmt, entity, idx ->
-                stmt.setString(idx, entity.workflowName.toString())
-            },
-            WORKFLOW_VERSION_COLUMN to { stmt, entity, idx ->
-                stmt.setString(idx, entity.workflowVersion.toString())
-            },
-            TIMEOUT_AT_COLUMN to { stmt, entity, idx ->
+    // Delegate WithIdRepository methods
+    override suspend fun findById(id: IDV7, connection: Connection?) =
+        idRepository.findById(id, connection)
+
+    override suspend fun deleteById(id: IDV7, connection: Connection?) =
+        idRepository.deleteById(id, connection)
+
+    // Delegate WithInstanceRepository methods
+    override suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection?) =
+        instanceRepository.findByWorkflowId(workflowId, connection)
+
+    // Delegate WithOutboxRepository methods
+    override suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection?) =
+        outboxRepository.findEntitiesToProcess(maxAttempts, limit, connection)
+
+    // Delegate WithCleanerRepository methods
+    override suspend fun findEntitiesToDelete(cutoffDate: Instant, batchSize: Int, connection: Connection?) =
+        cleanerRepository.findEntitiesToDelete(cutoffDate, batchSize, connection)
+
+    companion object {
+        const val STRATEGY_COLUMN = "strategy"
+        const val TIMEOUT_AT_COLUMN = "timeout_at"
+        const val CORRELATION_VALUES_COLUMN = "correlation_values"
+        const val EVENT_COLUMN = "event"
+        const val FILTERS_COUNT_COLUMN = "filters_count"
+
+        // Foreach columns
+        const val HAS_FOREACH_COLUMN = "has_foreach"
+        const val FOREACH_CURRENT_INDEX_COLUMN = "foreach_current_index"
+        const val FOREACH_PROCESSING_COLUMN = "foreach_processing"
+        const val LISTENER_COMPLETED_COLUMN = "listener_completed"
+
+        /** Creates a current timestamp for database operations. */
+        private fun nowTimestamp(): Timestamp = Timestamp.from(Clock.System.now().toJavaInstant())
+    }
+
+    override val columns: ColumnBindings<ListenerModel> by lazy {
+        ColumnBindingsBuilder<ListenerModel>().apply {
+            idColumn(idHelper)
+            instanceColumns(idHelper)
+            cleanupColumns()
+            outboxColumns()
+
+            // Listener-specific columns
+            column(STRATEGY_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.strategy.name)
+            }
+            column(TIMEOUT_AT_COLUMN) { stmt, entity, idx ->
                 entity.timeoutAt?.let {
                     stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
                 } ?: stmt.setNull(idx, Types.TIMESTAMP)
-            },
-            CORRELATION_VALUES_COLUMN to { stmt, entity, idx ->
-                stmt.setString(idx, entity.correlationValues)
-            },
-            EVENT_COLUMN to { stmt, entity, idx ->
-                stmt.setString(idx, entity.event)
-            },
-            TOTAL_FILTERS_COLUMN to { stmt, entity, idx ->
-                entity.totalFilters?.let { stmt.setInt(idx, it) } ?: stmt.setNull(idx, Types.INTEGER)
             }
-        )
+            column(CORRELATION_VALUES_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.correlationValues)
+            }
+            column(EVENT_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.event)
+            }
+            column(FILTERS_COUNT_COLUMN) { stmt, entity, idx ->
+                entity.filtersCount?.let { stmt.setInt(idx, it) } ?: stmt.setNull(idx, Types.INTEGER)
+            }
+
+            // Foreach columns
+            column(HAS_FOREACH_COLUMN) { stmt, entity, idx ->
+                stmt.setBoolean(idx, entity.hasForeach)
+            }
+            column(FOREACH_CURRENT_INDEX_COLUMN) { stmt, entity, idx ->
+                stmt.setInt(idx, entity.foreachCurrentIndex)
+            }
+            column(FOREACH_PROCESSING_COLUMN) { stmt, entity, idx ->
+                stmt.setBoolean(idx, entity.foreachProcessing)
+            }
+            column(LISTENER_COMPLETED_COLUMN) { stmt, entity, idx ->
+                stmt.setBoolean(idx, entity.listenerCompleted)
+            }
+        }.build()
     }
 
     override fun createModel(rs: ResultSet): ListenerModel = ListenerModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        // InstanceMessage contains all workflow info (namespace, name, version, id, position)
-        instanceMessage = InstanceMessage.fromJsonString(rs.getString(WORKFLOW_STATE_COLUMN)),
+        instanceMessage = rs.getInstanceMessage<WorkflowEvent.ListenStarted>(idHelper)!!,
+        strategy = ListenerStrategy.valueOf(rs.getString(STRATEGY_COLUMN)),
         timeoutAt = rs.getInstant(TIMEOUT_AT_COLUMN),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN)!!,
     ).apply {
+        // Listener-specific columns
         correlationValues = rs.getString(CORRELATION_VALUES_COLUMN)
         event = rs.getString(EVENT_COLUMN)
-        totalFilters = rs.getInt(TOTAL_FILTERS_COLUMN).takeIf { !rs.wasNull() }
-        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN)
-        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN)
-        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN)
-        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN)
-        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN)
-        outboxCompletedAt = rs.getInstant(OUTBOX_COMPLETED_AT_COLUMN)
-        outboxFailedAt = rs.getInstant(OUTBOX_FAILED_AT_COLUMN)
+        filtersCount = rs.getInt(FILTERS_COUNT_COLUMN).takeIf { !rs.wasNull() }
+        // Foreach columns
+        hasForeach = rs.getBoolean(HAS_FOREACH_COLUMN)
+        foreachCurrentIndex = rs.getInt(FOREACH_CURRENT_INDEX_COLUMN)
+        foreachProcessing = rs.getBoolean(FOREACH_PROCESSING_COLUMN)
+        listenerCompleted = rs.getBoolean(LISTENER_COMPLETED_COLUMN)
     }
+        .readCleanupField(rs)
+        .readOutboxFields(rs)
 
     /**
      * Batch finds active listeners for multiple query keys in a single database round-trip.
-     *
-     * This method builds a dynamic query with OR conditions to fetch listeners matching
-     * any of the provided keys. Each key specifies workflow identity, position, and
-     * optional correlation values.
-     *
-     * @param keys List of query keys to match
-     * @param connection Optional database connection
-     * @return List of matching active listeners (caller must match back to keys)
      */
     suspend fun findByKeys(
         keys: List<ListenerQueryKey>,
@@ -240,10 +292,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Finds listeners that have timed out.
-     *
-     * @param limit Maximum number of listeners to return
-     * @param connection Optional database connection
-     * @return List of timed out listeners
      */
     suspend fun findTimedOut(limit: Int, connection: Connection? = null): List<ListenerModel> =
         withConnection(connection) { conn ->
@@ -268,10 +316,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Marks a listener as completed.
-     *
-     * @param id Listener ID
-     * @param connection Optional database connection
-     * @return Number of rows updated
      */
     suspend fun markCompleted(id: IDV7, connection: Connection? = null): Int =
         withConnection(connection) { conn ->
@@ -295,13 +339,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Marks a listener as failed.
-     *
-     * @param id Listener ID
-     * @param errorClass Exception class name
-     * @param errorMessage Error message
-     * @param errorStackTrace Stack trace
-     * @param connection Optional database connection
-     * @return Number of rows updated
      */
     suspend fun markFailed(
         id: IDV7,
@@ -336,13 +373,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Deletes all listeners for a given workflow definition.
-     * Used when a workflow definition is deleted and all its listeners should be removed.
-     *
-     * @param namespace Workflow namespace
-     * @param name Workflow name
-     * @param version Workflow version
-     * @param connection Optional database connection
-     * @return Number of listeners deleted
      */
     suspend fun deleteByWorkflowDefinition(
         namespace: WorkflowNamespace,
@@ -373,19 +403,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Atomically marks a listener as ready for completion (ONE/ANY without until).
-     *
-     * This method uses a single atomic UPDATE with WHERE guards to prevent race conditions:
-     * - `outbox_delayed_until IS NULL` → still waiting (not yet completing)
-     * - `outbox_completed_at IS NULL` → not yet completed
-     * - `outbox_failed_at IS NULL` → not failed
-     *
-     * If the update succeeds (rows affected > 0), the listener is now ready for completion
-     * and will be picked up by ListenerCompletionOutbox.
-     *
-     * @param id Listener ID
-     * @param event JSON string of the event to store
-     * @param connection Optional database connection
-     * @return Number of rows updated (0 = already completing/completed, 1 = success)
      */
     suspend fun tryMarkReadyForCompletion(
         id: IDV7,
@@ -396,8 +413,8 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
         conn.prepareStatement(markReadyForCompletionSql).use { stmt ->
             stmt.setString(1, event)
-            stmt.setTimestamp(2, now) // outbox_delayed_until = NOW()
-            stmt.setTimestamp(3, now) // updated_at
+            stmt.setTimestamp(2, now)
+            stmt.setTimestamp(3, now)
             setIDV7(stmt, 4, id)
             stmt.executeUpdate()
         }
@@ -418,13 +435,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Marks a listener as ready for completion (for ALL/ANY+until after events table is populated).
-     *
-     * This is called after events have been inserted into lemline_listener_events
-     * and the completion condition is met.
-     *
-     * @param id Listener ID
-     * @param connection Optional database connection
-     * @return Number of rows updated (0 = already completing/completed, 1 = success)
      */
     suspend fun markReadyForCompletionFromEvents(
         id: IDV7,
@@ -433,8 +443,8 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         val now = nowTimestamp()
 
         conn.prepareStatement(markReadyForCompletionFromEventsSql).use { stmt ->
-            stmt.setTimestamp(1, now) // outbox_delayed_until = NOW()
-            stmt.setTimestamp(2, now) // updated_at
+            stmt.setTimestamp(1, now)
+            stmt.setTimestamp(2, now)
             setIDV7(stmt, 3, id)
             stmt.executeUpdate()
         }
@@ -454,15 +464,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Marks listeners as ready for completion by query keys (ONE/ANY strategy).
-     *
-     * This method performs a direct UPDATE without first SELECT, avoiding loading
-     * potentially millions of listeners into memory. It updates all active listeners
-     * matching the provided keys in a single database operation.
-     *
-     * @param keys List of query keys identifying listeners to update
-     * @param event JSON string of the event to store (same for all matched listeners)
-     * @param connection Optional database connection
-     * @return Number of listeners that were successfully marked for completion
      */
     suspend fun markReadyForCompletionByKeys(
         keys: List<ListenerQueryKey>,
@@ -498,13 +499,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Batch marks listeners as ready for completion (for ALL/ANY+until).
-     * Stores the aggregated events JSON in each listener's event column.
-     *
-     * Uses CASE WHEN to set different event values per listener in a single UPDATE.
-     *
-     * @param listenerEvents Map of listener ID to aggregated events JSON
-     * @param connection Optional database connection
-     * @return Number of listeners that were successfully marked for completion
      */
     suspend fun batchMarkReadyForCompletionFromEvents(
         listenerEvents: Map<IDV7, String>,
@@ -516,8 +510,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
             val now = nowTimestamp()
             val ids = listenerEvents.keys.toList()
             val placeholders = ids.joinToString(", ") { "?" }
-
-            // Build CASE WHEN clause for event values
             val caseWhen = ids.joinToString(" ") { "WHEN ? THEN ?" }
 
             val sql = """
@@ -534,17 +526,14 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
             conn.prepareStatement(sql).use { stmt ->
                 var paramIndex = 1
 
-                // CASE WHEN parameters: (id, event) pairs
                 for ((id, event) in listenerEvents) {
                     setIDV7(stmt, paramIndex++, id)
                     stmt.setString(paramIndex++, event)
                 }
 
-                // SET clause parameters
                 stmt.setTimestamp(paramIndex++, now)
                 stmt.setTimestamp(paramIndex++, now)
 
-                // WHERE IN clause parameters
                 for (id in ids) {
                     setIDV7(stmt, paramIndex++, id)
                 }
@@ -556,17 +545,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Marks listeners as terminated by query keys (ANY + until(event) strategy).
-     *
-     * This method performs a direct UPDATE with a subquery to aggregate accumulated events,
-     * avoiding loading potentially millions of listeners into memory. It updates all active
-     * listeners matching the provided keys in a single database operation.
-     *
-     * The accumulated events from lemline_listener_events are aggregated into a JSON array
-     * and stored in the listener's event column.
-     *
-     * @param keys List of query keys identifying listeners to terminate
-     * @param connection Optional database connection
-     * @return Number of listeners that were successfully marked for completion
      */
     suspend fun markTerminatedByKeys(
         keys: List<ListenerQueryKey>,
@@ -576,11 +554,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
         return withConnection(connection) { conn ->
             val now = nowTimestamp()
-
-            // Termination doesn't use correlation - build simpler conditions without correlation check
             val conditions = keys.map { it.toSqlConditionWithoutCorrelation() }
-
-            // Use database-specific JSON aggregation function
             val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
 
             val sql = """
@@ -588,7 +562,7 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
                 SET $EVENT_COLUMN = (
                     SELECT $jsonAgg
                     FROM $LISTENER_EVENT_TABLE e
-                    WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                    WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}
                 ),
                     $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
                     $UPDATED_AT_COLUMN = ?
@@ -612,16 +586,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Marks listeners as completed by query keys (ALL strategy).
-     *
-     * This method performs a direct UPDATE with subquery to:
-     * 1. Aggregate accumulated events from lemline_listener_events into JSON array
-     * 2. Only update listeners where event count >= total_filters
-     *
-     * This avoids loading potentially millions of listeners into memory.
-     *
-     * @param keys List of query keys identifying listeners to check for completion
-     * @param connection Optional database connection
-     * @return Number of listeners that were successfully marked for completion
      */
     suspend fun markAllCompletedByKeys(
         keys: List<ListenerQueryKey>,
@@ -631,8 +595,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
         return withConnection(connection) { conn ->
             val now = nowTimestamp()
-
-            // Use database-specific JSON aggregation function with ORDER BY filter_index
             val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
 
             val sql = """
@@ -640,15 +602,15 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
                 SET $EVENT_COLUMN = (
                     SELECT $jsonAgg
                     FROM $LISTENER_EVENT_TABLE e
-                    WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                    WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}
                 ),
                     $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
                     $UPDATED_AT_COLUMN = ?
                 WHERE $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
                   AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
                   AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND $TOTAL_FILTERS_COLUMN IS NOT NULL
-                  AND (SELECT COUNT(*) FROM $LISTENER_EVENT_TABLE e WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN) >= $TOTAL_FILTERS_COLUMN
+                  AND $FILTERS_COUNT_COLUMN IS NOT NULL
+                  AND (SELECT COUNT(*) FROM $LISTENER_EVENT_TABLE e WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}) >= $FILTERS_COUNT_COLUMN
                   AND (${ListenerQueryKey.buildWhereClause(keys)})
             """.trimIndent()
 
@@ -676,28 +638,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Streams listeners with their accumulated events for expression evaluation.
-     *
-     * Uses cursor-based streaming to process listeners one at a time without loading
-     * all into memory. This is critical for handling cases where millions of listeners
-     * may match.
-     *
-     * The query JOINs listeners with their accumulated events from lemline_listener_events,
-     * aggregating events into a JSON array per listener.
-     *
-     * ## Memory Efficiency
-     *
-     * - Uses small fetchSize to stream results one at a time
-     * - Each emitted ListenerWithEvents is processed and discarded
-     * - Constant memory regardless of total matching listeners
-     *
-     * ## Connection Lifecycle
-     *
-     * The connection is held open for the duration of the flow collection.
-     * Callers should process items quickly to avoid holding connections too long.
-     *
-     * @param keys List of query keys identifying listeners to stream
-     * @param fetchSize Number of rows to fetch per network round-trip (default: 500)
-     * @return Flow of listeners with their accumulated events
      */
     fun streamListenersWithEvents(
         keys: List<ListenerQueryKey>,
@@ -706,29 +646,25 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
         if (keys.isEmpty()) return@flow
 
         databaseManager.datasource.connection.use { conn ->
-            // Disable auto-commit for cursor to work
             conn.autoCommit = false
 
             try {
-                // Use database-specific JSON aggregation
                 val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
 
                 val sql = """
                     SELECT l.*,
                            (SELECT $jsonAgg
                             FROM $LISTENER_EVENT_TABLE e
-                            WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN) as accumulated_events
+                            WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}) as accumulated_events
                     FROM $tableName l
-                    WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                      AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                      AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                    WHERE l.${OUTBOX_DELAYED_UNTIL_COLUMN} IS NULL
+                      AND l.${OUTBOX_COMPLETED_AT_COLUMN} IS NULL
+                      AND l.${OUTBOX_FAILED_AT_COLUMN} IS NULL
                       AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
                 """.trimIndent()
 
                 conn.prepareStatement(sql).use { stmt ->
-                    // Set small fetch size for cursor streaming
                     stmt.fetchSize = fetchSize
-
                     ListenerQueryKey.bindAllParameters(keys, stmt, 1)
 
                     stmt.executeQuery().use { rs ->
@@ -741,7 +677,6 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
                     }
                 }
             } finally {
-                // Reset auto-commit
                 conn.autoCommit = true
             }
         }
@@ -749,23 +684,148 @@ internal class ListenerRepository : OutboxRepository<ListenerModel>() {
 
     /**
      * Parses a JSON array from json_agg/JSON_ARRAYAGG into a List<String>.
-     *
-     * The result from the database is a JSON array of JSON objects:
-     * [{"value":10},{"value":20}]
-     *
-     * This method extracts each element and returns it as a JSON string.
      */
     private fun parseJsonArrayToList(json: String?): List<String> {
         if (json == null || json == "null" || json.isBlank()) {
             return emptyList()
         }
         return try {
-            // Parse as JsonArray, then encode each element back to string
             val array = Json.parseToJsonElement(json).jsonArray
             array.map { Json.encodeToString(it) }
         } catch (e: Exception) {
-            // If parsing fails, return empty list
             emptyList()
         }
+    }
+
+    // ========================================
+    // Foreach Methods
+    // ========================================
+
+    /**
+     * Finds a listener by workflow ID and position.
+     */
+    suspend fun findByWorkflowIdAndPosition(
+        workflowId: WorkflowId,
+        position: NodePosition,
+        connection: Connection? = null
+    ): ListenerModel? = withConnection(connection) { conn ->
+        conn.prepareStatement(findByWorkflowIdAndPositionSql).use { stmt ->
+            stmt.setString(1, workflowId.toString())
+            stmt.setString(2, position.toString())
+            stmt.executeQuery().use { rs ->
+                if (rs.next()) createModel(rs) else null
+            }
+        }
+    }
+
+    private val findByWorkflowIdAndPositionSql by lazy {
+        """
+        SELECT * FROM $tableName
+        WHERE $WORKFLOW_ID_COLUMN = ?
+          AND $WORKFLOW_POSITION_COLUMN = ?
+        """.trimIndent()
+    }
+
+    /**
+     * Sets the foreach_processing flag for a listener.
+     */
+    suspend fun setForeachProcessing(
+        id: IDV7,
+        processing: Boolean,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        conn.prepareStatement(setForeachProcessingSql).use { stmt ->
+            stmt.setBoolean(1, processing)
+            stmt.setTimestamp(2, nowTimestamp())
+            setIDV7(stmt, 3, id)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val setForeachProcessingSql by lazy {
+        """
+        UPDATE $tableName
+        SET $FOREACH_PROCESSING_COLUMN = ?,
+            $UPDATED_AT_COLUMN = ?
+        WHERE $ID_COLUMN = ?
+        """.trimIndent()
+    }
+
+    /**
+     * Increments the foreach_current_index for a listener.
+     */
+    suspend fun incrementForeachIndex(
+        id: IDV7,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        conn.prepareStatement(incrementForeachIndexSql).use { stmt ->
+            stmt.setTimestamp(1, nowTimestamp())
+            setIDV7(stmt, 2, id)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val incrementForeachIndexSql by lazy {
+        """
+        UPDATE $tableName
+        SET $FOREACH_CURRENT_INDEX_COLUMN = $FOREACH_CURRENT_INDEX_COLUMN + 1,
+            $UPDATED_AT_COLUMN = ?
+        WHERE $ID_COLUMN = ?
+        """.trimIndent()
+    }
+
+    /**
+     * Sets the listener_completed flag for a listener.
+     */
+    suspend fun setListenerCompleted(
+        id: IDV7,
+        completed: Boolean,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        conn.prepareStatement(setListenerCompletedSql).use { stmt ->
+            stmt.setBoolean(1, completed)
+            stmt.setTimestamp(2, nowTimestamp())
+            setIDV7(stmt, 3, id)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val setListenerCompletedSql by lazy {
+        """
+        UPDATE $tableName
+        SET $LISTENER_COMPLETED_COLUMN = ?,
+            $UPDATED_AT_COLUMN = ?
+        WHERE $ID_COLUMN = ?
+        """.trimIndent()
+    }
+
+    /**
+     * Marks listener ready for completion with aggregated event output.
+     */
+    suspend fun markReadyForCompletionWithOutput(
+        id: IDV7,
+        event: String,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        val now = nowTimestamp()
+        conn.prepareStatement(markReadyForCompletionWithOutputSql).use { stmt ->
+            stmt.setString(1, event)
+            stmt.setTimestamp(2, now)
+            stmt.setTimestamp(3, now)
+            setIDV7(stmt, 4, id)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val markReadyForCompletionWithOutputSql by lazy {
+        """
+        UPDATE $tableName
+        SET $EVENT_COLUMN = ?,
+            $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+            $UPDATED_AT_COLUMN = ?
+        WHERE $ID_COLUMN = ?
+          AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+        """.trimIndent()
     }
 }

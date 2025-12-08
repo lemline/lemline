@@ -39,13 +39,6 @@ data class ForkModel(
     var output: String? = null,
 
     /**
-     * Timestamp when the fork has completed
-     * if compete=true: timestamp of the first branch completion
-     * if compete=false: timestamp of the last branch completion
-     */
-    override var outboxCompletedAt: Instant? = null,
-
-    /**
      * Timestamp when the fork has failed
      * if compete=true: timestamp of the last branch failure
      * if compete=false: timestamp of the first branch failure
@@ -64,4 +57,14 @@ data class ForkModel(
     /** Full stack trace of the exception for debugging, null if no failure */
     var errorStackTrace: String? = null
 
-) : AwaitingCompletionModel()
+) : WithId, WithInstanceMessage, WithCompletedAt, WithCleanup {
+
+    /** Timestamp when the fork completed successfully */
+    override var completedAt: Instant? = null
+
+
+    /** Timestamp after which this entity can be deleted, set when the fork completes or fails */
+    override var cleanupAfter: Instant? = null
+
+    companion object
+}

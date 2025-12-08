@@ -13,35 +13,50 @@ CREATE TABLE lemline_listeners
     workflow_version        VARCHAR(255) COLLATE "C" NOT NULL,
 
     -- Workflow instance information
-    workflow_id             UUID           NOT NULL,
-    workflow_position       TEXT           NOT NULL,
-    workflow_state          TEXT           NOT NULL,
+    workflow_id             UUID                     NOT NULL,
+    workflow_position       TEXT                     NOT NULL,
+    workflow_state          TEXT                     NOT NULL,
 
     -- Correlation state (for Mode 2: first-sets-baseline)
-    correlation_values      TEXT,                    -- JSON map of correlation key -> baseline value
+    correlation_values      TEXT, -- JSON map of correlation key -> baseline value
 
     -- Single event storage (for ONE and ANY without until)
-    event                   TEXT,                    -- JSON CloudEvent data
+    event                   TEXT, -- JSON CloudEvent data
 
-    -- ALL strategy: total number of filters that must match before completion
-    total_filters           INT,
+    -- Listen strategy: ONE, ANY, ANY_UNTIL, ALL
+    strategy                VARCHAR(20)              NOT NULL,
+
+    -- total number of filters
+    filters_count           INT,
 
     -- Timeout handling
     timeout_at              TIMESTAMPTZ(6),
 
+    -- Foreach configuration (extracted from workflow definition for efficiency)
+    has_foreach             BOOLEAN                  NOT NULL DEFAULT FALSE,
+
+    -- Foreach processing state
+    foreach_current_index   INT                      NOT NULL DEFAULT 0,
+    foreach_processing      BOOLEAN                  NOT NULL DEFAULT FALSE,
+
+    -- Completion flag (set by CloudEventHandler when completion criteria met)
+    -- This decouples completion detection from completion handling
+    listener_completed      BOOLEAN                  NOT NULL DEFAULT FALSE,
+
     -- Outbox fields
     -- outbox_delayed_until: NULL = waiting, NOT NULL = ready for processing
-    outbox_scheduled_for    TIMESTAMPTZ(6) NOT NULL,
+    outbox_scheduled_for    TIMESTAMPTZ(6)           NOT NULL,
     outbox_delayed_until    TIMESTAMPTZ(6),
-    outbox_attempt_count    INTEGER        NOT NULL DEFAULT 0,
+    outbox_attempt_count    INTEGER                  NOT NULL DEFAULT 0,
     outbox_error_class      TEXT,
     outbox_error_message    TEXT,
     outbox_error_stacktrace TEXT,
     outbox_completed_at     TIMESTAMPTZ(6),
     outbox_failed_at        TIMESTAMPTZ(6),
+    cleanup_after           TIMESTAMPTZ(6),
 
     -- Timestamps
-    created_at              TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at              TIMESTAMPTZ(6)           NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at              TIMESTAMPTZ(6)
 );
 
@@ -72,43 +87,9 @@ CREATE INDEX idx_lemline_listeners_processing
     WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
 
 -- Index for cleanup queries
-CREATE INDEX idx_lemline_listeners_completed
-    ON lemline_listeners (outbox_completed_at)
-    WHERE outbox_completed_at IS NOT NULL;
-
--- Listener events table (for ALL and ANY+until strategies)
--- Stores accumulated CloudEvents for listeners that need multiple events
-CREATE TABLE lemline_listener_events
-(
-    id              UUID PRIMARY KEY,
-
-    -- Reference to parent listener (CASCADE delete for automatic cleanup)
-    listener_id     UUID         NOT NULL REFERENCES lemline_listeners (id) ON DELETE CASCADE,
-
-    -- Filter index: explicit for ALL strategy (0, 1, 2...), NULL for ANY+until
-    filter_index    INT,
-
-    -- CloudEvent ID for idempotency (prevents duplicate events on retry)
-    -- Used for ANY+until strategy to ensure same CloudEvent isn't added twice
-    cloudevent_id   VARCHAR(255),
-
-    -- CloudEvent data
-    event           TEXT         NOT NULL,
-
-    -- Timestamps
-    created_at      TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMPTZ(6),
-
-    -- Ensure one event per filter index per listener (protects ALL strategy)
-    UNIQUE (listener_id, filter_index),
-
-    -- Ensure same CloudEvent isn't added twice for ANY+until strategy
-    UNIQUE (listener_id, cloudevent_id)
-);
-
--- Index for efficient lookup by listener_id
-CREATE INDEX idx_lemline_listener_events_listener_id
-    ON lemline_listener_events (listener_id);
+CREATE INDEX idx_lemline_listeners_cleanup
+    ON lemline_listeners (cleanup_after)
+    WHERE cleanup_after IS NOT NULL;
 
 -- Comments for documentation
 COMMENT ON TABLE lemline_listeners IS 'Active listener instances waiting for CloudEvents';
@@ -117,7 +98,8 @@ COMMENT ON COLUMN lemline_listeners.workflow_name IS 'Workflow name for locating
 COMMENT ON COLUMN lemline_listeners.workflow_version IS 'Workflow version for locating listen task in cached workflow definition';
 COMMENT ON COLUMN lemline_listeners.correlation_values IS 'Baseline correlation values set by first matching event (Mode 2)';
 COMMENT ON COLUMN lemline_listeners.event IS 'Single matched event for ONE/ANY strategies (JSON)';
-
-COMMENT ON TABLE lemline_listener_events IS 'Accumulated CloudEvents for ALL and ANY+until strategies';
-COMMENT ON COLUMN lemline_listener_events.filter_index IS 'Filter index that matched (explicit for ALL, auto-generated for ANY+until)';
-COMMENT ON COLUMN lemline_listener_events.event IS 'CloudEvent data (JSON)';
+COMMENT ON COLUMN lemline_listeners.strategy IS 'Listen strategy: ONE, ANY, ANY_UNTIL, ALL';
+COMMENT ON COLUMN lemline_listeners.has_foreach IS 'TRUE if listener has foreach.do configured';
+COMMENT ON COLUMN lemline_listeners.foreach_current_index IS 'Current foreach iteration index (0-based)';
+COMMENT ON COLUMN lemline_listeners.foreach_processing IS 'TRUE when foreach.do is executing for an event';
+COMMENT ON COLUMN lemline_listeners.listener_completed IS 'TRUE when completion criteria met (set by CloudEventHandler)';

@@ -17,12 +17,19 @@ import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.models.ListenerModel
+import com.lemline.runner.models.ListenerStrategy
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
+import com.lemline.runner.repositories.bases.ops.CleanerRepositoryTest
+import com.lemline.runner.repositories.bases.ops.CrudRepositoryTest
+import com.lemline.runner.repositories.bases.ops.IdRepositoryTest
+import com.lemline.runner.repositories.bases.ops.InstanceRepositoryTest
+import com.lemline.runner.repositories.bases.ops.OutboxRepositoryTest
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactlyInAnyOrder
 import io.kotest.matchers.collections.shouldHaveSize
@@ -37,23 +44,25 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonNull
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 /**
  * Abstract base class for testing ListenerRepository implementations.
- *
- * Extends OutboxRepositoryTest to inherit all standard outbox tests,
- * and adds listener-specific tests.
+ * Uses composition pattern with @Nested inner classes to run all test suites.
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerModel>() {
+internal abstract class ListenerRepositoryTest {
 
     @Inject
-    override lateinit var repository: ListenerRepository
+    lateinit var repository: ListenerRepository
 
     @Inject
     lateinit var definitionRepository: DefinitionRepository
+
+    @Inject
+    lateinit var databaseManager: DatabaseManager
 
     // Fixed test values for workflow identification
     private val testNamespace = WorkflowNamespace("test-namespace")
@@ -94,7 +103,8 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         }
     }
 
-    override fun createRandomEntity(): ListenerModel {
+    // Shared entity factory and modifier
+    private fun createEntity(): ListenerModel {
         val now = Clock.System.now()
         val workflowId = WorkflowId(IDV7.random())
 
@@ -105,7 +115,6 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         )
 
         // Create a proper NodeStack with the listen task position
-        // The nodeStack.lastPosition must equal testNodePosition for correct serialization
         val nodeStack = NodeStack(
             listOf(
                 NodePosition.root to RootState(
@@ -118,15 +127,17 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
             )
         )
 
+        val config = ListenConfig(
+            strategy = ListenStrategy.ONE,
+            filters = listOf(EventFilter(type = "com.example.Event")),
+            readAs = ListenAndReadAs.DATA,
+            timeoutAt = null
+        )
+
         val listenStarted = WorkflowEvent.ListenStarted(
             nodeStack = nodeStack,
             rawOutput = JsonNull,
-            config = ListenConfig(
-                strategy = ListenStrategy.ONE,
-                filters = listOf(EventFilter(type = "com.example.Event")),
-                readAs = ListenAndReadAs.DATA,
-                timeoutAt = null
-            )
+            config = config
         )
 
         return ListenerModel(
@@ -135,6 +146,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
                 workflowInfo = workflowInfo,
                 workflowState = listenStarted
             ),
+            strategy = ListenerStrategy.from(config),
             timeoutAt = null,
             outboxScheduledFor = now
         ).also {
@@ -143,15 +155,54 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         }
     }
 
-    override fun changeDelayedUntil(model: ListenerModel) =
-        model.copy().apply { outboxDelayedUntil = Instant.random() }
+    private fun modifyEntity(entity: ListenerModel) = entity.copy().apply { outboxDelayedUntil = Instant.random() }
+
+    @Nested
+    inner class CrudTests : CrudRepositoryTest<ListenerModel>(
+        crudRepository = { repository },
+        createEntity = ::createEntity,
+        modifyEntity = ::modifyEntity
+    )
+
+    @Nested
+    inner class IdTests : IdRepositoryTest<ListenerModel>(
+        idRepository = { repository },
+        crudRepository = { repository },
+        createEntity = ::createEntity
+    )
+
+    @Nested
+    inner class OutboxTests : OutboxRepositoryTest<ListenerModel>(
+        outboxRepository = { repository },
+        crudRepository = { repository },
+        createEntity = ::createEntity,
+        getEntityKey = { it.id },
+        databaseManager = { databaseManager }
+    )
+
+    @Nested
+    inner class CleanerTests : CleanerRepositoryTest<ListenerModel>(
+        cleanerRepository = { repository },
+        crudRepository = { repository },
+        createEntity = ::createEntity,
+        getEntityKey = { it.id },
+        databaseManager = { databaseManager }
+    )
+
+    @Nested
+    inner class InstanceTests : InstanceRepositoryTest<ListenerModel>(
+        instanceRepository = { repository },
+        crudRepository = { repository },
+        createEntity = ::createEntity,
+        getWorkflowId = { it.instanceMessage.workflowId }
+    )
 
     // ========== findByKeys tests ==========
 
     @Test
     fun `findByKeys should return empty list for empty keys`() = runTest {
         // Given - insert a listener
-        val listener = createRandomEntity()
+        val listener = createEntity()
         repository.insert(listener)
 
         // When
@@ -164,7 +215,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Test
     fun `findByKeys should find listener by single key without correlation`() = runTest {
         // Given
-        val listener = createRandomEntity()
+        val listener = createEntity()
         repository.insert(listener)
 
         val key = ListenerQueryKey(
@@ -184,7 +235,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Test
     fun `findByKeys should find listener with null correlation when key has correlation value`() = runTest {
         // Given - listener with null correlation values (Mode 2: first-sets-baseline)
-        val listener = createRandomEntity().apply {
+        val listener = createEntity().apply {
             correlationValues = null
         }
         repository.insert(listener)
@@ -207,7 +258,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     fun `findByKeys should find listener with matching correlation value`() = runTest {
         // Given
         val correlationJson = """{"orderId":"123"}"""
-        val listener = createRandomEntity().apply {
+        val listener = createEntity().apply {
             correlationValues = correlationJson
         }
         repository.insert(listener)
@@ -229,7 +280,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Test
     fun `findByKeys should not find listener with non-matching correlation value`() = runTest {
         // Given
-        val listener = createRandomEntity().apply {
+        val listener = createEntity().apply {
             correlationValues = """{"orderId":"123"}"""
         }
         repository.insert(listener)
@@ -281,7 +332,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Test
     fun `findByKeys should find listener matching any of multiple keys`() = runTest {
         // Given - one listener that matches the first key
-        val listener = createRandomEntity()
+        val listener = createEntity()
         repository.insert(listener)
 
         val keys = listOf(
@@ -309,10 +360,10 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     fun `findByKeys should handle mixed correlation keys`() = runTest {
         // Given - two listeners: one with null correlation, one with specific correlation
         val correlationJson = """{"orderId":"123"}"""
-        val listener1 = createRandomEntity().apply {
+        val listener1 = createEntity().apply {
             correlationValues = null
         }
-        val listener2 = createRandomEntity().apply {
+        val listener2 = createEntity().apply {
             correlationValues = correlationJson
         }
         repository.insert(listOf(listener1, listener2))
@@ -336,7 +387,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Test
     fun `findByKeys should not find completed listeners`() = runTest {
         // Given - a completed listener
-        val listener = createRandomEntity().apply {
+        val listener = createEntity().apply {
             outboxCompletedAt = Clock.System.now()
         }
         repository.insert(listener)
@@ -357,7 +408,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Test
     fun `findByKeys should not find failed listeners`() = runTest {
         // Given - a failed listener
-        val listener = createRandomEntity().apply {
+        val listener = createEntity().apply {
             outboxFailedAt = Clock.System.now()
         }
         repository.insert(listener)
@@ -378,7 +429,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Test
     fun `findByKeys should return empty when no matching listeners exist`() = runTest {
         // Given - a listener with different workflow info
-        val listener = createRandomEntity()
+        val listener = createEntity()
         repository.insert(listener)
 
         val key = ListenerQueryKey(
@@ -397,8 +448,8 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Test
     fun `findByKeys should find all listeners matching a single key`() = runTest {
         // Given - multiple active listeners for the same workflow position
-        val listener1 = createRandomEntity()
-        val listener2 = createRandomEntity()
+        val listener1 = createEntity()
+        val listener2 = createEntity()
         repository.insert(listOf(listener1, listener2))
 
         val key = ListenerQueryKey(
@@ -418,7 +469,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Test
     fun `findByKeys with null correlation should find listener that has correlation value`() = runTest {
         // Given - listener with specific correlation values
-        val listener = createRandomEntity().apply {
+        val listener = createEntity().apply {
             correlationValues = """{"orderId":"123"}"""
         }
         repository.insert(listener)
@@ -444,13 +495,13 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
         val correlationA = """{"orderId":"A"}"""
         val correlationB = """{"orderId":"B"}"""
 
-        val listenerNull = createRandomEntity().apply {
+        val listenerNull = createEntity().apply {
             correlationValues = null  // Mode 2: awaiting first event
         }
-        val listenerA = createRandomEntity().apply {
+        val listenerA = createEntity().apply {
             correlationValues = correlationA
         }
-        val listenerB = createRandomEntity().apply {
+        val listenerB = createEntity().apply {
             correlationValues = correlationB
         }
         repository.insert(listOf(listenerNull, listenerA, listenerB))
@@ -509,11 +560,11 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
     @Test
     fun `findByKeys should only find active listeners among mixed states`() = runTest {
         // Given - one active, one completed, one failed listener
-        val active = createRandomEntity()
-        val completed = createRandomEntity().apply {
+        val active = createEntity()
+        val completed = createEntity().apply {
             outboxCompletedAt = Clock.System.now()
         }
-        val failed = createRandomEntity().apply {
+        val failed = createEntity().apply {
             outboxFailedAt = Clock.System.now()
         }
         repository.insert(listOf(active, completed, failed))
@@ -556,15 +607,17 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
             )
         )
 
+        val config = ListenConfig(
+            strategy = ListenStrategy.ONE,
+            filters = listOf(EventFilter(type = "com.example.Event")),
+            readAs = ListenAndReadAs.DATA,
+            timeoutAt = null
+        )
+
         val listenStarted = WorkflowEvent.ListenStarted(
             nodeStack = nodeStack,
             rawOutput = JsonNull,
-            config = ListenConfig(
-                strategy = ListenStrategy.ONE,
-                filters = listOf(EventFilter(type = "com.example.Event")),
-                readAs = ListenAndReadAs.DATA,
-                timeoutAt = null
-            )
+            config = config
         )
 
         return ListenerModel(
@@ -573,6 +626,7 @@ internal abstract class ListenerRepositoryTest : OutboxRepositoryTest<ListenerMo
                 workflowInfo = workflowInfo,
                 workflowState = listenStarted
             ),
+            strategy = ListenerStrategy.from(config),
             timeoutAt = null,
             outboxScheduledFor = now
         ).also {

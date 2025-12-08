@@ -4,40 +4,60 @@ package com.lemline.runner.repositories
 import com.lemline.common.values.IDV7
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.ListenerEventModel
+import com.lemline.runner.repositories.helpers.ColumnBindings
+import com.lemline.runner.repositories.helpers.ColumnBindingsBuilder
+import com.lemline.runner.repositories.ops.CREATED_AT_COLUMN
+import com.lemline.runner.repositories.ops.CrudRepository
+import com.lemline.runner.repositories.ops.IdRepository
+import com.lemline.runner.repositories.ops.OutboxRepository
+import com.lemline.runner.repositories.ops.UPDATED_AT_COLUMN
+import com.lemline.runner.repositories.ops.getInstant
+import com.lemline.runner.repositories.with.WithIdRepository
+import com.lemline.runner.repositories.with.WithOutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
-import java.sql.PreparedStatement
 import java.sql.ResultSet
+import java.sql.Timestamp
 import java.sql.Types
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.toJavaInstant
 import kotlinx.serialization.ExperimentalSerializationApi
 
 const val LISTENER_EVENT_TABLE = "lemline_listener_events"
 
 /**
  * Repository for managing listener event accumulation.
- *
- * This table stores CloudEvents for listeners using ALL or ANY+until strategies
- * that need to accumulate multiple events before completion.
- *
- * ## Key Operations
- *
- * - **Batch insert**: Insert events for multiple listeners in one request
- * - **Count by listener**: Check if ALL strategy is complete
- * - **Get events**: Retrieve accumulated events at completion time
- *
- * ## Idempotency
- *
- * Inserts use ON CONFLICT DO NOTHING / INSERT IGNORE to handle duplicate events gracefully.
- * The primary key is derived deterministically from listener ID and filter index or event ID.
+ * Uses composition pattern with column bindings.
  *
  * @see ListenerEventModel for the entity model
  */
 @ApplicationScoped
 @ExperimentalSerializationApi
 @ExperimentalTime
-internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() {
+internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
+    WithIdRepository<ListenerEventModel>,
+    WithOutboxRepository<ListenerEventModel> {
+
+    @Inject
+    override lateinit var databaseManager: DatabaseManager
+
+    // Composed operations - initialized lazily to ensure databaseManager is injected
+    val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseManager) }
+    val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseManager) }
+
+    // Delegate WithIdRepository methods
+    override suspend fun findById(id: IDV7, connection: Connection?) =
+        idRepository.findById(id, connection)
+
+    override suspend fun deleteById(id: IDV7, connection: Connection?) =
+        idRepository.deleteById(id, connection)
+
+
+    // Delegate WithOutboxRepository methods
+    override suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection?) =
+        outboxRepository.findEntitiesToProcess(maxAttempts, limit, connection)
 
     companion object {
         const val ID_COLUMN = "id"
@@ -46,28 +66,80 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
         const val CLOUDEVENT_ID_COLUMN = "cloudevent_id"
         const val EVENT_COLUMN = "event"
 
-        // Outbox status columns from listener table for INSERT...SELECT WHERE clause
-        private const val OUTBOX_DELAYED_UNTIL_COLUMN = "outbox_delayed_until"
-        private const val OUTBOX_COMPLETED_AT_COLUMN = "outbox_completed_at"
-        private const val OUTBOX_FAILED_AT_COLUMN = "outbox_failed_at"
+        // Foreach outbox columns
+        const val OUTBOX_SCHEDULED_FOR_COLUMN = "outbox_scheduled_for"
+        const val OUTBOX_DELAYED_UNTIL_COLUMN = "outbox_delayed_until"
+        const val OUTBOX_ATTEMPT_COUNT_COLUMN = "outbox_attempt_count"
+        const val OUTBOX_ERROR_CLASS_COLUMN = "outbox_error_class"
+        const val OUTBOX_ERROR_MESSAGE_COLUMN = "outbox_error_message"
+        const val OUTBOX_ERROR_STACKTRACE_COLUMN = "outbox_error_stacktrace"
+        const val OUTBOX_COMPLETED_AT_COLUMN = "outbox_completed_at"
+        const val OUTBOX_FAILED_AT_COLUMN = "outbox_failed_at"
+
+        // Foreach iteration tracking columns
+        const val ITERATION_INDEX_COLUMN = "iteration_index"
+        const val ITERATION_OUTPUT_COLUMN = "iteration_output"
     }
-
-    @Inject
-    override lateinit var databaseManager: DatabaseManager
-
+    
     override val tableName = LISTENER_EVENT_TABLE
 
-    override val prepareStatementMap: Map<String, (PreparedStatement, ListenerEventModel, Int) -> Unit> by lazy {
-        super.prepareStatementMap + mapOf(
-            LISTENER_ID_COLUMN to { stmt, entity, idx -> setIDV7(stmt, idx, entity.listenerId) },
-            FILTER_INDEX_COLUMN to { stmt, entity, idx ->
+    override val columns: ColumnBindings<ListenerEventModel> by lazy {
+        ColumnBindingsBuilder<ListenerEventModel>().apply {
+            // Key column
+            key(ID_COLUMN) { stmt, entity, idx -> setIDV7(stmt, idx, entity.id) }
+
+            // Other columns
+            column(LISTENER_ID_COLUMN) { stmt, entity, idx -> setIDV7(stmt, idx, entity.listenerId) }
+            column(FILTER_INDEX_COLUMN) { stmt, entity, idx ->
                 entity.filterIndex?.let { stmt.setInt(idx, it) } ?: stmt.setNull(idx, Types.INTEGER)
-            },
-            CLOUDEVENT_ID_COLUMN to { stmt, entity, idx ->
+            }
+            column(CLOUDEVENT_ID_COLUMN) { stmt, entity, idx ->
                 entity.cloudEventId?.let { stmt.setString(idx, it) } ?: stmt.setNull(idx, Types.VARCHAR)
-            },
-            EVENT_COLUMN to { stmt, entity, idx -> stmt.setString(idx, entity.event) }
-        )
+            }
+            column(EVENT_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.event) }
+
+            // Foreach outbox columns
+            column(OUTBOX_SCHEDULED_FOR_COLUMN) { stmt, entity, idx ->
+                entity.outboxScheduledFor?.let {
+                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+                } ?: stmt.setNull(idx, Types.TIMESTAMP)
+            }
+            column(OUTBOX_DELAYED_UNTIL_COLUMN) { stmt, entity, idx ->
+                entity.outboxDelayedUntil?.let {
+                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+                } ?: stmt.setNull(idx, Types.TIMESTAMP)
+            }
+            column(OUTBOX_ATTEMPT_COUNT_COLUMN) { stmt, entity, idx ->
+                stmt.setInt(idx, entity.outboxAttemptCount)
+            }
+            column(OUTBOX_ERROR_CLASS_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.outboxErrorClass)
+            }
+            column(OUTBOX_ERROR_MESSAGE_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.outboxErrorMessage)
+            }
+            column(OUTBOX_ERROR_STACKTRACE_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.outboxErrorStackTrace)
+            }
+            column(OUTBOX_COMPLETED_AT_COLUMN) { stmt, entity, idx ->
+                entity.outboxCompletedAt?.let {
+                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+                } ?: stmt.setNull(idx, Types.TIMESTAMP)
+            }
+            column(OUTBOX_FAILED_AT_COLUMN) { stmt, entity, idx ->
+                entity.outboxFailedAt?.let {
+                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+                } ?: stmt.setNull(idx, Types.TIMESTAMP)
+            }
+
+            // Foreach iteration tracking
+            column(ITERATION_INDEX_COLUMN) { stmt, entity, idx ->
+                entity.iterationIndex?.let { stmt.setInt(idx, it) } ?: stmt.setNull(idx, Types.INTEGER)
+            }
+            column(ITERATION_OUTPUT_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.iterationOutput)
+            }
+        }.build()
     }
 
     override fun createModel(rs: ResultSet): ListenerEventModel = ListenerEventModel(
@@ -76,16 +148,23 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
         filterIndex = rs.getInt(FILTER_INDEX_COLUMN).takeIf { !rs.wasNull() },
         cloudEventId = rs.getString(CLOUDEVENT_ID_COLUMN),
         event = rs.getString(EVENT_COLUMN),
-        createdAt = rs.getInstant(CREATED_AT_COLUMN)
+        createdAt = rs.getInstant(CREATED_AT_COLUMN),
+        // Foreach outbox columns
+        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
+        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN),
+        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN),
+        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN),
+        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN),
+        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN),
+        outboxCompletedAt = rs.getInstant(OUTBOX_COMPLETED_AT_COLUMN),
+        outboxFailedAt = rs.getInstant(OUTBOX_FAILED_AT_COLUMN),
+        // Foreach iteration tracking
+        iterationIndex = rs.getInt(ITERATION_INDEX_COLUMN).takeIf { !rs.wasNull() },
+        iterationOutput = rs.getString(ITERATION_OUTPUT_COLUMN)
     )
 
     /**
      * Finds all events for a listener, ordered by filter index.
-     * Used at completion time to build the events array for the resume command.
-     *
-     * @param listenerId The listener ID
-     * @param connection Optional database connection
-     * @return List of events ordered by filter_index
      */
     suspend fun findByListenerId(
         listenerId: IDV7,
@@ -93,13 +172,7 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
     ): List<ListenerEventModel> = withConnection(connection) { conn ->
         conn.prepareStatement(findByListenerIdSql).use { stmt ->
             setIDV7(stmt, 1, listenerId)
-            stmt.executeQuery().use { rs ->
-                buildList {
-                    while (rs.next()) {
-                        add(createModel(rs))
-                    }
-                }
-            }
+            stmt.executeQuery().use { rs -> rs.toModels() }
         }
     }
 
@@ -109,13 +182,6 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
 
     /**
      * Batch finds all events for multiple listeners in a single query.
-     * Returns a map of listener_id to list of events (ordered by filter_index).
-     *
-     * This is more efficient than calling [findByListenerId] multiple times.
-     *
-     * @param listenerIds List of listener IDs to fetch events for
-     * @param connection Optional database connection
-     * @return Map of listener ID to list of events
      */
     suspend fun batchFindByListenerIds(
         listenerIds: List<IDV7>,
@@ -149,13 +215,6 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
 
     /**
      * Batch counts events for multiple listeners in a single query.
-     * Returns a map of listener_id to count.
-     *
-     * This minimizes database round-trips when checking completion for multiple listeners.
-     *
-     * @param listenerIds List of listener IDs to count
-     * @param connection Optional database connection
-     * @return Map of listener ID to event count
      */
     suspend fun batchCountByListenerIds(
         listenerIds: List<IDV7>,
@@ -191,10 +250,6 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
 
     /**
      * Counts events for a single listener.
-     *
-     * @param listenerId The listener ID
-     * @param connection Optional database connection
-     * @return Number of events for the listener
      */
     suspend fun countByListenerId(
         listenerId: IDV7,
@@ -214,10 +269,6 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
 
     /**
      * Deletes all events for a listener.
-     *
-     * @param listenerId The listener ID
-     * @param connection Optional database connection
-     * @return Number of deleted events
      */
     suspend fun deleteByListenerId(
         listenerId: IDV7,
@@ -235,19 +286,6 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
 
     /**
      * Bulk inserts events for all listeners matching the given query keys.
-     *
-     * Uses INSERT...SELECT to insert events without loading listeners into memory.
-     * This is critical for handling cases where millions of listeners may match.
-     *
-     * The cloudevent_id column ensures idempotency:
-     * - If the same CloudEvent is processed twice (retry), duplicates are ignored
-     * - The UNIQUE(listener_id, cloudevent_id) constraint prevents duplicate events
-     *
-     * @param keys List of query keys identifying listeners to receive the event
-     * @param cloudEventId The CloudEvent's ID for idempotency
-     * @param eventJson The CloudEvent data as JSON string
-     * @param connection Optional database connection
-     * @return Number of events inserted (may be less than matching listeners if duplicates skipped)
      */
     suspend fun bulkInsertEventsForKeys(
         keys: List<ListenerQueryKey>,
@@ -261,9 +299,9 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
             val selectSql = """
                 SELECT ${databaseManager.randomUuid()}, l.id, NULL, ?, ?, CURRENT_TIMESTAMP
                 FROM $LISTENER_TABLE l
-                WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                WHERE l.outbox_delayed_until IS NULL
+                  AND l.outbox_completed_at IS NULL
+                  AND l.outbox_failed_at IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
             """.trimIndent()
 
@@ -275,10 +313,8 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
 
             conn.prepareStatement(sql).use { stmt ->
                 var idx = 1
-                // Bind cloudevent_id and event JSON for the SELECT
                 stmt.setString(idx++, cloudEventId)
                 stmt.setString(idx++, eventJson)
-                // Bind key conditions
                 ListenerQueryKey.bindAllParameters(keys, stmt, idx)
                 stmt.executeUpdate()
             }
@@ -287,19 +323,6 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
 
     /**
      * Bulk inserts events for ALL strategy listeners matching the given query keys.
-     *
-     * Uses INSERT...SELECT to insert events without loading listeners into memory.
-     * This is critical for handling cases where millions of listeners may match.
-     *
-     * For ALL strategy, idempotency is ensured by:
-     * - filter_index column (which filter matched this event)
-     * - UNIQUE(listener_id, filter_index) constraint prevents duplicate events per filter
-     *
-     * @param keys List of query keys identifying listeners to receive the event
-     * @param filterIndex The index of the filter that matched this event
-     * @param eventJson The CloudEvent data as JSON string
-     * @param connection Optional database connection
-     * @return Number of events inserted (may be less than matching listeners if duplicates skipped)
      */
     suspend fun bulkInsertEventsForAllStrategy(
         keys: List<ListenerQueryKey>,
@@ -310,13 +333,12 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
         if (keys.isEmpty()) return 0
 
         return withConnection(connection) { conn ->
-            // For ALL strategy: use filter_index for idempotency, cloudevent_id is NULL
             val selectSql = """
                 SELECT ${databaseManager.randomUuid()}, l.id, ?, NULL, ?, CURRENT_TIMESTAMP
                 FROM $LISTENER_TABLE l
-                WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                WHERE l.outbox_delayed_until IS NULL
+                  AND l.outbox_completed_at IS NULL
+                  AND l.outbox_failed_at IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
             """.trimIndent()
 
@@ -328,13 +350,212 @@ internal class ListenerEventRepository : WithIdRepository<ListenerEventModel>() 
 
             conn.prepareStatement(sql).use { stmt ->
                 var idx = 1
-                // Bind filter_index and event JSON for the SELECT
                 stmt.setInt(idx++, filterIndex)
                 stmt.setString(idx++, eventJson)
-                // Bind key conditions
                 ListenerQueryKey.bindAllParameters(keys, stmt, idx)
                 stmt.executeUpdate()
             }
         }
+    }
+
+    // ========================================
+    // Foreach Outbox Methods
+    // ========================================
+
+    /**
+     * Finds the next pending event for a listener (FIFO order).
+     */
+    suspend fun findNextPending(
+        listenerId: IDV7,
+        connection: Connection? = null
+    ): ListenerEventModel? = withConnection(connection) { conn ->
+        conn.prepareStatement(findNextPendingSql).use { stmt ->
+            setIDV7(stmt, 1, listenerId)
+            stmt.executeQuery().use { rs ->
+                if (rs.next()) createModel(rs) else null
+            }
+        }
+    }
+
+    private val findNextPendingSql by lazy {
+        """
+        SELECT * FROM $tableName
+        WHERE $LISTENER_ID_COLUMN = ?
+          AND $OUTBOX_SCHEDULED_FOR_COLUMN IS NOT NULL
+          AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+        ORDER BY $CREATED_AT_COLUMN ASC
+        LIMIT 1
+        """.trimIndent()
+    }
+
+    /**
+     * Marks an event as ready for foreach processing.
+     */
+    suspend fun markReadyForProcessing(
+        id: IDV7,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        val now = Timestamp.from(Clock.System.now().toJavaInstant())
+        conn.prepareStatement(markReadyForProcessingSql).use { stmt ->
+            stmt.setTimestamp(1, now)
+            stmt.setTimestamp(2, now)
+            setIDV7(stmt, 3, id)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val markReadyForProcessingSql by lazy {
+        """
+        UPDATE $tableName
+        SET $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+            $UPDATED_AT_COLUMN = ?
+        WHERE $ID_COLUMN = ?
+          AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+        """.trimIndent()
+    }
+
+    /**
+     * Marks an event's foreach processing as completed.
+     */
+    suspend fun markForeachCompleted(
+        id: IDV7,
+        output: String,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        val now = Timestamp.from(Clock.System.now().toJavaInstant())
+        conn.prepareStatement(markForeachCompletedSql).use { stmt ->
+            stmt.setString(1, output)
+            stmt.setTimestamp(2, now)
+            stmt.setTimestamp(3, now)
+            setIDV7(stmt, 4, id)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val markForeachCompletedSql by lazy {
+        """
+        UPDATE $tableName
+        SET $ITERATION_OUTPUT_COLUMN = ?,
+            $OUTBOX_COMPLETED_AT_COLUMN = ?,
+            $UPDATED_AT_COLUMN = ?
+        WHERE $ID_COLUMN = ?
+        """.trimIndent()
+    }
+
+    /**
+     * Marks an event's foreach outbox as failed.
+     */
+    suspend fun markOutboxFailed(
+        id: IDV7,
+        errorClass: String?,
+        errorMessage: String?,
+        errorStackTrace: String?,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        val now = Timestamp.from(Clock.System.now().toJavaInstant())
+        conn.prepareStatement(markForeachFailedSql).use { stmt ->
+            stmt.setTimestamp(1, now)
+            stmt.setString(2, errorClass)
+            stmt.setString(3, errorMessage)
+            stmt.setString(4, errorStackTrace)
+            stmt.setTimestamp(5, now)
+            setIDV7(stmt, 6, id)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val markForeachFailedSql by lazy {
+        """
+        UPDATE $tableName
+        SET $OUTBOX_FAILED_AT_COLUMN = ?,
+            $OUTBOX_ERROR_CLASS_COLUMN = ?,
+            $OUTBOX_ERROR_MESSAGE_COLUMN = ?,
+            $OUTBOX_ERROR_STACKTRACE_COLUMN = ?,
+            $UPDATED_AT_COLUMN = ?
+        WHERE $ID_COLUMN = ?
+        """.trimIndent()
+    }
+
+    /**
+     * Gets all completed iteration outputs for a listener.
+     */
+    suspend fun getAllOutputs(
+        listenerId: IDV7,
+        connection: Connection? = null
+    ): List<String> = withConnection(connection) { conn ->
+        conn.prepareStatement(getAllOutputsSql).use { stmt ->
+            setIDV7(stmt, 1, listenerId)
+            stmt.executeQuery().use { rs ->
+                buildList {
+                    while (rs.next()) {
+                        rs.getString(ITERATION_OUTPUT_COLUMN)?.let { add(it) }
+                    }
+                }
+            }
+        }
+    }
+
+    private val getAllOutputsSql by lazy {
+        """
+        SELECT $ITERATION_OUTPUT_COLUMN FROM $tableName
+        WHERE $LISTENER_ID_COLUMN = ?
+          AND $OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
+        ORDER BY $CREATED_AT_COLUMN ASC
+        """.trimIndent()
+    }
+
+    /**
+     * Finds events ready for foreach outbox processing.
+     */
+    suspend fun findReadyForForeachProcessing(
+        limit: Int,
+        connection: Connection? = null
+    ): List<ListenerEventModel> = withConnection(connection) { conn ->
+        conn.prepareStatement(findReadyForForeachProcessingSql).use { stmt ->
+            val now = Timestamp.from(Clock.System.now().toJavaInstant())
+            stmt.setTimestamp(1, now)
+            stmt.setInt(2, limit)
+            stmt.executeQuery().use { rs -> rs.toModels() }
+        }
+    }
+
+    private val findReadyForForeachProcessingSql by lazy {
+        """
+        SELECT * FROM $tableName
+        WHERE $OUTBOX_SCHEDULED_FOR_COLUMN IS NOT NULL
+          AND $OUTBOX_DELAYED_UNTIL_COLUMN <= ?
+          AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+        ORDER BY $CREATED_AT_COLUMN ASC
+        LIMIT ?
+        FOR UPDATE SKIP LOCKED
+        """.trimIndent()
+    }
+
+    /**
+     * Finds an event by listener ID and iteration index.
+     */
+    suspend fun findByListenerIdAndIterationIndex(
+        listenerId: IDV7,
+        iterationIndex: Int,
+        connection: Connection? = null
+    ): ListenerEventModel? = withConnection(connection) { conn ->
+        conn.prepareStatement(findByListenerIdAndIterationIndexSql).use { stmt ->
+            setIDV7(stmt, 1, listenerId)
+            stmt.setInt(2, iterationIndex)
+            stmt.executeQuery().use { rs ->
+                if (rs.next()) createModel(rs) else null
+            }
+        }
+    }
+
+    private val findByListenerIdAndIterationIndexSql by lazy {
+        """
+        SELECT * FROM $tableName
+        WHERE $LISTENER_ID_COLUMN = ?
+          AND $ITERATION_INDEX_COLUMN = ?
+        """.trimIndent()
     }
 }

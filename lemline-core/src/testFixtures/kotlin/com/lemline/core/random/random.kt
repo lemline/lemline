@@ -298,10 +298,6 @@ fun WorkflowEvent.ForkBranchCompleted.Companion.random() =
         branchName = String.random(),
         output = JsonElement.random(),
         completedAt = Clock.System.now(),
-        flowDirective = when (Random.nextBoolean()) {
-            true -> randomFlowDirective()
-            false -> null
-        }
     )
 
 // Listen task random generators

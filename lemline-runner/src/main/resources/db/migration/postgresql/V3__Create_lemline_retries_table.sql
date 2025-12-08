@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS lemline_retries
     outbox_error_stacktrace TEXT,
     outbox_completed_at     TIMESTAMPTZ(6),
     outbox_failed_at        TIMESTAMPTZ(6),
+    cleanup_after           TIMESTAMPTZ(6),
     created_at              TIMESTAMPTZ(6) NOT NULL,
     updated_at              TIMESTAMPTZ(6)
 );
@@ -34,6 +35,6 @@ CREATE INDEX IF NOT EXISTS idx_lemline_retries_processing
     WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
 
 -- Create index for cleanup queries
-CREATE INDEX IF NOT EXISTS idx_lemline_retries_completed
-    ON lemline_retries (outbox_completed_at)
-    WHERE outbox_completed_at IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_lemline_retries_cleanup
+    ON lemline_retries (cleanup_after)
+    WHERE cleanup_after IS NOT NULL;

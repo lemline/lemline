@@ -12,10 +12,16 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.ForkBranchModel
 import com.lemline.runner.models.ForkModel
+import com.lemline.runner.random.random
 import com.lemline.runner.repositories.ForkRepository
+import com.lemline.runner.repositories.bases.ops.CleanerRepositoryTest
+import com.lemline.runner.repositories.bases.ops.CrudRepositoryTest
+import com.lemline.runner.repositories.bases.ops.IdRepositoryTest
+import com.lemline.runner.repositories.bases.ops.InstanceRepositoryTest
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
@@ -25,6 +31,7 @@ import io.kotest.matchers.shouldNotBe
 import jakarta.inject.Inject
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.test.runTest
@@ -32,6 +39,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 /**
@@ -47,9 +55,17 @@ internal abstract class ForkWaitingRepositoryTest {
     @Inject
     protected lateinit var repository: ForkRepository
 
+    @Inject
+    lateinit var databaseManager: DatabaseManager
+
     private val testWorkflowId = WorkflowId.random()
     private val testPosition = NodePosition.root.addName("fork1")
     private var testForkId: IDV7? = null
+
+    // Helper functions for nested tests
+    private fun createEntity() = ForkModel.random()
+    private fun modifyEntity(entity: ForkModel) =
+        entity.copy().apply { completedAt = Instant.fromEpochMilliseconds(System.currentTimeMillis()) }
 
     @BeforeEach
     fun clean() = runTest {
@@ -173,14 +189,15 @@ internal abstract class ForkWaitingRepositoryTest {
         // When - mark fork as completed
         val updatedFork = fork.copy(
             output = LemlineJson.encodeToString<JsonElement>(JsonPrimitive("final-result")),
-            outboxCompletedAt = Clock.System.now()
-        )
+        ).apply {
+            completedAt = Clock.System.now()
+        }
         repository.update(updatedFork)
 
         // Then
         val retrieved = repository.findByWorkflowIdAndPosition(testWorkflowId, testPosition)!!
         retrieved.output shouldBe "\"final-result\""
-        retrieved.outboxCompletedAt.shouldNotBeNull()
+        retrieved.completedAt.shouldNotBeNull()
     }
 
     @Test
@@ -193,7 +210,7 @@ internal abstract class ForkWaitingRepositoryTest {
         // When - simulate 3 workers updating different branches concurrently
         val updates = (0..2).map { index ->
             async {
-                repository.withTransaction { conn ->
+                databaseManager.withTransaction { conn ->
                     val (currentFork, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
                         testWorkflowId,
                         testPosition,
@@ -207,7 +224,7 @@ internal abstract class ForkWaitingRepositoryTest {
 
                     // Count completed branches (this is what the handler does)
                     if (currentBranches.filter { it.completedAt != null }.size == 3) {
-                        currentFork.outboxCompletedAt = Clock.System.now()
+                        currentFork.completedAt = Clock.System.now()
                         repository.update(currentFork, conn)
                     }
                 }
@@ -225,7 +242,7 @@ internal abstract class ForkWaitingRepositoryTest {
         finalBranches.count { it.completedAt != null } shouldBe 3
         finalBranches.map { it.output } shouldContainAll listOf("\"result-0\"", "\"result-1\"", "\"result-2\"")
         // this is the critical test
-        finalFork.outboxCompletedAt.shouldNotBeNull()
+        finalFork.completedAt.shouldNotBeNull()
     }
 
     @Test
@@ -238,7 +255,7 @@ internal abstract class ForkWaitingRepositoryTest {
         // When - simulate 3 workers completing different branches concurrently
         val completionResults = (0..2).map { index ->
             async {
-                repository.withTransaction { conn ->
+                databaseManager.withTransaction { conn ->
                     val (_, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
                         testWorkflowId,
                         testPosition,
@@ -282,7 +299,7 @@ internal abstract class ForkWaitingRepositoryTest {
 
         // When - two transactions try to read the same fork with FOR UPDATE
         val transaction1 = async {
-            repository.withTransaction { conn ->
+            databaseManager.withTransaction { conn ->
                 val (_, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
                     testWorkflowId,
                     testPosition,
@@ -298,7 +315,7 @@ internal abstract class ForkWaitingRepositoryTest {
         }
 
         val transaction2 = async {
-            repository.withTransaction { conn ->
+            databaseManager.withTransaction { conn ->
                 val (_, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
                     testWorkflowId,
                     testPosition,
@@ -331,7 +348,7 @@ internal abstract class ForkWaitingRepositoryTest {
         repository.insertForkWithBranches(fork, branches)
 
         // When - same branch is processed twice (e.g., message redelivery)
-        val firstUpdate = repository.withTransaction { conn ->
+        val firstUpdate = databaseManager.withTransaction { conn ->
             val (_, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
                 testWorkflowId,
                 testPosition,
@@ -352,7 +369,7 @@ internal abstract class ForkWaitingRepositoryTest {
             wasAlreadyCompleted
         }
 
-        val secondUpdate = repository.withTransaction { conn ->
+        val secondUpdate = databaseManager.withTransaction { conn ->
             val (_, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
                 testWorkflowId,
                 testPosition,
@@ -382,10 +399,41 @@ internal abstract class ForkWaitingRepositoryTest {
         finalBranches[0].output shouldBe "\"result-0\""
     }
 
-    // Helper functions
-    private fun createTestFork(
-        compete: Boolean = false
-    ): ForkModel {
+    // ========== Nested Standard Repository Tests ==========
+
+    @Nested
+    inner class CrudTests : CrudRepositoryTest<ForkModel>(
+        crudRepository = { repository },
+        createEntity = ::createEntity,
+        modifyEntity = ::modifyEntity
+    )
+
+    @Nested
+    inner class IdTests : IdRepositoryTest<ForkModel>(
+        idRepository = { repository },
+        crudRepository = { repository },
+        createEntity = ::createEntity
+    )
+
+    @Nested
+    inner class CleanerTests : CleanerRepositoryTest<ForkModel>(
+        cleanerRepository = { repository },
+        crudRepository = { repository },
+        createEntity = ::createEntity,
+        getEntityKey = { it.id },
+        databaseManager = { databaseManager }
+    )
+
+    @Nested
+    inner class InstanceTests : InstanceRepositoryTest<ForkModel>(
+        instanceRepository = { repository },
+        crudRepository = { repository },
+        createEntity = ::createEntity,
+        getWorkflowId = { it.instanceMessage.workflowId }
+    )
+
+    // ========== Helper functions ==========
+    private fun createTestFork(compete: Boolean = false): ForkModel {
         val forkId = IDV7.random()
         testForkId = forkId  // Store for cleanup
 

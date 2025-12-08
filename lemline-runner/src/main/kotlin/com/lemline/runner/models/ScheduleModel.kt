@@ -48,7 +48,7 @@ data class ScheduleModel(
 
     /** IANA timezone identifier for cron schedules (e.g., "America/New_York") */
     val scheduleZone: String?,
-) : OutboxModel() {
+) : WithInstanceMessage, WithId, WithOutbox, WithCleanup {
 
     override var outboxDelayedUntil: Instant? = outboxScheduledFor
 
@@ -63,6 +63,8 @@ data class ScheduleModel(
     override var outboxCompletedAt: Instant? = null
 
     override var outboxFailedAt: Instant? = null
+
+    override var cleanupAfter: Instant? = null
 
     /** Parsed duration for one-time delayed execution, null if not applicable */
     val after: Duration? by lazy { scheduleAfter?.let { Duration.parse(it) } }
@@ -92,7 +94,7 @@ data class ScheduleModel(
             scheduleAfter != null -> null // One-time schedule after completion
             scheduleCron != null -> cron!!.getNextCronExecutionInstant(currentTime, zone)
             scheduleEvery != null -> currentTime + every!!
-            else -> error("Invalid schedule model")
+            else -> error("Invalid schedule model: $this")
         }
 
         // Update both scheduled and delayed times

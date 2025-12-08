@@ -8,14 +8,14 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
  * Base class for outbox pattern message models.
- * This abstract class extends CleanableModel and adds retry/error tracking for the outbox pattern.
+ * This interface extends [WithCleanup] and adds retry/error tracking for the outbox pattern.
  *
  * OutboxModel entities are processed via scheduled relay with retry logic.
  * They implement reliable message delivery through:
  * 1. Storing messages in a database before attempting to send them
  * 2. Processing messages in batches with retry logic
  * 3. Tracking retry attempts and error details
- * 4. Cleaning up successfully processed messages (inherited from CleanableModel)
+ * 4. Cleanup via [WithCleanup.cleanupAfter] timestamp
  *
  * States are tracked via nullable timestamps:
  * - Pending: outbox_completed_at IS NULL AND outbox_failed_at IS NULL
@@ -23,11 +23,18 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * - Failed: outbox_failed_at IS NOT NULL
  *
  * @see AbstractOutbox for the processing logic
- * @see AwaitingCompletionModel for the base cleanup tracking
+ * @see WithCleanup for cleanup tracking
  */
 @ExperimentalSerializationApi
 @ExperimentalTime
-sealed class OutboxModel : AwaitingCompletionModel() {
+sealed interface WithOutbox {
+
+    /**
+     * Timestamp when the outbox processing completed successfully.
+     * - NULL: Processing is still pending or has failed
+     * - NOT NULL: Processing completed successfully
+     */
+    var outboxCompletedAt: Instant?
 
     /**
      * Original/intended scheduled time for this message.
@@ -35,7 +42,7 @@ sealed class OutboxModel : AwaitingCompletionModel() {
      * - For Wait/Retry: Original scheduled time (doesn't change with retries)
      * - For Schedule: Current scheduled execution time (updated each cycle)
      */
-    abstract val outboxScheduledFor: Instant?
+    val outboxScheduledFor: Instant?
 
     /**
      * Timestamp indicating when the message should be processed next by the outbox relay.
@@ -45,7 +52,7 @@ sealed class OutboxModel : AwaitingCompletionModel() {
      *
      * @see AbstractOutbox for delay calculation
      */
-    abstract var outboxDelayedUntil: Instant?
+    var outboxDelayedUntil: Instant?
 
     /**
      * Number of processing attempts made for this message by the outbox relay.
@@ -54,27 +61,27 @@ sealed class OutboxModel : AwaitingCompletionModel() {
      *
      * @see AbstractOutbox for retry logic
      */
-    abstract var outboxAttemptCount: Int
+    var outboxAttemptCount: Int
 
     /**
      * Class of the last exception that occurred during processing of this message by the outbox relay.
      */
-    abstract var outboxErrorClass: String?
+    var outboxErrorClass: String?
 
     /**
      * Message of the last exception that occurred during processing of this message by the outbox relay.
      */
-    abstract var outboxErrorMessage: String?
+    var outboxErrorMessage: String?
 
     /**
      * Stacktrace of the last exception that occurred during processing of this message by the outbox relay.
      */
-    abstract var outboxErrorStackTrace: String?
+    var outboxErrorStackTrace: String?
 
     /**
      * Timestamp when the outbox processing permanently failed (max retries reached).
      * - NULL: Not failed (either pending or completed)
      * - NOT NULL: Failed after max retry attempts, requires manual intervention
      */
-    abstract var outboxFailedAt: Instant?
+    var outboxFailedAt: Instant?
 }

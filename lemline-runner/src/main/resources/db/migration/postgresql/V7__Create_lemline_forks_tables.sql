@@ -17,15 +17,16 @@ CREATE TABLE lemline_forks (
     compete BOOLEAN NOT NULL,
     output TEXT,
 
-    -- Cleanup tracking
-    outbox_completed_at TIMESTAMPTZ(6),
+    -- Completion and cleanup tracking
+    completed_at TIMESTAMPTZ(6),
+    cleanup_after TIMESTAMPTZ(6),
     failed_at TIMESTAMPTZ,
 
     -- Error details (inline instead of FK to failures table)
     error_reason VARCHAR(255),
     error_class VARCHAR(500),
     error_message TEXT,
-    error_stack_trace TEXT,
+    error_stacktrace TEXT,
 
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP,
@@ -54,7 +55,7 @@ CREATE TABLE lemline_fork_branches (
     error_reason VARCHAR(255),
     error_class VARCHAR(500),
     error_message TEXT,
-    error_stack_trace TEXT,
+    error_stacktrace TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -68,9 +69,9 @@ CREATE TABLE lemline_fork_branches (
 );
 
 -- Create index for efficient cleanup queries
-CREATE INDEX idx_lemline_forks_completed
-    ON lemline_forks (outbox_completed_at)
-    WHERE outbox_completed_at IS NOT NULL;
+CREATE INDEX idx_lemline_forks_cleanup
+    ON lemline_forks (cleanup_after)
+    WHERE cleanup_after IS NOT NULL;
 
 -- Note: (workflow_id, position) has unique constraint, no separate index needed
 

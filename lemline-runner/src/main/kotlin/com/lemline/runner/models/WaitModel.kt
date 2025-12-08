@@ -19,7 +19,7 @@ data class WaitModel(
 
     /** Timestamp when the wait period should end and workflow should resume */
     override val outboxScheduledFor: Instant,
-) : OutboxModel() {
+) : WithId, WithInstanceMessage, WithOutbox, WithCleanup {
 
     override var outboxDelayedUntil: Instant? = outboxScheduledFor
         set(until) {
@@ -38,6 +38,8 @@ data class WaitModel(
     override var outboxCompletedAt: Instant? = null
 
     override var outboxFailedAt: Instant? = null
+
+    override var cleanupAfter: Instant? = null
 
     // Needed by tests
     companion object Companion

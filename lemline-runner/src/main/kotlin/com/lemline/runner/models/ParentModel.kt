@@ -20,10 +20,13 @@ data class ParentModel(
 
     /** The workflow ID of the child workflow that was spawned */
     val childId: WorkflowId,
+) : WithId, WithInstanceMessage, WithCompletedAt, WithCleanup {
 
-    /** Timestamp when the child workflow completed, null while awaiting */
-    override var outboxCompletedAt: Instant? = null
-) : AwaitingCompletionModel() {
+    /** Timestamp when the child workflow completed */
+    override var completedAt: Instant? = null
+
+    /** Timestamp after which this entity can be deleted, set when child completes */
+    override var cleanupAfter: Instant? = null
 
     // Needed by tests
     companion object Companion

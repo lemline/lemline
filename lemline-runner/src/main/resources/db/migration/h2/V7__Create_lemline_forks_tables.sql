@@ -3,29 +3,30 @@
 CREATE TABLE lemline_forks
 (
     -- Primary key
-    id                  UUID          NOT NULL PRIMARY KEY,
+    id                 UUID          NOT NULL PRIMARY KEY,
     -- Workflow instance information
-    workflow_id         UUID,
-    workflow_namespace  VARCHAR(255),
-    workflow_name       VARCHAR(255),
-    workflow_version    VARCHAR(255),
-    workflow_position   VARCHAR(1000),
-    workflow_state      CLOB,
+    workflow_id        UUID,
+    workflow_namespace VARCHAR(255),
+    workflow_name      VARCHAR(255),
+    workflow_version   VARCHAR(255),
+    workflow_position  VARCHAR(1000),
+    workflow_state     CLOB,
     -- Fork-specific fields
-    position            VARCHAR(1000) NOT NULL,
-    compete             BOOLEAN       NOT NULL,
-    output              CLOB,
-    -- Cleanup tracking
-    outbox_completed_at TIMESTAMP WITH TIME ZONE,
-    failed_at           TIMESTAMP,
+    position           VARCHAR(1000) NOT NULL,
+    compete            BOOLEAN       NOT NULL,
+    output             CLOB,
+    -- Completion and cleanup tracking
+    completed_at       TIMESTAMP WITH TIME ZONE,
+    cleanup_after      TIMESTAMP WITH TIME ZONE,
+    failed_at          TIMESTAMP,
     -- Error details (inline instead of FK to failures table)
-    error_reason        VARCHAR(255),
-    error_class         VARCHAR(500),
-    error_message       CLOB,
-    error_stack_trace   CLOB,
+    error_reason       VARCHAR(255),
+    error_class        VARCHAR(500),
+    error_message      CLOB,
+    error_stacktrace   CLOB,
     -- Timestamps
-    created_at          TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          TIMESTAMP,
+    created_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at         TIMESTAMP,
 
     -- Constraints
     CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, position)
@@ -36,21 +37,21 @@ CREATE TABLE lemline_forks
 CREATE TABLE lemline_fork_branches
 (
     -- Foreign key to parent fork
-    fork_id      UUID         NOT NULL,
+    fork_id          UUID         NOT NULL,
     -- Branch metadata
-    name         VARCHAR(255) NOT NULL,
+    name             VARCHAR(255) NOT NULL,
     -- Execution state
-    output       CLOB,
+    output           CLOB,
     -- Timestamps
-    completed_at TIMESTAMP,
-    failed_at    TIMESTAMP,
+    completed_at     TIMESTAMP,
+    failed_at        TIMESTAMP,
     -- Error details (inline instead of FK to failures table)
-    error_reason        VARCHAR(255),
-    error_class         VARCHAR(500),
-    error_message       CLOB,
-    error_stack_trace   CLOB,
-    created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    error_reason     VARCHAR(255),
+    error_class      VARCHAR(500),
+    error_message    CLOB,
+    error_stacktrace CLOB,
+    created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- Constraints
     PRIMARY KEY (fork_id, name),
 
@@ -61,7 +62,7 @@ CREATE TABLE lemline_fork_branches
 );
 
 -- Create index for cleanup queries
-CREATE INDEX idx_lemline_forks_completed
-    ON lemline_forks (outbox_completed_at);
+CREATE INDEX idx_lemline_forks_cleanup
+    ON lemline_forks (cleanup_after);
 
 -- Note: (workflow_id, position) has unique constraint, no separate index needed

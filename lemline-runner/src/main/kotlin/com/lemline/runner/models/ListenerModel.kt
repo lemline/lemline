@@ -2,11 +2,57 @@
 package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
+import com.lemline.core.processors.ListenConfig
+import com.lemline.core.processors.ListenStrategy as CoreListenStrategy
+import com.lemline.core.processors.UntilCondition
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.messaging.InstanceMessage
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
+
+/**
+ * Database representation of listen strategy.
+ *
+ * This enum distinguishes between all possible listen task configurations:
+ * - `ONE`: Single event, immediate completion
+ * - `ANY`: First matching event from multiple filters, immediate completion
+ * - `ANY_UNTIL_EXPR`: Accumulate events until expression condition is met
+ * - `ANY_UNTIL_EVENT`: Accumulate events until termination event is received
+ * - `ALL`: Wait for one event per filter
+ */
+enum class ListenerStrategy {
+    /** Wait for a single event matching the filter */
+    ONE,
+
+    /** Wait for first event matching any filter, immediate completion */
+    ANY,
+
+    /** Accumulate events until expression condition is met */
+    ANY_UNTIL_EXPR,
+
+    /** Accumulate events until termination event is received */
+    ANY_UNTIL_EVENT,
+
+    /** Wait for one event per filter */
+    ALL;
+
+    companion object {
+        /**
+         * Converts from core ListenStrategy + until condition to database ListenerStrategy.
+         */
+        fun from(config: ListenConfig): ListenerStrategy = when (config.strategy) {
+            CoreListenStrategy.ONE -> ONE
+            CoreListenStrategy.ANY -> when (config.until) {
+                is UntilCondition.Expression -> ANY_UNTIL_EXPR
+                is UntilCondition.Event -> ANY_UNTIL_EVENT
+                null -> ANY
+            }
+
+            CoreListenStrategy.ALL -> ALL
+        }
+    }
+}
 
 /**
  * Model representing an active listener waiting for CloudEvents.
@@ -51,12 +97,15 @@ data class ListenerModel(
     /** Workflow instance message containing state for resumption */
     override val instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>,
 
+    /** Listen strategy: ONE, ANY, ANY_UNTIL, ALL */
+    val strategy: ListenerStrategy,
+
     /** Timestamp when the listener times out (null = no timeout) */
     val timeoutAt: Instant?,
 
     /** Timestamp when this listener was scheduled for processing */
     override val outboxScheduledFor: Instant,
-) : OutboxModel() {
+) : WithId, WithInstanceMessage, WithOutbox, WithCleanup {
 
     /** Correlation baseline values (Mode 2: first-sets-baseline), JSON map */
     var correlationValues: String? = null
@@ -65,8 +114,21 @@ data class ListenerModel(
     var event: String? = null
 
     /** Total number of filters for ALL strategy (null for other strategies) */
-    var totalFilters: Int? = null
-    
+    var filtersCount: Int? = null
+
+    // Foreach fields
+    /** TRUE if listener has foreach.do configured */
+    var hasForeach: Boolean = false
+
+    /** Current foreach iteration index (0-based) */
+    var foreachCurrentIndex: Int = 0
+
+    /** TRUE when foreach.do is executing for an event */
+    var foreachProcessing: Boolean = false
+
+    /** TRUE when completion criteria met (set by CloudEventHandler) */
+    var listenerCompleted: Boolean = false
+
     // Outbox fields
     // NOTE: outboxDelayedUntil starts as NULL (waiting state).
     // It gets set to NOW() when a CloudEvent matches, triggering ListenerCompletionOutbox.
@@ -77,6 +139,7 @@ data class ListenerModel(
     override var outboxErrorStackTrace: String? = null
     override var outboxCompletedAt: Instant? = null
     override var outboxFailedAt: Instant? = null
+    override var cleanupAfter: Instant? = null
 
     companion object Companion
 }

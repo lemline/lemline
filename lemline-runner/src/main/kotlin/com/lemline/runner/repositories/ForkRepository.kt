@@ -2,19 +2,39 @@
 package com.lemline.runner.repositories
 
 import com.lemline.common.logger.logger
-import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.ForkBranchModel
 import com.lemline.runner.models.ForkModel
+import com.lemline.runner.repositories.helpers.ColumnBindings
+import com.lemline.runner.repositories.helpers.ColumnBindingsBuilder
+import com.lemline.runner.repositories.helpers.completionColumns
+import com.lemline.runner.repositories.helpers.readCompletionField
+import com.lemline.runner.repositories.ops.CleanerRepository
+import com.lemline.runner.repositories.ops.CrudRepository
+import com.lemline.runner.repositories.ops.ID_COLUMN
+import com.lemline.runner.repositories.ops.IdRepository
+import com.lemline.runner.repositories.ops.InstanceRepository
+import com.lemline.runner.repositories.ops.WORKFLOW_ID_COLUMN
+import com.lemline.runner.repositories.ops.cleanupColumns
+import com.lemline.runner.repositories.ops.getInstanceMessage
+import com.lemline.runner.repositories.ops.getInstant
+import com.lemline.runner.repositories.ops.idColumn
+import com.lemline.runner.repositories.ops.instanceColumns
+import com.lemline.runner.repositories.ops.readCleanupField
+import com.lemline.runner.repositories.with.WithCleanerRepository
+import com.lemline.runner.repositories.with.WithIdRepository
+import com.lemline.runner.repositories.with.WithInstanceRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
-import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Timestamp
 import kotlin.time.ExperimentalTime
+import kotlin.time.Instant
 import kotlin.time.toJavaInstant
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -22,19 +42,48 @@ const val FORK_TABLE = "lemline_forks"
 
 /**
  * Repository for managing fork execution state.
- * Extends [CleanerRepository] to follow standard pattern for waiting entities with cleanup tracking.
+ * Uses composition to provide cleaner and instance operations.
  *
- * Uses [ForkBranchRepository] for branch operations, ensuring consistent idempotent inserts.
+ * @see ForkModel for the entity model
+ * @see ForkBranchRepository for branch operations
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
 @ApplicationScoped
-class ForkRepository : CleanerRepository<ForkModel>() {
+class ForkRepository : CrudRepository<ForkModel>(),
+    WithIdRepository<ForkModel>,
+    WithInstanceRepository<ForkModel>,
+    WithCleanerRepository<ForkModel> {
+
+    @Inject
+    override lateinit var databaseManager: DatabaseManager
+
+    @Inject
+    private lateinit var forkBranchRepository: ForkBranchRepository
+
+    // Composed operations - initialized lazily to ensure databaseManager is injected
+    val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseManager) }
+    val instanceRepository by lazy { InstanceRepository(tableName, idHelper, ::createModel, databaseManager) }
+    val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseManager) }
+
+    // Delegate WithIdRepository methods
+    override suspend fun findById(id: IDV7, connection: Connection?) =
+        idRepository.findById(id, connection)
+
+    override suspend fun deleteById(id: IDV7, connection: Connection?) =
+        idRepository.deleteById(id, connection)
+
+    // Delegate WithInstanceRepository methods
+    override suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection?) =
+        instanceRepository.findByWorkflowId(workflowId, connection)
+
+    // Delegate WithCleanerRepository methods
+    override suspend fun findEntitiesToDelete(cutoffDate: Instant, batchSize: Int, connection: Connection?) =
+        cleanerRepository.findEntitiesToDelete(cutoffDate, batchSize, connection)
 
     private val log = logger()
 
-    companion object Companion {
-        // Fork table columns
+    companion object {
         internal const val FORK_POSITION_COLUMN = "position"
         internal const val FORK_COMPETE_COLUMN = "compete"
         internal const val FORK_OUTPUT_COLUMN = "output"
@@ -42,61 +91,62 @@ class ForkRepository : CleanerRepository<ForkModel>() {
         internal const val FORK_ERROR_REASON_COLUMN = "error_reason"
         internal const val FORK_ERROR_CLASS_COLUMN = "error_class"
         internal const val FORK_ERROR_MESSAGE_COLUMN = "error_message"
-        internal const val FORK_ERROR_STACK_TRACE_COLUMN = "error_stack_trace"
+        internal const val FORK_ERROR_STACK_TRACE_COLUMN = "error_stacktrace"
     }
-
-    @Inject
-    override lateinit var databaseManager: DatabaseManager
-
-    @Inject
-    lateinit var forkBranchRepository: ForkBranchRepository
 
     override val tableName = FORK_TABLE
 
-    override val prepareStatementMap: Map<String, (PreparedStatement, ForkModel, Int) -> Unit> by lazy {
-        super.prepareStatementMap + mapOf(
-            FORK_POSITION_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+    override val columns: ColumnBindings<ForkModel> by lazy {
+        ColumnBindingsBuilder<ForkModel>().apply {
+            idColumn(idHelper)
+            instanceColumns(idHelper)
+            completionColumns()
+            cleanupColumns()
+
+            // Fork-specific columns
+            column(FORK_POSITION_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.position)
-            },
-            FORK_COMPETE_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+            }
+            column(FORK_COMPETE_COLUMN) { stmt, entity, idx ->
                 stmt.setBoolean(idx, entity.compete)
-            },
-            FORK_OUTPUT_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+            }
+            column(FORK_OUTPUT_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.output)
-            },
-            FORK_FAILED_AT_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+            }
+            column(FORK_FAILED_AT_COLUMN) { stmt, entity, idx ->
                 entity.failedAt?.let {
                     stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
                 } ?: stmt.setNull(idx, java.sql.Types.TIMESTAMP)
-            },
-            FORK_ERROR_REASON_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+            }
+            column(FORK_ERROR_REASON_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.errorReason)
-            },
-            FORK_ERROR_CLASS_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+            }
+            column(FORK_ERROR_CLASS_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.errorClass)
-            },
-            FORK_ERROR_MESSAGE_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+            }
+            column(FORK_ERROR_MESSAGE_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.errorMessage)
-            },
-            FORK_ERROR_STACK_TRACE_COLUMN to { stmt: PreparedStatement, entity: ForkModel, idx: Int ->
+            }
+            column(FORK_ERROR_STACK_TRACE_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.errorStackTrace)
-            },
-        )
+            }
+        }.build()
     }
 
     override fun createModel(rs: ResultSet) = ForkModel(
         id = getIDV7(rs, ID_COLUMN)!!,
-        instanceMessage = rs.getInstanceMessage<WorkflowEvent.ForkStarted>()!!,
+        instanceMessage = rs.getInstanceMessage<WorkflowEvent.ForkStarted>(idHelper)!!,
         position = rs.getString(FORK_POSITION_COLUMN),
         compete = rs.getBoolean(FORK_COMPETE_COLUMN),
         output = rs.getString(FORK_OUTPUT_COLUMN),
-        outboxCompletedAt = rs.getInstant(OUTBOX_COMPLETED_AT_COLUMN),
         failedAt = rs.getInstant(FORK_FAILED_AT_COLUMN),
         errorReason = rs.getString(FORK_ERROR_REASON_COLUMN),
         errorClass = rs.getString(FORK_ERROR_CLASS_COLUMN),
         errorMessage = rs.getString(FORK_ERROR_MESSAGE_COLUMN),
         errorStackTrace = rs.getString(FORK_ERROR_STACK_TRACE_COLUMN),
     )
+        .readCompletionField(rs)
+        .readCleanupField(rs)
 
     /**
      * Insert fork with all branches atomically.
@@ -153,14 +203,7 @@ class ForkRepository : CleanerRepository<ForkModel>() {
      * Find fork with all its branches by workflow ID and position.
      *
      * Uses FOR UPDATE to acquire a row-level lock on the fork, preventing concurrent workers from
-     * processing branch completions with stale data. This ensures thread-safe fork completion logic
-     * when multiple branches complete simultaneously.
-     *
-     * Implementation uses two simple queries within the same connection/transaction:
-     * 1. Find and lock the fork (SELECT ... FOR UPDATE)
-     * 2. Find all branches for that fork (SELECT ... WHERE fork_id = ?)
-     *
-     * This approach is simpler and more portable across databases than using a JOIN with FOR UPDATE.
+     * processing branch completions with stale data.
      */
     suspend fun findByWorkflowIdAndPositionWithBranches(
         workflowId: WorkflowId,
@@ -179,7 +222,6 @@ class ForkRepository : CleanerRepository<ForkModel>() {
 
     /**
      * Find fork by workflow ID and position with pessimistic locking.
-     * Acquires a row-level lock using FOR UPDATE to prevent concurrent modifications.
      */
     private suspend fun findByWorkflowIdAndPositionForUpdate(
         workflowId: WorkflowId,

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS lemline_waits
     outbox_error_stacktrace CLOB,
     outbox_completed_at     TIMESTAMP WITH TIME ZONE,
     outbox_failed_at        TIMESTAMP WITH TIME ZONE,
+    cleanup_after           TIMESTAMP WITH TIME ZONE,
     created_at              TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at              TIMESTAMP WITH TIME ZONE
 );
@@ -29,5 +30,5 @@ CREATE INDEX idx_lemline_waits_processing
     ON lemline_waits (outbox_completed_at, outbox_failed_at, outbox_delayed_until);
 
 -- Create index for cleanup queries
-CREATE INDEX idx_lemline_waits_completed
-    ON lemline_waits (outbox_completed_at);
+CREATE INDEX idx_lemline_waits_cleanup
+    ON lemline_waits (cleanup_after);

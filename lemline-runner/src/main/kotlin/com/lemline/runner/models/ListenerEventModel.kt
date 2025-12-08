@@ -9,14 +9,18 @@ import kotlinx.serialization.ExperimentalSerializationApi
 /**
  * Model representing an accumulated CloudEvent for a listener.
  *
- * Implements [WithId] to enable [WithIdRepository] operations.
- *
  * Used for strategies that require multiple events:
  * - **ALL**: One event per filter, completion when all filters matched
  * - **ANY with until**: Accumulate events until condition is met
  *
  * For simple strategies (ONE, ANY without until), the event is stored
  * directly in the [ListenerModel.event] column.
+ *
+ * ## Foreach Support
+ *
+ * When foreach is enabled on the listener, this model also serves as an outbox
+ * for sequential event processing. Events are processed one at a time through
+ * foreach.do, with results stored in [iterationOutput].
  *
  * ## Idempotency
  *
@@ -58,5 +62,48 @@ data class ListenerEventModel(
     val event: String,
 
     /** Creation timestamp */
-    val createdAt: Instant? = null
-) : WithId
+    val createdAt: Instant? = null,
+
+    // ========================================
+    // Foreach Outbox Fields
+    // ========================================
+    // These fields are used when the listener has foreach enabled.
+    // They enable sequential processing of events through foreach.do.
+
+    /** When outbox processing was scheduled (NULL = not foreach enabled) */
+    override val outboxScheduledFor: Instant? = null,
+
+    /** When event is ready for foreach processing (NULL = queued, waiting) */
+    override var outboxDelayedUntil: Instant? = null,
+
+    /** Number of processing attempts */
+    override var outboxAttemptCount: Int = 0,
+
+    /** Error class from last failed attempt */
+    override var outboxErrorClass: String? = null,
+
+    /** Error message from last failed attempt */
+    override var outboxErrorMessage: String? = null,
+
+    /** Error stack trace from last failed attempt */
+    override var outboxErrorStackTrace: String? = null,
+
+    /** When foreach.do completed for this event */
+    override var outboxCompletedAt: Instant? = null,
+
+    /** When foreach.do permanently failed for this event */
+    override var outboxFailedAt: Instant? = null,
+
+    // ========================================
+    // Foreach Iteration Tracking
+    // ========================================
+
+    /** Foreach iteration index (0-based) */
+    val iterationIndex: Int? = null,
+
+    /** Output from foreach.do for this event (JSON) */
+    var iterationOutput: String? = null,
+
+    ) : WithId, WithOutbox {
+    companion object
+}

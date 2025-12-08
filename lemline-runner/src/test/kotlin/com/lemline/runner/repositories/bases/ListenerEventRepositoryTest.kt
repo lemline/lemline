@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.repositories.bases
 
-import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
@@ -17,13 +16,17 @@ import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.models.ListenerEventModel
 import com.lemline.runner.models.ListenerModel
+import com.lemline.runner.models.ListenerStrategy
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.ListenerEventRepository
 import com.lemline.runner.repositories.ListenerRepository
+import com.lemline.runner.repositories.bases.ops.IdRepositoryTest
+import com.lemline.runner.repositories.bases.ops.OutboxRepositoryTest
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldContainExactly
 import io.kotest.matchers.collections.shouldHaveSize
@@ -37,6 +40,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonNull
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 /**
@@ -60,17 +64,35 @@ internal abstract class ListenerEventRepositoryTest {
     @Inject
     protected lateinit var definitionRepository: DefinitionRepository
 
+    @Inject
+    lateinit var databaseManager: DatabaseManager
+
     // Fixed test values for workflow identification
     private val testNamespace = WorkflowNamespace("test-namespace")
     private val testName = WorkflowName("test-workflow")
     private val testVersion = WorkflowVersion("1.0.0")
     private val testNodePosition = NodePosition("/do/listenTask")
 
+    // Shared listener for IdTests - needs to be created before tests run
+    private var sharedListenerForIdTests: ListenerModel? = null
+
+    /**
+     * Creates entity for IdTests. Creates a listener if needed and returns an event for that listener.
+     */
+    private fun createEntityForIdTests(): ListenerEventModel {
+        val listener = sharedListenerForIdTests ?: createListener().also {
+            sharedListenerForIdTests = it
+            kotlinx.coroutines.runBlocking { listenerRepository.insert(it) }
+        }
+        return createEvent(listener.id, filterIndex = null, cloudEventId = IDV7.random().toString())
+    }
+
     @BeforeEach
     fun setup() = runTest {
-        // Clear existing data
+        // Clear existing data and reset shared state
         repository.deleteAll()
         listenerRepository.deleteAll()
+        sharedListenerForIdTests = null
 
         // Create parent definition record
         val definition = DefinitionModel(
@@ -121,18 +143,20 @@ internal abstract class ListenerEventRepositoryTest {
             )
         )
 
+        val config = ListenConfig(
+            strategy = ListenStrategy.ALL,
+            filters = listOf(
+                EventFilter(type = "com.example.Event1"),
+                EventFilter(type = "com.example.Event2")
+            ),
+            readAs = ListenAndReadAs.DATA,
+            timeoutAt = null
+        )
+
         val listenStarted = WorkflowEvent.ListenStarted(
             nodeStack = nodeStack,
             rawOutput = JsonNull,
-            config = ListenConfig(
-                strategy = ListenStrategy.ALL,
-                filters = listOf(
-                    EventFilter(type = "com.example.Event1"),
-                    EventFilter(type = "com.example.Event2")
-                ),
-                readAs = ListenAndReadAs.DATA,
-                timeoutAt = null
-            )
+            config = config
         )
 
         return ListenerModel(
@@ -141,6 +165,7 @@ internal abstract class ListenerEventRepositoryTest {
                 workflowInfo = workflowInfo,
                 workflowState = listenStarted
             ),
+            strategy = ListenerStrategy.from(config),
             timeoutAt = null,
             outboxScheduledFor = now
         )
@@ -428,7 +453,11 @@ internal abstract class ListenerEventRepositoryTest {
         // Then - events should be ordered by filter_index
         result[listener.id]!! shouldHaveSize 3
         result[listener.id]!!.map { it.filterIndex } shouldContainExactly listOf(0, 1, 2)
-        result[listener.id]!!.map { it.event } shouldContainExactly listOf("""{"idx":0}""", """{"idx":1}""", """{"idx":2}""")
+        result[listener.id]!!.map { it.event } shouldContainExactly listOf(
+            """{"idx":0}""",
+            """{"idx":1}""",
+            """{"idx":2}"""
+        )
     }
 
     // ========== deleteByListenerId tests ==========
@@ -517,4 +546,22 @@ internal abstract class ListenerEventRepositoryTest {
         // Should still have only 1 event
         repository.countByListenerId(listener.id) shouldBe 1
     }
+
+    // ========== Nested Standard Repository Tests ==========
+
+    @Nested
+    inner class IdTests : IdRepositoryTest<ListenerEventModel>(
+        idRepository = { repository.idRepository },
+        crudRepository = { repository },
+        createEntity = ::createEntityForIdTests
+    )
+
+    @Nested
+    inner class OutboxTests : OutboxRepositoryTest<ListenerEventModel>(
+        outboxRepository = { repository },
+        crudRepository = { repository },
+        createEntity = ::createEntityForIdTests,
+        getEntityKey = { it.id },
+        databaseManager = { databaseManager }
+    )
 }
