@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.outbox
 
-import com.lemline.runner.cleaner.AbstractCleaner
+import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.runner.models.OutboxModel
+import com.lemline.runner.models.WithOutbox
 import com.lemline.runner.repositories.FailureRepository
-import com.lemline.runner.repositories.OutboxRepository
+import com.lemline.runner.repositories.with.WithCrudRepository
+import com.lemline.runner.repositories.with.WithOutboxRepository
+import com.lemline.runner.scheduled.AbstractScheduledTask
 import jakarta.annotation.PostConstruct
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -18,17 +18,15 @@ import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.jetbrains.annotations.VisibleForTesting
 
 /**
  * AbstractOutbox provides base functionality for outbox pattern implementations.
  *
- * It extends [AbstractCleaner] to inherit cleanup scheduling and adds processing
- * functionality for pending messages. This class manages TWO scheduled tasks:
- * 1. **Outbox processing** - sends pending messages from the database
- * 2. **Cleanup** - removes old completed/failed messages (inherited from AbstractCleaner)
+ * This class handles outbox processing - sending pending messages from the database.
+ * Cleanup of old completed/failed messages is handled separately by cleaner classes
+ * that extend [com.lemline.runner.cleaner.AbstractCleaner].
  *
  * The class uses a scheduled approach with configurable intervals for processing.
  * It ensures thread safety by using SKIP concurrent execution strategy, preventing
@@ -38,22 +36,26 @@ import org.jetbrains.annotations.VisibleForTesting
  * - Storing messages in a database before attempting to send them
  * - Processing messages in batches with configurable sizes
  * - Implementing retry logic with exponential backoff
+ * - Setting `cleanupAfter = now + retention` when marking as completed
  *
- * @param T Type of the message entity (must implement OutboxModel interface)
- * @see AbstractCleaner for the cleanup infrastructure
+ * @param T Type of the message entity (must implement WithOutbox interface)
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
+internal abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
 
     protected abstract val failureRepository: FailureRepository
-    protected abstract val outboxRepository: OutboxRepository<T>
-    override val cleanerRepository: OutboxRepository<T> get() = outboxRepository
+    protected abstract val outboxRepository: WithOutboxRepository<T>
+    protected abstract val crudRepository: WithCrudRepository<T>
     protected abstract val instanceEmitter: WorkflowCommandEmitter
+    protected abstract val databaseManager: DatabaseManager
 
     protected abstract val outboxConf: LemlineConfiguration.OutboxProcessingConfig?
+    protected abstract val cleanerConf: LemlineConfiguration.OutboxCleanupConfig
 
-    private val outboxProcessingExecutor = Executors.newSingleThreadScheduledExecutor()
+    override val taskName: String get() = "Outbox"
+    override val interval: Duration get() = outboxConf?.every ?: Duration.INFINITE
+
     private val outboxProcessing = AtomicBoolean(false)
 
     /**
@@ -61,6 +63,7 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
      * Subclasses MUST override this to transform Event → Command before sending.
      */
     protected abstract suspend fun process(entity: T)
+
 
     @PostConstruct
     override fun init() {
@@ -70,34 +73,14 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
         }
 
         // Schedule outbox processing
-        outboxConf?.every?.inWholeSeconds?.let { period ->
-            outboxProcessingExecutor.scheduleAtFixedRate(
-                { scope.launch { outbox() } },
-                0,
-                period,
-                TimeUnit.SECONDS
-            )
-            logger.info { "Outbox processing scheduled every ${period}s" }
-        }
-
-        // Schedule cleanup (inherited from AbstractCleaner via AbstractScheduledTask)
         scheduleTask()
-    }
-
-    /**
-     * Shutdown additional executors (processing executor).
-     * Cleanup executor is shut down by the parent class.
-     */
-    override fun shutdownExecutors() {
-        shutdownExecutor(outboxProcessingExecutor, "outbox processing")
-        super.shutdownExecutors() // Shutdown cleanup executor
     }
 
     /**
      * Safely executes the outbox task while ensuring that no concurrent executions occur.
      * This method uses an `AtomicBoolean` to prevent overlapping executions.
      */
-    private suspend fun outbox() {
+    override suspend fun doWork() {
         if (isShuttingDown.get()) {
             logger.debug { "Skipping outbox processing: shutdown in progress" }
             return
@@ -155,7 +138,7 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
             batchNumber++
             var toProcess = 0
             // Find and process messages in the same transaction
-            outboxRepository.withTransaction { connection ->
+            databaseManager.withTransaction { connection ->
                 // Find and lock messages ready to process
                 val messages = outboxRepository.findEntitiesToProcess(maxAttempts, batchSize, connection)
                 toProcess = messages.size
@@ -163,7 +146,7 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
                 if (toProcess > 0) {
                     totalToProcess += toProcess
                     processBatch(messages, maxAttempts, initialDelay)
-                    val processed = outboxRepository.update(messages, connection)
+                    val processed = crudRepository.update(messages, connection)
                     totalProcessed += processed
                 }
             }
@@ -178,30 +161,55 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
 
     /**
      * Processes a list of entities concurrently on separate coroutines for improved performance.
+     * Subclasses can override to pre-load related data before processing (e.g., batch-fetch
+     * parent entities to avoid N+1 queries), then call [processEntitiesWith] with a custom processor.
      */
-    private suspend fun processBatch(
+    protected open suspend fun processBatch(
         entities: List<T>,
         maxAttempts: Int,
         initialDelay: Duration
+    ): Int = processEntitiesWith(entities, maxAttempts, initialDelay) { process(it) }
+
+    /**
+     * Processes entities concurrently using the provided processor function.
+     * Use this when you need to pass pre-loaded data (e.g., a local cache) to the processor.
+     *
+     * Example usage in subclass:
+     * ```
+     * override suspend fun processBatch(entities: List<T>, maxAttempts: Int, initialDelay: Duration): Int {
+     *     val cache = repository.findByIds(entities.map { it.parentId }.distinct())
+     *     return processEntitiesWith(entities, maxAttempts, initialDelay) { entity ->
+     *         val parent = cache[entity.parentId] ?: error("Not found")
+     *         // process with parent...
+     *     }
+     * }
+     * ```
+     */
+    protected suspend fun processEntitiesWith(
+        entities: List<T>,
+        maxAttempts: Int,
+        initialDelay: Duration,
+        processor: suspend (T) -> Unit
     ): Int = coroutineScope {
-        entities.map {
-            async { processEntity(it, maxAttempts, initialDelay) }
+        entities.map { entity ->
+            async { processEntityWith(entity, maxAttempts, initialDelay, processor) }
         }
     }.awaitAll().count { it }
 
     /**
-     * Processes a given message with retry handling, exponential backoff, and timestamp updates.
-     *
-     * The method increments the message's attempt count, processes the message,
-     * and updates timestamps accordingly. If the processing fails, it implements
-     * retries with a delayed schedule based on exponential backoff. Once the maximum
-     * attempts have been reached, outbox_failed_at is set.
+     * Processes an entity using the provided processor function with retry handling.
      */
-    private suspend fun processEntity(entity: T, maxAttempts: Int, initialDelay: Duration): Boolean = try {
+    private suspend fun processEntityWith(
+        entity: T,
+        maxAttempts: Int,
+        initialDelay: Duration,
+        processor: suspend (T) -> Unit
+    ): Boolean = try {
         entity.outboxAttemptCount++
-        process(entity)
-        // Mark as completed on success
-        entity.outboxCompletedAt = Clock.System.now()
+        processor(entity)
+        // Mark as completed on success and schedule for cleanup
+        val now = Clock.System.now()
+        entity.outboxCompletedAt = now
         true // <- return true (success)
     } catch (e: Exception) {
         logger.info(e) { "Failed to process $entity" }
@@ -210,14 +218,15 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
         entity.outboxErrorStackTrace = e.stackTraceToString()
 
         if (entity.outboxAttemptCount >= maxAttempts) {
-            // Mark as permanently failed
-            entity.outboxFailedAt = Clock.System.now()
-            logger.error { "Message ${entity.instanceMessage.workflowId} has reached maximum retry attempts" }
+            // Mark as permanently failed and schedule for cleanup
+            val now = Clock.System.now()
+            entity.outboxFailedAt = now
+            logger.error { "Reached maximum retry attempts, marking as failed: $entity" }
         } else {
             // Schedule for retry with exponential backoff
             val nextDelay = calculateNextAttemptDelay(entity.outboxAttemptCount, initialDelay)
             entity.outboxDelayedUntil = Clock.System.now() + nextDelay
-            logger.debug { "Message ${entity.instanceMessage.workflowId} will be retried in ${nextDelay}ms (attempt ${entity.outboxAttemptCount})" }
+            logger.debug { "Failing processing outbox, retrying in ${nextDelay}ms (attempt ${entity.outboxAttemptCount}): $entity" }
         }
         false // <- return false (failure)
     }
@@ -249,4 +258,7 @@ internal abstract class AbstractOutbox<T : OutboxModel> : AbstractCleaner<T>() {
             }
         }
     }
+
+    private fun Int.entities(): String = this.toString() + " entity" + if (this <= 1) "" else " entities"
+    private fun Int.batches(): String = this.toString() + " batch" + if (this <= 1) "" else "es"
 }
