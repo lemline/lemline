@@ -450,3 +450,8 @@ See ADR-0003 section "Adding a New Messaging Technology" for detailed steps:
 3. Add broker-specific config interface
 4. Update `MessagingConfig.toQuarkusProperties()`
 5. Create test profile and test resources
+
+## Active Technologies
+
+- Kotlin 2.2.10, Java 17 + Kotest 5.9.1, JUnit 5 (via Quarkus), MockK 1.13.9, Kotlinx Coroutines 1.10.2
+- PostgreSQL, MySQL, H2 (all supported)
