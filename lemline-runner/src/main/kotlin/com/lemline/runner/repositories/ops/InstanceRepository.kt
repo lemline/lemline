@@ -77,9 +77,9 @@ inline fun <reified S : WorkflowState> ResultSet.getInstanceMessage(idHelper: Id
         null -> null
         else -> InstanceMessage(
             workflowInfo = WorkflowInfo(
-                workflowNamespace = WorkflowNamespace(getString(WORKFLOW_NAMESPACE_COLUMN)),
-                workflowName = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
-                workflowVersion = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
+                namespace = WorkflowNamespace(getString(WORKFLOW_NAMESPACE_COLUMN)),
+                name = WorkflowName(getString(WORKFLOW_NAME_COLUMN)),
+                version = WorkflowVersion(getString(WORKFLOW_VERSION_COLUMN)),
             ),
             workflowState = WorkflowState.fromJsonString(getString(WORKFLOW_STATE_COLUMN)) as S,
         )

@@ -9,7 +9,7 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.runner.messaging.events.WorkflowEventEmitter
+import com.lemline.runner.messaging.lifecycle.LifecycleEventHookImpl
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.setup
@@ -48,7 +48,7 @@ class InstanceStartCommandTest {
     private lateinit var definitions: Definitions
     private lateinit var definitionRepository: DefinitionRepository
     private lateinit var instanceEmitter: WorkflowCommandEmitter
-    private lateinit var databaseEmitter: WorkflowEventEmitter
+    private lateinit var lifecycleHook: LifecycleEventHookImpl
 
     private var workflowNamespace = WorkflowNamespace("test")
     private var workflowName = WorkflowName("testWorkflow")
@@ -115,7 +115,9 @@ class InstanceStartCommandTest {
         messageSlot = slot<InstanceMessage<WorkflowCommand.ResumeFromTask>>()
         // Emitter mocks
         instanceEmitter = mockk(relaxUnitFun = true)
-        databaseEmitter = mockk(relaxUnitFun = true)
+
+        // Lifecycle hook mock (relaxed - all methods are no-ops)
+        lifecycleHook = mockk(relaxed = true)
 
         // Definition repository mock
         definitionRepository = mockk()
@@ -142,7 +144,7 @@ class InstanceStartCommandTest {
         command = InstanceStartCommand()
         command.inject("starter", starter)
         command.inject("instanceEmitter", instanceEmitter)
-        command.inject("databaseEmitter", databaseEmitter)
+        command.inject("lifecycleHook", lifecycleHook)
 
         // Save original streams
         originalOut = System.out
@@ -186,8 +188,8 @@ class InstanceStartCommandTest {
         coVerify { instanceEmitter.send(capture(messageSlot)) }
 
         val sentInstanceMessage = messageSlot.captured
-        sentInstanceMessage.workflowInfo.workflowName shouldBe workflowName
-        sentInstanceMessage.workflowInfo.workflowVersion shouldBe workflowVersion
+        sentInstanceMessage.workflowInfo.name shouldBe workflowName
+        sentInstanceMessage.workflowInfo.version shouldBe workflowVersion
 
         return sentInstanceMessage
     }

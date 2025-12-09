@@ -3,6 +3,7 @@ package com.lemline.core.orchestrator
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.activities.DefaultActivityExecutor
 import com.lemline.core.definitions.DefinitionCache
@@ -55,18 +56,20 @@ internal object FullOrchestrator {
         hasWaitingParent: Boolean = false,
         startedAt: Instant = Clock.System.now(),
         serde: Boolean = false,
-        activityExecutor: ActivityExecutor = defaultActivityExecutor
+        activityExecutor: ActivityExecutor = defaultActivityExecutor,
+        lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
     ): JsonElement {
         val cmd = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
 
-        return resume(workflow, cmd, serde, activityExecutor).value()
+        return resume(workflow, cmd, serde, activityExecutor, lifecycleHook).value()
     }
 
     suspend fun resume(
         workflow: Workflow,
         command: WorkflowCommand,
         serde: Boolean,
-        activityExecutor: ActivityExecutor = defaultActivityExecutor
+        activityExecutor: ActivityExecutor = defaultActivityExecutor,
+        lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
     ): WorkflowEvent.Outcome {
 
         val serdeCommand = when (serde) {
@@ -77,7 +80,7 @@ internal object FullOrchestrator {
         if (command != serdeCommand)
             throw IllegalStateException("Command mismatch\ncommand     : $command\nserdeCommand: $serdeCommand")
 
-        val event = StepByStepOrchestrator.runByTask(workflow, serdeCommand)
+        val event = StepByStepOrchestrator.runByTask(workflow, serdeCommand, workflow.info, lifecycleHook)
 
         val serdeEvent = when (serde) {
             true -> WorkflowState.fromJsonString(event.toJsonString()) as WorkflowEvent
@@ -92,24 +95,27 @@ internal object FullOrchestrator {
                 workflow,
                 handle(serdeEvent, activityExecutor),
                 serde,
-                activityExecutor
+                activityExecutor,
+                lifecycleHook,
             )
 
-            is WorkflowEvent.WaitStarted -> resume(workflow, handle(serdeEvent), serde, activityExecutor)
-            is WorkflowEvent.TaskScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor)
-            is WorkflowEvent.TaskRetryScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor)
+            is WorkflowEvent.WaitStarted -> resume(workflow, handle(serdeEvent), serde, activityExecutor, lifecycleHook)
+            is WorkflowEvent.TaskScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor, lifecycleHook)
+            is WorkflowEvent.TaskRetryScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor, lifecycleHook)
             is WorkflowEvent.RunWorkflowStarted -> resume(
                 workflow,
-                handle(serdeEvent, serde, activityExecutor),
+                handle(serdeEvent, serde, activityExecutor, lifecycleHook),
                 serde,
-                activityExecutor
+                activityExecutor,
+                lifecycleHook,
             )
 
             is WorkflowEvent.ForkStarted -> resume(
                 workflow,
-                handle(workflow, serdeEvent, serde, activityExecutor),
+                handle(workflow, serdeEvent, serde, activityExecutor, lifecycleHook),
                 serde,
-                activityExecutor
+                activityExecutor,
+                lifecycleHook,
             )
 
             is WorkflowEvent.ListenStarted -> throw UnsupportedOperationException(
@@ -166,7 +172,8 @@ internal object FullOrchestrator {
     private suspend fun handle(
         event: WorkflowEvent.RunWorkflowStarted,
         serde: Boolean,
-        activityExecutor: ActivityExecutor
+        activityExecutor: ActivityExecutor,
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowCommand {
         // Retrieve child workflow definition
         val childWorkflow = DefinitionCache.getWorkflow(
@@ -182,7 +189,7 @@ internal object FullOrchestrator {
                     workflowInput = event.config.input,
                     hasWaitingParent = true
                 )
-                val result = resume(childWorkflow, initCmd, serde, activityExecutor)
+                val result = resume(childWorkflow, initCmd, serde, activityExecutor, lifecycleHook)
                 logger.debug { "Child workflow completed" }
                 when (result) {
                     is WorkflowEvent.WorkflowCompleted -> event.resumeAsCompleted(result.output)
@@ -199,7 +206,7 @@ internal object FullOrchestrator {
                         workflowInput = event.config.input,
                         hasWaitingParent = false
                     )
-                    resume(childWorkflow, initCmd, serde, activityExecutor) // <= output is not handled
+                    resume(childWorkflow, initCmd, serde, activityExecutor, lifecycleHook) // <= output is not handled
                     logger.debug { "Child workflow completed" }
                 }
                 // Immediate resuming
@@ -235,7 +242,8 @@ internal object FullOrchestrator {
         workflow: Workflow,
         event: WorkflowEvent.ForkStarted,
         serde: Boolean,
-        activityExecutor: ActivityExecutor
+        activityExecutor: ActivityExecutor,
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowCommand {
         @Suppress("UNCHECKED_CAST")
         val forkNode = workflow.getNode(event.nodePosition) as Node<ForkTask>
@@ -246,9 +254,9 @@ internal object FullOrchestrator {
         // Execute branches and get the result
         return try {
             val output = if (forkNode.task.fork.isCompete) {
-                workflow.executeCompete(event.nodeStack, branches, event.rawInput, serde, activityExecutor)
+                workflow.executeCompete(event.nodeStack, branches, event.rawInput, serde, activityExecutor, lifecycleHook)
             } else {
-                workflow.executeCooperative(event.nodeStack, branches, event.rawInput, serde, activityExecutor)
+                workflow.executeCooperative(event.nodeStack, branches, event.rawInput, serde, activityExecutor, lifecycleHook)
             }
             logger.debug { "Fork completed: output=$output" }
             WorkflowCommand.ResumeWithCompletedTask(
@@ -275,7 +283,8 @@ internal object FullOrchestrator {
         branches: List<Node<*>>,
         rawInput: JsonElement,
         serde: Boolean,
-        activityExecutor: ActivityExecutor
+        activityExecutor: ActivityExecutor,
+        lifecycleHook: LifecycleEventHook,
     ): JsonElement {
         // Get the first success - if all branches failed, the last exception will be rethrown from here
         return branches.mapAwaitFirstFailSlow { branchNode ->
@@ -288,7 +297,8 @@ internal object FullOrchestrator {
                     flowDirective = null
                 ),
                 serde = serde,
-                activityExecutor = activityExecutor
+                activityExecutor = activityExecutor,
+                lifecycleHook = lifecycleHook,
             ).value()
         }
     }
@@ -304,7 +314,8 @@ internal object FullOrchestrator {
         branches: List<Node<*>>,
         rawInput: JsonElement,
         serde: Boolean,
-        activityExecutor: ActivityExecutor
+        activityExecutor: ActivityExecutor,
+        lifecycleHook: LifecycleEventHook,
     ): JsonArray {
         // Get all results - If a branch failed, the first exception will be rethrown from here
         return JsonArray(
@@ -318,7 +329,8 @@ internal object FullOrchestrator {
                         flowDirective = null
                     ),
                     serde = serde,
-                    activityExecutor = activityExecutor
+                    activityExecutor = activityExecutor,
+                    lifecycleHook = lifecycleHook,
                 ).value()
             })
     }

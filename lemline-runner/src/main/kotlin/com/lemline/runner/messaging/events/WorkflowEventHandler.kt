@@ -5,11 +5,15 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.LifecycleEventHook
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
@@ -21,6 +25,7 @@ import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
+import com.lemline.runner.messaging.lifecycle.LifecycleEventHookImpl
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.ForkBranchModel
@@ -87,6 +92,7 @@ internal class WorkflowEventHandler(
     private val starter: Starter,
     override val metrics: WorkflowEventSubscriberMetrics,
     private val databaseManager: DatabaseManager,
+    private val lifecycleHook: LifecycleEventHookImpl,
 ) : MessageHandler<InstanceMessage<WorkflowEvent>> {
 
     override var logger = logger()
@@ -436,7 +442,7 @@ internal class WorkflowEventHandler(
             }
 
             // Create the child + optional schedule
-            val (child, schedule) = starter.getStartingMessages(
+            val preparedWorkflow = starter.prepareWorkflow(
                 workflowId = childWorkflowId,
                 workflowNamespace = instance.workflowState.config.namespace,
                 workflowName = instance.workflowState.config.name,
@@ -447,12 +453,15 @@ internal class WorkflowEventHandler(
             ) { error(it) }
 
             // Insert schedule if present
-            schedule?.let { scheduleRepository.insert(it, conn) }
+            preparedWorkflow.scheduleModel?.let { scheduleRepository.insert(it, conn) }
 
             // Emit child to the workflow channel with idempotent message ID
-            child?.let {
+            preparedWorkflow.instanceMessage?.let { child ->
                 val childMessageId = parentId.derive("-child-init")
-                instanceEmitter.send(it, childMessageId)
+                instanceEmitter.send(child, childMessageId)
+
+                // Emit workflow.created lifecycle event for the child workflow
+                preparedWorkflow.onWorkflowCreated(lifecycleHook)
             }
         }
     }
@@ -460,11 +469,11 @@ internal class WorkflowEventHandler(
     private suspend fun handleWorkflowCompleted(instance: InstanceMessage<WorkflowEvent.WorkflowCompleted>) {
         // Get workflow definition for schedule check (read-only, outside transaction)
         val workflow = definitions.get(
-            instance.workflowInfo.workflowNamespace,
-            instance.workflowInfo.workflowName,
-            instance.workflowInfo.workflowVersion
+            instance.workflowInfo.namespace,
+            instance.workflowInfo.name,
+            instance.workflowInfo.version
         )
-            ?: error("CRITICAL - Unable to find definition of workflow ${instance.workflowInfo.workflowNamespace}/${instance.workflowInfo.workflowName}/${instance.workflowInfo.workflowVersion}.")
+            ?: error("CRITICAL - Unable to find definition of workflow ${instance.workflowInfo.namespace}/${instance.workflowInfo.name}/${instance.workflowInfo.version}.")
 
         val hasScheduleAfter = workflow.schedule?.after != null
 
@@ -541,11 +550,11 @@ internal class WorkflowEventHandler(
         // Get fork node from workflow definition to extract fork configuration
         val workflowInfo = instance.workflowInfo
         val workflow = DefinitionCache.getWorkflow(
-            namespace = workflowInfo.workflowNamespace,
-            name = workflowInfo.workflowName,
-            version = workflowInfo.workflowVersion
+            namespace = workflowInfo.namespace,
+            name = workflowInfo.name,
+            version = workflowInfo.version
         )
-            ?: error("Workflow definition not found: ${workflowInfo.workflowNamespace}/${workflowInfo.workflowName}/${workflowInfo.workflowVersion}")
+            ?: error("Workflow definition not found: ${workflowInfo.namespace}/${workflowInfo.name}/${workflowInfo.version}")
 
         @Suppress("UNCHECKED_CAST")
         val forkNode = workflow.getNode(state.nodePosition) as Node<ForkTask>

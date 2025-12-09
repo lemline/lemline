@@ -439,9 +439,9 @@ internal abstract class ForkWaitingRepositoryTest {
 
         val instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo(
-                workflowNamespace = WorkflowNamespace("test"),
-                workflowName = WorkflowName("test-workflow"),
-                workflowVersion = WorkflowVersion("1.0")
+                namespace = WorkflowNamespace("test"),
+                name = WorkflowName("test-workflow"),
+                version = WorkflowVersion("1.0")
             ),
             workflowState = WorkflowEvent.ForkStarted(
                 nodeStack = NodeStack(

@@ -45,6 +45,8 @@ const val CLOUDEVENTS_PRODUCER_ENABLED = "lemline.messaging.cloudevents.producer
 const val CLOUDEVENTS_CONSUMER_ENABLED = "lemline.messaging.cloudevents.consumer.enabled"
 const val CLOUDEVENTS_CONSUMER_CONCURRENCY = "lemline.messaging.cloudevents.consumer.concurrency"
 
+const val LIFECYCLE_EVENTS_PRODUCER_ENABLED = "lemline.messaging.lifecycleevents.producer.enabled"
+
 const val ORCHESTRATOR_MODE = "lemline.orchestrator.mode"
 
 /**
@@ -176,6 +178,8 @@ interface LemlineConfiguration {
 
         fun cloudevents(): Optional<CloudEventsChannelConfig>
 
+        fun lifecycleevents(): Optional<LifecycleEventsChannelConfig>
+
         /**
          * Optional Kafka configuration
          */
@@ -215,6 +219,15 @@ interface LemlineConfiguration {
     }
 
     /**
+     * Lifecycle events channel configuration.
+     * Used for emitting workflow and task lifecycle events as CloudEvents to external systems.
+     * This is a producer-only channel - lifecycle events are for external consumption.
+     */
+    interface LifecycleEventsChannelConfig {
+        fun producer(): ProducerConfig
+    }
+
+    /**
      * Kafka-specific configuration.
      */
     interface KafkaConfig {
@@ -229,6 +242,17 @@ interface LemlineConfiguration {
 
         fun workflows(): KafkaWorkflowsConfig
         fun database(): KafkaIngestionConfig
+        fun lifecycleevents(): Optional<KafkaLifecycleEventsConfig>
+    }
+
+    /**
+     * Kafka lifecycle events configuration.
+     * Producer-only configuration for emitting lifecycle events.
+     */
+    interface KafkaLifecycleEventsConfig {
+        @WithDefault(LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT)
+        fun topic(): String
+        fun producer(): KafkaProducerConfig
     }
 
     interface KafkaWorkflowsConfig {
@@ -296,6 +320,17 @@ interface LemlineConfiguration {
 
         fun workflows(): RabbitWorkflowsConfig
         fun database(): RabbitIngestionConfig
+        fun lifecycleevents(): Optional<RabbitLifecycleEventsConfig>
+    }
+
+    /**
+     * RabbitMQ lifecycle events configuration.
+     * Producer-only configuration for emitting lifecycle events.
+     */
+    interface RabbitLifecycleEventsConfig {
+        @WithDefault(LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT)
+        fun queue(): String
+        fun producer(): RabbitProducerConfig
     }
 
     interface RabbitWorkflowsConfig {

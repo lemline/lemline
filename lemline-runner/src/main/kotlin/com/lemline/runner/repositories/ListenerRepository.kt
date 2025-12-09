@@ -92,9 +92,9 @@ data class ListenerQueryKey(
      */
     fun bindParameters(stmt: PreparedStatement, startIndex: Int): Int {
         var idx = startIndex
-        stmt.setString(idx++, workflowInfo.workflowNamespace.toString())
-        stmt.setString(idx++, workflowInfo.workflowName.toString())
-        stmt.setString(idx++, workflowInfo.workflowVersion.toString())
+        stmt.setString(idx++, workflowInfo.namespace.toString())
+        stmt.setString(idx++, workflowInfo.name.toString())
+        stmt.setString(idx++, workflowInfo.version.toString())
         stmt.setString(idx++, position.toString())
         if (correlationValuesJson != null) {
             stmt.setString(idx++, correlationValuesJson)
@@ -115,9 +115,9 @@ data class ListenerQueryKey(
      */
     fun bindParametersWithoutCorrelation(stmt: PreparedStatement, startIndex: Int): Int {
         var idx = startIndex
-        stmt.setString(idx++, workflowInfo.workflowNamespace.toString())
-        stmt.setString(idx++, workflowInfo.workflowName.toString())
-        stmt.setString(idx++, workflowInfo.workflowVersion.toString())
+        stmt.setString(idx++, workflowInfo.namespace.toString())
+        stmt.setString(idx++, workflowInfo.name.toString())
+        stmt.setString(idx++, workflowInfo.version.toString())
         stmt.setString(idx++, position.toString())
         return idx
     }

@@ -52,9 +52,9 @@ private fun NodeStack.Companion.random(): NodeStack = NodeStack(
 )
 
 fun WorkflowInfo.Companion.random() = WorkflowInfo(
-    workflowNamespace = WorkflowNamespace.random(),
-    workflowName = WorkflowName.random(),
-    workflowVersion = WorkflowVersion.random()
+    namespace = WorkflowNamespace.random(),
+    name = WorkflowName.random(),
+    version = WorkflowVersion.random()
 )
 
 fun WorkflowCommand.Companion.random() = when (Random.nextBoolean()) {

@@ -12,17 +12,17 @@ data class WorkflowInfo(
     /**
      * The namespace of the workflow.
      */
-    @SerialName("s") val workflowNamespace: WorkflowNamespace,
+    @SerialName("s") val namespace: WorkflowNamespace,
 
     /**
      * The name of the workflow.
      */
-    @SerialName("n") val workflowName: WorkflowName,
+    @SerialName("n") val name: WorkflowName,
 
     /**
      * The version of the workflow.
      */
-    @SerialName("v") val workflowVersion: WorkflowVersion
+    @SerialName("v") val version: WorkflowVersion
 ) : JsonSerializable {
 
     override fun toJsonString() = LemlineJson.encodeToString(this)
@@ -30,6 +30,8 @@ data class WorkflowInfo(
     companion object {
         fun fromJsonString(json: String): WorkflowInfo = LemlineJson.decodeFromString(json)
     }
+
+    val qualifiedName: String by lazy { "$namespace/$name:$version" }
 }
 
-val Workflow.info get() = WorkflowInfo(namespace, name, version)
+val Workflow.info get() = WorkflowInfo(this.namespace, this.name, this.version)

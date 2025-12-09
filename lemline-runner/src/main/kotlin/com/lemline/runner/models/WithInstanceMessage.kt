@@ -18,11 +18,11 @@ interface WithInstanceMessage {
 
     val workflowId get() = instanceMessage.workflowState.workflowId
 
-    val workflowNamespace get() = instanceMessage.workflowInfo.workflowNamespace
+    val workflowNamespace get() = instanceMessage.workflowInfo.namespace
 
-    val workflowName get() = instanceMessage.workflowInfo.workflowName
+    val workflowName get() = instanceMessage.workflowInfo.name
 
-    val workflowVersion get() = instanceMessage.workflowInfo.workflowVersion
+    val workflowVersion get() = instanceMessage.workflowInfo.version
 
     val nodePosition get() = instanceMessage.workflowState.nodePosition
 }

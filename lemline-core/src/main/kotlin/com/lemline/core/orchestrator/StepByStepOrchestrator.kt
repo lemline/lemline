@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.orchestrator
 
-import com.lemline.common.logger.logger
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
+import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.Node
@@ -24,6 +24,7 @@ import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
 import com.lemline.core.states.WorkflowEvent.TaskRetryScheduled
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WaitStarted
+import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
 import com.lemline.core.states.WorkflowEvent.WorkflowFailed
 import com.lemline.core.workflows.toJava
 import com.lemline.core.workflows.toKotlin
@@ -49,8 +50,6 @@ import kotlinx.serialization.json.buildJsonObject
  */
 @ExperimentalTime
 object StepByStepOrchestrator {
-
-    private val logger = logger()
 
     /**
      * Provides a `WorkflowCommand` starting a workflow.
@@ -79,49 +78,129 @@ object StepByStepOrchestrator {
 
     /**
      * Processes a given workflow command and resumes workflow execution based on the command's type.
+     *
+     * @param workflow The workflow definition
+     * @param command The command to execute
+     * @param workflowInfo The workflow identity (namespace, name, version)
+     * @param lifecycleHook Optional hook for lifecycle event callbacks (default: no-op)
      */
     suspend fun runByTask(
         workflow: Workflow,
         command: WorkflowCommand,
+        workflowInfo: WorkflowInfo,
+        lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
     ): WorkflowEvent {
         val node = workflow.getNode(command.nodePosition)
+        val rootState = command.nodeStack[NodePosition.root] as RootState
 
-        return when (command) {
+        // Check if this is the first task (workflow starting)
+        val isWorkflowStart = command is WorkflowCommand.ResumeFromTask &&
+            command.nodePosition == NodePosition.doRoot &&
+            rootState.workflowStep == 0
+
+        // Emit workflow.started if this is the first task
+        if (isWorkflowStart) {
+            lifecycleHook.onWorkflowStarted(
+                workflowInfo = workflowInfo,
+                nodeStack = command.nodeStack,
+                startedAt = rootState.startedAt,
+            )
+        }
+
+        val event = when (command) {
             is WorkflowCommand.ResumeFromTask -> resumeFromTask(
                 nodeStack = command.nodeStack,
                 node = node,
                 rawInput = command.rawInput,
                 flowDirective = command.flowDirective?.toJava(),
+                workflowInfo = workflowInfo,
+                lifecycleHook = lifecycleHook,
             )
 
             is WorkflowCommand.ResumeWithCompletedTask -> resumeFromCompletedTask(
                 nodeStack = command.nodeStack,
                 node = node,
                 rawOutput = command.rawOutput,
+                workflowInfo = workflowInfo,
+                lifecycleHook = lifecycleHook,
             )
 
             is WorkflowCommand.ResumeWithFailedTask -> resumeFromFailedTask(
                 nodeStack = command.nodeStack,
                 node = node,
                 error = command.error,
+                workflowInfo = workflowInfo,
+                lifecycleHook = lifecycleHook,
             )
         }
+
+        // Emit lifecycle events based on event type
+        when (event) {
+            is WorkflowCompleted -> lifecycleHook.onWorkflowCompleted(
+                workflowInfo = workflowInfo,
+                nodeStack = event.nodeStack,
+                output = event.output,
+                completedAt = event.completedAt,
+            )
+
+            is WorkflowFailed -> lifecycleHook.onWorkflowFaulted(
+                workflowInfo = workflowInfo,
+                nodeStack = event.nodeStack,
+                error = event.error,
+                failedAt = event.failedAt,
+            )
+
+            is TaskScheduled -> lifecycleHook.onTaskCreated(
+                workflowInfo = workflowInfo,
+                nodeStack = event.nodeStack,
+                nodePosition = event.nodePosition,
+                rawInput = event.rawInput,
+                createdAt = Clock.System.now(),
+            )
+
+            is TaskRetryScheduled -> {
+                // Find the TryState in the nodeStack to get the attempt number
+                // The TryState is stored at the try node position
+                val attemptNumber = event.nodeStack.map { entry ->
+                    (entry.value as? TryState)?.attemptIndex
+                }.filterNotNull().maxOrNull() ?: 1
+                lifecycleHook.onTaskRetried(
+                    workflowInfo = workflowInfo,
+                    nodeStack = event.nodeStack,
+                    nodePosition = event.nodePosition,
+                    retryAt = event.retryAt,
+                    attemptNumber = attemptNumber,
+                )
+            }
+
+            else -> { /* No lifecycle event for other event types */
+            }
+        }
+
+        return event
     }
 
     /**
      * Executes the workflow based on the provided command, processing activity nodes recursively
      * until an appropriate event is returned.
+     *
+     * @param workflow The workflow definition
+     * @param command The command to execute
+     * @param workflowInfo The workflow identity (namespace, name, version)
+     * @param lifecycleHook Optional hook for lifecycle event callbacks (default: no-op)
      */
     suspend fun runByActivity(
         workflow: Workflow,
         command: WorkflowCommand,
+        workflowInfo: WorkflowInfo,
+        lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
     ): WorkflowEvent {
 
-        return when (val event = runByTask(workflow, command)) {
+        return when (val event = runByTask(workflow, command, workflowInfo, lifecycleHook)) {
             is TaskScheduled -> if (workflow.getNode(event.nodePosition).isActivity()) {
                 event
             } else {
-                runByActivity(workflow, event.resume())
+                runByActivity(workflow, event.resume(), workflowInfo, lifecycleHook)
             }
 
             is ActivityStarted -> event
@@ -137,15 +216,29 @@ object StepByStepOrchestrator {
 
     /**
      * Resumes the workflow execution from a specific task.
+     *
+     * Emits task.started lifecycle event when a task begins execution.
      */
     internal suspend fun resumeFromTask(
         nodeStack: NodeStack,
         node: Node<*>,
         rawInput: JsonElement,
         flowDirective: FlowDirective? = null,
+        workflowInfo: WorkflowInfo,
+        lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
     ): WorkflowEvent {
         // Increment workflow step counter
         val updatedStateStack = nodeStack.incrementStep()
+        val now = Clock.System.now()
+
+        // Emit task.started - task is now actually executing
+        lifecycleHook.onTaskStarted(
+            workflowInfo = workflowInfo,
+            nodeStack = updatedStateStack,
+            nodePosition = node.position,
+            rawInput = rawInput,
+            startedAt = now,
+        )
 
         return try {
             // run the next task within a try-catch block to handle workflow-caught exceptions
@@ -171,55 +264,85 @@ object StepByStepOrchestrator {
     /**
      * Resumes the workflow execution from an asynchronously completed task,
      * (transitioning the current task from an incomplete state to the next expected state.)
+     *
+     * Emits task.completed lifecycle event when task finishes successfully.
      */
     internal suspend fun resumeFromCompletedTask(
         nodeStack: NodeStack,
         node: Node<*>,
         rawOutput: JsonElement,
-    ): WorkflowEvent = try {
-        // Resume the completed task (transforms output, updates state)
-        tryCatch(node, nodeStack) {
-            completeTask(nodeStack, node, rawOutput)
+        workflowInfo: WorkflowInfo,
+        lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
+    ): WorkflowEvent {
+        // Emit task.completed - task finished successfully
+        lifecycleHook.onTaskCompleted(
+            workflowInfo = workflowInfo,
+            nodeStack = nodeStack,
+            nodePosition = node.position,
+            rawOutput = rawOutput,
+            completedAt = Clock.System.now(),
+        )
+
+        return try {
+            // Resume the completed task (transforms output, updates state)
+            tryCatch(node, nodeStack) {
+                completeTask(nodeStack, node, rawOutput)
+            }
+        } catch (e: Exception) {
+            // Uncaught failure within a fork branch
+            forkBranchFailed(nodeStack, node, e)
+            // Uncaught failure
+                ?: WorkflowFailed(
+                    nodeStack = nodeStack,
+                    nodePosition = node.position,
+                    rawInput = null,
+                    rawOutput = rawOutput,
+                    flowDirective = null,
+                    exception = e
+                )
         }
-    } catch (e: Exception) {
-        // Uncaught failure within a fork branch
-        forkBranchFailed(nodeStack, node, e)
-        // Uncaught failure
-            ?: WorkflowFailed(
-                nodeStack = nodeStack,
-                nodePosition = node.position,
-                rawInput = null,
-                rawOutput = rawOutput,
-                flowDirective = null,
-                exception = e
-            )
     }
 
     /**
      * Resumes the workflow execution from an asynchronously failed task,
      * (hopefully catching the error, if not returns a ForkBranchFailed or TaskFailed event on the same node)
+     *
+     * Emits task.faulted lifecycle event when task fails with an error.
      */
     internal suspend fun resumeFromFailedTask(
         nodeStack: NodeStack,
         node: Node<*>,
         error: InternalException.Error,
-    ): WorkflowEvent = try {
-        // Resume the failed task (hopefully, the error can be handled)
-        tryCatch(node, nodeStack) {
-            throw InternalException(error)
-        }
-    } catch (e: Exception) {
-        // Uncaught failure within a fork branch
-        forkBranchFailed(nodeStack, node, e)?.let { return it }
-        // Uncaught failure
-        WorkflowFailed(
+        workflowInfo: WorkflowInfo,
+        lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
+    ): WorkflowEvent {
+        // Emit task.faulted - task failed with an error
+        lifecycleHook.onTaskFaulted(
+            workflowInfo = workflowInfo,
             nodeStack = nodeStack,
             nodePosition = node.position,
-            rawInput = null,
-            rawOutput = null,
-            flowDirective = null,
-            exception = e
+            error = error,
+            failedAt = Clock.System.now(),
         )
+
+        return try {
+            // Resume the failed task (hopefully, the error can be handled)
+            tryCatch(node, nodeStack) {
+                throw InternalException(error)
+            }
+        } catch (e: Exception) {
+            // Uncaught failure within a fork branch
+            forkBranchFailed(nodeStack, node, e)?.let { return it }
+            // Uncaught failure
+            WorkflowFailed(
+                nodeStack = nodeStack,
+                nodePosition = node.position,
+                rawInput = null,
+                rawOutput = null,
+                flowDirective = null,
+                exception = e
+            )
+        }
     }
 
     /**

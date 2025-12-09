@@ -251,9 +251,9 @@ internal class ListenerTimeoutOutboxTest {
             id = listenerId,
             instanceMessage = InstanceMessage(
                 workflowInfo = WorkflowInfo(
-                    workflowNamespace = testNamespace,
-                    workflowName = testName,
-                    workflowVersion = testVersion
+                    namespace = testNamespace,
+                    name = testName,
+                    version = testVersion
                 ),
                 workflowState = listenStarted
             ),

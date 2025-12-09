@@ -81,9 +81,9 @@ fun JsonElement.Companion.nullableRandom(): JsonElement {
 fun NodePosition.Companion.random() = NodePosition("/${String.random()}/${String.random()}/${String.random()}")
 
 fun WorkflowInfo.Companion.random() = WorkflowInfo(
-    workflowNamespace = WorkflowNamespace.random(),
-    workflowName = WorkflowName.random(),
-    workflowVersion = WorkflowVersion.random(),
+    namespace = WorkflowNamespace.random(),
+    name = WorkflowName.random(),
+    version = WorkflowVersion.random(),
 )
 
 fun NodeState.Companion.random() = when (Random.nextInt(12)) {

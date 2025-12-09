@@ -9,7 +9,7 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.exceptions.CliException
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.runner.messaging.events.WorkflowEventEmitter
+import com.lemline.runner.messaging.lifecycle.LifecycleEventHookImpl
 import com.lemline.runner.repositories.ScheduleRepository
 import com.lemline.runner.starters.Starter
 import io.quarkus.arc.Unremovable
@@ -43,10 +43,10 @@ class InstanceStartCommand : Runnable {
     private lateinit var instanceEmitter: WorkflowCommandEmitter
 
     @Inject
-    private lateinit var databaseEmitter: WorkflowEventEmitter
+    private lateinit var scheduleRepository: ScheduleRepository
 
     @Inject
-    private lateinit var scheduleRepository: ScheduleRepository
+    private lateinit var lifecycleHook: LifecycleEventHookImpl
 
     @Parameters(
         index = "0",
@@ -96,7 +96,7 @@ class InstanceStartCommand : Runnable {
         // - schedule after or every -> an instanceMessage and a scheduleOutboxModel
         // - schedule cron -> a single scheduleOutboxModel
         // For the two last cases, we sent an IngestionMessage (first database ingestion, then only after starting the instance)
-        val (instanceMessage, scheduleOutboxModel) = starter.getStartingMessages(
+        val preparedWorkflow = starter.prepareWorkflow(
             workflowId = workflowId,
             workflowNamespace = workflowNamespace,
             workflowName = workflowName,
@@ -105,6 +105,9 @@ class InstanceStartCommand : Runnable {
             hasWaitingParent = false,
             zoneId = getZoneId(),
         ) { cliError(it) }
+
+        val instanceMessage = preparedWorkflow.instanceMessage
+        val scheduleOutboxModel = preparedWorkflow.scheduleModel
 
         val workflowVersion =
             instanceMessage?.workflowVersion ?: scheduleOutboxModel?.workflowVersion
@@ -118,6 +121,9 @@ class InstanceStartCommand : Runnable {
 
         // Send instance message if present (no schedule or immediate first run)
         instanceMessage?.let { instanceEmitter.send(it) }
+
+        // Trigger workflow.created lifecycle event after successfully sending the message
+        preparedWorkflow.onWorkflowCreated(lifecycleHook)
 
         cliPrint("Instance $workflowId started successfully (name: $workflowName, version: $workflowVersion, input: $workflowInput)")
     }

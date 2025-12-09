@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalTime::class)
+
 package com.lemline.runner.starters
 
 import com.lemline.common.values.WorkflowId
@@ -6,6 +8,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.orchestrator.LifecycleEventHook
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.WorkflowCommand
@@ -19,8 +22,25 @@ import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
-@ExperimentalTime
-@ExperimentalSerializationApi
+/**
+ * A prepared workflow ready to be dispatched.
+ *
+ * Contains all components needed to start a workflow instance:
+ * - The instance message to send to the workflow channel
+ * - Optional schedule model for scheduled workflows
+ * - Lifecycle hook callback to emit workflow.created event
+ *
+ * @property instanceMessage The instance message to send (null for cron-scheduled workflows)
+ * @property scheduleModel The schedule model for scheduled workflows (null if no schedule)
+ * @property onWorkflowCreated Lambda to trigger the workflow.created lifecycle event.
+ *           Caller should invoke this after successfully sending the message.
+ */
+data class PreparedWorkflow(
+    val instanceMessage: InstanceMessage<WorkflowCommand.ResumeFromTask>?,
+    val scheduleModel: ScheduleModel?,
+    val onWorkflowCreated: suspend (LifecycleEventHook) -> Unit,
+)
+
 @ApplicationScoped
 class Starter {
 
@@ -28,15 +48,18 @@ class Starter {
     private lateinit var definitions: Definitions
 
     /**
-     * Returns a pair of [InstanceMessage] and [ScheduleModel]
+     * Returns [PreparedWorkflow] containing the instance message, schedule model, and lifecycle hook lambda.
      *
      * Depending on the schedule of the workflow, different messages are needed:
      *      - no schedule -> a single instanceMessage
      *      - schedule after or every -> an instanceMessage and a scheduleOutboxModel
      *      - schedule cron -> a single scheduleOutboxModel
      *      For the two last cases, we sent an IngestionMessage (first database ingestion, then only after starting the instance)
+     *
+     * The [PreparedWorkflow.onWorkflowCreated] lambda should be called by the caller after successfully
+     * sending the message to emit the workflow.created lifecycle event.
      */
-    suspend fun getStartingMessages(
+    suspend fun prepareWorkflow(
         workflowId: WorkflowId,
         workflowNamespace: WorkflowNamespace,
         workflowName: WorkflowName,
@@ -45,7 +68,7 @@ class Starter {
         hasWaitingParent: Boolean,
         zoneId: ZoneId?,
         onError: (String) -> Nothing,
-    ): Pair<InstanceMessage<WorkflowCommand.ResumeFromTask>?, ScheduleModel?> {
+    ): PreparedWorkflow {
         // Retrieve the workflow definition from the repository
         val workflow = definitions.get(workflowNamespace, workflowName, optionalVersion)
             ?: onError("Workflow $workflowName (version=${optionalVersion ?: "latest"}) not found.")
@@ -79,7 +102,17 @@ class Starter {
             )
         }
 
-        return Pair(instanceMessage, scheduleModel)
+        // Create the lambda to trigger the workflow.created lifecycle event
+        // Caller invokes this after successfully sending the message
+        // Note: For cron-scheduled workflows (no instanceMessage), the lambda is a no-op
+        val workflowInfo = WorkflowInfo(workflowNamespace, workflowName, workflowVersion)
+        val onWorkflowCreated: suspend (LifecycleEventHook) -> Unit = { hook ->
+            instanceMessage?.let { msg ->
+                hook.onWorkflowCreated(workflowInfo, msg.workflowState.nodeStack)
+            }
+        }
+
+        return PreparedWorkflow(instanceMessage, scheduleModel, onWorkflowCreated)
     }
 
     private fun validateInput(

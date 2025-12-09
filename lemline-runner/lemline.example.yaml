@@ -132,3 +132,31 @@ lemline:
         consumer:
           concurrency: ${LEMLINE_WORKFLOWS_CONCURRENCY:5}
           dlq: ${LEMLINE_WORKFLOWS_DLQ:lemline-events-dlq}
+
+    # --- Lifecycle Events Configuration (Optional) ---
+    # Enable publishing of workflow and task lifecycle events as CloudEvents.
+    # Events are published to a dedicated topic/queue and follow the Serverless Workflow lifecycle spec.
+    # See: https://serverlessworkflow.io/
+    #
+    # Events published:
+    # - workflow.started, workflow.completed, workflow.faulted
+    # - task.created, task.started, task.completed, task.faulted, task.retried
+    #
+    # Each event includes:
+    # - CloudEvents attributes (id, source, type, time)
+    # - Lemline extensions (lemlineworkflowid, lemlineworkflowname, etc.)
+    # - Structured data payload with event-specific information
+    #
+    # lifecycleevents:
+    #   producer:
+    #     enabled: true  # Set to true to enable lifecycle event publishing
+    #
+    #   # Kafka-specific lifecycle events settings (when using kafka)
+    #   # Topic defaults to 'lemline-lifecycle-events' if not specified
+    #   kafka:
+    #     topic: ${LEMLINE_LIFECYCLE_EVENTS_TOPIC:lemline-lifecycle-events}
+    #
+    #   # RabbitMQ-specific lifecycle events settings (when using rabbitmq)
+    #   # Queue defaults to 'lemline-lifecycle-events' if not specified
+    #   # rabbitmq:
+    #   #   queue: ${LEMLINE_LIFECYCLE_EVENTS_QUEUE:lemline-lifecycle-events}

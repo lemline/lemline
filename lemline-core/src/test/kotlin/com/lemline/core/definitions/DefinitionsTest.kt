@@ -222,9 +222,9 @@ class DefinitionsTest {
         val index = workflow.info
 
         // Then
-        index.workflowNamespace shouldBe workflow.namespace
-        index.workflowName shouldBe workflow.name
-        index.workflowVersion shouldBe workflow.version
+        index.namespace shouldBe workflow.namespace
+        index.name shouldBe workflow.name
+        index.version shouldBe workflow.version
 
         // Verify the index is used correctly for caching
         val cachedWorkflow = DefinitionCache.getWorkflow(

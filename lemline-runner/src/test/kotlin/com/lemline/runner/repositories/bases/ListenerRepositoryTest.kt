@@ -109,9 +109,9 @@ internal abstract class ListenerRepositoryTest {
         val workflowId = WorkflowId(IDV7.random())
 
         val workflowInfo = WorkflowInfo(
-            workflowNamespace = testNamespace,
-            workflowName = testName,
-            workflowVersion = testVersion
+            namespace = testNamespace,
+            name = testName,
+            version = testVersion
         )
 
         // Create a proper NodeStack with the listen task position
@@ -590,9 +590,9 @@ internal abstract class ListenerRepositoryTest {
         val workflowId = WorkflowId(IDV7.random())
 
         val workflowInfo = WorkflowInfo(
-            workflowNamespace = testNamespace,
-            workflowName = testName,
-            workflowVersion = testVersion
+            namespace = testNamespace,
+            name = testName,
+            version = testVersion
         )
 
         val nodeStack = NodeStack(

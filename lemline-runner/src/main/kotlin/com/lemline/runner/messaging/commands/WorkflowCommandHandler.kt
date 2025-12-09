@@ -19,6 +19,7 @@ import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
+import com.lemline.runner.messaging.lifecycle.LifecycleEventHookImpl
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.repositories.DefinitionRepository
@@ -50,6 +51,7 @@ internal class WorkflowCommandHandler(
     override val metrics: WorkflowCommandSubscriberMetrics,
     private val config: LemlineConfiguration,
     private val activityExecutor: RunnerActivityExecutor,
+    private val lifecycleHook: LifecycleEventHookImpl,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
 
@@ -263,14 +265,20 @@ internal class WorkflowCommandHandler(
      * @return InstanceMessage to emit for next step, or null if paused/terminal
      */
     private suspend fun InstanceMessage<WorkflowCommand>.executeStep(workflow: Workflow): InstanceMessage<WorkflowCommand>? {
-
         // Execute using StepByStepOrchestrator
         logger.debug { "resumeFromTask state=$workflowState" }
         val event = when (config.orchestrator().mode()) {
-            LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(workflow, workflowState)
+            LemlineConfiguration.OrchestratorMode.ALL -> StepByStepOrchestrator.runByTask(
+                workflow,
+                workflowState,
+                workflowInfo,
+                lifecycleHook,
+            )
             LemlineConfiguration.OrchestratorMode.ACTION -> StepByStepOrchestrator.runByActivity(
                 workflow,
-                workflowState
+                workflowState,
+                workflowInfo,
+                lifecycleHook,
             )
         }
 
