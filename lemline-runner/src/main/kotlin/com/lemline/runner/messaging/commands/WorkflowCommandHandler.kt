@@ -138,7 +138,7 @@ internal class WorkflowCommandHandler(
         val error = InternalException.Error(
             type = exception::class.qualifiedName ?: "Unknown",
             status = 500,
-            instance = workflowId.toString(),
+            position = workflowId.toString(),
             title = exception.message,
             details = exception.stackTraceToString()
         )
@@ -274,6 +274,7 @@ internal class WorkflowCommandHandler(
                 workflowInfo,
                 lifecycleHook,
             )
+
             LemlineConfiguration.OrchestratorMode.ACTION -> StepByStepOrchestrator.runByActivity(
                 workflow,
                 workflowState,

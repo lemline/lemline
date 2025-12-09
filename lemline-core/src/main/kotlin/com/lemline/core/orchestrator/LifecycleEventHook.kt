@@ -113,14 +113,14 @@ interface LifecycleEventHook {
      * @param workflowInfo The workflow definition info (namespace, name, version)
      * @param nodeStack The current node stack
      * @param nodePosition The task's position in the workflow tree
-     * @param rawInput The task's input data
+     * @param input The task's input data
      * @param createdAt When the task was scheduled
      */
     suspend fun onTaskCreated(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
-        rawInput: JsonElement,
+        input: JsonElement,
         createdAt: Instant,
     )
 
@@ -150,14 +150,14 @@ interface LifecycleEventHook {
      * @param workflowInfo The workflow definition info (namespace, name, version)
      * @param nodeStack The current node stack
      * @param nodePosition The task's position in the workflow tree
-     * @param rawOutput The task's output data
+     * @param output The task's output data
      * @param completedAt When the task completed
      */
     suspend fun onTaskCompleted(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
-        rawOutput: JsonElement,
+        output: JsonElement,
         completedAt: Instant,
     )
 
@@ -231,7 +231,7 @@ interface LifecycleEventHook {
                 workflowInfo: WorkflowInfo,
                 nodeStack: NodeStack,
                 nodePosition: NodePosition,
-                rawInput: JsonElement,
+                input: JsonElement,
                 createdAt: Instant
             ) = Unit
 
@@ -247,7 +247,7 @@ interface LifecycleEventHook {
                 workflowInfo: WorkflowInfo,
                 nodeStack: NodeStack,
                 nodePosition: NodePosition,
-                rawOutput: JsonElement,
+                output: JsonElement,
                 completedAt: Instant
             ) = Unit
 

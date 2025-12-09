@@ -57,7 +57,7 @@ internal object FullOrchestrator {
         startedAt: Instant = Clock.System.now(),
         serde: Boolean = false,
         activityExecutor: ActivityExecutor = defaultActivityExecutor,
-        lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
+        lifecycleHook: LifecycleEventHook,
     ): JsonElement {
         val cmd = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
 
@@ -100,8 +100,22 @@ internal object FullOrchestrator {
             )
 
             is WorkflowEvent.WaitStarted -> resume(workflow, handle(serdeEvent), serde, activityExecutor, lifecycleHook)
-            is WorkflowEvent.TaskScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor, lifecycleHook)
-            is WorkflowEvent.TaskRetryScheduled -> resume(workflow, handle(serdeEvent), serde, activityExecutor, lifecycleHook)
+            is WorkflowEvent.TaskScheduled -> resume(
+                workflow,
+                handle(serdeEvent),
+                serde,
+                activityExecutor,
+                lifecycleHook
+            )
+
+            is WorkflowEvent.TaskRetryScheduled -> resume(
+                workflow,
+                handle(serdeEvent),
+                serde,
+                activityExecutor,
+                lifecycleHook
+            )
+
             is WorkflowEvent.RunWorkflowStarted -> resume(
                 workflow,
                 handle(serdeEvent, serde, activityExecutor, lifecycleHook),
@@ -254,9 +268,23 @@ internal object FullOrchestrator {
         // Execute branches and get the result
         return try {
             val output = if (forkNode.task.fork.isCompete) {
-                workflow.executeCompete(event.nodeStack, branches, event.rawInput, serde, activityExecutor, lifecycleHook)
+                workflow.executeCompete(
+                    event.nodeStack,
+                    branches,
+                    event.rawInput,
+                    serde,
+                    activityExecutor,
+                    lifecycleHook
+                )
             } else {
-                workflow.executeCooperative(event.nodeStack, branches, event.rawInput, serde, activityExecutor, lifecycleHook)
+                workflow.executeCooperative(
+                    event.nodeStack,
+                    branches,
+                    event.rawInput,
+                    serde,
+                    activityExecutor,
+                    lifecycleHook
+                )
             }
             logger.debug { "Fork completed: output=$output" }
             WorkflowCommand.ResumeWithCompletedTask(

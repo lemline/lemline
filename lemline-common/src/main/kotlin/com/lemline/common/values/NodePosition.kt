@@ -35,6 +35,19 @@ data class NodePosition(private val path: String) {
     val isRoot: Boolean by lazy { path == root.path }
 
     /**
+     * Check if this position is a parent of another position.
+     * Example: "/do" is parent of "/do/taskA", "/" is parent of "/do"
+     *
+     * @param other The position to check
+     * @return true if this position is a parent of the other position
+     */
+    fun isParentOf(other: NodePosition): Boolean {
+        val otherPath = other.toString()
+        return otherPath.startsWith(path) && otherPath.length > path.length &&
+            (path == "/" || otherPath[path.length] == '/')
+    }
+
+    /**
      * Get the node name (last segment of path).
      * Example: "/do/taskA" → "taskA", "/" → ""
      */

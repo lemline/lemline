@@ -52,7 +52,7 @@ class WorkflowErrorTest {
         assertEquals("Operation timed out", error.title)
         assertEquals(408, error.status)
         assertEquals("The operation exceeded the maximum allowed time", error.details)
-        assertEquals("/do/1/try", error.instance)
+        assertEquals("/do/1/try", error.position)
     }
 
     @Test

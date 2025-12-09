@@ -137,7 +137,7 @@ class TryProcessor(
         catches.errors?.with?.let { filter: ErrorFilter ->
             if (filter.type != null && filter.type != error.type) return false
             if (filter.status > 0 && filter.status != error.status) return false
-            if (filter.instance != null && filter.instance != error.instance) return false
+            if (filter.instance != null && filter.instance != error.position) return false
             if (filter.title != null && filter.title != error.title) return false
             if (filter.details != null && filter.details != error.details) return false
         }

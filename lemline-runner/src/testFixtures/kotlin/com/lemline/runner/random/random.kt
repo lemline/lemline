@@ -82,7 +82,7 @@ fun WorkflowEvent.WorkflowFailed.Companion.random() = WorkflowEvent.WorkflowFail
     error = InternalException.Error(
         type = "TestError",
         status = 500,
-        instance = "test-instance",
+        position = "test-instance",
         title = "Test error",
         details = "Test error details"
     ),

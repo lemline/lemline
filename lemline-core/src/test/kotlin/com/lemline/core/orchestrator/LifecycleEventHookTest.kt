@@ -4,20 +4,20 @@ package com.lemline.core.orchestrator
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
+import com.lemline.common.values.WorkflowName
+import com.lemline.common.values.WorkflowNamespace
+import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.errors.InternalException
 import com.lemline.core.getWorkflowToTest
 import com.lemline.core.states.NodeStack
 import io.kotest.core.spec.style.FunSpec
-import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 /**
  * Tests for lifecycle event hooks in StepByStepOrchestrator.
@@ -31,16 +31,18 @@ class LifecycleEventHookTest : FunSpec() {
 
     /**
      * Simple capturing hook that records all lifecycle events for verification.
+     * Uses thread-safe collection since events may be emitted from concurrent coroutines.
      */
     private class CapturingLifecycleHook : LifecycleEventHook {
-        val events = mutableListOf<String>()
+        private val _events = java.util.concurrent.CopyOnWriteArrayList<String>()
+        val events: List<String> get() = _events
 
         override suspend fun onWorkflowCreated(
             workflowInfo: WorkflowInfo,
             nodeStack: NodeStack,
         ) {
-            val workflowId = (nodeStack[NodePosition.root] as com.lemline.core.states.RootState).workflowId
-            events.add("workflow.created:$workflowId")
+            val workflowId = nodeStack.rootState.workflowId
+            _events.add("workflow.created:$workflowId")
         }
 
         override suspend fun onWorkflowStarted(
@@ -48,8 +50,8 @@ class LifecycleEventHookTest : FunSpec() {
             nodeStack: NodeStack,
             startedAt: Instant,
         ) {
-            val workflowId = (nodeStack[NodePosition.root] as com.lemline.core.states.RootState).workflowId
-            events.add("workflow.started:$workflowId")
+            val workflowId = nodeStack.rootState.workflowId
+            _events.add("workflow.started:$workflowId")
         }
 
         override suspend fun onWorkflowCompleted(
@@ -58,8 +60,8 @@ class LifecycleEventHookTest : FunSpec() {
             output: JsonElement,
             completedAt: Instant,
         ) {
-            val workflowId = (nodeStack[NodePosition.root] as com.lemline.core.states.RootState).workflowId
-            events.add("workflow.completed:$workflowId")
+            val workflowId = nodeStack.rootState.workflowId
+            _events.add("workflow.completed:$workflowId")
         }
 
         override suspend fun onWorkflowFaulted(
@@ -68,18 +70,18 @@ class LifecycleEventHookTest : FunSpec() {
             error: InternalException.Error,
             failedAt: Instant,
         ) {
-            val workflowId = (nodeStack[NodePosition.root] as com.lemline.core.states.RootState).workflowId
-            events.add("workflow.faulted:$workflowId")
+            val workflowId = nodeStack.rootState.workflowId
+            _events.add("workflow.faulted:$workflowId")
         }
 
         override suspend fun onTaskCreated(
             workflowInfo: WorkflowInfo,
             nodeStack: NodeStack,
             nodePosition: NodePosition,
-            rawInput: JsonElement,
+            input: JsonElement,
             createdAt: Instant,
         ) {
-            events.add("task.created:$nodePosition")
+            _events.add("task.created:$nodePosition")
         }
 
         override suspend fun onTaskStarted(
@@ -89,17 +91,17 @@ class LifecycleEventHookTest : FunSpec() {
             rawInput: JsonElement,
             startedAt: Instant,
         ) {
-            events.add("task.started:$nodePosition")
+            _events.add("task.started:$nodePosition")
         }
 
         override suspend fun onTaskCompleted(
             workflowInfo: WorkflowInfo,
             nodeStack: NodeStack,
             nodePosition: NodePosition,
-            rawOutput: JsonElement,
+            output: JsonElement,
             completedAt: Instant,
         ) {
-            events.add("task.completed:$nodePosition")
+            _events.add("task.completed:$nodePosition")
         }
 
         override suspend fun onTaskFaulted(
@@ -109,7 +111,7 @@ class LifecycleEventHookTest : FunSpec() {
             error: InternalException.Error,
             failedAt: Instant,
         ) {
-            events.add("task.faulted:$nodePosition")
+            _events.add("task.faulted:$nodePosition")
         }
 
         override suspend fun onTaskRetried(
@@ -119,10 +121,8 @@ class LifecycleEventHookTest : FunSpec() {
             retryAt: Instant,
             attemptNumber: Int,
         ) {
-            events.add("task.retried:$nodePosition:attempt=$attemptNumber")
+            _events.add("task.retried:$nodePosition:attempt=$attemptNumber")
         }
-
-        fun clear() = events.clear()
     }
 
     private suspend fun executeWorkflow(
@@ -134,6 +134,11 @@ class LifecycleEventHookTest : FunSpec() {
         version: String = "0.1.0",
     ): JsonElement {
         val workflow = getWorkflowToTest(yaml, namespace, name, version)
+        val workflowInfo = WorkflowInfo(
+            WorkflowNamespace(namespace),
+            WorkflowName(name),
+            WorkflowVersion(version)
+        )
 
         val startState = StepByStepOrchestrator.initCmd(
             workflowId = WorkflowId.random(),
@@ -141,6 +146,9 @@ class LifecycleEventHookTest : FunSpec() {
             hasWaitingParent = false,
             startedAt = Clock.System.now()
         )
+
+        // Emit workflow.created before starting execution (mimics Starter behavior)
+        lifecycleHook.onWorkflowCreated(workflowInfo, startState.nodeStack)
 
         val outcome = FullOrchestrator.resume(
             workflow = workflow,
@@ -268,25 +276,10 @@ class LifecycleEventHookTest : FunSpec() {
 
             assertTrue(workflowStartedIndex >= 0, "workflow.started should be emitted")
             assertTrue(workflowCompletedIndex >= 0, "workflow.completed should be emitted")
-            assertTrue(workflowStartedIndex < workflowCompletedIndex, "workflow.started should come before workflow.completed")
-        }
-
-        // ========================================
-        // NOOP Hook
-        // ========================================
-
-        test("should work with NOOP hook (no errors)") {
-            val yaml = """
-                do:
-                  - setValue:
-                      set:
-                        result: 1
-            """
-
-            // Using NOOP hook should not throw any errors
-            val output = executeWorkflow(yaml, buildJsonObject { }, LifecycleEventHook.NOOP)
-
-            assertEquals(1, (output as JsonObject)["result"]?.toString()?.toInt())
+            assertTrue(
+                workflowStartedIndex < workflowCompletedIndex,
+                "workflow.started should come before workflow.completed"
+            )
         }
     }
 }

@@ -173,7 +173,7 @@ class LifecycleEventHookImpl(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
-        rawInput: JsonElement,
+        input: JsonElement,
         createdAt: Instant,
     ) {
         val emitter = this.emitter ?: return
@@ -182,7 +182,7 @@ class LifecycleEventHookImpl(
         val data = LifecycleEventData.TaskCreatedData(
             workflow = workflowInfo.qualifiedName,
             task = nodePosition.toJsonPointer(),
-            input = rawInput,
+            input = input,
             createdAt = createdAt,
         )
 
@@ -232,7 +232,7 @@ class LifecycleEventHookImpl(
         workflowInfo: WorkflowInfo,
         nodeStack: NodeStack,
         nodePosition: NodePosition,
-        rawOutput: JsonElement,
+        output: JsonElement,
         completedAt: Instant,
     ) {
         val emitter = this.emitter ?: return
@@ -241,7 +241,7 @@ class LifecycleEventHookImpl(
         val data = LifecycleEventData.TaskCompletedData(
             workflow = workflowInfo.qualifiedName,
             task = nodePosition.toJsonPointer(),
-            output = rawOutput,
+            output = output,
             completedAt = completedAt,
         )
 

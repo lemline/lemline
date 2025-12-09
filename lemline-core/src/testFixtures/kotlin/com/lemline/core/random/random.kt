@@ -145,7 +145,7 @@ fun TryState.Companion.random() = TryState(
 fun InternalException.Error.Companion.random() = InternalException.Error(
     type = String.random(),
     status = Random.nextInt(400, 600),
-    instance = String.random(),
+    position = String.random(),
     title = when (Random.nextBoolean()) {
         true -> String.random()
         false -> null
