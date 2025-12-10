@@ -92,44 +92,51 @@ internal object FullOrchestrator {
 
         return when (serdeEvent) {
             is WorkflowEvent.ActivityStarted -> resume(
-                workflow,
-                handle(serdeEvent, activityExecutor),
-                serde,
-                activityExecutor,
-                lifecycleHook,
+                workflow = workflow,
+                command = handle(serdeEvent, activityExecutor),
+                serde = serde,
+                activityExecutor = activityExecutor,
+                lifecycleHook = lifecycleHook,
             )
 
-            is WorkflowEvent.WaitStarted -> resume(workflow, handle(serdeEvent), serde, activityExecutor, lifecycleHook)
+            is WorkflowEvent.WaitStarted -> resume(
+                workflow = workflow,
+                command = handle(serdeEvent),
+                serde = serde,
+                activityExecutor = activityExecutor,
+                lifecycleHook = lifecycleHook
+            )
+
             is WorkflowEvent.TaskScheduled -> resume(
-                workflow,
-                handle(serdeEvent),
-                serde,
-                activityExecutor,
-                lifecycleHook
+                workflow = workflow,
+                command = handle(serdeEvent),
+                serde = serde,
+                activityExecutor = activityExecutor,
+                lifecycleHook = lifecycleHook
             )
 
             is WorkflowEvent.TaskRetryScheduled -> resume(
-                workflow,
-                handle(serdeEvent),
-                serde,
-                activityExecutor,
-                lifecycleHook
+                workflow = workflow,
+                command = handle(serdeEvent),
+                serde = serde,
+                activityExecutor = activityExecutor,
+                lifecycleHook = lifecycleHook
             )
 
             is WorkflowEvent.RunWorkflowStarted -> resume(
-                workflow,
-                handle(serdeEvent, serde, activityExecutor, lifecycleHook),
-                serde,
-                activityExecutor,
-                lifecycleHook,
+                workflow = workflow,
+                command = handle(serdeEvent, serde, activityExecutor, lifecycleHook),
+                serde = serde,
+                activityExecutor = activityExecutor,
+                lifecycleHook = lifecycleHook,
             )
 
             is WorkflowEvent.ForkStarted -> resume(
-                workflow,
-                handle(workflow, serdeEvent, serde, activityExecutor, lifecycleHook),
-                serde,
-                activityExecutor,
-                lifecycleHook,
+                workflow = workflow,
+                command = handle(workflow, serdeEvent, serde, activityExecutor, lifecycleHook),
+                serde = serde,
+                activityExecutor = activityExecutor,
+                lifecycleHook = lifecycleHook,
             )
 
             is WorkflowEvent.ListenStarted -> throw UnsupportedOperationException(
@@ -316,6 +323,14 @@ internal object FullOrchestrator {
     ): JsonElement {
         // Get the first success - if all branches failed, the last exception will be rethrown from here
         return branches.mapAwaitFirstFailSlow { branchNode ->
+            lifecycleHook.onTaskCreated(
+                workflowInfo = info,
+                nodeStack = nodeStack,
+                nodePosition = branchNode.position,
+                input = rawInput,
+                createdAt = Clock.System.now(),
+            )
+
             resume(
                 workflow = this,
                 command = WorkflowCommand.ResumeFromTask(
@@ -348,6 +363,14 @@ internal object FullOrchestrator {
         // Get all results - If a branch failed, the first exception will be rethrown from here
         return JsonArray(
             branches.mapAwaitAllFailFast { branchNode ->
+                lifecycleHook.onTaskCreated(
+                    workflowInfo = info,
+                    nodeStack = nodeStack,
+                    nodePosition = branchNode.position,
+                    input = rawInput,
+                    createdAt = Clock.System.now(),
+                )
+
                 resume(
                     workflow = this,
                     command = WorkflowCommand.ResumeFromTask(

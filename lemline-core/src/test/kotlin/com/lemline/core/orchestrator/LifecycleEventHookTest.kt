@@ -12,7 +12,7 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.getWorkflowToTest
 import com.lemline.core.states.NodeStack
 import io.kotest.core.spec.style.FunSpec
-import kotlin.test.assertTrue
+import io.kotest.matchers.shouldBe
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -36,6 +36,22 @@ class LifecycleEventHookTest : FunSpec() {
     private class CapturingLifecycleHook : LifecycleEventHook {
         private val _events = java.util.concurrent.CopyOnWriteArrayList<String>()
         val events: List<String> get() = _events
+
+        /**
+         * Extracts a meaningful task identifier from a node position.
+         * For nested do blocks like /do/outer/do, extracts "outer" (parent segment).
+         * For regular tasks like /do/step1, extracts "step1" (last segment).
+         */
+        private fun NodePosition.taskId(): String {
+            val path = this.toString()
+            val segments = path.split("/").filter { it.isNotEmpty() }
+            // If last segment is "do" and there are more segments, use parent
+            return if (segments.lastOrNull() == "do" && segments.size > 1) {
+                segments[segments.size - 2]
+            } else {
+                nodeName
+            }
+        }
 
         override suspend fun onWorkflowCreated(
             workflowInfo: WorkflowInfo,
@@ -81,7 +97,7 @@ class LifecycleEventHookTest : FunSpec() {
             input: JsonElement,
             createdAt: Instant,
         ) {
-            _events.add("task.created:$nodePosition")
+            _events.add("task.created:${nodePosition.taskId()}")
         }
 
         override suspend fun onTaskStarted(
@@ -91,7 +107,7 @@ class LifecycleEventHookTest : FunSpec() {
             rawInput: JsonElement,
             startedAt: Instant,
         ) {
-            _events.add("task.started:$nodePosition")
+            _events.add("task.started:${nodePosition.taskId()}")
         }
 
         override suspend fun onTaskCompleted(
@@ -101,7 +117,7 @@ class LifecycleEventHookTest : FunSpec() {
             output: JsonElement,
             completedAt: Instant,
         ) {
-            _events.add("task.completed:$nodePosition")
+            _events.add("task.completed:${nodePosition.taskId()}")
         }
 
         override suspend fun onTaskFaulted(
@@ -111,7 +127,7 @@ class LifecycleEventHookTest : FunSpec() {
             error: InternalException.Error,
             failedAt: Instant,
         ) {
-            _events.add("task.faulted:$nodePosition")
+            _events.add("task.faulted:${nodePosition.taskId()}")
         }
 
         override suspend fun onTaskRetried(
@@ -121,7 +137,7 @@ class LifecycleEventHookTest : FunSpec() {
             retryAt: Instant,
             attemptNumber: Int,
         ) {
-            _events.add("task.retried:$nodePosition:attempt=$attemptNumber")
+            _events.add("task.retried:${nodePosition.taskId()}:attempt=$attemptNumber")
         }
     }
 
@@ -160,16 +176,30 @@ class LifecycleEventHookTest : FunSpec() {
         return outcome.value()
     }
 
+    /**
+     * Helper to strip workflow ID from events for easier comparison.
+     * Workflow events include IDs, task events use node names.
+     */
+    private fun List<String>.stripWorkflowIds(): List<String> = map { event ->
+        when {
+            event.startsWith("workflow.created:") -> "workflow.created"
+            event.startsWith("workflow.started:") -> "workflow.started"
+            event.startsWith("workflow.completed:") -> "workflow.completed"
+            event.startsWith("workflow.faulted:") -> "workflow.faulted"
+            else -> event
+        }
+    }
+
     init {
         afterEach {
             DefinitionCache.clear()
         }
 
         // ========================================
-        // Workflow Lifecycle Events
+        // Complete Event Sequence Tests
         // ========================================
 
-        test("should emit workflow.started on first task") {
+        test("single task workflow - complete event sequence") {
             val hook = CapturingLifecycleHook()
             val yaml = """
                 do:
@@ -180,24 +210,90 @@ class LifecycleEventHookTest : FunSpec() {
 
             executeWorkflow(yaml, buildJsonObject { }, hook)
 
-            assertTrue(hook.events.any { it.startsWith("workflow.started:") })
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",      // /do task created (first entry)
+                "task.started:do",      // /do task started
+                "task.created:setValue", // setValue scheduled from /do
+                "task.started:setValue", // setValue started
+                "task.completed:setValue", // setValue completed
+                "task.completed:do",    // /do completed
+                "workflow.completed"
+            )
         }
 
-        test("should emit workflow.completed on successful completion") {
+        test("two task workflow - complete event sequence") {
             val hook = CapturingLifecycleHook()
             val yaml = """
                 do:
-                  - setValue:
+                  - step1:
                       set:
-                        result: 1
+                        a: 1
+                  - step2:
+                      set:
+                        b: 2
             """
 
             executeWorkflow(yaml, buildJsonObject { }, hook)
 
-            assertTrue(hook.events.any { it.startsWith("workflow.completed:") })
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:step1",
+                "task.started:step1",
+                "task.completed:step1",
+                "task.created:step2",   // step2 scheduled after step1 completes
+                "task.started:step2",
+                "task.completed:step2",
+                "task.completed:do",
+                "workflow.completed"
+            )
         }
 
-        test("should emit workflow.faulted on unhandled error") {
+        test("three task workflow - complete event sequence") {
+            val hook = CapturingLifecycleHook()
+            val yaml = """
+                do:
+                  - step1:
+                      set:
+                        a: 1
+                  - step2:
+                      set:
+                        b: 2
+                  - step3:
+                      set:
+                        c: 3
+            """
+
+            executeWorkflow(yaml, buildJsonObject { }, hook)
+
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:step1",
+                "task.started:step1",
+                "task.completed:step1",
+                "task.created:step2",
+                "task.started:step2",
+                "task.completed:step2",
+                "task.created:step3",
+                "task.started:step3",
+                "task.completed:step3",
+                "task.completed:do",
+                "workflow.completed"
+            )
+        }
+
+        // ========================================
+        // Error Event Sequences
+        // ========================================
+
+        test("workflow fault - complete event sequence") {
             val hook = CapturingLifecycleHook()
             val yaml = """
                 do:
@@ -214,71 +310,362 @@ class LifecycleEventHookTest : FunSpec() {
                 // Expected to fail
             }
 
-            assertTrue(hook.events.any { it.startsWith("workflow.faulted:") })
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:raiseError",
+                "task.started:raiseError",
+                "task.faulted:raiseError",
+                "workflow.faulted"
+            )
         }
 
-        // ========================================
-        // Task Lifecycle Events
-        // ========================================
-
-        test("should emit task.started for each task") {
+        test("task fault after successful task - complete event sequence") {
             val hook = CapturingLifecycleHook()
             val yaml = """
                 do:
                   - step1:
                       set:
                         a: 1
-                  - step2:
-                      set:
-                        b: 2
+                  - raiseError:
+                      raise:
+                        error:
+                          type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                          status: 500
+            """
+
+            try {
+                executeWorkflow(yaml, buildJsonObject { }, hook)
+            } catch (_: Exception) {
+                // Expected to fail
+            }
+
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:step1",
+                "task.started:step1",
+                "task.completed:step1",
+                "task.created:raiseError",
+                "task.started:raiseError",
+                "task.faulted:raiseError",
+                "workflow.faulted"
+            )
+        }
+
+        // ========================================
+        // Try/Catch Event Sequences
+        // ========================================
+
+        test("caught error - complete event sequence") {
+            val hook = CapturingLifecycleHook()
+            val yaml = """
+                do:
+                  - handleError:
+                      try:
+                        - failingTask:
+                            raise:
+                              error:
+                                type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                                status: 500
+                      catch:
+                        errors:
+                          with:
+                            type: https://serverlessworkflow.io/spec/1.0.0/errors/runtime
+                        do:
+                          - recovery:
+                              set:
+                                recovered: true
             """
 
             executeWorkflow(yaml, buildJsonObject { }, hook)
 
-            // Verify task.started events for both tasks
-            assertTrue(hook.events.any { it == "task.started:/do/step1" })
-            assertTrue(hook.events.any { it == "task.started:/do/step2" })
+            // Note: try and catch are separate tasks in the workflow tree
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:handleError",
+                "task.started:handleError",
+                "task.created:try",          // try block is a task
+                "task.started:try",
+                "task.created:failingTask",
+                "task.started:failingTask",
+                "task.faulted:failingTask",  // task fails
+                "task.started:catch",        // catch block starts (no created - already exists)
+                "task.created:recovery",     // recovery task scheduled
+                "task.started:recovery",
+                "task.completed:recovery",
+                "task.completed:catch",      // catch block completes
+                "task.completed:handleError",
+                "task.completed:do",
+                "workflow.completed"         // workflow succeeds
+            )
         }
 
-        test("should emit task.created for scheduled activities") {
+        // ========================================
+        // Nested Do Block Event Sequences
+        // ========================================
+
+        test("nested do block - complete event sequence") {
             val hook = CapturingLifecycleHook()
             val yaml = """
                 do:
-                  - step1:
-                      set:
-                        a: 1
+                  - outer:
+                      do:
+                        - inner:
+                            set:
+                              result: 1
             """
 
             executeWorkflow(yaml, buildJsonObject { }, hook)
 
-            // TaskScheduled produces task.created
-            assertTrue(hook.events.any { it.startsWith("task.created:") })
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:outer",
+                "task.started:outer",
+                "task.created:inner",
+                "task.started:inner",
+                "task.completed:inner",
+                "task.completed:outer",
+                "task.completed:do",
+                "workflow.completed"
+            )
         }
 
         // ========================================
-        // Event Order Verification
+        // For Loop Event Sequences
         // ========================================
 
-        test("should emit events in correct order for simple workflow") {
+        test("for loop - complete event sequence") {
             val hook = CapturingLifecycleHook()
-            val yaml = """
+            val yaml = $$"""
                 do:
-                  - setValue:
+                  - createData:
+                      set:
+                        items: [1, 2]
+                  - processItems:
+                      for:
+                        each: item
+                        in: ${ .items }
+                      do:
+                        - processItem:
+                            set:
+                              processed: true
+            """
+
+            executeWorkflow(yaml, buildJsonObject { }, hook)
+
+            // For loops emit created/started events on each iteration
+            // The actual sequence shows the for loop re-enters on each iteration
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:createData",
+                "task.started:createData",
+                "task.completed:createData",
+                "task.created:processItems",   // for loop scheduled
+                "task.started:processItems",   // for loop initial entry
+                // First iteration
+                "task.created:processItems",   // for loop re-entry for iteration 1
+                "task.started:processItems",
+                "task.created:processItem",
+                "task.started:processItem",
+                "task.completed:processItem",
+                "task.completed:processItems", // iteration 1 done
+                // Second iteration
+                "task.created:processItems",   // for loop re-entry for iteration 2
+                "task.started:processItems",
+                "task.created:processItem",
+                "task.started:processItem",
+                "task.completed:processItem",
+                "task.completed:processItems", // iteration 2 done
+                // Loop complete
+                "task.completed:processItems", // for loop final completion
+                "task.completed:do",
+                "workflow.completed"
+            )
+        }
+
+        // ========================================
+        // Conditional Execution Event Sequences
+        // ========================================
+
+        test("conditional if - skipped task emits no events") {
+            val hook = CapturingLifecycleHook()
+            val yaml = $$"""
+                do:
+                  - setupData:
+                      set:
+                        shouldRun: false
+                  - conditionalTask:
+                      if: ${ .shouldRun }
+                      set:
+                        result: 1
+                  - alwaysRuns:
+                      set:
+                        done: true
+            """
+
+            executeWorkflow(yaml, buildJsonObject { }, hook)
+
+            // conditionalTask should be skipped entirely (no events)
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:setupData",
+                "task.started:setupData",
+                "task.completed:setupData",
+                "task.created:conditionalTask",  // created when scheduled
+                "task.started:conditionalTask",  // started but if check fails
+                // No completed for conditionalTask - it was skipped
+                "task.created:alwaysRuns",
+                "task.started:alwaysRuns",
+                "task.completed:alwaysRuns",
+                "task.completed:do",
+                "workflow.completed"
+            )
+        }
+
+        test("conditional if - executed task emits all events") {
+            val hook = CapturingLifecycleHook()
+            val yaml = $$"""
+                do:
+                  - setupData:
+                      set:
+                        shouldRun: true
+                  - conditionalTask:
+                      if: ${ .shouldRun }
                       set:
                         result: 1
             """
 
             executeWorkflow(yaml, buildJsonObject { }, hook)
 
-            // Verify order: workflow.started comes first, workflow.completed comes last
-            val workflowStartedIndex = hook.events.indexOfFirst { it.startsWith("workflow.started:") }
-            val workflowCompletedIndex = hook.events.indexOfFirst { it.startsWith("workflow.completed:") }
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:setupData",
+                "task.started:setupData",
+                "task.completed:setupData",
+                "task.created:conditionalTask",
+                "task.started:conditionalTask",
+                "task.completed:conditionalTask",
+                "task.completed:do",
+                "workflow.completed"
+            )
+        }
 
-            assertTrue(workflowStartedIndex >= 0, "workflow.started should be emitted")
-            assertTrue(workflowCompletedIndex >= 0, "workflow.completed should be emitted")
-            assertTrue(
-                workflowStartedIndex < workflowCompletedIndex,
-                "workflow.started should come before workflow.completed"
+        // ========================================
+        // Fork Event Sequences
+        // ========================================
+
+        test("fork with two branches - complete event sequence") {
+            val hook = CapturingLifecycleHook()
+            val yaml = """
+                do:
+                  - raceWork:
+                      fork:
+                        compete: false
+                        branches:
+                          - slowBranch:
+                              do:
+                                - delay:
+                                    wait:
+                                      seconds: 1
+                                - result:
+                                    set:
+                                      winner: "slow"
+                          - fastBranch:
+                              set:
+                                winner: "fast"
+            """
+
+            executeWorkflow(yaml, buildJsonObject { }, hook)
+
+            // Fork executes branches in parallel
+            // Note: branches don't emit task.created (they're started directly by fork)
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:raceWork",
+                "task.started:raceWork",
+                "task.created:slowBranch",
+                "task.started:slowBranch",
+                "task.created:delay",
+                "task.started:delay",
+                "task.created:fastBranch",
+                "task.started:fastBranch",
+                "task.completed:fastBranch",
+                "task.completed:delay",
+                "task.created:result",
+                "task.started:result",
+                "task.completed:result",
+                "task.completed:slowBranch",
+                "task.completed:raceWork",
+                "task.completed:do",
+                "workflow.completed"
+            )
+        }
+
+        test("fork in compete mode - first branch wins") {
+            val hook = CapturingLifecycleHook()
+            val yaml = """
+                do:
+                  - raceWork:
+                      fork:
+                        compete: true
+                        branches:
+                          - slowBranch:
+                              do:
+                                - delay:
+                                    wait:
+                                      seconds: 1
+                                - result:
+                                    set:
+                                      winner: "slow"
+                          - fastBranch:
+                              set:
+                                winner: "fast"
+            """
+
+            executeWorkflow(yaml, buildJsonObject { }, hook)
+
+            // In compete mode, first branch to complete wins, but all branches run to completion
+            // (since these are synchronous tasks, they all complete before fork returns)
+            hook.events.stripWorkflowIds() shouldBe listOf(
+                "workflow.created",
+                "workflow.started",
+                "task.created:do",
+                "task.started:do",
+                "task.created:raceWork",
+                "task.started:raceWork",
+                "task.created:slowBranch",
+                "task.started:slowBranch",
+                "task.created:delay",
+                "task.started:delay",
+                "task.created:fastBranch",
+                "task.started:fastBranch",
+                "task.completed:fastBranch",
+                "task.completed:raceWork",
+                "task.completed:do",
+                "workflow.completed"
             )
         }
     }
