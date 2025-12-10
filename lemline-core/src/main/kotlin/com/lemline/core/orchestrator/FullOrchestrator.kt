@@ -9,6 +9,7 @@ import com.lemline.core.activities.DefaultActivityExecutor
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
@@ -69,7 +70,7 @@ internal object FullOrchestrator {
         command: WorkflowCommand,
         serde: Boolean,
         activityExecutor: ActivityExecutor = defaultActivityExecutor,
-        lifecycleHook: LifecycleEventHook = LifecycleEventHook.NOOP,
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent.Outcome {
 
         val serdeCommand = when (serde) {

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.orchestrator
+package com.lemline.core.lifecycleevents
 
 import com.lemline.common.values.WorkflowInfo
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
 
 /**
  * Data payloads for Serverless Workflow lifecycle events.
@@ -39,7 +40,7 @@ sealed class LifecycleEventData {
     @SerialName("workflowCreated")
     data class WorkflowCreatedData(
         val name: String,
-        val input: kotlinx.serialization.json.JsonElement,
+        val input: JsonElement,
         val createdAt: Instant,
         val definition: WorkflowDefinitionData,
     ) : LifecycleEventData()
@@ -70,7 +71,7 @@ sealed class LifecycleEventData {
     @SerialName("workflowCompleted")
     data class WorkflowCompletedData(
         val name: String,
-        val output: kotlinx.serialization.json.JsonElement,
+        val output: JsonElement,
         val completedAt: Instant,
     ) : LifecycleEventData()
 
@@ -109,7 +110,7 @@ sealed class LifecycleEventData {
     data class TaskCreatedData(
         val workflow: String,
         val task: String,
-        val input: kotlinx.serialization.json.JsonElement,
+        val input: JsonElement,
         val createdAt: Instant,
     ) : LifecycleEventData()
 
@@ -141,7 +142,7 @@ sealed class LifecycleEventData {
     data class TaskCompletedData(
         val workflow: String,
         val task: String,
-        val output: kotlinx.serialization.json.JsonElement,
+        val output: JsonElement,
         val completedAt: Instant,
     ) : LifecycleEventData()
 

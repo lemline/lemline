@@ -4,6 +4,7 @@ package com.lemline.core.orchestrator
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.getWorkflowToTest
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -78,6 +79,7 @@ class OrchestratorTest : FunSpec() {
             workflow = workflow,
             command = startState,
             serde = true,
+            lifecycleHook = LifecycleEventHook.NOOP
         )
 
         return outcome.value()

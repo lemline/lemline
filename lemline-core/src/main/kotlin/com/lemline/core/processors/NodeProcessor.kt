@@ -11,9 +11,9 @@ import com.lemline.core.errors.WorkflowErrorType
 import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
 import com.lemline.core.expressions.JQExpression
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
-import com.lemline.core.orchestrator.LifecycleEventHook
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.withRawOutput
 import com.lemline.core.processors.scope.withTask
@@ -150,12 +150,23 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         scope = scope.withTask(node, startedAt, rawInput)
 
         // if this node is conditional, check if it should be executed, if not return to parent
-        if (!checkIf(rawInput, scope)) return getNextEvent(
-            nodeStack = nodeStack,
-            nextNode = node.parent,
-            nextInput = rawInput,
-            nextDirective = null, // Continue to next sibling
-        )
+        if (!checkIf(rawInput, scope)) {
+            // Emit task completed (there is not skipped type)
+            lifecycleHook.onTaskCompleted(
+                workflowInfo = workflowInfo,
+                nodeStack = nodeStack,
+                nodePosition = node.position,
+                output = rawInput,
+                completedAt = Clock.System.now(),
+            )
+
+            return getNextEvent(
+                nodeStack = nodeStack,
+                nextNode = node.parent,
+                nextInput = rawInput,
+                nextDirective = null, // Continue to next sibling
+            )
+        }
 
         // Apply input transformation (throws ExpressionException)
         val transformedInput = transformInput(rawInput, scope)

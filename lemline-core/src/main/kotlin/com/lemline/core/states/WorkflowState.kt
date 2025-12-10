@@ -45,10 +45,12 @@ sealed class WorkflowState {
         fun fromJsonString(jsonString: String): WorkflowState = LemlineJson.decodeFromString(jsonString)
     }
 
-    val workflowId: WorkflowId get() = (nodeStack[NodePosition.root] as RootState).workflowId
+    val workflowId: WorkflowId get() = nodeStack.rootState.workflowId
 
-    val hasWaitingParent: Boolean get() = (nodeStack[NodePosition.root] as RootState).hasWaitingParent
+    val hasWaitingParent: Boolean get() = nodeStack.rootState.hasWaitingParent
 
+    val isNew: Boolean get() = nodeStack[nodePosition] == null
+    
     /**
      * Simple integer counter that increments each time we enter a task.
      * Used for generating unique database IDs for outbox tables (waits, retries, parents).
@@ -56,7 +58,7 @@ sealed class WorkflowState {
      * Unlike [nodePosition] which is static (e.g., "/for/do/task"), this is a simple
      * counter that ensures uniqueness across multiple visits to the same node.
      */
-    val workflowStep: Int get() = (nodeStack[NodePosition.root] as RootState).workflowStep
+    val workflowStep: Int get() = nodeStack.rootState.workflowStep
 }
 
 @Serializable

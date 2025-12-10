@@ -8,7 +8,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.orchestrator.LifecycleEventHook
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.WorkflowCommand

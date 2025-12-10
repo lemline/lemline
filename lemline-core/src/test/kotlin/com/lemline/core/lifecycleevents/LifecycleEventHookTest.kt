@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.orchestrator
+package com.lemline.core.lifecycleevents
 
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
@@ -10,9 +9,12 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.errors.InternalException
 import com.lemline.core.getWorkflowToTest
+import com.lemline.core.orchestrator.FullOrchestrator
+import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.NodeStack
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
@@ -34,7 +36,7 @@ class LifecycleEventHookTest : FunSpec() {
      * Uses thread-safe collection since events may be emitted from concurrent coroutines.
      */
     private class CapturingLifecycleHook : LifecycleEventHook {
-        private val _events = java.util.concurrent.CopyOnWriteArrayList<String>()
+        private val _events = CopyOnWriteArrayList<String>()
         val events: List<String> get() = _events
 
         /**
@@ -45,7 +47,7 @@ class LifecycleEventHookTest : FunSpec() {
         private fun NodePosition.taskId(): String {
             val path = this.toString()
             val segments = path.split("/").filter { it.isNotEmpty() }
-            // If last segment is "do" and there are more segments, use parent
+            // If the last segment is "do" and there are more segments, use parent
             return if (segments.lastOrNull() == "do" && segments.size > 1) {
                 segments[segments.size - 2]
             } else {
@@ -213,12 +215,12 @@ class LifecycleEventHookTest : FunSpec() {
             hook.events.stripWorkflowIds() shouldBe listOf(
                 "workflow.created",
                 "workflow.started",
-                "task.created:do",      // /do task created (first entry)
-                "task.started:do",      // /do task started
-                "task.created:setValue", // setValue scheduled from /do
-                "task.started:setValue", // setValue started
-                "task.completed:setValue", // setValue completed
-                "task.completed:do",    // /do completed
+                "task.created:do",
+                "task.started:do",
+                "task.created:setValue",
+                "task.started:setValue",
+                "task.completed:setValue",
+                "task.completed:do",
                 "workflow.completed"
             )
         }
@@ -245,7 +247,7 @@ class LifecycleEventHookTest : FunSpec() {
                 "task.created:step1",
                 "task.started:step1",
                 "task.completed:step1",
-                "task.created:step2",   // step2 scheduled after step1 completes
+                "task.created:step2",
                 "task.started:step2",
                 "task.completed:step2",
                 "task.completed:do",
@@ -392,19 +394,20 @@ class LifecycleEventHookTest : FunSpec() {
                 "task.started:do",
                 "task.created:handleError",
                 "task.started:handleError",
-                "task.created:try",          // try block is a task
+                "task.created:try",
                 "task.started:try",
                 "task.created:failingTask",
                 "task.started:failingTask",
-                "task.faulted:failingTask",  // task fails
-                "task.started:catch",        // catch block starts (no created - already exists)
-                "task.created:recovery",     // recovery task scheduled
+                "task.faulted:failingTask",
+                "task.created:catch",
+                "task.started:catch",
+                "task.created:recovery",
                 "task.started:recovery",
                 "task.completed:recovery",
-                "task.completed:catch",      // catch block completes
+                "task.completed:catch",
                 "task.completed:handleError",
                 "task.completed:do",
-                "workflow.completed"         // workflow succeeds
+                "workflow.completed"
             )
         }
 
@@ -528,9 +531,9 @@ class LifecycleEventHookTest : FunSpec() {
                 "task.created:setupData",
                 "task.started:setupData",
                 "task.completed:setupData",
-                "task.created:conditionalTask",  // created when scheduled
-                "task.started:conditionalTask",  // started but if check fails
-                // No completed for conditionalTask - it was skipped
+                "task.created:conditionalTask",
+                "task.started:conditionalTask",
+                "task.completed:conditionalTask",
                 "task.created:alwaysRuns",
                 "task.started:alwaysRuns",
                 "task.completed:alwaysRuns",

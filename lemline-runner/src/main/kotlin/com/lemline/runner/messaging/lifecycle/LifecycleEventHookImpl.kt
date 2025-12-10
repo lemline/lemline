@@ -5,10 +5,10 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
-import com.lemline.core.orchestrator.ErrorInfo
-import com.lemline.core.orchestrator.LifecycleEventData
-import com.lemline.core.orchestrator.LifecycleEventHook
-import com.lemline.core.orchestrator.WorkflowDefinitionData
+import com.lemline.core.lifecycleevents.ErrorInfo
+import com.lemline.core.lifecycleevents.LifecycleEventData
+import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.lifecycleevents.WorkflowDefinitionData
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import io.cloudevents.core.builder.CloudEventBuilder

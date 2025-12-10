@@ -3,6 +3,7 @@ package com.lemline.core.testcases
 
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import io.serverlessworkflow.api.types.Workflow
@@ -48,7 +49,8 @@ class FullOrchestratorExecutor : WorkflowTestExecutor {
             val event = FullOrchestrator.resume(
                 workflow = workflow,
                 command = startState,
-                serde = true // For testing, we want to ensure serialization works
+                serde = true, // For testing, we want to ensure serialization works
+                lifecycleHook = LifecycleEventHook.NOOP
             )
 
             WorkflowTestResult.Success(event.value())

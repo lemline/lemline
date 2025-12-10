@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepByStepOrchestrator.completeTask
 import com.lemline.core.orchestrator.StepByStepOrchestrator.processInternalWorkflowException
@@ -122,7 +123,7 @@ object StepByStepOrchestrator {
             )
         }
 
-        emitLifecycleEventsForEvent(event, node, workflowInfo, lifecycleHook)
+        emitLifecycleEventsForEvent(event, workflowInfo, lifecycleHook)
 
         return event
     }
@@ -143,7 +144,6 @@ object StepByStepOrchestrator {
      */
     private suspend fun emitLifecycleEventsForEvent(
         event: WorkflowEvent,
-        node: Node<*>,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ) {
@@ -167,8 +167,8 @@ object StepByStepOrchestrator {
             }
 
             is TaskScheduled -> {
-                // Only emit task.created when going DOWN the tree (scheduling a child task)
-                if (node.position.isParentOf(event.nodePosition)) {
+                // Emit task.created only when scheduling a new task
+                if (event.isNew) {
                     lifecycleHook.onTaskCreated(
                         workflowInfo = workflowInfo,
                         nodeStack = event.nodeStack,
@@ -420,7 +420,7 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
-        val isFirstEntry = nodeStack.lastPosition != node.position
+        val isFirstEntry = nodeStack[node.position] == null
 
         // Emit entry events (workflow.started, task.created, task.started)
         if (isFirstEntry) {

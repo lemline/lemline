@@ -216,7 +216,7 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 - [x] Do
 - [x] Raise
 - [x] For
-- [ ] Listen
+- [x] Listen
 - [x] Emit
 - [x] Fork
 
@@ -273,8 +273,8 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
 
 ### Lifecycle events
 
-- [ ] Workflow
-- [ ] Tasks
+- [x] Workflow
+- [x] Tasks
 
 ### Others
 

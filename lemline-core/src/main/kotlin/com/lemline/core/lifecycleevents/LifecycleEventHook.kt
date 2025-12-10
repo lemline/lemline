@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.orchestrator
+package com.lemline.core.lifecycleevents
 
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowInfo
@@ -12,7 +12,7 @@ import kotlinx.serialization.json.JsonElement
 /**
  * Hook interface for workflow lifecycle events.
  *
- * This interface is called by [StepByStepOrchestrator] at precise state transition points
+ * This interface is called by [com.lemline.core.orchestrator.StepByStepOrchestrator] at precise state transition points
  * to emit lifecycle events for external observability. The runner implements this interface
  * to build and emit CloudEvents.
  *
@@ -26,7 +26,7 @@ import kotlinx.serialization.json.JsonElement
  * - Implementations should be fire-and-forget (never throw, log warnings on failure)
  * - The `nodeStack` parameter provides all context needed to build CloudEvents
  *
- * @see StepByStepOrchestrator for hook call sites
+ * @see com.lemline.core.orchestrator.StepByStepOrchestrator for hook call sites
  */
 @ExperimentalTime
 interface LifecycleEventHook {
