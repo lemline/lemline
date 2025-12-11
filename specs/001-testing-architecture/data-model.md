@@ -5,6 +5,9 @@
 
 ## Entity Overview
 
+**Architecture**: Native binary orchestration - tests spawn runner as external process, interact via
+CLI and CloudEvents through the message broker.
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                           lemline-testing module                            │
@@ -12,184 +15,190 @@
 │                                                                             │
 │  ┌─────────────────────┐      ┌──────────────────────┐                     │
 │  │ TestWorkflowExecutor│──────│  WorkflowStateHooks  │                     │
-│  │ (orchestrates test) │      │ (await convenience)  │                     │
-│  └─────────┬───────────┘      └──────────┬───────────┘                     │
-│            │                             │ wraps                            │
-│            │ uses                        ▼                                  │
-│            ▼                  ┌──────────────────────┐                     │
-│  ┌─────────────────────┐      │  CloudEventCapture   │◄──── scoped by      │
-│  │ TestActivityExecutor│      │ (capture & verify)   │      workflowId     │
-│  │ (activity mocking)  │      └──────────────────────┘                     │
-│  └─────────────────────┘                 ▲                                  │
-│                                          │ routes events                    │
-│            │                  ┌──────────┴───────────┐                     │
-│            │                  │ CloudEventDispatcher │ (singleton)         │
-│  ┌─────────▼───────────┐      │ (routes by workflowId│                     │
-│  │ TestConfiguration   │      └──────────────────────┘                     │
-│  │ (test settings)     │                 ▲                                  │
-│  └─────────────────────┘                 │ subscribes (single)              │
-│                               ┌──────────┴───────────┐                     │
-│  ┌─────────────────────┐      │   Messaging Channel  │                     │
-│  │  CloudEventDelivery │      │ (lifecycle events)   │                     │
-│  │ (trigger listen)    │      └──────────────────────┘                     │
-│  └─────────────────────┘                 ▲                                  │
-│                                          │ emits                            │
-│                               ┌──────────┴───────────┐                     │
+│  │ (spawns runner,     │      │ (await convenience)  │                     │
+│  │  manages lifecycle) │      └──────────┬───────────┘                     │
+│  └─────────┬───────────┘                 │ wraps                            │
+│            │                             ▼                                  │
+│            │ spawns         ┌──────────────────────┐                       │
+│            │ process        │  CloudEventCapture   │◄──── subscribes to    │
+│            │                │ (capture & verify)   │      broker           │
+│            │                └──────────────────────┘                       │
+│  ┌─────────▼───────────┐                 ▲                                 │
+│  │   RunnerProcess     │                 │ routes events                   │
+│  │ (native binary mgmt)│      ┌──────────┴───────────┐                     │
+│  └─────────────────────┘      │ CloudEventDispatcher │ (singleton)         │
+│                               │ (routes by workflowId│                     │
+│  ┌─────────────────────┐      └──────────────────────┘                     │
+│  │ TestConfiguration   │                 ▲                                 │
+│  │ (generates configs) │                 │ subscribes (single)             │
+│  └─────────────────────┘      ┌──────────┴───────────┐                     │
+│                               │   Messaging Channel  │                     │
+│  ┌─────────────────────┐      │ (Kafka/RabbitMQ)     │                     │
+│  │  CloudEventDelivery │      └──────────────────────┘                     │
+│  │ (trigger listen)    │────────────────►│                                 │
+│  └─────────────────────┘      emits      │                                 │
+│                                          │                                 │
+│  ┌─────────────────────┐                 │                                 │
+│  │    Testcontainers   │                 │                                 │
+│  │ (Kafka, PostgreSQL) │                 │                                 │
+│  └─────────────────────┘                 │                                 │
+└──────────────────────────────────────────┼─────────────────────────────────┘
+                                           │
+┌──────────────────────────────────────────┼─────────────────────────────────┐
+│                           lemline-runner (native binary)                    │
+├──────────────────────────────────────────┼─────────────────────────────────┤
+│                                          │                                 │
+│                               ┌──────────▼───────────┐                     │
 │                               │LifecycleEventHookImpl│                     │
-│                               │ (lemline-runner)     │                     │
+│                               │ (emits CloudEvents)  │                     │
 │                               └──────────────────────┘                     │
-│                                                                             │
-│  ┌─────────────────────────────────────────────────────────────────┐       │
-│  │                    Composable Test Profiles                      │       │
-│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────────┐    │       │
-│  │  │ KafkaProfile  │  │PostgresProfile│  │ KafkaPostgresProf │    │       │
-│  │  └───────────────┘  └───────────────┘  └───────────────────┘    │       │
-│  │  ┌───────────────┐  ┌───────────────┐  ┌───────────────────┐    │       │
-│  │  │RabbitMQProfile│  │ MySQLProfile  │  │ ...other combos   │    │       │
-│  │  └───────────────┘  └───────────────┘  └───────────────────┘    │       │
-│  └─────────────────────────────────────────────────────────────────┘       │
+│                                          ▲                                 │
+│  ┌─────────────────────┐                 │                                 │
+│  │ TestActivityExecutor│─────────────────┘                                 │
+│  │ (--test-mode flag)  │  returns mock responses                           │
+│  │ (--mock-config file)│                                                   │
+│  └─────────────────────┘                                                   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Test Isolation Flow**: `CloudEventDispatcher` (singleton) subscribes once to the lifecycle
-events channel. When events arrive, it extracts the workflowId and routes only to
-`CloudEventCapture` instances registered for that workflowId. This ensures concurrent tests
-don't interfere with each other.
+**Test Isolation Flow**: `CloudEventDispatcher` (singleton) subscribes once to the message broker.
+When events arrive, it extracts the workflowId and routes only to `CloudEventCapture` instances
+registered for that workflowId. This ensures concurrent tests don't interfere with each other.
 
 ---
 
 ## Core Entities
 
-### 1. TestWorkflowExecutor
+### 1. TestWorkflowExecutor (in lemline-testing)
 
-**Purpose**: Orchestrates end-to-end test execution with real infrastructure.
+**Purpose**: Orchestrates end-to-end test execution by spawning native runner binary and managing
+infrastructure lifecycle.
 
 ```kotlin
 interface TestWorkflowExecutor {
-    /**
-     * Execute a workflow test case and return the result.
-     *
-     * @param testCase The workflow test case to execute
-     * @param config Test configuration (timeouts, mocks)
-     * @return WorkflowTestResult (Success or Failure)
-     */
-    suspend fun execute(
-        testCase: WorkflowTestCase,
-        config: TestConfiguration = TestConfiguration.default()
-    ): WorkflowTestResult
+    /** Access to CloudEventCapture for reading events from broker. */
+    val cloudEventCapture: CloudEventCapture
 
-    /**
-     * Execute a workflow from YAML with custom input.
-     *
-     * @param yaml Workflow definition YAML
-     * @param input Workflow input as JsonElement
-     * @param config Test configuration
-     * @return WorkflowTestResult
-     */
-    suspend fun execute(
-        yaml: String,
+    /** Access to CloudEventDelivery for emitting events to broker. */
+    val cloudEventDelivery: CloudEventDelivery
+
+    /** Access to WorkflowStateHooks for deterministic await utilities. */
+    val stateHooks: WorkflowStateHooks
+
+    /** Start infrastructure (Testcontainers) and spawn native runner. */
+    suspend fun start()
+
+    /** Stop runner process and infrastructure containers. */
+    suspend fun stop()
+
+    /** Define a workflow via CLI command. */
+    suspend fun defineWorkflow(yaml: String)
+
+    /** Run a workflow and wait for completion. */
+    suspend fun runWorkflow(
+        name: String,
+        version: String,
         input: JsonElement,
-        config: TestConfiguration = TestConfiguration.default()
-    ): WorkflowTestResult
+        mocks: MockConfig? = null,
+        timeout: Duration = 30.seconds
+    ): WorkflowResult
+
+    /** Start a workflow without waiting for completion. */
+    suspend fun startWorkflowAsync(
+        name: String,
+        version: String,
+        input: JsonElement,
+        mocks: MockConfig? = null
+    ): String
+
+    companion object {
+        fun create(
+            broker: BrokerType,
+            database: DatabaseType,
+            runnerBinaryPath: String? = null
+        ): TestWorkflowExecutor
+    }
 }
 ```
 
 **Relationships**:
-- Uses `WorkflowStateHooks` for event-based synchronization
-- Uses `TestActivityExecutor` for activity mocking
-- Uses `CloudEventCapture` for event verification
-- Configured via `TestConfiguration`
+- Spawns `RunnerProcess` (native binary with `--test-mode`)
+- Manages `Testcontainers` (broker + database)
+- Provides `WorkflowStateHooks` for event-based synchronization
+- Provides `CloudEventCapture` for event verification
+- Provides `CloudEventDelivery` for triggering listen tasks
 
 ---
 
-### 2. TestActivityExecutor
+### 2. TestActivityExecutor (in lemline-runner)
 
-**Purpose**: Intercepts activity calls and returns configured responses for deterministic testing.
+**Purpose**: Built into runner, activated via `--test-mode` CLI flag. Returns mock responses
+loaded from `--mock-config` file.
 
 ```kotlin
-interface TestActivityExecutor {
-    /**
-     * Queue a response for the next HTTP call.
-     */
-    fun queueHttpResponse(response: HttpResponse)
+/**
+ * Implements ActivityExecutor interface. Returns mock responses from configuration.
+ * Activated when runner starts with `--test-mode` flag.
+ */
+class TestActivityExecutor(
+    private val mockConfig: MockConfiguration
+) : ActivityExecutor {
 
-    /**
-     * Queue a response for the next script execution.
-     */
-    fun queueScriptResponse(response: ScriptResponse)
-
-    /**
-     * Queue a response for the next shell execution.
-     */
-    fun queueShellResponse(response: ShellResponse)
-
-    /**
-     * Queue an error for the next activity call (any type).
-     */
-    fun queueError(error: ActivityError)
-
-    /**
-     * Get all activity invocations for verification.
-     */
-    fun getInvocations(): List<ActivityInvocation>
-
-    /**
-     * Clear all queued responses and recorded invocations.
-     */
-    fun reset()
+    override suspend fun execute(event: ActivityStarted): JsonElement = when (event) {
+        is EmitStarted -> executeEmit(event)
+        is CallHttpStarted -> executeHttp(event.config)
+        is RunScriptStarted -> executeScript(event.config)
+        is RunShellStarted -> executeShell(event.config)
+    }
 }
 
-// Response types
-data class HttpResponse(
-    val statusCode: Int = 200,
-    val body: JsonElement = JsonObject(emptyMap()),
-    val headers: Map<String, String> = emptyMap()
-)
-
-data class ScriptResponse(
-    val output: JsonElement,
-    val exitCode: Int = 0
-)
-
-data class ShellResponse(
-    val stdout: String = "",
-    val stderr: String = "",
-    val exitCode: Int = 0
-)
-
-data class ActivityError(
-    val type: String,
-    val message: String,
-    val details: JsonElement? = null
-)
-
-// Invocation tracking
-sealed class ActivityInvocation {
-    abstract val timestamp: Instant
-
-    data class HttpInvocation(
-        override val timestamp: Instant,
-        val method: String,
-        val url: String,
-        val headers: Map<String, String>,
-        val body: JsonElement?
-    ) : ActivityInvocation()
-
-    data class ScriptInvocation(
-        override val timestamp: Instant,
-        val language: String,
-        val code: String,
-        val arguments: Map<String, JsonElement>
-    ) : ActivityInvocation()
-
-    data class ShellInvocation(
-        override val timestamp: Instant,
-        val command: String,
-        val arguments: List<String>,
-        val environment: Map<String, String>
-    ) : ActivityInvocation()
+/**
+ * Mock configuration loaded from --mock-config file (YAML/JSON).
+ */
+data class MockConfiguration(
+    val httpMocks: List<HttpMockRule> = emptyList(),
+    val scriptMocks: List<ScriptMockRule> = emptyList(),
+    val shellMocks: List<ShellMockRule> = emptyList()
+) {
+    companion object {
+        fun fromYaml(path: String): MockConfiguration
+    }
 }
+
+// Mock rule types
+data class HttpMockRule(
+    val match: HttpMockMatcher,  // url pattern, method
+    val response: HttpMockResponse  // status, body, error
+)
+
+data class ScriptMockRule(
+    val match: ScriptMockMatcher,  // language
+    val response: ScriptMockResponse  // output, exitCode
+)
+
+data class ShellMockRule(
+    val match: ShellMockMatcher,  // command pattern
+    val response: ShellMockResponse  // stdout, stderr, exitCode
+)
+```
+
+**Mock Configuration Format** (YAML):
+```yaml
+http:
+  - match:
+      url: "*api.example.com*"
+      method: GET
+    response:
+      status: 200
+      body: { "id": 123 }
+
+shell:
+  - match:
+      command: "echo*"
+    response:
+      stdout: "mocked"
+      exitCode: 0
 ```
 
 ---
@@ -430,34 +439,41 @@ data class TestConfiguration(
 
 ---
 
-## Test Profile Entities
+## Infrastructure Configuration
 
-### 7. Composable Profiles
+### 7. BrokerType and DatabaseType
 
-**Base Profile**:
+**Purpose**: Configuration enums for selecting test infrastructure. No Quarkus test profiles -
+infrastructure is selected via `TestWorkflowExecutor.create()` parameters.
+
 ```kotlin
-abstract class BaseBrokerTestProfile : QuarkusTestProfile {
-    override fun getConfigOverrides(): Map<String, String> {
-        return mapOf(
-            ORCHESTRATOR_MODE to "all",
-            "lemline.outbox.enabled" to "true",
-            "lemline.outbox.wait.outbox.every" to "1s",
-            "lemline.outbox.wait.outbox.initial-delay" to "1s",
-            "lemline.outbox.retry.outbox.every" to "1s",
-            "lemline.outbox.retry.outbox.initial-delay" to "1s"
-        )
-    }
+enum class BrokerType {
+    KAFKA,
+    RABBITMQ
+}
+
+enum class DatabaseType {
+    POSTGRESQL,
+    MYSQL
 }
 ```
 
-**Concrete Profiles** (4 combinations):
+**Usage**:
+```kotlin
+val executor = TestWorkflowExecutor.create(
+    broker = BrokerType.KAFKA,
+    database = DatabaseType.POSTGRESQL
+)
+```
 
-| Profile | Database | Broker | TestResources |
-|---------|----------|--------|---------------|
-| `KafkaPostgresProfile` | PostgreSQL | Kafka | KafkaTestResource, PostgresTestResource |
-| `KafkaMySQLProfile` | MySQL | Kafka | KafkaTestResource, MySQLTestResource |
-| `RabbitMQPostgresProfile` | PostgreSQL | RabbitMQ | RabbitMQTestResource, PostgresTestResource |
-| `RabbitMQMySQLProfile` | MySQL | RabbitMQ | RabbitMQTestResource, MySQLTestResource |
+**4 Infrastructure Combinations**:
+
+| Broker | Database | Testcontainers |
+|--------|----------|----------------|
+| KAFKA | POSTGRESQL | KafkaContainer, PostgreSQLContainer |
+| KAFKA | MYSQL | KafkaContainer, MySQLContainer |
+| RABBITMQ | POSTGRESQL | RabbitMQContainer, PostgreSQLContainer |
+| RABBITMQ | MYSQL | RabbitMQContainer, MySQLContainer |
 
 ---
 

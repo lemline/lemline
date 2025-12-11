@@ -5,247 +5,360 @@
  * This file defines the contract for the TestWorkflowExecutor interface.
  * Implementation will be in lemline-testing module.
  *
+ * Architecture: Native binary orchestration - spawns runner as external process,
+ * interacts via CLI and CloudEvents through the message broker.
+ *
  * @feature 001-testing-architecture
  */
 package com.lemline.testing
 
-import com.lemline.common.values.WorkflowId
-import com.lemline.core.nodes.NodePosition
-import com.lemline.core.testcases.WorkflowTestCase
-import com.lemline.core.testcases.WorkflowTestResult
+import com.lemline.testing.infrastructure.BrokerType
+import com.lemline.testing.infrastructure.DatabaseType
 import kotlinx.serialization.json.JsonElement
 import kotlin.time.Duration
 
 /**
- * Orchestrates end-to-end workflow test execution with real infrastructure.
+ * Orchestrates end-to-end workflow test execution with native runner binary.
  *
- * This executor manages the full lifecycle of a workflow test:
- * 1. Register workflow definition(s) in the database
- * 2. Set up event-based synchronization hooks
- * 3. Send initial command to start workflow
- * 4. Wait for workflow completion using deterministic callbacks
- * 5. Return result with captured output or error details
+ * This executor manages the full test lifecycle:
+ * 1. Start infrastructure via Testcontainers (broker + database)
+ * 2. Spawn native-compiled runner with `--test-mode` flag
+ * 3. Define workflows via CLI command
+ * 4. Start workflow instances via CLI command
+ * 5. Capture CloudEvents from broker for verification
+ * 6. Emit CloudEvents to broker for listen task testing
+ * 7. Stop runner process and containers on teardown
  *
  * ## Usage
  *
  * ```kotlin
- * @QuarkusTest
- * @TestProfile(KafkaPostgresProfile::class)
- * class MyWorkflowTest {
- *     @Inject
+ * class MyWorkflowTest : FunSpec({
+ *
  *     lateinit var executor: TestWorkflowExecutor
  *
- *     @Test
- *     fun `my workflow produces expected output`() = runBlocking {
- *         val result = executor.execute(
+ *     beforeSpec {
+ *         executor = TestWorkflowExecutor.create(
+ *             broker = BrokerType.KAFKA,
+ *             database = DatabaseType.POSTGRESQL
+ *         )
+ *         executor.start()
+ *     }
+ *
+ *     afterSpec {
+ *         executor.stop()
+ *     }
+ *
+ *     test("workflow produces expected output") {
+ *         executor.defineWorkflow(
  *             yaml = """
+ *                 document:
+ *                   name: my-workflow
+ *                   version: "1.0.0"
+ *                   dsl: "1.0.0"
  *                 do:
  *                   - set:
  *                       answer: 42
- *             """.trimIndent(),
+ *             """.trimIndent()
+ *         )
+ *
+ *         val result = executor.runWorkflow(
+ *             name = "my-workflow",
+ *             version = "1.0.0",
  *             input = buildJsonObject { }
  *         )
  *
- *         result shouldBe WorkflowTestResult.Success(
- *             buildJsonObject { put("answer", 42) }
- *         )
+ *         result.output shouldBe buildJsonObject { put("answer", 42) }
  *     }
- * }
+ * })
  * ```
  *
  * ## Thread Safety
  *
  * TestWorkflowExecutor is thread-safe and supports concurrent test execution.
- * Each workflow instance is isolated via unique workflow IDs and names.
- *
- * ## Configuration
- *
- * Use [TestConfiguration] to customize:
- * - Timeout duration
- * - Activity mocking via [TestActivityExecutor]
- * - CloudEvent capture and delivery
- * - Platform and tag filtering
+ * Each workflow instance is isolated via unique workflow IDs.
  */
 interface TestWorkflowExecutor {
 
     /**
-     * Execute a [WorkflowTestCase] from lemline-core testFixtures.
-     *
-     * This method provides compatibility with existing test cases,
-     * enabling reuse of lemline-core tests against real infrastructure.
-     *
-     * @param testCase The workflow test case to execute
-     * @param config Test configuration (optional, uses defaults if not provided)
-     * @return [WorkflowTestResult.Success] with output, or [WorkflowTestResult.Failure] with error
-     * @throws IllegalStateException if infrastructure is not properly configured
+     * Access to CloudEventCapture for reading events from broker.
      */
-    suspend fun execute(
-        testCase: WorkflowTestCase,
-        config: TestConfiguration = TestConfiguration.default()
-    ): WorkflowTestResult
+    val cloudEventCapture: CloudEventCapture
 
     /**
-     * Execute a workflow from raw YAML definition.
+     * Access to CloudEventDelivery for emitting events to broker.
+     */
+    val cloudEventDelivery: CloudEventDelivery
+
+    /**
+     * Access to WorkflowStateHooks for deterministic await utilities.
+     */
+    val stateHooks: WorkflowStateHooks
+
+    /**
+     * Start infrastructure (Testcontainers) and spawn native runner.
      *
-     * This is the primary method for writing new end-to-end tests.
-     * The workflow YAML should NOT include the document header (namespace, name, version)
-     * as these are generated automatically to ensure test isolation.
+     * This method:
+     * 1. Starts broker container (Kafka or RabbitMQ)
+     * 2. Starts database container (PostgreSQL or MySQL)
+     * 3. Generates runner configuration file
+     * 4. Spawns native runner with `--test-mode` flag
+     * 5. Waits for runner to be ready
      *
-     * @param yaml Workflow definition YAML (without document header)
+     * @throws IllegalStateException if containers fail to start
+     * @throws IllegalStateException if runner fails to start
+     */
+    suspend fun start()
+
+    /**
+     * Stop runner process and infrastructure containers.
+     *
+     * This method:
+     * 1. Stops the native runner process (graceful shutdown)
+     * 2. Stops broker and database containers
+     * 3. Cleans up temporary configuration files
+     */
+    suspend fun stop()
+
+    /**
+     * Define a workflow via CLI command.
+     *
+     * Internally executes: `./lemline-runner definition create --yaml=<path>`
+     *
+     * @param yaml Complete workflow YAML including document header
+     * @throws WorkflowDefinitionException if CLI command fails
+     */
+    suspend fun defineWorkflow(yaml: String)
+
+    /**
+     * Run a workflow and wait for completion.
+     *
+     * Internally:
+     * 1. Executes: `./lemline-runner instance start --name=<name> --version=<version> --input=<json>`
+     * 2. Waits for workflow.completed or workflow.faulted CloudEvent via stateHooks
+     *
+     * @param name Workflow name
+     * @param version Workflow version
      * @param input Workflow input as JsonElement
-     * @param config Test configuration
-     * @return [WorkflowTestResult.Success] with output, or [WorkflowTestResult.Failure] with error
-     *
-     * @sample
-     * ```kotlin
-     * val result = executor.execute(
-     *     yaml = """
-     *         do:
-     *           - call: http
-     *             with:
-     *               method: GET
-     *               endpoint:
-     *                 uri: https://api.example.com/data
-     *     """.trimIndent(),
-     *     input = buildJsonObject { put("userId", "123") },
-     *     config = TestConfiguration.withMocking {
-     *         queueHttpResponse(HttpResponse(
-     *             statusCode = 200,
-     *             body = buildJsonObject { put("name", "Test User") }
-     *         ))
-     *     }
-     * )
-     * ```
+     * @param mocks Mock configuration (optional) - generates --mock-config file
+     * @param timeout Maximum time to wait for completion
+     * @return WorkflowResult with status and output
+     * @throws WorkflowTimeoutException if workflow doesn't complete within timeout
      */
-    suspend fun execute(
-        yaml: String,
+    suspend fun runWorkflow(
+        name: String,
+        version: String,
         input: JsonElement,
-        config: TestConfiguration = TestConfiguration.default()
-    ): WorkflowTestResult
-
-    /**
-     * Execute a workflow with dependencies (child workflows).
-     *
-     * Use this when testing parent-child workflow relationships via `run: workflow`.
-     *
-     * @param yaml Main workflow YAML
-     * @param input Workflow input
-     * @param dependencies List of child workflow definitions
-     * @param config Test configuration
-     * @return [WorkflowTestResult]
-     */
-    suspend fun execute(
-        yaml: String,
-        input: JsonElement,
-        dependencies: List<WorkflowDependency>,
-        config: TestConfiguration = TestConfiguration.default()
-    ): WorkflowTestResult
+        mocks: MockConfig? = null,
+        timeout: Duration = Duration.parse("30s")
+    ): WorkflowResult
 
     /**
      * Start a workflow without waiting for completion.
      *
-     * Use this with [WorkflowStateHooks] for manual synchronization when testing:
+     * Use this with [stateHooks] for manual synchronization when testing:
      * - Listen tasks that need external events delivered mid-execution
      * - Intermediate task outputs before workflow completion
      * - Complex async patterns requiring fine-grained control
      *
-     * @param yaml Workflow definition YAML (without document header)
+     * @param name Workflow name
+     * @param version Workflow version
      * @param input Workflow input as JsonElement
-     * @param config Test configuration
-     * @return WorkflowId of the started workflow instance
-     *
-     * @sample
-     * ```kotlin
-     * val hooks = executor.getStateHooks()
-     * val delivery = executor.getEventDelivery()
-     *
-     * // Start workflow (non-blocking)
-     * val workflowId = executor.startWorkflowAsync(
-     *     yaml = """
-     *         do:
-     *           - listen:
-     *               to:
-     *                 one:
-     *                   with:
-     *                     type: com.myapp.payment.completed
-     *     """.trimIndent(),
-     *     input = buildJsonObject { }
-     * )
-     *
-     * // Wait for listen task to be ready
-     * hooks.awaitTaskStarted(workflowId, NodePosition.parse("[0, \"listen\"]"), 5.seconds)
-     *
-     * // Deliver the event
-     * delivery.deliver(
-     *     type = "com.myapp.payment.completed",
-     *     source = "/payments/123",
-     *     data = buildJsonObject { put("amount", 99.99) },
-     *     targetWorkflowId = workflowId
-     * )
-     *
-     * // Wait for workflow completion
-     * val result = hooks.awaitCompletion(workflowId, 10.seconds)
-     * ```
+     * @param mocks Mock configuration (optional)
+     * @return Workflow instance ID
      */
     suspend fun startWorkflowAsync(
-        yaml: String,
+        name: String,
+        version: String,
         input: JsonElement,
-        config: TestConfiguration = TestConfiguration.default()
-    ): WorkflowId
+        mocks: MockConfig? = null
+    ): String
 
-    /**
-     * Get the [CloudEventCapture] for the last execution.
-     *
-     * Call this after [execute] to verify emitted CloudEvents.
-     *
-     * @return CloudEventCapture with all events from the last execution
-     * @throws IllegalStateException if no execution has occurred
-     */
-    fun getEventCapture(): CloudEventCapture
-
-    /**
-     * Get the [CloudEventDelivery] for programmatic event delivery.
-     *
-     * Use this to trigger listen tasks during test execution.
-     *
-     * @return CloudEventDelivery instance
-     */
-    fun getEventDelivery(): CloudEventDelivery
-
-    /**
-     * Get the [WorkflowStateHooks] for event-based synchronization.
-     *
-     * Use this to wait for specific workflow/task state transitions.
-     *
-     * @return WorkflowStateHooks instance
-     */
-    fun getStateHooks(): WorkflowStateHooks
+    companion object {
+        /**
+         * Create a TestWorkflowExecutor instance.
+         *
+         * @param broker Broker type (KAFKA or RABBITMQ)
+         * @param database Database type (POSTGRESQL or MYSQL)
+         * @param runnerBinaryPath Path to native runner binary (optional, auto-detected)
+         * @return TestWorkflowExecutor instance (not yet started)
+         */
+        fun create(
+            broker: BrokerType,
+            database: DatabaseType,
+            runnerBinaryPath: String? = null
+        ): TestWorkflowExecutor = TestWorkflowExecutorImpl(broker, database, runnerBinaryPath)
+    }
 }
 
 /**
- * Dependency workflow for parent-child relationship testing.
- *
- * When testing workflows that use `run: workflow` to call child workflows,
- * the child workflow definitions must be registered before execution.
+ * Result of workflow execution.
  */
-data class WorkflowDependency(
+data class WorkflowResult(
     /**
-     * Child workflow YAML definition (without document header).
+     * Final workflow status.
      */
-    val yaml: String,
+    val status: WorkflowStatus,
 
     /**
-     * Workflow namespace. Must match the namespace used in `run: workflow`.
+     * Workflow output (if completed successfully).
      */
-    val namespace: String = "test",
+    val output: JsonElement?,
 
     /**
-     * Workflow name. Must match the name used in `run: workflow`.
+     * Error details (if faulted).
      */
-    val name: String,
-
-    /**
-     * Workflow version. Must match the version used in `run: workflow`.
-     */
-    val version: String = "0.1.0"
+    val error: WorkflowError?
 )
+
+/**
+ * Workflow status.
+ */
+enum class WorkflowStatus {
+    COMPLETED,
+    FAULTED,
+    CANCELLED
+}
+
+/**
+ * Workflow error details.
+ */
+data class WorkflowError(
+    val type: String,
+    val title: String,
+    val detail: String?
+)
+
+/**
+ * Mock configuration for test activity responses.
+ *
+ * This generates a YAML file that the runner loads via `--mock-config` flag.
+ */
+class MockConfig private constructor(
+    internal val httpMocks: List<HttpMock>,
+    internal val scriptMocks: List<ScriptMock>,
+    internal val shellMocks: List<ShellMock>
+) {
+    class Builder {
+        private val httpMocks = mutableListOf<HttpMock>()
+        private val scriptMocks = mutableListOf<ScriptMock>()
+        private val shellMocks = mutableListOf<ShellMock>()
+
+        fun http(block: HttpMockBuilder.() -> Unit) {
+            httpMocks.add(HttpMockBuilder().apply(block).build())
+        }
+
+        fun script(block: ScriptMockBuilder.() -> Unit) {
+            scriptMocks.add(ScriptMockBuilder().apply(block).build())
+        }
+
+        fun shell(block: ShellMockBuilder.() -> Unit) {
+            shellMocks.add(ShellMockBuilder().apply(block).build())
+        }
+
+        fun build() = MockConfig(httpMocks, scriptMocks, shellMocks)
+    }
+
+    companion object {
+        operator fun invoke(block: Builder.() -> Unit): MockConfig =
+            Builder().apply(block).build()
+    }
+}
+
+// Mock builders (simplified - full implementation in lemline-testing)
+class HttpMockBuilder {
+    private var matcher: HttpMatcher? = null
+    private var response: HttpMockResponse? = null
+
+    fun match(block: HttpMatcher.() -> Unit) {
+        matcher = HttpMatcher().apply(block)
+    }
+
+    fun respond(block: HttpMockResponse.() -> Unit) {
+        response = HttpMockResponse().apply(block)
+    }
+
+    fun build() = HttpMock(matcher!!, response!!)
+}
+
+class HttpMatcher {
+    var url: String? = null
+    infix fun String.contains(pattern: String): Boolean = true // DSL marker
+}
+
+class HttpMockResponse {
+    var status: Int = 200
+    var body: JsonElement? = null
+    var error: String? = null
+}
+
+data class HttpMock(val matcher: HttpMatcher, val response: HttpMockResponse)
+
+class ScriptMockBuilder {
+    fun match(block: ScriptMatcher.() -> Unit) {}
+    fun respond(block: ScriptMockResponse.() -> Unit) {}
+    fun build() = ScriptMock()
+}
+
+class ScriptMatcher {
+    var language: String? = null
+}
+
+class ScriptMockResponse {
+    var output: JsonElement? = null
+}
+
+data class ScriptMock(val placeholder: Unit = Unit)
+
+class ShellMockBuilder {
+    fun match(block: ShellMatcher.() -> Unit) {}
+    fun respond(block: ShellMockResponse.() -> Unit) {}
+    fun build() = ShellMock()
+}
+
+class ShellMatcher {
+    var command: String? = null
+    infix fun String.startsWith(prefix: String): Boolean = true // DSL marker
+}
+
+class ShellMockResponse {
+    var stdout: String = ""
+    var exitCode: Int = 0
+}
+
+data class ShellMock(val placeholder: Unit = Unit)
+
+// Exceptions
+class WorkflowDefinitionException(message: String, cause: Throwable? = null) : Exception(message, cause)
+class WorkflowTimeoutException(message: String) : Exception(message)
+
+// Implementation placeholder (actual impl in lemline-testing module)
+internal class TestWorkflowExecutorImpl(
+    private val broker: BrokerType,
+    private val database: DatabaseType,
+    private val runnerBinaryPath: String?
+) : TestWorkflowExecutor {
+    override val cloudEventCapture: CloudEventCapture
+        get() = TODO("Implementation in lemline-testing")
+    override val cloudEventDelivery: CloudEventDelivery
+        get() = TODO("Implementation in lemline-testing")
+    override val stateHooks: WorkflowStateHooks
+        get() = TODO("Implementation in lemline-testing")
+
+    override suspend fun start() = TODO("Implementation in lemline-testing")
+    override suspend fun stop() = TODO("Implementation in lemline-testing")
+    override suspend fun defineWorkflow(yaml: String) = TODO("Implementation in lemline-testing")
+    override suspend fun runWorkflow(
+        name: String,
+        version: String,
+        input: JsonElement,
+        mocks: MockConfig?,
+        timeout: Duration
+    ): WorkflowResult = TODO("Implementation in lemline-testing")
+
+    override suspend fun startWorkflowAsync(
+        name: String,
+        version: String,
+        input: JsonElement,
+        mocks: MockConfig?
+    ): String = TODO("Implementation in lemline-testing")
+}

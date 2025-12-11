@@ -5,16 +5,22 @@
 
 ## Summary
 
-Build a dedicated `lemline-testing` module providing a comprehensive end-to-end testing framework for Lemline workflows. The framework enables testing against real infrastructure (Kafka/RabbitMQ × PostgreSQL/MySQL) using composable Quarkus test profiles, deterministic event-based synchronization, and mocked activity execution for reproducible tests.
+Build an end-to-end testing framework with two components: (1) CLI test mode in `lemline-runner` providing
+`--test-mode` flag with `TestActivityExecutor` for mock responses, and (2) `lemline-testing` module as a test harness
+that spawns the native-compiled runner, manages Testcontainers infrastructure, and provides CloudEvent capture/delivery
+for workflow verification. Tests define workflows via CLI, start workflows via CLI, and verify behavior by reading
+lifecycle CloudEvents from the broker.
 
 ## Technical Context
 
 **Language/Version**: Kotlin 2.2.10 + Java 17
-**Primary Dependencies**: Quarkus 3.x, Kotest 5.9.1, Testcontainers, SmallRye Reactive Messaging, CloudEvents SDK
-**Storage**: PostgreSQL, MySQL (via Testcontainers); H2 for in-memory fallback
-**Testing**: Kotest + JUnit 5 (via Quarkus), Testcontainers for infrastructure
+**Primary Dependencies**:
+- `lemline-runner`: Quarkus 3.x (CLI with `--test-mode`), existing `ActivityExecutor` interface
+- `lemline-testing`: Kotest 5.9.1, Testcontainers, Kafka/RabbitMQ client libraries, CloudEvents SDK
+**Storage**: PostgreSQL, MySQL (via Testcontainers)
+**Testing**: Kotest + JUnit 5, native runner binary spawned as external process
 **Target Platform**: JVM (Linux/macOS/Windows server)
-**Project Type**: Multi-module Gradle project (new `lemline-testing` module)
+**Project Type**: Multi-module Gradle project (extend `lemline-runner` + new `lemline-testing` module)
 **Performance Goals**: Complete workflow test in <30 seconds (excluding infrastructure startup)
 **Constraints**: No `Thread.sleep()` for synchronization, deterministic execution, 99% test reliability
 **Scale/Scope**: 14 task types, 4 infrastructure combinations, 100% lemline-core test case compatibility
@@ -55,30 +61,12 @@ specs/001-testing-architecture/
 ### Source Code (repository root)
 
 ```text
-lemline-testing/                        # NEW MODULE
-├── build.gradle.kts                    # Module dependencies
-├── src/
-│   └── main/kotlin/com/lemline/testing/
-│       ├── TestWorkflowExecutor.kt     # Core test execution orchestration
-│       ├── TestActivityExecutor.kt     # Activity mocking (HTTP, script, shell)
-│       ├── CloudEventCapture.kt        # Event capture and query
-│       ├── CloudEventDelivery.kt       # Programmatic event delivery
-│       ├── WorkflowStateHooks.kt       # Event-based synchronization callbacks
-│       ├── TestConfiguration.kt        # Test config (timeouts, mocks)
-│       └── profiles/                   # Composable Quarkus profiles
-│           ├── KafkaProfile.kt
-│           ├── RabbitMQProfile.kt
-│           ├── PostgresProfile.kt
-│           ├── MySQLProfile.kt
-│           └── resources/              # TestResources for Testcontainers
-│               ├── KafkaTestResource.kt
-│               ├── RabbitMQTestResource.kt
-│               ├── PostgresTestResource.kt
-│               └── MySQLTestResource.kt
-└── src/test/kotlin/com/lemline/testing/
-    └── SelfTest.kt                     # Framework self-validation tests
-
-lemline-runner/
+lemline-runner/                         # EXTENDED with test mode
+├── src/main/kotlin/com/lemline/runner/
+│   ├── activities/
+│   │   └── TestActivityExecutor.kt     # Mock activity responses (--test-mode)
+│   └── cli/
+│       └── ListenCommand.kt            # Extended with --test-mode, --mock-config flags
 └── src/test/kotlin/com/lemline/runner/
     └── e2e/                            # End-to-end tests using lemline-testing
         ├── SetTaskE2ETest.kt
@@ -87,33 +75,60 @@ lemline-runner/
         ├── EmitTaskE2ETest.kt
         ├── WaitTaskE2ETest.kt
         └── ... (one per task type)
+
+lemline-testing/                        # NEW MODULE (test harness)
+├── build.gradle.kts                    # Module dependencies (NO runner dependency)
+├── src/
+│   └── main/kotlin/com/lemline/testing/
+│       ├── TestWorkflowExecutor.kt     # Spawns runner, manages Testcontainers lifecycle
+│       ├── RunnerProcess.kt            # Native binary process management
+│       ├── CloudEventCapture.kt        # Subscribe to broker, capture events
+│       ├── CloudEventDelivery.kt       # Publish events to trigger listen tasks
+│       ├── WorkflowStateHooks.kt       # await* utilities on captured events
+│       ├── TestConfiguration.kt        # Generate runner config + mock files
+│       └── infrastructure/             # Testcontainers setup
+│           ├── KafkaContainer.kt
+│           ├── RabbitMQContainer.kt
+│           ├── PostgresContainer.kt
+│           └── MySQLContainer.kt
+└── src/test/kotlin/com/lemline/testing/
+    └── SelfTest.kt                     # Framework self-validation tests
 ```
 
-**Structure Decision**: New `lemline-testing` module alongside existing `lemline-common`, `lemline-core`, `lemline-runner`. The module provides testing infrastructure as a library that can be consumed by `lemline-runner` tests and external projects.
+**Structure Decision**: Two-part architecture:
+1. `lemline-runner` extended with `--test-mode` CLI flag and `TestActivityExecutor`
+2. `lemline-testing` module as test harness - spawns native runner, manages infrastructure, captures/emits CloudEvents
+The harness does NOT depend on `lemline-runner` (runner is external process).
 
 ## Complexity Tracking
 
 No constitution violations requiring justification. The design follows existing patterns:
-- Single new module (not exceeding project count)
-- Composable profiles follow Quarkus best practices
-- Event-based sync is standard reactive pattern
-- No new abstractions beyond what's specified
+- Extends existing `ActivityExecutor` interface for test mode
+- Native binary spawning is standard process management
+- CloudEvent-based sync uses existing broker infrastructure
+- `lemline-testing` is thin harness, not complex framework
 
 ## Phase 0: Research Summary
 
 See [research.md](./research.md) for detailed findings.
 
 **Key Decisions:**
-1. **Module structure**: Dedicated `lemline-testing` module with Gradle `java-test-fixtures` plugin
-2. **Profile composition**: Use `@QuarkusTestProfile` interface with merged config maps
-3. **Event synchronization**: Leverage existing `on*Test` callbacks + `CompletableFuture`/`Channel`
-4. **Activity mocking**: Extend existing `ActivityRunner` interface with test implementation
-5. **CloudEvent capture**: Hook into existing event emission via callbacks
+1. **Architecture**: Native binary orchestration - tests spawn runner as external process, interact via CloudEvents
+2. **Activity mocking**: CLI `--test-mode` flag in runner activates `TestActivityExecutor`, mock responses via
+   `--mock-config=<path>` file
+3. **Module structure**: `lemline-runner` extended with test mode + new `lemline-testing` harness module
+4. **Infrastructure**: `lemline-testing` manages Testcontainers lifecycle (broker + database)
+5. **Event synchronization**: `CloudEventCapture` subscribes to broker, `WorkflowStateHooks` provides `await*` methods
+6. **Workflow control**: Define workflows via `definition` CLI, start via `instance` CLI, verify via captured CloudEvents
 
 ## Phase 1: Design Artifacts
 
 - **data-model.md**: Key entities and their relationships
-- **contracts/**: Internal API contracts (TestWorkflowExecutor, TestActivityExecutor interfaces)
+- **contracts/**: Internal API contracts:
+  - `TestActivityExecutor.kt` (in lemline-runner) - mock activity responses
+  - `TestWorkflowExecutor.kt` (in lemline-testing) - test orchestration
+  - `CloudEventCapture.kt` / `CloudEventDelivery.kt` - broker interaction
+  - `WorkflowStateHooks.kt` - await utilities
 - **quickstart.md**: Getting started guide for writing tests
 
 ## Dependencies
@@ -121,12 +136,10 @@ See [research.md](./research.md) for detailed findings.
 ```kotlin
 // lemline-testing/build.gradle.kts
 dependencies {
-    // Internal modules
-    implementation(project(":lemline-core"))
-    implementation(project(":lemline-runner"))
+    // Internal modules - NO lemline-runner dependency (spawned as external process)
+    implementation(project(":lemline-core"))  // For workflow definition parsing
 
-    // Quarkus test infrastructure
-    implementation("io.quarkus:quarkus-junit5")
+    // Testcontainers (infrastructure management)
     implementation(platform(libs.testcontainers.bom))
     implementation("org.testcontainers:testcontainers")
     implementation("org.testcontainers:kafka")
@@ -134,24 +147,41 @@ dependencies {
     implementation("org.testcontainers:postgresql")
     implementation("org.testcontainers:mysql")
 
+    // Kafka/RabbitMQ clients (for CloudEvent capture/delivery)
+    implementation("org.apache.kafka:kafka-clients")
+    implementation("com.rabbitmq:amqp-client")
+
     // Kotest
     implementation(libs.kotest.runner.junit5)
     implementation(libs.kotest.assertions.core)
 
     // CloudEvents SDK (for capture/delivery)
     implementation(libs.cloudevents.core)
+    implementation(libs.cloudevents.kafka)  // CloudEvent Kafka binding
+}
+
+// lemline-runner/build.gradle.kts (additions for test mode)
+dependencies {
+    // TestActivityExecutor mock config parsing
+    implementation(libs.kaml)  // YAML parsing for --mock-config
 }
 ```
 
 ## Migration Path
 
-1. Extract existing test infrastructure from `lemline-runner/src/test`:
-   - `BrokerWorkflowTestExecutor` → `TestWorkflowExecutor`
-   - `KafkaTestResource`, etc. → composable profile resources
-   - Test callbacks → `WorkflowStateHooks`
+1. **Extend `lemline-runner` with test mode**:
+   - Add `TestActivityExecutor` implementing `ActivityExecutor` interface
+   - Add `--test-mode` and `--mock-config` CLI flags to `listen` command
+   - Wire CDI to select executor based on test mode flag
 
-2. Create new `lemline-testing` module with extracted + enhanced code
+2. **Create `lemline-testing` module**:
+   - `TestWorkflowExecutor`: Testcontainers lifecycle + runner process management
+   - `RunnerProcess`: Spawn native binary with CLI args
+   - `CloudEventCapture`/`CloudEventDelivery`: Broker interaction
+   - `WorkflowStateHooks`: `await*` utilities
 
-3. Migrate existing runner tests to use new module
+3. **Migrate existing runner tests**:
+   - Replace in-process test infrastructure with `lemline-testing` harness
+   - Update tests to use native binary spawning approach
 
-4. Add comprehensive task type coverage tests
+4. **Add comprehensive task type E2E tests** (14 task types)

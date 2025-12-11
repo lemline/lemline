@@ -5,7 +5,11 @@
 
 ## Overview
 
-This guide shows how to write end-to-end tests for Lemline workflows using real infrastructure (Kafka/RabbitMQ + PostgreSQL/MySQL).
+This guide shows how to write end-to-end tests for Lemline workflows using the native runner binary with real
+infrastructure (Kafka/RabbitMQ + PostgreSQL/MySQL).
+
+**Architecture**: Tests spawn the native-compiled runner as an external process, interact via CloudEvents through the
+message broker.
 
 ---
 
@@ -20,137 +24,160 @@ dependencies {
 
 ---
 
-## 2. Choose Your Test Profile
-
-Select a profile based on your infrastructure:
-
-| Profile | Broker | Database |
-|---------|--------|----------|
-| `KafkaPostgresProfile` | Kafka | PostgreSQL |
-| `KafkaMySQLProfile` | Kafka | MySQL |
-| `RabbitMQPostgresProfile` | RabbitMQ | PostgreSQL |
-| `RabbitMQMySQLProfile` | RabbitMQ | MySQL |
-
----
-
-## 3. Write Your First Test
+## 2. Write Your First Test
 
 ### Basic Test
 
 ```kotlin
 import com.lemline.testing.TestWorkflowExecutor
-import com.lemline.core.testcases.WorkflowTestResult
+import com.lemline.testing.infrastructure.BrokerType
+import com.lemline.testing.infrastructure.DatabaseType
+import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
-import io.quarkus.test.junit.QuarkusTest
-import io.quarkus.test.junit.TestProfile
-import jakarta.inject.Inject
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import org.junit.jupiter.api.Test
 
-@QuarkusTest
-@TestProfile(KafkaPostgresProfile::class)
-class MyFirstWorkflowTest {
+class MyFirstWorkflowTest : FunSpec({
 
-    @Inject
     lateinit var executor: TestWorkflowExecutor
 
-    @Test
-    fun `workflow produces expected output`() = runBlocking {
-        val result = executor.execute(
+    beforeSpec {
+        // Start infrastructure (Testcontainers) and native runner
+        executor = TestWorkflowExecutor.create(
+            broker = BrokerType.KAFKA,
+            database = DatabaseType.POSTGRESQL
+        )
+        executor.start()
+    }
+
+    afterSpec {
+        executor.stop()
+    }
+
+    test("workflow produces expected output") {
+        // Define workflow via CLI
+        executor.defineWorkflow(
             yaml = """
+                document:
+                  name: my-test-workflow
+                  version: "1.0.0"
+                  dsl: "1.0.0"
                 do:
                   - set:
                       greeting: Hello, World!
-            """.trimIndent(),
+            """.trimIndent()
+        )
+
+        // Start workflow via CLI and wait for completion
+        val result = executor.runWorkflow(
+            name = "my-test-workflow",
+            version = "1.0.0",
             input = buildJsonObject { }
         )
 
-        result shouldBe WorkflowTestResult.Success(
-            buildJsonObject { put("greeting", "Hello, World!") }
-        )
+        result.output shouldBe buildJsonObject { put("greeting", "Hello, World!") }
     }
-}
+})
 ```
 
 ---
 
-## 4. Mock External Activities
+## 3. Mock External Activities
 
-Use `TestConfiguration.withMocking` to mock HTTP, script, and shell calls:
+Create a mock configuration file that the runner loads via `--mock-config`:
 
 ```kotlin
-@Test
-fun `workflow with mocked HTTP call`() = runBlocking {
-    val result = executor.execute(
+test("workflow with mocked HTTP call") {
+    // Define mocks that runner will use
+    val mocks = MockConfig {
+        http {
+            match { url contains "api.example.com" }
+            respond {
+                status = 200
+                body = buildJsonObject {
+                    put("id", 123)
+                    put("name", "Test User")
+                }
+            }
+        }
+    }
+
+    executor.defineWorkflow(
         yaml = """
+            document:
+              name: http-test
+              version: "1.0.0"
+              dsl: "1.0.0"
             do:
               - call: http
                 with:
                   method: GET
                   endpoint:
                     uri: https://api.example.com/users/123
-        """.trimIndent(),
-        input = buildJsonObject { },
-        config = TestConfiguration.withMocking {
-            queueHttpResponse(HttpResponse.ok(
-                buildJsonObject {
-                    put("id", 123)
-                    put("name", "Test User")
-                }
-            ))
-        }
+        """.trimIndent()
     )
 
-    // Verify the HTTP call was made
-    val invocations = config.activityExecutor!!.getHttpInvocations()
-    invocations.size shouldBe 1
-    invocations[0].url shouldBe "https://api.example.com/users/123"
-    invocations[0].method shouldBe "GET"
+    // Run with mocks - runner spawned with --test-mode --mock-config=<path>
+    val result = executor.runWorkflow(
+        name = "http-test",
+        version = "1.0.0",
+        input = buildJsonObject { },
+        mocks = mocks
+    )
+
+    result.output["id"]?.jsonPrimitive?.int shouldBe 123
 }
 ```
 
 ### Mock Script Execution
 
 ```kotlin
-TestConfiguration.withMocking {
-    queueScriptResponse(ScriptResponse.ok(
-        buildJsonObject { put("computed", 42) }
-    ))
+MockConfig {
+    script {
+        match { language == "javascript" }
+        respond { output = buildJsonObject { put("computed", 42) } }
+    }
 }
 ```
 
 ### Mock Shell Command
 
 ```kotlin
-TestConfiguration.withMocking {
-    queueShellResponse(ShellResponse.ok(stdout = "success"))
+MockConfig {
+    shell {
+        match { command startsWith "echo" }
+        respond { stdout = "mocked output"; exitCode = 0 }
+    }
 }
 ```
 
 ### Simulate Errors
 
 ```kotlin
-TestConfiguration.withMocking {
-    queueError(ActivityError(
-        type = "network",
-        message = "Connection refused"
-    ))
+MockConfig {
+    http {
+        match { url contains "failing.api" }
+        respond { status = 500; error = "Service unavailable" }
+    }
 }
 ```
 
 ---
 
-## 5. Verify Emitted CloudEvents
+## 4. Verify Emitted CloudEvents
 
-Check lifecycle and custom events emitted during workflow execution:
+Use `CloudEventCapture` to read events from the broker:
 
 ```kotlin
-@Test
-fun `workflow emits expected events`() = runBlocking {
-    val result = executor.execute(
+test("workflow emits expected events") {
+    val capture = executor.cloudEventCapture
+
+    executor.defineWorkflow(
         yaml = """
+            document:
+              name: emit-test
+              version: "1.0.0"
+              dsl: "1.0.0"
             do:
               - emit:
                   event:
@@ -159,203 +186,191 @@ fun `workflow emits expected events`() = runBlocking {
                       source: /orders
                       data:
                         orderId: "123"
-        """.trimIndent(),
+        """.trimIndent()
+    )
+
+    executor.runWorkflow(
+        name = "emit-test",
+        version = "1.0.0",
         input = buildJsonObject { }
     )
 
-    val capture = executor.getEventCapture()
+    // Query captured events from broker
+    val lifecycleEvents = capture.filter { it.type.startsWith("com.lemline.") }
+    lifecycleEvents.any { it.type == "com.lemline.workflow.completed" } shouldBe true
 
-    // Check lifecycle events
-    val lifecycleEvents = capture.lifecycleEvents()
-    lifecycleEvents.any { it.type == LemlineEventTypes.WORKFLOW_COMPLETED } shouldBe true
-
-    // Check custom events
-    val customEvents = capture.customEvents()
+    val customEvents = capture.filter { it.type == "com.myapp.order.created" }
     customEvents.size shouldBe 1
-    customEvents[0].type shouldBe "com.myapp.order.created"
+    customEvents[0].source shouldBe "/orders"
 }
 ```
 
 ---
 
-## 6. Test Listen Tasks (Event-Driven Workflows)
+## 5. Test Listen Tasks (Event-Driven Workflows)
 
-For workflows that wait for external events, use event-based synchronization.
-This uses the real CloudEvents emitted by `LifecycleEventHookImpl`:
+Use `CloudEventDelivery` to emit events that trigger `listen` tasks:
 
 ```kotlin
-@Test
-fun `workflow waits for and processes event`() = runBlocking {
-    val hooks = executor.getStateHooks()
-    val delivery = executor.getEventDelivery()
+test("workflow waits for and processes event") {
+    val hooks = executor.stateHooks
+    val delivery = executor.cloudEventDelivery
 
-    // Start workflow (non-blocking)
-    val workflowId = executor.startWorkflowAsync(
+    executor.defineWorkflow(
         yaml = """
+            document:
+              name: listen-test
+              version: "1.0.0"
+              dsl: "1.0.0"
             do:
               - listen:
                   to:
                     one:
                       with:
                         type: com.myapp.payment.completed
-        """.trimIndent(),
+        """.trimIndent()
+    )
+
+    // Start workflow (non-blocking) via CLI
+    val workflowId = executor.startWorkflowAsync(
+        name = "listen-test",
+        version = "1.0.0",
         input = buildJsonObject { }
     )
 
-    // Wait for listen task to start (via task.started CloudEvent)
+    // Wait for listen task to start (via captured CloudEvent)
     // This is deterministic - no Thread.sleep() needed!
     hooks.awaitTaskStarted(
-        workflowId,
-        NodePosition.parse("[0, \"listen\"]"),
+        workflowId = workflowId,
+        taskName = "listen",
         timeout = 5.seconds
     )
 
-    // Now safely deliver the event (listen task is ready to receive)
-    delivery.deliver(
+    // Deliver event to broker - runner will receive it
+    delivery.emit(
         type = "com.myapp.payment.completed",
         source = "/payments/456",
-        data = buildJsonObject { put("amount", 99.99) },
-        targetWorkflowId = workflowId
+        data = buildJsonObject { put("amount", 99.99) }
     )
 
-    // Wait for workflow completion (via workflow.completed CloudEvent)
-    val result = hooks.awaitCompletion(workflowId, 10.seconds)
-    result shouldBe instanceOf<WorkflowTestResult.Success>()
+    // Wait for workflow completion (via captured CloudEvent)
+    val result = hooks.awaitWorkflowCompleted(workflowId, timeout = 10.seconds)
+    result.status shouldBe WorkflowStatus.COMPLETED
 }
 ```
 
-**How it works**: `WorkflowStateHooks.awaitTaskStarted()` internally waits for a
-`com.lemline.task.started` CloudEvent from the real `LifecycleEventHookImpl`.
-This ensures tests verify the actual event emission path.
-
 ---
 
-## 7. Test Parent-Child Workflows
-
-Test workflows that invoke child workflows:
+## 6. Test Parent-Child Workflows
 
 ```kotlin
-@Test
-fun `parent workflow calls child workflow`() = runBlocking {
-    val result = executor.execute(
+test("parent workflow calls child workflow") {
+    // Define child workflow first
+    executor.defineWorkflow(
         yaml = """
+            document:
+              name: child-workflow
+              version: "1.0.0"
+              dsl: "1.0.0"
+            do:
+              - set:
+                  childResult: "processed"
+        """.trimIndent()
+    )
+
+    // Define parent workflow
+    executor.defineWorkflow(
+        yaml = """
+            document:
+              name: parent-workflow
+              version: "1.0.0"
+              dsl: "1.0.0"
             do:
               - run: workflow
                 with:
-                  namespace: test
                   name: child-workflow
-                  version: "0.1.0"
-                  input: \${ .parentData }
-        """.trimIndent(),
-        input = buildJsonObject { put("parentData", "from parent") },
-        dependencies = listOf(
-            WorkflowDependency(
-                yaml = """
-                    do:
-                      - set:
-                          childResult: "processed: \${ .input }"
-                """.trimIndent(),
-                namespace = "test",
-                name = "child-workflow",
-                version = "0.1.0"
-            )
-        )
+                  version: "1.0.0"
+        """.trimIndent()
     )
 
-    result shouldBe instanceOf<WorkflowTestResult.Success>()
-}
-```
-
----
-
-## 8. Advanced: Custom Event Synchronization
-
-Wait for specific task events during execution:
-
-```kotlin
-@Test
-fun `verify intermediate task output`() = runBlocking {
-    val hooks = executor.getStateHooks()
-
-    val workflowId = executor.startWorkflowAsync(
-        yaml = """
-            do:
-              - set:
-                  step1: value1
-              - set:
-                  step2: value2
-        """.trimIndent(),
+    val result = executor.runWorkflow(
+        name = "parent-workflow",
+        version = "1.0.0",
         input = buildJsonObject { }
     )
 
-    // Wait for first task to complete
-    val step1Output = hooks.awaitTaskCompleted(
-        workflowId,
-        NodePosition.parse("[0, \"set\"]"),
-        timeout = 5.seconds
-    )
-    step1Output shouldBe buildJsonObject { put("step1", "value1") }
-
-    // Continue to workflow completion
-    val result = hooks.awaitCompletion(workflowId, 10.seconds)
-    result shouldBe instanceOf<WorkflowTestResult.Success>()
+    result.status shouldBe WorkflowStatus.COMPLETED
 }
 ```
 
 ---
 
-## 9. Switching Infrastructure
+## 7. Switching Infrastructure
 
-Simply change the test profile to run against different infrastructure:
+Change broker/database by creating executor with different types:
 
 ```kotlin
-// Test with Kafka + PostgreSQL
-@TestProfile(KafkaPostgresProfile::class)
-class KafkaPostgresWorkflowTest { ... }
+class KafkaPostgresTest : FunSpec({
+    val executor = TestWorkflowExecutor.create(
+        broker = BrokerType.KAFKA,
+        database = DatabaseType.POSTGRESQL
+    )
+    // ... tests
+})
 
-// Same tests with RabbitMQ + MySQL
-@TestProfile(RabbitMQMySQLProfile::class)
-class RabbitMQMySQLWorkflowTest { ... }
+class RabbitMQMySQLTest : FunSpec({
+    val executor = TestWorkflowExecutor.create(
+        broker = BrokerType.RABBITMQ,
+        database = DatabaseType.MYSQL
+    )
+    // ... same tests work with different infrastructure
+})
 ```
 
 Testcontainers automatically provision the required infrastructure.
 
 ---
 
-## 10. Common Patterns
+## 8. Common Patterns
 
 ### Pattern: Timeout Configuration
 
 ```kotlin
-val result = executor.execute(
-    yaml = workflowYaml,
+val result = executor.runWorkflow(
+    name = "slow-workflow",
+    version = "1.0.0",
     input = input,
-    config = TestConfiguration(timeout = 60.seconds)
+    timeout = 60.seconds
 )
 ```
 
-### Pattern: Verify No Unused Mocks
+### Pattern: Custom Runner Binary Path
 
 ```kotlin
-@Test
-fun `all mocked responses are consumed`() = runBlocking {
-    val config = TestConfiguration.withMocking {
-        queueHttpResponse(HttpResponse.ok(data))
-    }
-
-    executor.execute(yaml, input, config)
-
-    config.activityExecutor!!.hasUnusedResponses() shouldBe false
-}
+val executor = TestWorkflowExecutor.create(
+    broker = BrokerType.KAFKA,
+    database = DatabaseType.POSTGRESQL,
+    runnerBinaryPath = "/custom/path/lemline-runner"
+)
 ```
 
 ### Pattern: Error Handling Test
 
 ```kotlin
-@Test
-fun `workflow handles error correctly`() = runBlocking {
-    val result = executor.execute(
+test("workflow handles error correctly") {
+    val mocks = MockConfig {
+        http {
+            match { url contains "failing.api" }
+            respond { status = 500; error = "Service unavailable" }
+        }
+    }
+
+    executor.defineWorkflow(
         yaml = """
+            document:
+              name: error-handling-test
+              version: "1.0.0"
+              dsl: "1.0.0"
             do:
               - try:
                   - call: http
@@ -366,16 +381,17 @@ fun `workflow handles error correctly`() = runBlocking {
                 catch:
                   - set:
                       recovered: true
-        """.trimIndent(),
-        input = buildJsonObject { },
-        config = TestConfiguration.withMocking {
-            queueError(ActivityError("http", "Service unavailable"))
-        }
+        """.trimIndent()
     )
 
-    result shouldBe WorkflowTestResult.Success(
-        buildJsonObject { put("recovered", true) }
+    val result = executor.runWorkflow(
+        name = "error-handling-test",
+        version = "1.0.0",
+        input = buildJsonObject { },
+        mocks = mocks
     )
+
+    result.output["recovered"]?.jsonPrimitive?.boolean shouldBe true
 }
 ```
 
@@ -383,11 +399,12 @@ fun `workflow handles error correctly`() = runBlocking {
 
 ## Key Principles
 
-1. **No Thread.sleep()** - Use event-based synchronization (`awaitCompletion`, `awaitListenStarted`, etc.)
-2. **Deterministic** - Tests produce the same result every time
-3. **Isolated** - Each test uses unique workflow IDs and names
-4. **Profile-based** - Switch infrastructure by changing `@TestProfile`
-5. **Mocking** - Control external dependencies for predictable behavior
+1. **Native Binary** - Tests spawn the real native-compiled runner
+2. **CLI-Driven** - Define workflows via `definition` CLI, start via `instance` CLI
+3. **CloudEvent Interaction** - Read events via `CloudEventCapture`, emit via `CloudEventDelivery`
+4. **No Thread.sleep()** - Use `WorkflowStateHooks.await*` methods for deterministic sync
+5. **Isolated** - Each test uses unique workflow IDs
+6. **Infrastructure Switching** - Change `BrokerType`/`DatabaseType` to test different combinations
 
 ---
 

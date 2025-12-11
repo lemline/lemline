@@ -3,394 +3,278 @@
  * TestActivityExecutor Contract
  *
  * This file defines the contract for activity mocking in tests.
- * Implementation will be in lemline-testing module.
+ * Implementation will be in lemline-runner module, activated via --test-mode CLI flag.
+ *
+ * Architecture: TestActivityExecutor implements the existing ActivityExecutor interface.
+ * Mock responses are loaded from a YAML/JSON config file specified via --mock-config flag.
  *
  * @feature 001-testing-architecture
  */
-package com.lemline.testing
+package com.lemline.runner.activities
 
+import com.lemline.core.activities.ActivityExecutor
+import com.lemline.core.processors.CallHttpConfig
+import com.lemline.core.processors.RunScriptConfig
+import com.lemline.core.processors.RunShellConfig
+import com.lemline.core.states.WorkflowEvent.ActivityStarted
+import com.lemline.core.states.WorkflowEvent.CallHttpStarted
+import com.lemline.core.states.WorkflowEvent.RunScriptStarted
+import com.lemline.core.states.WorkflowEvent.RunShellStarted
+import com.lemline.core.states.WorkflowEvent.EmitStarted
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import java.time.Instant
 
 /**
- * Intercepts activity calls and returns configured responses for deterministic testing.
+ * Activity executor that returns mock responses from configuration.
  *
- * Use this to mock HTTP calls, script execution, and shell commands
- * without depending on external services.
+ * Activated when runner starts with `--test-mode` flag.
+ * Mock responses are loaded from the file specified by `--mock-config=<path>`.
  *
- * ## Usage
+ * ## CLI Usage
  *
- * ```kotlin
- * val config = TestConfiguration.withMocking {
- *     // Queue responses in order they will be called
- *     queueHttpResponse(HttpResponse(
- *         statusCode = 200,
- *         body = buildJsonObject { put("success", true) }
- *     ))
- *
- *     queueHttpResponse(HttpResponse(
- *         statusCode = 404,
- *         body = buildJsonObject { put("error", "Not found") }
- *     ))
- * }
- *
- * val result = executor.execute(workflowYaml, input, config)
- *
- * // Verify calls were made as expected
- * val invocations = config.activityExecutor!!.getInvocations()
- * invocations.size shouldBe 2
- * (invocations[0] as HttpInvocation).url shouldBe "https://api.example.com/first"
+ * ```bash
+ * ./lemline-runner listen --test-mode --mock-config=/path/to/mocks.yaml
  * ```
  *
- * ## Response Queuing
+ * ## Mock Configuration Format
  *
- * Responses are consumed in FIFO order. If the queue is empty when an
- * activity is called, the test fails with a clear error message.
+ * ```yaml
+ * # mocks.yaml
+ * http:
+ *   - match:
+ *       url: "*api.example.com*"
+ *       method: GET
+ *     response:
+ *       status: 200
+ *       body:
+ *         id: 123
+ *         name: "Test User"
+ *
+ *   - match:
+ *       url: "*failing.api*"
+ *     response:
+ *       status: 500
+ *       error: "Service unavailable"
+ *
+ * script:
+ *   - match:
+ *       language: javascript
+ *     response:
+ *       output:
+ *         computed: 42
+ *       exitCode: 0
+ *
+ * shell:
+ *   - match:
+ *       command: "echo*"
+ *     response:
+ *       stdout: "mocked output"
+ *       exitCode: 0
+ * ```
+ *
+ * ## Matching Rules
+ *
+ * - URL patterns support glob wildcards: `*`, `?`
+ * - Command patterns support prefix matching with `*`
+ * - First matching rule wins
+ * - If no rule matches, an error is thrown (fail-fast)
  *
  * ## Thread Safety
  *
- * TestActivityExecutor is thread-safe for concurrent workflow execution.
+ * TestActivityExecutor is thread-safe. Mock configuration is immutable after loading.
  */
-interface TestActivityExecutor {
+class TestActivityExecutor(
+    private val mockConfig: MockConfiguration
+) : ActivityExecutor {
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // HTTP Mocking
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Queue an HTTP response for the next `call: http` task.
-     *
-     * @param response The HTTP response to return
-     */
-    fun queueHttpResponse(response: HttpResponse)
-
-    /**
-     * Queue multiple HTTP responses for sequential calls.
-     *
-     * @param responses The HTTP responses in call order
-     */
-    fun queueHttpResponses(vararg responses: HttpResponse) {
-        responses.forEach { queueHttpResponse(it) }
+    override suspend fun execute(event: ActivityStarted): JsonElement = when (event) {
+        is EmitStarted -> executeEmit(event)
+        is CallHttpStarted -> executeHttp(event.config)
+        is RunScriptStarted -> executeScript(event.config)
+        is RunShellStarted -> executeShell(event.config)
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Script Mocking
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /**
-     * Queue a script response for the next `run: script` task.
-     *
-     * @param response The script execution result
-     */
-    fun queueScriptResponse(response: ScriptResponse)
-
-    /**
-     * Queue multiple script responses for sequential calls.
-     */
-    fun queueScriptResponses(vararg responses: ScriptResponse) {
-        responses.forEach { queueScriptResponse(it) }
+    private fun executeEmit(event: EmitStarted): JsonElement {
+        // Emit tasks are fire-and-forget in test mode too
+        // The CloudEvent is still emitted to the broker for capture
+        return event.input
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Shell Mocking
-    // ─────────────────────────────────────────────────────────────────────────
+    private fun executeHttp(config: CallHttpConfig): JsonElement {
+        val mock = mockConfig.findHttpMock(config.url, config.method)
+            ?: throw MockNotFoundException("No HTTP mock found for ${config.method} ${config.url}")
 
-    /**
-     * Queue a shell response for the next `run: shell` task.
-     *
-     * @param response The shell execution result
-     */
-    fun queueShellResponse(response: ShellResponse)
+        if (mock.response.error != null) {
+            throw MockedActivityException(mock.response.error)
+        }
 
-    /**
-     * Queue multiple shell responses for sequential calls.
-     */
-    fun queueShellResponses(vararg responses: ShellResponse) {
-        responses.forEach { queueShellResponse(it) }
+        return mock.response.body ?: JsonObject(emptyMap())
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Error Simulation
-    // ─────────────────────────────────────────────────────────────────────────
+    private fun executeScript(config: RunScriptConfig): JsonElement {
+        val mock = mockConfig.findScriptMock(config.language)
+            ?: throw MockNotFoundException("No script mock found for language: ${config.language}")
 
-    /**
-     * Queue an error for the next activity call of any type.
-     *
-     * Use this to test error handling and retry logic.
-     *
-     * @param error The error to simulate
-     */
-    fun queueError(error: ActivityError)
+        if (mock.response.exitCode != 0) {
+            throw MockedActivityException("Script failed with exit code: ${mock.response.exitCode}")
+        }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Invocation Tracking
-    // ─────────────────────────────────────────────────────────────────────────
+        return mock.response.output ?: JsonObject(emptyMap())
+    }
 
-    /**
-     * Get all activity invocations recorded during test execution.
-     *
-     * Use this to verify:
-     * - Activities were called with expected parameters
-     * - Call order was correct
-     * - Headers, bodies, etc. match expectations
-     *
-     * @return List of invocations in chronological order
-     */
-    fun getInvocations(): List<ActivityInvocation>
+    private fun executeShell(config: RunShellConfig): JsonElement {
+        val mock = mockConfig.findShellMock(config.command)
+            ?: throw MockNotFoundException("No shell mock found for command: ${config.command}")
 
-    /**
-     * Get HTTP invocations only.
-     */
-    fun getHttpInvocations(): List<HttpInvocation> =
-        getInvocations().filterIsInstance<HttpInvocation>()
+        if (mock.response.exitCode != 0) {
+            throw MockedActivityException("Shell command failed with exit code: ${mock.response.exitCode}")
+        }
 
-    /**
-     * Get script invocations only.
-     */
-    fun getScriptInvocations(): List<ScriptInvocation> =
-        getInvocations().filterIsInstance<ScriptInvocation>()
+        return kotlinx.serialization.json.JsonPrimitive(mock.response.stdout)
+    }
+}
 
-    /**
-     * Get shell invocations only.
-     */
-    fun getShellInvocations(): List<ShellInvocation> =
-        getInvocations().filterIsInstance<ShellInvocation>()
+/**
+ * Mock configuration loaded from --mock-config file.
+ */
+data class MockConfiguration(
+    val httpMocks: List<HttpMockRule> = emptyList(),
+    val scriptMocks: List<ScriptMockRule> = emptyList(),
+    val shellMocks: List<ShellMockRule> = emptyList()
+) {
+    fun findHttpMock(url: String, method: String): HttpMockRule? =
+        httpMocks.firstOrNull { it.matches(url, method) }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Lifecycle
-    // ─────────────────────────────────────────────────────────────────────────
+    fun findScriptMock(language: String): ScriptMockRule? =
+        scriptMocks.firstOrNull { it.matches(language) }
 
-    /**
-     * Clear all queued responses and recorded invocations.
-     *
-     * Called automatically between test executions.
-     */
-    fun reset()
+    fun findShellMock(command: String): ShellMockRule? =
+        shellMocks.firstOrNull { it.matches(command) }
 
-    /**
-     * Check if there are any unused queued responses.
-     *
-     * Useful for verifying all expected calls were made.
-     *
-     * @return true if response queues are empty
-     */
-    fun hasUnusedResponses(): Boolean
+    companion object {
+        /**
+         * Load mock configuration from YAML file.
+         */
+        fun fromYaml(path: String): MockConfiguration {
+            // Implementation uses kaml library
+            TODO("Implementation in lemline-runner")
+        }
+
+        /**
+         * Empty configuration (no mocks - all activities will fail).
+         */
+        fun empty() = MockConfiguration()
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Response Data Classes
+// HTTP Mock Rules
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Mocked HTTP response for `call: http` tasks.
- */
-data class HttpResponse(
-    /**
-     * HTTP status code (e.g., 200, 404, 500).
-     */
-    val statusCode: Int = 200,
-
-    /**
-     * Response body as JSON.
-     */
-    val body: JsonElement = JsonObject(emptyMap()),
-
-    /**
-     * Response headers.
-     */
-    val headers: Map<String, String> = emptyMap()
+data class HttpMockRule(
+    val match: HttpMockMatcher,
+    val response: HttpMockResponse
 ) {
-    companion object {
-        /**
-         * Create a successful JSON response.
-         */
-        fun ok(body: JsonElement) = HttpResponse(statusCode = 200, body = body)
-
-        /**
-         * Create a 404 Not Found response.
-         */
-        fun notFound(message: String = "Not found") = HttpResponse(
-            statusCode = 404,
-            body = JsonObject(mapOf("error" to kotlinx.serialization.json.JsonPrimitive(message)))
-        )
-
-        /**
-         * Create a 500 Internal Server Error response.
-         */
-        fun serverError(message: String = "Internal server error") = HttpResponse(
-            statusCode = 500,
-            body = JsonObject(mapOf("error" to kotlinx.serialization.json.JsonPrimitive(message)))
-        )
+    fun matches(url: String, method: String): Boolean {
+        if (match.method != null && !match.method.equals(method, ignoreCase = true)) {
+            return false
+        }
+        if (match.url != null && !globMatches(match.url, url)) {
+            return false
+        }
+        return true
     }
 }
 
-/**
- * Mocked script execution result for `run: script` tasks.
- */
-data class ScriptResponse(
-    /**
-     * Script output as JSON (returned to workflow).
-     */
-    val output: JsonElement,
+data class HttpMockMatcher(
+    val url: String? = null,
+    val method: String? = null
+)
 
-    /**
-     * Exit code (0 = success).
-     */
-    val exitCode: Int = 0
-) {
-    companion object {
-        /**
-         * Create a successful script response.
-         */
-        fun ok(output: JsonElement) = ScriptResponse(output = output, exitCode = 0)
-
-        /**
-         * Create a failed script response.
-         */
-        fun failed(exitCode: Int = 1) = ScriptResponse(
-            output = JsonObject(emptyMap()),
-            exitCode = exitCode
-        )
-    }
-}
-
-/**
- * Mocked shell execution result for `run: shell` tasks.
- */
-data class ShellResponse(
-    /**
-     * Standard output.
-     */
-    val stdout: String = "",
-
-    /**
-     * Standard error.
-     */
-    val stderr: String = "",
-
-    /**
-     * Exit code (0 = success).
-     */
-    val exitCode: Int = 0
-) {
-    companion object {
-        /**
-         * Create a successful shell response.
-         */
-        fun ok(stdout: String = "") = ShellResponse(stdout = stdout, exitCode = 0)
-
-        /**
-         * Create a failed shell response.
-         */
-        fun failed(stderr: String = "", exitCode: Int = 1) = ShellResponse(
-            stderr = stderr,
-            exitCode = exitCode
-        )
-    }
-}
-
-/**
- * Simulated activity error for testing error handling.
- */
-data class ActivityError(
-    /**
-     * Error type (e.g., "network", "timeout", "validation").
-     */
-    val type: String,
-
-    /**
-     * Human-readable error message.
-     */
-    val message: String,
-
-    /**
-     * Additional error details.
-     */
-    val details: JsonElement? = null
+data class HttpMockResponse(
+    val status: Int = 200,
+    val body: JsonElement? = null,
+    val headers: Map<String, String> = emptyMap(),
+    val error: String? = null
 )
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Invocation Tracking Data Classes
+// Script Mock Rules
+// ─────────────────────────────────────────────────────────────────────────────
+
+data class ScriptMockRule(
+    val match: ScriptMockMatcher,
+    val response: ScriptMockResponse
+) {
+    fun matches(language: String): Boolean {
+        if (match.language != null && !match.language.equals(language, ignoreCase = true)) {
+            return false
+        }
+        return true
+    }
+}
+
+data class ScriptMockMatcher(
+    val language: String? = null
+)
+
+data class ScriptMockResponse(
+    val output: JsonElement? = null,
+    val exitCode: Int = 0
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shell Mock Rules
+// ─────────────────────────────────────────────────────────────────────────────
+
+data class ShellMockRule(
+    val match: ShellMockMatcher,
+    val response: ShellMockResponse
+) {
+    fun matches(command: String): Boolean {
+        if (match.command != null && !globMatches(match.command, command)) {
+            return false
+        }
+        return true
+    }
+}
+
+data class ShellMockMatcher(
+    val command: String? = null
+)
+
+data class ShellMockResponse(
+    val stdout: String = "",
+    val stderr: String = "",
+    val exitCode: Int = 0
+)
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Utility Functions
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Base class for activity invocation records.
+ * Simple glob pattern matching.
+ * Supports `*` (matches any characters) and `?` (matches single character).
  */
-sealed class ActivityInvocation {
-    /**
-     * When the activity was invoked.
-     */
-    abstract val timestamp: Instant
+private fun globMatches(pattern: String, input: String): Boolean {
+    val regex = pattern
+        .replace(".", "\\.")
+        .replace("*", ".*")
+        .replace("?", ".")
+    return Regex(regex, RegexOption.IGNORE_CASE).matches(input)
 }
 
-/**
- * Record of an HTTP call invocation.
- */
-data class HttpInvocation(
-    override val timestamp: Instant,
-
-    /**
-     * HTTP method (GET, POST, PUT, DELETE, etc.).
-     */
-    val method: String,
-
-    /**
-     * Request URL.
-     */
-    val url: String,
-
-    /**
-     * Request headers.
-     */
-    val headers: Map<String, String>,
-
-    /**
-     * Request body (if any).
-     */
-    val body: JsonElement?
-) : ActivityInvocation()
+// ─────────────────────────────────────────────────────────────────────────────
+// Exceptions
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Record of a script execution invocation.
+ * Thrown when no mock rule matches the activity request.
  */
-data class ScriptInvocation(
-    override val timestamp: Instant,
-
-    /**
-     * Script language (javascript, python, etc.).
-     */
-    val language: String,
-
-    /**
-     * Script code or source reference.
-     */
-    val code: String,
-
-    /**
-     * Arguments passed to the script.
-     */
-    val arguments: Map<String, JsonElement>
-) : ActivityInvocation()
+class MockNotFoundException(message: String) : RuntimeException(message)
 
 /**
- * Record of a shell command invocation.
+ * Thrown when mock configuration specifies an error response.
  */
-data class ShellInvocation(
-    override val timestamp: Instant,
-
-    /**
-     * Shell command.
-     */
-    val command: String,
-
-    /**
-     * Command arguments.
-     */
-    val arguments: List<String>,
-
-    /**
-     * Environment variables.
-     */
-    val environment: Map<String, String>
-) : ActivityInvocation()
+class MockedActivityException(message: String) : RuntimeException(message)
