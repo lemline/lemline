@@ -9,6 +9,8 @@
  */
 package com.lemline.testing
 
+import com.lemline.common.values.WorkflowId
+import com.lemline.core.nodes.NodePosition
 import com.lemline.core.testcases.WorkflowTestCase
 import com.lemline.core.testcases.WorkflowTestResult
 import kotlinx.serialization.json.JsonElement
@@ -138,6 +140,58 @@ interface TestWorkflowExecutor {
         dependencies: List<WorkflowDependency>,
         config: TestConfiguration = TestConfiguration.default()
     ): WorkflowTestResult
+
+    /**
+     * Start a workflow without waiting for completion.
+     *
+     * Use this with [WorkflowStateHooks] for manual synchronization when testing:
+     * - Listen tasks that need external events delivered mid-execution
+     * - Intermediate task outputs before workflow completion
+     * - Complex async patterns requiring fine-grained control
+     *
+     * @param yaml Workflow definition YAML (without document header)
+     * @param input Workflow input as JsonElement
+     * @param config Test configuration
+     * @return WorkflowId of the started workflow instance
+     *
+     * @sample
+     * ```kotlin
+     * val hooks = executor.getStateHooks()
+     * val delivery = executor.getEventDelivery()
+     *
+     * // Start workflow (non-blocking)
+     * val workflowId = executor.startWorkflowAsync(
+     *     yaml = """
+     *         do:
+     *           - listen:
+     *               to:
+     *                 one:
+     *                   with:
+     *                     type: com.myapp.payment.completed
+     *     """.trimIndent(),
+     *     input = buildJsonObject { }
+     * )
+     *
+     * // Wait for listen task to be ready
+     * hooks.awaitTaskStarted(workflowId, NodePosition.parse("[0, \"listen\"]"), 5.seconds)
+     *
+     * // Deliver the event
+     * delivery.deliver(
+     *     type = "com.myapp.payment.completed",
+     *     source = "/payments/123",
+     *     data = buildJsonObject { put("amount", 99.99) },
+     *     targetWorkflowId = workflowId
+     * )
+     *
+     * // Wait for workflow completion
+     * val result = hooks.awaitCompletion(workflowId, 10.seconds)
+     * ```
+     */
+    suspend fun startWorkflowAsync(
+        yaml: String,
+        input: JsonElement,
+        config: TestConfiguration = TestConfiguration.default()
+    ): WorkflowId
 
     /**
      * Get the [CloudEventCapture] for the last execution.
