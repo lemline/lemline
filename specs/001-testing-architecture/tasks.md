@@ -16,7 +16,8 @@
 - **Module**: `lemline-testing/src/main/kotlin/com/lemline/testing/`
 - **Profiles**: `lemline-testing/src/main/kotlin/com/lemline/testing/profiles/`
 - **Resources**: `lemline-testing/src/main/kotlin/com/lemline/testing/profiles/resources/`
-- **E2E Tests**: `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/`
+- **E2E Tests**: `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/`
+- **Runner Unit Tests**: `lemline-runner/src/test/kotlin/com/lemline/runner/activities/`
 
 ---
 
@@ -89,8 +90,8 @@
 
 ### Validation
 
-- [ ] T027 [US1] Create `SetTaskE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` using KafkaPostgresProfile - verify simple set task
-- [ ] T028 [US1] Create `InfrastructureSwitchingTest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - same test runs with all 4 profiles
+- [ ] T027 [US1] Create `SetTaskE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` using KafkaPostgresProfile - verify simple set task
+- [ ] T028 [US1] Create `InfrastructureSwitchingTest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - same test runs with all 4 profiles
 
 **Checkpoint**: US1 complete - can execute simple workflows through real infrastructure with deterministic waiting
 
@@ -117,9 +118,9 @@
 
 ### Validation
 
-- [ ] T036 [US2] Create `HttpTaskMockingE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - verify HTTP mocking
-- [ ] T037 [US2] Create `ScriptTaskMockingE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - verify script mocking
-- [ ] T038 [US2] Create `ErrorSimulationE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - verify error injection
+- [ ] T036 [US2] Create `HttpTaskMockingE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - verify HTTP mocking
+- [ ] T037 [US2] Create `ScriptTaskMockingE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - verify script mocking
+- [ ] T038 [US2] Create `ErrorSimulationE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - verify error injection
 
 **Checkpoint**: US2 complete - can mock all activity types for deterministic testing
 
@@ -146,8 +147,8 @@
 
 ### Validation
 
-- [ ] T046 [US3] Create `LifecycleEventCaptureE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - verify lifecycle events captured
-- [ ] T047 [US3] Create `EmitTaskE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - verify custom emit events captured
+- [ ] T046 [US3] Create `LifecycleEventCaptureE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - verify lifecycle events captured
+- [ ] T047 [US3] Create `EmitTaskE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - verify custom emit events captured
 
 **Checkpoint**: US3 complete - can capture and verify all CloudEvents from workflow execution
 
@@ -167,7 +168,7 @@
 
 ### Validation
 
-- [ ] T051 [US4] Create `LemlineCoreCompatibilityE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` running subset of core test cases
+- [ ] T051 [US4] Create `LemlineCoreCompatibilityE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` running subset of core test cases
 
 **Checkpoint**: US4 complete - lemline-core test cases run through real infrastructure
 
@@ -192,9 +193,9 @@
 
 ### Validation
 
-- [ ] T057 [US5] Create `WaitTaskE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - verify wait with outbox
-- [ ] T058 [US5] Create `RetryE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - verify retry with backoff
-- [ ] T059 [US5] Create `ParentChildWorkflowE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - verify run workflow task
+- [ ] T057 [US5] Create `WaitTaskE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - verify wait with outbox
+- [ ] T058 [US5] Create `RetryE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - verify retry with backoff
+- [ ] T059 [US5] Create `ParentChildWorkflowE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - verify run workflow task
 
 **Checkpoint**: US5 complete - async patterns work with real outbox processing
 
@@ -208,32 +209,32 @@
 
 ### Control Flow Tasks
 
-- [ ] T060 [P] [US6] Create `DoBlockE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - sequential execution
-- [ ] T061 [P] [US6] Create `IfConditionE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - conditional branching
-- [ ] T062 [P] [US6] Create `SwitchTaskE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - multi-way branching
-- [ ] T063 [P] [US6] Create `ForLoopE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - iteration
+- [ ] T060 [P] [US6] Create `DoBlockE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - sequential execution
+- [ ] T061 [P] [US6] Create `IfConditionE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - conditional branching
+- [ ] T062 [P] [US6] Create `SwitchTaskE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - multi-way branching
+- [ ] T063 [P] [US6] Create `ForLoopE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - iteration
 
 ### Parallel Execution Tasks
 
-- [ ] T064 [P] [US6] Create `ForkTaskE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - parallel branches
+- [ ] T064 [P] [US6] Create `ForkTaskE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - parallel branches
 
 ### Event Tasks
 
-- [ ] T065 [P] [US6] Create `ListenTaskE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - one/any/all strategies
+- [ ] T065 [P] [US6] Create `ListenTaskE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - one/any/all strategies
 - [ ] T066 [P] [US6] Create `ListenTaskDeliveryE2ETest.kt` using CloudEventDelivery for deterministic event trigger
 
 ### Error Handling Tasks
 
-- [ ] T067 [P] [US6] Create `TryCatchE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - error handling
-- [ ] T068 [P] [US6] Create `RaiseTaskE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - explicit errors
+- [ ] T067 [P] [US6] Create `TryCatchE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - error handling
+- [ ] T068 [P] [US6] Create `RaiseTaskE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - explicit errors
 
 ### External Call Tasks
 
-- [ ] T069 [P] [US6] Create `ShellTaskE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - with platform filtering
+- [ ] T069 [P] [US6] Create `ShellTaskE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - with platform filtering
 
 ### Scheduling Tasks
 
-- [ ] T070 [P] [US6] Create `ScheduledWorkflowE2ETest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/e2e/` - verify cron-triggered workflow (FR-030)
+- [ ] T070 [P] [US6] Create `ScheduledWorkflowE2ETest.kt` in `lemline-testing/src/test/kotlin/com/lemline/testing/e2e/` - verify cron-triggered workflow (FR-030)
 
 **Checkpoint**: US6 complete - all 14 task types have passing E2E tests
 

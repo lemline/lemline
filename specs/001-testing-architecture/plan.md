@@ -68,13 +68,8 @@ lemline-runner/                         # EXTENDED with test mode
 │   └── cli/
 │       └── ListenCommand.kt            # Extended with --test-mode, --mock-config flags
 └── src/test/kotlin/com/lemline/runner/
-    └── e2e/                            # End-to-end tests using lemline-testing
-        ├── SetTaskE2ETest.kt
-        ├── ForkTaskE2ETest.kt
-        ├── ListenTaskE2ETest.kt
-        ├── EmitTaskE2ETest.kt
-        ├── WaitTaskE2ETest.kt
-        └── ... (one per task type)
+    └── activities/
+        └── TestActivityExecutorTest.kt # Unit tests for mock config parsing
 
 lemline-testing/                        # NEW MODULE (test harness)
 ├── build.gradle.kts                    # Module dependencies (NO runner dependency)
@@ -92,13 +87,25 @@ lemline-testing/                        # NEW MODULE (test harness)
 │           ├── PostgresContainer.kt
 │           └── MySQLContainer.kt
 └── src/test/kotlin/com/lemline/testing/
-    └── SelfTest.kt                     # Framework self-validation tests
+    ├── SelfTest.kt                     # Framework self-validation tests
+    └── e2e/                            # E2E tests (requires pre-built native binary)
+        ├── SetTaskE2ETest.kt
+        ├── ForkTaskE2ETest.kt
+        ├── ListenTaskE2ETest.kt
+        ├── EmitTaskE2ETest.kt
+        ├── WaitTaskE2ETest.kt
+        └── ... (one per task type)
 ```
 
 **Structure Decision**: Two-part architecture:
 1. `lemline-runner` extended with `--test-mode` CLI flag and `TestActivityExecutor`
 2. `lemline-testing` module as test harness - spawns native runner, manages infrastructure, captures/emits CloudEvents
 The harness does NOT depend on `lemline-runner` (runner is external process).
+
+**E2E Test Location**: E2E tests live in `lemline-testing/src/test/e2e/` (not in runner) to avoid
+circular dependency. The native binary must be built before E2E tests can run. CI pipeline should:
+1. Build `lemline-runner` native binary
+2. Run `lemline-testing` tests (which spawn the pre-built binary)
 
 ## Complexity Tracking
 
@@ -173,15 +180,20 @@ dependencies {
    - Add `TestActivityExecutor` implementing `ActivityExecutor` interface
    - Add `--test-mode` and `--mock-config` CLI flags to `listen` command
    - Wire CDI to select executor based on test mode flag
+   - Add unit tests for mock config parsing in `lemline-runner/src/test/`
 
 2. **Create `lemline-testing` module**:
    - `TestWorkflowExecutor`: Testcontainers lifecycle + runner process management
    - `RunnerProcess`: Spawn native binary with CLI args
    - `CloudEventCapture`/`CloudEventDelivery`: Broker interaction
    - `WorkflowStateHooks`: `await*` utilities
+   - `SelfTest`: Framework self-validation (can use JVM runner initially)
 
-3. **Migrate existing runner tests**:
-   - Replace in-process test infrastructure with `lemline-testing` harness
-   - Update tests to use native binary spawning approach
+3. **Add E2E tests in `lemline-testing/src/test/e2e/`**:
+   - One test class per task type (14 total)
+   - Tests require pre-built native binary
 
-4. **Add comprehensive task type E2E tests** (14 task types)
+4. **Configure CI pipeline**:
+   - Stage 1: Build `lemline-runner` native binary
+   - Stage 2: Run `lemline-testing` tests (spawns native binary)
+   - Run E2E tests across all 4 infrastructure combinations
