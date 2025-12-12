@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.lifecycleevents
 
 import com.lemline.common.values.NodePosition

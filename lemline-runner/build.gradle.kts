@@ -76,10 +76,18 @@ dependencies {
     implementation(libs.javaSemver)
     implementation("com.cronutils:cron-utils:9.2.1")
 
+    // Ktor client for HTTP execution in DefaultActivityExecutor
+    implementation(platform(libs.ktor.bom))
+    implementation("io.ktor:ktor-client-core")
+    implementation("io.ktor:ktor-client-cio")
+    implementation("io.ktor:ktor-client-content-negotiation")
+    implementation("io.ktor:ktor-serialization-kotlinx-json")
+
     // Jackson for JSON serialization/deserialization
     implementation(libs.jackson.bom)
     implementation("com.fasterxml.jackson.core:jackson-databind")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
 
     // CloudEvents SDK with Jackson serialization for emitting CloudEvents
     implementation(libs.cloudevents.core)

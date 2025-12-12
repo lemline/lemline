@@ -52,6 +52,14 @@ class IfConditionExecutionTest : AbstractWorkflowExecutionTest(IfConditionTestCa
 }
 
 /**
+ * Tests for Listen task execution using FullOrchestrator.
+ */
+@ExperimentalTime
+class ListenExecutionTest : AbstractWorkflowExecutionTest(ListenTestCases.cases) {
+    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+}
+
+/**
  * Tests for Script execution using FullOrchestrator.
  */
 @ExperimentalTime

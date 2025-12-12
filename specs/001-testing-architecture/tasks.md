@@ -25,37 +25,37 @@
 
 **Purpose**: Create the lemline-testing module and extend lemline-runner with test mode
 
-- [ ] T001 Create `lemline-testing` directory structure per plan.md
-- [ ] T002 Create `lemline-testing/build.gradle.kts` with dependencies (Testcontainers, Kotest, Kafka/RabbitMQ clients, CloudEvents SDK) - NO Quarkus dependency
-- [ ] T003 Add `lemline-testing` to `settings.gradle.kts` include list
-- [ ] T004 [P] Create package directories: `com.lemline.testing`, `com.lemline.testing.infrastructure`
+- [X] T001 Create `lemline-testing` directory structure per plan.md
+- [X] T002 Create `lemline-testing/build.gradle.kts` with dependencies (Testcontainers, Kotest, Kafka/RabbitMQ clients, CloudEvents SDK) - NO Quarkus dependency
+- [X] T003 Add `lemline-testing` to `settings.gradle.kts` include list
+- [X] T004 [P] Create package directories: `com.lemline.testing`, `com.lemline.testing.infrastructure`
 
 ---
 
 ## Phase 2: Foundational (Runner CLI Test Mode)
 
-**Purpose**: Extend lemline-runner with `--test-mode` CLI flag and TestActivityExecutor - BLOCKS all user stories
+**Purpose**: Extend lemline-runner with `--mock-config` CLI flag and TestActivityExecutor - BLOCKS all user stories
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete (native binary must support test mode)
 
 ### CLI Flags (FR-037, FR-038)
 
-- [ ] T005 Add `--test-mode` CLI flag to `ListenCommand.kt` in `lemline-runner/src/main/kotlin/com/lemline/runner/cli/ListenCommand.kt`
-- [ ] T006 Add `--mock-config=<path>` CLI option to `ListenCommand.kt` for loading mock configuration file
+- [X] T005 Add `--mock-config=<path>` CLI option to `ListenCommand.kt` - enables test mode with mock activity responses
+- [X] T006 (merged into T005) - `--mock-config` implicitly enables test mode, no separate flag needed
 
 ### TestActivityExecutor (in runner)
 
-- [ ] T007 [P] Create `MockConfiguration.kt` data class in `lemline-runner/src/main/kotlin/com/lemline/runner/activities/` with HttpMockRule, ScriptMockRule, ShellMockRule
-- [ ] T008 [P] Create `MockConfigurationParser.kt` in `lemline-runner/src/main/kotlin/com/lemline/runner/activities/` for YAML/JSON parsing using kaml
-- [ ] T009 Create `TestActivityExecutor.kt` implementing `ActivityExecutor` interface in `lemline-runner/src/main/kotlin/com/lemline/runner/activities/`
-- [ ] T010 Wire CDI to select `TestActivityExecutor` when `--test-mode` flag is active in runner
+- [X] T007 [P] Create `MockConfiguration.kt` data class in `lemline-runner/src/main/kotlin/com/lemline/runner/activities/` with HttpMockRule, ScriptMockRule, ShellMockRule
+- [X] T008 [P] Create `MockConfigurationParser.kt` in `lemline-runner/src/main/kotlin/com/lemline/runner/activities/` for YAML/JSON parsing using Jackson
+- [X] T009 Create `TestActivityExecutor.kt` implementing `ActivityExecutor` interface in `lemline-runner/src/main/kotlin/com/lemline/runner/activities/`
+- [X] T010 Wire CDI to select `TestActivityExecutor` when `--mock-config` flag is provided
 
 ### Unit Tests for Test Mode
 
-- [ ] T011 [P] Create `MockConfigurationParserTest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/activities/` - test YAML parsing
-- [ ] T012 [P] Create `TestActivityExecutorTest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/activities/` - test mock matching
+- [X] T011 [P] Create `MockConfigurationParserTest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/activities/` - test YAML parsing
+- [X] T012 [P] Create `TestActivityExecutorTest.kt` in `lemline-runner/src/test/kotlin/com/lemline/runner/activities/` - test mock matching
 
-**Checkpoint**: Runner can start with `--test-mode --mock-config=<path>` and return mock responses
+**Checkpoint**: Runner can start with `--mock-config=<path>` and return mock responses
 
 ---
 
@@ -63,7 +63,7 @@
 
 **Goal**: Execute workflows through real message brokers and databases by spawning native runner binary
 
-**Independent Test**: Start Testcontainers, spawn native runner with `--test-mode`, run a simple `set` task workflow through Kafka/PostgreSQL, verify it completes with expected output
+**Independent Test**: Start Testcontainers, spawn native runner with `--mock-config`, run a simple `set` task workflow through Kafka/PostgreSQL, verify it completes with expected output
 
 ### Infrastructure Containers
 
@@ -344,7 +344,7 @@ Complete only:
 - Phase 3: User Story 1 (T013-T037)
 
 This delivers:
-- Native runner with `--test-mode` CLI flag
+- Native runner with `--mock-config` CLI flag
 - Working lemline-testing module
 - Testcontainers infrastructure (4 combinations)
 - Core executor spawning native binary

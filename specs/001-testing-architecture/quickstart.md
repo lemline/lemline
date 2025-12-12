@@ -117,7 +117,7 @@ test("workflow with mocked HTTP call") {
         """.trimIndent()
     )
 
-    // Run with mocks - runner spawned with --test-mode --mock-config=<path>
+    // Run with mocks - runner spawned with --mock-config=<path>
     val result = executor.runWorkflow(
         name = "http-test",
         version = "1.0.0",

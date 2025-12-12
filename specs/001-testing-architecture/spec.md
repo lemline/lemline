@@ -1,4 +1,4 @@
-Questio# Feature Specification: End-to-End Testing Framework
+# Feature Specification: End-to-End Testing Framework
 
 **Feature Branch**: `001-testing-architecture`
 **Created**: 2025-12-11
@@ -35,9 +35,9 @@ testing and check emitted CloudEvents."
   external verification process reads/emits CloudEvents to check and interact with test workflows. This provides true
   production-like testing with process isolation.
 - Q: How should activity mocking be implemented for testing? → A: CLI test mode built into runner. The runner includes
-  a `TestActivityExecutor` activated via `--test-mode` CLI flag, with mock responses configured via `--mock-config`
+  a `TestActivityExecutor` activated via `--mock-config=<path>` CLI flag, which loads mock responses from the specified
   file. Same binary for production and test - just different execution mode. The `lemline-testing` module spawns the
-  runner with these flags and provides CloudEvent capture (to verify workflow behavior) and CloudEvent delivery (to
+  runner with this flag and provides CloudEvent capture (to verify workflow behavior) and CloudEvent delivery (to
   trigger listen tasks).
 - Q: Who provisions test infrastructure (broker/database containers)? → A: `lemline-testing` manages infrastructure.
   Testcontainers are started by `TestWorkflowExecutor`, keeping test code simple. Tests just call
@@ -278,8 +278,8 @@ that specific task.
   binary orchestration)
 - **FR-036**: System MUST interact with workflow tests exclusively via CloudEvents through the message broker (no
   in-process coupling)
-- **FR-037**: Runner MUST provide `--test-mode` CLI flag that activates `TestActivityExecutor` for mock responses
-- **FR-038**: Runner MUST provide `--mock-config=<path>` CLI option to load activity mock responses from YAML/JSON file
+- **FR-037**: Runner MUST provide `--mock-config=<path>` CLI flag that activates `TestActivityExecutor` and loads mock responses from the specified YAML/JSON file
+- **FR-038**: (Merged into FR-037) The presence of `--mock-config` implicitly enables test mode - no separate flag needed
 
 #### Test Execution Control
 
@@ -337,14 +337,14 @@ that specific task.
 
 **In `lemline-runner` (CLI test mode)**:
 
-- **TestActivityExecutor**: Built into the runner, activated via `--test-mode` CLI flag. Intercepts activity calls
-  (HTTP, script, shell) and returns mock responses from `--mock-config` file. Implements the existing `ActivityExecutor`
+- **TestActivityExecutor**: Built into the runner, activated via `--mock-config=<path>` CLI flag. Intercepts activity calls
+  (HTTP, script, shell) and returns mock responses from the specified file. Implements the existing `ActivityExecutor`
   interface.
 
 **In `lemline-testing` (test harness module)**:
 
 - **TestWorkflowExecutor**: Orchestrates full test lifecycle - starts Testcontainers (broker + database), spawns
-  native-compiled Lemline runner with `--test-mode` flag, manages runner lifecycle (start/stop), generates mock
+  native-compiled Lemline runner with `--mock-config` flag, manages runner lifecycle (start/stop), generates mock
   configuration files, triggers workflow instances, handles teardown
 - **CloudEventCapture**: Subscribes to the message broker to capture all CloudEvents emitted during workflow execution;
   provides query interface to verify workflow behavior (filter by type, source, workflow ID)
@@ -361,8 +361,8 @@ Testing capability is split between two modules:
 
 **`lemline-runner`** (extended with CLI test mode):
 - `TestActivityExecutor`: Implements `ActivityExecutor` interface, returns mock responses
-- Activated via `--test-mode` CLI flag
-- Mock responses loaded from `--mock-config=<path>` YAML/JSON file
+- Activated via `--mock-config=<path>` CLI flag (implicitly enables test mode)
+- Mock responses loaded from the specified YAML/JSON file
 - Same production binary - no separate test build required
 
 **`lemline-testing`** (new test harness module):
@@ -370,7 +370,7 @@ Testing capability is split between two modules:
 - Does NOT depend on `lemline-runner` (runner is spawned as external native binary)
 - Provides:
     - `TestWorkflowExecutor`: Manages full test lifecycle - starts Testcontainers (broker + database), spawns runner
-      with `--test-mode`, handles teardown
+      with `--mock-config`, handles teardown
     - `CloudEventCapture`: Subscribe to broker, verify workflow behavior
     - `CloudEventDelivery`: Publish events to trigger `listen` tasks
     - `WorkflowStateHooks`: Deterministic await utilities
@@ -382,7 +382,7 @@ With native binary orchestration, `TestWorkflowExecutor` manages the full test l
 
 1. **Start Infrastructure**: Testcontainers start Kafka/RabbitMQ and PostgreSQL/MySQL containers
 2. **Generate Configuration**: Create runner config file pointing to container ports + mock responses
-3. **Spawn Runner**: Start native binary with `--test-mode --mock-config=<path>` and infrastructure config
+3. **Spawn Runner**: Start native binary with `--mock-config=<path>` and infrastructure config
 4. **Connect to Broker**: `CloudEventCapture` and `CloudEventDelivery` connect to broker for event interaction
 5. **Execute Tests**: Tests trigger workflows, emit events, await completions, verify behavior
 6. **Teardown**: Stop runner process, stop containers

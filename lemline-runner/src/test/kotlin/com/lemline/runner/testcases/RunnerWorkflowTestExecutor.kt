@@ -8,6 +8,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.activities.mock.MockConfiguration
 import com.lemline.core.testcases.WorkflowDependency
 import com.lemline.core.testcases.WorkflowTestExecutor
 import com.lemline.core.testcases.WorkflowTestResult
@@ -94,8 +95,11 @@ internal class RunnerWorkflowTestExecutor : WorkflowTestExecutor {
         namespace: String,
         name: String,
         version: String,
-        dependencies: List<WorkflowDependency>
+        dependencies: List<WorkflowDependency>,
+        mockConfig: MockConfiguration
     ): WorkflowTestResult {
+        // Note: RunnerWorkflowTestExecutor uses real activity execution, not mocks.
+        // The mockConfig parameter is ignored - this executor tests against real infrastructure.
         // Generate unique workflow name based on yaml content to avoid cache conflicts
         val uniqueName = "workflow-${yaml.hashCode()}"
         val mainWorkflowId = WorkflowId.random()

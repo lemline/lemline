@@ -3,26 +3,26 @@ package com.lemline.runner.config
 
 import com.lemline.common.logger.logger
 import com.lemline.runner.LemlineApplication
+import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
-import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_DB_NAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_PASSWORD_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.H2_USERNAME_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.IN_MEMORY_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_BROKERS_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CLOUDEVENTS_GROUP_ID_DEFAULT
-import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.KAFKA_CONNECTOR
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_DATABASE_GROUP_ID_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_OFFSET_RESET_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_DESERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.KAFKA_WORKFLOWS_GROUP_ID_DEFAULT
+import com.lemline.runner.config.LemlineConfigConstants.LIFECYCLE_EVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PATH_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.METRICS_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
@@ -45,10 +45,10 @@ import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_PORT_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_STRING_SERIALIZER
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_USER_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.RABBITMQ_VHOST_DEFAULT
-import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
-import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
+import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
+import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import io.smallrye.config.PropertiesConfigSource
@@ -70,6 +70,8 @@ enum class TopicType(
     val consumerConcurrency: String,
     val consumerGroupDefault: String,
 ) {
+    // Note: 'type' values must match LemlineConfiguration.KafkaConfig interface method names
+    // (commands, events) for config validation to pass
     COMMANDS(
         "commands",
         COMMANDS_TOPIC_DEFAULT,

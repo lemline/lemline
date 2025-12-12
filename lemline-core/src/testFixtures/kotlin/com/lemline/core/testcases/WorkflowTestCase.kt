@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
+import com.lemline.core.activities.mock.MockConfiguration
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -31,6 +32,7 @@ data class WorkflowDependency(
  * @property validate Custom validation function for the output (returns error message or null if valid)
  * @property tags Tags for filtering tests (e.g., "slow", "http", "fork", "external")
  * @property dependencies Workflows that need to be registered before the main workflow runs
+ * @property mockConfig Mock configuration for activity execution (HTTP, script, shell mocks)
  */
 data class WorkflowTestCase(
     val name: String,
@@ -39,7 +41,8 @@ data class WorkflowTestCase(
     val input: JsonElement = JsonObject(emptyMap()),
     val validate: (WorkflowTestResult) -> String? = { null },
     val tags: Set<String> = emptySet(),
-    val dependencies: List<WorkflowDependency> = emptyList()
+    val dependencies: List<WorkflowDependency> = emptyList(),
+    val mockConfig: MockConfiguration = MockConfiguration.empty()
 ) {
     companion object
 }

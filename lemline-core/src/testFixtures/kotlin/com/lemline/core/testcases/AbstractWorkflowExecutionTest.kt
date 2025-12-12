@@ -55,7 +55,8 @@ abstract class AbstractWorkflowExecutionTest(
                         val result = executor.execute(
                             yaml = case.yaml,
                             input = case.input,
-                            dependencies = case.dependencies
+                            dependencies = case.dependencies,
+                            mockConfig = case.mockConfig
                         )
 
                         // Run custom validation if provided

@@ -50,7 +50,7 @@ sealed class WorkflowState {
     val hasWaitingParent: Boolean get() = nodeStack.rootState.hasWaitingParent
 
     val isNew: Boolean get() = nodeStack[nodePosition] == null
-    
+
     /**
      * Simple integer counter that increments each time we enter a task.
      * Used for generating unique database IDs for outbox tables (waits, retries, parents).

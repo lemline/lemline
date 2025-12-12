@@ -9,7 +9,7 @@ import com.lemline.core.errors.InternalException
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.runner.activities.RunnerActivityExecutor
+import com.lemline.core.activities.ActivityExecutor
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
@@ -50,7 +50,7 @@ internal class WorkflowCommandHandler(
     private val failureRepository: FailureRepository,
     override val metrics: WorkflowCommandSubscriberMetrics,
     private val config: LemlineConfiguration,
-    private val activityExecutor: RunnerActivityExecutor,
+    private val activityExecutor: ActivityExecutor,
     private val lifecycleHook: LifecycleEventHookImpl,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()

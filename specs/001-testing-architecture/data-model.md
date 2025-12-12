@@ -55,8 +55,8 @@ CLI and CloudEvents through the message broker.
 │                                          ▲                                 │
 │  ┌─────────────────────┐                 │                                 │
 │  │ TestActivityExecutor│─────────────────┘                                 │
-│  │ (--test-mode flag)  │  returns mock responses                           │
-│  │ (--mock-config file)│                                                   │
+│  │ (--mock-config flag)│  returns mock responses                           │
+│  │                     │                                                   │
 │  └─────────────────────┘                                                   │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -123,7 +123,7 @@ interface TestWorkflowExecutor {
 ```
 
 **Relationships**:
-- Spawns `RunnerProcess` (native binary with `--test-mode`)
+- Spawns `RunnerProcess` (native binary with `--mock-config`)
 - Manages `Testcontainers` (broker + database)
 - Provides `WorkflowStateHooks` for event-based synchronization
 - Provides `CloudEventCapture` for event verification
@@ -133,13 +133,13 @@ interface TestWorkflowExecutor {
 
 ### 2. TestActivityExecutor (in lemline-runner)
 
-**Purpose**: Built into runner, activated via `--test-mode` CLI flag. Returns mock responses
-loaded from `--mock-config` file.
+**Purpose**: Built into runner, activated via `--mock-config` CLI flag. Returns mock responses
+loaded from the specified file.
 
 ```kotlin
 /**
  * Implements ActivityExecutor interface. Returns mock responses from configuration.
- * Activated when runner starts with `--test-mode` flag.
+ * Activated when runner starts with `--mock-config=<path>` flag.
  */
 class TestActivityExecutor(
     private val mockConfig: MockConfiguration

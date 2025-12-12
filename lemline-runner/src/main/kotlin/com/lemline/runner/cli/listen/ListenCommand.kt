@@ -2,10 +2,12 @@
 package com.lemline.runner.cli.listen
 
 import com.lemline.common.logger.logger
+import com.lemline.runner.activities.TestModeConfiguration
 import com.lemline.runner.cli.GlobalMixin
 import io.quarkus.arc.Unremovable
 import io.quarkus.runtime.Quarkus
 import jakarta.enterprise.context.Dependent
+import jakarta.inject.Inject
 import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
@@ -24,9 +26,24 @@ class ListenCommand : Runnable {
     @CommandLine.Option(names = ["-p", "--port"], description = ["The metrics port to use"])
     var port: Int? = null
 
+    @CommandLine.Option(
+        names = ["--mock-config"],
+        description = ["Path to mock configuration file (YAML/JSON). Enables test mode with mock activity responses."]
+    )
+    var mockConfigPath: String? = null
+
+    @Inject
+    lateinit var testModeConfiguration: TestModeConfiguration
+
     val logger = logger()
 
     override fun run() {
+        // Configure test mode if mock config is provided
+        if (mockConfigPath != null) {
+            testModeConfiguration.enable(mockConfigPath)
+            logger.info { "Test mode enabled with mock config: $mockConfigPath" }
+        }
+
         val mascotLines = """
 
                               %%%                         @%%

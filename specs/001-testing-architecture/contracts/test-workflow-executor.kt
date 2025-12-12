@@ -22,7 +22,7 @@ import kotlin.time.Duration
  *
  * This executor manages the full test lifecycle:
  * 1. Start infrastructure via Testcontainers (broker + database)
- * 2. Spawn native-compiled runner with `--test-mode` flag
+ * 2. Spawn native-compiled runner with `--mock-config` flag
  * 3. Define workflows via CLI command
  * 4. Start workflow instances via CLI command
  * 5. Capture CloudEvents from broker for verification
@@ -101,7 +101,7 @@ interface TestWorkflowExecutor {
      * 1. Starts broker container (Kafka or RabbitMQ)
      * 2. Starts database container (PostgreSQL or MySQL)
      * 3. Generates runner configuration file
-     * 4. Spawns native runner with `--test-mode` flag
+     * 4. Spawns native runner with `--mock-config` flag
      * 5. Waits for runner to be ready
      *
      * @throws IllegalStateException if containers fail to start

@@ -5,7 +5,7 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
-import com.lemline.core.activities.DefaultActivityExecutor
+import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
@@ -47,8 +47,8 @@ internal object FullOrchestrator {
 
     private val logger = logger()
 
-    /** Default activity executor for real I/O operations */
-    private val defaultActivityExecutor = DefaultActivityExecutor()
+    /** Default mock activity executor - requires explicit mock configuration for activities */
+    private val defaultActivityExecutor = MockActivityExecutor.empty()
 
     suspend fun start(
         workflow: Workflow,
@@ -140,14 +140,20 @@ internal object FullOrchestrator {
                 lifecycleHook = lifecycleHook,
             )
 
-            is WorkflowEvent.ListenStarted -> throw UnsupportedOperationException(
-                "ListenStarted events require external CloudEvent coordination and cannot be handled by FullOrchestrator. " +
-                    "Use StepByStepOrchestrator with runner infrastructure instead."
+            is WorkflowEvent.ListenStarted -> resume(
+                workflow = workflow,
+                command = handle(serdeEvent, activityExecutor),
+                serde = serde,
+                activityExecutor = activityExecutor,
+                lifecycleHook = lifecycleHook,
             )
 
-            is WorkflowEvent.ListenForEachCompleted -> throw UnsupportedOperationException(
-                "ListenForEachCompleted events require external coordination and cannot be handled by FullOrchestrator. " +
-                    "Use StepByStepOrchestrator with runner infrastructure instead."
+            is WorkflowEvent.ListenForEachCompleted -> resume(
+                workflow = workflow,
+                command = handle(serdeEvent),
+                serde = serde,
+                activityExecutor = activityExecutor,
+                lifecycleHook = lifecycleHook,
             )
 
             is WorkflowEvent.Outcome -> serdeEvent
@@ -185,6 +191,56 @@ internal object FullOrchestrator {
         if (delayDuration > Duration.ZERO) delay(delayDuration)
         logger.debug { "Retrying" }
         return event.resume()
+    }
+
+    /**
+     * Handles a ListenStarted event using mock configuration.
+     * Returns mock CloudEvent data if the activity executor has listen mocks configured.
+     */
+    private fun handle(
+        event: WorkflowEvent.ListenStarted,
+        activityExecutor: ActivityExecutor
+    ): WorkflowCommand {
+        // Get mock config from MockActivityExecutor if available
+        val mockConfig = (activityExecutor as? MockActivityExecutor)?.mockConfig
+            ?: throw UnsupportedOperationException(
+                "ListenStarted events require mock configuration or external CloudEvent coordination. " +
+                    "Use MockActivityExecutor with listen mocks or StepByStepOrchestrator with runner infrastructure."
+            )
+
+        // Get the event type filter from the first filter in the listen config
+        val eventTypeFilter = event.config.filters.firstOrNull()?.type ?: "*"
+        val mock = mockConfig.findListenMock(eventTypeFilter)
+            ?: throw UnsupportedOperationException(
+                "No listen mock found for event type: $eventTypeFilter. " +
+                    "Add a listen mock to MockConfiguration to test listen tasks."
+            )
+
+        logger.debug { "Mock: Listen mock matched for type=$eventTypeFilter" }
+
+        if (mock.response.error != null) {
+            return event.resumeFailed(
+                InternalException.Error.from(
+                    RuntimeException(mock.response.error),
+                    event.nodePosition
+                )
+            )
+        }
+
+        // Return mock data as a single-element JsonArray (listen returns array of events)
+        return event.resumeCompleted(JsonArray(listOf(mock.response.data ?: buildJsonObject { })))
+    }
+
+    /**
+     * Handles a ListenForEachCompleted event by resuming with the iteration output.
+     *
+     * In mock mode, this assumes a single-event scenario where one foreach iteration
+     * completes and the listen task should resume with that output wrapped in an array.
+     */
+    private fun handle(event: WorkflowEvent.ListenForEachCompleted): WorkflowCommand {
+        logger.debug { "Mock: ListenForEachCompleted iteration=${event.iterationIndex}" }
+        // Resume with the single iteration output wrapped in an array
+        return event.resumeCompleted(JsonArray(listOf(event.iterationOutput)))
     }
 
     /**

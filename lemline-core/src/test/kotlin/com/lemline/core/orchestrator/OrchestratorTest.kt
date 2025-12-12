@@ -2,6 +2,18 @@
 package com.lemline.core.orchestrator
 
 import com.lemline.common.values.WorkflowId
+import com.lemline.core.activities.ActivityExecutor
+import com.lemline.core.activities.mock.EmitMockMatcher
+import com.lemline.core.activities.mock.EmitMockResponse
+import com.lemline.core.activities.mock.EmitMockRule
+import com.lemline.core.activities.mock.HttpMockMatcher
+import com.lemline.core.activities.mock.HttpMockResponse
+import com.lemline.core.activities.mock.HttpMockRule
+import com.lemline.core.activities.mock.MockActivityExecutor
+import com.lemline.core.activities.mock.MockConfiguration
+import com.lemline.core.activities.mock.ShellMockMatcher
+import com.lemline.core.activities.mock.ShellMockResponse
+import com.lemline.core.activities.mock.ShellMockRule
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.getWorkflowToTest
 import com.lemline.core.lifecycleevents.LifecycleEventHook
@@ -21,6 +33,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Abstract base class providing shared test scenarios for workflow orchestrators.
@@ -65,6 +78,7 @@ class OrchestratorTest : FunSpec() {
         namespace: String = "default",
         name: String = "test",
         version: String = "0.1.0",
+        activityExecutor: ActivityExecutor = MockActivityExecutor.empty(),
     ): JsonElement {
         val workflow = getWorkflowToTest(yaml, namespace, name, version)
 
@@ -79,6 +93,7 @@ class OrchestratorTest : FunSpec() {
             workflow = workflow,
             command = startState,
             serde = true,
+            activityExecutor = activityExecutor,
             lifecycleHook = LifecycleEventHook.NOOP
         )
 
@@ -140,6 +155,18 @@ class OrchestratorTest : FunSpec() {
         // ========================================
 
         test("should execute HTTP call activity completely") {
+            val mockExecutor = MockActivityExecutor(MockConfiguration(
+                httpMocks = listOf(
+                    HttpMockRule(
+                        match = HttpMockMatcher(url = "*jsonplaceholder*", method = "GET"),
+                        response = HttpMockResponse(body = buildJsonObject {
+                            put("id", 1)
+                            put("title", "Test Post")
+                            put("body", "Test Body")
+                        })
+                    )
+                )
+            ))
             val yaml = """
                 do:
                   - getPost:
@@ -148,15 +175,23 @@ class OrchestratorTest : FunSpec() {
                         method: GET
                         endpoint: https://jsonplaceholder.typicode.com/posts/1
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = mockExecutor) as JsonObject
 
-            // Should complete the HTTP call and return the result
+            // Should complete the HTTP call and return the mocked result
             assertEquals(1, output["id"]?.jsonPrimitive?.int)
             assertTrue(output.containsKey("title"))
             assertTrue(output.containsKey("body"))
         }
 
         test("should execute shell command activity completely") {
+            val mockExecutor = MockActivityExecutor(MockConfiguration(
+                shellMocks = listOf(
+                    ShellMockRule(
+                        match = ShellMockMatcher(command = "echo*"),
+                        response = ShellMockResponse(stdout = "Hello World")
+                    )
+                )
+            ))
             val yaml = """
                 do:
                   - echoCommand:
@@ -164,13 +199,25 @@ class OrchestratorTest : FunSpec() {
                         shell:
                           command: echo "Hello World"
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap()))
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = mockExecutor)
 
             // Should complete the shell command and return stdout as JsonPrimitive
             assertEquals("Hello World", (output as JsonPrimitive).content)
         }
 
         test("should execute multiple activities in sequence") {
+            val mockExecutor = MockActivityExecutor(MockConfiguration(
+                httpMocks = listOf(
+                    HttpMockRule(
+                        match = HttpMockMatcher(url = "*posts/1"),
+                        response = HttpMockResponse(body = buildJsonObject { put("id", 1) })
+                    ),
+                    HttpMockRule(
+                        match = HttpMockMatcher(url = "*posts/2"),
+                        response = HttpMockResponse(body = buildJsonObject { put("id", 2) })
+                    )
+                )
+            ))
             val yaml = """
                 do:
                   - firstCall:
@@ -184,9 +231,9 @@ class OrchestratorTest : FunSpec() {
                         method: GET
                         endpoint: https://jsonplaceholder.typicode.com/posts/2
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = mockExecutor) as JsonObject
 
-            // Should complete both HTTP calls
+            // Should complete both HTTP calls (last one wins as output)
             assertEquals(2, output["id"]?.jsonPrimitive?.int)
         }
 
@@ -536,6 +583,18 @@ class OrchestratorTest : FunSpec() {
         // Emit Task Tests
         // ========================================
 
+        // Create a catch-all emit mock executor for emit tests
+        val emitMockExecutor = MockActivityExecutor(
+            MockConfiguration(
+                emitMocks = listOf(
+                    EmitMockRule(
+                        match = EmitMockMatcher(), // Matches all emit events
+                        response = EmitMockResponse()
+                    )
+                )
+            )
+        )
+
         test("should execute emit task and continue workflow") {
             val yaml = $$"""
                 do:
@@ -555,7 +614,7 @@ class OrchestratorTest : FunSpec() {
                         status: "order_emitted"
                         orderId: ${ .orderId }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = emitMockExecutor) as JsonObject
 
             // Should continue execution after emit task (fire-and-forget)
             assertEquals("order_emitted", output["status"]?.jsonPrimitive?.content)
@@ -583,7 +642,7 @@ class OrchestratorTest : FunSpec() {
                       set:
                         completed: true
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = emitMockExecutor) as JsonObject
 
             // Should complete after emitting
             assertEquals(true, output["completed"]?.jsonPrimitive?.boolean)
@@ -608,7 +667,7 @@ class OrchestratorTest : FunSpec() {
                       set:
                         eventCount: 2
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = emitMockExecutor) as JsonObject
 
             // Both emit tasks should complete
             assertEquals(2, output["eventCount"]?.jsonPrimitive?.int)
@@ -639,7 +698,7 @@ class OrchestratorTest : FunSpec() {
                       output:
                         as: ${ . }
             """
-            val output = executeWorkflow(yaml, JsonObject(emptyMap())) as JsonObject
+            val output = executeWorkflow(yaml, JsonObject(emptyMap()), activityExecutor = emitMockExecutor) as JsonObject
 
             // Should emit for each item
             assertEquals(3, output["count"]?.jsonPrimitive?.int)

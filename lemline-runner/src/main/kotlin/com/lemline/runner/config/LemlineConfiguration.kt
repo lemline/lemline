@@ -240,8 +240,8 @@ interface LemlineConfiguration {
         fun saslUsername(): Optional<String>
         fun saslPassword(): Optional<String>
 
-        fun workflows(): KafkaWorkflowsConfig
-        fun database(): KafkaIngestionConfig
+        fun commands(): KafkaCommandsConfig
+        fun events(): KafkaEventsConfig
         fun lifecycleevents(): Optional<KafkaLifecycleEventsConfig>
     }
 
@@ -255,14 +255,14 @@ interface LemlineConfiguration {
         fun producer(): KafkaProducerConfig
     }
 
-    interface KafkaWorkflowsConfig {
+    interface KafkaCommandsConfig {
         @WithDefault(COMMANDS_TOPIC_DEFAULT)
         fun topic(): String
         fun consumer(): KafkaConsumerWorkflowsConfig
         fun producer(): KafkaProducerConfig
     }
 
-    interface KafkaIngestionConfig {
+    interface KafkaEventsConfig {
         @WithDefault(EVENTS_TOPIC_DEFAULT)
         fun topic(): String
         fun consumer(): KafkaConsumerDatabaseConfig
@@ -318,8 +318,8 @@ interface LemlineConfiguration {
         fun sslEnabled(): Optional<Boolean>
         fun virtualHost(): Optional<String>
 
-        fun workflows(): RabbitWorkflowsConfig
-        fun database(): RabbitIngestionConfig
+        fun commands(): RabbitCommandsConfig
+        fun events(): RabbitEventsConfig
         fun lifecycleevents(): Optional<RabbitLifecycleEventsConfig>
     }
 
@@ -333,7 +333,7 @@ interface LemlineConfiguration {
         fun producer(): RabbitProducerConfig
     }
 
-    interface RabbitWorkflowsConfig {
+    interface RabbitCommandsConfig {
         @WithDefault(RABBITMQ_VHOST_DEFAULT)
         fun virtualHost(): Optional<String>
 
@@ -343,7 +343,7 @@ interface LemlineConfiguration {
         fun producer(): RabbitProducerConfig
     }
 
-    interface RabbitIngestionConfig {
+    interface RabbitEventsConfig {
         @WithDefault(RABBITMQ_VHOST_DEFAULT)
         fun virtualHost(): Optional<String>
 
@@ -492,6 +492,7 @@ interface LemlineConfiguration {
     enum class OrchestratorMode {
         /** Batches control flow nodes, emits message only for action tasks (call, run, emit, etc.) */
         ACTION,
+
         /** Emits a message for every task including control flow nodes */
         ALL
     }

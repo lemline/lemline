@@ -6,7 +6,7 @@
 ## Summary
 
 Build an end-to-end testing framework with two components: (1) CLI test mode in `lemline-runner` providing
-`--test-mode` flag with `TestActivityExecutor` for mock responses, and (2) `lemline-testing` module as a test harness
+`--mock-config=<path>` flag with `TestActivityExecutor` for mock responses, and (2) `lemline-testing` module as a test harness
 that spawns the native-compiled runner, manages Testcontainers infrastructure, and provides CloudEvent capture/delivery
 for workflow verification. Tests define workflows via CLI, start workflows via CLI, and verify behavior by reading
 lifecycle CloudEvents from the broker.
@@ -15,7 +15,7 @@ lifecycle CloudEvents from the broker.
 
 **Language/Version**: Kotlin 2.2.10 + Java 17
 **Primary Dependencies**:
-- `lemline-runner`: Quarkus 3.x (CLI with `--test-mode`), existing `ActivityExecutor` interface
+- `lemline-runner`: Quarkus 3.x (CLI with `--mock-config`), existing `ActivityExecutor` interface
 - `lemline-testing`: Kotest 5.9.1, Testcontainers, Kafka/RabbitMQ client libraries, CloudEvents SDK
 **Storage**: PostgreSQL, MySQL (via Testcontainers)
 **Testing**: Kotest + JUnit 5, native runner binary spawned as external process
@@ -64,9 +64,9 @@ specs/001-testing-architecture/
 lemline-runner/                         # EXTENDED with test mode
 ├── src/main/kotlin/com/lemline/runner/
 │   ├── activities/
-│   │   └── TestActivityExecutor.kt     # Mock activity responses (--test-mode)
+│   │   └── TestActivityExecutor.kt     # Mock activity responses (--mock-config)
 │   └── cli/
-│       └── ListenCommand.kt            # Extended with --test-mode, --mock-config flags
+│       └── ListenCommand.kt            # Extended with --mock-config flag
 └── src/test/kotlin/com/lemline/runner/
     └── activities/
         └── TestActivityExecutorTest.kt # Unit tests for mock config parsing
@@ -98,7 +98,7 @@ lemline-testing/                        # NEW MODULE (test harness)
 ```
 
 **Structure Decision**: Two-part architecture:
-1. `lemline-runner` extended with `--test-mode` CLI flag and `TestActivityExecutor`
+1. `lemline-runner` extended with `--mock-config` CLI flag and `TestActivityExecutor`
 2. `lemline-testing` module as test harness - spawns native runner, manages infrastructure, captures/emits CloudEvents
 The harness does NOT depend on `lemline-runner` (runner is external process).
 
@@ -121,8 +121,8 @@ See [research.md](./research.md) for detailed findings.
 
 **Key Decisions:**
 1. **Architecture**: Native binary orchestration - tests spawn runner as external process, interact via CloudEvents
-2. **Activity mocking**: CLI `--test-mode` flag in runner activates `TestActivityExecutor`, mock responses via
-   `--mock-config=<path>` file
+2. **Activity mocking**: CLI `--mock-config=<path>` flag in runner activates `TestActivityExecutor` and loads mock
+   responses from the specified file
 3. **Module structure**: `lemline-runner` extended with test mode + new `lemline-testing` harness module
 4. **Infrastructure**: `lemline-testing` manages Testcontainers lifecycle (broker + database)
 5. **Event synchronization**: `CloudEventCapture` subscribes to broker, `WorkflowStateHooks` provides `await*` methods
@@ -178,8 +178,8 @@ dependencies {
 
 1. **Extend `lemline-runner` with test mode**:
    - Add `TestActivityExecutor` implementing `ActivityExecutor` interface
-   - Add `--test-mode` and `--mock-config` CLI flags to `listen` command
-   - Wire CDI to select executor based on test mode flag
+   - Add `--mock-config` CLI flag to `listen` command (implicitly enables test mode)
+   - Wire CDI to select executor based on presence of mock config
    - Add unit tests for mock config parsing in `lemline-runner/src/test/`
 
 2. **Create `lemline-testing` module**:

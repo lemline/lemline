@@ -3,11 +3,9 @@ package com.lemline.runner.activities
 
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
-import com.lemline.core.activities.DefaultActivityExecutor
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
 import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import io.quarkus.arc.Arc
-import jakarta.enterprise.context.ApplicationScoped
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 
@@ -20,9 +18,11 @@ import kotlinx.serialization.json.JsonElement
  *
  * The CloudEventsEmitter is conditionally available based on configuration.
  * If not enabled, emit tasks will log a warning but not fail the workflow.
+ *
+ * Note: This class is NOT a CDI bean. It's instantiated by [ActivityExecutorProducer]
+ * which decides which executor to use based on test mode configuration.
  */
 @ExperimentalTime
-@ApplicationScoped
 class RunnerActivityExecutor : ActivityExecutor {
 
     private val logger = logger()

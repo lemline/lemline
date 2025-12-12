@@ -404,4 +404,3 @@ class LifecycleEventHookImpl(
         return OffsetDateTime.ofInstant(this.toJavaInstant(), ZoneOffset.UTC)
     }
 }
-

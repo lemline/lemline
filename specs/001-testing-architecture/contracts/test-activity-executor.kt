@@ -3,10 +3,10 @@
  * TestActivityExecutor Contract
  *
  * This file defines the contract for activity mocking in tests.
- * Implementation will be in lemline-runner module, activated via --test-mode CLI flag.
+ * Implementation will be in lemline-runner module, activated via --mock-config CLI flag.
  *
  * Architecture: TestActivityExecutor implements the existing ActivityExecutor interface.
- * Mock responses are loaded from a YAML/JSON config file specified via --mock-config flag.
+ * Mock responses are loaded from the YAML/JSON config file specified via --mock-config flag.
  *
  * @feature 001-testing-architecture
  */
@@ -27,13 +27,13 @@ import kotlinx.serialization.json.JsonObject
 /**
  * Activity executor that returns mock responses from configuration.
  *
- * Activated when runner starts with `--test-mode` flag.
- * Mock responses are loaded from the file specified by `--mock-config=<path>`.
+ * Activated when runner starts with `--mock-config=<path>` flag.
+ * Mock responses are loaded from the specified file.
  *
  * ## CLI Usage
  *
  * ```bash
- * ./lemline-runner listen --test-mode --mock-config=/path/to/mocks.yaml
+ * ./lemline-runner listen --mock-config=/path/to/mocks.yaml
  * ```
  *
  * ## Mock Configuration Format
