@@ -20,6 +20,5 @@ plugins {
 include(":lemline-common")
 include(":lemline-core")
 include(":lemline-runner")
-include(":lemline-testing")
 
 rootProject.name = "lemline"
