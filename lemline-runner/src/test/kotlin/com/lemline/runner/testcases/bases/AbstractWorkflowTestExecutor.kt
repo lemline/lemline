@@ -16,7 +16,7 @@ import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.TestLifecycleEventEmitter
+import com.lemline.runner.testcases.TestLifecycleEventListener
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
@@ -32,7 +32,8 @@ import kotlinx.serialization.json.JsonElement
  * - [awaitCompletion] - how to wait for completion (with optional message routing)
  *
  * All executors detect workflow completion via lifecycle CloudEvents captured by
- * [TestLifecycleEventEmitter], which is spec-compliant per the Serverless Workflow specification.
+ * [TestLifecycleEventListener] which subscribes to the broker, ensuring that events
+ * actually flow through the messaging infrastructure.
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
@@ -40,7 +41,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
     protected abstract val definitionRepository: DefinitionRepository
     protected abstract val databaseManager: DatabaseManager
-    protected abstract val lifecycleEmitter: TestLifecycleEventEmitter
+    protected abstract val lifecycleListener: TestLifecycleEventListener
     protected abstract val starter: Starter
     protected abstract val lifecycleHook: LifecycleEventHook
 
@@ -74,7 +75,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
 
         return try {
             // Clear previous state
-            lifecycleEmitter.clear()
+            lifecycleListener.clear()
 
             // Register dependencies and main workflow in database
             dependencies.forEach { dep ->
@@ -123,11 +124,11 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         timeoutSeconds: Long
     ): WorkflowTestResult {
         return try {
-            lifecycleEmitter.awaitWorkflowResult(workflowId, timeout = timeoutSeconds.seconds)
+            lifecycleListener.awaitWorkflowResult(workflowId, timeout = timeoutSeconds.seconds)
         } catch (e: TimeoutException) {
             WorkflowTestResult.Failure(
                 error = "Workflow did not complete within $timeoutSeconds seconds. " +
-                    "Captured events: ${lifecycleEmitter.summary()}",
+                    "Captured events: ${lifecycleListener.summary()}",
                 exception = e
             )
         }

@@ -11,10 +11,10 @@ import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_TYPE
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import com.lemline.runner.config.MESSAGING_TYPE
-import com.lemline.runner.testcases.TestLifecycleEventEmitter
 import io.quarkus.test.junit.QuarkusTestProfile
 
 /**
@@ -23,6 +23,7 @@ import io.quarkus.test.junit.QuarkusTestProfile
  * This profile configures:
  * - an H2 (in memory) database for persistence
  * - In-memory channels for messaging
+ * - Lifecycle events with loopback for test verification
  *
  * All corresponding Quarkus properties are set by LemlineConfigSourceFactory.
  */
@@ -39,6 +40,11 @@ class InMemoryProfile : QuarkusTestProfile {
             EVENTS_PRODUCER_ENABLED to "true",
             CLOUDEVENTS_CONSUMER_ENABLED to "true",
             CLOUDEVENTS_PRODUCER_ENABLED to "true",
+
+            // Enable lifecycle events producer so events flow through the broker
+            LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
+            // Configure lifecycleevents-in channel for test listener (loopback)
+            "mp.messaging.incoming.lifecycleevents-in.connector" to "smallrye-in-memory",
 
             // Enable outbox schedulers for tests that need them (Listen, Wait, Retry, etc.)
             "lemline.outbox.enabled" to "true",
@@ -60,13 +66,5 @@ class InMemoryProfile : QuarkusTestProfile {
      */
     override fun tags(): Set<String> {
         return setOf(DB_TYPE_IN_MEMORY)
-    }
-
-    /**
-     * Enables the test lifecycle event emitter alternative.
-     * This allows tests to capture CloudEvents for verification.
-     */
-    override fun getEnabledAlternatives(): Set<Class<*>> {
-        return setOf(TestLifecycleEventEmitter::class.java)
     }
 }

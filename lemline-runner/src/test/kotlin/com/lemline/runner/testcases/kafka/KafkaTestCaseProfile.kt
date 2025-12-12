@@ -9,10 +9,10 @@ import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_TYPE
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LemlineConfigConstants
 import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.config.ORCHESTRATOR_MODE
-import com.lemline.runner.testcases.TestLifecycleEventEmitter
 import com.lemline.runner.tests.resources.KafkaTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -25,6 +25,7 @@ import io.quarkus.test.junit.QuarkusTestProfile
  * This profile configures:
  * - H2 (in-memory) database for persistence
  * - Kafka channels with loopback topics
+ * - Lifecycle events with loopback for test verification
  * - Outbox schedulers enabled with fast polling for Wait/Fork/Retry tests
  */
 class KafkaTestCaseProfile : QuarkusTestProfile {
@@ -40,6 +41,9 @@ class KafkaTestCaseProfile : QuarkusTestProfile {
             EVENTS_CONSUMER_ENABLED to "true",
             EVENTS_PRODUCER_ENABLED to "true",
 
+            // Enable lifecycle events producer so events flow through the broker
+            LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
+
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
             ORCHESTRATOR_MODE to "all",
 
@@ -48,6 +52,13 @@ class KafkaTestCaseProfile : QuarkusTestProfile {
             "mp.messaging.outgoing.commands-out.topic" to "lemline-commands",
             "mp.messaging.incoming.events-in.topic" to "lemline-events",
             "mp.messaging.outgoing.events-out.topic" to "lemline-events",
+
+            // Lifecycle events loopback - same topic for producer and test listener
+            "mp.messaging.outgoing.lifecycleevents-out.topic" to "lemline-lifecycle",
+            "mp.messaging.incoming.lifecycleevents-in.connector" to "smallrye-kafka",
+            "mp.messaging.incoming.lifecycleevents-in.topic" to "lemline-lifecycle",
+            "mp.messaging.incoming.lifecycleevents-in.auto.offset.reset" to "earliest",
+            "mp.messaging.incoming.lifecycleevents-in.group.id" to "lemline-test-lifecycle-listener",
 
             "smallrye.messaging.kafka.topic.creation.enable" to "true",
 
@@ -69,13 +80,5 @@ class KafkaTestCaseProfile : QuarkusTestProfile {
 
     override fun tags(): Set<String> {
         return setOf("kafka-testcase")
-    }
-
-    /**
-     * Enables the test lifecycle event emitter alternative.
-     * This allows tests to capture CloudEvents for verification.
-     */
-    override fun getEnabledAlternatives(): Set<Class<*>> {
-        return setOf(TestLifecycleEventEmitter::class.java)
     }
 }

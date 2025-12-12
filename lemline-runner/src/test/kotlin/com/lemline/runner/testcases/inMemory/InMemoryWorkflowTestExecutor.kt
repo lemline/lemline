@@ -13,7 +13,7 @@ import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.TestLifecycleEventEmitter
+import com.lemline.runner.testcases.TestLifecycleEventListener
 import com.lemline.runner.testcases.bases.AbstractWorkflowTestExecutor
 import io.smallrye.reactive.messaging.memory.InMemoryConnector
 import jakarta.enterprise.inject.Any
@@ -25,12 +25,19 @@ import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.delay
 import kotlinx.serialization.ExperimentalSerializationApi
 
+private const val LIFECYCLEEVENTS_OUT_CHANNEL = "lifecycleevents-out"
+private const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
+
 /**
  * Workflow test executor using in-memory channels with manual message routing.
  *
  * SmallRye's InMemoryConnector requires manual loopback routing:
  * - commands-out → commands-in
  * - events-out → events-in
+ * - lifecycleevents-out → lifecycleevents-in
+ *
+ * Lifecycle CloudEvents are captured via [TestLifecycleEventListener] which subscribes
+ * to the in-memory channel, verifying that events flow through the messaging infrastructure.
  */
 @Singleton
 @ExperimentalTime
@@ -44,7 +51,7 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
     override lateinit var databaseManager: DatabaseManager
 
     @Inject
-    override lateinit var lifecycleEmitter: TestLifecycleEventEmitter
+    override lateinit var lifecycleListener: TestLifecycleEventListener
 
     @Inject
     override lateinit var starter: Starter
@@ -61,10 +68,13 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
     private val commandsOut get() = connector.sink<String>(COMMANDS_OUT_CHANNEL)
     private val eventsIn get() = connector.source<String>(EVENTS_IN_CHANNEL)
     private val eventsOut get() = connector.sink<String>(EVENTS_OUT_CHANNEL)
+    private val lifecycleEventsIn get() = connector.source<String>(LIFECYCLEEVENTS_IN_CHANNEL)
+    private val lifecycleEventsOut get() = connector.sink<String>(LIFECYCLEEVENTS_OUT_CHANNEL)
 
     override suspend fun sendInitialCommand(message: InstanceMessage<out WorkflowCommand>) {
         commandsOut.clear()
         eventsOut.clear()
+        lifecycleEventsOut.clear()
         commandsIn.send(message.toJsonString())
     }
 
@@ -76,7 +86,7 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
                 routeMessages()
 
                 try {
-                    return lifecycleEmitter.awaitWorkflowResult(workflowId, timeout = 0.seconds)
+                    return lifecycleListener.awaitWorkflowResult(workflowId, timeout = 0.seconds)
                 } catch (_: TimeoutException) {
                     // Not yet completed
                 }
@@ -86,12 +96,13 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
 
             return WorkflowTestResult.Failure(
                 error = "Workflow did not complete within $timeoutSeconds seconds. " +
-                    "Captured events: ${lifecycleEmitter.summary()}",
+                    "Captured events: ${lifecycleListener.summary()}",
                 exception = TimeoutException("Workflow execution timeout")
             )
         } finally {
             commandsOut.clear()
             eventsOut.clear()
+            lifecycleEventsOut.clear()
         }
     }
 
@@ -102,5 +113,9 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
 
         eventsOut.received().toList().also { eventsOut.clear() }
             .forEach { eventsIn.send(it.payload) }
+
+        // Route lifecycle events to the listener
+        lifecycleEventsOut.received().toList().also { lifecycleEventsOut.clear() }
+            .forEach { lifecycleEventsIn.send(it.payload) }
     }
 }

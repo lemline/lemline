@@ -9,10 +9,10 @@ import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_TYPE
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
 import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
+import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LemlineConfigConstants
 import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.config.ORCHESTRATOR_MODE
-import com.lemline.runner.testcases.TestLifecycleEventEmitter
 import com.lemline.runner.tests.resources.RabbitMQTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -25,6 +25,7 @@ import io.quarkus.test.junit.QuarkusTestProfile
  * This profile configures:
  * - H2 (in-memory) database for persistence
  * - RabbitMQ channels with loopback via shared exchanges
+ * - Lifecycle events with loopback for test verification
  * - Outbox schedulers enabled with fast polling for Wait/Fork/Retry tests
  */
 class RabbitMQTestCaseProfile : QuarkusTestProfile {
@@ -39,6 +40,9 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
             COMMANDS_PRODUCER_ENABLED to "true",
             EVENTS_CONSUMER_ENABLED to "true",
             EVENTS_PRODUCER_ENABLED to "true",
+
+            // Enable lifecycle events producer so events flow through the broker
+            LIFECYCLE_EVENTS_PRODUCER_ENABLED to "true",
 
             // Orchestrator mode: ALL generates more messages for thorough end-to-end testing
             ORCHESTRATOR_MODE to "all",
@@ -58,6 +62,14 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
             "mp.messaging.outgoing.events-out.exchange.name" to "lemline-events-exchange",
             "mp.messaging.outgoing.events-out.exchange.type" to "fanout",
 
+            // Lifecycle events loopback - same exchange for producer and test listener
+            "mp.messaging.outgoing.lifecycleevents-out.exchange.name" to "lemline-lifecycle-exchange",
+            "mp.messaging.outgoing.lifecycleevents-out.exchange.type" to "fanout",
+            "mp.messaging.incoming.lifecycleevents-in.connector" to "smallrye-rabbitmq",
+            "mp.messaging.incoming.lifecycleevents-in.queue.name" to "lemline-lifecycle-test",
+            "mp.messaging.incoming.lifecycleevents-in.exchange.name" to "lemline-lifecycle-exchange",
+            "mp.messaging.incoming.lifecycleevents-in.exchange.type" to "fanout",
+
             // Enable outbox schedulers for Wait/Fork/Retry tests
             "lemline.outbox.enabled" to "true",
             // Fast polling for tests (1s interval, no initial delay)
@@ -76,13 +88,5 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
 
     override fun tags(): Set<String> {
         return setOf("rabbitmq-testcase")
-    }
-
-    /**
-     * Enables the test lifecycle event emitter alternative.
-     * This allows tests to capture CloudEvents for verification.
-     */
-    override fun getEnabledAlternatives(): Set<Class<*>> {
-        return setOf(TestLifecycleEventEmitter::class.java)
     }
 }

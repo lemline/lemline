@@ -10,7 +10,7 @@ import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.TestLifecycleEventEmitter
+import com.lemline.runner.testcases.TestLifecycleEventListener
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import kotlin.time.ExperimentalTime
@@ -21,6 +21,9 @@ import kotlinx.serialization.ExperimentalSerializationApi
  *
  * Relies on broker loopback configuration (same topic/queue for in/out channels)
  * for automatic message routing. No manual routing needed.
+ *
+ * Lifecycle CloudEvents are captured via [TestLifecycleEventListener] which subscribes
+ * to the broker, verifying that events actually flow through the messaging infrastructure.
  */
 @Singleton
 @ExperimentalTime
@@ -34,7 +37,7 @@ internal class BrokerWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
     override lateinit var databaseManager: DatabaseManager
 
     @Inject
-    override lateinit var lifecycleEmitter: TestLifecycleEventEmitter
+    override lateinit var lifecycleListener: TestLifecycleEventListener
 
     @Inject
     override lateinit var starter: Starter
@@ -50,7 +53,7 @@ internal class BrokerWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
     }
 
     override suspend fun awaitCompletion(workflowId: WorkflowId, timeoutSeconds: Long): WorkflowTestResult {
-        // Broker handles routing automatically - just wait for lifecycle events
+        // Broker handles routing automatically - just wait for lifecycle events from broker
         return awaitLifecycleResult(workflowId, timeoutSeconds)
     }
 }
