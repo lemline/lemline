@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class)
+
 package com.lemline.runner.testcases.rabbitmq
 
 import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
+import kotlin.time.ExperimentalTime
 import com.lemline.runner.config.COMMANDS_PRODUCER_ENABLED
 import com.lemline.runner.config.DATABASE_TYPE
 import com.lemline.runner.config.EVENTS_CONSUMER_ENABLED
@@ -9,6 +12,7 @@ import com.lemline.runner.config.EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LemlineConfigConstants
 import com.lemline.runner.config.MESSAGING_TYPE
 import com.lemline.runner.config.ORCHESTRATOR_MODE
+import com.lemline.runner.testcases.TestLifecycleEventEmitter
 import com.lemline.runner.tests.resources.RabbitMQTestResource
 import io.quarkus.test.junit.QuarkusTestProfile
 
@@ -72,5 +76,13 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
 
     override fun tags(): Set<String> {
         return setOf("rabbitmq-testcase")
+    }
+
+    /**
+     * Enables the test lifecycle event emitter alternative.
+     * This allows tests to capture CloudEvents for verification.
+     */
+    override fun getEnabledAlternatives(): Set<Class<*>> {
+        return setOf(TestLifecycleEventEmitter::class.java)
     }
 }

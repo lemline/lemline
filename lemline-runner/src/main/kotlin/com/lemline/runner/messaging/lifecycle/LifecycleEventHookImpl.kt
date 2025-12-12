@@ -60,7 +60,7 @@ class LifecycleEventHookImpl(
         nodeStack: NodeStack,
     ) {
         val emitter = this.emitter ?: return
-        val rootState = nodeStack[NodePosition.root] as RootState
+        val rootState = nodeStack.rootState
 
         val data = LifecycleEventData.WorkflowCreatedData(
             name = workflowInfo.qualifiedName,

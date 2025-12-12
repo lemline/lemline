@@ -21,7 +21,7 @@ import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.runner.messaging.lifecycle.LifecycleEventHookImpl
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.ForkBranchModel
@@ -88,7 +88,7 @@ internal class WorkflowEventHandler(
     private val starter: Starter,
     override val metrics: WorkflowEventSubscriberMetrics,
     private val databaseManager: DatabaseManager,
-    private val lifecycleHook: LifecycleEventHookImpl,
+    private val lifecycleHook: LifecycleEventHook,
 ) : MessageHandler<InstanceMessage<WorkflowEvent>> {
 
     override var logger = logger()

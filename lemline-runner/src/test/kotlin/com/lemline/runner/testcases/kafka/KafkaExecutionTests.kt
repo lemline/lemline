@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalSerializationApi::class, ExperimentalTime::class)
+
 package com.lemline.runner.testcases.kafka
 
 import com.lemline.core.testcases.CallHttpTestCases
@@ -14,7 +16,7 @@ import com.lemline.core.testcases.SetTaskTestCases
 import com.lemline.core.testcases.SwitchTaskTestCases
 import com.lemline.core.testcases.TryTaskTestCases
 import com.lemline.core.testcases.WaitTestCases
-import com.lemline.runner.testcases.AbstractBrokerWorkflowTest
+import com.lemline.runner.testcases.bases.BrokerWorkflowTest
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import kotlin.time.ExperimentalTime
@@ -29,84 +31,58 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaCallHttpExecutionTest : AbstractBrokerWorkflowTest(CallHttpTestCases.cases)
+internal class KafkaCallHttpExecutionTest : BrokerWorkflowTest(CallHttpTestCases.cases)
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaDoExecutionTest : AbstractBrokerWorkflowTest(DoTaskTestCases.cases)
+internal class KafkaDoExecutionTest : BrokerWorkflowTest(DoTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaExportContextExecutionTest : AbstractBrokerWorkflowTest(ExportContextTestCases.cases)
+internal class KafkaExportContextExecutionTest : BrokerWorkflowTest(ExportContextTestCases.cases)
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaForExecutionTest : AbstractBrokerWorkflowTest(ForTaskTestCases.cases)
+internal class KafkaForExecutionTest : BrokerWorkflowTest(ForTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaForkExecutionTest : AbstractBrokerWorkflowTest(ForkTaskTestCases.cases)
+internal class KafkaForkExecutionTest : BrokerWorkflowTest(ForkTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaIfExecutionTest : AbstractBrokerWorkflowTest(IfConditionTestCases.cases)
+internal class KafkaIfExecutionTest : BrokerWorkflowTest(IfConditionTestCases.cases)
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaRunScriptExecutionTest : AbstractBrokerWorkflowTest(
+internal class KafkaRunScriptExecutionTest : BrokerWorkflowTest(
     RunScriptTestCases.cases,
     excludeTags = setOf("windows-only")
 )
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaRunShellExecutionTest : AbstractBrokerWorkflowTest(
+internal class KafkaRunShellExecutionTest : BrokerWorkflowTest(
     RunShellTestCases.cases,
     excludeTags = setOf("windows-only")
 )
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaRunWorkflowExecutionTest : AbstractBrokerWorkflowTest(RunWorkflowTestCases.cases)
+internal class KafkaRunWorkflowExecutionTest : BrokerWorkflowTest(RunWorkflowTestCases.cases)
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaSetExecutionTest : AbstractBrokerWorkflowTest(SetTaskTestCases.cases)
+internal class KafkaSetExecutionTest : BrokerWorkflowTest(SetTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaSwitchExecutionTest : AbstractBrokerWorkflowTest(SwitchTaskTestCases.cases)
+internal class KafkaSwitchExecutionTest : BrokerWorkflowTest(SwitchTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaTryExecutionTest : AbstractBrokerWorkflowTest(TryTaskTestCases.cases)
+internal class KafkaTryExecutionTest : BrokerWorkflowTest(TryTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(KafkaTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class KafkaWaitExecutionTest : AbstractBrokerWorkflowTest(WaitTestCases.cases)
+internal class KafkaWaitExecutionTest : BrokerWorkflowTest(WaitTestCases.cases)

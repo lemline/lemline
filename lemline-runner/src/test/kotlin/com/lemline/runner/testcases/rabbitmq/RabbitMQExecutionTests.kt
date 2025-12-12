@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
+@file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
+
 package com.lemline.runner.testcases.rabbitmq
 
 import com.lemline.core.testcases.CallHttpTestCases
@@ -14,7 +16,7 @@ import com.lemline.core.testcases.SetTaskTestCases
 import com.lemline.core.testcases.SwitchTaskTestCases
 import com.lemline.core.testcases.TryTaskTestCases
 import com.lemline.core.testcases.WaitTestCases
-import com.lemline.runner.testcases.AbstractBrokerWorkflowTest
+import com.lemline.runner.testcases.bases.BrokerWorkflowTest
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
 import kotlin.time.ExperimentalTime
@@ -29,84 +31,58 @@ import kotlinx.serialization.ExperimentalSerializationApi
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQCallHttpExecutionTest : AbstractBrokerWorkflowTest(CallHttpTestCases.cases)
+internal class RabbitMQCallHttpExecutionTest : BrokerWorkflowTest(CallHttpTestCases.cases)
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQDoExecutionTest : AbstractBrokerWorkflowTest(DoTaskTestCases.cases)
+internal class RabbitMQDoExecutionTest : BrokerWorkflowTest(DoTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQExportContextExecutionTest : AbstractBrokerWorkflowTest(ExportContextTestCases.cases)
+internal class RabbitMQExportContextExecutionTest : BrokerWorkflowTest(ExportContextTestCases.cases)
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQForExecutionTest : AbstractBrokerWorkflowTest(ForTaskTestCases.cases)
+internal class RabbitMQForExecutionTest : BrokerWorkflowTest(ForTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQForkExecutionTest : AbstractBrokerWorkflowTest(ForkTaskTestCases.cases)
+internal class RabbitMQForkExecutionTest : BrokerWorkflowTest(ForkTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQIfExecutionTest : AbstractBrokerWorkflowTest(IfConditionTestCases.cases)
+internal class RabbitMQIfExecutionTest : BrokerWorkflowTest(IfConditionTestCases.cases)
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQRunScriptExecutionTest : AbstractBrokerWorkflowTest(
+internal class RabbitMQRunScriptExecutionTest : BrokerWorkflowTest(
     RunScriptTestCases.cases,
     excludeTags = setOf("windows-only")
 )
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQRunShellExecutionTest : AbstractBrokerWorkflowTest(
+internal class RabbitMQRunShellExecutionTest : BrokerWorkflowTest(
     RunShellTestCases.cases,
     excludeTags = setOf("windows-only")
 )
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQRunWorkflowExecutionTest : AbstractBrokerWorkflowTest(RunWorkflowTestCases.cases)
+internal class RabbitMQRunWorkflowExecutionTest : BrokerWorkflowTest(RunWorkflowTestCases.cases)
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQSetExecutionTest : AbstractBrokerWorkflowTest(SetTaskTestCases.cases)
+internal class RabbitMQSetExecutionTest : BrokerWorkflowTest(SetTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQSwitchExecutionTest : AbstractBrokerWorkflowTest(SwitchTaskTestCases.cases)
+internal class RabbitMQSwitchExecutionTest : BrokerWorkflowTest(SwitchTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQTryExecutionTest : AbstractBrokerWorkflowTest(TryTaskTestCases.cases)
+internal class RabbitMQTryExecutionTest : BrokerWorkflowTest(TryTaskTestCases.cases)
 
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
-@ExperimentalTime
-@ExperimentalSerializationApi
-internal class RabbitMQWaitExecutionTest : AbstractBrokerWorkflowTest(WaitTestCases.cases)
+internal class RabbitMQWaitExecutionTest : BrokerWorkflowTest(WaitTestCases.cases)

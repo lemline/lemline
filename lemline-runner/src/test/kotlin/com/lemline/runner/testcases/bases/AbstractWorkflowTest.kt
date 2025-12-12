@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.testcases.inMemory
+package com.lemline.runner.testcases.bases
 
 import com.lemline.core.testcases.WorkflowTestCase
-import com.lemline.runner.testcases.RunnerWorkflowTestExecutor
-import jakarta.inject.Inject
+import com.lemline.core.testcases.WorkflowTestExecutor
+import com.lemline.runner.testcases.PlatformUtils
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -11,38 +11,43 @@ import org.junit.jupiter.api.DynamicTest
 import org.junit.jupiter.api.TestFactory
 
 /**
- * Abstract base class for runner workflow execution tests.
+ * Abstract base class for workflow execution tests using JUnit5 dynamic tests.
  *
- * This class uses JUnit5's dynamic tests to execute shared [com.lemline.core.testcases.WorkflowTestCase]s
- * from lemline-core's testFixtures against the runner's messaging infrastructure.
+ * This class provides common test factory logic for executing shared [WorkflowTestCase]s
+ * from lemline-core's testFixtures. Subclasses specify:
+ * - Which test cases to run
+ * - Which tags to exclude
+ * - The executor to use (injected via [getExecutor])
  *
  * Subclasses must:
  * - Use `@QuarkusTest` and appropriate `@TestProfile` annotations
- * - Provide the list of test cases to execute
- * - Optionally specify tags to exclude
+ * - Override [getExecutor] to return the appropriate injected executor
  *
  * @param testCases The list of test cases to execute
  * @param excludeTags Tags to exclude from execution (e.g., "external", "slow")
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal abstract class InMemoryRunnerWorkflowTest(
+internal abstract class AbstractWorkflowTest(
     private val testCases: List<WorkflowTestCase>,
     private val excludeTags: Set<String> = emptySet()
 ) {
 
-    @Inject
-    lateinit var executor: RunnerWorkflowTestExecutor
+    /**
+     * Returns the workflow test executor to use for running tests.
+     * Subclasses should return an injected executor instance.
+     */
+    protected abstract fun getExecutor(): WorkflowTestExecutor
 
     @TestFactory
     fun workflowTests(): List<DynamicTest> {
         return testCases
             .filter { case -> case.tags.none { it in excludeTags } }
-            .filter { case -> shouldRunOnCurrentPlatform(case) }
+            .filter { case -> PlatformUtils.shouldRunOnCurrentPlatform(case) }
             .map { case ->
                 DynamicTest.dynamicTest(case.name) {
                     runBlocking {
-                        val result = executor.execute(
+                        val result = getExecutor().execute(
                             yaml = case.yaml,
                             input = case.input,
                             dependencies = case.dependencies
@@ -57,21 +62,5 @@ internal abstract class InMemoryRunnerWorkflowTest(
                     }
                 }
             }
-    }
-
-    private fun shouldRunOnCurrentPlatform(case: WorkflowTestCase): Boolean {
-        val osName = System.getProperty("os.name").lowercase()
-
-        return when {
-            "unix-only" in case.tags -> {
-                osName.contains("mac") || osName.contains("linux")
-            }
-
-            "windows-only" in case.tags -> {
-                osName.contains("windows")
-            }
-
-            else -> true
-        }
     }
 }
