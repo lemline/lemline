@@ -36,11 +36,6 @@ import kotlinx.serialization.json.buildJsonObject
  *
  * This orchestrator executes workflows in a single pass, handling all events
  * (activities, waits, forks, child workflows) directly without external coordination.
- *
- * It manages both compete (race) and cooperative (all) fork modes,
- * coordinating parallel execution of multiple workflow branches.
- *
- * @property activityExecutor Executor for activity tasks (HTTP, scripts, emit, etc.)
  */
 @ExperimentalTime
 internal object FullOrchestrator {

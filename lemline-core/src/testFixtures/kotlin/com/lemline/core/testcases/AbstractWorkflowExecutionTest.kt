@@ -2,6 +2,7 @@
 package com.lemline.core.testcases
 
 import io.kotest.core.spec.style.FunSpec
+import kotlinx.serialization.json.JsonElement
 
 /**
  * Abstract base class for workflow execution tests.
@@ -109,7 +110,7 @@ object WorkflowTestValidators {
      */
     fun expectOutputMatching(
         description: String,
-        predicate: (kotlinx.serialization.json.JsonElement) -> Boolean
+        predicate: (JsonElement) -> Boolean
     ): (WorkflowTestResult) -> String? = { result ->
         when (result) {
             is WorkflowTestResult.Success -> {

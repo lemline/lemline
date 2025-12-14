@@ -8,7 +8,7 @@ import kotlin.time.ExperimentalTime
  */
 @ExperimentalTime
 class CallHttpExecutionTest : AbstractWorkflowExecutionTest(CallHttpTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -16,7 +16,7 @@ class CallHttpExecutionTest : AbstractWorkflowExecutionTest(CallHttpTestCases.ca
  */
 @ExperimentalTime
 class DoTaskExecutionTest : AbstractWorkflowExecutionTest(DoTaskTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -24,7 +24,7 @@ class DoTaskExecutionTest : AbstractWorkflowExecutionTest(DoTaskTestCases.cases)
  */
 @ExperimentalTime
 class ExportContextExecutionTest : AbstractWorkflowExecutionTest(ExportContextTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -32,7 +32,7 @@ class ExportContextExecutionTest : AbstractWorkflowExecutionTest(ExportContextTe
  */
 @ExperimentalTime
 class ForTaskExecutionTest : AbstractWorkflowExecutionTest(ForTaskTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -40,7 +40,7 @@ class ForTaskExecutionTest : AbstractWorkflowExecutionTest(ForTaskTestCases.case
  */
 @ExperimentalTime
 class ForkTaskExecutionTest : AbstractWorkflowExecutionTest(ForkTaskTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -48,7 +48,7 @@ class ForkTaskExecutionTest : AbstractWorkflowExecutionTest(ForkTaskTestCases.ca
  */
 @ExperimentalTime
 class IfConditionExecutionTest : AbstractWorkflowExecutionTest(IfConditionTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -56,7 +56,7 @@ class IfConditionExecutionTest : AbstractWorkflowExecutionTest(IfConditionTestCa
  */
 @ExperimentalTime
 class ListenExecutionTest : AbstractWorkflowExecutionTest(ListenTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -64,7 +64,7 @@ class ListenExecutionTest : AbstractWorkflowExecutionTest(ListenTestCases.cases)
  */
 @ExperimentalTime
 class RunScriptExecutionTest : AbstractWorkflowExecutionTest(RunScriptTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -72,7 +72,7 @@ class RunScriptExecutionTest : AbstractWorkflowExecutionTest(RunScriptTestCases.
  */
 @ExperimentalTime
 class RunShellExecutionTest : AbstractWorkflowExecutionTest(RunShellTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -80,7 +80,7 @@ class RunShellExecutionTest : AbstractWorkflowExecutionTest(RunShellTestCases.ca
  */
 @ExperimentalTime
 class RunWorkflowExecutionTest : AbstractWorkflowExecutionTest(RunWorkflowTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -88,7 +88,7 @@ class RunWorkflowExecutionTest : AbstractWorkflowExecutionTest(RunWorkflowTestCa
  */
 @ExperimentalTime
 class SetTaskExecutionTest : AbstractWorkflowExecutionTest(SetTaskTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -96,7 +96,7 @@ class SetTaskExecutionTest : AbstractWorkflowExecutionTest(SetTaskTestCases.case
  */
 @ExperimentalTime
 class SwitchTaskExecutionTest : AbstractWorkflowExecutionTest(SwitchTaskTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -104,7 +104,7 @@ class SwitchTaskExecutionTest : AbstractWorkflowExecutionTest(SwitchTaskTestCase
  */
 @ExperimentalTime
 class TryTaskExecutionTest : AbstractWorkflowExecutionTest(TryTaskTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }
 
 /**
@@ -112,5 +112,5 @@ class TryTaskExecutionTest : AbstractWorkflowExecutionTest(TryTaskTestCases.case
  */
 @ExperimentalTime
 class WaitExecutionTest : AbstractWorkflowExecutionTest(WaitTestCases.cases) {
-    override fun createExecutor(): WorkflowTestExecutor = FullOrchestratorExecutor()
+    override fun createExecutor() = FullOrchestratorTestExecutor()
 }

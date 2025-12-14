@@ -25,7 +25,7 @@ import kotlinx.serialization.json.JsonElement
  *
  * Ideal for fast unit tests.
  */
-class FullOrchestratorExecutor : WorkflowTestExecutor {
+class FullOrchestratorTestExecutor : WorkflowTestExecutor {
 
     @ExperimentalTime
     override suspend fun execute(
@@ -42,7 +42,6 @@ class FullOrchestratorExecutor : WorkflowTestExecutor {
             dependencies.forEach { dep ->
                 createWorkflow(dep.yaml, dep.namespace, dep.name, dep.version)
             }
-
             val workflow = createWorkflow(yaml, namespace, name, version)
 
             val startState = StepByStepOrchestrator.initCmd(
