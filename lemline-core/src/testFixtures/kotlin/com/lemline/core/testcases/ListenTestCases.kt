@@ -1116,7 +1116,7 @@ object ListenTestCases {
                               set:
                                 value: ${ $context.value }
                           - simulateSlowProcessing:
-                              wait: 
+                              wait:
                                 milliseconds: 400
                           - returnResult:
                               set:
@@ -1134,6 +1134,129 @@ object ListenTestCases {
                     arr[0].jsonObject["value"]?.jsonPrimitive?.intOrNull == 1 &&
                     arr[1].jsonObject["value"]?.jsonPrimitive?.intOrNull == 2 &&
                     arr[2].jsonObject["value"]?.jsonPrimitive?.intOrNull == 3
+            }
+        ),
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // Error Handling Test - Verifies errors in foreach propagate correctly
+        // ─────────────────────────────────────────────────────────────────────────
+
+        WorkflowTestCase(
+            name = "listen foreach error is caught by inner try-catch and returns error info",
+            cloudEvents = listOf(
+                TestMocks.reading1Event,
+                TestMocks.reading2Event,  // Second event will trigger failure but be caught
+                TestMocks.reading3ThresholdEvent  // Third event triggers until condition
+            ),
+            yaml = $$"""
+                do:
+                  - collectReadings:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until: . | any(.data.value > 100)
+                      foreach:
+                        do:
+                          - handleEvent:
+                              try:
+                                - checkValue:
+                                    if: ${ .data.readingId == 2 }
+                                    raise:
+                                      error:
+                                        type: https://serverlessworkflow.io/errors/processing
+                                        status: 400
+                                        title: Processing failed
+                                        detail: Failed to process reading with id 2
+                                - processEvent:
+                                    set:
+                                      processed: true
+                                      readingId: ${ .data.readingId }
+                              catch:
+                                as: caughtError
+                                do:
+                                  - returnError:
+                                      set:
+                                        caught: true
+                                        errorType: ${ $caughtError.type }
+                                        errorStatus: ${ $caughtError.status }
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "foreach", "error", "try-catch"),
+            validate = expectOutputMatching("3 iterations: 2 processed, 1 caught error") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                arr.size == 3 &&
+                    // First event processed successfully
+                    arr[0].jsonObject["processed"]?.jsonPrimitive?.booleanOrNull == true &&
+                    arr[0].jsonObject["readingId"]?.jsonPrimitive?.intOrNull == 1 &&
+                    // Second event caught error
+                    arr[1].jsonObject["caught"]?.jsonPrimitive?.booleanOrNull == true &&
+                    arr[1].jsonObject["errorType"]?.jsonPrimitive?.contentOrNull?.contains("processing") == true &&
+                    arr[1].jsonObject["errorStatus"]?.jsonPrimitive?.intOrNull == 400 &&
+                    // Third event processed successfully
+                    arr[2].jsonObject["processed"]?.jsonPrimitive?.booleanOrNull == true &&
+                    arr[2].jsonObject["readingId"]?.jsonPrimitive?.intOrNull == 3
+            }
+        ),
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // Fail-Fast Test - Verifies foreach stops on error and doesn't process remaining events
+        // ─────────────────────────────────────────────────────────────────────────
+
+        WorkflowTestCase(
+            name = "listen foreach with outer try-catch stops on error and skips remaining events",
+            cloudEvents = listOf(
+                TestMocks.reading1Event,
+                TestMocks.reading2Event,  // Second event will trigger failure
+                TestMocks.reading3ThresholdEvent  // Third event should NOT be processed
+            ),
+            yaml = $$"""
+                do:
+                  - setProcessedCount:
+                      set:
+                        processedCount: 0
+                      export:
+                        as: ${ . }
+                  - handleReadings:
+                      try:
+                        - collectReadings:
+                            listen:
+                              to:
+                                any:
+                                  - with:
+                                      type: sensor.reading
+                                until: . | any(.data.value > 100)
+                            foreach:
+                              do:
+                                - checkValue:
+                                    if: ${ .data.readingId == 2 }
+                                    raise:
+                                      error:
+                                        type: https://serverlessworkflow.io/errors/processing
+                                        status: 400
+                                        title: Processing failed
+                                - incrementCount:
+                                    set:
+                                      processedCount: ${ $context.processedCount + 1 }
+                                    export:
+                                      as: ${ . }
+                      catch:
+                        as: caughtError
+                        do:
+                          - returnResult:
+                              set:
+                                failed: true
+                                errorType: ${ $caughtError.type }
+                                processedBeforeError: ${ $context.processedCount }
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "foreach", "error", "fail-fast"),
+            validate = expectOutputMatching("only 1 event processed before error, third event skipped") { output ->
+                val obj = output as? JsonObject ?: return@expectOutputMatching false
+                // Verify error was caught
+                obj["failed"]?.jsonPrimitive?.booleanOrNull == true &&
+                    obj["errorType"]?.jsonPrimitive?.contentOrNull?.contains("processing") == true &&
+                    // Only 1 event was processed (event 1), event 2 failed, event 3 was never processed
+                    obj["processedBeforeError"]?.jsonPrimitive?.intOrNull == 1
             }
         )
     )

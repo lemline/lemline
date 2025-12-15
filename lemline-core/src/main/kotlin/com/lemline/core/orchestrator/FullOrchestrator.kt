@@ -288,10 +288,10 @@ internal object FullOrchestrator {
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowCommand {
+        val listenNode = workflow.getNode(event.nodePosition) as Node<ListenTask>
         logger.debug { "Listening for CloudEvents: strategy=${event.config.strategy} filters=${event.config.filters} until=${event.config.until}" }
 
         // Check if foreach is configured by looking at the node's children
-        val listenNode = workflow.getNode(event.nodePosition) as Node<ListenTask>
         val hasForeach = listenNode.children != null
 
         // Create foreach context if foreach is configured
@@ -306,8 +306,9 @@ internal object FullOrchestrator {
             (it - Clock.System.now()).inWholeMilliseconds.coerceAtLeast(0)
         } ?: Long.MAX_VALUE
 
+        // Wrap in try/catch like fork does - errors from foreach are caught and converted to ResumeWithFailedTask
         return try {
-            val outputs = withTimeout(timeoutMillis) {
+            withTimeout(timeoutMillis) {
                 when (event.config.strategy) {
                     ListenStrategy.ONE -> {
                         // Wait for first matching event
@@ -316,11 +317,12 @@ internal object FullOrchestrator {
                             .first()
                         val eventJson = cloudEvent.toJsonElement()
                         // Process through foreach immediately if configured
-                        if (foreachCtx != null) {
-                            listOf(processEventThroughForeach(foreachCtx, eventJson, 0))
+                        val output = if (foreachCtx != null) {
+                            processEventThroughForeach(foreachCtx, eventJson, 0)
                         } else {
-                            listOf(eventJson)
+                            eventJson
                         }
+                        event.resumeCompleted(JsonArray(listOf(output)))
                     }
 
                     ListenStrategy.ANY -> {
@@ -333,55 +335,68 @@ internal object FullOrchestrator {
                                     .first()
                                 val eventJson = cloudEvent.toJsonElement()
                                 // Process through foreach immediately if configured
-                                if (foreachCtx != null) {
-                                    listOf(processEventThroughForeach(foreachCtx, eventJson, 0))
+                                val output = if (foreachCtx != null) {
+                                    processEventThroughForeach(foreachCtx, eventJson, 0)
                                 } else {
-                                    listOf(eventJson)
+                                    eventJson
                                 }
+                                event.resumeCompleted(JsonArray(listOf(output)))
                             }
 
                             is UntilCondition.Expression -> {
                                 // Accumulate events until expression evaluates to true
                                 // Process each event through foreach as it arrives
-                                collectEventsUntilExpression(
+                                val outputs = collectEventsUntilExpression(
                                     cloudEventHook = cloudEventHook,
                                     filters = event.config.filters,
                                     expression = until.expression,
                                     foreachCtx = foreachCtx
                                 )
+                                event.resumeCompleted(JsonArray(outputs))
                             }
 
                             is UntilCondition.Event -> {
                                 // Accumulate events until termination event arrives
                                 // Process each event through foreach as it arrives
-                                collectEventsUntilTermination(
+                                val outputs = collectEventsUntilTermination(
                                     cloudEventHook = cloudEventHook,
                                     filters = event.config.filters,
                                     terminationFilter = until.filter,
                                     foreachCtx = foreachCtx
                                 )
+                                event.resumeCompleted(JsonArray(outputs))
                             }
                         }
                     }
 
                     ListenStrategy.ALL -> {
                         // Wait for one event per filter, process each through foreach as it arrives
-                        event.config.filters.mapIndexed { index, filter ->
+                        val outputs = mutableListOf<JsonElement>()
+                        for ((index, filter) in event.config.filters.withIndex()) {
                             val cloudEvent = cloudEventHook.receive()
                                 .filter { matchesFilters(it, listOf(filter)) }
                                 .first()
                             val eventJson = cloudEvent.toJsonElement()
-                            if (foreachCtx != null) {
+                            val output = if (foreachCtx != null) {
                                 processEventThroughForeach(foreachCtx, eventJson, index)
                             } else {
                                 eventJson
                             }
+                            outputs.add(output)
                         }
+                        event.resumeCompleted(JsonArray(outputs))
                     }
                 }
             }
-
-            event.resumeCompleted(JsonArray(outputs))
+        } catch (e: InternalException) {
+            // Error from foreach.do - convert to ResumeWithFailedTask like fork does
+            // This lets the error flow through normal workflow error handling (try/catch, etc.)
+            // Use the updated nodeStack from foreachCtx if available (preserves context from previous iterations)
+            logger.error { "Listen foreach failed: error=$e" }
+            WorkflowCommand.ResumeWithFailedTask(
+                nodeStack = foreachCtx?.currentNodeStack ?: event.nodeStack,
+                error = InternalException.Error.from(e, listenNode.position)
+            )
         } catch (_: TimeoutCancellationException) {
             logger.error { "Listen timed out waiting for matching events: filters=${event.config.filters}" }
             event.resumeFailed(
@@ -409,7 +424,8 @@ internal object FullOrchestrator {
      * @param ctx Foreach context containing workflow and execution dependencies
      * @param eventData The CloudEvent data to process
      * @param iterationIndex The iteration index (0-based)
-     * @return The output from foreach.do tasks
+     * @return The output from the foreach iteration
+     * @throws InternalException if the foreach iteration fails
      */
     private suspend fun processEventThroughForeach(
         ctx: ForeachContext,
@@ -445,10 +461,16 @@ internal object FullOrchestrator {
                 iterationOutput
             }
 
+            is WorkflowEvent.WorkflowFailed -> {
+                // Error occurred in foreach.do - throw so the listen handler can catch it
+                // and create ResumeWithFailedTask (like fork does)
+                logger.debug { "Foreach iteration $iterationIndex failed with error: ${outcome.error}" }
+                throw InternalException(outcome.error)
+            }
+
             else -> {
-                // Workflow completed/failed unexpectedly during foreach - this shouldn't happen
-                logger.error { "Foreach iteration $iterationIndex failed unexpectedly: $outcome" }
-                throw IllegalStateException("Foreach iteration completed workflow instead of returning to listen task: $outcome")
+                // Unexpected outcome - this shouldn't happen in normal execution
+                throw IllegalStateException("Unexpected outcome from foreach iteration: $outcome")
             }
         }
     }
@@ -468,7 +490,8 @@ internal object FullOrchestrator {
      * @param filters Filters to match incoming events
      * @param expression JQ expression evaluated against accumulated raw events array
      * @param foreachCtx If non-null, process events through foreach.do as they arrive
-     * @return List of accumulated events or foreach outputs (as JsonElements)
+     * @return List of collected outputs (foreach outputs if configured, otherwise raw events)
+     * @throws InternalException if a foreach iteration fails
      */
     private suspend fun collectEventsUntilExpression(
         cloudEventHook: CloudEventHook,
@@ -494,6 +517,7 @@ internal object FullOrchestrator {
                 rawEvents.add(eventJson)
 
                 // Process through foreach - MUST complete before we receive next event
+                // If foreach fails, it throws InternalException which propagates up
                 val outputJson = if (foreachCtx != null) {
                     processEventThroughForeach(foreachCtx, eventJson, outputs.size)
                 } else {
@@ -504,7 +528,7 @@ internal object FullOrchestrator {
                 logger.debug { "Accumulated event (count=${rawEvents.size}): type=${cloudEvent.type}" }
 
                 // Evaluate expression against raw events (not foreach outputs)
-                val shouldStop = evaluateExpressionAsBoolean($$"${$$expression}", JsonArray(rawEvents))
+                val shouldStop = evaluateExpressionAsBoolean("$expression", JsonArray(rawEvents))
 
                 if (shouldStop) {
                     logger.debug { "Until expression evaluated to true after ${rawEvents.size} events" }
@@ -533,7 +557,8 @@ internal object FullOrchestrator {
      * @param filters Main filters to match and accumulate events
      * @param terminationFilter Filter for the termination event
      * @param foreachCtx If non-null, process events through foreach.do as they arrive
-     * @return List of accumulated events or foreach outputs (excluding termination event)
+     * @return List of collected outputs (foreach outputs if configured, otherwise raw events)
+     * @throws InternalException if a foreach iteration fails
      */
     private suspend fun collectEventsUntilTermination(
         cloudEventHook: CloudEventHook,
@@ -561,6 +586,7 @@ internal object FullOrchestrator {
                     val eventJson = cloudEvent.toJsonElement()
 
                     // Process through foreach - MUST complete before we receive next event
+                    // If foreach fails, it throws InternalException which propagates up
                     val outputJson = if (foreachCtx != null) {
                         processEventThroughForeach(foreachCtx, eventJson, outputs.size)
                     } else {

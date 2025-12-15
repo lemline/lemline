@@ -35,6 +35,7 @@ import com.lemline.core.workflows.toJava
 import com.lemline.core.workflows.toKotlin
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.ForkTask
+import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
@@ -357,8 +358,9 @@ object StepByStepOrchestrator {
      * Handle exception by finding a TryTask and returning the appropriate state transition.
      *
      * Walks up the node tree looking for a TryTask that can handle the error.
-     * Stops at fork boundaries - fork tasks act as error boundaries and handle
-     * errors internally, according to their compete strategy.
+     * Stops at error boundaries:
+     * - Fork tasks act as error boundaries and handle errors internally
+     * - Listen tasks with foreach act as error boundaries for foreach iterations
      *
      * Emits `task.retried` when a retry is scheduled.
      */
@@ -369,7 +371,7 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
-        // Find the nearest TryTask - within the same fork branch - that can handle this error
+        // Find the nearest TryTask - within the same error boundary - that can handle this error
         var current: Node<*>? = failingNode
 
         do {
@@ -401,10 +403,23 @@ object StepByStepOrchestrator {
                 }
             }
             current = current.parent
-        } while (current != null && current.task !is ForkTask)
+            // Stop at error boundaries: fork tasks and listen tasks with foreach
+        } while (current != null && !isErrorBoundary(current))
 
         // No handler found - fail workflow
         throw exception
+    }
+
+    /**
+     * Check if a node is an error boundary.
+     * Error boundaries prevent errors from propagating beyond them:
+     * - ForkTask: errors in branches are handled by the fork
+     * - ListenTask with foreach: errors in foreach.do are handled by the listen handler
+     */
+    private fun isErrorBoundary(node: Node<*>): Boolean = when (val task = node.task) {
+        is ForkTask -> true
+        is ListenTask -> task.foreach != null
+        else -> false
     }
 
     /**
