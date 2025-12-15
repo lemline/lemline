@@ -6,19 +6,27 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.activities.mock.MockActivityExecutor
+import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
+import com.lemline.core.processors.EmitConfig
+import com.lemline.core.processors.EventFilter
+import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
 import com.lemline.core.utils.mapAwaitAllFailFast
 import com.lemline.core.utils.mapAwaitFirstFailSlow
+import io.cloudevents.CloudEvent
+import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.Workflow
+import java.net.URI
+import java.time.OffsetDateTime
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
@@ -26,10 +34,13 @@ import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
+
 
 /**
  * Full orchestrator for synchronous workflow execution.
@@ -53,11 +64,12 @@ internal object FullOrchestrator {
         startedAt: Instant = Clock.System.now(),
         serde: Boolean = false,
         activityExecutor: ActivityExecutor = defaultActivityExecutor,
+        cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
     ): JsonElement {
         val cmd = StepByStepOrchestrator.initCmd(workflowId, workflowInput, hasWaitingParent, startedAt)
 
-        return resume(workflow, cmd, serde, activityExecutor, lifecycleHook).value()
+        return resume(workflow, cmd, serde, activityExecutor, cloudEventHook, lifecycleHook).value()
     }
 
     suspend fun resume(
@@ -65,6 +77,7 @@ internal object FullOrchestrator {
         command: WorkflowCommand,
         serde: Boolean,
         activityExecutor: ActivityExecutor = defaultActivityExecutor,
+        cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent.Outcome {
 
@@ -92,6 +105,16 @@ internal object FullOrchestrator {
                 command = handle(serdeEvent, activityExecutor),
                 serde = serde,
                 activityExecutor = activityExecutor,
+                cloudEventHook = cloudEventHook,
+                lifecycleHook = lifecycleHook,
+            )
+
+            is WorkflowEvent.EmitStarted -> resume(
+                workflow = workflow,
+                command = handle(serdeEvent, cloudEventHook),
+                serde = serde,
+                activityExecutor = activityExecutor,
+                cloudEventHook = cloudEventHook,
                 lifecycleHook = lifecycleHook,
             )
 
@@ -100,7 +123,8 @@ internal object FullOrchestrator {
                 command = handle(serdeEvent),
                 serde = serde,
                 activityExecutor = activityExecutor,
-                lifecycleHook = lifecycleHook
+                cloudEventHook = cloudEventHook,
+                lifecycleHook = lifecycleHook,
             )
 
             is WorkflowEvent.TaskScheduled -> resume(
@@ -108,7 +132,8 @@ internal object FullOrchestrator {
                 command = handle(serdeEvent),
                 serde = serde,
                 activityExecutor = activityExecutor,
-                lifecycleHook = lifecycleHook
+                cloudEventHook = cloudEventHook,
+                lifecycleHook = lifecycleHook,
             )
 
             is WorkflowEvent.TaskRetryScheduled -> resume(
@@ -116,30 +141,34 @@ internal object FullOrchestrator {
                 command = handle(serdeEvent),
                 serde = serde,
                 activityExecutor = activityExecutor,
-                lifecycleHook = lifecycleHook
+                cloudEventHook = cloudEventHook,
+                lifecycleHook = lifecycleHook,
             )
 
             is WorkflowEvent.RunWorkflowStarted -> resume(
                 workflow = workflow,
-                command = handle(serdeEvent, serde, activityExecutor, lifecycleHook),
+                command = handle(serdeEvent, serde, activityExecutor, cloudEventHook, lifecycleHook),
                 serde = serde,
                 activityExecutor = activityExecutor,
+                cloudEventHook = cloudEventHook,
                 lifecycleHook = lifecycleHook,
             )
 
             is WorkflowEvent.ForkStarted -> resume(
                 workflow = workflow,
-                command = handle(workflow, serdeEvent, serde, activityExecutor, lifecycleHook),
+                command = handle(workflow, serdeEvent, serde, activityExecutor, cloudEventHook, lifecycleHook),
                 serde = serde,
                 activityExecutor = activityExecutor,
+                cloudEventHook = cloudEventHook,
                 lifecycleHook = lifecycleHook,
             )
 
             is WorkflowEvent.ListenStarted -> resume(
                 workflow = workflow,
-                command = handle(serdeEvent, activityExecutor),
+                command = handle(serdeEvent, cloudEventHook),
                 serde = serde,
                 activityExecutor = activityExecutor,
+                cloudEventHook = cloudEventHook,
                 lifecycleHook = lifecycleHook,
             )
 
@@ -148,6 +177,7 @@ internal object FullOrchestrator {
                 command = handle(serdeEvent),
                 serde = serde,
                 activityExecutor = activityExecutor,
+                cloudEventHook = cloudEventHook,
                 lifecycleHook = lifecycleHook,
             )
 
@@ -180,7 +210,9 @@ internal object FullOrchestrator {
      * Handles a retry event by delaying execution until the scheduled retry time
      * and then resuming the workflow from the specified task.
      */
-    private suspend fun handle(event: WorkflowEvent.TaskRetryScheduled): WorkflowCommand {
+    private suspend fun handle(
+        event: WorkflowEvent.TaskRetryScheduled
+    ): WorkflowCommand {
         val delayDuration = event.retryAt - Clock.System.now()
         logger.debug { "Retrying in $delayDuration" }
         if (delayDuration > Duration.ZERO) delay(delayDuration)
@@ -189,41 +221,64 @@ internal object FullOrchestrator {
     }
 
     /**
-     * Handles a ListenStarted event using mock configuration.
-     * Returns mock CloudEvent data if the activity executor has listen mocks configured.
+     * Handles an EmitStarted event by building a CloudEvent and emitting via CloudEventHook.
      */
-    private fun handle(
-        event: WorkflowEvent.ListenStarted,
-        activityExecutor: ActivityExecutor
+    private suspend fun handle(
+        event: WorkflowEvent.EmitStarted,
+        cloudEventHook: CloudEventHook
     ): WorkflowCommand {
-        // Get mock config from MockActivityExecutor if available
-        val mockConfig = (activityExecutor as? MockActivityExecutor)?.mockConfig
-            ?: throw UnsupportedOperationException(
-                "ListenStarted events require mock configuration or external CloudEvent coordination. " +
-                    "Use MockActivityExecutor with listen mocks or StepByStepOrchestrator with runner infrastructure."
-            )
+        logger.debug { "Emitting CloudEvent: type=${event.config.type} source=${event.config.source}" }
+        val cloudEvent = buildCloudEvent(event.config)
+        cloudEventHook.emit(cloudEvent)
+        return event.resume()
+    }
 
-        // Get the event type filter from the first filter in the listen config
-        val eventTypeFilter = event.config.filters.firstOrNull()?.type ?: "*"
-        val mock = mockConfig.findListenMock(eventTypeFilter)
-            ?: throw UnsupportedOperationException(
-                "No listen mock found for event type: $eventTypeFilter. " +
-                    "Add a listen mock to MockConfiguration to test listen tasks."
-            )
+    /**
+     * Handles a ListenStarted event by receiving CloudEvents from CloudEventHook.
+     *
+     * The hook provides a raw event stream; this handler applies the listen configuration
+     * (strategy, filters) to determine when to resume the workflow.
+     */
+    private suspend fun handle(
+        event: WorkflowEvent.ListenStarted,
+        cloudEventHook: CloudEventHook
+    ): WorkflowCommand {
+        logger.debug { "Listening for CloudEvents: strategy=${event.config.strategy} filters=${event.config.filters}" }
 
-        logger.debug { "Mock: Listen mock matched for type=$eventTypeFilter" }
+        return try {
+            val events = when (event.config.strategy) {
+                ListenStrategy.ONE -> {
+                    // Wait for first matching event
+                    val cloudEvent = cloudEventHook.receive()
+                        .filter { matchesFilters(it, event.config.filters) }
+                        .first()
+                    listOf(cloudEvent.toJsonElement())
+                }
 
-        if (mock.response.error != null) {
-            return event.resumeFailed(
-                InternalException.Error.from(
-                    RuntimeException(mock.response.error),
-                    event.nodePosition
-                )
-            )
+                ListenStrategy.ANY -> {
+                    // Wait for first matching event (or accumulate if until is set)
+                    // For simplicity, treat same as ONE in FullOrchestrator
+                    val cloudEvent = cloudEventHook.receive()
+                        .filter { matchesFilters(it, event.config.filters) }
+                        .first()
+                    listOf(cloudEvent.toJsonElement())
+                }
+
+                ListenStrategy.ALL -> {
+                    // Wait for one event per filter
+                    event.config.filters.map { filter ->
+                        cloudEventHook.receive()
+                            .filter { matchesFilters(it, listOf(filter)) }
+                            .first()
+                            .toJsonElement()
+                    }
+                }
+            }
+            event.resumeCompleted(JsonArray(events))
+        } catch (e: Exception) {
+            logger.error(e) { "Listen failed" }
+            event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
         }
-
-        // Return mock data as a single-element JsonArray (listen returns array of events)
-        return event.resumeCompleted(JsonArray(listOf(mock.response.data ?: buildJsonObject { })))
     }
 
     /**
@@ -246,6 +301,7 @@ internal object FullOrchestrator {
         event: WorkflowEvent.RunWorkflowStarted,
         serde: Boolean,
         activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowCommand {
         // Retrieve child workflow definition
@@ -262,7 +318,7 @@ internal object FullOrchestrator {
                     workflowInput = event.config.input,
                     hasWaitingParent = true
                 )
-                val result = resume(childWorkflow, initCmd, serde, activityExecutor, lifecycleHook)
+                val result = resume(childWorkflow, initCmd, serde, activityExecutor, cloudEventHook, lifecycleHook)
                 logger.debug { "Child workflow completed" }
                 when (result) {
                     is WorkflowEvent.WorkflowCompleted -> event.resumeAsCompleted(result.output)
@@ -279,7 +335,7 @@ internal object FullOrchestrator {
                         workflowInput = event.config.input,
                         hasWaitingParent = false
                     )
-                    resume(childWorkflow, initCmd, serde, activityExecutor, lifecycleHook) // <= output is not handled
+                    resume(childWorkflow, initCmd, serde, activityExecutor, cloudEventHook, lifecycleHook)
                     logger.debug { "Child workflow completed" }
                 }
                 // Immediate resuming
@@ -316,6 +372,7 @@ internal object FullOrchestrator {
         event: WorkflowEvent.ForkStarted,
         serde: Boolean,
         activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowCommand {
         @Suppress("UNCHECKED_CAST")
@@ -333,6 +390,7 @@ internal object FullOrchestrator {
                     event.rawInput,
                     serde,
                     activityExecutor,
+                    cloudEventHook,
                     lifecycleHook
                 )
             } else {
@@ -342,6 +400,7 @@ internal object FullOrchestrator {
                     event.rawInput,
                     serde,
                     activityExecutor,
+                    cloudEventHook,
                     lifecycleHook
                 )
             }
@@ -371,6 +430,7 @@ internal object FullOrchestrator {
         rawInput: JsonElement,
         serde: Boolean,
         activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
     ): JsonElement {
         // Get the first success - if all branches failed, the last exception will be rethrown from here
@@ -393,6 +453,7 @@ internal object FullOrchestrator {
                 ),
                 serde = serde,
                 activityExecutor = activityExecutor,
+                cloudEventHook = cloudEventHook,
                 lifecycleHook = lifecycleHook,
             ).value()
         }
@@ -410,6 +471,7 @@ internal object FullOrchestrator {
         rawInput: JsonElement,
         serde: Boolean,
         activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
     ): JsonArray {
         // Get all results - If a branch failed, the first exception will be rethrown from here
@@ -433,8 +495,71 @@ internal object FullOrchestrator {
                     ),
                     serde = serde,
                     activityExecutor = activityExecutor,
+                    cloudEventHook = cloudEventHook,
                     lifecycleHook = lifecycleHook,
                 ).value()
             })
+    }
+
+    // ========================================
+    // CloudEvent Helpers
+    // ========================================
+
+    /**
+     * Build a CloudEvent from EmitConfig.
+     */
+    private fun buildCloudEvent(config: EmitConfig): CloudEvent {
+        val builder = CloudEventBuilder.v1()
+            .withId(config.id)
+            .withSource(URI.create(config.source))
+            .withType(config.type)
+
+        config.time?.let { builder.withTime(OffsetDateTime.parse(it)) }
+        config.subject?.let { builder.withSubject(it) }
+        config.dataschema?.let { builder.withDataSchema(URI.create(it)) }
+        config.datacontenttype?.let { builder.withDataContentType(it) }
+        config.data?.let { builder.withData(it.toString().toByteArray()) }
+        config.extensions?.forEach { (key, value) ->
+            builder.withExtension(key, value)
+        }
+
+        return builder.build()
+    }
+
+    /**
+     * Check if a CloudEvent matches any of the given filters.
+     */
+    private fun matchesFilters(event: CloudEvent, filters: List<EventFilter>): Boolean {
+        if (filters.isEmpty()) return true // Empty filters = wildcard
+
+        return filters.any { filter ->
+            val typeMatches = filter.type == null || filter.type == event.type
+            val sourceMatches = filter.source == null || filter.source == event.source?.toString()
+            val subjectMatches = filter.subject == null || filter.subject == event.subject
+            typeMatches && sourceMatches && subjectMatches
+        }
+    }
+
+    /**
+     * Convert a CloudEvent to JsonElement for workflow consumption.
+     */
+    private fun CloudEvent.toJsonElement(): JsonElement {
+        return buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive(id))
+            put("source", kotlinx.serialization.json.JsonPrimitive(source.toString()))
+            put("type", kotlinx.serialization.json.JsonPrimitive(type))
+            time?.let { put("time", kotlinx.serialization.json.JsonPrimitive(it.toString())) }
+            subject?.let { put("subject", kotlinx.serialization.json.JsonPrimitive(it)) }
+            dataSchema?.let { put("dataschema", kotlinx.serialization.json.JsonPrimitive(it.toString())) }
+            dataContentType?.let { put("datacontenttype", kotlinx.serialization.json.JsonPrimitive(it)) }
+            data?.let {
+                val dataString = String(it.toBytes())
+                try {
+                    put("data", kotlinx.serialization.json.Json.parseToJsonElement(dataString))
+                } catch (_: Exception) {
+                    put("data", kotlinx.serialization.json.JsonPrimitive(dataString))
+                }
+            }
+        }
     }
 }

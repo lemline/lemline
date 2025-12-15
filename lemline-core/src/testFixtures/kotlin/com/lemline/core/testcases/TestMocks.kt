@@ -17,7 +17,12 @@ import com.lemline.core.activities.mock.ScriptMockRule
 import com.lemline.core.activities.mock.ShellMockMatcher
 import com.lemline.core.activities.mock.ShellMockResponse
 import com.lemline.core.activities.mock.ShellMockRule
+import io.cloudevents.CloudEvent
+import io.cloudevents.core.builder.CloudEventBuilder
+import java.net.URI
+import java.util.UUID
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -338,4 +343,35 @@ object TestMocks {
         scriptMocks = scriptMocks,
         shellMocks = shellMocks
     )
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CloudEvent Builders - For listen task tests
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Helper to build a CloudEvent from type and JSON data.
+     */
+    private fun buildCloudEvent(type: String, data: JsonElement): CloudEvent {
+        return CloudEventBuilder.v1()
+            .withId(UUID.randomUUID().toString())
+            .withSource(URI.create("https://test.example.com"))
+            .withType(type)
+            .withData("application/json", data.toString().toByteArray())
+            .build()
+    }
+
+    /** CloudEvent for order.created */
+    val orderCreatedCloudEvent: CloudEvent = buildCloudEvent("order.created", orderCreatedEvent)
+
+    /** CloudEvent for user.registered */
+    val userRegisteredCloudEvent: CloudEvent = buildCloudEvent("user.registered", userRegisteredEvent)
+
+    /** CloudEvent for payment.completed */
+    val paymentCompletedCloudEvent: CloudEvent = buildCloudEvent("payment.completed", paymentCompletedEvent)
+
+    /** CloudEvent for sensor.reading */
+    val sensorReadingCloudEvent: CloudEvent = buildCloudEvent("sensor.reading", sensorReadingEvent)
+
+    /** CloudEvent for generic/wildcard matching */
+    val genericCloudEvent: CloudEvent = buildCloudEvent("some.unknown.type", genericEvent)
 }

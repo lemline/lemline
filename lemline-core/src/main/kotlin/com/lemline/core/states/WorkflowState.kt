@@ -551,7 +551,8 @@ sealed class WorkflowEvent : WorkflowState() {
      * Event emitted when an emit task needs to publish a CloudEvent.
      *
      * The config contains all data needed to build a CloudEvent. The actual
-     * CloudEvent is built by the ActivityExecutor using the CloudEvents SDK.
+     * CloudEvent is built by the orchestrator using the CloudEvents SDK and
+     * emitted via [com.lemline.core.cloudevents.CloudEventHook].
      *
      * The workflow continues immediately after publishing (fire-and-forget).
      */
@@ -559,9 +560,9 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("emitStarted")
     data class EmitStarted(
         override val nodeStack: NodeStack,
-        override val input: JsonElement,   // Pass-through: output = input for emit task
+        val input: JsonElement,   // Pass-through: output = input for emit task
         val config: EmitConfig
-    ) : ActivityStarted() {
+    ) : Suspension() {
 
         @Transient
         override val nodePosition = nodeStack.lastPosition // Emit position
@@ -572,6 +573,15 @@ sealed class WorkflowEvent : WorkflowState() {
             ", rawOutput=$input" +
             ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
+
+        /**
+         * Resume the workflow after emitting the CloudEvent.
+         * Output equals input (fire-and-forget semantic).
+         */
+        fun resume() = WorkflowCommand.ResumeWithCompletedTask(
+            nodeStack = nodeStack,
+            rawOutput = input,
+        )
     }
 
     /**

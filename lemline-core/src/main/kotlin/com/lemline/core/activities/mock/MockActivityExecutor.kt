@@ -5,7 +5,6 @@ import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
 import com.lemline.core.states.WorkflowEvent.CallHttpStarted
-import com.lemline.core.states.WorkflowEvent.EmitStarted
 import com.lemline.core.states.WorkflowEvent.RunScriptStarted
 import com.lemline.core.states.WorkflowEvent.RunShellStarted
 import kotlinx.serialization.json.JsonElement
@@ -50,29 +49,9 @@ class MockActivityExecutor(
     private val logger = logger()
 
     override suspend fun execute(event: ActivityStarted): JsonElement = when (event) {
-        is EmitStarted -> executeEmit(event)
         is CallHttpStarted -> executeHttp(event)
         is RunScriptStarted -> executeScript(event)
         is RunShellStarted -> executeShell(event)
-    }
-
-    /**
-     * Execute emit task using mock configuration.
-     * In test mode, emit events are not actually published.
-     */
-    private fun executeEmit(event: EmitStarted): JsonElement {
-        val config = event.config
-        val mock = mockConfig.findEmitMock(config.type, config.source)
-            ?: throw MockNotFoundException("No emit mock found for type=${config.type} source=${config.source}")
-
-        logger.debug { "Mock: Emit mock matched for type=${config.type} source=${config.source}" }
-
-        if (mock.response.error != null) {
-            throw MockedActivityException(mock.response.error)
-        }
-
-        // Return configured output, or fall back to input (fire-and-forget semantic)
-        return mock.response.output ?: event.input
     }
 
     /**

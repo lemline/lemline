@@ -88,4 +88,6 @@ dependencies {
     testFixturesImplementation(testFixtures(project(":lemline-common")))
     // Required for FullOrchestratorExecutor
     testFixturesImplementation(libs.serverlessworkflow.api)
+    // Required for CloudEvent test data
+    testFixturesImplementation(libs.cloudevents.core)
 }

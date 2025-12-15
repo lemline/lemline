@@ -2,6 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.activities.mock.MockConfiguration
+import io.cloudevents.CloudEvent
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -24,6 +25,7 @@ interface WorkflowTestExecutor {
      * @param version The workflow version
      * @param dependencies Workflows that need to be registered before execution
      * @param mockConfig Mock configuration for activity execution
+     * @param cloudEvents CloudEvents to emit before workflow execution (for listen task tests)
      * @return The result of the workflow execution
      */
     suspend fun execute(
@@ -33,6 +35,7 @@ interface WorkflowTestExecutor {
         name: String = "test",
         version: String = "0.1.0",
         dependencies: List<WorkflowDependency> = emptyList(),
-        mockConfig: MockConfiguration = MockConfiguration.empty()
+        mockConfig: MockConfiguration = MockConfiguration.empty(),
+        cloudEvents: List<CloudEvent> = emptyList()
     ): WorkflowTestResult
 }

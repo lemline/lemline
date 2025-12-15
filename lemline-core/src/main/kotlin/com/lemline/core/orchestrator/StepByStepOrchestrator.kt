@@ -19,6 +19,7 @@ import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
+import com.lemline.core.states.WorkflowEvent.EmitStarted
 import com.lemline.core.states.WorkflowEvent.ForkBranchFailed
 import com.lemline.core.states.WorkflowEvent.ForkStarted
 import com.lemline.core.states.WorkflowEvent.ListenForEachCompleted
@@ -208,6 +209,7 @@ object StepByStepOrchestrator {
             }
 
             is ActivityStarted -> event
+            is EmitStarted -> event
             is WaitStarted -> event
             is ListenStarted -> event
             is ListenForEachCompleted -> event

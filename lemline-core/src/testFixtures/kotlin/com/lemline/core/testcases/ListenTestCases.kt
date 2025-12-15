@@ -6,13 +6,12 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.double
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
  * Test cases for listen task execution.
- * Tests CloudEvent listening using mock responses from TestMocks.
+ * Tests CloudEvent listening using real CloudEvents emitted to InMemoryCloudEventHook.
  */
 object ListenTestCases {
 
@@ -23,7 +22,7 @@ object ListenTestCases {
 
         WorkflowTestCase(
             name = "listen can wait for a single event",
-            mockConfig = TestMocks.listenConfig,
+            cloudEvents = listOf(TestMocks.orderCreatedCloudEvent),
             yaml = """
                 do:
                   - waitForOrder:
@@ -37,13 +36,13 @@ object ListenTestCases {
             validate = expectOutputMatching("array with order event data") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["orderId"]?.jsonPrimitive?.contentOrNull == "ORD-12345"
+                    arr[0].jsonObject["data"]?.jsonObject?.get("orderId")?.jsonPrimitive?.contentOrNull == "ORD-12345"
             }
         ),
 
         WorkflowTestCase(
             name = "listen can filter by event type",
-            mockConfig = TestMocks.listenConfig,
+            cloudEvents = listOf(TestMocks.userRegisteredCloudEvent),
             yaml = """
                 do:
                   - waitForUser:
@@ -57,14 +56,14 @@ object ListenTestCases {
             validate = expectOutputMatching("array with user registration data") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["userId"]?.jsonPrimitive?.contentOrNull == "USR-98765" &&
-                    arr[0].jsonObject["email"]?.jsonPrimitive?.contentOrNull == "user@example.com"
+                    arr[0].jsonObject["data"]?.jsonObject?.get("userId")?.jsonPrimitive?.contentOrNull == "USR-98765" &&
+                    arr[0].jsonObject["data"]?.jsonObject?.get("email")?.jsonPrimitive?.contentOrNull == "user@example.com"
             }
         ),
 
         WorkflowTestCase(
             name = "listen can use wildcard event filter",
-            mockConfig = TestMocks.listenConfig,
+            cloudEvents = listOf(TestMocks.genericCloudEvent),
             yaml = """
                 do:
                   - waitForAnyEvent:
@@ -78,7 +77,7 @@ object ListenTestCases {
             validate = expectOutputMatching("array with generic event data (wildcard match)") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["type"]?.jsonPrimitive?.contentOrNull == "generic"
+                    arr[0].jsonObject["data"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull == "generic"
             }
         ),
 
@@ -88,7 +87,7 @@ object ListenTestCases {
 
         WorkflowTestCase(
             name = "listen result can be transformed with output as",
-            mockConfig = TestMocks.listenConfig,
+            cloudEvents = listOf(TestMocks.orderCreatedCloudEvent),
             yaml = $$"""
                 do:
                   - waitForOrder:
@@ -98,7 +97,7 @@ object ListenTestCases {
                             with:
                               type: order.created
                       output:
-                        as: '${ .[0] | {id: .orderId, customer: .customerId} }'
+                        as: '${ .[0].data | {id: .orderId, customer: .customerId} }'
             """.trimIndent(),
             tags = setOf("listen", "cloudevents"),
             validate = expectOutputMatching("transformed order with id and customer") { output ->
@@ -110,7 +109,7 @@ object ListenTestCases {
 
         WorkflowTestCase(
             name = "listen can extract nested data from event",
-            mockConfig = TestMocks.listenConfig,
+            cloudEvents = listOf(TestMocks.orderCreatedCloudEvent),
             yaml = $$"""
                 do:
                   - waitForOrder:
@@ -120,7 +119,7 @@ object ListenTestCases {
                             with:
                               type: order.created
                       output:
-                        as: '${ .[0].items[0] }'
+                        as: '${ .[0].data.items[0] }'
             """.trimIndent(),
             tags = setOf("listen", "cloudevents"),
             validate = expectOutputMatching("first item from order") { output ->
@@ -136,7 +135,7 @@ object ListenTestCases {
 
         WorkflowTestCase(
             name = "listen can be chained with other tasks",
-            mockConfig = TestMocks.listenConfig,
+            cloudEvents = listOf(TestMocks.orderCreatedCloudEvent),
             yaml = $$"""
                 do:
                   - waitForOrder:
@@ -147,7 +146,7 @@ object ListenTestCases {
                               type: order.created
                   - processOrder:
                       set:
-                        orderId: ${ .[0].orderId }
+                        orderId: ${ .[0].data.orderId }
                         processed: true
             """.trimIndent(),
             tags = setOf("listen", "cloudevents"),
@@ -160,7 +159,8 @@ object ListenTestCases {
 
         WorkflowTestCase(
             name = "listen output can be used in subsequent http call",
-            mockConfig = TestMocks.allMocks,
+            mockConfig = TestMocks.httpConfig,
+            cloudEvents = listOf(TestMocks.orderCreatedCloudEvent),
             yaml = $$"""
                 do:
                   - waitForOrder:
@@ -170,7 +170,7 @@ object ListenTestCases {
                             with:
                               type: order.created
                       output:
-                        as: '${ .[0] }'
+                        as: '${ .[0].data }'
                   - fetchDetails:
                       call: http
                       with:
@@ -190,7 +190,7 @@ object ListenTestCases {
 
         WorkflowTestCase(
             name = "listen can receive sensor reading events",
-            mockConfig = TestMocks.listenConfig,
+            cloudEvents = listOf(TestMocks.sensorReadingCloudEvent),
             yaml = """
                 do:
                   - waitForReading:
@@ -204,15 +204,15 @@ object ListenTestCases {
             validate = expectOutputMatching("sensor reading with temperature and humidity") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["sensorId"]?.jsonPrimitive?.contentOrNull == "SENSOR-001" &&
-                    arr[0].jsonObject["temperature"]?.jsonPrimitive?.double == 23.5 &&
-                    arr[0].jsonObject["humidity"]?.jsonPrimitive?.content == "65"
+                    arr[0].jsonObject["data"]?.jsonObject?.get("sensorId")?.jsonPrimitive?.contentOrNull == "SENSOR-001" &&
+                    arr[0].jsonObject["data"]?.jsonObject?.get("temperature")?.jsonPrimitive?.double == 23.5 &&
+                    arr[0].jsonObject["data"]?.jsonObject?.get("humidity")?.jsonPrimitive?.content == "65"
             }
         ),
 
         WorkflowTestCase(
             name = "listen can process sensor data with transformation",
-            mockConfig = TestMocks.listenConfig,
+            cloudEvents = listOf(TestMocks.sensorReadingCloudEvent),
             yaml = $$"""
                 do:
                   - waitForReading:
@@ -222,7 +222,7 @@ object ListenTestCases {
                             with:
                               type: sensor.reading
                       output:
-                        as: '${ .[0] | {sensor: .sensorId, tempF: ((.temperature * 9/5) + 32)} }'
+                        as: '${ .[0].data | {sensor: .sensorId, tempF: ((.temperature * 9/5) + 32)} }'
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "iot"),
             validate = expectOutputMatching("sensor data with Fahrenheit conversion") { output ->
@@ -238,7 +238,7 @@ object ListenTestCases {
 
         WorkflowTestCase(
             name = "listen result can be used in switch condition",
-            mockConfig = TestMocks.listenConfig,
+            cloudEvents = listOf(TestMocks.orderCreatedCloudEvent),
             yaml = $$"""
                 do:
                   - waitForOrder:
@@ -248,7 +248,7 @@ object ListenTestCases {
                             with:
                               type: order.created
                       output:
-                        as: '${ .[0] }'
+                        as: '${ .[0].data }'
                   - checkTotal:
                       switch:
                         - highValue:

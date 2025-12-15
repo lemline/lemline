@@ -2,6 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.activities.mock.MockConfiguration
+import io.cloudevents.CloudEvent
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -33,6 +34,7 @@ data class WorkflowDependency(
  * @property tags Tags for filtering tests (e.g., "slow", "http", "fork", "external")
  * @property dependencies Workflows that need to be registered before the main workflow runs
  * @property mockConfig Mock configuration for activity execution (HTTP, script, shell mocks)
+ * @property cloudEvents CloudEvents to emit before workflow execution (for listen task tests)
  */
 data class WorkflowTestCase(
     val name: String,
@@ -42,7 +44,8 @@ data class WorkflowTestCase(
     val validate: (WorkflowTestResult) -> String? = { null },
     val tags: Set<String> = emptySet(),
     val dependencies: List<WorkflowDependency> = emptyList(),
-    val mockConfig: MockConfiguration = MockConfiguration.empty()
+    val mockConfig: MockConfiguration = MockConfiguration.empty(),
+    val cloudEvents: List<CloudEvent> = emptyList()
 ) {
     companion object
 }

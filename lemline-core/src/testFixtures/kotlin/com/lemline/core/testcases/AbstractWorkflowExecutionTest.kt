@@ -57,7 +57,8 @@ abstract class AbstractWorkflowExecutionTest(
                             yaml = case.yaml,
                             input = case.input,
                             dependencies = case.dependencies,
-                            mockConfig = case.mockConfig
+                            mockConfig = case.mockConfig,
+                            cloudEvents = case.cloudEvents
                         )
 
                         // Run custom validation if provided

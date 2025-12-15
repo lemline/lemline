@@ -4,10 +4,12 @@ package com.lemline.core.testcases
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.activities.mock.MockConfiguration
+import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
+import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -23,6 +25,10 @@ import kotlinx.serialization.json.JsonElement
  * Uses MockActivityExecutor for activity execution - all activities
  * require mock configurations to be provided.
  *
+ * For listen tasks, CloudEvents should be provided via the cloudEvents parameter.
+ * These events are emitted to an InMemoryCloudEventHook before workflow execution,
+ * so listen tasks receive them immediately.
+ *
  * Ideal for fast unit tests.
  */
 class FullOrchestratorTestExecutor : WorkflowTestExecutor {
@@ -35,7 +41,8 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
         name: String,
         version: String,
         dependencies: List<WorkflowDependency>,
-        mockConfig: MockConfiguration
+        mockConfig: MockConfiguration,
+        cloudEvents: List<CloudEvent>
     ): WorkflowTestResult {
         return try {
             // Register dependencies first
@@ -54,11 +61,18 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
             // Use MockActivityExecutor with the provided configuration
             val activityExecutor = MockActivityExecutor(mockConfig)
 
+            // Create CloudEventHook and pre-populate with test events
+            val cloudEventHook = InMemoryCloudEventHook()
+            cloudEvents.forEach { event ->
+                cloudEventHook.emit(event)
+            }
+
             val event = FullOrchestrator.resume(
                 workflow = workflow,
                 command = startState,
                 serde = true, // For testing, we want to ensure serialization works
                 activityExecutor = activityExecutor,
+                cloudEventHook = cloudEventHook,
                 lifecycleHook = LifecycleEventHook.NOOP
             )
 
