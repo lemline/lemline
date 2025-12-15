@@ -670,12 +670,116 @@ object ListenTestCases {
         // ─────────────────────────────────────────────────────────────────────────
         // Until Tests (Accumulation Mode)
         // ─────────────────────────────────────────────────────────────────────────
-        // NOTE: Until tests are excluded because FullOrchestrator (used for in-memory
-        // testing) does not implement the accumulation logic for ANY + until.
-        // The `until` clause is handled by the runner infrastructure which uses
-        // database-backed listeners for proper event accumulation.
-        // See: lemline-runner/src/main/kotlin/com/lemline/runner/messaging/cloudevents/CloudEventHandler.kt
-        // for the full implementation supporting until expressions and termination events.
+
+        WorkflowTestCase(
+            name = "listen any with until expression accumulates events until condition is true",
+            cloudEvents = listOf(
+                TestMocks.reading1Event,
+                TestMocks.reading2Event,
+                TestMocks.reading3ThresholdEvent
+            ),
+            yaml = $$"""
+                do:
+                  - collectReadings:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until: . | any(.data.value > 100)
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "until", "expression"),
+            validate = expectOutputMatching("array of 3 readings including threshold event") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                // Should collect all 3 events (the last one triggers the until condition)
+                arr.size == 3 &&
+                    arr[0].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "1" &&
+                    arr[1].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "2" &&
+                    arr[2].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "3"
+            }
+        ),
+
+        WorkflowTestCase(
+            name = "listen any with until expression can use length condition",
+            cloudEvents = listOf(
+                TestMocks.reading1Event,
+                TestMocks.reading2Event,
+                TestMocks.reading3ThresholdEvent
+            ),
+            yaml = $$"""
+                do:
+                  - collectReadings:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until: length >= 2
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "until", "expression"),
+            validate = expectOutputMatching("array of exactly 2 readings") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                // Should stop after 2 events (length >= 2)
+                arr.size == 2 &&
+                    arr[0].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "1" &&
+                    arr[1].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "2"
+            }
+        ),
+
+        WorkflowTestCase(
+            name = "listen any with until event accumulates until termination event",
+            cloudEvents = listOf(
+                TestMocks.reading1Event,
+                TestMocks.reading2Event,
+                TestMocks.stopMonitoringEvent
+            ),
+            yaml = """
+                do:
+                  - monitorReadings:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until:
+                            one:
+                              with:
+                                type: monitoring.stopped
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "until", "event"),
+            validate = expectOutputMatching("array of 2 readings (excluding termination event)") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                // Should collect 2 sensor readings, not the monitoring.stopped event
+                arr.size == 2 &&
+                    arr[0].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "1" &&
+                    arr[1].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "2"
+            }
+        ),
+
+        WorkflowTestCase(
+            name = "listen any with until event returns empty array if termination event arrives first",
+            cloudEvents = listOf(
+                TestMocks.stopMonitoringEvent
+            ),
+            yaml = """
+                do:
+                  - monitorReadings:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until:
+                            one:
+                              with:
+                                type: monitoring.stopped
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "until", "event"),
+            validate = expectOutputMatching("empty array (termination arrived first)") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                arr.isEmpty()
+            }
+        ),
 
         // ─────────────────────────────────────────────────────────────────────────
         // Any Strategy with Multiple Filters

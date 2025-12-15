@@ -17,6 +17,7 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenStrategy
+import com.lemline.core.processors.UntilCondition
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
@@ -248,12 +249,21 @@ internal object FullOrchestrator {
      *
      * Uses a timeout to prevent infinite waits when no matching events are received.
      * Default timeout is 30 seconds for in-memory testing scenarios.
+     *
+     * ## Strategy Behavior
+     *
+     * - **ONE**: Wait for first matching event, return single-element array
+     * - **ANY (no until)**: Wait for first matching event, return single-element array
+     * - **ANY + until(expression)**: Accumulate events, evaluate expression after each,
+     *   stop when expression returns true
+     * - **ANY + until(event)**: Accumulate events until termination event arrives
+     * - **ALL**: Wait for one event per filter
      */
     private suspend fun handle(
         event: WorkflowEvent.ListenStarted,
         cloudEventHook: CloudEventHook
     ): WorkflowCommand {
-        logger.debug { "Listening for CloudEvents: strategy=${event.config.strategy} filters=${event.config.filters}" }
+        logger.debug { "Listening for CloudEvents: strategy=${event.config.strategy} filters=${event.config.filters} until=${event.config.until}" }
 
         // Use configured timeout or default to 30 seconds for testing
         val timeoutMillis = event.config.timeoutAt?.let {
@@ -272,12 +282,34 @@ internal object FullOrchestrator {
                     }
 
                     ListenStrategy.ANY -> {
-                        // Wait for first matching event (or accumulate if until is set)
-                        // For simplicity, treat same as ONE in FullOrchestrator
-                        val cloudEvent = cloudEventHook.receive()
-                            .filter { matchesFilters(it, event.config.filters) }
-                            .first()
-                        listOf(cloudEvent.toJsonElement())
+                        // Check for until condition
+                        when (val until = event.config.until) {
+                            null -> {
+                                // No until: wait for first matching event
+                                val cloudEvent = cloudEventHook.receive()
+                                    .filter { matchesFilters(it, event.config.filters) }
+                                    .first()
+                                listOf(cloudEvent.toJsonElement())
+                            }
+
+                            is UntilCondition.Expression -> {
+                                // Accumulate events until expression evaluates to true
+                                collectEventsUntilExpression(
+                                    cloudEventHook = cloudEventHook,
+                                    filters = event.config.filters,
+                                    expression = until.expression
+                                )
+                            }
+
+                            is UntilCondition.Event -> {
+                                // Accumulate events until termination event arrives
+                                collectEventsUntilTermination(
+                                    cloudEventHook = cloudEventHook,
+                                    filters = event.config.filters,
+                                    terminationFilter = until.filter
+                                )
+                            }
+                        }
                     }
 
                     ListenStrategy.ALL -> {
@@ -292,7 +324,7 @@ internal object FullOrchestrator {
                 }
             }
             event.resumeCompleted(JsonArray(events))
-        } catch (e: TimeoutCancellationException) {
+        } catch (_: TimeoutCancellationException) {
             logger.error { "Listen timed out waiting for matching events: filters=${event.config.filters}" }
             event.resumeFailed(
                 InternalException.Error.from(
@@ -304,6 +336,94 @@ internal object FullOrchestrator {
             logger.error(e) { "Listen failed" }
             event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
         }
+    }
+
+    /**
+     * Collects events until the given JQ expression evaluates to true.
+     *
+     * The expression is evaluated against the accumulated events array after each event.
+     * Example expression: `. | any(.temperature > 38)` or `. | length >= 5`
+     *
+     * Uses flow's `first` operator with a predicate that:
+     * 1. Accumulates matching events into a buffer
+     * 2. Returns true when the expression evaluates to true (stopping collection)
+     *
+     * @param cloudEventHook Source of CloudEvents
+     * @param filters Filters to match incoming events
+     * @param expression JQ expression evaluated against accumulated events array
+     * @return List of accumulated events (as JsonElements)
+     */
+    private suspend fun collectEventsUntilExpression(
+        cloudEventHook: CloudEventHook,
+        filters: List<EventFilter>,
+        expression: String
+    ): List<JsonElement> {
+        val accumulated = mutableListOf<JsonElement>()
+
+        // Use first with predicate - returns true when we should stop
+        cloudEventHook.receive()
+            .filter { matchesFilters(it, filters) }
+            .first { cloudEvent ->
+                val eventJson = cloudEvent.toJsonElement()
+                accumulated.add(eventJson)
+
+                logger.debug { "Accumulated event (count=${accumulated.size}): type=${cloudEvent.type}" }
+
+                // Evaluate expression against accumulated events
+                val shouldStop = evaluateExpressionAsBoolean($$"${$$expression}", JsonArray(accumulated))
+
+                if (shouldStop) {
+                    logger.debug { "Until expression evaluated to true after ${accumulated.size} events" }
+                }
+
+                shouldStop // Return true to stop collecting
+            }
+
+        return accumulated
+    }
+
+    /**
+     * Collects events until a termination event arrives.
+     *
+     * Events matching the main filters are accumulated. When an event matching
+     * the termination filter arrives, collection stops and accumulated events
+     * are returned (the termination event is NOT included in the output).
+     *
+     * Uses flow's `first` operator with a predicate that:
+     * 1. Checks if the event is a termination event (returns true to stop)
+     * 2. Otherwise accumulates events matching main filters (returns false to continue)
+     *
+     * @param cloudEventHook Source of CloudEvents
+     * @param filters Main filters to match and accumulate events
+     * @param terminationFilter Filter for the termination event
+     * @return List of accumulated events (excluding termination event)
+     */
+    private suspend fun collectEventsUntilTermination(
+        cloudEventHook: CloudEventHook,
+        filters: List<EventFilter>,
+        terminationFilter: EventFilter
+    ): List<JsonElement> {
+        val accumulated = mutableListOf<JsonElement>()
+
+        // Use first with predicate - returns true when termination event arrives
+        cloudEventHook.receive()
+            .first { cloudEvent ->
+                // Check if this is the termination event
+                if (matchesFilters(cloudEvent, listOf(terminationFilter))) {
+                    logger.debug { "Termination event received: type=${cloudEvent.type}, returning ${accumulated.size} accumulated events" }
+                    true // Stop collection
+                } else {
+                    // Check if this event matches our main filters
+                    if (matchesFilters(cloudEvent, filters)) {
+                        val eventJson = cloudEvent.toJsonElement()
+                        accumulated.add(eventJson)
+                        logger.debug { "Accumulated event (count=${accumulated.size}): type=${cloudEvent.type}" }
+                    }
+                    false // Continue collecting
+                }
+            }
+
+        return accumulated
     }
 
     /**
