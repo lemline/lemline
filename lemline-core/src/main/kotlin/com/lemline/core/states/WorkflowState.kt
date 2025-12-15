@@ -151,6 +151,7 @@ sealed class WorkflowEvent : WorkflowState() {
         internal fun value(): JsonElement = when (this) {
             is WorkflowCompleted -> output
             is ForkBranchCompleted -> output
+            is ListenForEachCompleted -> output
             is WorkflowFailed -> throw exception
             is ForkBranchFailed -> throw exception
         }
@@ -511,11 +512,10 @@ sealed class WorkflowEvent : WorkflowState() {
     /**
      * Event emitted when a foreach iteration of a listen task completes successfully.
      *
-     * This event is sent after foreach.do tasks complete for a single CloudEvent.
-     * The runner uses this to:
-     * - Store the iteration output
-     * - Trigger processing of the next queued event (if any)
-     * - Or complete the listener if no more events and completion criteria met
+     * This is an Outcome because it represents a terminal state for the foreach iteration,
+     * similar to how ForkBranchCompleted represents a terminal state for a fork branch.
+     * The FullOrchestrator handles this by extracting the iteration output and continuing
+     * to process subsequent events.
      *
      * @see ListenStarted for the initial listen task event
      */
@@ -524,27 +524,20 @@ sealed class WorkflowEvent : WorkflowState() {
     data class ListenForEachCompleted(
         override val nodeStack: NodeStack,
         /** Output from foreach.do tasks for this iteration */
-        val iterationOutput: JsonElement,
-        val iterationIndex: Int
-    ) : Suspension() {
+        val output: JsonElement,
+        /** iteration index */
+        val index: Int
+    ) : Outcome() {
 
         @Transient
         override val nodePosition = nodeStack.lastPosition // Listen position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
-            ", iterationOutput=$iterationOutput" +
-            ", iterationIndex=$iterationIndex" +
+            ", output=$output" +
+            ", index=$index" +
             ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
-
-        /**
-         * Resume the listen task with the aggregated outputs from all foreach iterations.
-         */
-        fun resumeCompleted(outputs: JsonArray) = WorkflowCommand.ResumeWithCompletedTask(
-            nodeStack = nodeStack,
-            rawOutput = outputs,
-        )
     }
 
     /**

@@ -4,6 +4,7 @@ package com.lemline.core.orchestrator
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
+import com.lemline.common.values.Token
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
@@ -38,10 +39,12 @@ import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
@@ -181,15 +184,7 @@ internal object FullOrchestrator {
                 lifecycleHook = lifecycleHook,
             )
 
-            is WorkflowEvent.ListenForEachCompleted -> resume(
-                workflow = workflow,
-                command = handle(serdeEvent),
-                serde = serde,
-                activityExecutor = activityExecutor,
-                cloudEventHook = cloudEventHook,
-                lifecycleHook = lifecycleHook,
-            )
-
+            // ListenForEachCompleted is now an Outcome, so it's handled here
             is WorkflowEvent.Outcome -> serdeEvent
         }
     }
@@ -269,15 +264,20 @@ internal object FullOrchestrator {
     /**
      * Context for foreach processing, containing all dependencies needed
      * to execute foreach.do tasks as events arrive.
+     *
+     * @property currentNodeStack Mutable nodeStack that gets updated after each iteration
+     *           to propagate context changes (via export.as) across iterations.
      */
-    private data class ForeachContext(
+    private class ForeachContext(
         val workflow: Workflow,
         val listenEvent: WorkflowEvent.ListenStarted,
         val serde: Boolean,
         val activityExecutor: ActivityExecutor,
         val cloudEventHook: CloudEventHook,
         val lifecycleHook: LifecycleEventHook,
-    )
+    ) {
+        var currentNodeStack: NodeStack = listenEvent.nodeStack
+    }
 
     @Suppress("UNCHECKED_CAST")
     private suspend fun handle(
@@ -402,6 +402,10 @@ internal object FullOrchestrator {
      * This is called as each event arrives, not after all events are collected.
      * The foreach.do tasks are executed synchronously before the next event is processed.
      *
+     * IMPORTANT: Uses ctx.currentNodeStack (not the original listenEvent.nodeStack) to ensure
+     * context changes from previous iterations (via export.as) are available in subsequent iterations.
+     * After processing, updates ctx.currentNodeStack with the outcome's nodeStack.
+     *
      * @param ctx Foreach context containing workflow and execution dependencies
      * @param eventData The CloudEvent data to process
      * @param iterationIndex The iteration index (0-based)
@@ -414,10 +418,15 @@ internal object FullOrchestrator {
     ): JsonElement {
         logger.debug { "Processing foreach iteration $iterationIndex with event: $eventData" }
 
-        // Create a command to execute foreach.do with this event as input
-        val foreachCommand = ctx.listenEvent.resumeForeach(eventData, iterationIndex)
+        // Create a command using the CURRENT nodeStack (which may have been updated by previous iterations)
+        // This ensures context exports from previous iterations are visible
+        val foreachCommand = WorkflowCommand.ResumeFromTask(
+            nodeStack = ctx.currentNodeStack,
+            nodePosition = ctx.listenEvent.nodePosition.addToken(Token.FOR),
+            rawInput = eventData,
+        )
 
-        // Execute the foreach.do tasks by recursively calling resume
+        // Execute the foreach.do tasks - resume() returns when it hits ListenForEachCompleted (an Outcome)
         val outcome = resume(
             workflow = ctx.workflow,
             command = foreachCommand,
@@ -427,18 +436,21 @@ internal object FullOrchestrator {
             lifecycleHook = ctx.lifecycleHook
         )
 
-        // Extract the output from the outcome
-        // The workflow returns an array (from ListenForEachCompleted handler),
-        // extract the first element which is the actual iteration output
-        val workflowOutput = outcome.value()
-        val iterationOutput = if (workflowOutput is JsonArray && workflowOutput.isNotEmpty()) {
-            workflowOutput[0]
-        } else {
-            workflowOutput
-        }
+        return when (outcome) {
+            is WorkflowEvent.ListenForEachCompleted -> {
+                // Update the nodeStack for the next iteration to preserve context changes
+                ctx.currentNodeStack = outcome.nodeStack
+                val iterationOutput = outcome.output
+                logger.debug { "Foreach iteration $iterationIndex completed with output: $iterationOutput" }
+                iterationOutput
+            }
 
-        logger.debug { "Foreach iteration $iterationIndex completed with output: $iterationOutput" }
-        return iterationOutput
+            else -> {
+                // Workflow completed/failed unexpectedly during foreach - this shouldn't happen
+                logger.error { "Foreach iteration $iterationIndex failed unexpectedly: $outcome" }
+                throw IllegalStateException("Foreach iteration completed workflow instead of returning to listen task: $outcome")
+            }
+        }
     }
 
     /**
@@ -448,8 +460,9 @@ internal object FullOrchestrator {
      * Example expression: `. | any(.data.value > 100)` or `. | length >= 5`
      *
      * If foreach is configured, each event is processed through foreach.do as it arrives.
-     * The expression is always evaluated against raw events for consistency, but the
-     * final output contains foreach outputs (not raw events).
+     * Events are processed SEQUENTIALLY - we wait for foreach.do to complete before
+     * receiving the next event. The expression is always evaluated against raw events
+     * for consistency, but the final output contains foreach outputs (not raw events).
      *
      * @param cloudEventHook Source of CloudEvents
      * @param filters Filters to match incoming events
@@ -468,14 +481,19 @@ internal object FullOrchestrator {
         // Track outputs (foreach outputs if configured, otherwise same as raw events)
         val outputs = mutableListOf<JsonElement>()
 
-        // Use first with predicate - returns true when we should stop
-        cloudEventHook.receive()
+        // Use a channel to ensure truly sequential processing:
+        // We receive one event, fully process it (including foreach.do), then receive the next
+        val scope = CoroutineScope(currentCoroutineContext())
+        val channel: ReceiveChannel<CloudEvent> = cloudEventHook.receive()
             .filter { matchesFilters(it, filters) }
-            .first { cloudEvent ->
+            .produceIn(scope)
+
+        try {
+            for (cloudEvent in channel) {
                 val eventJson = cloudEvent.toJsonElement()
                 rawEvents.add(eventJson)
 
-                // Process through foreach immediately if configured
+                // Process through foreach - MUST complete before we receive next event
                 val outputJson = if (foreachCtx != null) {
                     processEventThroughForeach(foreachCtx, eventJson, outputs.size)
                 } else {
@@ -490,10 +508,12 @@ internal object FullOrchestrator {
 
                 if (shouldStop) {
                     logger.debug { "Until expression evaluated to true after ${rawEvents.size} events" }
+                    break
                 }
-
-                shouldStop // Return true to stop collecting
             }
+        } finally {
+            channel.cancel()
+        }
 
         return outputs
     }
@@ -506,6 +526,8 @@ internal object FullOrchestrator {
      * are returned (the termination event is NOT included in the output).
      *
      * If foreach is configured, each event is processed through foreach.do as it arrives.
+     * Events are processed SEQUENTIALLY - we wait for foreach.do to complete before
+     * receiving the next event.
      *
      * @param cloudEventHook Source of CloudEvents
      * @param filters Main filters to match and accumulate events
@@ -521,45 +543,39 @@ internal object FullOrchestrator {
     ): List<JsonElement> {
         val outputs = mutableListOf<JsonElement>()
 
-        // Use first with predicate - returns true when termination event arrives
-        cloudEventHook.receive()
-            .first { cloudEvent ->
+        // Use a channel to ensure truly sequential processing
+        val scope = CoroutineScope(currentCoroutineContext())
+        val channel: ReceiveChannel<CloudEvent> = cloudEventHook.receive()
+            .produceIn(scope)
+
+        try {
+            for (cloudEvent in channel) {
                 // Check if this is the termination event
                 if (matchesFilters(cloudEvent, listOf(terminationFilter))) {
                     logger.debug { "Termination event received: type=${cloudEvent.type}, returning ${outputs.size} accumulated events" }
-                    true // Stop collection
-                } else {
-                    // Check if this event matches our main filters
-                    if (matchesFilters(cloudEvent, filters)) {
-                        val eventJson = cloudEvent.toJsonElement()
+                    break
+                }
 
-                        // Process through foreach immediately if configured
-                        val outputJson = if (foreachCtx != null) {
-                            processEventThroughForeach(foreachCtx, eventJson, outputs.size)
-                        } else {
-                            eventJson
-                        }
-                        outputs.add(outputJson)
+                // Check if this event matches our main filters
+                if (matchesFilters(cloudEvent, filters)) {
+                    val eventJson = cloudEvent.toJsonElement()
 
-                        logger.debug { "Accumulated event (count=${outputs.size}): type=${cloudEvent.type}" }
+                    // Process through foreach - MUST complete before we receive next event
+                    val outputJson = if (foreachCtx != null) {
+                        processEventThroughForeach(foreachCtx, eventJson, outputs.size)
+                    } else {
+                        eventJson
                     }
-                    false // Continue collecting
+                    outputs.add(outputJson)
+
+                    logger.debug { "Accumulated event (count=${outputs.size}): type=${cloudEvent.type}" }
                 }
             }
+        } finally {
+            channel.cancel()
+        }
 
         return outputs
-    }
-
-    /**
-     * Handles a ListenForEachCompleted event by resuming with the iteration output.
-     *
-     * In mock mode, this assumes a single-event scenario where one foreach iteration
-     * completes and the listen task should resume with that output wrapped in an array.
-     */
-    private fun handle(event: WorkflowEvent.ListenForEachCompleted): WorkflowCommand {
-        logger.debug { "Mock: ListenForEachCompleted iteration=${event.iterationIndex}" }
-        // Resume with the single iteration output wrapped in an array
-        return event.resumeCompleted(JsonArray(listOf(event.iterationOutput)))
     }
 
     /**
@@ -591,9 +607,12 @@ internal object FullOrchestrator {
                 logger.debug { "Child workflow completed" }
                 when (result) {
                     is WorkflowEvent.WorkflowCompleted -> event.resumeAsCompleted(result.output)
-                    is WorkflowEvent.ForkBranchCompleted -> event.resumeAsCompleted(result.output)
                     is WorkflowEvent.WorkflowFailed -> event.resumeAsFailed(result.error)
-                    is WorkflowEvent.ForkBranchFailed -> event.resumeAsFailed(result.error)
+                    // ForkBranchCompleted, ForkBranchFailed, and ListenForEachCompleted are internal
+                    // events that should never escape from a child workflow
+                    else -> throw IllegalStateException(
+                        "Child workflow returned unexpected outcome: $result"
+                    )
                 }
             }
 

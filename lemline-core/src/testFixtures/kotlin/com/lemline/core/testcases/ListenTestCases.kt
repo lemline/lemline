@@ -1083,6 +1083,58 @@ object ListenTestCases {
                     arr[0].jsonObject["processed"]?.jsonPrimitive?.booleanOrNull == true &&
                     arr[1].jsonObject["processed"]?.jsonPrimitive?.booleanOrNull == true
             }
+        ),
+
+        // ─────────────────────────────────────────────────────────────────────────
+        // Sequential Processing Test - Verifies foreach processes events one at a time
+        // ─────────────────────────────────────────────────────────────────────────
+
+        WorkflowTestCase(
+            name = "listen foreach processes events sequentially with delay preserving order",
+            cloudEvents = listOf(
+                TestMocks.reading1Event,
+                TestMocks.reading2Event,
+                TestMocks.reading3ThresholdEvent
+            ),
+            yaml = $$"""
+                do:
+                  - setContext:
+                      set:
+                        value: 0
+                      export:
+                        as: ${ . }
+                  - collectReadings:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until: . | any(.data.value > 100)
+                      foreach:
+                        do:
+                          - captureContext:
+                              set:
+                                value: ${ $context.value }
+                          - simulateSlowProcessing:
+                              wait: 
+                                milliseconds: 400
+                          - returnResult:
+                              set:
+                                value: ${ .value + 1 }
+                              export:
+                                as: ${ . }
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "foreach", "sequential"),
+            validate = expectOutputMatching("events processed in order: 1, 2, 3 (proves sequential processing)") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                // If processing is sequential, outputs are in the same order as events arrived
+                // If parallel, order could be scrambled (first completed = first in output)
+                // With 100ms delay each, parallel processing would mix up order
+                arr.size == 3 &&
+                    arr[0].jsonObject["value"]?.jsonPrimitive?.intOrNull == 1 &&
+                    arr[1].jsonObject["value"]?.jsonPrimitive?.intOrNull == 2 &&
+                    arr[2].jsonObject["value"]?.jsonPrimitive?.intOrNull == 3
+            }
         )
     )
 }

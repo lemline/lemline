@@ -9,6 +9,7 @@ import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.expressions.JQExpression
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.states.WorkflowCommand
@@ -21,7 +22,6 @@ import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
-import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.models.ForkBranchModel
@@ -223,7 +223,7 @@ internal class WorkflowEventHandler(
     private suspend fun handleListenForEachCompleted(message: InstanceMessage<WorkflowEvent.ListenForEachCompleted>) {
         val state = message.workflowState
         val listenPosition = state.nodeStack.lastPosition
-        val iterationOutput = state.iterationOutput
+        val iterationOutput = state.output
 
         logger.debug { "ListenForEachCompleted: $message" }
 
@@ -238,7 +238,7 @@ internal class WorkflowEventHandler(
             // Find the current event being processed (by iteration index)
             val currentEvent = listenerEventRepository.findByListenerIdAndIterationIndex(
                 listener.id,
-                message.workflowState.iterationIndex,
+                message.workflowState.index,
                 conn
             )
 

@@ -498,8 +498,8 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // The iteration index is tracked by the runner (ListenerModel.foreachCurrentIndex)
         return ListenForEachCompleted(
             nodeStack = nodeStack,
-            iterationOutput = nextInput,
-            iterationIndex = 0
+            output = nextInput,
+            index = 0
         )
     }
 
