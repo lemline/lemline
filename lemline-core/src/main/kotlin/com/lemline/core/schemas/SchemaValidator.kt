@@ -4,6 +4,7 @@ package com.lemline.core.schemas
 import com.fasterxml.jackson.databind.JsonNode
 import com.lemline.common.json.LemlineJson
 import com.networknt.schema.JsonSchemaFactory
+import com.networknt.schema.SchemaValidatorsConfig
 import com.networknt.schema.SpecVersion.VersionFlag
 import com.networknt.schema.ValidationMessage
 import io.serverlessworkflow.api.WorkflowFormat
@@ -15,7 +16,10 @@ import kotlinx.serialization.json.JsonElement
 
 object SchemaValidator {
     private val resourceLoader = DefaultResourceLoaderFactory.get().getResourceLoader(null)
-    private val jsonSchemaFactory = JsonSchemaFactory.getInstance(VersionFlag.V7)
+
+    // Use JSON Schema Draft 2020-12 for modern standards compliance
+    private val jsonSchemaFactory = JsonSchemaFactory.getInstance(VersionFlag.V202012)
+    private val schemaConfig = SchemaValidatorsConfig.builder().build()
 
     fun validate(node: JsonElement, schemaUnion: SchemaUnion) =
         validateSchema(with(LemlineJson) { node.toJsonNode() }, schemaUnionToSchema(schemaUnion))
@@ -42,13 +46,17 @@ object SchemaValidator {
                 val present = node.fieldNames().asSequence().toSet()
                 val missing = required.filterNot { it in present }
                 if (missing.isNotEmpty()) {
-                    val missingMsg = missing.joinToString(", ") { "'" + it + "'" }
+                    val missingMsg = missing.joinToString(", ") { "'$it'" }
                     throw IllegalArgumentException("There are JsonSchema validation errors:\nMissing required field(s): $missingMsg")
                 }
             }
         }
 
-        val report = jsonSchemaFactory.getSchema(schema).validate(node)
+        val jsonSchema = jsonSchemaFactory.getSchema(schema, schemaConfig)
+        // Enable format assertions (disabled by default in Draft 2020-12)
+        val report = jsonSchema.validate(node) { executionContext ->
+            executionContext.executionConfig.formatAssertionsEnabled = true
+        }
         if (report.isNotEmpty()) {
             val sb = StringBuilder("There are JsonSchema validation errors:")
             report.forEach(
