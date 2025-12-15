@@ -5,7 +5,6 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
-import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
@@ -53,9 +52,6 @@ internal object FullOrchestrator {
 
     private val logger = logger()
 
-    /** Default mock activity executor - requires explicit mock configuration for activities */
-    private val defaultActivityExecutor = MockActivityExecutor.empty()
-
     suspend fun start(
         workflow: Workflow,
         workflowId: WorkflowId = WorkflowId.random(),
@@ -63,7 +59,7 @@ internal object FullOrchestrator {
         hasWaitingParent: Boolean = false,
         startedAt: Instant = Clock.System.now(),
         serde: Boolean = false,
-        activityExecutor: ActivityExecutor = defaultActivityExecutor,
+        activityExecutor: ActivityExecutor,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
     ): JsonElement {
@@ -76,7 +72,7 @@ internal object FullOrchestrator {
         workflow: Workflow,
         command: WorkflowCommand,
         serde: Boolean,
-        activityExecutor: ActivityExecutor = defaultActivityExecutor,
+        activityExecutor: ActivityExecutor,
         cloudEventHook: CloudEventHook,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent.Outcome {

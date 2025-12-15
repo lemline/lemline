@@ -4,6 +4,7 @@ package com.lemline.core.cloudevents
 import io.cloudevents.CloudEvent
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 /**
  * Hook interface for CloudEvent operations (emit and listen).
@@ -46,7 +47,8 @@ interface CloudEventHook {
          */
         val NOOP: CloudEventHook = object : CloudEventHook {
             override suspend fun emit(event: CloudEvent) = Unit
-            override fun receive(): Flow<CloudEvent> = kotlinx.coroutines.flow.emptyFlow()
+
+            override fun receive(): Flow<CloudEvent> = emptyFlow()
         }
     }
 }

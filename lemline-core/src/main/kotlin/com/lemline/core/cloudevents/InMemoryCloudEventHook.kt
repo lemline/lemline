@@ -86,13 +86,4 @@ class InMemoryCloudEventHook : CloudEventHook {
         logger.debug { "InMemory: Closing channel" }
         channel.close()
     }
-
-    /**
-     * Clear emitted events history (for test setup/teardown).
-     */
-    fun clearHistory() {
-        synchronized(_emittedEvents) {
-            _emittedEvents.clear()
-        }
-    }
 }

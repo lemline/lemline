@@ -7,6 +7,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.errors.InternalException
@@ -174,6 +175,7 @@ class LifecycleEventHookTest : FunSpec() {
             workflow = workflow,
             command = startState,
             serde = true,
+            activityExecutor = MockActivityExecutor.empty(),
             cloudEventHook = InMemoryCloudEventHook(),
             lifecycleHook = lifecycleHook,
         )
