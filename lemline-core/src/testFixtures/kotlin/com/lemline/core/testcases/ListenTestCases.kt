@@ -4,8 +4,10 @@ package com.lemline.core.testcases
 import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.double
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
@@ -889,10 +891,198 @@ object ListenTestCases {
                     // read: data wraps in envelope at output but data key contains payload
                     arr[0].jsonObject["data"]?.jsonObject?.get("orderId")?.jsonPrimitive?.contentOrNull == "ORD-12345"
             }
-        )
+        ),
 
-        // Note: Listen + foreach tests are excluded for now as they require
-        // additional infrastructure support (ListenForEachCompleted handling)
-        // that involves more complex state management beyond mock configuration.
+        // ─────────────────────────────────────────────────────────────────────────
+        // Foreach Tests - Process events through nested tasks
+        // ─────────────────────────────────────────────────────────────────────────
+
+        WorkflowTestCase(
+            name = "listen one with foreach processes event through nested tasks",
+            cloudEvents = listOf(TestMocks.orderCreatedCloudEvent),
+            yaml = $$"""
+                do:
+                  - waitForOrder:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: order.created
+                      foreach:
+                        do:
+                          - processOrder:
+                              set:
+                                processed: true
+                                orderId: ${ .data.orderId }
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "foreach", "one"),
+            validate = expectOutputMatching("array with single processed output") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                arr.size == 1 &&
+                    arr[0].jsonObject["processed"]?.jsonPrimitive?.booleanOrNull == true &&
+                    arr[0].jsonObject["orderId"]?.jsonPrimitive?.content == "ORD-12345"
+            }
+        ),
+
+        WorkflowTestCase(
+            name = "listen any with foreach processes event through nested tasks",
+            cloudEvents = listOf(TestMocks.sensorReadingCloudEvent),
+            yaml = $$"""
+                do:
+                  - waitForReading:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                      foreach:
+                        do:
+                          - logReading:
+                              set:
+                                logged: true
+                                sensorId: ${ .data.sensorId }
+                                temperature: ${ .data.temperature }
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "foreach", "any"),
+            validate = expectOutputMatching("array with single logged reading") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                arr.size == 1 &&
+                    arr[0].jsonObject["logged"]?.jsonPrimitive?.booleanOrNull == true &&
+                    arr[0].jsonObject["sensorId"]?.jsonPrimitive?.content == "SENSOR-001"
+            }
+        ),
+
+        WorkflowTestCase(
+            name = "listen any with until expression and foreach processes all events sequentially",
+            cloudEvents = listOf(
+                TestMocks.reading1Event,
+                TestMocks.reading2Event,
+                TestMocks.reading3ThresholdEvent
+            ),
+            yaml = """
+                do:
+                  - collectReadings:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until: . | any(.data.value > 100)
+                      foreach:
+                        do:
+                          - processReading:
+                              set:
+                                processed: true
+                                readingId: ${'$'}{ .data.readingId }
+                                value: ${'$'}{ .data.value }
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "foreach", "until", "expression"),
+            validate = expectOutputMatching("array of 3 processed readings") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                // Should have 3 outputs from foreach processing each event
+                arr.size == 3 &&
+                    arr[0].jsonObject["processed"]?.jsonPrimitive?.booleanOrNull == true &&
+                    arr[0].jsonObject["readingId"]?.jsonPrimitive?.intOrNull == 1 &&
+                    arr[1].jsonObject["readingId"]?.jsonPrimitive?.intOrNull == 2 &&
+                    arr[2].jsonObject["readingId"]?.jsonPrimitive?.intOrNull == 3
+            }
+        ),
+
+        WorkflowTestCase(
+            name = "listen any with until event and foreach processes accumulated events",
+            cloudEvents = listOf(
+                TestMocks.reading1Event,
+                TestMocks.reading2Event,
+                TestMocks.stopMonitoringEvent
+            ),
+            yaml = $$"""
+                do:
+                  - monitorReadings:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until:
+                            one:
+                              with:
+                                type: monitoring.stopped
+                      foreach:
+                        do:
+                          - storeReading:
+                              set:
+                                stored: true
+                                id: ${ .data.readingId }
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "foreach", "until", "event"),
+            validate = expectOutputMatching("array of 2 stored readings (termination event excluded)") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                // Should have 2 outputs (readings only, not the termination event)
+                arr.size == 2 &&
+                    arr[0].jsonObject["stored"]?.jsonPrimitive?.booleanOrNull == true &&
+                    arr[0].jsonObject["id"]?.jsonPrimitive?.intOrNull == 1 &&
+                    arr[1].jsonObject["id"]?.jsonPrimitive?.intOrNull == 2
+            }
+        ),
+
+        WorkflowTestCase(
+            name = "listen with foreach and empty events returns empty array",
+            cloudEvents = listOf(TestMocks.stopMonitoringEvent),
+            yaml = """
+                do:
+                  - monitorReadings:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until:
+                            one:
+                              with:
+                                type: monitoring.stopped
+                      foreach:
+                        do:
+                          - storeReading:
+                              set:
+                                stored: true
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "foreach", "until", "event", "empty"),
+            validate = expectOutputMatching("empty array (termination arrived first)") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                arr.isEmpty()
+            }
+        ),
+
+        WorkflowTestCase(
+            name = "listen all with foreach processes each matched filter event",
+            cloudEvents = listOf(
+                TestMocks.orderCreatedCloudEvent,
+                TestMocks.paymentCompletedCloudEvent
+            ),
+            yaml = $$"""
+                do:
+                  - waitForOrderAndPayment:
+                      listen:
+                        to:
+                          all:
+                            - with:
+                                type: order.created
+                            - with:
+                                type: payment.completed
+                      foreach:
+                        do:
+                          - logEvent:
+                              set:
+                                processed: true
+                                eventType: ${ .type }
+            """.trimIndent(),
+            tags = setOf("listen", "cloudevents", "foreach", "all"),
+            validate = expectOutputMatching("array of 2 processed events") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                arr.size == 2 &&
+                    arr[0].jsonObject["processed"]?.jsonPrimitive?.booleanOrNull == true &&
+                    arr[1].jsonObject["processed"]?.jsonPrimitive?.booleanOrNull == true
+            }
+        )
     )
 }

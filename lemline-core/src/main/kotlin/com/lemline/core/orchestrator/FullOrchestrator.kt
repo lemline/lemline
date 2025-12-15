@@ -27,6 +27,7 @@ import com.lemline.core.utils.mapAwaitFirstFailSlow
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.ForkTask
+import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
@@ -173,7 +174,7 @@ internal object FullOrchestrator {
 
             is WorkflowEvent.ListenStarted -> resume(
                 workflow = workflow,
-                command = handle(serdeEvent, cloudEventHook),
+                command = handle(workflow, serdeEvent, serde, activityExecutor, cloudEventHook, lifecycleHook),
                 serde = serde,
                 activityExecutor = activityExecutor,
                 cloudEventHook = cloudEventHook,
@@ -258,12 +259,27 @@ internal object FullOrchestrator {
      *   stop when expression returns true
      * - **ANY + until(event)**: Accumulate events until termination event arrives
      * - **ALL**: Wait for one event per filter
+     *
+     * ## Foreach Processing
+     *
+     * If the listen task has `foreach` configured, each event is processed sequentially
+     * through the foreach.do tasks. The output is an array of foreach iteration outputs,
+     * not the raw events.
      */
+    @Suppress("UNCHECKED_CAST")
     private suspend fun handle(
+        workflow: Workflow,
         event: WorkflowEvent.ListenStarted,
-        cloudEventHook: CloudEventHook
+        serde: Boolean,
+        activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
+        lifecycleHook: LifecycleEventHook,
     ): WorkflowCommand {
         logger.debug { "Listening for CloudEvents: strategy=${event.config.strategy} filters=${event.config.filters} until=${event.config.until}" }
+
+        // Check if foreach is configured by looking at the node's children
+        val listenNode = workflow.getNode(event.nodePosition) as Node<ListenTask>
+        val hasForeach = listenNode.children != null
 
         // Use configured timeout or default to 30 seconds for testing
         val timeoutMillis = event.config.timeoutAt?.let {
@@ -323,7 +339,22 @@ internal object FullOrchestrator {
                     }
                 }
             }
-            event.resumeCompleted(JsonArray(events))
+
+            // If foreach is configured, process each event through foreach.do sequentially
+            if (hasForeach && events.isNotEmpty()) {
+                val foreachOutputs = processForeachEvents(
+                    workflow = workflow,
+                    event = event,
+                    events = events,
+                    serde = serde,
+                    activityExecutor = activityExecutor,
+                    cloudEventHook = cloudEventHook,
+                    lifecycleHook = lifecycleHook
+                )
+                event.resumeCompleted(JsonArray(foreachOutputs))
+            } else {
+                event.resumeCompleted(JsonArray(events))
+            }
         } catch (_: TimeoutCancellationException) {
             logger.error { "Listen timed out waiting for matching events: filters=${event.config.filters}" }
             event.resumeFailed(
@@ -336,6 +367,68 @@ internal object FullOrchestrator {
             logger.error(e) { "Listen failed" }
             event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
         }
+    }
+
+    /**
+     * Processes events through foreach.do tasks sequentially.
+     *
+     * For each event in the buffer:
+     * 1. Create a ResumeFromTask command to execute foreach.do with the event as input
+     * 2. Execute the foreach.do tasks by calling resume recursively
+     * 3. Collect the iteration output
+     * 4. Wait for the iteration to complete before processing the next event
+     *
+     * @param workflow The workflow definition
+     * @param event The original ListenStarted event (for nodeStack context)
+     * @param events List of collected CloudEvents (as JsonElements)
+     * @param serde Whether to enable serde checking
+     * @param activityExecutor Executor for activities
+     * @param cloudEventHook Hook for CloudEvent operations
+     * @param lifecycleHook Hook for lifecycle events
+     * @return List of foreach iteration outputs
+     */
+    private suspend fun processForeachEvents(
+        workflow: Workflow,
+        event: WorkflowEvent.ListenStarted,
+        events: List<JsonElement>,
+        serde: Boolean,
+        activityExecutor: ActivityExecutor,
+        cloudEventHook: CloudEventHook,
+        lifecycleHook: LifecycleEventHook
+    ): List<JsonElement> {
+        val outputs = mutableListOf<JsonElement>()
+
+        events.forEachIndexed { index, eventData ->
+            logger.debug { "Processing foreach iteration $index with event: $eventData" }
+
+            // Create a command to execute foreach.do with this event as input
+            val foreachCommand = event.resumeForeach(eventData, index)
+
+            // Execute the foreach.do tasks by recursively calling resume
+            val outcome = resume(
+                workflow = workflow,
+                command = foreachCommand,
+                serde = serde,
+                activityExecutor = activityExecutor,
+                cloudEventHook = cloudEventHook,
+                lifecycleHook = lifecycleHook
+            )
+
+            // Extract the output from the outcome
+            // The workflow returns an array (from ListenForEachCompleted handler),
+            // extract the first element which is the actual iteration output
+            val workflowOutput = outcome.value()
+            val iterationOutput = if (workflowOutput is JsonArray && workflowOutput.isNotEmpty()) {
+                workflowOutput[0]
+            } else {
+                workflowOutput
+            }
+            outputs.add(iterationOutput)
+
+            logger.debug { "Foreach iteration $index completed with output: $iterationOutput" }
+        }
+
+        return outputs
     }
 
     /**
