@@ -266,6 +266,19 @@ internal object FullOrchestrator {
      * through the foreach.do tasks. The output is an array of foreach iteration outputs,
      * not the raw events.
      */
+    /**
+     * Context for foreach processing, containing all dependencies needed
+     * to execute foreach.do tasks as events arrive.
+     */
+    private data class ForeachContext(
+        val workflow: Workflow,
+        val listenEvent: WorkflowEvent.ListenStarted,
+        val serde: Boolean,
+        val activityExecutor: ActivityExecutor,
+        val cloudEventHook: CloudEventHook,
+        val lifecycleHook: LifecycleEventHook,
+    )
+
     @Suppress("UNCHECKED_CAST")
     private suspend fun handle(
         workflow: Workflow,
@@ -281,20 +294,33 @@ internal object FullOrchestrator {
         val listenNode = workflow.getNode(event.nodePosition) as Node<ListenTask>
         val hasForeach = listenNode.children != null
 
-        // Use configured timeout or default to 30 seconds for testing
+        // Create foreach context if foreach is configured
+        val foreachCtx = if (hasForeach) {
+            ForeachContext(workflow, event, serde, activityExecutor, cloudEventHook, lifecycleHook)
+        } else {
+            null
+        }
+
+        // Use configured timeout
         val timeoutMillis = event.config.timeoutAt?.let {
             (it - Clock.System.now()).inWholeMilliseconds.coerceAtLeast(0)
-        } ?: 3_000L
+        } ?: Long.MAX_VALUE
 
         return try {
-            val events = withTimeout(timeoutMillis) {
+            val outputs = withTimeout(timeoutMillis) {
                 when (event.config.strategy) {
                     ListenStrategy.ONE -> {
                         // Wait for first matching event
                         val cloudEvent = cloudEventHook.receive()
                             .filter { matchesFilters(it, event.config.filters) }
                             .first()
-                        listOf(cloudEvent.toJsonElement())
+                        val eventJson = cloudEvent.toJsonElement()
+                        // Process through foreach immediately if configured
+                        if (foreachCtx != null) {
+                            listOf(processEventThroughForeach(foreachCtx, eventJson, 0))
+                        } else {
+                            listOf(eventJson)
+                        }
                     }
 
                     ListenStrategy.ANY -> {
@@ -305,56 +331,57 @@ internal object FullOrchestrator {
                                 val cloudEvent = cloudEventHook.receive()
                                     .filter { matchesFilters(it, event.config.filters) }
                                     .first()
-                                listOf(cloudEvent.toJsonElement())
+                                val eventJson = cloudEvent.toJsonElement()
+                                // Process through foreach immediately if configured
+                                if (foreachCtx != null) {
+                                    listOf(processEventThroughForeach(foreachCtx, eventJson, 0))
+                                } else {
+                                    listOf(eventJson)
+                                }
                             }
 
                             is UntilCondition.Expression -> {
                                 // Accumulate events until expression evaluates to true
+                                // Process each event through foreach as it arrives
                                 collectEventsUntilExpression(
                                     cloudEventHook = cloudEventHook,
                                     filters = event.config.filters,
-                                    expression = until.expression
+                                    expression = until.expression,
+                                    foreachCtx = foreachCtx
                                 )
                             }
 
                             is UntilCondition.Event -> {
                                 // Accumulate events until termination event arrives
+                                // Process each event through foreach as it arrives
                                 collectEventsUntilTermination(
                                     cloudEventHook = cloudEventHook,
                                     filters = event.config.filters,
-                                    terminationFilter = until.filter
+                                    terminationFilter = until.filter,
+                                    foreachCtx = foreachCtx
                                 )
                             }
                         }
                     }
 
                     ListenStrategy.ALL -> {
-                        // Wait for one event per filter
-                        event.config.filters.map { filter ->
-                            cloudEventHook.receive()
+                        // Wait for one event per filter, process each through foreach as it arrives
+                        event.config.filters.mapIndexed { index, filter ->
+                            val cloudEvent = cloudEventHook.receive()
                                 .filter { matchesFilters(it, listOf(filter)) }
                                 .first()
-                                .toJsonElement()
+                            val eventJson = cloudEvent.toJsonElement()
+                            if (foreachCtx != null) {
+                                processEventThroughForeach(foreachCtx, eventJson, index)
+                            } else {
+                                eventJson
+                            }
                         }
                     }
                 }
             }
 
-            // If foreach is configured, process each event through foreach.do sequentially
-            if (hasForeach && events.isNotEmpty()) {
-                val foreachOutputs = processForeachEvents(
-                    workflow = workflow,
-                    event = event,
-                    events = events,
-                    serde = serde,
-                    activityExecutor = activityExecutor,
-                    cloudEventHook = cloudEventHook,
-                    lifecycleHook = lifecycleHook
-                )
-                event.resumeCompleted(JsonArray(foreachOutputs))
-            } else {
-                event.resumeCompleted(JsonArray(events))
-            }
+            event.resumeCompleted(JsonArray(outputs))
         } catch (_: TimeoutCancellationException) {
             logger.error { "Listen timed out waiting for matching events: filters=${event.config.filters}" }
             event.resumeFailed(
@@ -370,109 +397,105 @@ internal object FullOrchestrator {
     }
 
     /**
-     * Processes events through foreach.do tasks sequentially.
+     * Processes a single event through foreach.do tasks.
      *
-     * For each event in the buffer:
-     * 1. Create a ResumeFromTask command to execute foreach.do with the event as input
-     * 2. Execute the foreach.do tasks by calling resume recursively
-     * 3. Collect the iteration output
-     * 4. Wait for the iteration to complete before processing the next event
+     * This is called as each event arrives, not after all events are collected.
+     * The foreach.do tasks are executed synchronously before the next event is processed.
      *
-     * @param workflow The workflow definition
-     * @param event The original ListenStarted event (for nodeStack context)
-     * @param events List of collected CloudEvents (as JsonElements)
-     * @param serde Whether to enable serde checking
-     * @param activityExecutor Executor for activities
-     * @param cloudEventHook Hook for CloudEvent operations
-     * @param lifecycleHook Hook for lifecycle events
-     * @return List of foreach iteration outputs
+     * @param ctx Foreach context containing workflow and execution dependencies
+     * @param eventData The CloudEvent data to process
+     * @param iterationIndex The iteration index (0-based)
+     * @return The output from foreach.do tasks
      */
-    private suspend fun processForeachEvents(
-        workflow: Workflow,
-        event: WorkflowEvent.ListenStarted,
-        events: List<JsonElement>,
-        serde: Boolean,
-        activityExecutor: ActivityExecutor,
-        cloudEventHook: CloudEventHook,
-        lifecycleHook: LifecycleEventHook
-    ): List<JsonElement> {
-        val outputs = mutableListOf<JsonElement>()
+    private suspend fun processEventThroughForeach(
+        ctx: ForeachContext,
+        eventData: JsonElement,
+        iterationIndex: Int
+    ): JsonElement {
+        logger.debug { "Processing foreach iteration $iterationIndex with event: $eventData" }
 
-        events.forEachIndexed { index, eventData ->
-            logger.debug { "Processing foreach iteration $index with event: $eventData" }
+        // Create a command to execute foreach.do with this event as input
+        val foreachCommand = ctx.listenEvent.resumeForeach(eventData, iterationIndex)
 
-            // Create a command to execute foreach.do with this event as input
-            val foreachCommand = event.resumeForeach(eventData, index)
+        // Execute the foreach.do tasks by recursively calling resume
+        val outcome = resume(
+            workflow = ctx.workflow,
+            command = foreachCommand,
+            serde = ctx.serde,
+            activityExecutor = ctx.activityExecutor,
+            cloudEventHook = ctx.cloudEventHook,
+            lifecycleHook = ctx.lifecycleHook
+        )
 
-            // Execute the foreach.do tasks by recursively calling resume
-            val outcome = resume(
-                workflow = workflow,
-                command = foreachCommand,
-                serde = serde,
-                activityExecutor = activityExecutor,
-                cloudEventHook = cloudEventHook,
-                lifecycleHook = lifecycleHook
-            )
-
-            // Extract the output from the outcome
-            // The workflow returns an array (from ListenForEachCompleted handler),
-            // extract the first element which is the actual iteration output
-            val workflowOutput = outcome.value()
-            val iterationOutput = if (workflowOutput is JsonArray && workflowOutput.isNotEmpty()) {
-                workflowOutput[0]
-            } else {
-                workflowOutput
-            }
-            outputs.add(iterationOutput)
-
-            logger.debug { "Foreach iteration $index completed with output: $iterationOutput" }
+        // Extract the output from the outcome
+        // The workflow returns an array (from ListenForEachCompleted handler),
+        // extract the first element which is the actual iteration output
+        val workflowOutput = outcome.value()
+        val iterationOutput = if (workflowOutput is JsonArray && workflowOutput.isNotEmpty()) {
+            workflowOutput[0]
+        } else {
+            workflowOutput
         }
 
-        return outputs
+        logger.debug { "Foreach iteration $iterationIndex completed with output: $iterationOutput" }
+        return iterationOutput
     }
 
     /**
      * Collects events until the given JQ expression evaluates to true.
      *
-     * The expression is evaluated against the accumulated events array after each event.
-     * Example expression: `. | any(.temperature > 38)` or `. | length >= 5`
+     * The expression is evaluated against the accumulated RAW events array after each event.
+     * Example expression: `. | any(.data.value > 100)` or `. | length >= 5`
      *
-     * Uses flow's `first` operator with a predicate that:
-     * 1. Accumulates matching events into a buffer
-     * 2. Returns true when the expression evaluates to true (stopping collection)
+     * If foreach is configured, each event is processed through foreach.do as it arrives.
+     * The expression is always evaluated against raw events for consistency, but the
+     * final output contains foreach outputs (not raw events).
      *
      * @param cloudEventHook Source of CloudEvents
      * @param filters Filters to match incoming events
-     * @param expression JQ expression evaluated against accumulated events array
-     * @return List of accumulated events (as JsonElements)
+     * @param expression JQ expression evaluated against accumulated raw events array
+     * @param foreachCtx If non-null, process events through foreach.do as they arrive
+     * @return List of accumulated events or foreach outputs (as JsonElements)
      */
     private suspend fun collectEventsUntilExpression(
         cloudEventHook: CloudEventHook,
         filters: List<EventFilter>,
-        expression: String
+        expression: String,
+        foreachCtx: ForeachContext?
     ): List<JsonElement> {
-        val accumulated = mutableListOf<JsonElement>()
+        // Track raw events for until expression evaluation
+        val rawEvents = mutableListOf<JsonElement>()
+        // Track outputs (foreach outputs if configured, otherwise same as raw events)
+        val outputs = mutableListOf<JsonElement>()
 
         // Use first with predicate - returns true when we should stop
         cloudEventHook.receive()
             .filter { matchesFilters(it, filters) }
             .first { cloudEvent ->
                 val eventJson = cloudEvent.toJsonElement()
-                accumulated.add(eventJson)
+                rawEvents.add(eventJson)
 
-                logger.debug { "Accumulated event (count=${accumulated.size}): type=${cloudEvent.type}" }
+                // Process through foreach immediately if configured
+                val outputJson = if (foreachCtx != null) {
+                    processEventThroughForeach(foreachCtx, eventJson, outputs.size)
+                } else {
+                    eventJson
+                }
+                outputs.add(outputJson)
 
-                // Evaluate expression against accumulated events
-                val shouldStop = evaluateExpressionAsBoolean($$"${$$expression}", JsonArray(accumulated))
+                logger.debug { "Accumulated event (count=${rawEvents.size}): type=${cloudEvent.type}" }
+
+                // Evaluate expression against raw events (not foreach outputs)
+                val shouldStop = evaluateExpressionAsBoolean($$"${$$expression}", JsonArray(rawEvents))
 
                 if (shouldStop) {
-                    logger.debug { "Until expression evaluated to true after ${accumulated.size} events" }
+                    logger.debug { "Until expression evaluated to true after ${rawEvents.size} events" }
                 }
 
                 shouldStop // Return true to stop collecting
             }
 
-        return accumulated
+        return outputs
     }
 
     /**
@@ -482,41 +505,49 @@ internal object FullOrchestrator {
      * the termination filter arrives, collection stops and accumulated events
      * are returned (the termination event is NOT included in the output).
      *
-     * Uses flow's `first` operator with a predicate that:
-     * 1. Checks if the event is a termination event (returns true to stop)
-     * 2. Otherwise accumulates events matching main filters (returns false to continue)
+     * If foreach is configured, each event is processed through foreach.do as it arrives.
      *
      * @param cloudEventHook Source of CloudEvents
      * @param filters Main filters to match and accumulate events
      * @param terminationFilter Filter for the termination event
-     * @return List of accumulated events (excluding termination event)
+     * @param foreachCtx If non-null, process events through foreach.do as they arrive
+     * @return List of accumulated events or foreach outputs (excluding termination event)
      */
     private suspend fun collectEventsUntilTermination(
         cloudEventHook: CloudEventHook,
         filters: List<EventFilter>,
-        terminationFilter: EventFilter
+        terminationFilter: EventFilter,
+        foreachCtx: ForeachContext?
     ): List<JsonElement> {
-        val accumulated = mutableListOf<JsonElement>()
+        val outputs = mutableListOf<JsonElement>()
 
         // Use first with predicate - returns true when termination event arrives
         cloudEventHook.receive()
             .first { cloudEvent ->
                 // Check if this is the termination event
                 if (matchesFilters(cloudEvent, listOf(terminationFilter))) {
-                    logger.debug { "Termination event received: type=${cloudEvent.type}, returning ${accumulated.size} accumulated events" }
+                    logger.debug { "Termination event received: type=${cloudEvent.type}, returning ${outputs.size} accumulated events" }
                     true // Stop collection
                 } else {
                     // Check if this event matches our main filters
                     if (matchesFilters(cloudEvent, filters)) {
                         val eventJson = cloudEvent.toJsonElement()
-                        accumulated.add(eventJson)
-                        logger.debug { "Accumulated event (count=${accumulated.size}): type=${cloudEvent.type}" }
+
+                        // Process through foreach immediately if configured
+                        val outputJson = if (foreachCtx != null) {
+                            processEventThroughForeach(foreachCtx, eventJson, outputs.size)
+                        } else {
+                            eventJson
+                        }
+                        outputs.add(outputJson)
+
+                        logger.debug { "Accumulated event (count=${outputs.size}): type=${cloudEvent.type}" }
                     }
                     false // Continue collecting
                 }
             }
 
-        return accumulated
+        return outputs
     }
 
     /**
