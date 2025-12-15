@@ -269,6 +269,8 @@ This project is licensed under the [Business Source License 1.1](LICENSE.md).
     - [ ] Workflow
     - [ ] Task
 
+- [ ] Pause/Resume workflows
+
 - [x] Schedule
 
 ### Lifecycle events

@@ -11,9 +11,7 @@ IMPORTANT: If a scope is provided, then restrict the commit to the given scope
 1. **Check git status** to see what files have been modified, added, or deleted
 2. **Analyze your history and the changes** to understand what was done
 3. **Draft a commit message** that:
-    - Contains "why" and "what" sections and the list of impacted files (if > 20 list only the most significant, eg. "43
-      files changed including: " + list of files paths )
-    - Accurately reflects the changes and their purpose
+    - Contains "why" and "what" sections, accurately reflecting the changes and their purpose
     - Uses imperative mood (e.g., "Add", "Update", "Fix", "Implement")
     - Does NOT mention Claude, AI, or automated tools
     - Follows the repository's commit message style (check recent commits)
