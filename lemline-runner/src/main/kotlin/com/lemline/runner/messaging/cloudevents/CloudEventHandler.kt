@@ -3,6 +3,7 @@ package com.lemline.runner.messaging.cloudevents
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
+import com.lemline.common.logger.Logger
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.core.definitions.CachedUntilCondition
@@ -11,10 +12,12 @@ import com.lemline.core.processors.ListenStrategy
 import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.definitions.DefinitionMatch
 import com.lemline.runner.definitions.TerminationDefinitionMatch
+import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.repositories.ListenerEventRepository
 import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
 import io.cloudevents.CloudEvent
+import io.cloudevents.jackson.JsonFormat
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -29,10 +32,14 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import org.eclipse.microprofile.reactive.messaging.Message
 
 /**
  * Handles incoming CloudEvents by matching them against active listeners
  * and marking matched listeners ready for completion.
+ *
+ * Implements [MessageHandler] for integration with the subscriber infrastructure.
+ * Returns null from [handle] to skip emit (CloudEvents don't produce outbound messages).
  *
  * ## Processing Flow
  *
@@ -65,11 +72,52 @@ import kotlinx.serialization.json.put
 internal class CloudEventHandler(
     private val definitionListenService: DefinitionListenService,
     private val listenerRepository: ListenerRepository,
-) {
-    private val logger = logger()
+    override val metrics: CloudEventSubscriberMetrics,
+) : MessageHandler<CloudEvent> {
+
+    override val logger: Logger = logger()
 
     @Inject
     private lateinit var listenerEventRepository: ListenerEventRepository
+
+    private val cloudEventFormat = JsonFormat()
+
+    // Test hooks
+    override var onCompleteTest: (Message<String>, CloudEvent?) -> Unit = { _, _ -> }
+    override var onFailureTest: (Message<String>, Throwable?) -> Unit = { _, _ -> }
+
+    // ========================================
+    // MessageHandler implementation
+    // ========================================
+
+    override suspend fun Message<String>.deserialize(): CloudEvent {
+        return cloudEventFormat.deserialize(payload.toByteArray())
+    }
+
+    override suspend fun handle(current: CloudEvent): CloudEvent? {
+        handleCloudEvent(current)
+        // Return null to skip emit - CloudEvents don't produce outbound messages
+        return null
+    }
+
+    // Never called since handle() returns null
+    override suspend fun serialize(current: CloudEvent, next: CloudEvent): String {
+        throw UnsupportedOperationException("CloudEvents don't emit messages")
+    }
+
+    // Never called since handle() returns null
+    override suspend fun emit(payload: String, idempotentKey: IDV7) {
+        throw UnsupportedOperationException("CloudEvents don't emit messages")
+    }
+
+    // Never called since handle() returns null
+    override fun deriveIdempotentKey(next: CloudEvent): IDV7 {
+        throw UnsupportedOperationException("CloudEvents don't emit messages")
+    }
+
+    // ========================================
+    // CloudEvent processing logic
+    // ========================================
 
     /**
      * Processes an incoming CloudEvent by matching it against active listeners.
@@ -92,7 +140,7 @@ internal class CloudEventHandler(
      * @param event The incoming CloudEvent
      * @return Number of listeners that were affected (completed or updated)
      */
-    suspend fun handleCloudEvent(event: CloudEvent): Int {
+    private suspend fun handleCloudEvent(event: CloudEvent): Int {
         val eventType: String = event.type
 
         logger.debug { "Processing CloudEvent: type=$eventType, source=${event.source}, id=${event.id}" }

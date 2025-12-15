@@ -24,8 +24,28 @@ import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 
+/**
+ * Base class for message subscribers providing subscription lifecycle management,
+ * backpressure control, and graceful shutdown.
+ *
+ * This class handles all the infrastructure concerns:
+ * - Subscription/unsubscription lifecycle
+ * - Backpressure via request-based flow control
+ * - Graceful shutdown with configurable timeout
+ * - Coroutine scope management with supervisor job for error isolation
+ * - Automatic re-subscription on errors
+ *
+ * Subclasses only need to provide:
+ * - Configuration properties (maxConcurrency, enabled)
+ * - The message publisher (channel)
+ * - The message handler
+ * - Metrics implementation
+ *
+ * @param T The message type that the handler processes
+ */
+@Suppress("ReactiveStreamsSubscriberImplementation")
 @ExperimentalTime
-internal abstract class MessageSubscriber<T>() : Subscriber<Message<String>> {
+internal abstract class MessageSubscriber<T> : Subscriber<Message<String>> {
 
     abstract val maxConcurrency: Long
     abstract val enabled: Boolean
@@ -41,11 +61,9 @@ internal abstract class MessageSubscriber<T>() : Subscriber<Message<String>> {
         CoroutineScope(Dispatchers.IO + SupervisorJob() + CoroutineExceptionHandler { _, e ->
             if (!isShutdown.get() && (e is Exception)) {
                 logger.warn(e) { "Error processing message, will attempt to recover." }
-                // restart the subscription on another coroutine
                 reSubscribe()
             }
         })
-
 
     @PostConstruct
     fun init() {
@@ -57,7 +75,6 @@ internal abstract class MessageSubscriber<T>() : Subscriber<Message<String>> {
         }
     }
 
-    // Quarkus will wait for the completion of performGracefulShutdown() before shutting down
     fun onQuarkusShutdown(@Observes event: ShutdownEvent) {
         logger.info { "🛑 ShutdownEvent received - initiating graceful shutdown" }
         performGracefulShutdown()
@@ -65,7 +82,6 @@ internal abstract class MessageSubscriber<T>() : Subscriber<Message<String>> {
 
     private lateinit var subscription: Subscription
 
-    // Add state tracking
     private var isResubscribing = AtomicBoolean(false)
     private var isSubscribed = AtomicBoolean(false)
     private var isShutdown = AtomicBoolean(false)
@@ -77,10 +93,8 @@ internal abstract class MessageSubscriber<T>() : Subscriber<Message<String>> {
         }
         if (isSubscribed.get()) {
             cancelSubscription()
-            // wait for active messages to complete
             gracefulWaitForCompletion()
         }
-        // restart the subscription
         subscribe()
     }
 
@@ -129,7 +143,6 @@ internal abstract class MessageSubscriber<T>() : Subscriber<Message<String>> {
 
     override fun onComplete() {
         logger.info { "Subscription completed" }
-        //onShutdown()
     }
 
     private fun performGracefulShutdown() {
@@ -139,21 +152,14 @@ internal abstract class MessageSubscriber<T>() : Subscriber<Message<String>> {
         }
 
         logger.info { "🛑 Starting graceful shutdown" }
-
-        // Stop receiving messages
         cancelSubscription()
-
-        // Wait for active messages to complete
         gracefulWaitForCompletion()
-
-        // Shutdown du scope
         scope.cancel()
         logger.info { "🏁 scope cancelled" }
     }
 
     private fun requestNext() {
         try {
-            // Only request more if we are not shutting down
             if (!isShutdown.get()) subscription.request(1)
         } catch (e: Exception) {
             logger.warn(e) { "Failed to request next message" }
@@ -176,11 +182,7 @@ internal abstract class MessageSubscriber<T>() : Subscriber<Message<String>> {
         try {
             withTimeout(gracePeriod) {
                 logger.info { "⏳ Waiting for ${metrics.getActiveCount()} active messages to complete" }
-
-                // Wait for coroutines currently processing messages
                 scope.coroutineContext.job.children.forEach { it.join() }
-
-                // check also metrics
                 while (metrics.getActiveCount() > 0) {
                     delay(10)
                 }
