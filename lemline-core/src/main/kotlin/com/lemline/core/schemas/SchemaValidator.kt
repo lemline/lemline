@@ -20,6 +20,8 @@ object SchemaValidator {
     fun validate(node: JsonElement, schemaUnion: SchemaUnion) =
         validateSchema(with(LemlineJson) { node.toJsonNode() }, schemaUnionToSchema(schemaUnion))
 
+    fun validateJsonNode(node: JsonNode, schema: JsonNode) = validateSchema(node, schema)
+
     private fun schemaUnionToSchema(schemaUnion: SchemaUnion): JsonNode = when {
         schemaUnion.schemaInline != null ->
             JsonUtils.mapper().convertValue(schemaUnion.schemaInline.document, JsonNode::class.java)

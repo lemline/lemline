@@ -20,6 +20,7 @@ import com.lemline.core.activities.mock.ShellMockRule
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import java.net.URI
+import java.time.OffsetDateTime
 import java.util.UUID
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -360,6 +361,33 @@ object TestMocks {
             .build()
     }
 
+    /**
+     * Comprehensive CloudEvent builder with all attributes.
+     */
+    fun buildCloudEvent(
+        type: String,
+        data: JsonElement,
+        id: String = UUID.randomUUID().toString(),
+        source: URI = URI.create("https://test.example.com"),
+        subject: String? = null,
+        time: OffsetDateTime? = null,
+        dataContentType: String = "application/json",
+        dataSchema: URI? = null
+    ): CloudEvent {
+        val builder = CloudEventBuilder.v1()
+            .withId(id)
+            .withSource(source)
+            .withType(type)
+            .withDataContentType(dataContentType)
+            .withData(dataContentType, data.toString().toByteArray())
+
+        subject?.let { builder.withSubject(it) }
+        time?.let { builder.withTime(it) }
+        dataSchema?.let { builder.withDataSchema(it) }
+
+        return builder.build()
+    }
+
     /** CloudEvent for order.created */
     val orderCreatedCloudEvent: CloudEvent = buildCloudEvent("order.created", orderCreatedEvent)
 
@@ -374,4 +402,132 @@ object TestMocks {
 
     /** CloudEvent for generic/wildcard matching */
     val genericCloudEvent: CloudEvent = buildCloudEvent("some.unknown.type", genericEvent)
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Specialized CloudEvents for Comprehensive Filter Testing
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** CloudEvent with specific ID for id filter tests */
+    val eventWithSpecificId: CloudEvent = buildCloudEvent(
+        type = "test.event",
+        data = buildJsonObject { put("message", "test") },
+        id = "specific-event-id-12345"
+    )
+
+    /** CloudEvent with specific source for source filter tests */
+    val eventWithSpecificSource: CloudEvent = buildCloudEvent(
+        type = "test.event",
+        data = buildJsonObject { put("message", "from-orders") },
+        source = URI.create("https://orders.example.com/api")
+    )
+
+    /** CloudEvent with specific subject for subject filter tests */
+    val eventWithSubject: CloudEvent = buildCloudEvent(
+        type = "order.shipped",
+        data = buildJsonObject {
+            put("orderId", "ORD-999")
+            put("carrier", "FedEx")
+        },
+        subject = "order/ORD-999"
+    )
+
+    /** CloudEvent with specific time for time filter tests */
+    val eventWithTime: CloudEvent = buildCloudEvent(
+        type = "scheduled.task",
+        data = buildJsonObject { put("taskId", "TASK-001") },
+        time = OffsetDateTime.parse("2024-06-15T14:30:00Z")
+    )
+
+    /** CloudEvent with specific dataschema for dataschema filter tests */
+    val eventWithDataSchema: CloudEvent = buildCloudEvent(
+        type = "validated.event",
+        data = buildJsonObject {
+            put("name", "John")
+            put("age", 30)
+        },
+        dataSchema = URI.create("https://schemas.example.com/person/v1")
+    )
+
+    /** CloudEvent with XML content type for datacontenttype filter tests */
+    val eventWithXmlContentType: CloudEvent = buildCloudEvent(
+        type = "xml.data",
+        data = buildJsonObject { put("format", "xml") },
+        dataContentType = "application/xml"
+    )
+
+    /** High temperature sensor event for data expression filter tests */
+    val highTemperatureEvent: CloudEvent = buildCloudEvent(
+        type = "sensor.reading",
+        data = buildJsonObject {
+            put("sensorId", "TEMP-001")
+            put("temperature", 42.5)
+            put("unit", "celsius")
+        }
+    )
+
+    /** Low temperature sensor event for data expression filter tests */
+    val lowTemperatureEvent: CloudEvent = buildCloudEvent(
+        type = "sensor.reading",
+        data = buildJsonObject {
+            put("sensorId", "TEMP-002")
+            put("temperature", 18.0)
+            put("unit", "celsius")
+        }
+    )
+
+    /** Critical alert event for data expression filter tests */
+    val criticalAlertEvent: CloudEvent = buildCloudEvent(
+        type = "alert.triggered",
+        data = buildJsonObject {
+            put("alertId", "ALERT-001")
+            put("severity", "critical")
+            put("source", "monitoring")
+        }
+    )
+
+    /** Warning alert event for data expression filter tests */
+    val warningAlertEvent: CloudEvent = buildCloudEvent(
+        type = "alert.triggered",
+        data = buildJsonObject {
+            put("alertId", "ALERT-002")
+            put("severity", "warning")
+            put("source", "monitoring")
+        }
+    )
+
+    /** Stop/termination event for until tests */
+    val stopMonitoringEvent: CloudEvent = buildCloudEvent(
+        type = "monitoring.stopped",
+        data = buildJsonObject {
+            put("reason", "shift-ended")
+            put("timestamp", "2024-06-15T18:00:00Z")
+        }
+    )
+
+    /** First reading in a series for until expression tests */
+    val reading1Event: CloudEvent = buildCloudEvent(
+        type = "sensor.reading",
+        data = buildJsonObject {
+            put("readingId", 1)
+            put("value", 10)
+        }
+    )
+
+    /** Second reading in a series for until expression tests */
+    val reading2Event: CloudEvent = buildCloudEvent(
+        type = "sensor.reading",
+        data = buildJsonObject {
+            put("readingId", 2)
+            put("value", 25)
+        }
+    )
+
+    /** Third reading that triggers threshold for until expression tests */
+    val reading3ThresholdEvent: CloudEvent = buildCloudEvent(
+        type = "sensor.reading",
+        data = buildJsonObject {
+            put("readingId", 3)
+            put("value", 150)
+        }
+    )
 }

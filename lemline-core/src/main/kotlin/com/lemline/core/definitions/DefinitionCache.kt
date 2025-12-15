@@ -113,7 +113,15 @@ object DefinitionCache {
     fun parseAndPut(definition: String): Workflow =
         try {
             WorkflowReader.validation().read(definition, WorkflowFormat.YAML)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            // Debug: print the YAML that failed
+            if (definition.contains("time:") && definition.contains("\${")) {
+                System.err.println("=== DEBUG: YAML parsing failed for time expression ===")
+                System.err.println("YAML:\n$definition")
+                System.err.println("Error: ${e.message}")
+                e.cause?.let { System.err.println("Cause: ${it.message}") }
+                System.err.println("=== END DEBUG ===")
+            }
             WorkflowReader.validation().read(definition, WorkflowFormat.JSON)
         }.also { workflow ->
             workflowCache[workflow.info] = workflow

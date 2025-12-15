@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.fasterxml.jackson.databind.node.ObjectNode
 import io.serverlessworkflow.impl.json.JsonUtils
+import net.thisptr.jackson.jq.BuiltinFunctionLoader
 import net.thisptr.jackson.jq.Output
 import net.thisptr.jackson.jq.Scope as JQScope
 import net.thisptr.jackson.jq.Versions
@@ -18,6 +19,13 @@ object JQExpression : ExpressionEvaluator {
 
     // The jqVersion of JQ being used.
     private val jqVersion = Versions.JQ_1_6
+
+    // Root scope with built-in functions loaded (shared across threads in read-only manner)
+    private val rootScope: JQScope by lazy {
+        JQScope.newEmptyScope().also { scope ->
+            BuiltinFunctionLoader.getInstance().loadFunctions(jqVersion, scope)
+        }
+    }
 
     /**
      * Evaluates a JQ expression against a given JSON node within a specified scope.
@@ -59,10 +67,12 @@ object JQExpression : ExpressionEvaluator {
         }
     }
 
-    /**`
-     * Converts an object JSON to a JQScope
+    /**
+     * Converts an object JSON to a JQScope with built-in functions available.
+     * Creates a child scope from rootScope to allow setting variables without
+     * modifying the shared root scope.
      */
-    private fun ObjectNode.toJQScope() = JQScope.newEmptyScope().apply {
+    private fun ObjectNode.toJQScope(): JQScope = JQScope.newChildScope(rootScope).apply {
         properties().forEach { field -> setValue(field.key, field.value) }
     }
 }

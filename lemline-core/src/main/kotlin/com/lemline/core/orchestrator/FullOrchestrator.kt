@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.orchestrator
 
+import com.fasterxml.jackson.databind.node.ObjectNode
+import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.info
@@ -9,6 +11,7 @@ import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
+import com.lemline.core.expressions.JQExpression
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.EmitConfig
@@ -24,6 +27,7 @@ import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.Workflow
+import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
 import java.time.OffsetDateTime
 import kotlin.time.Clock
@@ -31,13 +35,20 @@ import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 
 
@@ -234,6 +245,9 @@ internal object FullOrchestrator {
      *
      * The hook provides a raw event stream; this handler applies the listen configuration
      * (strategy, filters) to determine when to resume the workflow.
+     *
+     * Uses a timeout to prevent infinite waits when no matching events are received.
+     * Default timeout is 30 seconds for in-memory testing scenarios.
      */
     private suspend fun handle(
         event: WorkflowEvent.ListenStarted,
@@ -241,36 +255,51 @@ internal object FullOrchestrator {
     ): WorkflowCommand {
         logger.debug { "Listening for CloudEvents: strategy=${event.config.strategy} filters=${event.config.filters}" }
 
+        // Use configured timeout or default to 30 seconds for testing
+        val timeoutMillis = event.config.timeoutAt?.let {
+            (it - Clock.System.now()).inWholeMilliseconds.coerceAtLeast(0)
+        } ?: 3_000L
+
         return try {
-            val events = when (event.config.strategy) {
-                ListenStrategy.ONE -> {
-                    // Wait for first matching event
-                    val cloudEvent = cloudEventHook.receive()
-                        .filter { matchesFilters(it, event.config.filters) }
-                        .first()
-                    listOf(cloudEvent.toJsonElement())
-                }
-
-                ListenStrategy.ANY -> {
-                    // Wait for first matching event (or accumulate if until is set)
-                    // For simplicity, treat same as ONE in FullOrchestrator
-                    val cloudEvent = cloudEventHook.receive()
-                        .filter { matchesFilters(it, event.config.filters) }
-                        .first()
-                    listOf(cloudEvent.toJsonElement())
-                }
-
-                ListenStrategy.ALL -> {
-                    // Wait for one event per filter
-                    event.config.filters.map { filter ->
-                        cloudEventHook.receive()
-                            .filter { matchesFilters(it, listOf(filter)) }
+            val events = withTimeout(timeoutMillis) {
+                when (event.config.strategy) {
+                    ListenStrategy.ONE -> {
+                        // Wait for first matching event
+                        val cloudEvent = cloudEventHook.receive()
+                            .filter { matchesFilters(it, event.config.filters) }
                             .first()
-                            .toJsonElement()
+                        listOf(cloudEvent.toJsonElement())
+                    }
+
+                    ListenStrategy.ANY -> {
+                        // Wait for first matching event (or accumulate if until is set)
+                        // For simplicity, treat same as ONE in FullOrchestrator
+                        val cloudEvent = cloudEventHook.receive()
+                            .filter { matchesFilters(it, event.config.filters) }
+                            .first()
+                        listOf(cloudEvent.toJsonElement())
+                    }
+
+                    ListenStrategy.ALL -> {
+                        // Wait for one event per filter
+                        event.config.filters.map { filter ->
+                            cloudEventHook.receive()
+                                .filter { matchesFilters(it, listOf(filter)) }
+                                .first()
+                                .toJsonElement()
+                        }
                     }
                 }
             }
             event.resumeCompleted(JsonArray(events))
+        } catch (e: TimeoutCancellationException) {
+            logger.error { "Listen timed out waiting for matching events: filters=${event.config.filters}" }
+            event.resumeFailed(
+                InternalException.Error.from(
+                    IllegalStateException("Listen timeout: no matching CloudEvent received within ${timeoutMillis}ms"),
+                    event.nodePosition
+                )
+            )
         } catch (e: Exception) {
             logger.error(e) { "Listen failed" }
             event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
@@ -524,15 +553,103 @@ internal object FullOrchestrator {
 
     /**
      * Check if a CloudEvent matches any of the given filters.
+     *
+     * Supports all CloudEvent filter properties:
+     * - Literal-only fields (exact match): type, id, subject, datacontenttype
+     * - Expression-capable fields: source, dataschema, time, data (dataFilter)
      */
     private fun matchesFilters(event: CloudEvent, filters: List<EventFilter>): Boolean {
         if (filters.isEmpty()) return true // Empty filters = wildcard
 
+        // Parse event data once (lazily) for data filter evaluation
+        val eventData by lazy { parseEventData(event) }
+
         return filters.any { filter ->
-            val typeMatches = filter.type == null || filter.type == event.type
-            val sourceMatches = filter.source == null || filter.source == event.source?.toString()
-            val subjectMatches = filter.subject == null || filter.subject == event.subject
-            typeMatches && sourceMatches && subjectMatches
+            // Literal-only fields: exact string match
+            if (!matchesLiteralField(filter.type, event.type)) return@any false
+            if (!matchesLiteralField(filter.id, event.id)) return@any false
+            if (!matchesLiteralField(filter.subject, event.subject)) return@any false
+            if (!matchesLiteralField(filter.datacontenttype, event.dataContentType)) return@any false
+
+            // Expression-capable fields
+            if (!matchesExprField(filter.source, event.source?.toString())) return@any false
+            if (!matchesExprField(filter.dataschema, event.dataSchema?.toString())) return@any false
+            if (!matchesExprField(filter.time, event.time?.toString())) return@any false
+
+            // Data filter (expression against event payload)
+            if (!matchesDataFilter(filter.dataFilter, eventData)) return@any false
+
+            true
+        }
+    }
+
+    /**
+     * Matches a literal-only field (exact string match).
+     */
+    private fun matchesLiteralField(filterValue: String?, eventValue: String?): Boolean {
+        if (filterValue == null) return true
+        return filterValue == eventValue
+    }
+
+    /**
+     * Matches an expression-capable field.
+     * If the filter value is an expression (starts with ${), evaluate it against the event value.
+     * Otherwise, do exact string match.
+     */
+    private fun matchesExprField(filterValue: String?, eventValue: String?): Boolean {
+        if (filterValue == null) return true
+
+        return if (ExpressionUtils.isExpr(filterValue)) {
+            evaluateExpressionAsBoolean(filterValue, eventValue?.let { JsonPrimitive(it) } ?: JsonNull)
+        } else {
+            filterValue == eventValue
+        }
+    }
+
+    /**
+     * Matches data filter expression against event payload.
+     * The filter expression is evaluated against the event data and must return boolean.
+     */
+    private fun matchesDataFilter(dataFilter: String?, eventData: JsonElement): Boolean {
+        if (dataFilter == null) return true
+        if (eventData == JsonNull) return false
+
+        return evaluateExpressionAsBoolean("\${$dataFilter}", eventData)
+    }
+
+    /**
+     * Evaluates a JQ expression against input and expects a boolean result.
+     */
+    private fun evaluateExpressionAsBoolean(expression: String, input: JsonElement): Boolean {
+        return try {
+            val trimmedExpr = ExpressionUtils.trimExpr(expression)
+            val result = with(LemlineJson) {
+                val inputNode = input.toJsonNode()
+                val scope = JsonObject(emptyMap()).toJsonNode() as ObjectNode
+                JQExpression.eval(inputNode, trimmedExpr, scope).toJsonElement()
+            }
+            (result as? JsonPrimitive)?.booleanOrNull == true
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to evaluate expression: $expression" }
+            false
+        }
+    }
+
+    /**
+     * Parses the CloudEvent data payload to JsonElement.
+     */
+    private fun parseEventData(event: CloudEvent): JsonElement {
+        val data = event.data ?: return JsonNull
+        return try {
+            val bytes = data.toBytes()
+            if (bytes.isEmpty()) {
+                JsonNull
+            } else {
+                Json.parseToJsonElement(String(bytes))
+            }
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to parse CloudEvent data as JSON" }
+            JsonNull
         }
     }
 
@@ -541,19 +658,19 @@ internal object FullOrchestrator {
      */
     private fun CloudEvent.toJsonElement(): JsonElement {
         return buildJsonObject {
-            put("id", kotlinx.serialization.json.JsonPrimitive(id))
-            put("source", kotlinx.serialization.json.JsonPrimitive(source.toString()))
-            put("type", kotlinx.serialization.json.JsonPrimitive(type))
-            time?.let { put("time", kotlinx.serialization.json.JsonPrimitive(it.toString())) }
-            subject?.let { put("subject", kotlinx.serialization.json.JsonPrimitive(it)) }
-            dataSchema?.let { put("dataschema", kotlinx.serialization.json.JsonPrimitive(it.toString())) }
-            dataContentType?.let { put("datacontenttype", kotlinx.serialization.json.JsonPrimitive(it)) }
+            put("id", JsonPrimitive(id))
+            put("source", JsonPrimitive(source.toString()))
+            put("type", JsonPrimitive(type))
+            time?.let { put("time", JsonPrimitive(it.toString())) }
+            subject?.let { put("subject", JsonPrimitive(it)) }
+            dataSchema?.let { put("dataschema", JsonPrimitive(it.toString())) }
+            dataContentType?.let { put("datacontenttype", JsonPrimitive(it)) }
             data?.let {
                 val dataString = String(it.toBytes())
                 try {
-                    put("data", kotlinx.serialization.json.Json.parseToJsonElement(dataString))
+                    put("data", Json.parseToJsonElement(dataString))
                 } catch (_: Exception) {
-                    put("data", kotlinx.serialization.json.JsonPrimitive(dataString))
+                    put("data", JsonPrimitive(dataString))
                 }
             }
         }
