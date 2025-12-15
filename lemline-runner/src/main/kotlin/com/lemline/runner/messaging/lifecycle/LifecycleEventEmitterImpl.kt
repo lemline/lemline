@@ -2,6 +2,7 @@
 package com.lemline.runner.messaging.lifecycle
 
 import com.lemline.common.logger.logger
+import com.lemline.core.lifecycleevents.LifecycleEventEmitter
 import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LIFECYCLEEVENTS_OUT_CHANNEL
 import io.cloudevents.CloudEvent

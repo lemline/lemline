@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.lifecycle
+package com.lemline.core.lifecycleevents
 
 import io.cloudevents.CloudEvent
 import kotlin.time.ExperimentalTime
@@ -14,7 +14,7 @@ import kotlin.time.ExperimentalTime
  * - Events are sent asynchronously without waiting for acknowledgment
  * - Failures should be logged but never thrown to avoid impacting workflow execution
  *
- * @see LifecycleEventHookImpl for building CloudEvents from workflow state
+ * @see CloudEventLifecycleHook for building CloudEvents from workflow state
  */
 @ExperimentalTime
 interface LifecycleEventEmitter {
