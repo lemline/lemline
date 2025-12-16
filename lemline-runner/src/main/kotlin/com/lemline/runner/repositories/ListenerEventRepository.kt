@@ -286,6 +286,7 @@ internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
     /**
      * Bulk inserts events for all listeners matching the given query keys.
+     * Uses application-generated UUIDv7s to ensure compatibility with IDV7 validation.
      */
     suspend fun bulkInsertEventsForKeys(
         keys: List<ListenerQueryKey>,
@@ -296,33 +297,55 @@ internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         if (keys.isEmpty()) return 0
 
         return withConnection(connection) { conn ->
-            val selectSql = """
-                SELECT ${databaseManager.randomUuid()}, l.id, NULL, ?, ?, CURRENT_TIMESTAMP
-                FROM $LISTENER_TABLE l
+            // First, find all matching listener IDs
+            val selectListenersSql = """
+                SELECT l.id FROM $LISTENER_TABLE l
                 WHERE l.outbox_delayed_until IS NULL
                   AND l.outbox_completed_at IS NULL
                   AND l.outbox_failed_at IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
             """.trimIndent()
 
-            val sql = databaseManager.insertIgnoreSelect(
-                tableName = tableName,
-                columns = "$ID_COLUMN, $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $CLOUDEVENT_ID_COLUMN, $EVENT_COLUMN, $CREATED_AT_COLUMN",
-                selectSql = selectSql
-            )
-
-            conn.prepareStatement(sql).use { stmt ->
-                var idx = 1
-                stmt.setString(idx++, cloudEventId)
-                stmt.setString(idx++, eventJson)
-                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
-                stmt.executeUpdate()
+            val listenerIds = mutableListOf<IDV7>()
+            conn.prepareStatement(selectListenersSql).use { stmt ->
+                ListenerQueryKey.bindAllParameters(keys, stmt, 1)
+                stmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        getIDV7(rs, "id")?.let { listenerIds.add(it) }
+                    }
+                }
             }
+
+            if (listenerIds.isEmpty()) return@withConnection 0
+
+            // Insert events with application-generated UUIDv7s
+            val insertSql = """
+                INSERT INTO $tableName ($ID_COLUMN, $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $CLOUDEVENT_ID_COLUMN, $EVENT_COLUMN, $CREATED_AT_COLUMN)
+                VALUES (?, ?, NULL, ?, ?, CURRENT_TIMESTAMP)
+            """.trimIndent()
+
+            var inserted = 0
+            conn.prepareStatement(insertSql).use { stmt ->
+                for (listenerId in listenerIds) {
+                    val eventId = IDV7.random()
+                    setIDV7(stmt, 1, eventId)
+                    setIDV7(stmt, 2, listenerId)
+                    stmt.setString(3, cloudEventId)
+                    stmt.setString(4, eventJson)
+                    try {
+                        inserted += stmt.executeUpdate()
+                    } catch (_: java.sql.SQLException) {
+                        // Ignore duplicate key errors (idempotency)
+                    }
+                }
+            }
+            inserted
         }
     }
 
     /**
      * Bulk inserts events for ALL strategy listeners matching the given query keys.
+     * Uses application-generated UUIDv7s to ensure compatibility with IDV7 validation.
      */
     suspend fun bulkInsertEventsForAllStrategy(
         keys: List<ListenerQueryKey>,
@@ -333,28 +356,49 @@ internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         if (keys.isEmpty()) return 0
 
         return withConnection(connection) { conn ->
-            val selectSql = """
-                SELECT ${databaseManager.randomUuid()}, l.id, ?, NULL, ?, CURRENT_TIMESTAMP
-                FROM $LISTENER_TABLE l
+            // First, find all matching listener IDs
+            val selectListenersSql = """
+                SELECT l.id FROM $LISTENER_TABLE l
                 WHERE l.outbox_delayed_until IS NULL
                   AND l.outbox_completed_at IS NULL
                   AND l.outbox_failed_at IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
             """.trimIndent()
 
-            val sql = databaseManager.insertIgnoreSelect(
-                tableName = tableName,
-                columns = "$ID_COLUMN, $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $CLOUDEVENT_ID_COLUMN, $EVENT_COLUMN, $CREATED_AT_COLUMN",
-                selectSql = selectSql
-            )
-
-            conn.prepareStatement(sql).use { stmt ->
-                var idx = 1
-                stmt.setInt(idx++, filterIndex)
-                stmt.setString(idx++, eventJson)
-                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
-                stmt.executeUpdate()
+            val listenerIds = mutableListOf<IDV7>()
+            conn.prepareStatement(selectListenersSql).use { stmt ->
+                ListenerQueryKey.bindAllParameters(keys, stmt, 1)
+                stmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        getIDV7(rs, "id")?.let { listenerIds.add(it) }
+                    }
+                }
             }
+
+            if (listenerIds.isEmpty()) return@withConnection 0
+
+            // Insert events with application-generated UUIDv7s
+            val insertSql = """
+                INSERT INTO $tableName ($ID_COLUMN, $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $CLOUDEVENT_ID_COLUMN, $EVENT_COLUMN, $CREATED_AT_COLUMN)
+                VALUES (?, ?, ?, NULL, ?, CURRENT_TIMESTAMP)
+            """.trimIndent()
+
+            var inserted = 0
+            conn.prepareStatement(insertSql).use { stmt ->
+                for (listenerId in listenerIds) {
+                    val eventId = IDV7.random()
+                    setIDV7(stmt, 1, eventId)
+                    setIDV7(stmt, 2, listenerId)
+                    stmt.setInt(3, filterIndex)
+                    stmt.setString(4, eventJson)
+                    try {
+                        inserted += stmt.executeUpdate()
+                    } catch (_: java.sql.SQLException) {
+                        // Ignore duplicate key errors (idempotency)
+                    }
+                }
+            }
+            inserted
         }
     }
 
@@ -390,25 +434,29 @@ internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     }
 
     /**
-     * Marks an event as ready for foreach processing.
+     * Marks an event as ready for foreach processing with the given iteration index.
      */
     suspend fun markReadyForProcessing(
         id: IDV7,
+        iterationIndex: Int,
         connection: Connection? = null
     ): Int = withConnection(connection) { conn ->
         val now = Timestamp.from(Clock.System.now().toJavaInstant())
-        conn.prepareStatement(markReadyForProcessingSql).use { stmt ->
+        val updated = conn.prepareStatement(markReadyForProcessingSql).use { stmt ->
             stmt.setTimestamp(1, now)
-            stmt.setTimestamp(2, now)
-            setIDV7(stmt, 3, id)
+            stmt.setInt(2, iterationIndex)
+            stmt.setTimestamp(3, now)
+            setIDV7(stmt, 4, id)
             stmt.executeUpdate()
         }
+        updated
     }
 
     private val markReadyForProcessingSql by lazy {
         """
         UPDATE $tableName
         SET $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+            $ITERATION_INDEX_COLUMN = ?,
             $UPDATED_AT_COLUMN = ?
         WHERE $ID_COLUMN = ?
           AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
@@ -513,12 +561,13 @@ internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         limit: Int,
         connection: Connection? = null
     ): List<ListenerEventModel> = withConnection(connection) { conn ->
-        conn.prepareStatement(findReadyForForeachProcessingSql).use { stmt ->
+        val result = conn.prepareStatement(findReadyForForeachProcessingSql).use { stmt ->
             val now = Timestamp.from(Clock.System.now().toJavaInstant())
             stmt.setTimestamp(1, now)
             stmt.setInt(2, limit)
             stmt.executeQuery().use { rs -> rs.toModels() }
         }
+        result
     }
 
     private val findReadyForForeachProcessingSql by lazy {
@@ -557,5 +606,221 @@ internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         WHERE $LISTENER_ID_COLUMN = ?
           AND $ITERATION_INDEX_COLUMN = ?
         """.trimIndent()
+    }
+
+    // ========================================
+    // Foreach Scheduling Methods
+    // ========================================
+
+    /**
+     * Sets outbox_scheduled_for for all events of listeners matching the given keys
+     * that have foreach enabled (has_foreach = TRUE).
+     *
+     * This enables events to be picked up by the ListenerEventOutbox for foreach processing.
+     */
+    suspend fun setForeachScheduledForKeys(
+        keys: List<ListenerQueryKey>,
+        connection: Connection? = null
+    ): Int {
+        if (keys.isEmpty()) return 0
+
+        return withConnection(connection) { conn ->
+            val now = Timestamp.from(Clock.System.now().toJavaInstant())
+            // Use subquery for database-agnostic UPDATE (H2 doesn't support UPDATE ... FROM)
+            val sql = """
+                UPDATE $tableName
+                SET $OUTBOX_SCHEDULED_FOR_COLUMN = ?,
+                    $UPDATED_AT_COLUMN = ?
+                WHERE $OUTBOX_SCHEDULED_FOR_COLUMN IS NULL
+                  AND $LISTENER_ID_COLUMN IN (
+                      SELECT l.id FROM $LISTENER_TABLE l
+                      WHERE l.has_foreach = TRUE
+                        AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
+                  )
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                var idx = 1
+                stmt.setTimestamp(idx++, now)
+                stmt.setTimestamp(idx++, now)
+                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    /**
+     * Triggers first event for foreach processing for listeners matching the given keys.
+     * Sets outbox_delayed_until on the first pending event and foreach_processing on the listener.
+     *
+     * Only triggers if:
+     * - Listener has foreach enabled (has_foreach = TRUE)
+     * - Listener is not currently processing (foreach_processing = FALSE)
+     * - Event is scheduled (outbox_scheduled_for IS NOT NULL)
+     * - Event is not yet triggered (outbox_delayed_until IS NULL)
+     */
+    suspend fun triggerFirstEventForForeachListeners(
+        keys: List<ListenerQueryKey>,
+        connection: Connection? = null
+    ): Int {
+        if (keys.isEmpty()) return 0
+
+        return withConnection(connection) { conn ->
+            val now = Timestamp.from(Clock.System.now().toJavaInstant())
+
+            // Step 1: Find listeners that need their first event triggered
+            val selectListenersSql = """
+                SELECT l.id FROM $LISTENER_TABLE l
+                WHERE l.has_foreach = TRUE
+                  AND l.foreach_processing = FALSE
+                  AND l.outbox_delayed_until IS NULL
+                  AND l.outbox_completed_at IS NULL
+                  AND EXISTS (
+                      SELECT 1 FROM $tableName e
+                      WHERE e.$LISTENER_ID_COLUMN = l.id
+                        AND e.$OUTBOX_SCHEDULED_FOR_COLUMN IS NOT NULL
+                        AND e.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                        AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  )
+                  AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
+            """.trimIndent()
+
+            val listenerIds = mutableListOf<IDV7>()
+            conn.prepareStatement(selectListenersSql).use { stmt ->
+                ListenerQueryKey.bindAllParameters(keys, stmt, 1)
+                stmt.executeQuery().use { rs ->
+                    while (rs.next()) {
+                        getIDV7(rs, "id")?.let { listenerIds.add(it) }
+                    }
+                }
+            }
+
+            if (listenerIds.isEmpty()) return@withConnection 0
+
+            // Step 2: Mark listeners as processing
+            for (listenerId in listenerIds) {
+                val updateListenerSql = """
+                    UPDATE $LISTENER_TABLE
+                    SET foreach_processing = TRUE,
+                        $UPDATED_AT_COLUMN = ?
+                    WHERE id = ?
+                      AND foreach_processing = FALSE
+                """.trimIndent()
+
+                conn.prepareStatement(updateListenerSql).use { stmt ->
+                    stmt.setTimestamp(1, now)
+                    setIDV7(stmt, 2, listenerId)
+                    stmt.executeUpdate()
+                }
+            }
+
+            // Step 3: Trigger the first event for each listener
+            // Use MIN(created_at) to identify the first pending event without reading UUIDs
+            // (H2's RANDOM_UUID generates UUIDv4 which fails IDV7 validation)
+            // Calculate iteration_index as MAX(existing) + 1 to handle resumption after waiting
+            var totalTriggered = 0
+            for (listenerId in listenerIds) {
+                val triggerEventSql = """
+                    UPDATE $tableName
+                    SET $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+                        $ITERATION_INDEX_COLUMN = COALESCE(
+                            (SELECT MAX($ITERATION_INDEX_COLUMN) + 1 FROM $tableName
+                             WHERE $LISTENER_ID_COLUMN = ? AND $ITERATION_INDEX_COLUMN IS NOT NULL),
+                            0
+                        ),
+                        $UPDATED_AT_COLUMN = ?
+                    WHERE $LISTENER_ID_COLUMN = ?
+                      AND $OUTBOX_SCHEDULED_FOR_COLUMN IS NOT NULL
+                      AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                      AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                      AND $CREATED_AT_COLUMN = (
+                          SELECT MIN($CREATED_AT_COLUMN) FROM $tableName
+                          WHERE $LISTENER_ID_COLUMN = ?
+                            AND $OUTBOX_SCHEDULED_FOR_COLUMN IS NOT NULL
+                            AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                            AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                      )
+                """.trimIndent()
+
+                conn.prepareStatement(triggerEventSql).use { stmt ->
+                    stmt.setTimestamp(1, now)
+                    setIDV7(stmt, 2, listenerId)
+                    stmt.setTimestamp(3, now)
+                    setIDV7(stmt, 4, listenerId)
+                    setIDV7(stmt, 5, listenerId)
+                    totalTriggered += stmt.executeUpdate()
+                }
+            }
+
+            totalTriggered
+        }
+    }
+
+    /**
+     * Sets outbox_scheduled_for for all events of a specific listener.
+     * Used when listener completion criteria is met and foreach processing should begin.
+     */
+    suspend fun setForeachScheduledForListener(
+        listenerId: IDV7,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        val now = Timestamp.from(Clock.System.now().toJavaInstant())
+        val sql = """
+            UPDATE $tableName
+            SET $OUTBOX_SCHEDULED_FOR_COLUMN = ?,
+                $UPDATED_AT_COLUMN = ?
+            WHERE $LISTENER_ID_COLUMN = ?
+              AND $OUTBOX_SCHEDULED_FOR_COLUMN IS NULL
+        """.trimIndent()
+
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.setTimestamp(1, now)
+            stmt.setTimestamp(2, now)
+            setIDV7(stmt, 3, listenerId)
+            stmt.executeUpdate()
+        }
+    }
+
+    /**
+     * Triggers the first pending event for foreach processing for a specific listener.
+     * Sets outbox_delayed_until on the first pending event.
+     */
+    suspend fun triggerFirstEventForListener(
+        listenerId: IDV7,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        val now = Timestamp.from(Clock.System.now().toJavaInstant())
+        // Use MIN(created_at) to identify the first event without reading UUIDs
+        // (H2's RANDOM_UUID generates UUIDv4 which fails IDV7 validation)
+        val sql = """
+            UPDATE $tableName
+            SET $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+                $ITERATION_INDEX_COLUMN = COALESCE(
+                    (SELECT MAX($ITERATION_INDEX_COLUMN) + 1 FROM $tableName
+                     WHERE $LISTENER_ID_COLUMN = ? AND $ITERATION_INDEX_COLUMN IS NOT NULL),
+                    0
+                ),
+                $UPDATED_AT_COLUMN = ?
+            WHERE $LISTENER_ID_COLUMN = ?
+              AND $OUTBOX_SCHEDULED_FOR_COLUMN IS NOT NULL
+              AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+              AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+              AND $CREATED_AT_COLUMN = (
+                  SELECT MIN($CREATED_AT_COLUMN) FROM $tableName
+                  WHERE $LISTENER_ID_COLUMN = ?
+                    AND $OUTBOX_SCHEDULED_FOR_COLUMN IS NOT NULL
+                    AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                    AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+              )
+        """.trimIndent()
+
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.setTimestamp(1, now)
+            setIDV7(stmt, 2, listenerId)
+            stmt.setTimestamp(3, now)
+            setIDV7(stmt, 4, listenerId)
+            setIDV7(stmt, 5, listenerId)
+            stmt.executeUpdate()
+        }
     }
 }

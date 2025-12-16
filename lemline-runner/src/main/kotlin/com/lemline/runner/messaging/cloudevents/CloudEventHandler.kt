@@ -242,6 +242,7 @@ internal class CloudEventHandler(
      *
      * Completes listeners with all their accumulated events (excluding the termination event)
      * in a single UPDATE with subquery, avoiding loading listeners into memory.
+     * For foreach-enabled listeners, marks them as logically completed instead.
      *
      * @param definitions Termination definition matches
      * @return Number of listeners that were completed
@@ -250,11 +251,20 @@ internal class CloudEventHandler(
         definitions: List<TerminationDefinitionMatch>
     ): Int {
         val queryKeys = definitions.map { it.toQueryKey() }.distinct()
+        val foreachQueryKeys = definitions.filter { it.hasForeach }.map { it.toQueryKey() }.distinct()
 
+        // Mark non-foreach listeners ready for immediate completion
         val completed = listenerRepository.markTerminatedByKeys(queryKeys)
-
         if (completed > 0) {
             logger.info { "Direct UPDATE marked $completed listeners ready for completion (termination event received)" }
+        }
+
+        // Mark foreach-enabled listeners as logically completed (they'll complete after foreach finishes)
+        if (foreachQueryKeys.isNotEmpty()) {
+            val foreachCompleted = listenerRepository.markForeachTerminatedByKeys(foreachQueryKeys)
+            if (foreachCompleted > 0) {
+                logger.info { "Marked $foreachCompleted foreach listeners as logically completed (termination event received)" }
+            }
         }
 
         return completed
@@ -267,6 +277,7 @@ internal class CloudEventHandler(
      * 1. Grouping definitions by (filterIndex, readAs) for batch processing
      * 2. Bulk INSERT events using INSERT...SELECT (one query per group, no memory load)
      * 3. Direct UPDATE with subquery to mark complete listeners (COUNT >= filters_count)
+     * 4. For foreach-enabled listeners: schedule events for foreach processing instead
      *
      * Idempotency is ensured by:
      * - filter_index column with UNIQUE(listener_id, filter_index) constraint
@@ -285,8 +296,9 @@ internal class CloudEventHandler(
 
         val byGroup = definitions.groupBy { AllGroupKey(it.filterIndex, it.readAs) }
 
-        // Collect all query keys for the final completion check
+        // Collect query keys separately for foreach and non-foreach
         val allQueryKeys = mutableSetOf<ListenerQueryKey>()
+        val foreachQueryKeys = mutableSetOf<ListenerQueryKey>()
 
         // Step 1: Bulk INSERT events for each (filterIndex, readAs) group
         for ((groupKey, defGroup) in byGroup) {
@@ -295,6 +307,9 @@ internal class CloudEventHandler(
 
             val queryKeys = defGroup.map { it.toQueryKey() }.distinct()
             allQueryKeys.addAll(queryKeys)
+
+            // Collect foreach keys separately
+            defGroup.filter { it.hasForeach }.forEach { foreachQueryKeys.add(it.toQueryKey()) }
 
             val inserted = listenerEventRepository.bulkInsertEventsForAllStrategy(
                 keys = queryKeys,
@@ -307,11 +322,30 @@ internal class CloudEventHandler(
 
         if (allQueryKeys.isEmpty()) return 0
 
-        // Step 2: Direct UPDATE with subquery to mark completed listeners
-        val completed = listenerRepository.markAllCompletedByKeys(allQueryKeys.toList())
+        var completed = 0
 
-        if (completed > 0) {
-            logger.info { "Direct UPDATE marked $completed ALL listeners ready for completion (all filters matched)" }
+        // Step 2a: Direct UPDATE for non-foreach listeners (immediate completion)
+        val nonForeachCompleted = listenerRepository.markAllCompletedByKeys(allQueryKeys.toList())
+        if (nonForeachCompleted > 0) {
+            logger.info { "Direct UPDATE marked $nonForeachCompleted ALL listeners ready for completion (all filters matched)" }
+            completed += nonForeachCompleted
+        }
+
+        // Step 2b: For foreach-enabled listeners - schedule events and mark logically completed
+        if (foreachQueryKeys.isNotEmpty()) {
+            // Set outbox_scheduled_for on events for foreach processing
+            val scheduled = listenerEventRepository.setForeachScheduledForKeys(foreachQueryKeys.toList())
+            logger.debug { "Scheduled $scheduled events for foreach processing (ALL strategy)" }
+
+            // Trigger first event for listeners not already processing
+            val triggered = listenerEventRepository.triggerFirstEventForForeachListeners(foreachQueryKeys.toList())
+            logger.debug { "Triggered first event for $triggered foreach listeners (ALL strategy)" }
+
+            // Mark foreach listeners as logically completed (they'll complete after foreach finishes)
+            val foreachCompleted = listenerRepository.markForeachAllCompletedByKeys(foreachQueryKeys.toList())
+            if (foreachCompleted > 0) {
+                logger.info { "Marked $foreachCompleted ALL foreach listeners as logically completed (foreach will process)" }
+            }
         }
 
         return completed
@@ -367,6 +401,7 @@ internal class CloudEventHandler(
      * 2. Stream listeners with accumulated events using cursor (constant memory)
      * 3. Evaluate expression on each streamed listener
      * 4. Batch UPDATE ready listeners (periodic flushes)
+     * 5. For foreach-enabled listeners: schedule events for foreach processing instead
      *
      * Idempotency is ensured by:
      * - cloudevent_id column with UNIQUE constraint prevents duplicate events on retry
@@ -390,6 +425,7 @@ internal class CloudEventHandler(
             val eventJson = Json.encodeToString(eventData)
 
             val queryKeys = defGroup.map { it.toQueryKey() }.distinct()
+            val foreachQueryKeys = defGroup.filter { it.hasForeach }.map { it.toQueryKey() }.distinct()
 
             // Build map of (workflowInfo, position) -> until expression
             val untilExpressions = defGroup.associate { def ->
@@ -405,8 +441,18 @@ internal class CloudEventHandler(
             )
             logger.debug { "Bulk inserted $inserted events for ANY+until(expr) listeners (readAs=$readAs)" }
 
+            // Step 1b: For foreach-enabled listeners, schedule events for foreach processing
+            if (foreachQueryKeys.isNotEmpty()) {
+                val scheduled = listenerEventRepository.setForeachScheduledForKeys(foreachQueryKeys)
+                logger.debug { "Scheduled $scheduled events for foreach processing (ANY+until expr)" }
+
+                val triggered = listenerEventRepository.triggerFirstEventForForeachListeners(foreachQueryKeys)
+                logger.debug { "Triggered first event for $triggered foreach listeners (ANY+until expr)" }
+            }
+
             // Step 2: Stream listeners with accumulated events and evaluate expressions
             val readyListeners = mutableMapOf<IDV7, String>()
+            val foreachReadyListenerIds = mutableListOf<IDV7>()
             val batchSize = 1000
 
             listenerRepository.streamListenersWithEvents(queryKeys).collect { (listener, accumulatedEvents) ->
@@ -425,10 +471,17 @@ internal class CloudEventHandler(
                 }
 
                 if (shouldComplete) {
-                    readyListeners[listener.id] = Json.encodeToString(eventsArray)
-                    logger.debug { "ANY+until expression evaluated to true for listener ${listener.id}" }
+                    if (listener.hasForeach) {
+                        // Foreach listener: just mark as logically completed
+                        foreachReadyListenerIds.add(listener.id)
+                        logger.debug { "ANY+until expression evaluated to true for foreach listener ${listener.id}" }
+                    } else {
+                        // Non-foreach listener: mark ready for immediate completion
+                        readyListeners[listener.id] = Json.encodeToString(eventsArray)
+                        logger.debug { "ANY+until expression evaluated to true for listener ${listener.id}" }
+                    }
 
-                    // Flush batch if size reached
+                    // Flush non-foreach batch if size reached
                     if (readyListeners.size >= batchSize) {
                         val flushed = listenerRepository.batchMarkReadyForCompletionFromEvents(readyListeners.toMap())
                         totalAffected += flushed
@@ -438,11 +491,19 @@ internal class CloudEventHandler(
                 }
             }
 
-            // Flush remaining
+            // Flush remaining non-foreach listeners
             if (readyListeners.isNotEmpty()) {
                 val flushed = listenerRepository.batchMarkReadyForCompletionFromEvents(readyListeners)
                 totalAffected += flushed
                 logger.info { "Flushed final $flushed ANY+until(expr) listeners ready for completion" }
+            }
+
+            // Mark foreach listeners as logically completed (they'll complete after foreach finishes)
+            for (listenerId in foreachReadyListenerIds) {
+                listenerRepository.setListenerCompleted(listenerId, true)
+            }
+            if (foreachReadyListenerIds.isNotEmpty()) {
+                logger.info { "Marked ${foreachReadyListenerIds.size} ANY+until(expr) foreach listeners as logically completed" }
             }
         }
 
@@ -456,6 +517,7 @@ internal class CloudEventHandler(
      * termination event arrives (via processTerminationEventsDirect).
      *
      * Uses INSERT...SELECT to bulk insert events without loading listeners into memory.
+     * For foreach-enabled listeners, also schedules events for foreach processing.
      *
      * @param definitions Definition matches for ANY + until(event) strategy
      * @param event The CloudEvent being processed
@@ -472,6 +534,7 @@ internal class CloudEventHandler(
             val eventJson = Json.encodeToString(eventData)
 
             val queryKeys = defGroup.map { it.toQueryKey() }.distinct()
+            val foreachQueryKeys = defGroup.filter { it.hasForeach }.map { it.toQueryKey() }.distinct()
 
             // Bulk INSERT events for all matching listeners (one query, no memory load)
             val inserted = listenerEventRepository.bulkInsertEventsForKeys(
@@ -480,6 +543,15 @@ internal class CloudEventHandler(
                 eventJson = eventJson
             )
             logger.debug { "Bulk inserted $inserted events for ANY+until(event) listeners (readAs=$readAs, accumulating)" }
+
+            // For foreach-enabled listeners, schedule events for foreach processing
+            if (foreachQueryKeys.isNotEmpty()) {
+                val scheduled = listenerEventRepository.setForeachScheduledForKeys(foreachQueryKeys)
+                logger.debug { "Scheduled $scheduled events for foreach processing (ANY+until event)" }
+
+                val triggered = listenerEventRepository.triggerFirstEventForForeachListeners(foreachQueryKeys)
+                logger.debug { "Triggered first event for $triggered foreach listeners (ANY+until event)" }
+            }
         }
 
         // Accumulation doesn't complete listeners - just stores events

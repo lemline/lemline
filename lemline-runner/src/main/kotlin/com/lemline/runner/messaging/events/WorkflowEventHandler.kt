@@ -274,10 +274,14 @@ internal class WorkflowEventHandler(
             }
 
             // For ALL/ANY+until strategies: process events from listener_events table
+            // Use the listener's foreachCurrentIndex from the database (not message.workflowState.index
+            // which is always 0 because the core processor doesn't track runner iteration indices)
+            val currentIterationIndex = listener.foreachCurrentIndex
+
             // Find the current event being processed (by iteration index)
             val currentEvent = listenerEventRepository.findByListenerIdAndIterationIndex(
                 listener.id,
-                message.workflowState.index,
+                currentIterationIndex,
                 conn
             )
 
@@ -290,6 +294,9 @@ internal class WorkflowEventHandler(
                 )
             }
 
+            // Calculate next iteration index before incrementing
+            val nextIterationIndex = currentIterationIndex + 1
+
             // Increment foreach index and clear processing flag
             listenerRepository.incrementForeachIndex(listener.id, conn)
             listenerRepository.setForeachProcessing(listener.id, false, conn)
@@ -298,10 +305,10 @@ internal class WorkflowEventHandler(
             val nextEvent = listenerEventRepository.findNextPending(listener.id, conn)
 
             if (nextEvent != null) {
-                // More events to process: mark next event ready for outbox pickup
-                listenerEventRepository.markReadyForProcessing(nextEvent.id, conn)
+                // More events to process: mark next event ready for outbox pickup with correct iteration index
+                listenerEventRepository.markReadyForProcessing(nextEvent.id, nextIterationIndex, conn)
                 listenerRepository.setForeachProcessing(listener.id, true, conn)
-                logger.debug { "Next event ${nextEvent.id} ready for foreach processing" }
+                logger.debug { "Next event ${nextEvent.id} ready for foreach processing at index $nextIterationIndex" }
             } else if (listener.listenerCompleted) {
                 // All events processed and listener is complete: aggregate outputs and finish
                 val outputs = listenerEventRepository.getAllOutputs(listener.id, conn)

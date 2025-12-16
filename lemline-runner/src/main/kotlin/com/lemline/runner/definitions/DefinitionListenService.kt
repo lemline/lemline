@@ -50,7 +50,9 @@ data class DefinitionMatch(
     val strategy: ListenStrategy,
     val readAs: ListenTaskConfiguration.ListenAndReadAs,
     /** Until condition for ANY+until accumulation mode (null for ONE, ANY without until, ALL) */
-    val until: CachedUntilCondition? = null
+    val until: CachedUntilCondition? = null,
+    /** Whether this listen task has foreach enabled for sequential event processing */
+    val hasForeach: Boolean = false
 ) {
     /** Converts this definition match to a query key for listener lookup. */
     fun toQueryKey() = ListenerQueryKey(
@@ -69,7 +71,9 @@ data class DefinitionMatch(
 data class TerminationDefinitionMatch(
     val workflowInfo: WorkflowInfo,
     val nodePosition: NodePosition,
-    val readAs: ListenTaskConfiguration.ListenAndReadAs
+    val readAs: ListenTaskConfiguration.ListenAndReadAs,
+    /** Whether this listen task has foreach enabled for sequential event processing */
+    val hasForeach: Boolean = false
 ) {
     /** Converts this termination match to a query key (without correlation - termination doesn't use it). */
     fun toQueryKey() = ListenerQueryKey(
@@ -165,7 +169,8 @@ class DefinitionListenService {
                     totalFilters = task.filters.size,
                     strategy = task.strategy,
                     readAs = task.readAs,
-                    until = task.until
+                    until = task.until,
+                    hasForeach = task.hasForeach
                 )
             }
         }
@@ -201,7 +206,8 @@ class DefinitionListenService {
             TerminationDefinitionMatch(
                 workflowInfo = task.workflowInfo,
                 nodePosition = task.nodePosition,
-                readAs = task.readAs
+                readAs = task.readAs,
+                hasForeach = task.hasForeach
             )
         }
 

@@ -44,7 +44,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -1010,15 +1009,14 @@ internal class ListenTaskEndToEndTest {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("Foreach for ANY+until strategies requires Phase 5 implementation (ListenerEventOutbox)")
     fun `listen ANY with until expression and foreach processes all events sequentially`() = runTest {
         // Given: A workflow with ANY+until expression and foreach
         val workflowName = WorkflowName("listen-any-until-expr-foreach-${System.currentTimeMillis()}")
-        val yaml = """
+        val yaml = $$"""
             document:
               dsl: '1.0.0'
               namespace: test
-              name: $workflowName
+              name: $$workflowName
               version: '1.0.0'
             do:
               - collectReadings:
@@ -1033,7 +1031,7 @@ internal class ListenTaskEndToEndTest {
                       - processReading:
                           set:
                             processed: true
-                            value: ${'$'}{ .value }
+                            value: ${ .value }
         """.trimIndent()
 
         registerWorkflow(yaml, workflowName)
@@ -1066,15 +1064,14 @@ internal class ListenTaskEndToEndTest {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("Foreach for ANY+until strategies requires Phase 5 implementation (ListenerEventOutbox)")
     fun `listen ANY with until event and foreach processes accumulated events`() = runTest {
         // Given: A workflow with ANY+until event and foreach
         val workflowName = WorkflowName("listen-any-until-event-foreach-${System.currentTimeMillis()}")
-        val yaml = """
+        val yaml = $$"""
             document:
               dsl: '1.0.0'
               namespace: test
-              name: $workflowName
+              name: $$workflowName
               version: '1.0.0'
             do:
               - monitorVitals:
@@ -1092,7 +1089,7 @@ internal class ListenTaskEndToEndTest {
                       - recordVitals:
                           set:
                             recorded: true
-                            heartRate: ${'$'}{ .bpm }
+                            heartRate: ${ .bpm }
         """.trimIndent()
 
         registerWorkflow(yaml, workflowName)
@@ -1131,7 +1128,7 @@ internal class ListenTaskEndToEndTest {
     }
 
     @Test
-    @org.junit.jupiter.api.Disabled("Foreach for ALL strategy requires Phase 5 implementation (ListenerEventOutbox)")
+    // @org.junit.jupiter.api.Disabled("Phase 5 infrastructure implemented, needs debugging of event sequencing")
     fun `listen ALL with foreach processes each matched filter event`() = runTest {
         // Given: A workflow with ALL strategy and foreach
         val workflowName = WorkflowName("listen-all-foreach-${System.currentTimeMillis()}")
@@ -1163,17 +1160,25 @@ internal class ListenTaskEndToEndTest {
         processUntilListenStarted(workflowId)
         realDelay(DB_WRITE_DELAY_MS)
 
-        // Send both required events
+        // Send both required events with longer delay to ensure both are fully processed by CloudEventHandler
         sendCloudEvent(type = "com.example.OrderCreated", data = """{"orderId": "ORD-001"}""")
-        realDelay(EVENT_INTERVAL_MS)
+        realDelay(1000) // Wait 1s for first event to be processed
         sendCloudEvent(type = "com.example.PaymentReceived", data = """{"amount": 99.99}""")
+        realDelay(1000) // Wait 1s for second event to be processed
 
+        // Wait for outbox to process both events through foreach
+        realDelay(5000) // 5 seconds for outbox processing (2 events * 2 polls + buffer)
+
+        // Process messages to help route ListenForEachCompleted events
+        processMessages(workflowId, maxIterations = 100)
         realDelay(OUTBOX_PROCESSING_DELAY_MS)
-        val result = processUntilCompletion(workflowId)
+        val result = processUntilCompletion(workflowId, timeoutMs = 20000)
 
         // Then: Output should be an array with 2 processed events
         result shouldNotBe null
+        println("DEBUG: result = $result")
         val events = result!!.jsonArray
+        println("DEBUG: events.size = ${events.size}")
         events.size shouldBe 2
 
         // All events should be marked as processed

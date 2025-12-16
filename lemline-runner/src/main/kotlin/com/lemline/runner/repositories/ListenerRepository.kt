@@ -576,6 +576,7 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
 
     /**
      * Marks listeners as terminated by query keys (ANY + until(event) strategy).
+     * Only affects non-foreach listeners (has_foreach = FALSE).
      */
     suspend fun markTerminatedByKeys(
         keys: List<ListenerQueryKey>,
@@ -600,6 +601,7 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
                 WHERE $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
                   AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
                   AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND $HAS_FOREACH_COLUMN = FALSE
                   AND (${conditions.joinToString(" OR ")})
             """.trimIndent()
 
@@ -616,7 +618,45 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
     }
 
     /**
+     * Marks foreach-enabled listeners as logically completed (ANY + until(event) strategy).
+     * Sets listener_completed = TRUE without setting outbox_delayed_until.
+     * The ListenerEventOutbox will complete the listener after all foreach iterations.
+     */
+    suspend fun markForeachTerminatedByKeys(
+        keys: List<ListenerQueryKey>,
+        connection: Connection? = null
+    ): Int {
+        if (keys.isEmpty()) return 0
+
+        return withConnection(connection) { conn ->
+            val now = nowTimestamp()
+            val conditions = keys.map { it.toSqlConditionWithoutCorrelation("l") }
+
+            val sql = """
+                UPDATE $tableName l
+                SET $LISTENER_COMPLETED_COLUMN = TRUE,
+                    $UPDATED_AT_COLUMN = ?
+                WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND l.$HAS_FOREACH_COLUMN = TRUE
+                  AND (${conditions.joinToString(" OR ")})
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                var idx = 1
+                stmt.setTimestamp(idx++, now)
+                for (key in keys) {
+                    idx = key.bindParametersWithoutCorrelation(stmt, idx)
+                }
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    /**
      * Marks listeners as completed by query keys (ALL strategy).
+     * Only affects non-foreach listeners (has_foreach = FALSE).
      */
     suspend fun markAllCompletedByKeys(
         keys: List<ListenerQueryKey>,
@@ -641,6 +681,7 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
                   AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
                   AND $OUTBOX_FAILED_AT_COLUMN IS NULL
                   AND $FILTERS_COUNT_COLUMN IS NOT NULL
+                  AND $HAS_FOREACH_COLUMN = FALSE
                   AND (SELECT COUNT(*) FROM $LISTENER_EVENT_TABLE e WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}) >= $FILTERS_COUNT_COLUMN
                   AND (${ListenerQueryKey.buildWhereClause(keys)})
             """.trimIndent()
@@ -648,6 +689,42 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
             conn.prepareStatement(sql).use { stmt ->
                 var idx = 1
                 stmt.setTimestamp(idx++, now)
+                stmt.setTimestamp(idx++, now)
+                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    /**
+     * Marks foreach-enabled listeners as logically completed (ALL strategy).
+     * Sets listener_completed = TRUE without setting outbox_delayed_until.
+     * The ListenerEventOutbox will complete the listener after all foreach iterations.
+     */
+    suspend fun markForeachAllCompletedByKeys(
+        keys: List<ListenerQueryKey>,
+        connection: Connection? = null
+    ): Int {
+        if (keys.isEmpty()) return 0
+
+        return withConnection(connection) { conn ->
+            val now = nowTimestamp()
+
+            val sql = """
+                UPDATE $tableName l
+                SET $LISTENER_COMPLETED_COLUMN = TRUE,
+                    $UPDATED_AT_COLUMN = ?
+                WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND l.$FILTERS_COUNT_COLUMN IS NOT NULL
+                  AND l.$HAS_FOREACH_COLUMN = TRUE
+                  AND (SELECT COUNT(*) FROM $LISTENER_EVENT_TABLE e WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}) >= l.$FILTERS_COUNT_COLUMN
+                  AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                var idx = 1
                 stmt.setTimestamp(idx++, now)
                 ListenerQueryKey.bindAllParameters(keys, stmt, idx)
                 stmt.executeUpdate()

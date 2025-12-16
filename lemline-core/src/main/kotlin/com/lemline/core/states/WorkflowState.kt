@@ -499,8 +499,12 @@ sealed class WorkflowEvent : WorkflowState() {
          * Resume for foreach processing with a single event.
          * Creates a ResumeFromTask targeting the foreach.do position.
          *
+         * Note: The iteration index parameter is not used by the core processor.
+         * The runner tracks iteration indices in the database and uses them when
+         * handling ListenForEachCompleted events.
+         *
          * @param eventData The CloudEvent data to process
-         * @param iterationIndex The iteration index (0-based) for this foreach execution
+         * @param iterationIndex The iteration index (0-based) - tracked by runner, not used here
          */
         fun resumeForeach(eventData: JsonElement, iterationIndex: Int) = WorkflowCommand.ResumeFromTask(
             nodeStack = nodeStack,
