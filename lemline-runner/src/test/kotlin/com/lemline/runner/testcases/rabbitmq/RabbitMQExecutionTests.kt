@@ -9,6 +9,7 @@ import com.lemline.core.testcases.ExportContextTestCases
 import com.lemline.core.testcases.ForTaskTestCases
 import com.lemline.core.testcases.ForkTaskTestCases
 import com.lemline.core.testcases.IfConditionTestCases
+import com.lemline.core.testcases.ListenTestCases
 import com.lemline.core.testcases.RunScriptTestCases
 import com.lemline.core.testcases.RunShellTestCases
 import com.lemline.core.testcases.RunWorkflowTestCases
@@ -86,3 +87,7 @@ internal class RabbitMQTryExecutionTest : BrokerWorkflowTest(TryTaskTestCases.ca
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQWaitExecutionTest : BrokerWorkflowTest(WaitTestCases.cases)
+
+@QuarkusTest
+@TestProfile(RabbitMQTestCaseProfile::class)
+internal class RabbitMQListenExecutionTest : BrokerWorkflowTest(ListenTestCases.cases)

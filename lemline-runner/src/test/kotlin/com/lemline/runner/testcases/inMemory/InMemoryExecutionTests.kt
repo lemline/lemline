@@ -9,6 +9,7 @@ import com.lemline.core.testcases.ExportContextTestCases
 import com.lemline.core.testcases.ForTaskTestCases
 import com.lemline.core.testcases.ForkTaskTestCases
 import com.lemline.core.testcases.IfConditionTestCases
+import com.lemline.core.testcases.ListenTestCases
 import com.lemline.core.testcases.RunScriptTestCases
 import com.lemline.core.testcases.RunShellTestCases
 import com.lemline.core.testcases.RunWorkflowTestCases
@@ -80,3 +81,7 @@ internal class TryExecutionTest : InMemoryWorkflowTest(TryTaskTestCases.cases)
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
 internal class WaitExecutionTest : InMemoryWorkflowTest(WaitTestCases.cases)
+
+@QuarkusTest
+@TestProfile(InMemoryProfile::class)
+internal class ListenExecutionTest : InMemoryWorkflowTest(ListenTestCases.cases)
