@@ -38,7 +38,7 @@ object ListenTestCases {
             validate = expectOutputMatching("array with order event data") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("orderId")?.jsonPrimitive?.contentOrNull == "ORD-12345"
+                    arr[0].jsonObject["orderId"]?.jsonPrimitive?.contentOrNull == "ORD-12345"
             }
         ),
 
@@ -58,8 +58,8 @@ object ListenTestCases {
             validate = expectOutputMatching("array with user registration data") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("userId")?.jsonPrimitive?.contentOrNull == "USR-98765" &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("email")?.jsonPrimitive?.contentOrNull == "user@example.com"
+                    arr[0].jsonObject["userId"]?.jsonPrimitive?.contentOrNull == "USR-98765" &&
+                    arr[0].jsonObject["email"]?.jsonPrimitive?.contentOrNull == "user@example.com"
             }
         ),
 
@@ -79,7 +79,7 @@ object ListenTestCases {
             validate = expectOutputMatching("array with generic event data (wildcard match)") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("type")?.jsonPrimitive?.contentOrNull == "generic"
+                    arr[0].jsonObject["type"]?.jsonPrimitive?.contentOrNull == "generic"
             }
         ),
 
@@ -99,7 +99,7 @@ object ListenTestCases {
                             with:
                               type: order.created
                       output:
-                        as: '${ .[0].data | {id: .orderId, customer: .customerId} }'
+                        as: '${ .[0] | {id: .orderId, customer: .customerId} }'
             """.trimIndent(),
             tags = setOf("listen", "cloudevents"),
             validate = expectOutputMatching("transformed order with id and customer") { output ->
@@ -121,7 +121,7 @@ object ListenTestCases {
                             with:
                               type: order.created
                       output:
-                        as: '${ .[0].data.items[0] }'
+                        as: '${ .[0].items[0] }'
             """.trimIndent(),
             tags = setOf("listen", "cloudevents"),
             validate = expectOutputMatching("first item from order") { output ->
@@ -148,7 +148,7 @@ object ListenTestCases {
                               type: order.created
                   - processOrder:
                       set:
-                        orderId: ${ .[0].data.orderId }
+                        orderId: ${ .[0].orderId }
                         processed: true
             """.trimIndent(),
             tags = setOf("listen", "cloudevents"),
@@ -172,7 +172,7 @@ object ListenTestCases {
                             with:
                               type: order.created
                       output:
-                        as: '${ .[0].data }'
+                        as: '${ .[0] }'
                   - fetchDetails:
                       call: http
                       with:
@@ -206,9 +206,9 @@ object ListenTestCases {
             validate = expectOutputMatching("sensor reading with temperature and humidity") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("sensorId")?.jsonPrimitive?.contentOrNull == "SENSOR-001" &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("temperature")?.jsonPrimitive?.double == 23.5 &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("humidity")?.jsonPrimitive?.content == "65"
+                    arr[0].jsonObject["sensorId"]?.jsonPrimitive?.contentOrNull == "SENSOR-001" &&
+                    arr[0].jsonObject["temperature"]?.jsonPrimitive?.double == 23.5 &&
+                    arr[0].jsonObject["humidity"]?.jsonPrimitive?.content == "65"
             }
         ),
 
@@ -224,7 +224,7 @@ object ListenTestCases {
                             with:
                               type: sensor.reading
                       output:
-                        as: '${ .[0].data | {sensor: .sensorId, tempF: ((.temperature * 9/5) + 32)} }'
+                        as: '${ .[0] | {sensor: .sensorId, tempF: ((.temperature * 9/5) + 32)} }'
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "iot"),
             validate = expectOutputMatching("sensor data with Fahrenheit conversion") { output ->
@@ -250,7 +250,7 @@ object ListenTestCases {
                             with:
                               type: order.created
                       output:
-                        as: '${ .[0].data }'
+                        as: '${ .[0] }'
                   - checkTotal:
                       switch:
                         - highValue:
@@ -290,7 +290,7 @@ object ListenTestCases {
             validate = expectOutputMatching("event with specific id") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull == "test"
+                    arr[0].jsonObject["message"]?.jsonPrimitive?.contentOrNull == "test"
             }
         ),
 
@@ -315,7 +315,7 @@ object ListenTestCases {
             validate = expectOutputMatching("event from orders source") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull == "from-orders"
+                    arr[0].jsonObject["message"]?.jsonPrimitive?.contentOrNull == "from-orders"
             }
         ),
 
@@ -336,7 +336,7 @@ object ListenTestCases {
             validate = expectOutputMatching("event from orders source (startswith)") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull == "from-orders"
+                    arr[0].jsonObject["message"]?.jsonPrimitive?.contentOrNull == "from-orders"
             }
         ),
 
@@ -357,7 +357,7 @@ object ListenTestCases {
             validate = expectOutputMatching("event from orders source (contains)") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("message")?.jsonPrimitive?.contentOrNull == "from-orders"
+                    arr[0].jsonObject["message"]?.jsonPrimitive?.contentOrNull == "from-orders"
             }
         ),
 
@@ -382,8 +382,8 @@ object ListenTestCases {
             validate = expectOutputMatching("event with specific subject") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("orderId")?.jsonPrimitive?.contentOrNull == "ORD-999" &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("carrier")?.jsonPrimitive?.contentOrNull == "FedEx"
+                    arr[0].jsonObject["orderId"]?.jsonPrimitive?.contentOrNull == "ORD-999" &&
+                    arr[0].jsonObject["carrier"]?.jsonPrimitive?.contentOrNull == "FedEx"
             }
         ),
 
@@ -408,7 +408,7 @@ object ListenTestCases {
             validate = expectOutputMatching("event with specific time") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("taskId")?.jsonPrimitive?.contentOrNull == "TASK-001"
+                    arr[0].jsonObject["taskId"]?.jsonPrimitive?.contentOrNull == "TASK-001"
             }
         ),
 
@@ -439,7 +439,7 @@ object ListenTestCases {
             validate = expectOutputMatching("event with json content type") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("orderId")?.jsonPrimitive?.contentOrNull == "ORD-12345"
+                    arr[0].jsonObject["orderId"]?.jsonPrimitive?.contentOrNull == "ORD-12345"
             }
         ),
 
@@ -460,7 +460,7 @@ object ListenTestCases {
             validate = expectOutputMatching("event with xml content type") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("format")?.jsonPrimitive?.contentOrNull == "xml"
+                    arr[0].jsonObject["format"]?.jsonPrimitive?.contentOrNull == "xml"
             }
         ),
 
@@ -485,8 +485,8 @@ object ListenTestCases {
             validate = expectOutputMatching("event with specific dataschema") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull == "John" &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("age")?.jsonPrimitive?.content == "30"
+                    arr[0].jsonObject["name"]?.jsonPrimitive?.contentOrNull == "John" &&
+                    arr[0].jsonObject["age"]?.jsonPrimitive?.content == "30"
             }
         ),
 
@@ -507,7 +507,7 @@ object ListenTestCases {
             validate = expectOutputMatching("event with person schema (expression)") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull == "John"
+                    arr[0].jsonObject["name"]?.jsonPrimitive?.contentOrNull == "John"
             }
         ),
 
@@ -532,8 +532,8 @@ object ListenTestCases {
             validate = expectOutputMatching("high temperature event") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("sensorId")?.jsonPrimitive?.contentOrNull == "TEMP-001" &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("temperature")?.jsonPrimitive?.double == 42.5
+                    arr[0].jsonObject["sensorId"]?.jsonPrimitive?.contentOrNull == "TEMP-001" &&
+                    arr[0].jsonObject["temperature"]?.jsonPrimitive?.double == 42.5
             }
         ),
 
@@ -554,8 +554,8 @@ object ListenTestCases {
             validate = expectOutputMatching("critical alert event") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("alertId")?.jsonPrimitive?.contentOrNull == "ALERT-001" &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("severity")?.jsonPrimitive?.contentOrNull == "critical"
+                    arr[0].jsonObject["alertId"]?.jsonPrimitive?.contentOrNull == "ALERT-001" &&
+                    arr[0].jsonObject["severity"]?.jsonPrimitive?.contentOrNull == "critical"
             }
         ),
 
@@ -576,8 +576,8 @@ object ListenTestCases {
             validate = expectOutputMatching("high temperature in celsius") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("temperature")?.jsonPrimitive?.double == 42.5 &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("unit")?.jsonPrimitive?.contentOrNull == "celsius"
+                    arr[0].jsonObject["temperature"]?.jsonPrimitive?.double == 42.5 &&
+                    arr[0].jsonObject["unit"]?.jsonPrimitive?.contentOrNull == "celsius"
             }
         ),
 
@@ -598,7 +598,7 @@ object ListenTestCases {
             validate = expectOutputMatching("important alert (critical or high)") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("severity")?.jsonPrimitive?.contentOrNull == "critical"
+                    arr[0].jsonObject["severity"]?.jsonPrimitive?.contentOrNull == "critical"
             }
         ),
 
@@ -619,7 +619,7 @@ object ListenTestCases {
             validate = expectOutputMatching("large USD order") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("total")?.jsonPrimitive?.double == 99.99
+                    arr[0].jsonObject["total"]?.jsonPrimitive?.double == 99.99
             }
         ),
 
@@ -665,7 +665,7 @@ object ListenTestCases {
             validate = expectOutputMatching("event matching type, source and data") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("temperature")?.jsonPrimitive?.double == 42.5
+                    arr[0].jsonObject["temperature"]?.jsonPrimitive?.double == 42.5
             }
         ),
 
@@ -688,16 +688,16 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: . | any(.data.value > 100)
+                          until: . | any(.value > 100)
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "until", "expression"),
             validate = expectOutputMatching("array of 3 readings including threshold event") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 // Should collect all 3 events (the last one triggers the until condition)
                 arr.size == 3 &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "1" &&
-                    arr[1].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "2" &&
-                    arr[2].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "3"
+                    arr[0].jsonObject["readingId"]?.jsonPrimitive?.content == "1" &&
+                    arr[1].jsonObject["readingId"]?.jsonPrimitive?.content == "2" &&
+                    arr[2].jsonObject["readingId"]?.jsonPrimitive?.content == "3"
             }
         ),
 
@@ -723,8 +723,8 @@ object ListenTestCases {
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 // Should stop after 2 events (length >= 2)
                 arr.size == 2 &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "1" &&
-                    arr[1].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "2"
+                    arr[0].jsonObject["readingId"]?.jsonPrimitive?.content == "1" &&
+                    arr[1].jsonObject["readingId"]?.jsonPrimitive?.content == "2"
             }
         ),
 
@@ -753,8 +753,8 @@ object ListenTestCases {
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 // Should collect 2 sensor readings, not the monitoring.stopped event
                 arr.size == 2 &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "1" &&
-                    arr[1].jsonObject["data"]?.jsonObject?.get("readingId")?.jsonPrimitive?.content == "2"
+                    arr[0].jsonObject["readingId"]?.jsonPrimitive?.content == "1" &&
+                    arr[1].jsonObject["readingId"]?.jsonPrimitive?.content == "2"
             }
         ),
 
@@ -807,7 +807,7 @@ object ListenTestCases {
             validate = expectOutputMatching("first matching event (temperature)") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.size == 1 &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("temperature")?.jsonPrimitive?.double == 42.5
+                    arr[0].jsonObject["temperature"]?.jsonPrimitive?.double == 42.5
             }
         ),
 
@@ -888,8 +888,8 @@ object ListenTestCases {
             validate = expectOutputMatching("only data payload") { output ->
                 val arr = output as? JsonArray ?: return@expectOutputMatching false
                 arr.isNotEmpty() &&
-                    // read: data wraps in envelope at output but data key contains payload
-                    arr[0].jsonObject["data"]?.jsonObject?.get("orderId")?.jsonPrimitive?.contentOrNull == "ORD-12345"
+                    // read: data returns only the data payload, not wrapped in envelope
+                    arr[0].jsonObject["orderId"]?.jsonPrimitive?.contentOrNull == "ORD-12345"
             }
         ),
 
@@ -913,7 +913,7 @@ object ListenTestCases {
                           - processOrder:
                               set:
                                 processed: true
-                                orderId: ${ .data.orderId }
+                                orderId: ${ .orderId }
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "foreach", "one"),
             validate = expectOutputMatching("array with single processed output") { output ->
@@ -940,8 +940,8 @@ object ListenTestCases {
                           - logReading:
                               set:
                                 logged: true
-                                sensorId: ${ .data.sensorId }
-                                temperature: ${ .data.temperature }
+                                sensorId: ${ .sensorId }
+                                temperature: ${ .temperature }
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "foreach", "any"),
             validate = expectOutputMatching("array with single logged reading") { output ->
@@ -967,14 +967,14 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: . | any(.data.value > 100)
+                          until: . | any(.value > 100)
                       foreach:
                         do:
                           - processReading:
                               set:
                                 processed: true
-                                readingId: ${'$'}{ .data.readingId }
-                                value: ${'$'}{ .data.value }
+                                readingId: ${'$'}{ .readingId }
+                                value: ${'$'}{ .value }
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "foreach", "until", "expression"),
             validate = expectOutputMatching("array of 3 processed readings") { output ->
@@ -1012,7 +1012,7 @@ object ListenTestCases {
                           - storeReading:
                               set:
                                 stored: true
-                                id: ${ .data.readingId }
+                                id: ${ .readingId }
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "foreach", "until", "event"),
             validate = expectOutputMatching("array of 2 stored readings (termination event excluded)") { output ->
@@ -1109,7 +1109,7 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: . | any(.data.value > 100)
+                          until: . | any(.value > 100)
                       foreach:
                         do:
                           - captureContext:
@@ -1156,13 +1156,13 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: . | any(.data.value > 100)
+                          until: . | any(.value > 100)
                       foreach:
                         do:
                           - handleEvent:
                               try:
                                 - checkValue:
-                                    if: ${ .data.readingId == 2 }
+                                    if: ${ .readingId == 2 }
                                     raise:
                                       error:
                                         type: https://serverlessworkflow.io/errors/processing
@@ -1172,7 +1172,7 @@ object ListenTestCases {
                                 - processEvent:
                                     set:
                                       processed: true
-                                      readingId: ${ .data.readingId }
+                                      readingId: ${ .readingId }
                               catch:
                                 as: caughtError
                                 do:
@@ -1225,11 +1225,11 @@ object ListenTestCases {
                                 any:
                                   - with:
                                       type: sensor.reading
-                                until: . | any(.data.value > 100)
+                                until: . | any(.value > 100)
                             foreach:
                               do:
                                 - checkValue:
-                                    if: ${ .data.readingId == 2 }
+                                    if: ${ .readingId == 2 }
                                     raise:
                                       error:
                                         type: https://serverlessworkflow.io/errors/processing

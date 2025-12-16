@@ -29,6 +29,7 @@ import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.ListenTask
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
@@ -315,7 +316,7 @@ internal object FullOrchestrator {
                         val cloudEvent = cloudEventHook.receive()
                             .filter { matchesFilters(it, event.config.filters) }
                             .first()
-                        val eventJson = cloudEvent.toJsonElement()
+                        val eventJson = cloudEvent.toJsonElement(event.config.readAs)
                         // Process through foreach immediately if configured
                         val output = if (foreachCtx != null) {
                             processEventThroughForeach(foreachCtx, eventJson, 0)
@@ -333,7 +334,7 @@ internal object FullOrchestrator {
                                 val cloudEvent = cloudEventHook.receive()
                                     .filter { matchesFilters(it, event.config.filters) }
                                     .first()
-                                val eventJson = cloudEvent.toJsonElement()
+                                val eventJson = cloudEvent.toJsonElement(event.config.readAs)
                                 // Process through foreach immediately if configured
                                 val output = if (foreachCtx != null) {
                                     processEventThroughForeach(foreachCtx, eventJson, 0)
@@ -350,6 +351,7 @@ internal object FullOrchestrator {
                                     cloudEventHook = cloudEventHook,
                                     filters = event.config.filters,
                                     expression = until.expression,
+                                    readAs = event.config.readAs,
                                     foreachCtx = foreachCtx
                                 )
                                 event.resumeCompleted(JsonArray(outputs))
@@ -362,6 +364,7 @@ internal object FullOrchestrator {
                                     cloudEventHook = cloudEventHook,
                                     filters = event.config.filters,
                                     terminationFilter = until.filter,
+                                    readAs = event.config.readAs,
                                     foreachCtx = foreachCtx
                                 )
                                 event.resumeCompleted(JsonArray(outputs))
@@ -376,7 +379,7 @@ internal object FullOrchestrator {
                             val cloudEvent = cloudEventHook.receive()
                                 .filter { matchesFilters(it, listOf(filter)) }
                                 .first()
-                            val eventJson = cloudEvent.toJsonElement()
+                            val eventJson = cloudEvent.toJsonElement(event.config.readAs)
                             val output = if (foreachCtx != null) {
                                 processEventThroughForeach(foreachCtx, eventJson, index)
                             } else {
@@ -497,6 +500,7 @@ internal object FullOrchestrator {
         cloudEventHook: CloudEventHook,
         filters: List<EventFilter>,
         expression: String,
+        readAs: ListenAndReadAs,
         foreachCtx: ForeachContext?
     ): List<JsonElement> {
         // Track raw events for until expression evaluation
@@ -513,7 +517,7 @@ internal object FullOrchestrator {
 
         try {
             for (cloudEvent in channel) {
-                val eventJson = cloudEvent.toJsonElement()
+                val eventJson = cloudEvent.toJsonElement(readAs)
                 rawEvents.add(eventJson)
 
                 // Process through foreach - MUST complete before we receive next event
@@ -564,6 +568,7 @@ internal object FullOrchestrator {
         cloudEventHook: CloudEventHook,
         filters: List<EventFilter>,
         terminationFilter: EventFilter,
+        readAs: ListenAndReadAs,
         foreachCtx: ForeachContext?
     ): List<JsonElement> {
         val outputs = mutableListOf<JsonElement>()
@@ -583,7 +588,7 @@ internal object FullOrchestrator {
 
                 // Check if this event matches our main filters
                 if (matchesFilters(cloudEvent, filters)) {
-                    val eventJson = cloudEvent.toJsonElement()
+                    val eventJson = cloudEvent.toJsonElement(readAs)
 
                     // Process through foreach - MUST complete before we receive next event
                     // If foreach fails, it throws InternalException which propagates up
@@ -943,24 +948,50 @@ internal object FullOrchestrator {
     }
 
     /**
-     * Convert a CloudEvent to JsonElement for workflow consumption.
+     * Convert a CloudEvent to JsonElement based on the readAs mode.
+     *
+     * @param readAs How to extract event content (DATA, ENVELOPE, RAW)
+     * @return The extracted content as JsonElement
      */
-    private fun CloudEvent.toJsonElement(): JsonElement {
-        return buildJsonObject {
-            put("id", JsonPrimitive(id))
-            put("source", JsonPrimitive(source.toString()))
-            put("type", JsonPrimitive(type))
-            time?.let { put("time", JsonPrimitive(it.toString())) }
-            subject?.let { put("subject", JsonPrimitive(it)) }
-            dataSchema?.let { put("dataschema", JsonPrimitive(it.toString())) }
-            dataContentType?.let { put("datacontenttype", JsonPrimitive(it)) }
-            data?.let {
-                val dataString = String(it.toBytes())
-                try {
-                    put("data", Json.parseToJsonElement(dataString))
-                } catch (_: Exception) {
-                    put("data", JsonPrimitive(dataString))
+    private fun CloudEvent.toJsonElement(readAs: ListenAndReadAs): JsonElement {
+        return when (readAs) {
+            ListenAndReadAs.DATA -> {
+                // Extract just the data payload
+                data?.let {
+                    val dataString = String(it.toBytes())
+                    try {
+                        Json.parseToJsonElement(dataString)
+                    } catch (_: Exception) {
+                        JsonPrimitive(dataString)
+                    }
+                } ?: JsonNull
+            }
+
+            ListenAndReadAs.ENVELOPE -> {
+                // Return the full CloudEvent structure
+                buildJsonObject {
+                    put("specversion", JsonPrimitive(specVersion.toString()))
+                    put("id", JsonPrimitive(id))
+                    put("source", JsonPrimitive(source.toString()))
+                    put("type", JsonPrimitive(type))
+                    time?.let { put("time", JsonPrimitive(it.toString())) }
+                    subject?.let { put("subject", JsonPrimitive(it)) }
+                    dataSchema?.let { put("dataschema", JsonPrimitive(it.toString())) }
+                    dataContentType?.let { put("datacontenttype", JsonPrimitive(it)) }
+                    data?.let {
+                        val dataString = String(it.toBytes())
+                        try {
+                            put("data", Json.parseToJsonElement(dataString))
+                        } catch (_: Exception) {
+                            put("data", JsonPrimitive(dataString))
+                        }
+                    }
                 }
+            }
+
+            ListenAndReadAs.RAW -> {
+                // Return raw bytes as string
+                data?.let { JsonPrimitive(String(it.toBytes())) } ?: JsonNull
             }
         }
     }
