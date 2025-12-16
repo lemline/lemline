@@ -20,6 +20,7 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 
 /**
  * Outbox processor for listener completions.
@@ -139,13 +140,15 @@ internal class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
         val listenPosition = entity.instanceMessage.workflowState.nodePosition
         val resumeCommand = if (entity.hasForeach && isSimpleStrategy) {
             // Resume to foreach.do position with the event as input
+            // Event is stored as array (spec requirement), extract first element for foreach iteration
             val foreachPosition = listenPosition.addToken(Token.FOR)
-            logger.debug { "Foreach enabled for ONE/ANY - resuming to foreach.do at $foreachPosition" }
+            val eventForIteration = (parsedEvent as JsonArray).first()
+            logger.debug { "Foreach enabled for ONE/ANY - resuming to foreach.do at $foreachPosition with input: $eventForIteration" }
 
             WorkflowCommand.ResumeFromTask(
                 nodeStack = entity.instanceMessage.workflowState.nodeStack,
                 nodePosition = foreachPosition,
-                rawInput = parsedEvent
+                rawInput = eventForIteration
             )
         } else {
             // Normal completion: complete the listen task with event(s) as output

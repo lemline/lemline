@@ -202,6 +202,8 @@ internal class WorkflowEventHandler(
             is WorkflowEvent.TaskScheduled -> error("Unexpected state in workflow event handler: $state")
 
             is WorkflowEvent.ActivityStarted -> error("ActivityStarted should not be sent to events channel - activities are executed inline: $state")
+
+            is WorkflowEvent.EmitStarted -> error("EmitStarted should not be sent to events channel - emit is executed inline: $state")
         }
         return null
     }
@@ -211,21 +213,21 @@ internal class WorkflowEventHandler(
      *
      * When a foreach.do completes for a single event:
      * 1. Find listener by workflowId and position
-     * 2. Mark current event as completed and store its output
-     * 3. Increment the foreach iteration index
-     * 4. Clear foreach_processing flag
-     * 5. Check flowDirective for early exit (Exit/End = break from foreach loop)
-     * 6. Check for next pending event or if listener is complete
-     *    - If has next event: trigger next event processing
-     *    - If listener_completed and no more events: aggregate outputs and complete
-     *    - If not completed: wait for more events
+     * 2. For ONE/ANY (simple strategies): complete immediately with the iteration output
+     * 3. For ALL/ANY+until (accumulating strategies):
+     *    - Mark current event as completed and store its output
+     *    - Increment the foreach iteration index
+     *    - Clear foreach_processing flag
+     *    - Check for next pending event or if listener is complete
      */
     private suspend fun handleListenForEachCompleted(message: InstanceMessage<WorkflowEvent.ListenForEachCompleted>) {
         val state = message.workflowState
-        val listenPosition = state.nodeStack.lastPosition
+        // Use state.nodePosition which is explicitly defined as the listen position in WorkflowState.kt
+        // This is safer than using state.nodeStack.lastPosition which might be at the FOR position
+        val listenPosition = state.nodePosition
         val iterationOutput = state.output
 
-        logger.debug { "ListenForEachCompleted: $message" }
+        logger.debug { "ListenForEachCompleted: $message, listenPosition=$listenPosition" }
 
         databaseManager.withTransaction { conn ->
             // Find listener by workflowId and position
@@ -235,6 +237,43 @@ internal class WorkflowEventHandler(
                 conn
             ) ?: error("Listener not found for workflow ${message.workflowId} at position $listenPosition")
 
+            // Check if this is a simple strategy (ONE/ANY)
+            // For simple strategies, events are NOT stored in listener_events table
+            // They are stored directly in the listener.event field
+            val isSimpleStrategy = listener.strategy == ListenerStrategy.ONE ||
+                listener.strategy == ListenerStrategy.ANY
+
+            if (isSimpleStrategy) {
+                // For ONE/ANY with foreach: complete immediately with iteration output wrapped in array
+                // We emit the resume command directly because the listener was already marked as
+                // outbox_completed by ListenerCompletionOutbox when it resumed to foreach.do
+                val outputArray = JsonArray(listOf(iterationOutput))
+
+                // Create and emit the resume command directly
+                // IMPORTANT: Use the original listener's nodeStack (from ListenStarted), not the
+                // ListenForEachCompleted's nodeStack, because the latter may have the FOR position
+                // as lastPosition instead of the listen position.
+                val resumeMessage = InstanceMessage(
+                    workflowInfo = listener.instanceMessage.workflowInfo,
+                    workflowState = WorkflowCommand.ResumeWithCompletedTask(
+                        nodeStack = listener.instanceMessage.workflowState.nodeStack,
+                        rawOutput = outputArray
+                    )
+                )
+
+                // Derive idempotent message ID from listener ID
+                val messageId = listener.id.derive("-foreach-complete")
+                instanceEmitter.send(resumeMessage, messageId)
+
+                // Mark listener for cleanup
+                listener.cleanupAfter = Clock.System.now()
+                listenerRepository.update(listener, conn)
+
+                logger.info { "Listener ${listener.id} foreach complete for ${listener.strategy} strategy" }
+                return@withTransaction
+            }
+
+            // For ALL/ANY+until strategies: process events from listener_events table
             // Find the current event being processed (by iteration index)
             val currentEvent = listenerEventRepository.findByListenerIdAndIterationIndex(
                 listener.id,
@@ -242,7 +281,7 @@ internal class WorkflowEventHandler(
                 conn
             )
 
-            // Mark event as completed with output (if found - may not exist for ONE/ANY)
+            // Mark event as completed with output (if found)
             currentEvent?.let {
                 listenerEventRepository.markForeachCompleted(
                     id = it.id,
@@ -347,6 +386,11 @@ internal class WorkflowEventHandler(
 
         // Set totalFilters (enables direct UPDATE optimization)
         listener.filtersCount = config.filters.size
+
+        // Lookup hasForeach from cached workflow definition
+        val cachedTask = DefinitionCache.getListenTasks(instance.workflowInfo)
+            .find { it.nodePosition == state.nodePosition }
+        listener.hasForeach = cachedTask?.hasForeach ?: false
 
         // Insert listener into database
         val rowsInserted = listenerRepository.insert(listener)

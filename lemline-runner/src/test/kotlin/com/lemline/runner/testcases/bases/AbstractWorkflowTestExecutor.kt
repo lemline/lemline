@@ -17,6 +17,7 @@ import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.starters.Starter
 import com.lemline.runner.testcases.TestLifecycleEventListener
+import io.cloudevents.CloudEvent
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
@@ -67,7 +68,8 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         name: String,
         version: String,
         dependencies: List<WorkflowDependency>,
-        mockConfig: MockConfiguration
+        mockConfig: MockConfiguration,
+        cloudEvents: List<CloudEvent>
     ): WorkflowTestResult {
         // Generate unique workflow name based on yaml content to avoid cache conflicts
         val uniqueName = "workflow-${yaml.hashCode()}"

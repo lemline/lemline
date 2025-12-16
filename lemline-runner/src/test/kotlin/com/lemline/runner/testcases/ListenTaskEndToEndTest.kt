@@ -902,6 +902,389 @@ internal class ListenTaskEndToEndTest {
     }
 
     // ========================================
+    // Foreach Tests - Process events through nested tasks
+    // These tests verify that listen tasks with foreach.do process events
+    // correctly through the runner's messaging infrastructure.
+    // ========================================
+
+    @Test
+    fun `listen ONE with foreach processes event through nested tasks`() = runTest {
+        // Given: A workflow with a listen task and foreach processing
+        val workflowName = WorkflowName("listen-one-foreach-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - waitForOrder:
+                  listen:
+                    to:
+                      one:
+                        with:
+                          type: com.example.Order
+                  foreach:
+                    do:
+                      - processOrder:
+                          set:
+                            processed: true
+                            orderId: ${'$'}{ .orderId }
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(DB_WRITE_DELAY_MS)
+
+        // Verify listener is registered
+        val listeners = findListenersByWorkflow(testNamespace, workflowName, testVersion)
+        listeners.size shouldBe 1
+
+        // Send CloudEvent with order data
+        sendCloudEvent(
+            type = "com.example.Order",
+            data = """{"orderId": "ORD-123", "amount": 99.99}"""
+        )
+
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be an array with one processed result from foreach
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 1
+        events[0].jsonObject["processed"]?.jsonPrimitive?.content shouldBe "true"
+        events[0].jsonObject["orderId"]?.jsonPrimitive?.content shouldBe "ORD-123"
+    }
+
+    @Test
+    fun `listen ANY with foreach processes event through nested tasks`() = runTest {
+        // Given: A workflow with ANY strategy and foreach processing
+        val workflowName = WorkflowName("listen-any-foreach-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - waitForReading:
+                  listen:
+                    to:
+                      any:
+                        - with:
+                            type: com.example.SensorA
+                        - with:
+                            type: com.example.SensorB
+                  foreach:
+                    do:
+                      - logReading:
+                          set:
+                            logged: true
+                            sensorId: ${'$'}{ .sensorId }
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(DB_WRITE_DELAY_MS)
+
+        // Send event matching second filter
+        sendCloudEvent(
+            type = "com.example.SensorB",
+            data = """{"sensorId": "SENSOR-B-001", "value": 42}"""
+        )
+
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be an array with one logged result from foreach
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 1
+        events[0].jsonObject["logged"]?.jsonPrimitive?.content shouldBe "true"
+        events[0].jsonObject["sensorId"]?.jsonPrimitive?.content shouldBe "SENSOR-B-001"
+    }
+
+    @Test
+    @org.junit.jupiter.api.Disabled("Foreach for ANY+until strategies requires Phase 5 implementation (ListenerEventOutbox)")
+    fun `listen ANY with until expression and foreach processes all events sequentially`() = runTest {
+        // Given: A workflow with ANY+until expression and foreach
+        val workflowName = WorkflowName("listen-any-until-expr-foreach-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - collectReadings:
+                  listen:
+                    to:
+                      any:
+                        - with:
+                            type: com.example.Reading
+                      until: .[2] != null
+                  foreach:
+                    do:
+                      - processReading:
+                          set:
+                            processed: true
+                            value: ${'$'}{ .value }
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(DB_WRITE_DELAY_MS)
+
+        // Send three events to trigger the until condition
+        sendCloudEvent(type = "com.example.Reading", data = """{"value": 10}""")
+        realDelay(EVENT_INTERVAL_MS)
+        sendCloudEvent(type = "com.example.Reading", data = """{"value": 20}""")
+        realDelay(EVENT_INTERVAL_MS)
+        sendCloudEvent(type = "com.example.Reading", data = """{"value": 30}""")
+
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be an array with 3 processed results from foreach
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 3
+
+        // Verify all values were processed
+        val values = events.map { it.jsonObject["value"]?.jsonPrimitive?.int }.toSet()
+        values shouldBe setOf(10, 20, 30)
+
+        // Verify all were marked as processed
+        events.all { it.jsonObject["processed"]?.jsonPrimitive?.content == "true" } shouldBe true
+    }
+
+    @Test
+    @org.junit.jupiter.api.Disabled("Foreach for ANY+until strategies requires Phase 5 implementation (ListenerEventOutbox)")
+    fun `listen ANY with until event and foreach processes accumulated events`() = runTest {
+        // Given: A workflow with ANY+until event and foreach
+        val workflowName = WorkflowName("listen-any-until-event-foreach-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - monitorVitals:
+                  listen:
+                    to:
+                      any:
+                        - with:
+                            type: com.example.Vitals
+                      until:
+                        one:
+                          with:
+                            type: com.example.StopMonitoring
+                  foreach:
+                    do:
+                      - recordVitals:
+                          set:
+                            recorded: true
+                            heartRate: ${'$'}{ .bpm }
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(DB_WRITE_DELAY_MS)
+
+        // Send vital readings
+        sendCloudEvent(type = "com.example.Vitals", data = """{"bpm": 72}""")
+        realDelay(EVENT_INTERVAL_MS)
+        sendCloudEvent(type = "com.example.Vitals", data = """{"bpm": 75}""")
+        realDelay(EVENT_INTERVAL_MS)
+
+        // Send termination event (should NOT be included in output)
+        sendCloudEvent(type = "com.example.StopMonitoring", data = """{"reason": "complete"}""")
+
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be an array with 2 processed vitals (not termination event)
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 2
+
+        // Verify the bpm values were recorded
+        val bpmValues = events.map { it.jsonObject["heartRate"]?.jsonPrimitive?.int }.toSet()
+        bpmValues shouldBe setOf(72, 75)
+
+        // Verify all were marked as recorded
+        events.all { it.jsonObject["recorded"]?.jsonPrimitive?.content == "true" } shouldBe true
+
+        // Verify termination event is NOT in output
+        val hasReason = events.any { it.jsonObject.containsKey("reason") }
+        hasReason shouldBe false
+    }
+
+    @Test
+    @org.junit.jupiter.api.Disabled("Foreach for ALL strategy requires Phase 5 implementation (ListenerEventOutbox)")
+    fun `listen ALL with foreach processes each matched filter event`() = runTest {
+        // Given: A workflow with ALL strategy and foreach
+        val workflowName = WorkflowName("listen-all-foreach-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - waitForOrderAndPayment:
+                  listen:
+                    to:
+                      all:
+                        - with:
+                            type: com.example.OrderCreated
+                        - with:
+                            type: com.example.PaymentReceived
+                  foreach:
+                    do:
+                      - logEvent:
+                          set:
+                            processed: true
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(DB_WRITE_DELAY_MS)
+
+        // Send both required events
+        sendCloudEvent(type = "com.example.OrderCreated", data = """{"orderId": "ORD-001"}""")
+        realDelay(EVENT_INTERVAL_MS)
+        sendCloudEvent(type = "com.example.PaymentReceived", data = """{"amount": 99.99}""")
+
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be an array with 2 processed events
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 2
+
+        // All events should be marked as processed
+        events.all { it.jsonObject["processed"]?.jsonPrimitive?.content == "true" } shouldBe true
+    }
+
+    // ========================================
+    // Read Mode Tests (envelope vs data)
+    // ========================================
+
+    @Test
+    fun `listen with read envelope includes full CloudEvent structure`() = runTest {
+        // Given: A workflow with read: envelope mode
+        val workflowName = WorkflowName("listen-read-envelope-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - waitForEvent:
+                  listen:
+                    to:
+                      one:
+                        with:
+                          type: com.example.TestEvent
+                    read: envelope
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(DB_WRITE_DELAY_MS)
+
+        sendCloudEvent(
+            type = "com.example.TestEvent",
+            data = """{"message": "hello"}"""
+        )
+
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should include CloudEvent envelope fields
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 1
+        val event = events[0].jsonObject
+
+        // Envelope should include specversion, type, source, id, etc.
+        event["type"]?.jsonPrimitive?.content shouldBe "com.example.TestEvent"
+        event["specversion"]?.jsonPrimitive?.content shouldBe "1.0"
+        event.containsKey("source") shouldBe true
+        event.containsKey("id") shouldBe true
+
+        // Data should be nested under "data" key
+        event["data"]?.jsonObject?.get("message")?.jsonPrimitive?.content shouldBe "hello"
+    }
+
+    @Test
+    fun `listen with read data returns only payload`() = runTest {
+        // Given: A workflow with read: data mode
+        val workflowName = WorkflowName("listen-read-data-${System.currentTimeMillis()}")
+        val yaml = """
+            document:
+              dsl: '1.0.0'
+              namespace: test
+              name: $workflowName
+              version: '1.0.0'
+            do:
+              - waitForEvent:
+                  listen:
+                    to:
+                      one:
+                        with:
+                          type: com.example.DataEvent
+                    read: data
+        """.trimIndent()
+
+        registerWorkflow(yaml, workflowName)
+
+        val workflowId = startWorkflow(workflowName)
+        processUntilListenStarted(workflowId)
+        realDelay(DB_WRITE_DELAY_MS)
+
+        sendCloudEvent(
+            type = "com.example.DataEvent",
+            data = """{"message": "hello", "value": 42}"""
+        )
+
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
+        val result = processUntilCompletion(workflowId)
+
+        // Then: Output should be just the data payload (no envelope)
+        result shouldNotBe null
+        val events = result!!.jsonArray
+        events.size shouldBe 1
+        val eventData = events[0].jsonObject
+
+        // Should have the data fields directly
+        eventData["message"]?.jsonPrimitive?.content shouldBe "hello"
+        eventData["value"]?.jsonPrimitive?.int shouldBe 42
+
+        // Should NOT have envelope fields
+        eventData.containsKey("type") shouldBe false
+        eventData.containsKey("source") shouldBe false
+        eventData.containsKey("specversion") shouldBe false
+    }
+
+    // ========================================
     // Helper Functions
     // ========================================
 

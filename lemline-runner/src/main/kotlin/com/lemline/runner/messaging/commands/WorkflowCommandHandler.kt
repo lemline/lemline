@@ -3,13 +3,15 @@ package com.lemline.runner.messaging.commands
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
+import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
+import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.StepByStepOrchestrator
+import com.lemline.core.processors.EmitConfig
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.activities.ActivityExecutor
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
@@ -18,14 +20,19 @@ import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
+import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
-import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.runner.messaging.toLogString
 import com.lemline.runner.models.FailureModel
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.repositories.FailureRepository
+import io.cloudevents.CloudEvent
+import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.Workflow
 import jakarta.enterprise.context.ApplicationScoped
+import jakarta.enterprise.inject.Instance
+import java.net.URI
+import java.time.OffsetDateTime
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -52,6 +59,7 @@ internal class WorkflowCommandHandler(
     private val config: LemlineConfiguration,
     private val activityExecutor: ActivityExecutor,
     private val lifecycleHook: LifecycleEventHook,
+    private val cloudEventsEmitter: Instance<CloudEventsEmitter>,
 ) : MessageHandler<InstanceMessage<WorkflowCommand>> {
     override var logger = logger()
 
@@ -345,6 +353,12 @@ internal class WorkflowCommandHandler(
                 null  // Paused - waiting for branches to complete
             }
 
+            is WorkflowEvent.EmitStarted -> {
+                // Emit CloudEvent and resume immediately (fire-and-forget)
+                emitCloudEvent(this, event)
+                event.resume()
+            }
+
             is WorkflowEvent.ListenStarted -> {
                 // Send to the database for listener persistence
                 // The listener will be stored and CloudEvents will be matched against it
@@ -432,5 +446,50 @@ internal class WorkflowCommandHandler(
             logger.error(e) { "Activity failed: ${event::class.simpleName}" }
             event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
         }
+    }
+
+    /**
+     * Emits a CloudEvent based on EmitStarted event configuration.
+     *
+     * This is fire-and-forget: errors are logged but don't fail the workflow.
+     * If CloudEventsEmitter is not available (disabled), the event is silently skipped.
+     */
+    private suspend fun emitCloudEvent(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent.EmitStarted) {
+        if (!cloudEventsEmitter.isResolvable) {
+            logger.debug { "CloudEventsEmitter not available, skipping emit task" }
+            return
+        }
+
+        val cloudEvent = buildCloudEvent(event.config)
+        logger.debug { "Emitting CloudEvent: type=${event.config.type} source=${event.config.source}" }
+
+        cloudEventsEmitter.get().send(
+            cloudEvent = cloudEvent,
+            workflowId = message.workflowId.toString(),
+            workflowNamespace = message.workflowNamespace.toString(),
+            workflowName = message.workflowName.toString(),
+            workflowVersion = message.workflowVersion.toString()
+        )
+    }
+
+    /**
+     * Builds a CloudEvent from EmitConfig using the CloudEvents SDK.
+     */
+    private fun buildCloudEvent(config: EmitConfig): CloudEvent {
+        val builder = CloudEventBuilder.v1()
+            .withId(config.id)
+            .withSource(URI.create(config.source))
+            .withType(config.type)
+
+        config.time?.let { builder.withTime(OffsetDateTime.parse(it)) }
+        config.subject?.let { builder.withSubject(it) }
+        config.dataschema?.let { builder.withDataSchema(URI.create(it)) }
+        config.datacontenttype?.let { builder.withDataContentType(it) }
+        config.data?.let { builder.withData(it.toString().toByteArray()) }
+        config.extensions?.forEach { (key, value) ->
+            builder.withExtension(key, value)
+        }
+
+        return builder.build()
     }
 }
