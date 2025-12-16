@@ -50,7 +50,8 @@ internal abstract class AbstractWorkflowTest(
                         val result = getExecutor().execute(
                             yaml = case.yaml,
                             input = case.input,
-                            dependencies = case.dependencies
+                            dependencies = case.dependencies,
+                            cloudEvents = case.cloudEvents
                         )
 
                         val validationError = case.validate(result)

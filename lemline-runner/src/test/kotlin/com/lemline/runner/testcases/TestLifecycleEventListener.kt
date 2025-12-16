@@ -129,7 +129,7 @@ class TestLifecycleEventListener {
      */
     suspend fun awaitWorkflowResult(
         workflowId: WorkflowId,
-        timeout: Duration = 30.seconds
+        timeout: Duration = 5.seconds
     ): WorkflowTestResult {
         val workflowIdStr = workflowId.toString()
         val channel = Channel<CloudEvent>(Channel.UNLIMITED)

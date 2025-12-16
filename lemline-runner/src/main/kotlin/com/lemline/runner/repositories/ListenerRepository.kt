@@ -591,11 +591,11 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
 
             val sql = """
                 UPDATE $tableName l
-                SET $EVENT_COLUMN = (
+                SET $EVENT_COLUMN = COALESCE((
                     SELECT $jsonAgg
                     FROM $LISTENER_EVENT_TABLE e
                     WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}
-                ),
+                ), '[]'),
                     $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
                     $UPDATED_AT_COLUMN = ?
                 WHERE $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
@@ -619,8 +619,12 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
 
     /**
      * Marks foreach-enabled listeners as logically completed (ANY + until(event) strategy).
-     * Sets listener_completed = TRUE without setting outbox_delayed_until.
-     * The ListenerEventOutbox will complete the listener after all foreach iterations.
+     *
+     * Two cases:
+     * 1. Listeners WITH events: Sets listener_completed = TRUE. The ListenerEventOutbox
+     *    will process remaining events and complete after all foreach iterations.
+     * 2. Listeners WITHOUT events: Sets listener_completed = TRUE, event = '[]', and
+     *    outbox_delayed_until = NOW(). The ListenerCompletionOutbox will complete immediately.
      */
     suspend fun markForeachTerminatedByKeys(
         keys: List<ListenerQueryKey>,
@@ -631,8 +635,11 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
         return withConnection(connection) { conn ->
             val now = nowTimestamp()
             val conditions = keys.map { it.toSqlConditionWithoutCorrelation("l") }
+            val whereConditions = conditions.joinToString(" OR ")
 
-            val sql = """
+            // First: Mark listeners WITH events as logically completed
+            // (ListenerEventOutbox will process remaining events and complete after foreach)
+            val sqlWithEvents = """
                 UPDATE $tableName l
                 SET $LISTENER_COMPLETED_COLUMN = TRUE,
                     $UPDATED_AT_COLUMN = ?
@@ -640,10 +647,14 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
                   AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
                   AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
                   AND l.$HAS_FOREACH_COLUMN = TRUE
-                  AND (${conditions.joinToString(" OR ")})
+                  AND ($whereConditions)
+                  AND EXISTS (
+                      SELECT 1 FROM $LISTENER_EVENT_TABLE e
+                      WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                  )
             """.trimIndent()
 
-            conn.prepareStatement(sql).use { stmt ->
+            val withEventsCount = conn.prepareStatement(sqlWithEvents).use { stmt ->
                 var idx = 1
                 stmt.setTimestamp(idx++, now)
                 for (key in keys) {
@@ -651,6 +662,37 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
                 }
                 stmt.executeUpdate()
             }
+
+            // Second: Mark listeners WITHOUT events for immediate completion
+            // (Sets event = '[]' and schedules for ListenerCompletionOutbox)
+            val sqlNoEvents = """
+                UPDATE $tableName l
+                SET $LISTENER_COMPLETED_COLUMN = TRUE,
+                    $EVENT_COLUMN = '[]',
+                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+                    $UPDATED_AT_COLUMN = ?
+                WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND l.$HAS_FOREACH_COLUMN = TRUE
+                  AND ($whereConditions)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM $LISTENER_EVENT_TABLE e
+                      WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                  )
+            """.trimIndent()
+
+            val noEventsCount = conn.prepareStatement(sqlNoEvents).use { stmt ->
+                var idx = 1
+                stmt.setTimestamp(idx++, now)
+                stmt.setTimestamp(idx++, now)
+                for (key in keys) {
+                    idx = key.bindParametersWithoutCorrelation(stmt, idx)
+                }
+                stmt.executeUpdate()
+            }
+
+            withEventsCount + noEventsCount
         }
     }
 

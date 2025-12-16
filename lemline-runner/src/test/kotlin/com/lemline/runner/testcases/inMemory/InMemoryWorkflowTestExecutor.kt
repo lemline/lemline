@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.testcases.inMemory
 
+import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.testcases.WorkflowTestResult
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
 import com.lemline.runner.repositories.DefinitionRepository
+import com.lemline.runner.repositories.ListenerRepository
 import com.lemline.runner.starters.Starter
 import com.lemline.runner.testcases.TestLifecycleEventListener
 import com.lemline.runner.testcases.bases.AbstractWorkflowTestExecutor
@@ -44,6 +47,13 @@ private const val LIFECYCLEEVENTS_IN_CHANNEL = "lifecycleevents-in"
 @ExperimentalSerializationApi
 internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
 
+    private val logger = logger()
+
+    companion object {
+        /** Delay for workflow completion polling */
+        private const val COMPLETION_POLL_INTERVAL_MS = 20L
+    }
+
     @Inject
     override lateinit var definitionRepository: DefinitionRepository
 
@@ -60,6 +70,9 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
     override lateinit var lifecycleHook: LifecycleEventHook
 
     @Inject
+    override lateinit var listenerRepository: ListenerRepository
+
+    @Inject
     @Any
     lateinit var connector: InMemoryConnector
 
@@ -70,12 +83,17 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
     private val eventsOut get() = connector.sink<String>(EVENTS_OUT_CHANNEL)
     private val lifecycleEventsIn get() = connector.source<String>(LIFECYCLEEVENTS_IN_CHANNEL)
     private val lifecycleEventsOut get() = connector.sink<String>(LIFECYCLEEVENTS_OUT_CHANNEL)
+    private val cloudEventsIn get() = connector.source<String>(CLOUDEVENTS_IN_CHANNEL)
 
     override suspend fun sendInitialCommand(message: InstanceMessage<out WorkflowCommand>) {
         commandsOut.clear()
         eventsOut.clear()
         lifecycleEventsOut.clear()
         commandsIn.send(message.toJsonString())
+    }
+
+    override suspend fun sendCloudEventPayload(payload: String) {
+        cloudEventsIn.send(payload)
     }
 
     override suspend fun awaitCompletion(workflowId: WorkflowId, timeoutSeconds: Long): WorkflowTestResult {
@@ -91,7 +109,7 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
                     // Not yet completed
                 }
 
-                delay(20)
+                delay(COMPLETION_POLL_INTERVAL_MS)
             }
 
             return WorkflowTestResult.Failure(
@@ -104,6 +122,28 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
             eventsOut.clear()
             lifecycleEventsOut.clear()
         }
+    }
+
+    /**
+     * Override to route messages while waiting for listener registration.
+     */
+    override suspend fun waitForListenerRegistration(workflowId: WorkflowId): Boolean {
+        val startTime = System.currentTimeMillis()
+
+        while (System.currentTimeMillis() - startTime < listenerWaitTimeoutMs) {
+            // Route messages to allow workflow to progress to the listen task
+            routeMessages()
+
+            val listener = listenerRepository.findByWorkflowId(workflowId)
+            if (listener != null) {
+                logger.debug { "Listener found for workflow $workflowId after ${System.currentTimeMillis() - startTime}ms" }
+                return true
+            }
+            delay(listenerPollIntervalMs)
+        }
+
+        logger.warn { "Timeout waiting for listener registration for workflow $workflowId" }
+        return false
     }
 
     /** Routes messages from output sinks to input sources (manual loopback). */

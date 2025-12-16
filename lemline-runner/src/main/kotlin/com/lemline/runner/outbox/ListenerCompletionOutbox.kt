@@ -21,6 +21,7 @@ import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Outbox processor for listener completions.
@@ -128,7 +129,24 @@ internal class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
         }
 
         // Parse the stored event(s)
-        val parsedEvent = Json.parseToJsonElement(eventJson)
+        // Handle edge cases:
+        // 1. Empty/blank string -> empty array
+        // 2. "[]" string -> empty array
+        // 3. Valid JSON -> parse normally
+        // 4. If parsed result is a JsonPrimitive("[]"), convert to empty array
+        val parsedEvent = when {
+            eventJson.isBlank() -> JsonArray(emptyList())
+            eventJson == "[]" -> JsonArray(emptyList())
+            else -> {
+                val parsed = Json.parseToJsonElement(eventJson)
+                // Handle case where database returns JSON-encoded string "[]" instead of array []
+                if (parsed is JsonPrimitive && parsed.content == "[]") {
+                    JsonArray(emptyList())
+                } else {
+                    parsed
+                }
+            }
+        }
 
         // ONE and ANY are simple strategies (single event, immediate completion)
         // ANY_UNTIL_EXPR, ANY_UNTIL_EVENT, and ALL accumulate events
