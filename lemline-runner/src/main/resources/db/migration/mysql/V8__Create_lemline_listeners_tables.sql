@@ -72,6 +72,10 @@ CREATE INDEX idx_lemline_listeners_workflow_id
 CREATE INDEX idx_lemline_listeners_workflow_position
     ON lemline_listeners (workflow_namespace(50), workflow_name(100), workflow_version(20), workflow_position(500));
 
+-- Index for correlation-based lookup (includes correlation_values for CloudEvent matching)
+CREATE INDEX idx_lemline_listeners_correlation
+    ON lemline_listeners (workflow_namespace(50), workflow_name(100), workflow_version(20), workflow_position(500), correlation_values(200));
+
 -- Index for timeout processing
 CREATE INDEX idx_lemline_listeners_timeout
     ON lemline_listeners (timeout_at);

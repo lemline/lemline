@@ -18,7 +18,8 @@ CREATE TABLE lemline_listeners
     workflow_state          CLOB                     NOT NULL,
 
     -- Correlation state (for Mode 2: first-sets-baseline)
-    correlation_values      CLOB, -- JSON map of correlation key -> baseline value
+    -- Using VARCHAR instead of CLOB to allow indexing (H2 test database only)
+    correlation_values      VARCHAR(1000), -- JSON map of correlation key -> baseline value
 
     -- Single event storage (for ONE and ANY without until)
     event                   CLOB, -- JSON CloudEvent data
@@ -67,6 +68,10 @@ CREATE INDEX idx_lemline_listeners_workflow_id
 -- Index for efficient lookup by workflow info + position (for event routing)
 CREATE INDEX idx_lemline_listeners_workflow_position
     ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position);
+
+-- Index for correlation-based lookup (includes correlation_values for CloudEvent matching)
+CREATE INDEX idx_lemline_listeners_correlation
+    ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position, correlation_values);
 
 -- Index for timeout processing
 CREATE INDEX idx_lemline_listeners_timeout
