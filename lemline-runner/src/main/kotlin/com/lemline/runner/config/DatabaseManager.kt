@@ -123,6 +123,23 @@ class DatabaseManager {
     }
 
     /**
+     * Returns the database-specific JSON array aggregation function with ordering.
+     *
+     * - PostgreSQL: json_agg(column::json ORDER BY orderColumn)
+     * - MySQL: JSON_ARRAYAGG(CAST(column AS JSON) ORDER BY orderColumn)
+     * - H2: JSON_ARRAYAGG(column FORMAT JSON ORDER BY orderColumn)
+     *
+     * @param column The column expression containing JSON strings to aggregate
+     * @param orderColumn The column to order by
+     * @return SQL fragment for ordered JSON array aggregation
+     */
+    fun jsonArrayAggOrdered(column: String, orderColumn: String): String = when (dbType) {
+        DB_TYPE_POSTGRESQL -> "json_agg($column::json ORDER BY $orderColumn)"
+        DB_TYPE_MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON) ORDER BY $orderColumn)"
+        else -> "JSON_ARRAYAGG($column FORMAT JSON ORDER BY $orderColumn)"
+    }
+
+    /**
      * Returns the database-specific random UUID generation function.
      *
      * - PostgreSQL: gen_random_uuid()
