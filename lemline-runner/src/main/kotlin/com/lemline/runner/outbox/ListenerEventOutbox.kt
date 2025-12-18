@@ -52,7 +52,7 @@ import kotlinx.serialization.json.Json
  * when inserting the first event. This outbox does NOT set the flag -
  * it's already TRUE when we pick up the event.
  *
- * @see ListenerCompletionOutbox for ONE/ANY without foreach (simpler flow)
+ * @see ListenerOutbox for ONE/ANY without foreach (simpler flow)
  * @see WorkflowEventHandler.handleListenForEachCompleted for completion handling
  */
 @Startup

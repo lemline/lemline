@@ -68,12 +68,15 @@ const val LISTENER_TABLE = "lemline_listeners"
 
 /**
  * Key for batch querying listeners by workflow identity and correlation.
+ * Optionally includes filterIndex for ALL strategy event insertion.
  */
 @OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 data class ListenerQueryKey(
     val workflowInfo: WorkflowInfo,
     val position: NodePosition,
-    val correlationValuesJson: String?
+    val correlationValuesJson: String?,
+    /** Filter index for ALL strategy - indicates which filter matched (null for ONE/ANY) */
+    val filterIndex: Int? = null
 ) {
     /**
      * Builds SQL WHERE condition for this key.
@@ -496,7 +499,7 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
     /**
      * Marks listeners as ready for completion by query keys (ONE/ANY strategy).
      */
-    suspend fun markReadyForCompletionByKeys(
+    suspend fun markCompletedByKeys(
         keys: List<ListenerQueryKey>,
         event: String,
         connection: Connection? = null

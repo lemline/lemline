@@ -57,7 +57,7 @@ import kotlinx.serialization.json.JsonPrimitive
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-internal class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
+internal class ListenerOutbox : AbstractOutbox<ListenerModel>() {
 
     @Inject
     override lateinit var instanceEmitter: WorkflowCommandEmitter

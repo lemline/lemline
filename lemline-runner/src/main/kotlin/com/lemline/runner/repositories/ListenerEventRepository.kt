@@ -344,61 +344,72 @@ internal class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     }
 
     /**
-     * Bulk inserts events for ALL strategy listeners matching the given query keys.
+     * Bulk inserts events for ALL strategy listeners matching the given keys.
+     * Keys must include filterIndex (via ListenerQueryKey.filterIndex).
+     * Groups by filterIndex internally, allowing multiple filter matches to be processed
+     * in a single call (reducing database round-trips when grouped by readAs only).
+     *
      * Uses application-generated UUIDv7s to ensure compatibility with IDV7 validation.
+     *
+     * @param keys List of query keys with filterIndex set
+     * @param eventJson The serialized event data (same for all keys in this call)
+     * @return Total number of events inserted
      */
     suspend fun bulkInsertEventsForAllStrategy(
         keys: List<ListenerQueryKey>,
-        filterIndex: Int,
         eventJson: String,
         connection: Connection? = null
     ): Int {
         if (keys.isEmpty()) return 0
 
         return withConnection(connection) { conn ->
-            // First, find all matching listener IDs
-            val selectListenersSql = """
-                SELECT l.id FROM $LISTENER_TABLE l
-                WHERE l.outbox_delayed_until IS NULL
-                  AND l.outbox_completed_at IS NULL
-                  AND l.outbox_failed_at IS NULL
-                  AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
-            """.trimIndent()
+            // Group by filterIndex to batch queries
+            val byFilterIndex = keys.groupBy { it.filterIndex ?: 0 }
 
-            val listenerIds = mutableListOf<IDV7>()
-            conn.prepareStatement(selectListenersSql).use { stmt ->
-                ListenerQueryKey.bindAllParameters(keys, stmt, 1)
-                stmt.executeQuery().use { rs ->
-                    while (rs.next()) {
-                        getIDV7(rs, "id")?.let { listenerIds.add(it) }
-                    }
-                }
-            }
-
-            if (listenerIds.isEmpty()) return@withConnection 0
-
-            // Insert events with application-generated UUIDv7s
             val insertSql = """
                 INSERT INTO $tableName ($ID_COLUMN, $LISTENER_ID_COLUMN, $FILTER_INDEX_COLUMN, $CLOUDEVENT_ID_COLUMN, $EVENT_COLUMN, $CREATED_AT_COLUMN)
                 VALUES (?, ?, ?, NULL, ?, CURRENT_TIMESTAMP)
             """.trimIndent()
 
-            var inserted = 0
-            conn.prepareStatement(insertSql).use { stmt ->
-                for (listenerId in listenerIds) {
-                    val eventId = IDV7.random()
-                    setIDV7(stmt, 1, eventId)
-                    setIDV7(stmt, 2, listenerId)
-                    stmt.setInt(3, filterIndex)
-                    stmt.setString(4, eventJson)
-                    try {
-                        inserted += stmt.executeUpdate()
-                    } catch (_: java.sql.SQLException) {
-                        // Ignore duplicate key errors (idempotency)
+            var totalInserted = 0
+
+            conn.prepareStatement(insertSql).use { insertStmt ->
+                for ((filterIndex, queryKeys) in byFilterIndex) {
+                    // Find all matching listener IDs for this filterIndex's keys
+                    val selectListenersSql = """
+                        SELECT l.id FROM $LISTENER_TABLE l
+                        WHERE l.outbox_delayed_until IS NULL
+                          AND l.outbox_completed_at IS NULL
+                          AND l.outbox_failed_at IS NULL
+                          AND (${ListenerQueryKey.buildWhereClause(queryKeys, "l")})
+                    """.trimIndent()
+
+                    val listenerIds = mutableListOf<IDV7>()
+                    conn.prepareStatement(selectListenersSql).use { selectStmt ->
+                        ListenerQueryKey.bindAllParameters(queryKeys, selectStmt, 1)
+                        selectStmt.executeQuery().use { rs ->
+                            while (rs.next()) {
+                                getIDV7(rs, "id")?.let { listenerIds.add(it) }
+                            }
+                        }
+                    }
+
+                    // Insert events for each listener with this filterIndex
+                    for (listenerId in listenerIds) {
+                        val eventId = IDV7.random()
+                        setIDV7(insertStmt, 1, eventId)
+                        setIDV7(insertStmt, 2, listenerId)
+                        insertStmt.setInt(3, filterIndex)
+                        insertStmt.setString(4, eventJson)
+                        try {
+                            totalInserted += insertStmt.executeUpdate()
+                        } catch (_: java.sql.SQLException) {
+                            // Ignore duplicate key errors (idempotency)
+                        }
                     }
                 }
             }
-            inserted
+            totalInserted
         }
     }
 
