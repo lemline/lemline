@@ -14,6 +14,7 @@ import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.models.ListenerStrategy
 import com.lemline.runner.repositories.helpers.ColumnBindings
 import com.lemline.runner.repositories.helpers.ColumnBindingsBuilder
+import com.lemline.runner.repositories.ops.CREATED_AT_COLUMN
 import com.lemline.runner.repositories.ops.CleanerRepository
 import com.lemline.runner.repositories.ops.CrudRepository
 import com.lemline.runner.repositories.ops.ID_COLUMN
@@ -56,10 +57,6 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -149,6 +146,13 @@ data class ListenerQueryKey(
  * Repository for managing listener instances in the outbox pattern.
  * Uses composition pattern with column bindings.
  *
+ * ## Simplified Architecture
+ *
+ * All events are stored in `lemline_listener_events` table.
+ * State tracking uses:
+ * - `ready_at`: Set when completion criteria are met
+ * - Standard outbox columns for processing
+ *
  * @see ListenerModel for the entity model
  */
 @ApplicationScoped
@@ -225,14 +229,11 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
         const val STRATEGY_COLUMN = "strategy"
         const val TIMEOUT_AT_COLUMN = "timeout_at"
         const val CORRELATION_VALUES_COLUMN = "correlation_values"
-        const val EVENT_COLUMN = "event"
         const val FILTERS_COUNT_COLUMN = "filters_count"
-
-        // Foreach columns
+        const val HAS_UNTIL_COLUMN = "has_until"
+        const val UNTIL_EXPRESSION_COLUMN = "until_expression"
         const val HAS_FOREACH_COLUMN = "has_foreach"
-        const val FOREACH_CURRENT_INDEX_COLUMN = "foreach_current_index"
-        const val FOREACH_PROCESSING_COLUMN = "foreach_processing"
-        const val LISTENER_COMPLETED_COLUMN = "listener_completed"
+        const val READY_AT_COLUMN = "ready_at"
 
         /** Creates a current timestamp for database operations. */
         private fun nowTimestamp(): Timestamp = Timestamp.from(Clock.System.now().toJavaInstant())
@@ -254,28 +255,25 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
                     stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
                 } ?: stmt.setNull(idx, Types.TIMESTAMP)
             }
-            column(CORRELATION_VALUES_COLUMN) { stmt, entity, idx ->
-                stmt.setString(idx, entity.correlationValues)
-            }
-            column(EVENT_COLUMN) { stmt, entity, idx ->
-                stmt.setString(idx, entity.event)
-            }
             column(FILTERS_COUNT_COLUMN) { stmt, entity, idx ->
                 entity.filtersCount?.let { stmt.setInt(idx, it) } ?: stmt.setNull(idx, Types.INTEGER)
             }
-
-            // Foreach columns
+            column(HAS_UNTIL_COLUMN) { stmt, entity, idx ->
+                stmt.setBoolean(idx, entity.hasUntil)
+            }
+            column(UNTIL_EXPRESSION_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.untilExpression)
+            }
             column(HAS_FOREACH_COLUMN) { stmt, entity, idx ->
                 stmt.setBoolean(idx, entity.hasForeach)
             }
-            column(FOREACH_CURRENT_INDEX_COLUMN) { stmt, entity, idx ->
-                stmt.setInt(idx, entity.foreachCurrentIndex)
+            column(CORRELATION_VALUES_COLUMN) { stmt, entity, idx ->
+                stmt.setString(idx, entity.correlationValues)
             }
-            column(FOREACH_PROCESSING_COLUMN) { stmt, entity, idx ->
-                stmt.setBoolean(idx, entity.foreachProcessing)
-            }
-            column(LISTENER_COMPLETED_COLUMN) { stmt, entity, idx ->
-                stmt.setBoolean(idx, entity.listenerCompleted)
+            column(READY_AT_COLUMN) { stmt, entity, idx ->
+                entity.readyAt?.let {
+                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
+                } ?: stmt.setNull(idx, Types.TIMESTAMP)
             }
         }.build()
     }
@@ -288,14 +286,12 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN)!!,
     ).apply {
         // Listener-specific columns
-        correlationValues = rs.getString(CORRELATION_VALUES_COLUMN)
-        event = rs.getString(EVENT_COLUMN)
         filtersCount = rs.getInt(FILTERS_COUNT_COLUMN).takeIf { !rs.wasNull() }
-        // Foreach columns
+        hasUntil = rs.getBoolean(HAS_UNTIL_COLUMN)
+        untilExpression = rs.getString(UNTIL_EXPRESSION_COLUMN)
         hasForeach = rs.getBoolean(HAS_FOREACH_COLUMN)
-        foreachCurrentIndex = rs.getInt(FOREACH_CURRENT_INDEX_COLUMN)
-        foreachProcessing = rs.getBoolean(FOREACH_PROCESSING_COLUMN)
-        listenerCompleted = rs.getBoolean(LISTENER_COMPLETED_COLUMN)
+        correlationValues = rs.getString(CORRELATION_VALUES_COLUMN)
+        readyAt = rs.getInstant(READY_AT_COLUMN)
     }
         .readCleanupField(rs)
         .readOutboxFields(rs)
@@ -432,204 +428,87 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
     }
 
     // ========================================
-    // Atomic Update Methods for Race-Safe CloudEvent Processing
+    // Simplified Completion Methods
     // ========================================
 
     /**
-     * Atomically marks a listener as ready for completion (ONE/ANY without until).
-     */
-    suspend fun tryMarkReadyForCompletion(
-        id: IDV7,
-        event: String,
-        connection: Connection? = null
-    ): Int = withConnection(connection) { conn ->
-        val now = nowTimestamp()
-
-        conn.prepareStatement(markReadyForCompletionSql).use { stmt ->
-            stmt.setString(1, event)
-            stmt.setTimestamp(2, now)
-            stmt.setTimestamp(3, now)
-            setIDV7(stmt, 4, id)
-            stmt.executeUpdate()
-        }
-    }
-
-    private val markReadyForCompletionSql by lazy {
-        """
-        UPDATE $tableName
-        SET $EVENT_COLUMN = ?,
-            $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
-            $UPDATED_AT_COLUMN = ?
-        WHERE $ID_COLUMN = ?
-          AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-          AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-        """.trimIndent()
-    }
-
-    /**
-     * Marks a listener as ready for completion (for ALL/ANY+until after events table is populated).
-     */
-    suspend fun markReadyForCompletionFromEvents(
-        id: IDV7,
-        connection: Connection? = null
-    ): Int = withConnection(connection) { conn ->
-        val now = nowTimestamp()
-
-        conn.prepareStatement(markReadyForCompletionFromEventsSql).use { stmt ->
-            stmt.setTimestamp(1, now)
-            stmt.setTimestamp(2, now)
-            setIDV7(stmt, 3, id)
-            stmt.executeUpdate()
-        }
-    }
-
-    private val markReadyForCompletionFromEventsSql by lazy {
-        """
-        UPDATE $tableName
-        SET $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
-            $UPDATED_AT_COLUMN = ?
-        WHERE $ID_COLUMN = ?
-          AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-          AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-        """.trimIndent()
-    }
-
-    /**
-     * Marks listeners as ready for completion by query keys (ONE/ANY strategy).
-     */
-    suspend fun markCompletedByKeys(
-        keys: List<ListenerQueryKey>,
-        event: String,
-        connection: Connection? = null
-    ): Int {
-        if (keys.isEmpty()) return 0
-
-        return withConnection(connection) { conn ->
-            val now = nowTimestamp()
-
-            val sql = """
-                UPDATE $tableName
-                SET $EVENT_COLUMN = ?,
-                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
-                    $UPDATED_AT_COLUMN = ?
-                WHERE $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                  AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND (${ListenerQueryKey.buildWhereClause(keys)})
-            """.trimIndent()
-
-            conn.prepareStatement(sql).use { stmt ->
-                var idx = 1
-                stmt.setString(idx++, event)
-                stmt.setTimestamp(idx++, now)
-                stmt.setTimestamp(idx++, now)
-                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
-                stmt.executeUpdate()
-            }
-        }
-    }
-
-    /**
-     * Batch marks listeners as ready for completion (for ALL/ANY+until).
-     */
-    suspend fun batchMarkReadyForCompletionFromEvents(
-        listenerEvents: Map<IDV7, String>,
-        connection: Connection? = null
-    ): Int {
-        if (listenerEvents.isEmpty()) return 0
-
-        return withConnection(connection) { conn ->
-            val now = nowTimestamp()
-            val ids = listenerEvents.keys.toList()
-            val placeholders = ids.joinToString(", ") { "?" }
-            val caseWhen = ids.joinToString(" ") { "WHEN ? THEN ?" }
-
-            val sql = """
-                UPDATE $tableName
-                SET $EVENT_COLUMN = CASE $ID_COLUMN $caseWhen END,
-                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
-                    $UPDATED_AT_COLUMN = ?
-                WHERE $ID_COLUMN IN ($placeholders)
-                  AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                  AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-            """.trimIndent()
-
-            conn.prepareStatement(sql).use { stmt ->
-                var paramIndex = 1
-
-                for ((id, event) in listenerEvents) {
-                    setIDV7(stmt, paramIndex++, id)
-                    stmt.setString(paramIndex++, event)
-                }
-
-                stmt.setTimestamp(paramIndex++, now)
-                stmt.setTimestamp(paramIndex++, now)
-
-                for (id in ids) {
-                    setIDV7(stmt, paramIndex++, id)
-                }
-
-                stmt.executeUpdate()
-            }
-        }
-    }
-
-    /**
-     * Marks listeners as terminated by query keys (ANY + until(event) strategy).
-     * Only affects non-foreach listeners (has_foreach = FALSE).
-     */
-    suspend fun markTerminatedByKeys(
-        keys: List<ListenerQueryKey>,
-        connection: Connection? = null
-    ): Int {
-        if (keys.isEmpty()) return 0
-
-        return withConnection(connection) { conn ->
-            val now = nowTimestamp()
-            val conditions = keys.map { it.toSqlConditionWithoutCorrelation() }
-            val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
-
-            val sql = """
-                UPDATE $tableName l
-                SET $EVENT_COLUMN = COALESCE((
-                    SELECT $jsonAgg
-                    FROM $LISTENER_EVENT_TABLE e
-                    WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}
-                ), '[]'),
-                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
-                    $UPDATED_AT_COLUMN = ?
-                WHERE $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                  AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND $HAS_FOREACH_COLUMN = FALSE
-                  AND (${conditions.joinToString(" OR ")})
-            """.trimIndent()
-
-            conn.prepareStatement(sql).use { stmt ->
-                var idx = 1
-                stmt.setTimestamp(idx++, now)
-                stmt.setTimestamp(idx++, now)
-                for (key in keys) {
-                    idx = key.bindParametersWithoutCorrelation(stmt, idx)
-                }
-                stmt.executeUpdate()
-            }
-        }
-    }
-
-    /**
-     * Marks foreach-enabled listeners as logically completed (ANY + until(event) strategy).
+     * Batch marks listeners as ready for completion.
      *
-     * Two cases:
-     * 1. Listeners WITH events: Sets listener_completed = TRUE. The ListenerEventOutbox
-     *    will process remaining events and complete after all foreach iterations.
-     * 2. Listeners WITHOUT events: Sets listener_completed = TRUE, event = '[]', and
-     *    outbox_delayed_until = NOW(). The ListenerCompletionOutbox will complete immediately.
+     * This method checks completion criteria and sets ready_at + outbox_delayed_until:
+     * - ONE/ANY: Ready when at least one event with outbox_completed_at IS NOT NULL
+     * - ALL: Ready when COUNT(DISTINCT filter_index) >= filters_count AND all completed
+     * - ANY_UNTIL_EXPR: Handled separately via evaluateUntilExpression()
+     * - ANY_UNTIL_EVENT: Handled via batchMarkReadyByTermination()
+     *
+     * @return Number of listeners marked ready
      */
-    suspend fun markForeachTerminatedByKeys(
+    suspend fun batchMarkReady(connection: Connection? = null): Int =
+        withConnection(connection) { conn ->
+            val now = nowTimestamp()
+
+            // Mark ONE/ANY listeners ready (at least one completed event)
+            val oneAnySql = """
+                UPDATE $tableName l
+                SET $READY_AT_COLUMN = ?,
+                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+                    $UPDATED_AT_COLUMN = ?
+                WHERE l.$READY_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND l.$STRATEGY_COLUMN IN ('ONE', 'ANY')
+                  AND EXISTS (
+                      SELECT 1 FROM $LISTENER_EVENT_TABLE e
+                      WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                        AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NOT NULL
+                  )
+            """.trimIndent()
+
+            val oneAnyCount = conn.prepareStatement(oneAnySql).use { stmt ->
+                stmt.setTimestamp(1, now)
+                stmt.setTimestamp(2, now)
+                stmt.setTimestamp(3, now)
+                stmt.executeUpdate()
+            }
+
+            // Mark ALL listeners ready (all filters matched and all events completed)
+            val allSql = """
+                UPDATE $tableName l
+                SET $READY_AT_COLUMN = ?,
+                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+                    $UPDATED_AT_COLUMN = ?
+                WHERE l.$READY_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND l.$STRATEGY_COLUMN = 'ALL'
+                  AND l.$FILTERS_COUNT_COLUMN IS NOT NULL
+                  AND (
+                      SELECT COUNT(DISTINCT e.${ListenerEventRepository.FILTER_INDEX_COLUMN})
+                      FROM $LISTENER_EVENT_TABLE e
+                      WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                        AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NOT NULL
+                  ) >= l.$FILTERS_COUNT_COLUMN
+            """.trimIndent()
+
+            val allCount = conn.prepareStatement(allSql).use { stmt ->
+                stmt.setTimestamp(1, now)
+                stmt.setTimestamp(2, now)
+                stmt.setTimestamp(3, now)
+                stmt.executeUpdate()
+            }
+
+            oneAnyCount + allCount
+        }
+
+    /**
+     * Marks listeners as ready by termination event (ANY_UNTIL_EVENT strategy).
+     * Called when a termination event is received.
+     *
+     * This method sets `ready_at` to mark that termination was received.
+     * The `outbox_delayed_until` is only set if all events are already completed.
+     * For foreach listeners with pending events, `batchMarkReadyTerminatedListeners()`
+     * will set `outbox_delayed_until` later when all events are done.
+     */
+    suspend fun batchMarkReadyByUntilEvent(
         keys: List<ListenerQueryKey>,
         connection: Connection? = null
     ): Int {
@@ -638,221 +517,158 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
         return withConnection(connection) { conn ->
             val now = nowTimestamp()
             val conditions = keys.map { it.toSqlConditionWithoutCorrelation("l") }
-            val whereConditions = conditions.joinToString(" OR ")
 
-            // First: Mark listeners WITH events as logically completed
-            // (ListenerEventOutbox will process remaining events and complete after foreach)
-            val sqlWithEvents = """
+            // First: Mark ready_at for ALL matched listeners (termination received)
+            // Only set outbox_delayed_until if all events are completed
+            val sql = """
                 UPDATE $tableName l
-                SET $LISTENER_COMPLETED_COLUMN = TRUE,
+                SET $READY_AT_COLUMN = ?,
+                    $OUTBOX_DELAYED_UNTIL_COLUMN = CASE
+                        WHEN NOT EXISTS (
+                            SELECT 1 FROM $LISTENER_EVENT_TABLE e
+                            WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                              AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NULL
+                        ) THEN ?
+                        ELSE NULL
+                    END,
                     $UPDATED_AT_COLUMN = ?
-                WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                WHERE l.$READY_AT_COLUMN IS NULL
                   AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
                   AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND l.$HAS_FOREACH_COLUMN = TRUE
-                  AND ($whereConditions)
+                  AND l.$STRATEGY_COLUMN = 'ANY_UNTIL_EVENT'
+                  AND (${conditions.joinToString(" OR ")})
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                var idx = 1
+                stmt.setTimestamp(idx++, now)  // ready_at
+                stmt.setTimestamp(idx++, now)  // outbox_delayed_until (conditional)
+                stmt.setTimestamp(idx++, now)  // updated_at
+                for (key in keys) {
+                    idx = key.bindParametersWithoutCorrelation(stmt, idx)
+                }
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    /**
+     * Marks terminated ANY_UNTIL_EVENT listeners as ready for processing.
+     *
+     * Called from ListenerCompletionOutbox to check if listeners that received
+     * a termination event (ready_at IS NOT NULL) now have all their events
+     * completed (for foreach processing).
+     *
+     * @return Number of listeners marked ready for processing
+     */
+    suspend fun batchMarkReadyTerminatedListeners(connection: Connection? = null): Int =
+        withConnection(connection) { conn ->
+            val now = nowTimestamp()
+            conn.prepareStatement(batchMarkReadyTerminatedSql).use { stmt ->
+                stmt.setTimestamp(1, now)
+                stmt.setTimestamp(2, now)
+                stmt.executeUpdate()
+            }
+        }
+
+    private val batchMarkReadyTerminatedSql by lazy {
+        """
+        UPDATE $tableName l
+        SET $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+            $UPDATED_AT_COLUMN = ?
+        WHERE l.$READY_AT_COLUMN IS NOT NULL
+          AND l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+          AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+          AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+          AND l.$STRATEGY_COLUMN = 'ANY_UNTIL_EVENT'
+          AND NOT EXISTS (
+              SELECT 1 FROM $LISTENER_EVENT_TABLE e
+              WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NULL
+          )
+        """.trimIndent()
+    }
+
+    /**
+     * Finds ANY_UNTIL_EXPR listeners with completed events needing expression evaluation.
+     * Returns pairs of (listener, list of event data).
+     */
+    suspend fun findListenersForUntilEvaluation(
+        limit: Int = 100,
+        connection: Connection? = null
+    ): List<Pair<ListenerModel, List<String>>> =
+        withConnection(connection) { conn ->
+            // Use ordered JSON array aggregation (ORDER BY inside aggregate for H2 compatibility)
+            val jsonAgg = databaseManager.jsonArrayAggOrdered(
+                "e.${ListenerEventRepository.EVENT_COLUMN}",
+                "e.$CREATED_AT_COLUMN"
+            )
+
+            val sql = """
+                SELECT l.*,
+                       (SELECT $jsonAgg
+                        FROM $LISTENER_EVENT_TABLE e
+                        WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                          AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NOT NULL
+                       ) as events_json
+                FROM $tableName l
+                WHERE l.$READY_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
+                  AND l.$STRATEGY_COLUMN = 'ANY_UNTIL_EXPR'
                   AND EXISTS (
                       SELECT 1 FROM $LISTENER_EVENT_TABLE e
                       WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                        AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NOT NULL
                   )
-            """.trimIndent()
-
-            val withEventsCount = conn.prepareStatement(sqlWithEvents).use { stmt ->
-                var idx = 1
-                stmt.setTimestamp(idx++, now)
-                for (key in keys) {
-                    idx = key.bindParametersWithoutCorrelation(stmt, idx)
-                }
-                stmt.executeUpdate()
-            }
-
-            // Second: Mark listeners WITHOUT events for immediate completion
-            // (Sets event = '[]' and schedules for ListenerCompletionOutbox)
-            val sqlNoEvents = """
-                UPDATE $tableName l
-                SET $LISTENER_COMPLETED_COLUMN = TRUE,
-                    $EVENT_COLUMN = '[]',
-                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
-                    $UPDATED_AT_COLUMN = ?
-                WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND l.$HAS_FOREACH_COLUMN = TRUE
-                  AND ($whereConditions)
-                  AND NOT EXISTS (
-                      SELECT 1 FROM $LISTENER_EVENT_TABLE e
-                      WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
-                  )
-            """.trimIndent()
-
-            val noEventsCount = conn.prepareStatement(sqlNoEvents).use { stmt ->
-                var idx = 1
-                stmt.setTimestamp(idx++, now)
-                stmt.setTimestamp(idx++, now)
-                for (key in keys) {
-                    idx = key.bindParametersWithoutCorrelation(stmt, idx)
-                }
-                stmt.executeUpdate()
-            }
-
-            withEventsCount + noEventsCount
-        }
-    }
-
-    /**
-     * Marks listeners as completed by query keys (ALL strategy).
-     * Only affects non-foreach listeners (has_foreach = FALSE).
-     */
-    suspend fun markAllCompletedByKeys(
-        keys: List<ListenerQueryKey>,
-        connection: Connection? = null
-    ): Int {
-        if (keys.isEmpty()) return 0
-
-        return withConnection(connection) { conn ->
-            val now = nowTimestamp()
-            val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
-
-            val sql = """
-                UPDATE $tableName l
-                SET $EVENT_COLUMN = (
-                    SELECT $jsonAgg
-                    FROM $LISTENER_EVENT_TABLE e
-                    WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}
-                ),
-                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
-                    $UPDATED_AT_COLUMN = ?
-                WHERE $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                  AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND $FILTERS_COUNT_COLUMN IS NOT NULL
-                  AND $HAS_FOREACH_COLUMN = FALSE
-                  AND (SELECT COUNT(*) FROM $LISTENER_EVENT_TABLE e WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}) >= $FILTERS_COUNT_COLUMN
-                  AND (${ListenerQueryKey.buildWhereClause(keys)})
+                LIMIT ?
+                FOR UPDATE SKIP LOCKED
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->
-                var idx = 1
-                stmt.setTimestamp(idx++, now)
-                stmt.setTimestamp(idx++, now)
-                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
-                stmt.executeUpdate()
-            }
-        }
-    }
-
-    /**
-     * Marks foreach-enabled listeners as logically completed (ALL strategy).
-     * Sets listener_completed = TRUE without setting outbox_delayed_until.
-     * The ListenerEventOutbox will complete the listener after all foreach iterations.
-     */
-    suspend fun markForeachAllCompletedByKeys(
-        keys: List<ListenerQueryKey>,
-        connection: Connection? = null
-    ): Int {
-        if (keys.isEmpty()) return 0
-
-        return withConnection(connection) { conn ->
-            val now = nowTimestamp()
-
-            val sql = """
-                UPDATE $tableName l
-                SET $LISTENER_COMPLETED_COLUMN = TRUE,
-                    $UPDATED_AT_COLUMN = ?
-                WHERE l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND l.$FILTERS_COUNT_COLUMN IS NOT NULL
-                  AND l.$HAS_FOREACH_COLUMN = TRUE
-                  AND (SELECT COUNT(*) FROM $LISTENER_EVENT_TABLE e WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}) >= l.$FILTERS_COUNT_COLUMN
-                  AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
-            """.trimIndent()
-
-            conn.prepareStatement(sql).use { stmt ->
-                var idx = 1
-                stmt.setTimestamp(idx++, now)
-                ListenerQueryKey.bindAllParameters(keys, stmt, idx)
-                stmt.executeUpdate()
-            }
-        }
-    }
-
-    // ========================================
-    // Streaming Methods for Memory-Efficient Processing
-    // ========================================
-
-    /**
-     * Data class for streaming listener with accumulated events.
-     */
-    data class ListenerWithEvents(
-        val listener: ListenerModel,
-        val accumulatedEvents: List<String>
-    )
-
-    /**
-     * Streams listeners with their accumulated events for expression evaluation.
-     */
-    fun streamListenersWithEvents(
-        keys: List<ListenerQueryKey>,
-        fetchSize: Int = 500
-    ): Flow<ListenerWithEvents> = flow {
-        if (keys.isEmpty()) return@flow
-
-        databaseManager.datasource.connection.use { conn ->
-            conn.autoCommit = false
-
-            try {
-                val jsonAgg = databaseManager.jsonArrayAgg("e.${ListenerEventRepository.EVENT_COLUMN}")
-
-                val sql = """
-                    SELECT l.*,
-                           (SELECT $jsonAgg
-                            FROM $LISTENER_EVENT_TABLE e
-                            WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.${ID_COLUMN}) as accumulated_events
-                    FROM $tableName l
-                    WHERE l.${OUTBOX_DELAYED_UNTIL_COLUMN} IS NULL
-                      AND l.${OUTBOX_COMPLETED_AT_COLUMN} IS NULL
-                      AND l.${OUTBOX_FAILED_AT_COLUMN} IS NULL
-                      AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
-                """.trimIndent()
-
-                conn.prepareStatement(sql).use { stmt ->
-                    stmt.fetchSize = fetchSize
-                    ListenerQueryKey.bindAllParameters(keys, stmt, 1)
-
-                    stmt.executeQuery().use { rs ->
+                stmt.setInt(1, limit)
+                stmt.executeQuery().use { rs ->
+                    buildList {
                         while (rs.next()) {
                             val listener = createModel(rs)
-                            val eventsJson = rs.getString("accumulated_events")
+                            val eventsJson = rs.getString("events_json")
                             val events = parseJsonArrayToList(eventsJson)
-                            emit(ListenerWithEvents(listener, events))
+                            add(listener to events)
                         }
                     }
                 }
-            } finally {
-                conn.autoCommit = true
             }
         }
-    }.flowOn(Dispatchers.IO)
 
     /**
-     * Parses a JSON array from json_agg/JSON_ARRAYAGG into a List<String>.
+     * Marks a single listener as ready (after until expression evaluation).
      */
-    private fun parseJsonArrayToList(json: String?): List<String> {
-        if (json == null || json == "null" || json.isBlank()) {
-            return emptyList()
-        }
-        return try {
-            val array = Json.parseToJsonElement(json).jsonArray
-            array.map { Json.encodeToString(it) }
-        } catch (e: Exception) {
-            emptyList()
+    suspend fun markReady(
+        id: IDV7,
+        connection: Connection? = null
+    ): Int = withConnection(connection) { conn ->
+        val now = nowTimestamp()
+        conn.prepareStatement(markReadySql).use { stmt ->
+            stmt.setTimestamp(1, now)
+            stmt.setTimestamp(2, now)
+            stmt.setTimestamp(3, now)
+            setIDV7(stmt, 4, id)
+            stmt.executeUpdate()
         }
     }
 
-    // ========================================
-    // Foreach Methods
-    // ========================================
+    private val markReadySql by lazy {
+        """
+        UPDATE $tableName
+        SET $READY_AT_COLUMN = ?,
+            $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+            $UPDATED_AT_COLUMN = ?
+        WHERE $ID_COLUMN = ?
+          AND $READY_AT_COLUMN IS NULL
+          AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+        """.trimIndent()
+    }
 
     /**
      * Finds a listener by workflow ID and position.
@@ -880,105 +696,17 @@ internal class ListenerRepository : CrudRepository<ListenerModel>(),
     }
 
     /**
-     * Sets the foreach_processing flag for a listener.
+     * Parses a JSON array from json_agg/JSON_ARRAYAGG into a List<String>.
      */
-    suspend fun setForeachProcessing(
-        id: IDV7,
-        processing: Boolean,
-        connection: Connection? = null
-    ): Int = withConnection(connection) { conn ->
-        conn.prepareStatement(setForeachProcessingSql).use { stmt ->
-            stmt.setBoolean(1, processing)
-            stmt.setTimestamp(2, nowTimestamp())
-            setIDV7(stmt, 3, id)
-            stmt.executeUpdate()
+    private fun parseJsonArrayToList(json: String?): List<String> {
+        if (json == null || json == "null" || json.isBlank()) {
+            return emptyList()
         }
-    }
-
-    private val setForeachProcessingSql by lazy {
-        """
-        UPDATE $tableName
-        SET $FOREACH_PROCESSING_COLUMN = ?,
-            $UPDATED_AT_COLUMN = ?
-        WHERE $ID_COLUMN = ?
-        """.trimIndent()
-    }
-
-    /**
-     * Increments the foreach_current_index for a listener.
-     */
-    suspend fun incrementForeachIndex(
-        id: IDV7,
-        connection: Connection? = null
-    ): Int = withConnection(connection) { conn ->
-        conn.prepareStatement(incrementForeachIndexSql).use { stmt ->
-            stmt.setTimestamp(1, nowTimestamp())
-            setIDV7(stmt, 2, id)
-            stmt.executeUpdate()
+        return try {
+            val array = Json.parseToJsonElement(json).jsonArray
+            array.map { Json.encodeToString(it) }
+        } catch (_: Exception) {
+            emptyList()
         }
-    }
-
-    private val incrementForeachIndexSql by lazy {
-        """
-        UPDATE $tableName
-        SET $FOREACH_CURRENT_INDEX_COLUMN = $FOREACH_CURRENT_INDEX_COLUMN + 1,
-            $UPDATED_AT_COLUMN = ?
-        WHERE $ID_COLUMN = ?
-        """.trimIndent()
-    }
-
-    /**
-     * Sets the listener_completed flag for a listener.
-     */
-    suspend fun setListenerCompleted(
-        id: IDV7,
-        completed: Boolean,
-        connection: Connection? = null
-    ): Int = withConnection(connection) { conn ->
-        conn.prepareStatement(setListenerCompletedSql).use { stmt ->
-            stmt.setBoolean(1, completed)
-            stmt.setTimestamp(2, nowTimestamp())
-            setIDV7(stmt, 3, id)
-            stmt.executeUpdate()
-        }
-    }
-
-    private val setListenerCompletedSql by lazy {
-        """
-        UPDATE $tableName
-        SET $LISTENER_COMPLETED_COLUMN = ?,
-            $UPDATED_AT_COLUMN = ?
-        WHERE $ID_COLUMN = ?
-        """.trimIndent()
-    }
-
-    /**
-     * Marks listener ready for completion with aggregated event output.
-     */
-    suspend fun markReadyForCompletionWithOutput(
-        id: IDV7,
-        event: String,
-        connection: Connection? = null
-    ): Int = withConnection(connection) { conn ->
-        val now = nowTimestamp()
-        conn.prepareStatement(markReadyForCompletionWithOutputSql).use { stmt ->
-            stmt.setString(1, event)
-            stmt.setTimestamp(2, now)
-            stmt.setTimestamp(3, now)
-            setIDV7(stmt, 4, id)
-            stmt.executeUpdate()
-        }
-    }
-
-    private val markReadyForCompletionWithOutputSql by lazy {
-        """
-        UPDATE $tableName
-        SET $EVENT_COLUMN = ?,
-            $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
-            $UPDATED_AT_COLUMN = ?
-        WHERE $ID_COLUMN = ?
-          AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-        """.trimIndent()
     }
 }

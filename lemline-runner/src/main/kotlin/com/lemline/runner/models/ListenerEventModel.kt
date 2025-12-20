@@ -7,103 +7,102 @@ import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
- * Model representing an accumulated CloudEvent for a listener.
+ * Model representing a CloudEvent stored for a listener.
  *
- * Used for strategies that require multiple events:
- * - **ALL**: One event per filter, completion when all filters matched
- * - **ANY with until**: Accumulate events until condition is met
+ * ## Composite Key
  *
- * For simple strategies (ONE, ANY without until), the event is stored
- * directly in the [ListenerModel.event] column.
+ * This model uses a composite primary key `(listenerId, eventId, filterIndex)` where:
+ * - `eventId` is the CloudEvent's unique identifier
+ * - `filterIndex` identifies which filter the event matched
  *
- * ## Foreach Support
+ * This allows the same CloudEvent to satisfy multiple filters in an ALL strategy,
+ * while providing natural idempotency for duplicate events.
  *
- * When foreach is enabled on the listener, this model also serves as an outbox
- * for sequential event processing. Events are processed one at a time through
- * foreach.do, with results stored in [iterationOutput].
+ * ## Simplified Architecture
  *
- * ## Idempotency
+ * ALL events (for ALL strategies) are stored in this table.
+ * This model serves as both event storage AND foreach outbox.
  *
- * Two unique constraints ensure idempotency:
- * - **ALL**: `UNIQUE(listener_id, filter_index)` - one event per filter
- * - **ANY+until**: `UNIQUE(listener_id, cloudevent_id)` - same CloudEvent not added twice
+ * ## FIFO Ordering
+ *
+ * Events are processed in arrival order via the `created_at` column:
+ * - First event for a listener gets `outbox_delayed_until = NOW` (immediately ready)
+ * - Subsequent events get `outbox_delayed_until = NULL` (waiting for FIFO turn)
+ * - When an event completes, the next event's `delayed_until` is set to NOW
+ *
+ * ## State Tracking via Outbox Columns
+ *
+ * | State | outbox_delayed_until | outbox_completed_at |
+ * |-------|---------------------|---------------------|
+ * | Waiting for FIFO | NULL | NULL |
+ * | Ready for processing | NOT NULL, <= NOW | NULL |
+ * | Processing (claimed) | NOT NULL | NULL (in-flight) |
+ * | Completed | (any) | NOT NULL |
+ * | Skipped (no foreach) | (any) | = created_at |
  *
  * ## Filter Index
  *
- * - **ALL strategy**: Explicit value (0, 1, 2...) matching the filter that was satisfied
- * - **ANY+until**: NULL (allows multiple events per listener)
+ * - **ALL strategy**: Explicit value (0, 1, 2...) for completion check
+ * - **ONE/ANY strategies**: Defaults to 0 (single event per listener)
  *
  * @see ListenerModel for the parent listener
  */
 @ExperimentalSerializationApi
 @ExperimentalTime
 data class ListenerEventModel(
-    /** Unique identifier */
-    override val id: IDV7,
-
-    /** Reference to the parent listener */
+    /** Reference to the parent listener (part of composite PK) */
     val listenerId: IDV7,
 
-    /**
-     * Filter index.
-     * - For ALL: explicit filter index (0, 1, 2...)
-     * - For ANY+until: null (allows multiple events)
-     */
-    val filterIndex: Int?,
+    /** CloudEvent ID from the CloudEvent spec 'id' field (part of composite PK) */
+    val eventId: String,
 
     /**
-     * CloudEvent ID for idempotency.
-     * - For ALL: null (idempotency via filter_index)
-     * - For ANY+until: CloudEvent.id to prevent duplicate events on retry
+     * Filter index that matched (part of composite PK).
+     * - ALL strategy: Explicit value (0, 1, 2...) for completion check
+     * - ONE/ANY strategies: Defaults to 0 (only one event stored per listener)
      */
-    val cloudEventId: String?,
+    val filterIndex: Int = 0,
 
     /** CloudEvent data as JSON string */
     val event: String,
 
-    /** Creation timestamp */
-    val createdAt: Instant? = null,
-
-    // ========================================
-    // Foreach Outbox Fields
-    // ========================================
-    // These fields are used when the listener has foreach enabled.
-    // They enable sequential processing of events through foreach.do.
-
-    /** When outbox processing was scheduled (NULL = not foreach enabled) */
+    /** When outbox processing was scheduled (NULL for non-foreach events) */
     override val outboxScheduledFor: Instant? = null,
+) : WithOutbox, WithCleanup {
 
-    /** When event is ready for foreach processing (NULL = queued, waiting) */
-    override var outboxDelayedUntil: Instant? = null,
+    /** Whether foreach.do has completed for this event (used for efficient indexing) */
+    var foreachCompleted: Boolean = false
+
+    /** Output from foreach.do iteration (captured after completion) */
+    var foreachOutput: String? = null
+
+    /** Creation timestamp */
+    var createdAt: Instant? = null
+
+    // Standard outbox fields for foreach processing
+    /** NULL = waiting for FIFO turn, NOT NULL = ready for processing */
+    override var outboxDelayedUntil: Instant? = null
 
     /** Number of processing attempts */
-    override var outboxAttemptCount: Int = 0,
+    override var outboxAttemptCount: Int = 0
 
     /** Error class from last failed attempt */
-    override var outboxErrorClass: String? = null,
+    override var outboxErrorClass: String? = null
 
     /** Error message from last failed attempt */
-    override var outboxErrorMessage: String? = null,
+    override var outboxErrorMessage: String? = null
 
     /** Error stack trace from last failed attempt */
-    override var outboxErrorStackTrace: String? = null,
+    override var outboxErrorStackTrace: String? = null
 
-    /** When foreach.do completed for this event */
-    override var outboxCompletedAt: Instant? = null,
+    /** When foreach.do completed for this event (or immediate if no foreach) */
+    override var outboxCompletedAt: Instant? = null
 
     /** When foreach.do permanently failed for this event */
-    override var outboxFailedAt: Instant? = null,
+    override var outboxFailedAt: Instant? = null
 
-    // ========================================
-    // Foreach Iteration Tracking
-    // ========================================
+    /** When to delete this event */
+    override var cleanupAfter: Instant? = null
 
-    /** Foreach iteration index (0-based) */
-    val iterationIndex: Int = 0,
-
-    /** Output from foreach.do for this event (JSON) */
-    var iterationOutput: String? = null,
-
-    ) : WithId, WithOutbox {
     companion object
 }

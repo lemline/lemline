@@ -156,19 +156,18 @@ class DefinitionListenService {
         event: CloudEvent,
         eventDataProvider: () -> JsonElement
     ): List<MatchingListenTask> {
-        logger.debug { "Finding matching listen tasks for CloudEvent: type=${event.type}, source=${event.source}" }
+        logger.debug { "Finding matching listen tasks for CloudEvent: $event" }
 
         // Parse event data lazily (only if needed for filter evaluation)
         val eventData by lazy { eventDataProvider() }
 
         val matches = DefinitionCache.getAllListenTasks().flatMap { listenTask ->
             listenTask.filters.mapIndexedNotNull { index, filter ->
-                if (!filterMatches(filter, event, eventData)) return@mapIndexedNotNull null
+                if (!filterMatches(filter, event, eventDataProvider)) return@mapIndexedNotNull null
 
                 MatchingListenTask(
                     listenTask = listenTask,
-                    correlationValuesJson = extractCorrelationValues(filter, eventData)
-                        ?.let(::serializeCorrelationValues),
+                    correlationValuesJson = extractCorrelationJson(filter, eventData),
                     filterIndex = index
                 )
             }
@@ -195,14 +194,13 @@ class DefinitionListenService {
         logger.debug { "Finding matching 'until' for CloudEvent: $event" }
 
         // Parse event data lazily
-        val eventData by lazy { eventDataProvider() }
 
         val matches = DefinitionCache.getAllListenTasks().mapNotNull { listenTask ->
             // Only check tasks with termination filters
             val terminationFilter = listenTask.untilEventFilter ?: return@mapNotNull null
 
             // Check if this event matches the termination filter
-            if (!filterMatches(terminationFilter, event, eventData)) return@mapNotNull null
+            if (!filterMatches(terminationFilter, event, eventDataProvider)) return@mapNotNull null
 
             MatchingListenTaskUntilEvent(listenTask = listenTask)
         }
@@ -212,14 +210,21 @@ class DefinitionListenService {
     }
 
     /**
-     * Serializes correlation values to JSON with sorted keys for consistent database comparison.
+     * Extracts correlation data from the given event filter and event data, then serializes it into a JSON string.
+     * Utilizes correlation definitions in the provided event filter to extract relevant data from the event.
+     * If no correlation values are extracted or an error occurs, the method returns null.
+     *
+     * @param eventFilter The filter containing correlation definitions to evaluate against the event data.
+     * @param eventData The JSON representation of the event data to be evaluated.
+     * @return A JSON string representing the serialized correlation data if extraction succeeds, or null otherwise.
      */
-    private fun serializeCorrelationValues(values: Map<String, String>) =
-        Json.encodeToString(values.toSortedMap())
+    private fun extractCorrelationJson(
+        eventFilter: EventFilter,
+        eventData: JsonElement
+    ): String? = extractCorrelationValues(eventFilter, eventData)
+        ?.let { Json.encodeToString(it.toSortedMap()) }
 
-    /**
-     * Extracts correlation values from the event data using the filter's correlation definitions.
-     */
+    /** Extracts correlation values from the event data using the filter's correlation definitions.*/
     private fun extractCorrelationValues(
         eventFilter: EventFilter,
         eventData: JsonElement
@@ -263,7 +268,7 @@ class DefinitionListenService {
     private fun filterMatches(
         filter: EventFilter,
         event: CloudEvent,
-        eventData: JsonElement
+        eventDataProvider: () -> JsonElement
     ): Boolean {
         val eventProps = filter.with ?: return true // No filter criteria = match all
 
@@ -294,7 +299,7 @@ class DefinitionListenService {
 
         if (!matchesExprField(
                 eventProps.data?.get()?.toString(),
-                eventData
+                eventDataProvider()
             )
         ) return false
 

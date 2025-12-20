@@ -17,33 +17,32 @@ CREATE TABLE lemline_listeners
     workflow_position       TEXT         NOT NULL,
     workflow_state          MEDIUMTEXT   NOT NULL,
 
-    -- Correlation state (for Mode 2: first-sets-baseline)
-    correlation_values      TEXT,       -- JSON map of correlation key -> baseline value
-
-    -- Single event storage (for ONE and ANY without until)
-    event                   MEDIUMTEXT, -- JSON CloudEvent data
-
-    -- Listen strategy: ONE, ANY, ANY_UNTIL, ALL
+    -- Listen strategy: ONE, ANY, ANY_UNTIL_EXPR, ANY_UNTIL_EVENT, ALL
     strategy                VARCHAR(20)  NOT NULL,
 
-    -- total number of filters
+    -- Total number of filters (for ALL strategy completion check)
     filters_count           INT,
+
+    -- Whether listener has an until condition (for routing decisions)
+    has_until               BOOLEAN      NOT NULL DEFAULT FALSE,
+
+    -- Until expression (for ANY_UNTIL_EXPR strategy)
+    until_expression        TEXT,
+
+    -- Whether listener has foreach.do configured
+    has_foreach             BOOLEAN      NOT NULL DEFAULT FALSE,
+
+    -- Correlation baseline values (Mode 2: first-sets-baseline), JSON map
+    correlation_values      TEXT,
 
     -- Timeout handling
     timeout_at              TIMESTAMP(6),
 
-    -- Foreach configuration (extracted from workflow definition for efficiency)
-    has_foreach             BOOLEAN      NOT NULL DEFAULT FALSE,
+    -- State progression: ready_at is set when completion criteria are met
+    -- This triggers ListenerCompletionOutbox to process the listener
+    ready_at                TIMESTAMP(6),
 
-    -- Foreach processing state
-    foreach_current_index   INT          NOT NULL DEFAULT 0,
-    foreach_processing      BOOLEAN      NOT NULL DEFAULT FALSE,
-
-    -- Completion flag (set by CloudEventHandler when completion criteria met)
-    -- This decouples completion detection from completion handling
-    listener_completed      BOOLEAN      NOT NULL DEFAULT FALSE,
-
-    -- Outbox fields
+    -- Standard outbox fields (for completion processing)
     -- outbox_delayed_until: NULL = waiting, NOT NULL = ready for processing
     outbox_scheduled_for    TIMESTAMP(6) NOT NULL,
     outbox_delayed_until    TIMESTAMP(6),
@@ -53,6 +52,8 @@ CREATE TABLE lemline_listeners
     outbox_error_stacktrace MEDIUMTEXT,
     outbox_completed_at     TIMESTAMP(6),
     outbox_failed_at        TIMESTAMP(6),
+
+    -- Cleanup
     cleanup_after           TIMESTAMP(6),
 
     -- Timestamps
@@ -66,15 +67,19 @@ CREATE TABLE lemline_listeners
 CREATE INDEX idx_lemline_listeners_workflow_id
     ON lemline_listeners (workflow_id);
 
--- Index for efficient lookup by workflow info + position (for event routing)
+-- Index for finding pending listeners by workflow identity (for event routing)
 -- Using prefixes to stay within MySQL's 3072 byte key limit (utf8mb4 = 4 bytes/char)
--- Reallocated: namespace/name/version are short, position can be long for nested workflows
-CREATE INDEX idx_lemline_listeners_workflow_position
+CREATE INDEX idx_lemline_listeners_pending
     ON lemline_listeners (workflow_namespace(50), workflow_name(100), workflow_version(20), workflow_position(500));
 
--- Index for correlation-based lookup (includes correlation_values for CloudEvent matching)
+-- Index for correlation-based lookup
+-- Prefix lengths reduced to stay within MySQL's 3072 byte key limit (utf8mb4 = 4 bytes/char)
 CREATE INDEX idx_lemline_listeners_correlation
-    ON lemline_listeners (workflow_namespace(50), workflow_name(100), workflow_version(20), workflow_position(500), correlation_values(200));
+    ON lemline_listeners (workflow_namespace(50), workflow_name(100), workflow_version(20), workflow_position(400), correlation_values(100));
+
+-- Index for completion outbox processing (ready listeners)
+CREATE INDEX idx_lemline_listeners_ready
+    ON lemline_listeners (ready_at);
 
 -- Index for timeout processing
 CREATE INDEX idx_lemline_listeners_timeout

@@ -5,8 +5,8 @@ import com.lemline.common.logger.logger
 import com.lemline.core.lifecycleevents.LifecycleEventEmitter
 import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LIFECYCLEEVENTS_OUT_CHANNEL
+import com.lemline.runner.messaging.cloudevents.CloudEventService
 import io.cloudevents.CloudEvent
-import io.cloudevents.jackson.JsonFormat
 import io.quarkus.arc.properties.IfBuildProperty
 import io.quarkus.runtime.Startup
 import io.smallrye.mutiny.coroutines.awaitSuspending
@@ -39,10 +39,8 @@ class LifecycleEventEmitterImpl : LifecycleEventEmitter {
     @Channel(LIFECYCLEEVENTS_OUT_CHANNEL)
     private lateinit var emitter: MutinyEmitter<String>
 
-    private val jsonFormat = JsonFormat()
-
     override suspend fun emit(cloudEvent: CloudEvent) {
-        val payload = String(jsonFormat.serialize(cloudEvent), Charsets.UTF_8)
+        val payload = CloudEventService.serialize(cloudEvent)
 
         logger.debug {
             "Emitting lifecycle event: id=${cloudEvent.id}, type=${cloudEvent.type}, source=${cloudEvent.source}"

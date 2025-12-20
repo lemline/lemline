@@ -4,7 +4,6 @@ package com.lemline.runner.messaging.cloudevents
 import com.lemline.common.logger.logger
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
-import io.cloudevents.jackson.JsonFormat
 import io.quarkus.arc.properties.IfBuildProperty
 import io.quarkus.runtime.Startup
 import io.smallrye.mutiny.coroutines.awaitSuspending
@@ -36,8 +35,6 @@ internal class CloudEventsEmitter {
     @Channel(CLOUDEVENTS_OUT_CHANNEL)
     private lateinit var emitter: MutinyEmitter<String>
 
-    private val jsonFormat = JsonFormat()
-
     /**
      * Sends a CloudEvent to the external channel.
      *
@@ -66,8 +63,8 @@ internal class CloudEventsEmitter {
 
         val enrichedEvent = builder.build()
 
-        // Serialize using the official CloudEvents Jackson format
-        val payload = String(jsonFormat.serialize(enrichedEvent), Charsets.UTF_8)
+        // Serialize using the centralized CloudEventService
+        val payload = CloudEventService.serialize(enrichedEvent)
 
         logger.debug { "Emitting CloudEvent: id=${enrichedEvent.id}, source=${enrichedEvent.source}, type=${enrichedEvent.type}" }
 

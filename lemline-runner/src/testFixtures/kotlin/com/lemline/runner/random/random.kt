@@ -217,12 +217,15 @@ fun ForkBranchModel.Companion.random(forkId: IDV7 = IDV7.random()) = ForkBranchM
     failedAt = null
 )
 
-fun ListenerEventModel.Companion.random(listenerId: IDV7 = IDV7.random()) = ListenerEventModel(
-    id = IDV7.random(),
+fun ListenerEventModel.Companion.random(
+    listenerId: IDV7 = IDV7.random(),
+    filterIndex: Int = Random.nextInt(0, 10)
+) = ListenerEventModel(
     listenerId = listenerId,
-    filterIndex = Random.nextInt(0, 10),
-    cloudEventId = String.random(),
-    event = """{"type":"com.example.${String.random()}","data":{"value":${Random.nextInt()}}}"""
+    eventId = IDV7.random().toString(),
+    filterIndex = filterIndex,
+    event = """{"type":"com.example.${String.random()}","data":{"value":${Random.nextInt()}}}""",
+    outboxScheduledFor = Instant.random()
 )
 
 fun ListenerModel.Companion.random(): ListenerModel {
@@ -248,9 +251,7 @@ fun ListenerModel.Companion.random(): ListenerModel {
             true -> """{"${String.random()}":"${String.random()}"}"""
             false -> null
         }
-        it.event = when (Random.nextBoolean()) {
-            true -> """{"type":"com.example.${String.random()}"}"""
-            false -> null
-        }
+        it.hasUntil = Random.nextBoolean()
+        it.hasForeach = Random.nextBoolean()
     }
 }

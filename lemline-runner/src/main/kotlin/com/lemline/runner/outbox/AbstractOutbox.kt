@@ -129,7 +129,7 @@ internal abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask()
      * @param initialDelay Initial delay in seconds before first retry
      */
     @VisibleForTesting
-    internal suspend fun processEntities(batchSize: Int, maxAttempts: Int, initialDelay: Duration) = try {
+    open suspend fun processEntities(batchSize: Int, maxAttempts: Int, initialDelay: Duration) = try {
         var totalToProcess = 0
         var totalProcessed = 0
         var batchNumber = 0
@@ -208,8 +208,7 @@ internal abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask()
         entity.outboxAttemptCount++
         processor(entity)
         // Mark as completed on success and schedule for cleanup
-        val now = Clock.System.now()
-        entity.outboxCompletedAt = now
+        entity.outboxCompletedAt = Clock.System.now()
         true // <- return true (success)
     } catch (e: Exception) {
         logger.info(e) { "Failed to process $entity" }

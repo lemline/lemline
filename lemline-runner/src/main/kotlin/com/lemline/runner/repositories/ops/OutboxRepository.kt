@@ -34,7 +34,7 @@ const val OUTBOX_ERROR_STACKTRACE_COLUMN = "outbox_error_stacktrace"
  * @param createModel Function to create a model from a ResultSet
  * @param databaseManager The database manager for connections
  */
-class OutboxRepository<T : WithOutbox>(
+open class OutboxRepository<T : WithOutbox>(
     private val tableName: String,
     private val createModel: (ResultSet) -> T,
     private val databaseManager: DatabaseManager

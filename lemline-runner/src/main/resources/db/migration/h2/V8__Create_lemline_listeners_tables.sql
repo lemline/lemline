@@ -17,34 +17,33 @@ CREATE TABLE lemline_listeners
     workflow_position       VARCHAR(1000)            NOT NULL,
     workflow_state          CLOB                     NOT NULL,
 
-    -- Correlation state (for Mode 2: first-sets-baseline)
-    -- Using VARCHAR instead of CLOB to allow indexing (H2 test database only)
-    correlation_values      VARCHAR(1000), -- JSON map of correlation key -> baseline value
-
-    -- Single event storage (for ONE and ANY without until)
-    event                   CLOB, -- JSON CloudEvent data
-
-    -- Listen strategy: ONE, ANY, ANY_UNTIL, ALL
+    -- Listen strategy: ONE, ANY, ANY_UNTIL_EXPR, ANY_UNTIL_EVENT, ALL
     strategy                VARCHAR(20)              NOT NULL,
 
-    -- total number of filters
+    -- Total number of filters (for ALL strategy completion check)
     filters_count           INT,
+
+    -- Whether listener has an until condition (for routing decisions)
+    has_until               BOOLEAN                  NOT NULL DEFAULT FALSE,
+
+    -- Until expression (for ANY_UNTIL_EXPR strategy)
+    until_expression        CLOB,
+
+    -- Whether listener has foreach.do configured
+    has_foreach             BOOLEAN                  NOT NULL DEFAULT FALSE,
+
+    -- Correlation baseline values (Mode 2: first-sets-baseline), JSON map
+    -- Using VARCHAR instead of CLOB to allow indexing (H2 test database only)
+    correlation_values      VARCHAR(1000),
 
     -- Timeout handling
     timeout_at              TIMESTAMP WITH TIME ZONE,
 
-    -- Foreach configuration (extracted from workflow definition for efficiency)
-    has_foreach             BOOLEAN                  NOT NULL DEFAULT FALSE,
+    -- State progression: ready_at is set when completion criteria are met
+    -- This triggers ListenerCompletionOutbox to process the listener
+    ready_at                TIMESTAMP WITH TIME ZONE,
 
-    -- Foreach processing state
-    foreach_current_index   INT                      NOT NULL DEFAULT 0,
-    foreach_processing      BOOLEAN                  NOT NULL DEFAULT FALSE,
-
-    -- Completion flag (set by CloudEventHandler when completion criteria met)
-    -- This decouples completion detection from completion handling
-    listener_completed      BOOLEAN                  NOT NULL DEFAULT FALSE,
-
-    -- Outbox fields
+    -- Standard outbox fields (for completion processing)
     -- outbox_delayed_until: NULL = waiting, NOT NULL = ready for processing
     outbox_scheduled_for    TIMESTAMP WITH TIME ZONE NOT NULL,
     outbox_delayed_until    TIMESTAMP WITH TIME ZONE,
@@ -54,6 +53,8 @@ CREATE TABLE lemline_listeners
     outbox_error_stacktrace CLOB,
     outbox_completed_at     TIMESTAMP WITH TIME ZONE,
     outbox_failed_at        TIMESTAMP WITH TIME ZONE,
+
+    -- Cleanup
     cleanup_after           TIMESTAMP WITH TIME ZONE,
 
     -- Timestamps
@@ -65,13 +66,17 @@ CREATE TABLE lemline_listeners
 CREATE INDEX idx_lemline_listeners_workflow_id
     ON lemline_listeners (workflow_id);
 
--- Index for efficient lookup by workflow info + position (for event routing)
-CREATE INDEX idx_lemline_listeners_workflow_position
+-- Index for finding pending listeners by workflow identity (for event routing)
+CREATE INDEX idx_lemline_listeners_pending
     ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position);
 
--- Index for correlation-based lookup (includes correlation_values for CloudEvent matching)
+-- Index for correlation-based lookup
 CREATE INDEX idx_lemline_listeners_correlation
     ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position, correlation_values);
+
+-- Index for completion outbox processing (ready listeners)
+CREATE INDEX idx_lemline_listeners_ready
+    ON lemline_listeners (ready_at);
 
 -- Index for timeout processing
 CREATE INDEX idx_lemline_listeners_timeout

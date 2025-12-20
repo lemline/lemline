@@ -211,23 +211,25 @@ internal class WorkflowEventHandler(
     /**
      * Handles foreach iteration completion.
      *
+     * ## Simplified Architecture
+     *
      * When a foreach.do completes for a single event:
-     * 1. Find listener by workflowId and position
-     * 2. For ONE/ANY (simple strategies): complete immediately with the iteration output
-     * 3. For ALL/ANY+until (accumulating strategies):
-     *    - Mark current event as completed and store its output
-     *    - Increment the foreach iteration index
-     *    - Clear foreach_processing flag
-     *    - Check for next pending event or if listener is complete
+     * 1. Find the currently processing event (outbox_delayed_until IS NOT NULL, outbox_completed_at IS NULL)
+     * 2. Call `markCompletedWithOutput()` which:
+     *    - Marks the event as completed
+     *    - Stores the foreach output
+     *    - Triggers the next event in FIFO sequence
+     * 3. Listener completion is handled by `ListenerCompletionOutbox.batchMarkReady()`
+     *
+     * @see ListenerEventRepository.markCompletedWithOutput for event completion logic
+     * @see ListenerCompletionOutbox for listener completion
      */
     private suspend fun handleListenForEachCompleted(message: InstanceMessage<WorkflowEvent.ListenForEachCompleted>) {
         val state = message.workflowState
-        // Use state.nodePosition which is explicitly defined as the listen position in WorkflowState.kt
-        // This is safer than using state.nodeStack.lastPosition which might be at the FOR position
         val listenPosition = state.nodePosition
         val iterationOutput = state.output
 
-        logger.debug { "ListenForEachCompleted: $message, listenPosition=$listenPosition" }
+        logger.debug { "ListenForEachCompleted: listenPosition=$listenPosition" }
 
         databaseManager.withTransaction { conn ->
             // Find listener by workflowId and position
@@ -237,95 +239,30 @@ internal class WorkflowEventHandler(
                 conn
             ) ?: error("Listener not found for workflow ${message.workflowId} at position $listenPosition")
 
-            // Check if this is a simple strategy (ONE/ANY)
-            // For simple strategies, events are NOT stored in listener_events table
-            // They are stored directly in the listener.event field
-            val isSimpleStrategy = listener.strategy == ListenerStrategy.ONE ||
-                listener.strategy == ListenerStrategy.ANY
+            // Find the currently processing event
+            val processingEvent = listenerEventRepository.findProcessingEvent(listener.id, conn)
+                ?: error("No processing event found for listener ${listener.id}")
 
-            if (isSimpleStrategy) {
-                // For ONE/ANY with foreach: complete immediately with iteration output wrapped in array
-                // We emit the resume command directly because the listener was already marked as
-                // outbox_completed by ListenerCompletionOutbox when it resumed to foreach.do
-                val outputArray = JsonArray(listOf(iterationOutput))
+            // Mark event as completed with output (this also triggers the next event)
+            val outputJson = LemlineJson.encodeToString(iterationOutput)
 
-                // Create and emit the resume command directly
-                // IMPORTANT: Use the original listener's nodeStack (from ListenStarted), not the
-                // ListenForEachCompleted's nodeStack, because the latter may have the FOR position
-                // as lastPosition instead of the listen position.
-                val resumeMessage = InstanceMessage(
-                    workflowInfo = listener.instanceMessage.workflowInfo,
-                    workflowState = WorkflowCommand.ResumeWithCompletedTask(
-                        nodeStack = listener.instanceMessage.workflowState.nodeStack,
-                        rawOutput = outputArray
-                    )
-                )
-
-                // Derive idempotent message ID from listener ID
-                val messageId = listener.id.derive("-foreach-complete")
-                instanceEmitter.send(resumeMessage, messageId)
-
-                // Mark listener for cleanup
-                listener.cleanupAfter = Clock.System.now()
-                listenerRepository.update(listener, conn)
-
-                logger.info { "Listener ${listener.id} foreach complete for ${listener.strategy} strategy" }
-                return@withTransaction
-            }
-
-            // For ALL/ANY+until strategies: process events from listener_events table
-            // Use the listener's foreachCurrentIndex from the database (not message.workflowState.index
-            // which is always 0 because the core processor doesn't track runner iteration indices)
-            val currentIterationIndex = listener.foreachCurrentIndex
-
-            // Find the current event being processed (by iteration index)
-            val currentEvent = listenerEventRepository.findByListenerIdAndIterationIndex(
-                listener.id,
-                currentIterationIndex,
+            listenerEventRepository.markCompletedWithOutput(
+                processingEvent.listenerId,
+                processingEvent.eventId,
+                outputJson,
                 conn
             )
 
-            // Mark event as completed with output (if found)
-            currentEvent?.let {
-                listenerEventRepository.markForeachCompleted(
-                    id = it.id,
-                    output = LemlineJson.encodeToString(iterationOutput),
-                    connection = conn
-                )
+            logger.info {
+                "Foreach event (listenerId=${processingEvent.listenerId}, eventId=${processingEvent.eventId}) " +
+                    "completed for listener ${listener.id}"
             }
 
-            // Calculate next iteration index before incrementing
-            val nextIterationIndex = currentIterationIndex + 1
-
-            // Increment foreach index and clear processing flag
-            listenerRepository.incrementForeachIndex(listener.id, conn)
-            listenerRepository.setForeachProcessing(listener.id, false, conn)
-
-            // Check for next pending event
-            val nextEvent = listenerEventRepository.findNextPending(listener.id, conn)
-
-            if (nextEvent != null) {
-                // More events to process: mark next event ready for outbox pickup with correct iteration index
-                listenerEventRepository.markReadyForProcessing(nextEvent.id, nextIterationIndex, conn)
-                listenerRepository.setForeachProcessing(listener.id, true, conn)
-                logger.debug { "Next event ${nextEvent.id} ready for foreach processing at index $nextIterationIndex" }
-            } else if (listener.listenerCompleted) {
-                // All events processed and listener is complete: aggregate outputs and finish
-                val outputs = listenerEventRepository.getAllOutputs(listener.id, conn)
-                val outputArray = JsonArray(outputs.map { Json.parseToJsonElement(it) })
-
-                // Mark listener ready for completion with aggregated outputs
-                listenerRepository.markReadyForCompletionWithOutput(
-                    id = listener.id,
-                    event = LemlineJson.encodeToString(outputArray),
-                    connection = conn
-                )
-
-                logger.info { "Listener ${listener.id} foreach complete with ${outputs.size} outputs" }
-            } else {
-                // No more events and not completed: wait for more events
-                logger.debug { "Listener ${listener.id} waiting for more events" }
-            }
+            // Note: Listener completion is handled by ListenerCompletionOutbox.batchMarkReady()
+            // which detects when:
+            // - ONE/ANY: At least one event has outbox_completed_at IS NOT NULL
+            // - ALL: All filter indices have completed events
+            // - ANY+until: Expression evaluates true OR termination event received
         }
     }
 
@@ -394,10 +331,15 @@ internal class WorkflowEventHandler(
         // Set totalFilters (enables direct UPDATE optimization)
         listener.filtersCount = config.filters.size
 
-        // Lookup hasForeach from cached workflow definition
+        // Lookup hasForeach and until configuration from cached workflow definition
         val cachedTask = DefinitionCache.getListenTasks(instance.workflowInfo)
             .find { it.nodePosition == state.nodePosition }
         listener.hasForeach = cachedTask?.hasForeach ?: false
+
+        // Store until configuration for expression evaluation
+        listener.hasUntil = cachedTask?.until != null
+        listener.untilExpression =
+            (cachedTask?.until as? com.lemline.core.definitions.CachedUntilCondition.Expression)?.expression
 
         // Insert listener into database
         val rowsInserted = listenerRepository.insert(listener)

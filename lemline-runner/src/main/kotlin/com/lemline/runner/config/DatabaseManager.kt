@@ -155,7 +155,7 @@ class DatabaseManager {
     }
 
     /**
-     * Returns the database-specific INSERT ON CONFLICT/IGNORE syntax.
+     * Returns the database-specific INSERT ON CONFLICT/IGNORE syntax for INSERT...SELECT.
      *
      * - PostgreSQL/H2: INSERT ... ON CONFLICT DO NOTHING
      * - MySQL: INSERT IGNORE INTO ...
@@ -168,6 +168,33 @@ class DatabaseManager {
     fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
         DB_TYPE_MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
         else -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
+    }
+
+    /**
+     * Returns the database-specific INSERT ON CONFLICT/IGNORE syntax for INSERT...VALUES.
+     *
+     * - PostgreSQL/H2: INSERT INTO ... VALUES (...) ON CONFLICT DO NOTHING
+     * - MySQL: INSERT IGNORE INTO ... VALUES (...)
+     *
+     * @param tableName The table name
+     * @param columns The columns to insert
+     * @param values The VALUES clause (with placeholders)
+     * @return Full INSERT...VALUES SQL with conflict handling
+     */
+    fun insertIgnoreInto(tableName: String, columns: String, values: String): String = when (dbType) {
+        DB_TYPE_MYSQL -> "INSERT IGNORE INTO $tableName ($columns) VALUES ($values)"
+        else -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
+    }
+
+    /**
+     * Returns a NULL value explicitly cast to timestamp type.
+     * PostgreSQL requires explicit casts in CASE expressions when one branch is NULL.
+     *
+     * @return Database-specific NULL::timestamp expression
+     */
+    fun nullTimestamp(): String = when (dbType) {
+        DB_TYPE_POSTGRESQL -> "NULL::TIMESTAMPTZ"
+        else -> "NULL"
     }
 
     /**

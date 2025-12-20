@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Language
+
+IMPORTANT: even if instructed in another language than English, always use English in the code and all files in this
+project!
+
 ## Project Overview
 
 Lemline is a high-performance, event-driven workflow orchestration runtime that implements the Serverless Workflow DSL
@@ -452,13 +457,17 @@ See ADR-0003 section "Adding a New Messaging Technology" for detailed steps:
 5. Create test profile and test resources
 
 ## Active Technologies
+
 - Kotlin 2.2.10, Java 17 + Quarkus, SmallRye Reactive Messaging, CloudEvents SDK (io.cloudevents) (002-lifecycle-events)
 - N/A (fire-and-forget to messaging channel, no database persistence) (002-lifecycle-events)
-- Kotlin 2.2.10 + Java 17 + Quarkus 3.x, Kotest 5.9.1, Testcontainers, SmallRye Reactive Messaging, CloudEvents SDK (001-testing-architecture)
+- Kotlin 2.2.10 + Java 17 + Quarkus 3.x, Kotest 5.9.1, Testcontainers, SmallRye Reactive Messaging, CloudEvents SDK (
+  001-testing-architecture)
 - PostgreSQL, MySQL (via Testcontainers); H2 for in-memory fallback (001-testing-architecture)
 
 - Kotlin 2.2.10, Java 17 + Kotest 5.9.1, JUnit 5 (via Quarkus), MockK 1.13.9, Kotlinx Coroutines 1.10.2
 - PostgreSQL, MySQL, H2 (all supported)
 
 ## Recent Changes
-- 002-lifecycle-events: Added Kotlin 2.2.10, Java 17 + Quarkus, SmallRye Reactive Messaging, CloudEvents SDK (io.cloudevents)
+
+- 002-lifecycle-events: Added Kotlin 2.2.10, Java 17 + Quarkus, SmallRye Reactive Messaging, CloudEvents SDK (
+  io.cloudevents)

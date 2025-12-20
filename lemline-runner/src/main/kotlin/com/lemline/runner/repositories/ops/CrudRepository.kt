@@ -107,11 +107,18 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
 
     /**
      * Inserts a new entity.
+     * Uses ON CONFLICT DO NOTHING (PostgreSQL) or INSERT IGNORE (MySQL) for idempotency.
+     * For H2: catches unique constraint violations and returns 0.
      */
     override suspend fun insert(entity: T, connection: Connection?): Int = withConnection(connection) { conn ->
-        conn.prepareStatement(insertSql).use { stmt ->
-            bindInsert(stmt, entity)
-            stmt.executeUpdate()
+        try {
+            conn.prepareStatement(insertSql).use { stmt ->
+                bindInsert(stmt, entity)
+                stmt.executeUpdate()
+            }
+        } catch (e: java.sql.SQLIntegrityConstraintViolationException) {
+            // H2 throws this for duplicate key violations - treat as "already exists"
+            0
         }
     }
 
@@ -120,10 +127,15 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
         val valsCsv = allColumns.joinToString { "?" }
 
         when (databaseManager.dbType) {
-            LemlineConfigConstants.DB_TYPE_IN_MEMORY, LemlineConfigConstants.DB_TYPE_POSTGRESQL -> """
+            LemlineConfigConstants.DB_TYPE_POSTGRESQL -> """
                 INSERT INTO $tableName ($colsCsv)
                 VALUES ($valsCsv)
                 ON CONFLICT DO NOTHING
+            """.trimIndent()
+
+            LemlineConfigConstants.DB_TYPE_IN_MEMORY -> """
+                INSERT INTO $tableName ($colsCsv)
+                VALUES ($valsCsv)
             """.trimIndent()
 
             LemlineConfigConstants.DB_TYPE_MYSQL -> """
@@ -137,9 +149,28 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
 
     /**
      * Inserts a list of new entities using a batch operation.
+     * For H2: catches unique constraint violations for individual entries.
      */
     override suspend fun insert(entities: List<T>, connection: Connection?): Int = withConnection(connection) { conn ->
         if (entities.isEmpty()) return@withConnection 0
+
+        // For H2, use individual inserts to handle constraint violations per entity
+        if (databaseManager.dbType == LemlineConfigConstants.DB_TYPE_IN_MEMORY) {
+            var successCount = 0
+            conn.prepareStatement(insertSql).use { stmt ->
+                for (entity in entities) {
+                    try {
+                        bindInsert(stmt, entity)
+                        successCount += stmt.executeUpdate()
+                    } catch (e: java.sql.SQLIntegrityConstraintViolationException) {
+                        // Skip duplicates
+                    }
+                }
+            }
+            return@withConnection successCount
+        }
+
+        // For PostgreSQL/MySQL, use batch operations
         conn.prepareStatement(insertSql).use { stmt ->
             for (entity in entities) {
                 bindInsert(stmt, entity)
