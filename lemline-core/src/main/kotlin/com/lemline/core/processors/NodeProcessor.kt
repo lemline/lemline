@@ -33,6 +33,7 @@ import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.InputFrom
+import com.lemline.core.workflows.branches
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.api.types.SchemaUnion
@@ -467,9 +468,11 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // if nextNode is not a fork task, or if we are entering for the first time
         if (nextNode.task !is ForkTask || nextState == null) return null
 
-        // Find the branch name
-        val branchName = nextNode.children?.find { it.name == node.name }?.name
-            ?: throw IllegalStateException("Fork - can not find ${node.name} in ${nextNode.children?.joinToString { it.name }}")
+        // Find the branch name using typed accessor
+        @Suppress("UNCHECKED_CAST")
+        val forkNode = nextNode as Node<ForkTask>
+        val branchName = forkNode.branches.find { it.name == node.name }?.name
+            ?: throw IllegalStateException("Fork - can not find ${node.name} in ${forkNode.branches.joinToString { it.name }}")
 
         return ForkBranchCompleted(
             nodeStack = nodeStack,

@@ -14,6 +14,7 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.CachedUntilCondition
 import com.lemline.core.workflows.WorkflowCache
+import com.lemline.core.workflows.branches
 import com.lemline.core.workflows.getNode
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.definitions.Definitions
@@ -549,7 +550,7 @@ internal class WorkflowEventHandler(
         @Suppress("UNCHECKED_CAST")
         val forkNode = workflow.getNode(state.nodePosition) as Node<ForkTask>
         val isCompete = forkNode.task.fork.isCompete
-        val branches = forkNode.children ?: emptyList()
+        val branches = forkNode.branches
 
         // 1. Create fork metadata model with deterministic ID
         val forkModel = ForkModel(

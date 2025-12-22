@@ -21,6 +21,8 @@ import io.serverlessworkflow.api.types.LinearBackoff
 import io.serverlessworkflow.api.types.RetryPolicy
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.TryTaskCatch
+import com.lemline.core.workflows.catchBlock
+import com.lemline.core.workflows.tryBlock
 import kotlin.math.pow
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -233,14 +235,15 @@ class TryProcessor(
 
     /**
      * Retrieves the "try" child node from the current node's children.
+     * @see com.lemline.core.workflows.tryBlock
      */
-    private fun getDoTry(): Node<*> = node.children?.getOrNull(0)
-        ?: throw IllegalStateException("No try child found in TryTask ${node.position}")
+    private fun getDoTry(): Node<*> = node.tryBlock
 
     /**
      * Retrieves the "catch" child node from the current node's children.
+     * @see com.lemline.core.workflows.catchBlock
      */
-    private fun getCatchNode(): Node<*> = node.children?.getOrNull(1)
+    private fun getCatchNode(): Node<*> = node.catchBlock
         ?: throw IllegalStateException("No catch child found in TryTask ${node.position}")
 
     /**

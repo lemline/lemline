@@ -6,6 +6,7 @@ package com.lemline.core.processors
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.DoState
+import com.lemline.core.workflows.doBlock
 import io.serverlessworkflow.api.types.DoTask
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
@@ -65,7 +66,7 @@ class DoProcessor(
         scope: Scope,
     ): NavigationInfo {
         // state.index already points to the next child to execute
-        return when (state.index >= (node.children?.size ?: 0)) {
+        return when (state.index >= node.doBlock.size) {
             true -> NavigationInfo(
                 nextNode = node.parent,
                 nextDirective = getFlowDirective()
@@ -83,12 +84,11 @@ class DoProcessor(
         else -> getChildIndexByName(name)
     }
 
-    private fun getChildByIndex(index: Int): Node<*> = node.children?.getOrNull(index) ?: throw NoSuchElementException(
-        "No child with index '$index' found in node ${node.position}"
-    )
+    private fun getChildByIndex(index: Int): Node<*> = node.doBlock.getOrNull(index)
+        ?: throw NoSuchElementException("No child with index '$index' found in node ${node.position}")
 
     private fun getChildIndexByName(name: String): Int {
-        val index = node.children?.indexOfFirst { it.name == name } ?: -1
+        val index = node.doBlock.indexOfFirst { it.name == name }
         if (index < 0) {
             throw NoSuchElementException("No child with name '$name' found in node ${node.position}")
         }

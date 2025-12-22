@@ -24,6 +24,8 @@ import com.lemline.core.states.WorkflowState
 import com.lemline.core.utils.mapAwaitAllFailFast
 import com.lemline.core.utils.mapAwaitFirstFailSlow
 import com.lemline.core.workflows.WorkflowCache
+import com.lemline.core.workflows.branches
+import com.lemline.core.workflows.foreachBlock
 import com.lemline.core.workflows.getNode
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
@@ -292,8 +294,8 @@ internal object FullOrchestrator {
         val listenNode = workflow.getNode(event.nodePosition) as Node<ListenTask>
         logger.debug { "Listening for CloudEvents: strategy=${event.config.strategy} filters=${event.config.filters} until=${event.config.until}" }
 
-        // Check if foreach is configured by looking at the node's children
-        val hasForeach = listenNode.children != null
+        // Check if foreach is configured by looking at the node's foreachBlock
+        val hasForeach = listenNode.foreachBlock != null
 
         // Create foreach context if foreach is configured
         val foreachCtx = if (hasForeach) {
@@ -697,8 +699,9 @@ internal object FullOrchestrator {
         @Suppress("UNCHECKED_CAST")
         val forkNode = workflow.getNode(event.nodePosition) as Node<ForkTask>
 
-        val branches = forkNode.children
-            ?: throw IllegalStateException("Fork node in ${forkNode.position} has no branches")
+        val branches = forkNode.branches.ifEmpty {
+            throw IllegalStateException("Fork node in ${forkNode.position} has no branches")
+        }
 
         // Execute branches and get the result
         return try {

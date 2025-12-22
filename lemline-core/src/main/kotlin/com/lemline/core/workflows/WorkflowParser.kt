@@ -223,3 +223,64 @@ object WorkflowParser {
         else -> throw IllegalArgumentException("Unsupported task type: ${task.javaClass.canonicalName}")
     }
 }
+
+// ============================================================
+// Typed Children Accessors
+// ============================================================
+// These accessors mirror the parsing logic in WorkflowParser.
+// When modifying parse*Children methods, update corresponding accessor.
+
+/**
+ * DoTask children: sequential task nodes.
+ * @see WorkflowParser.parseDoChildren
+ */
+val Node<DoTask>.doBlock: List<Node<*>>
+    get() = children ?: emptyList()
+
+/**
+ * ForTask children: single DoTask for loop body.
+ * @see WorkflowParser.parseForChildren
+ */
+val Node<ForTask>.forBlock: Node<DoTask>
+    @Suppress("UNCHECKED_CAST")
+    get() = children!![0] as Node<DoTask>
+
+/**
+ * TryTask children: try block (always present).
+ * Structure: [0] = try DoTask, [1] = catch DoTask (if catch.do exists)
+ * @see WorkflowParser.parseTryChildren
+ */
+val Node<TryTask>.tryBlock: Node<DoTask>
+    @Suppress("UNCHECKED_CAST")
+    get() = children!![0] as Node<DoTask>
+
+/**
+ * TryTask children: catch block (optional, only if catch.do is defined).
+ * @see WorkflowParser.parseTryChildren
+ */
+val Node<TryTask>.catchBlock: Node<DoTask>?
+    @Suppress("UNCHECKED_CAST")
+    get() = children?.getOrNull(1) as? Node<DoTask>
+
+/**
+ * ForkTask children: parallel branch nodes.
+ * @see WorkflowParser.parseForkChildren
+ */
+val Node<ForkTask>.branches: List<Node<*>>
+    get() = children ?: emptyList()
+
+/**
+ * ListenTask children: optional foreach DoTask.
+ * @see WorkflowParser.parseListenChildren
+ */
+val Node<ListenTask>.foreachBlock: Node<DoTask>?
+    @Suppress("UNCHECKED_CAST")
+    get() = children?.firstOrNull() as? Node<DoTask>
+
+/**
+ * CallAsyncAPI children: optional subscription foreach DoTask.
+ * @see WorkflowParser.parseCallAsyncAPIChildren
+ */
+val Node<CallAsyncAPI>.subscriptionForeach: Node<DoTask>?
+    @Suppress("UNCHECKED_CAST")
+    get() = children?.firstOrNull() as? Node<DoTask>
