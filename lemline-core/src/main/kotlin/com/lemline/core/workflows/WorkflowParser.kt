@@ -34,6 +34,14 @@ import io.serverlessworkflow.api.types.Workflow
  *
  * The node tree is built lazily - each Node's `children` property
  * calls [parseChildren] on first access.
+ *
+ * ## Structure
+ *
+ * Each task type that has children has:
+ * 1. A parsing function (e.g., [parseDoChildren]) that creates child nodes
+ * 2. A typed accessor extension (e.g., [doBlock]) for type-safe access
+ *
+ * These are grouped together in the file for easy consistency verification.
  */
 object WorkflowParser {
 
@@ -99,156 +107,142 @@ object WorkflowParser {
     /**
      * Parses children for a given node based on its task type.
      *
-     * Each task type has specific rules for what constitutes its children:
-     * - RootTask: Has a single DoTask child containing the workflow's do block
-     * - DoTask: Children are the task items in the do block
-     * - ForTask: Has a single DoTask child for the loop body
-     * - TryTask: Has try and optionally catch DoTask children
-     * - ForkTask: Children are the parallel branches
-     * - ListenTask: Has optional foreach DoTask child
-     * - CallAsyncAPI: Has optional subscription foreach DoTask child
+     * Each task type has specific rules for what constitutes its children.
+     * See individual parse functions for details.
      *
      * @param node The node to parse children for
      * @return List of child nodes, or null if the task type has no children
      */
     fun parseChildren(node: Node<*>): List<Node<*>>? {
-        val position = node.position
-
         return when (val task = node.task) {
             is RootTask -> parseRootChildren(task, node)
-            is DoTask -> parseDoChildren(task, position, node)
-            is ForTask -> parseForChildren(task, position, node)
-            is TryTask -> parseTryChildren(task, position, node)
-            is ForkTask -> parseForkChildren(task, position, node)
-            is ListenTask -> parseListenChildren(task, position, node)
-            is CallAsyncAPI -> parseCallAsyncAPIChildren(task, position, node)
+            is DoTask -> parseDoChildren(node)
+            is ForTask -> parseForChildren(node)
+            is TryTask -> parseTryChildren(node)
+            is ForkTask -> parseForkChildren(node)
+            is ListenTask -> parseListenChildren(node)
+            is CallAsyncAPI -> parseCallAsyncAPIChildren(node)
             else -> null
         }
     }
+}
 
-    private fun parseRootChildren(task: RootTask, parent: Node<*>): List<Node<*>> = listOf(
-        Node(
-            position = NodePosition.root.addToken(DO),
-            task = DoTask(task.`do`),
-            name = "$DO",
-            parent = parent,
-        ),
-    )
-
-    private fun parseDoChildren(task: DoTask, position: NodePosition, parent: Node<*>): List<Node<*>> =
-        task.`do`.map { taskItem ->
-            val child = taskItem.toTask()
-            val childPosition = position.addName(taskItem.name).let {
-                if (child is DoTask) it.addToken(DO) else it
-            }
-
-            Node(
-                position = childPosition,
-                task = child,
-                name = taskItem.name,
-                parent = parent,
-            )
-        }
-
-    private fun parseForChildren(task: ForTask, position: NodePosition, parent: Node<*>): List<Node<*>> = listOf(
-        Node(
-            position = position.addToken(DO),
-            task = DoTask(task.`do`),
-            name = "$DO",
-            parent = parent,
-        ),
-    )
-
-    private fun parseTryChildren(task: TryTask, position: NodePosition, parent: Node<*>): List<Node<*>> = buildList {
-        add(
-            Node(
-                position = position.addToken(TRY),
-                task = DoTask(task.`try`),
-                name = "$TRY",
-                parent = parent,
-            )
-        )
-        task.`catch`.`do`?.let {
-            add(
-                Node(
-                    position = position.addToken(CATCH),
-                    task = DoTask(it),
-                    name = "$CATCH",
-                    parent = parent,
-                ),
-            )
-        }
-    }
-
-    private fun parseForkChildren(task: ForkTask, position: NodePosition, parent: Node<*>): List<Node<*>>? =
-        task.fork.branches?.map { taskItem ->
-            Node(
-                position = position.addToken(FORK).addName(taskItem.name),
-                task = taskItem.toTask(),
-                name = taskItem.name,
-                parent = parent,
-            )
-        }
-
-    private fun parseListenChildren(task: ListenTask, position: NodePosition, parent: Node<*>): List<Node<*>>? =
-        task.foreach?.`do`?.let {
-            listOf(
-                Node(
-                    position = position.addToken(Token.FOR),
-                    task = DoTask(it),
-                    name = "${Token.FOR}",
-                    parent = parent,
-                ),
-            )
-        }
-
-    private fun parseCallAsyncAPIChildren(task: CallAsyncAPI, position: NodePosition, parent: Node<*>): List<Node<*>>? =
-        task.with.subscription?.foreach?.`do`?.let {
-            listOf(
-                Node(
-                    position = position.addToken(WITH).addToken(SUBSCRIPTION).addToken(FOREACH).addToken(DO),
-                    task = DoTask(it),
-                    name = "$WITH.$SUBSCRIPTION.$FOREACH.$DO",
-                    parent = parent,
-                ),
-            )
-        }
-
-    /**
-     * Converts a TaskItem to its underlying TaskBase.
-     */
-    private fun TaskItem.toTask(): TaskBase = when (val task = task.get()) {
-        is TaskBase -> task
-        is CallTask -> task.get() as TaskBase
-        else -> throw IllegalArgumentException("Unsupported task type: ${task.javaClass.canonicalName}")
-    }
+/**
+ * Converts a TaskItem to its underlying TaskBase.
+ */
+private fun TaskItem.toTask(): TaskBase = when (val task = task.get()) {
+    is TaskBase -> task
+    is CallTask -> task.get() as TaskBase
+    else -> throw IllegalArgumentException("Unsupported task type: ${task.javaClass.canonicalName}")
 }
 
 // ============================================================
-// Typed Children Accessors
+// RootTask Children
 // ============================================================
-// These accessors mirror the parsing logic in WorkflowParser.
-// When modifying parse*Children methods, update corresponding accessor.
+
+/**
+ * RootTask has a single DoTask child containing the workflow's do block.
+ * No accessor needed - navigation starts at NodePosition.doRoot.
+ */
+private fun parseRootChildren(task: RootTask, parent: Node<*>): List<Node<*>> = listOf(
+    Node(
+        position = NodePosition.root.addToken(DO),
+        task = DoTask(task.`do`),
+        name = "$DO",
+        parent = parent,
+    ),
+)
+
+// ============================================================
+// DoTask Children
+// ============================================================
+
+/**
+ * DoTask children are the sequential task items in the do block.
+ */
+private fun parseDoChildren(node: Node<*>): List<Node<*>> {
+    val task = node.task as DoTask
+    return task.`do`.map { taskItem ->
+        val child = taskItem.toTask()
+        val childPosition = node.position.addName(taskItem.name).let {
+            if (child is DoTask) it.addToken(DO) else it
+        }
+
+        Node(
+            position = childPosition,
+            task = child,
+            name = taskItem.name,
+            parent = node,
+        )
+    }
+}
 
 /**
  * DoTask children: sequential task nodes.
- * @see WorkflowParser.parseDoChildren
  */
 val Node<DoTask>.doBlock: List<Node<*>>
-    get() = children ?: emptyList()
+    get() = children!!
+
+// ============================================================
+// ForTask Children
+// ============================================================
+
+/**
+ * ForTask has a single DoTask child for the loop body.
+ */
+private fun parseForChildren(node: Node<*>): List<Node<*>> {
+    val task = node.task as ForTask
+    return listOf(
+        Node(
+            position = node.position.addToken(DO),
+            task = DoTask(task.`do`),
+            name = "$DO",
+            parent = node,
+        ),
+    )
+}
 
 /**
  * ForTask children: single DoTask for loop body.
- * @see WorkflowParser.parseForChildren
  */
 val Node<ForTask>.forBlock: Node<DoTask>
     @Suppress("UNCHECKED_CAST")
     get() = children!![0] as Node<DoTask>
 
+// ============================================================
+// TryTask Children
+// ============================================================
+
+/**
+ * TryTask has try block (always present) and catch block (optional).
+ * Structure: [0] = try DoTask, [1] = catch DoTask (if catch.do exists)
+ */
+private fun parseTryChildren(node: Node<*>): List<Node<*>> {
+    val task = node.task as TryTask
+    return buildList {
+        add(
+            Node(
+                position = node.position.addToken(TRY),
+                task = DoTask(task.`try`),
+                name = "$TRY",
+                parent = node,
+            )
+        )
+        task.`catch`.`do`?.let {
+            add(
+                Node(
+                    position = node.position.addToken(CATCH),
+                    task = DoTask(it),
+                    name = "$CATCH",
+                    parent = node,
+                ),
+            )
+        }
+    }
+}
+
 /**
  * TryTask children: try block (always present).
- * Structure: [0] = try DoTask, [1] = catch DoTask (if catch.do exists)
- * @see WorkflowParser.parseTryChildren
  */
 val Node<TryTask>.tryBlock: Node<DoTask>
     @Suppress("UNCHECKED_CAST")
@@ -256,31 +250,90 @@ val Node<TryTask>.tryBlock: Node<DoTask>
 
 /**
  * TryTask children: catch block (optional, only if catch.do is defined).
- * @see WorkflowParser.parseTryChildren
  */
 val Node<TryTask>.catchBlock: Node<DoTask>?
     @Suppress("UNCHECKED_CAST")
-    get() = children?.getOrNull(1) as? Node<DoTask>
+    get() = children!!.getOrNull(1) as? Node<DoTask>
+
+// ============================================================
+// ForkTask Children
+// ============================================================
+
+/**
+ * ForkTask children are the parallel branch nodes.
+ */
+private fun parseForkChildren(node: Node<*>): List<Node<*>>? {
+    val task = node.task as ForkTask
+    return task.fork.branches?.map { taskItem ->
+        Node(
+            position = node.position.addToken(FORK).addName(taskItem.name),
+            task = taskItem.toTask(),
+            name = taskItem.name,
+            parent = node,
+        )
+    }
+}
 
 /**
  * ForkTask children: parallel branch nodes.
- * @see WorkflowParser.parseForkChildren
  */
 val Node<ForkTask>.branches: List<Node<*>>
     get() = children ?: emptyList()
 
+// ============================================================
+// ListenTask Children
+// ============================================================
+
+/**
+ * ListenTask has optional foreach DoTask child.
+ */
+private fun parseListenChildren(node: Node<*>): List<Node<*>>? {
+    val task = node.task as ListenTask
+    return task.foreach?.`do`?.let {
+        listOf(
+            Node(
+                position = node.position.addToken(Token.FOR),
+                task = DoTask(it),
+                name = "${Token.FOR}",
+                parent = node,
+            ),
+        )
+    }
+}
+
 /**
  * ListenTask children: optional foreach DoTask.
- * @see WorkflowParser.parseListenChildren
  */
+@get:JvmName("getForeachBlockForListenTask")
 val Node<ListenTask>.foreachBlock: Node<DoTask>?
     @Suppress("UNCHECKED_CAST")
     get() = children?.firstOrNull() as? Node<DoTask>
 
+// ============================================================
+// CallAsyncAPI Children
+// ============================================================
+
+/**
+ * CallAsyncAPI has optional subscription foreach DoTask child.
+ */
+private fun parseCallAsyncAPIChildren(node: Node<*>): List<Node<*>>? {
+    val task = node.task as CallAsyncAPI
+    return task.with.subscription?.foreach?.`do`?.let {
+        listOf(
+            Node(
+                position = node.position.addToken(WITH).addToken(SUBSCRIPTION).addToken(FOREACH).addToken(DO),
+                task = DoTask(it),
+                name = "$WITH.$SUBSCRIPTION.$FOREACH.$DO",
+                parent = node,
+            ),
+        )
+    }
+}
+
 /**
  * CallAsyncAPI children: optional subscription foreach DoTask.
- * @see WorkflowParser.parseCallAsyncAPIChildren
  */
-val Node<CallAsyncAPI>.subscriptionForeach: Node<DoTask>?
+@get:JvmName("getForeachBlockForCallAsyncAPI")
+val Node<CallAsyncAPI>.foreachBlock: Node<DoTask>?
     @Suppress("UNCHECKED_CAST")
     get() = children?.firstOrNull() as? Node<DoTask>
