@@ -13,7 +13,7 @@ import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.workflows.CachedListenTask
 import com.lemline.core.workflows.CachedUntilCondition
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
@@ -112,7 +112,7 @@ data class TerminationMatch(
  * Instead, they are retrieved on-demand from workflow definitions cached in DefinitionCache.
  * This eliminates sync complexity and ensures single source of truth.
  *
- * @see DefinitionCache for workflow definition caching
+ * @see WorkflowCache for workflow definition caching
  * @see ListenerRepository for active listener storage
  */
 @ExperimentalTime
@@ -161,7 +161,7 @@ class DefinitionListenService {
         // Parse event data lazily (only if needed for filter evaluation)
         val eventData by lazy { eventDataProvider() }
 
-        val matches = DefinitionCache.getAllListenTasks().flatMap { listenTask ->
+        val matches = WorkflowCache.getAllListenTasks().flatMap { listenTask ->
             listenTask.filters.mapIndexedNotNull { index, filter ->
                 if (!filterMatches(filter, event, eventDataProvider)) return@mapIndexedNotNull null
 
@@ -195,7 +195,7 @@ class DefinitionListenService {
 
         // Parse event data lazily
 
-        val matches = DefinitionCache.getAllListenTasks().mapNotNull { listenTask ->
+        val matches = WorkflowCache.getAllListenTasks().mapNotNull { listenTask ->
             // Only check tasks with termination filters
             val terminationFilter = listenTask.untilEventFilter ?: return@mapNotNull null
 

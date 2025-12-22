@@ -5,7 +5,7 @@ import com.github.zafarkhaja.semver.Version
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.serverlessworkflow.api.types.Workflow
@@ -31,13 +31,13 @@ class Definitions {
         if (workflowVersion == null) return getFromDatabase(workflowNamespace, workflowName)
 
         // get the workflow from the cache first, if not in cache, get from the database and update the cache
-        return DefinitionCache.getWorkflow(workflowNamespace, workflowName, workflowVersion)
+        return WorkflowCache.getWorkflow(workflowNamespace, workflowName, workflowVersion)
             ?: definitionRepository.findByNameAndVersion(workflowNamespace, workflowName, workflowVersion)
                 ?.parseAndPut()
     }
 
     // parse the workflow definition and put it to the cache
-    private fun DefinitionModel.parseAndPut(): Workflow = DefinitionCache.parseYamlAndPut(definition)
+    private fun DefinitionModel.parseAndPut(): Workflow = WorkflowCache.parseYamlAndPut(definition)
 
     private suspend fun getFromDatabase(workflowNamespace: WorkflowNamespace, workflowName: WorkflowName): Workflow? {
         // by name only, get the last version from the repository

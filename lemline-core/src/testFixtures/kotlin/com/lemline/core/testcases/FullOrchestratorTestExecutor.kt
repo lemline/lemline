@@ -8,7 +8,7 @@ import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
@@ -109,7 +109,7 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
                   version: $version
             """.trimIndent()
             val workflowYaml = document + "\n" + doYaml.trimIndent()
-            return DefinitionCache.parseYamlAndPut(workflowYaml)
+            return WorkflowCache.parseYamlAndPut(workflowYaml)
         }
     }
 }

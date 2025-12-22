@@ -14,7 +14,7 @@ import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.models.ListenerModel
@@ -61,7 +61,7 @@ internal class ListenerTimeoutOutboxTest {
     @BeforeEach
     fun setup() = runTest {
         listenerRepository.deleteAll()
-        DefinitionCache.clear()
+        WorkflowCache.clear()
 
         // Create definition (for cache lookup during listener processing)
         val definition = """
@@ -87,7 +87,7 @@ internal class ListenerTimeoutOutboxTest {
                 definition = definition
             )
         )
-        DefinitionCache.parseYamlAndPut(definition)
+        WorkflowCache.parseYamlAndPut(definition)
     }
 
     @Test

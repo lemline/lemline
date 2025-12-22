@@ -15,7 +15,7 @@ import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.getWorkflowToTest
 import com.lemline.core.lifecycleevents.LifecycleEventHook
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -103,7 +103,7 @@ class OrchestratorTest : FunSpec() {
 
     init {
         afterEach {
-            DefinitionCache.clear()
+            WorkflowCache.clear()
         }
 
         // ========================================

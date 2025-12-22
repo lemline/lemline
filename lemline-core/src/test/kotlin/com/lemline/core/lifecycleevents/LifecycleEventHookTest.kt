@@ -14,7 +14,7 @@ import com.lemline.core.getWorkflowToTest
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.NodeStack
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CopyOnWriteArrayList
@@ -199,7 +199,7 @@ class LifecycleEventHookTest : FunSpec() {
 
     init {
         afterEach {
-            DefinitionCache.clear()
+            WorkflowCache.clear()
         }
 
         // ========================================

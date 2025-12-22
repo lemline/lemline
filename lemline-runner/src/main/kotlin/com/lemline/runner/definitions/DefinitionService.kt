@@ -5,7 +5,7 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
@@ -21,7 +21,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * This service coordinates operations between:
  * - [DefinitionRepository] for storing workflow definitions
  * - [DefinitionListenService] for extracting and storing listen task definitions
- * - [DefinitionCache] for caching parsed workflows
+ * - [WorkflowCache] for caching parsed workflows
  *
  * ## Usage
  *
@@ -92,7 +92,7 @@ class DefinitionService {
         // Note: Listen task definitions are retrieved on-demand from the cached workflow,
         // so no database sync is needed here.
         if (result == SaveResult.CREATED || result == SaveResult.UPDATED) {
-            DefinitionCache.parseYamlAndPut(model.definition)
+            WorkflowCache.parseYamlAndPut(model.definition)
         }
 
         return result
@@ -183,7 +183,7 @@ class DefinitionService {
             definitionListenService.removeListeners(namespace, name, version)
 
             // Remove from definition cache
-            DefinitionCache.remove(namespace, name, version)
+            WorkflowCache.remove(namespace, name, version)
 
             // Delete the definition
             val deleted = definitionRepository.delete(model, conn) == 1
@@ -222,7 +222,7 @@ class DefinitionService {
             // Remove active listeners for each version
             definitionListenService.removeListeners(namespace, name, model.version)
             // Remove from cache
-            DefinitionCache.remove(namespace, name, model.version)
+            WorkflowCache.remove(namespace, name, model.version)
         }
 
         val deletedCount = definitionRepository.delete(definitions, conn)
@@ -255,7 +255,7 @@ class DefinitionService {
             // Remove active listeners for each definition
             definitionListenService.removeListeners(namespace, model.name, model.version)
             // Remove from cache
-            DefinitionCache.remove(namespace, model.name, model.version)
+            WorkflowCache.remove(namespace, model.name, model.version)
         }
 
         val deletedCount = definitionRepository.deleteAllInNamespace(namespace, conn)

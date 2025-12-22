@@ -5,7 +5,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.WorkflowCommand
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
@@ -107,7 +107,7 @@ class InstanceStartCommandTest {
     )
 
     init {
-        DefinitionCache.clear()
+        WorkflowCache.clear()
     }
 
     @BeforeEach

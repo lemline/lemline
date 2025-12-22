@@ -23,7 +23,7 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
 import com.lemline.core.utils.mapAwaitAllFailFast
 import com.lemline.core.utils.mapAwaitFirstFailSlow
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.getNode
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
@@ -621,7 +621,7 @@ internal object FullOrchestrator {
         lifecycleHook: LifecycleEventHook,
     ): WorkflowCommand {
         // Retrieve child workflow definition
-        val childWorkflow = DefinitionCache.getWorkflow(
+        val childWorkflow = WorkflowCache.getWorkflow(
             namespace = event.config.namespace,
             name = event.config.name,
             version = event.config.version

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.definitions
 
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.scheduled.AbstractScheduledTask
@@ -28,7 +28,7 @@ import kotlin.time.ExperimentalTime
  * - Loads all definitions from the database and caches them
  * - Skips definitions that are already cached to avoid unnecessary parsing
  *
- * @see DefinitionCache for workflow definition caching
+ * @see WorkflowCache for workflow definition caching
  * @see DefinitionListenService for how listen tasks use the cache
  */
 @Startup
@@ -64,13 +64,13 @@ internal class DefinitionCacheSync : AbstractScheduledTask() {
 
         for (definition in allDefinitions) {
             // Skip if already cached
-            if (DefinitionCache.getWorkflow(definition.namespace, definition.name, definition.version) != null) {
+            if (WorkflowCache.getWorkflow(definition.namespace, definition.name, definition.version) != null) {
                 skipped++
                 continue
             }
 
             try {
-                DefinitionCache.parseYamlAndPut(definition.definition)
+                WorkflowCache.parseYamlAndPut(definition.definition)
                 loaded++
                 logger.debug { "Cached definition: ${definition.namespace}/${definition.name}:${definition.version}" }
             } catch (e: Exception) {

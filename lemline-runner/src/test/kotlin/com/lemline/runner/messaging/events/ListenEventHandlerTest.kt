@@ -16,7 +16,7 @@ import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository
@@ -64,7 +64,7 @@ internal class ListenEventHandlerTest {
     @BeforeEach
     fun setup() = runTest {
         listenerRepository.deleteAll()
-        DefinitionCache.clear()
+        WorkflowCache.clear()
     }
 
     private fun cacheWorkflowDefinition() {
@@ -83,7 +83,7 @@ internal class ListenEventHandlerTest {
                         with:
                           type: com.example.OrderCreated
         """.trimIndent()
-        DefinitionCache.parseYamlAndPut(definition)
+        WorkflowCache.parseYamlAndPut(definition)
     }
 
     @Test

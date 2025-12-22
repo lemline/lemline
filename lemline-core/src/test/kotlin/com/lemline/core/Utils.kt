@@ -4,7 +4,7 @@ package com.lemline.core
 import com.lemline.common.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow
@@ -14,7 +14,7 @@ inline fun <reified T> JsonObject.set(key: String, value: T) =
     JsonObject(toMutableMap().apply { set(key, LemlineJson.encodeToElement(value)) })
 
 internal fun load(resourcePath: String): String {
-    val inputStream = DefinitionCache::class.java.getResourceAsStream(resourcePath)
+    val inputStream = WorkflowCache::class.java.getResourceAsStream(resourcePath)
         ?: throw IllegalArgumentException("Resource not found: $resourcePath")
 
     return inputStream.bufferedReader().use { it.readText() }
@@ -42,7 +42,7 @@ internal fun getRootNodeOfWorkflowToTest(
 ): Node<RootTask> {
     val workflow = getWorkflowToTest(doYaml, namespace, name, version)
 
-    return DefinitionCache.getRootNode(workflow)
+    return WorkflowCache.getRootNode(workflow)
 }
 
 internal fun getWorkflowToTest(
@@ -59,5 +59,5 @@ internal fun getWorkflowToTest(
               version: $version
         """
     val workflowYaml = document.trimIndent() + "\n" + doYaml.trimIndent()
-    return DefinitionCache.parseYamlAndPut(workflowYaml)
+    return WorkflowCache.parseYamlAndPut(workflowYaml)
 }

@@ -69,7 +69,7 @@ data class CachedListenTask(
         get() = (until as? CachedUntilCondition.Event)?.filter
 }
 
-object DefinitionCache {
+object WorkflowCache {
 
     private val workflowCache = ConcurrentHashMap<WorkflowInfo, Workflow>()
     private val nodesMapCache = ConcurrentHashMap<WorkflowInfo, Map<NodePosition, Node<*>>>()
@@ -351,7 +351,7 @@ object DefinitionCache {
  * @throws IllegalStateException If the node is not found at the specified position.
  */
 fun Workflow.getNode(position: NodePosition): Node<*> {
-    val nodesMap = DefinitionCache.getNodesMap(this)
+    val nodesMap = WorkflowCache.getNodesMap(this)
     return nodesMap[position]
         ?: throw IllegalStateException(
             "Node not found at position $position in workflow: ${this.namespace}/${this.name}/${this.version}"

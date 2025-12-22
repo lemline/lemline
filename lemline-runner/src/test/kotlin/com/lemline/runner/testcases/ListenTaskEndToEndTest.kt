@@ -9,7 +9,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
@@ -126,7 +126,7 @@ internal class ListenTaskEndToEndTest {
 
         // Clear database state
         listenerRepository.deleteAll()
-        DefinitionCache.clear()
+        WorkflowCache.clear()
 
         // Clear tracked completions
         completedWorkflows.clear()
@@ -1320,7 +1320,7 @@ internal class ListenTaskEndToEndTest {
         version: WorkflowVersion
     ): List<ListenerModel> {
         val workflowInfo = WorkflowInfo(namespace, name, version)
-        val listenTasks = DefinitionCache.getListenTasks(workflowInfo)
+        val listenTasks = WorkflowCache.getListenTasks(workflowInfo)
         if (listenTasks.isEmpty()) return emptyList()
 
         val keys = listenTasks.map { listenTask ->
@@ -1355,7 +1355,7 @@ internal class ListenTaskEndToEndTest {
 
         // Parse and cache workflow definition
         // Note: Listen task definitions are retrieved on-demand from the cached workflow
-        DefinitionCache.parseYamlAndPut(yaml)
+        WorkflowCache.parseYamlAndPut(yaml)
     }
 
     /**

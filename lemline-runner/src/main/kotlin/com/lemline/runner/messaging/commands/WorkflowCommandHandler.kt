@@ -10,7 +10,7 @@ import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.getNode
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
@@ -212,7 +212,7 @@ internal class WorkflowCommandHandler(
      */
     private suspend fun InstanceMessage<WorkflowCommand>.findWorkflowDefinition(): Workflow {
         // Try cache first
-        DefinitionCache.getWorkflow(
+        WorkflowCache.getWorkflow(
             namespace = workflowNamespace,
             name = workflowName,
             version = workflowVersion
@@ -226,7 +226,7 @@ internal class WorkflowCommandHandler(
                 workflowVersion
             )
                 ?.definition
-                ?.let { DefinitionCache.parseYamlAndPut(it) }
+                ?.let { WorkflowCache.parseYamlAndPut(it) }
         } catch (e: Exception) {
             logger.error(e) { "Error during workflow definition retrieval" }
 

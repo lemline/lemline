@@ -13,7 +13,7 @@ import com.lemline.core.processors.ListenConfig
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.CachedUntilCondition
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.getNode
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.definitions.Definitions
@@ -333,7 +333,7 @@ internal class WorkflowEventHandler(
         listener.filtersCount = config.filters.size
 
         // Lookup hasForeach and until configuration from cached workflow definition
-        val cachedTask = DefinitionCache.getListenTasks(instance.workflowInfo)
+        val cachedTask = WorkflowCache.getListenTasks(instance.workflowInfo)
             .find { it.nodePosition == state.nodePosition }
         listener.hasForeach = cachedTask?.hasForeach ?: false
 
@@ -539,7 +539,7 @@ internal class WorkflowEventHandler(
 
         // Get fork node from workflow definition to extract fork configuration
         val workflowInfo = instance.workflowInfo
-        val workflow = DefinitionCache.getWorkflow(
+        val workflow = WorkflowCache.getWorkflow(
             namespace = workflowInfo.namespace,
             name = workflowInfo.name,
             version = workflowInfo.version

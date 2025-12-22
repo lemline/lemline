@@ -6,7 +6,7 @@ import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.ListenStrategy as CoreListenStrategy
 import com.lemline.core.processors.UntilCondition
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.messaging.InstanceMessage
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.time.ExperimentalTime
@@ -141,7 +141,7 @@ data class ListenerModel(
      * Defaults to DATA if the definition is not found.
      */
     val readAs: ListenAndReadAs by lazy {
-        val listenTasks = DefinitionCache.getListenTasks(workflowInfo)
+        val listenTasks = WorkflowCache.getListenTasks(workflowInfo)
         val listenTask = listenTasks.find { it.nodePosition == nodePosition }
 
         listenTask?.readAs ?: ListenAndReadAs.DATA
