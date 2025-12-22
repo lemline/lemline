@@ -12,6 +12,7 @@ import com.lemline.common.values.Token.TRY
 import com.lemline.common.values.Token.WITH
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.workflows.WorkflowParser.parseChildren
 import io.serverlessworkflow.api.types.CallAsyncAPI
 import io.serverlessworkflow.api.types.CallTask
 import io.serverlessworkflow.api.types.DoTask
@@ -112,16 +113,15 @@ object WorkflowParser {
      */
     fun parseChildren(node: Node<*>): List<Node<*>>? {
         val position = node.position
-        val parent = node
 
         return when (val task = node.task) {
-            is RootTask -> parseRootChildren(task, parent)
-            is DoTask -> parseDoChildren(task, position, parent)
-            is ForTask -> parseForChildren(task, position, parent)
-            is TryTask -> parseTryChildren(task, position, parent)
-            is ForkTask -> parseForkChildren(task, position, parent)
-            is ListenTask -> parseListenChildren(task, position, parent)
-            is CallAsyncAPI -> parseCallAsyncAPIChildren(task, position, parent)
+            is RootTask -> parseRootChildren(task, node)
+            is DoTask -> parseDoChildren(task, position, node)
+            is ForTask -> parseForChildren(task, position, node)
+            is TryTask -> parseTryChildren(task, position, node)
+            is ForkTask -> parseForkChildren(task, position, node)
+            is ListenTask -> parseListenChildren(task, position, node)
+            is CallAsyncAPI -> parseCallAsyncAPIChildren(task, position, node)
             else -> null
         }
     }
