@@ -19,7 +19,7 @@ import kotlin.time.toJavaDuration
  */
 @Suppress("PropertyName")
 @ExperimentalTime
-internal abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
+abstract class MessageSubscriberMetrics(val registry: MeterRegistry) {
 
     // Metric Names
     protected abstract val METRIC_PREFIX: String

@@ -2,7 +2,7 @@
 package com.lemline.runner.config
 
 import com.lemline.common.logger.logger
-import com.lemline.runner.LemlineApplication
+import com.lemline.runner.cli.config.ConfigPathHolder
 import com.lemline.runner.config.LemlineConfigConstants.CLOUDEVENTS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.COMMANDS_TOPIC_DEFAULT
 import com.lemline.runner.config.LemlineConfigConstants.CONSUMER_CONCURRENCY_DEFAULT
@@ -107,7 +107,7 @@ class LemlineConfigSource : PropertiesConfigSource(
             val lemlineProps = mutableMapOf<String, String>()
 
             // Load user properties from file
-            LemlineApplication.configPath?.let { path ->
+            ConfigPathHolder.configPath?.let { path ->
                 ExtraFileConfigFactory().getConfig(path).properties.forEach { (name, value) ->
                     if (name.startsWith("lemline.")) {
                         lemlineProps[name] = value.split("#").first().trim()

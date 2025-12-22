@@ -4,6 +4,7 @@ package com.lemline.runner.activities
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.activities.mock.MockActivityExecutor
+import com.lemline.runner.common.activities.TestModeConfiguration
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Produces
 import jakarta.inject.Inject

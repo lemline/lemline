@@ -12,7 +12,7 @@ import kotlin.time.ExperimentalTime
  */
 @Singleton
 @ExperimentalTime
-internal class WorkflowCommandSubscriberMetrics @Inject constructor(
+class WorkflowCommandSubscriberMetrics @Inject constructor(
     registry: MeterRegistry
 ) : MessageSubscriberMetrics(registry) {
     override val METRIC_PREFIX = "lemline.messaging.commands"

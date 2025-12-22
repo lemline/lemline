@@ -13,8 +13,8 @@ import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.definitions.MatchingListenTask
 import com.lemline.runner.definitions.MatchingListenTaskUntilEvent
 import com.lemline.runner.messaging.MessageHandler
-import com.lemline.runner.repositories.ListenerEventRepository
-import com.lemline.runner.repositories.ListenerRepository
+import com.lemline.runner.listeners.ListenerEventRepository
+import com.lemline.runner.listeners.ListenerRepository
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject

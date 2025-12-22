@@ -17,9 +17,9 @@ import com.lemline.core.states.RootState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
-import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.repositories.ListenerQueryKey
-import com.lemline.runner.repositories.ListenerRepository
+import com.lemline.runner.common.messaging.InstanceMessage
+import com.lemline.runner.listeners.ListenerQueryKey
+import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe

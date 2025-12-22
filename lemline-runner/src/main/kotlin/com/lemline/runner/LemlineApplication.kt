@@ -3,10 +3,9 @@
 
 package com.lemline.runner
 
-import com.lemline.runner.LemlineApplication.Companion.configPath
-import com.lemline.runner.cli.CustomExceptionHandler
-import com.lemline.runner.cli.CustomParameterHandler
 import com.lemline.runner.cli.MainCommand
+import com.lemline.runner.cli.setup
+import com.lemline.runner.cli.config.ConfigPathHolder
 import com.lemline.runner.cli.instances.InstanceStartCommand
 import com.lemline.runner.cli.listen.ListenCommand
 import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
@@ -59,8 +58,6 @@ class LemlineApplication : QuarkusApplication {
     }
 
     companion object {
-        var configPath: Path? = null
-
         /**
          * Main method to start the Lemline application.
          *
@@ -88,7 +85,7 @@ class LemlineApplication : QuarkusApplication {
                 // Set the config path
                 setConfigPath(parseResults)
 
-                if (configPath == null && !helpOrVersion) {
+                if (ConfigPathHolder.configPath == null && !helpOrVersion) {
                     System.err.println("No valid configuration file found. Please provide one, using one of the following methods:")
                     System.err.println("1. Pass the path to the file as a command-line argument (e.g., --config=<path>).")
                     System.err.println("2. Set the LEMLINE_CONFIG environment variable to the file's path.")
@@ -198,7 +195,7 @@ class LemlineApplication : QuarkusApplication {
          *    - `~/.config/lemline/config.yaml`
          *    - `~/.lemline.yaml`
          *
-         * If a valid configuration file is found, it sets the `configPath` variable.
+         * If a valid configuration file is found, it sets the `ConfigPathHolder.configPath` variable.
          * If no valid configuration file is found, the application continues without setting `configPath`.
          *
          * @param parseResults A list of `ParseResult` objects containing parsed command-line arguments.
@@ -232,15 +229,6 @@ class LemlineApplication : QuarkusApplication {
     }
 }
 
-internal fun CommandLine.setup() = this
-    .setUsageHelpAutoWidth(true)
-    .setCaseInsensitiveEnumValuesAllowed(true)
-    .setUnmatchedArgumentsAllowed(false)
-    .apply {
-        parameterExceptionHandler = CustomParameterHandler()
-        executionExceptionHandler = CustomExceptionHandler()
-    }
-
 @ExperimentalSerializationApi
 private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
     val path = filePath.normalize()
@@ -253,7 +241,7 @@ private fun checkConfigLocation(filePath: Path, provided: Boolean): Boolean {
         throw IllegalArgumentException("'${path.toAbsolutePath()}' is not a regular file")
     }
     if (fileExists && isRegularFile) {
-        configPath = path
+        ConfigPathHolder.configPath = path
         return true
     }
     return false

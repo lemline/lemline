@@ -12,11 +12,11 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.testcases.WorkflowDependency
 import com.lemline.core.testcases.WorkflowTestExecutor
 import com.lemline.core.testcases.WorkflowTestResult
+import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.messaging.InstanceMessage
-import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.repositories.DefinitionRepository
-import com.lemline.runner.repositories.ListenerRepository
+import com.lemline.runner.definitions.DefinitionModel
+import com.lemline.runner.definitions.DefinitionRepository
+import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.starters.Starter
 import com.lemline.runner.testcases.TestLifecycleEventListener
 import io.cloudevents.CloudEvent

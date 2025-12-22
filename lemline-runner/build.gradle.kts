@@ -44,6 +44,16 @@ dependencies {
     // Our modules
     implementation(project(":lemline-common"))
     implementation(project(":lemline-core"))
+    implementation(project(":lemline-runner-common"))
+    implementation(project(":lemline-runner-waits"))
+    implementation(project(":lemline-runner-retries"))
+    implementation(project(":lemline-runner-schedules"))
+    implementation(project(":lemline-runner-parents"))
+    implementation(project(":lemline-runner-forks"))
+    implementation(project(":lemline-runner-listeners"))
+    implementation(project(":lemline-runner-failures"))
+    implementation(project(":lemline-runner-definitions"))
+    implementation(project(":lemline-runner-cli"))
 
     // KotlinX ecosystem
     implementation(libs.bundles.kotlinxEcosystem)
@@ -124,6 +134,7 @@ dependencies {
     // ─────────────────────────────────────────────────────────────────────────
     testImplementation(testFixtures(project(":lemline-common")))
     testImplementation(testFixtures(project(":lemline-core")))
+    testImplementation(project(":lemline-runner-definitions"))
 
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform(libs.kotest.bom))
@@ -147,7 +158,18 @@ dependencies {
     testFixturesImplementation(libs.bundles.kotlinxEcosystem)
     testFixturesImplementation(testFixtures(project(":lemline-common")))
     testFixturesImplementation(testFixtures(project(":lemline-core")))
+    // QuarkusTestProfile for InMemoryProfile
+    testFixturesImplementation(enforcedPlatform(libs.quarkus.bom))
+    testFixturesImplementation("io.quarkus:quarkus-junit5")
     testFixturesImplementation(libs.serverlessworkflow.api)
+    testFixturesImplementation(project(":lemline-runner-common"))
+    testFixturesImplementation(project(":lemline-runner-failures"))
+    testFixturesImplementation(project(":lemline-runner-waits"))
+    testFixturesImplementation(project(":lemline-runner-retries"))
+    testFixturesImplementation(project(":lemline-runner-schedules"))
+    testFixturesImplementation(project(":lemline-runner-parents"))
+    testFixturesImplementation(project(":lemline-runner-forks"))
+    testFixturesImplementation(project(":lemline-runner-listeners"))
 }
 
 // ────────────────────────────────────────────────────────────────────────────

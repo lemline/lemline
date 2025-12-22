@@ -9,6 +9,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowVersion
+import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.healthcheck.FatalAckLiveness.livenessDownOnFailure
 import com.lemline.runner.healthcheck.RetryReadiness.readinessDownDuringRetries
 import io.quarkus.smallrye.reactivemessaging.ackSuspending

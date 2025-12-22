@@ -4,7 +4,7 @@ package com.lemline.runner.messaging.commands
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.config.COMMANDS_CONSUMER_CONCURRENCY
 import com.lemline.runner.config.COMMANDS_CONSUMER_ENABLED
-import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageSubscriber
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped

@@ -4,6 +4,8 @@ package com.lemline.runner.config
 import com.lemline.common.debug
 import com.lemline.common.logger
 import com.lemline.common.trace
+import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.MigrationManager
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_POSTGRESQL
@@ -21,11 +23,13 @@ import org.eclipse.microprofile.config.inject.ConfigProperty
 import org.flywaydb.core.Flyway
 
 @ApplicationScoped
-class DatabaseManager {
+class DatabaseManager : DatabaseConfig, MigrationManager {
     private val log = logger()
 
     @ConfigProperty(name = DATABASE_TYPE)
-    internal lateinit var dbType: String
+    private lateinit var _dbType: String
+
+    override val dbType: String get() = _dbType
 
     @Inject
     @IfBuildProfile("test")
@@ -103,6 +107,36 @@ class DatabaseManager {
         }
     }
 
+    // ========================================
+    // MigrationManager Implementation
+    // ========================================
+
+    override fun getPendingMigrations(): List<MigrationManager.MigrationInfo> {
+        return flyway.info().pending().map { migration ->
+            MigrationManager.MigrationInfo(
+                version = migration.version?.version,
+                description = migration.description,
+                state = migration.state.displayName,
+                installedOn = migration.installedOn?.toString()
+            )
+        }
+    }
+
+    override fun getAllMigrations(): List<MigrationManager.MigrationInfo> {
+        return flyway.info().all().map { migration ->
+            MigrationManager.MigrationInfo(
+                version = migration.version?.version,
+                description = migration.description,
+                state = migration.state.displayName,
+                installedOn = migration.installedOn?.toString()
+            )
+        }
+    }
+
+    override fun migrate() {
+        flyway.migrate()
+    }
+
     /**
      * Returns the database-specific JSON array aggregation function.
      *
@@ -116,7 +150,7 @@ class DatabaseManager {
      * @param column The column expression containing JSON strings to aggregate
      * @return SQL fragment for JSON array aggregation
      */
-    fun jsonArrayAgg(column: String): String = when (dbType) {
+    override fun jsonArrayAgg(column: String): String = when (dbType) {
         DB_TYPE_POSTGRESQL -> "json_agg($column::json)"
         DB_TYPE_MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON))"
         else -> "JSON_ARRAYAGG($column FORMAT JSON)"
@@ -133,7 +167,7 @@ class DatabaseManager {
      * @param orderColumn The column to order by
      * @return SQL fragment for ordered JSON array aggregation
      */
-    fun jsonArrayAggOrdered(column: String, orderColumn: String): String = when (dbType) {
+    override fun jsonArrayAggOrdered(column: String, orderColumn: String): String = when (dbType) {
         DB_TYPE_POSTGRESQL -> "json_agg($column::json ORDER BY $orderColumn)"
         DB_TYPE_MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON) ORDER BY $orderColumn)"
         else -> "JSON_ARRAYAGG($column FORMAT JSON ORDER BY $orderColumn)"
@@ -165,7 +199,7 @@ class DatabaseManager {
      * @param selectSql The SELECT SQL to insert from
      * @return Full INSERT...SELECT SQL with conflict handling
      */
-    fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
+    override fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
         DB_TYPE_MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
         else -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
     }
@@ -181,7 +215,7 @@ class DatabaseManager {
      * @param values The VALUES clause (with placeholders)
      * @return Full INSERT...VALUES SQL with conflict handling
      */
-    fun insertIgnoreInto(tableName: String, columns: String, values: String): String = when (dbType) {
+    override fun insertIgnoreInto(tableName: String, columns: String, values: String): String = when (dbType) {
         DB_TYPE_MYSQL -> "INSERT IGNORE INTO $tableName ($columns) VALUES ($values)"
         else -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
     }
@@ -206,8 +240,8 @@ class DatabaseManager {
      * @param block The code block to execute with the connection
      * @return The result of the block execution
      */
-    suspend fun <R> withConnection(
-        connection: Connection? = null,
+    override suspend fun <R> withConnection(
+        connection: Connection?,
         block: suspend (Connection) -> R
     ): R = withContext(Dispatchers.IO) {
         when (connection) {
@@ -227,8 +261,8 @@ class DatabaseManager {
      * @return The result of the block execution
      * @throws Throwable Rethrows any exception after rolling back the transaction
      */
-    suspend fun <R> withTransaction(
-        connection: Connection? = null,
+    override suspend fun <R> withTransaction(
+        connection: Connection?,
         block: suspend (Connection) -> R
     ): R = withContext(Dispatchers.IO) {
         when (connection) {

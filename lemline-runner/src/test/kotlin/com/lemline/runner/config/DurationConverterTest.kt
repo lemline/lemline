@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test
 
 @QuarkusTest
 @TestProfile(InMemoryProfile::class)
-internal class SimpleDurationConverterTest {
+internal class DurationConverterTest {
 
     @Test
     fun `should convert seconds to duration`() {

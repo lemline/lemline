@@ -9,11 +9,11 @@ import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.messaging.CompensationException
-import com.lemline.runner.messaging.InstanceMessage
+import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.messaging.commands.WorkflowCommandHandler
 import com.lemline.runner.messaging.events.WorkflowEventHandler
-import com.lemline.runner.models.DefinitionModel
-import com.lemline.runner.repositories.DefinitionRepository
+import com.lemline.runner.definitions.DefinitionModel
+import com.lemline.runner.definitions.DefinitionRepository
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.matchers.nulls.shouldNotBeNull
 import io.kotest.matchers.shouldBe

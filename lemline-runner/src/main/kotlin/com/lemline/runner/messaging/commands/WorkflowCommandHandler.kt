@@ -12,20 +12,20 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.getNode
+import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.LemlineConfiguration
+import com.lemline.runner.definitions.DefinitionRepository
+import com.lemline.runner.failures.FailureModel
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.SERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
+import com.lemline.runner.failures.FailureRepository
 import com.lemline.runner.messaging.CompensationException
-import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.MessageHandler
 import com.lemline.runner.messaging.cloudevents.CloudEventsEmitter
 import com.lemline.runner.messaging.events.WorkflowEventEmitter
 import com.lemline.runner.messaging.toLogString
-import com.lemline.runner.models.FailureModel
-import com.lemline.runner.repositories.DefinitionRepository
-import com.lemline.runner.repositories.FailureRepository
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.Workflow
@@ -318,7 +318,7 @@ internal class WorkflowCommandHandler(
                     event.resume()
                 } else {
                     // Send to the database for persistence
-                    sendToDatabase(this, event)
+                    sendToEventChannel(this, event)
                     null  // Paused
                 }
             }
@@ -330,14 +330,14 @@ internal class WorkflowCommandHandler(
                     event.resume()
                 } else {
                     // Send to the database for persistence
-                    sendToDatabase(this, event)
+                    sendToEventChannel(this, event)
                     null  // Paused
                 }
             }
 
             is WorkflowEvent.RunWorkflowStarted -> {
                 // Send to the database for parent storage + child creation
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
 
                 when (event.config.sync) {
                     // waiting for synchronous completion
@@ -349,7 +349,7 @@ internal class WorkflowCommandHandler(
 
             is WorkflowEvent.ForkStarted -> {
                 // Send to the database for fork persistence + branch scheduling
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
                 null  // Paused - waiting for branches to complete
             }
 
@@ -362,7 +362,7 @@ internal class WorkflowCommandHandler(
             is WorkflowEvent.ListenStarted -> {
                 // Send to the database for listener persistence
                 // The listener will be stored and CloudEvents will be matched against it
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
                 null  // Paused - waiting for matching CloudEvents
             }
 
@@ -380,7 +380,7 @@ internal class WorkflowCommandHandler(
 
                 // Determine if this workflow has a parent or need to be scheduled after completion
                 if (event.hasWaitingParent || workflow.schedule?.after != null) {
-                    sendToDatabase(this, event)
+                    sendToEventChannel(this, event)
                 }
                 null  // Terminal
             }
@@ -390,26 +390,26 @@ internal class WorkflowCommandHandler(
                 onEventProducedTest(this, event)
 
                 // Send to database for failure persistence
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
                 null  // Terminal
             }
 
             is WorkflowEvent.ForkBranchCompleted -> {
                 // Send to database for branch completion tracking
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
                 null  // Terminal
             }
 
             is WorkflowEvent.ForkBranchFailed -> {
                 // Send to database for branch failure tracking
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
                 null  // Terminal
             }
 
             is WorkflowEvent.ListenForEachCompleted -> {
                 // Send to database for foreach iteration completion handling
                 // The database handler will check for next event or complete the listener
-                sendToDatabase(this, event)
+                sendToEventChannel(this, event)
                 null  // Terminal
             }
         }?.let {
@@ -420,7 +420,7 @@ internal class WorkflowCommandHandler(
     /**
      * Sends a workflow event to the database channel for persistence.
      */
-    private suspend fun sendToDatabase(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent) {
+    private suspend fun sendToEventChannel(message: InstanceMessage<WorkflowCommand>, event: WorkflowEvent) {
         logger.debug { "Sending event to database: $event" }
         eventEmitter.send(
             InstanceMessage(
