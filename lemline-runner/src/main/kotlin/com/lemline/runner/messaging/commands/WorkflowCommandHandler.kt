@@ -226,7 +226,7 @@ internal class WorkflowCommandHandler(
                 workflowVersion
             )
                 ?.definition
-                ?.let { DefinitionCache.parseAndPut(it) }
+                ?.let { DefinitionCache.parseYamlAndPut(it) }
         } catch (e: Exception) {
             logger.error(e) { "Error during workflow definition retrieval" }
 

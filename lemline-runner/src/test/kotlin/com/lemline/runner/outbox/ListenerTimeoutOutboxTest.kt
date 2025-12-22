@@ -87,7 +87,7 @@ internal class ListenerTimeoutOutboxTest {
                 definition = definition
             )
         )
-        DefinitionCache.parseAndPut(definition)
+        DefinitionCache.parseYamlAndPut(definition)
     }
 
     @Test

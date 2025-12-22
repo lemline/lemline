@@ -103,33 +103,34 @@ object DefinitionCache {
     }
 
     /**
-     * Parses the given workflow definition string in either YAML or JSON format,
-     * validates it, and adds it to the cache. If the definition is successfully parsed,
-     * it is cached along with its root node, nodes map, and listen tasks for efficient retrieval.
-     *
-     * @param definition The workflow definition as a string, expected to be in YAML or JSON format.
-     * @return The parsed and validated Workflow object.
+     * Parses the given workflow definition string in YAML format
+     * and puts it into the cache.
      */
     @JvmStatic
-    fun parseAndPut(definition: String): Workflow =
-        try {
-            WorkflowReader.validation().read(definition, WorkflowFormat.YAML)
-        } catch (e: Exception) {
-            // Debug: print the YAML that failed
-            if (definition.contains("time:") && definition.contains("\${")) {
-                System.err.println("=== DEBUG: YAML parsing failed for time expression ===")
-                System.err.println("YAML:\n$definition")
-                System.err.println("Error: ${e.message}")
-                e.cause?.let { System.err.println("Cause: ${it.message}") }
-                System.err.println("=== END DEBUG ===")
-            }
-            WorkflowReader.validation().read(definition, WorkflowFormat.JSON)
-        }.also { workflow ->
-            workflowCache[workflow.info] = workflow
-            val nodesMap = getNodesMap(createRootNode(workflow))
-            nodesMapCache[workflow.info] = nodesMap
-            listenTasksCache[workflow.info] = extractListenTasks(workflow.info, nodesMap)
-        }
+    fun parseYamlAndPut(definition: String): Workflow = WorkflowReader
+        .validation()
+        .read(definition, WorkflowFormat.YAML)
+        .also { workflow -> cacheWorkflow(workflow) }
+
+    /**
+     * Parses the given workflow definition string in JSON format
+     * and puts it into the cache.
+     */
+    @JvmStatic
+    fun parseJsonAndPut(definition: String): Workflow = WorkflowReader
+        .validation()
+        .read(definition, WorkflowFormat.JSON)
+        .also { workflow -> cacheWorkflow(workflow) }
+
+    /**
+     * Caches a workflow along with its parsed node tree and listen tasks.
+     */
+    private fun cacheWorkflow(workflow: Workflow) {
+        workflowCache[workflow.info] = workflow
+        val (_, nodesMap) = WorkflowParser.parse(workflow)
+        nodesMapCache[workflow.info] = nodesMap
+        listenTasksCache[workflow.info] = extractListenTasks(workflow.info, nodesMap)
+    }
 
     /**
      * Retrieves a workflow from the workflow cache, uniquely identified by its namespace, name, and version.
@@ -182,44 +183,6 @@ object DefinitionCache {
 
         @Suppress("UNCHECKED_CAST")
         return rootNode as Node<RootTask>
-    }
-
-    /**
-     * Retrieves the root node of the given workflow.
-     * The root node is the Node<RootTask> at the root level of the workflow.
-     */
-    private fun createRootNode(workflow: Workflow): Node<RootTask> = Node(
-        position = NodePosition.root,
-        task = RootTask(workflow.document, workflow.`do`, workflow.use).also {
-            it.output = workflow.output
-            it.input = workflow.input
-        },
-        name = NodePosition.root.toString(),
-        parent = null,
-    )
-
-    /**
-     * Constructs a map of all nodes in a hierarchical tree starting from the given root node.
-     * Each node is mapped to its position in the workflow.
-     */
-    private fun getNodesMap(nodeRoot: Node<RootTask>): Map<NodePosition, Node<*>> {
-
-        val map = mutableMapOf<NodePosition, Node<*>>()
-
-        fun addNodeAndChildren(node: Node<*>) {
-            // Add the current node to the map
-            map[node.position] = node
-
-            // Recursively add all children
-            node.children?.forEach { child ->
-                addNodeAndChildren(child)
-            }
-        }
-
-        // Start the recursive traversal from the root
-        addNodeAndChildren(nodeRoot)
-
-        return map
     }
 
     /**

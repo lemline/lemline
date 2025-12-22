@@ -115,7 +115,7 @@ class DefinitionsTest {
     @Test
     fun `parseAndPut should cache the workflow and its root node`() {
         // When
-        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseYamlAndPut(sampleYamlWorkflow)
 
         // Then
         workflow.shouldBeInstanceOf<Workflow>()
@@ -152,7 +152,7 @@ class DefinitionsTest {
 
         // Then
         assertThrows<Exception> {
-            DefinitionCache.parseAndPut(invalidWorkflow)
+            DefinitionCache.parseYamlAndPut(invalidWorkflow)
         }
     }
 
@@ -172,7 +172,7 @@ class DefinitionsTest {
     @Test
     fun `getOrNull should return cached workflow`() {
         // Given
-        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseYamlAndPut(sampleYamlWorkflow)
 
         // When
         val result = DefinitionCache.getWorkflow(
@@ -188,7 +188,7 @@ class DefinitionsTest {
     @Test
     fun `getRootNode get cached root node with the correct structure`() {
         // Given - a simple workflow
-        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseYamlAndPut(sampleYamlWorkflow)
 
         // When
         val rootNode = DefinitionCache.getRootNode(workflow)
@@ -203,7 +203,7 @@ class DefinitionsTest {
     @Test
     fun `getRootNode should get cached root node for workflow`() {
         // Given
-        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseYamlAndPut(sampleYamlWorkflow)
 
         // When
         val rootNode1 = DefinitionCache.getRootNode(workflow)
@@ -217,7 +217,7 @@ class DefinitionsTest {
     @Test
     fun `workflow index should work correctly`() {
         // Given
-        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseYamlAndPut(sampleYamlWorkflow)
 
         // When
         val index = workflow.info
@@ -288,7 +288,7 @@ class DefinitionsTest {
         // Process workflows concurrently
         val results = workflows.map { yaml ->
             async(Dispatchers.Default) {
-                DefinitionCache.parseAndPut(yaml)
+                DefinitionCache.parseYamlAndPut(yaml)
             }
         }.awaitAll()
 
@@ -308,7 +308,7 @@ class DefinitionsTest {
     @Test
     fun `concurrent access to root node cache should work correctly`() = runBlocking {
         // Create a workflow to test with
-        val workflow = DefinitionCache.parseAndPut(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseYamlAndPut(sampleYamlWorkflow)
 
         // Access the root node concurrently from multiple coroutines
         val results = (1..10).map {
@@ -382,7 +382,7 @@ class DefinitionsTest {
 
         // When/Then - should parse without error
         val workflow = assertDoesNotThrow {
-            DefinitionCache.parseAndPut(workflowWithListenTime)
+            DefinitionCache.parseYamlAndPut(workflowWithListenTime)
         }
         workflow.document.name shouldBe "listen-time-literal"
     }

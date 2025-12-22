@@ -37,7 +37,7 @@ class Definitions {
     }
 
     // parse the workflow definition and put it to the cache
-    private fun DefinitionModel.parseAndPut(): Workflow = DefinitionCache.parseAndPut(definition)
+    private fun DefinitionModel.parseAndPut(): Workflow = DefinitionCache.parseYamlAndPut(definition)
 
     private suspend fun getFromDatabase(workflowNamespace: WorkflowNamespace, workflowName: WorkflowName): Workflow? {
         // by name only, get the last version from the repository

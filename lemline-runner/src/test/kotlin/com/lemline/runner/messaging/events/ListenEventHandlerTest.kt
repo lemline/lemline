@@ -83,7 +83,7 @@ internal class ListenEventHandlerTest {
                         with:
                           type: com.example.OrderCreated
         """.trimIndent()
-        DefinitionCache.parseAndPut(definition)
+        DefinitionCache.parseYamlAndPut(definition)
     }
 
     @Test

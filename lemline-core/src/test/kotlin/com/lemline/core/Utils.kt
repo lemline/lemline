@@ -59,5 +59,5 @@ internal fun getWorkflowToTest(
               version: $version
         """
     val workflowYaml = document.trimIndent() + "\n" + doYaml.trimIndent()
-    return DefinitionCache.parseAndPut(workflowYaml)
+    return DefinitionCache.parseYamlAndPut(workflowYaml)
 }

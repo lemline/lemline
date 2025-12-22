@@ -109,7 +109,7 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
                   version: $version
             """.trimIndent()
             val workflowYaml = document + "\n" + doYaml.trimIndent()
-            return DefinitionCache.parseAndPut(workflowYaml)
+            return DefinitionCache.parseYamlAndPut(workflowYaml)
         }
     }
 }

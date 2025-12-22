@@ -1355,7 +1355,7 @@ internal class ListenTaskEndToEndTest {
 
         // Parse and cache workflow definition
         // Note: Listen task definitions are retrieved on-demand from the cached workflow
-        DefinitionCache.parseAndPut(yaml)
+        DefinitionCache.parseYamlAndPut(yaml)
     }
 
     /**

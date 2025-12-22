@@ -92,7 +92,7 @@ class DefinitionService {
         // Note: Listen task definitions are retrieved on-demand from the cached workflow,
         // so no database sync is needed here.
         if (result == SaveResult.CREATED || result == SaveResult.UPDATED) {
-            DefinitionCache.parseAndPut(model.definition)
+            DefinitionCache.parseYamlAndPut(model.definition)
         }
 
         return result

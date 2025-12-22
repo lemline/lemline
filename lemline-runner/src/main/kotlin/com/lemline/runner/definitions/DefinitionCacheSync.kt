@@ -70,7 +70,7 @@ internal class DefinitionCacheSync : AbstractScheduledTask() {
             }
 
             try {
-                DefinitionCache.parseAndPut(definition.definition)
+                DefinitionCache.parseYamlAndPut(definition.definition)
                 loaded++
                 logger.debug { "Cached definition: ${definition.namespace}/${definition.name}:${definition.version}" }
             } catch (e: Exception) {
