@@ -9,11 +9,11 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.definitions.CachedListenTask
-import com.lemline.core.definitions.CachedUntilCondition
-import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.ListenStrategy
+import com.lemline.core.workflows.CachedListenTask
+import com.lemline.core.workflows.CachedUntilCondition
+import com.lemline.core.workflows.DefinitionCache
 import com.lemline.runner.models.ListenerModel
 import com.lemline.runner.repositories.ListenerQueryKey
 import com.lemline.runner.repositories.ListenerRepository

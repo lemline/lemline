@@ -87,7 +87,7 @@ private suspend fun <T> List<suspend () -> T>.awaitFirstFailSlow(): T {
 
     val scope = CoroutineScope(currentCoroutineContext() + SupervisorJob())
 
-    map { block ->
+    forEach { block ->
         scope.launch {
             try {
                 block().also {

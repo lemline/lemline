@@ -5,10 +5,10 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.activities.mock.MockConfiguration
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
-import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
+import com.lemline.core.workflows.DefinitionCache
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock

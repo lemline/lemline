@@ -29,6 +29,7 @@ import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
 import java.time.OffsetDateTime
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
@@ -145,7 +146,7 @@ class ListenProcessor(
                     timeoutValue.after?.let { timeoutAfter ->
                         try {
                             val duration = timeoutAfter.toDuration()
-                            if (duration > kotlin.time.Duration.ZERO) Clock.System.now() + duration else null
+                            if (duration > Duration.ZERO) Clock.System.now() + duration else null
                         } catch (e: Exception) {
                             logger.warn(e) { "Failed to parse listen timeout: $timeoutAfter" }
                             null

@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.definitions.DefinitionCache as Workflows
+import com.lemline.core.workflows.DefinitionCache as Workflows
 import com.lemline.runner.cli.GlobalMixin
 import com.lemline.runner.cli.common.InteractiveWorkflowSelector
 import com.lemline.runner.definitions.DefinitionService
@@ -22,10 +22,10 @@ import io.serverlessworkflow.api.types.Workflow
 import java.io.ByteArrayOutputStream
 import java.io.PrintStream
 import java.lang.reflect.Field
-import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
+import org.junit.jupiter.api.AfterEach
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import picocli.CommandLine
@@ -162,7 +162,7 @@ class DefinitionGetCommandTest {
 
             // Mock static method
             mockkStatic(Workflows::class)
-            every { Workflows.parse(workflowDefinition.definition) } returns workflow
+            every { Workflows.parseYaml(workflowDefinition.definition) } returns workflow
 
             // Mock the entire chain of method calls
             every {
@@ -181,7 +181,7 @@ class DefinitionGetCommandTest {
             // Then
             exitCode shouldBe 0
             outStream.toString() shouldContain jsonOutput
-            verify { Workflows.parse(workflowDefinition.definition) }
+            verify { Workflows.parseYaml(workflowDefinition.definition) }
             verify { objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(any<Workflow>()) }
         }
     }

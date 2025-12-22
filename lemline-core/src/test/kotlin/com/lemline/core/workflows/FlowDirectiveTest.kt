@@ -2,6 +2,11 @@
 package com.lemline.core.workflows
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.core.tasks.FlowDirective
+import com.lemline.core.tasks.FlowDirectiveEnum
+import com.lemline.core.tasks.FlowDirectiveGoto
+import com.lemline.core.tasks.toJava
+import com.lemline.core.tasks.toKotlin
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals

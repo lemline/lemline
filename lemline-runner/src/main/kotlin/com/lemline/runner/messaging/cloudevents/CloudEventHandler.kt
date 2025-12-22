@@ -6,9 +6,9 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.Logger
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
-import com.lemline.core.definitions.CachedUntilCondition
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.ListenStrategy
+import com.lemline.core.workflows.CachedUntilCondition
 import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.definitions.MatchingListenTask
 import com.lemline.runner.definitions.MatchingListenTaskUntilEvent

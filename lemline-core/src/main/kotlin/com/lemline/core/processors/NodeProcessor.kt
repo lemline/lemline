@@ -27,7 +27,7 @@ import com.lemline.core.states.WorkflowEvent.ForkBranchCompleted
 import com.lemline.core.states.WorkflowEvent.ListenForEachCompleted
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
-import com.lemline.core.workflows.toKotlin
+import com.lemline.core.tasks.toKotlin
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
@@ -412,7 +412,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
             nodeStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop(),
             nextNode = node.parent,
             nextInput = output,
-            nextDirective = FlowDirective().apply { setFlowDirectiveEnum(FlowDirectiveEnum.END) } // Pass END up the chain
+            nextDirective = FlowDirective().apply { flowDirectiveEnum = FlowDirectiveEnum.END } // Pass END up the chain
         )
     }
 

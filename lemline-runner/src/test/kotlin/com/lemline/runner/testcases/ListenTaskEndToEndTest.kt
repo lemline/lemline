@@ -7,9 +7,9 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.workflows.DefinitionCache
 import com.lemline.runner.definitions.DefinitionListenService
 import com.lemline.runner.messaging.InstanceMessage
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL

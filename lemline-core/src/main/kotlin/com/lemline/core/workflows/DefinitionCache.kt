@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.definitions
+package com.lemline.core.workflows
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.values.NodePosition
@@ -79,27 +79,28 @@ object DefinitionCache {
     private val yamlMapper = LemlineJson.yamlMapper
 
     /**
-     * Parses a workflow definition provided as a string. The method attempts to parse the definition
-     * first as YAML. If YAML parsing fails, it falls back to parsing as JSON.
-     * The method returns a Workflow object if parsing is successful.
-     *
-     * @param definition The workflow definition provided as a string. This can be a YAML or JSON formatted string.
-     * @return The parsed Workflow object.
-     * @throws Exception If both YAML and JSON parsing fail, an exception is thrown.
+     * Parses the given workflow definition string in YAML format
      */
     @JvmStatic
-    fun parse(definition: String): Workflow {
-        // Try to parse as YAML first, then as JSON
-        val jsonNode = try {
-            yamlMapper.readTree(definition)
-        } catch (_: Exception) {
-            jsonMapper.readTree(definition)
-        }
+    fun parseYaml(definition: String): Workflow {
+        // Parse the YAML string into a JSON node
+        val jsonNode = yamlMapper.readTree(definition)
 
         // Project the JSON node to a Workflow object
         return jsonMapper.treeToValue(jsonNode, Workflow::class.java)
     }
 
+    /**
+     * Parses the given workflow definition string in JSON format
+     */
+    @JvmStatic
+    fun parseJson(definition: String): Workflow {
+        // Parse the JSON string into a JsonNode
+        val jsonNode = jsonMapper.readTree(definition)
+
+        // Project the JSON node to a Workflow object
+        return jsonMapper.treeToValue(jsonNode, Workflow::class.java)
+    }
 
     /**
      * Parses the given workflow definition string in either YAML or JSON format,

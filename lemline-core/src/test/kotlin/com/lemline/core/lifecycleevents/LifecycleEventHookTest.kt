@@ -9,12 +9,12 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.activities.mock.MockActivityExecutor
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
-import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.errors.InternalException
 import com.lemline.core.getWorkflowToTest
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.NodeStack
+import com.lemline.core.workflows.DefinitionCache
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
 import java.util.concurrent.CopyOnWriteArrayList

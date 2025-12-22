@@ -138,15 +138,15 @@ internal abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask()
             batchNumber++
             var toProcess = 0
             // Find and process messages in the same transaction
-            databaseManager.withTransaction { connection ->
+            databaseManager.withTransaction { conn ->
                 // Find and lock messages ready to process
-                val messages = outboxRepository.findEntitiesToProcess(maxAttempts, batchSize, connection)
+                val messages = outboxRepository.findEntitiesToProcess(maxAttempts, batchSize, conn)
                 toProcess = messages.size
 
                 if (toProcess > 0) {
                     totalToProcess += toProcess
                     processBatch(messages, maxAttempts, initialDelay)
-                    val processed = crudRepository.update(messages, connection)
+                    val processed = crudRepository.update(messages, conn)
                     totalProcessed += processed
                 }
             }

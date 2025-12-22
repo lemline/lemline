@@ -2,9 +2,9 @@
 package com.lemline.core
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.workflows.DefinitionCache
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader.validation
 import io.serverlessworkflow.api.types.Workflow

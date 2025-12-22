@@ -1,10 +1,9 @@
-// SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.workflows
+package com.lemline.core.expressions.scopes
 
 import com.fasterxml.jackson.databind.JsonNode
-import com.lemline.core.workflows.RuntimeDescriptor.metadata
-import com.lemline.core.workflows.RuntimeDescriptor.name
-import com.lemline.core.workflows.RuntimeDescriptor.version
+import com.lemline.core.expressions.scopes.RuntimeDescriptor.metadata
+import com.lemline.core.expressions.scopes.RuntimeDescriptor.name
+import com.lemline.core.expressions.scopes.RuntimeDescriptor.version
 import kotlinx.serialization.Serializable
 
 /**

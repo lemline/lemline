@@ -2,11 +2,11 @@
 package com.lemline.runner.models
 
 import com.lemline.common.values.IDV7
-import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.ListenStrategy as CoreListenStrategy
 import com.lemline.core.processors.UntilCondition
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.workflows.DefinitionCache
 import com.lemline.runner.messaging.InstanceMessage
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.time.ExperimentalTime

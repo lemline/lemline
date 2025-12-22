@@ -4,14 +4,14 @@ package com.lemline.runner.messaging.commands
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.core.activities.ActivityExecutor
-import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.getNode
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.failures.FailureReasons.DEFINITION_MISSING
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
@@ -410,7 +410,7 @@ internal class WorkflowCommandHandler(
                 // Send to database for foreach iteration completion handling
                 // The database handler will check for next event or complete the listener
                 sendToDatabase(this, event)
-                null  // Paused - waiting for next event or completion
+                null  // Terminal
             }
         }?.let {
             copy(workflowState = it)

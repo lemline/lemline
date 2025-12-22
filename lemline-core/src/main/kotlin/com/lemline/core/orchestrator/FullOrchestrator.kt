@@ -9,8 +9,6 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.cloudevents.CloudEventHook
-import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.lifecycleevents.LifecycleEventHook
@@ -25,6 +23,8 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
 import com.lemline.core.utils.mapAwaitAllFailFast
 import com.lemline.core.utils.mapAwaitFirstFailSlow
+import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.getNode
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.ForkTask

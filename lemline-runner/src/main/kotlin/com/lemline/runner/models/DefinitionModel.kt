@@ -8,7 +8,7 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.common.values.name
 import com.lemline.common.values.namespace
 import com.lemline.common.values.version
-import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.workflows.DefinitionCache
 import io.serverlessworkflow.api.types.Workflow
 
 data class DefinitionModel(
@@ -41,7 +41,7 @@ data class DefinitionModel(
          * The original content is preserved as-is.
          */
         fun from(definition: String): DefinitionModel {
-            val workflow = DefinitionCache.parse(definition)
+            val workflow = DefinitionCache.parseYaml(definition)
             return DefinitionModel(
                 namespace = workflow.namespace,
                 name = workflow.name,

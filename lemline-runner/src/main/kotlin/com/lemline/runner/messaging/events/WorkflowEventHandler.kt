@@ -5,8 +5,6 @@ import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowId
-import com.lemline.core.definitions.DefinitionCache
-import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.lifecycleevents.LifecycleEventHook
@@ -14,6 +12,9 @@ import com.lemline.core.nodes.Node
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.workflows.CachedUntilCondition
+import com.lemline.core.workflows.DefinitionCache
+import com.lemline.core.workflows.getNode
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.definitions.Definitions
 import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
@@ -339,7 +340,7 @@ internal class WorkflowEventHandler(
         // Store until configuration for expression evaluation
         listener.hasUntil = cachedTask?.until != null
         listener.untilExpression =
-            (cachedTask?.until as? com.lemline.core.definitions.CachedUntilCondition.Expression)?.expression
+            (cachedTask?.until as? CachedUntilCondition.Expression)?.expression
 
         // Insert listener into database
         val rowsInserted = listenerRepository.insert(listener)

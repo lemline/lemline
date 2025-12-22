@@ -10,6 +10,7 @@ import com.lemline.common.values.namespace
 import com.lemline.common.values.version
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.workflows.DefinitionCache
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -77,7 +78,7 @@ class DefinitionsTest {
     @Test
     fun `parse should successfully parse a YAML workflow definition`() {
         // When
-        val workflow = DefinitionCache.parse(sampleYamlWorkflow)
+        val workflow = DefinitionCache.parseYaml(sampleYamlWorkflow)
 
         // Then
         workflow.shouldBeInstanceOf<Workflow>()
@@ -88,7 +89,7 @@ class DefinitionsTest {
     @Test
     fun `parse should successfully parse a JSON workflow definition`() {
         // When
-        val workflow = DefinitionCache.parse(sampleJsonWorkflow)
+        val workflow = DefinitionCache.parseYaml(sampleJsonWorkflow)
 
         // Then
         workflow.shouldBeInstanceOf<Workflow>()
@@ -107,7 +108,7 @@ class DefinitionsTest {
 
         // Then
         assertThrows<Exception> {
-            DefinitionCache.parse(invalidWorkflow)
+            DefinitionCache.parseYaml(invalidWorkflow)
         }
     }
 
@@ -245,7 +246,7 @@ class DefinitionsTest {
 
         // When parsing - it should fall back to JSON parsing
         val workflow = assertDoesNotThrow {
-            DefinitionCache.parse(badYamlGoodJson)
+            DefinitionCache.parseYaml(badYamlGoodJson)
         }
 
         // Then
@@ -262,7 +263,7 @@ class DefinitionsTest {
 
         // Then both YAML and JSON parsing should fail
         assertThrows<Exception> {
-            DefinitionCache.parse(invalidDefinition)
+            DefinitionCache.parseYaml(invalidDefinition)
         }
     }
 
@@ -349,7 +350,7 @@ class DefinitionsTest {
 
         // When
         val workflow = assertDoesNotThrow {
-            DefinitionCache.parse(complexWorkflow)
+            DefinitionCache.parseYaml(complexWorkflow)
         }
 
         // Then

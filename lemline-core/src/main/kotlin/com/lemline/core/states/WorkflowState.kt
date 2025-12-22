@@ -15,7 +15,7 @@ import com.lemline.core.processors.RunScriptConfig
 import com.lemline.core.processors.RunShellConfig
 import com.lemline.core.processors.RunWorkflowConfig
 import com.lemline.core.processors.WaitConfig
-import com.lemline.core.workflows.FlowDirective
+import com.lemline.core.tasks.FlowDirective
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant

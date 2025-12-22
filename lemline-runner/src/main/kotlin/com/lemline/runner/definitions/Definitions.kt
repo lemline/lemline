@@ -5,7 +5,7 @@ import com.github.zafarkhaja.semver.Version
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.workflows.DefinitionCache
 import com.lemline.runner.models.DefinitionModel
 import com.lemline.runner.repositories.DefinitionRepository
 import io.serverlessworkflow.api.types.Workflow
@@ -17,7 +17,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalTime
 @ExperimentalSerializationApi
 @ApplicationScoped
-class Definitions() {
+class Definitions {
 
     @Inject
     private lateinit var definitionRepository: DefinitionRepository

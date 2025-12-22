@@ -34,9 +34,9 @@ import com.lemline.core.states.WaitState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
-import com.lemline.core.workflows.FlowDirective
-import com.lemline.core.workflows.FlowDirectiveEnum
-import com.lemline.core.workflows.FlowDirectiveGoto
+import com.lemline.core.tasks.FlowDirective
+import com.lemline.core.tasks.FlowDirectiveEnum
+import com.lemline.core.tasks.FlowDirectiveGoto
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.random.Random
 import kotlin.time.Clock

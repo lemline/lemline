@@ -4,7 +4,6 @@ package com.lemline.core.orchestrator
 import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
-import com.lemline.core.definitions.getNode
 import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
@@ -31,8 +30,9 @@ import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WaitStarted
 import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
 import com.lemline.core.states.WorkflowEvent.WorkflowFailed
-import com.lemline.core.workflows.toJava
-import com.lemline.core.workflows.toKotlin
+import com.lemline.core.tasks.toJava
+import com.lemline.core.tasks.toKotlin
+import com.lemline.core.workflows.getNode
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.ListenTask

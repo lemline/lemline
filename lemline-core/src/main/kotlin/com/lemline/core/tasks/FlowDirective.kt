@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.workflows
+package com.lemline.core.tasks
 
 import io.serverlessworkflow.api.types.FlowDirectiveEnum.CONTINUE
 import io.serverlessworkflow.api.types.FlowDirectiveEnum.END

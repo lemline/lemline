@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.definitions
 
-import com.lemline.core.definitions.DefinitionCache
+import com.lemline.core.workflows.DefinitionCache
 import com.lemline.runner.config.LemlineConfiguration
 import com.lemline.runner.repositories.DefinitionRepository
 import com.lemline.runner.scheduled.AbstractScheduledTask

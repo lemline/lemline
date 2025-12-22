@@ -13,9 +13,9 @@ import com.lemline.core.activities.mock.ShellMockResponse
 import com.lemline.core.activities.mock.ShellMockRule
 import com.lemline.core.cloudevents.CloudEventHook
 import com.lemline.core.cloudevents.InMemoryCloudEventHook
-import com.lemline.core.definitions.DefinitionCache
 import com.lemline.core.getWorkflowToTest
 import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.workflows.DefinitionCache
 import io.kotest.core.spec.style.FunSpec
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
