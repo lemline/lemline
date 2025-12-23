@@ -22,11 +22,15 @@ class ListenerRepositoryPostgresTest : ListenerRepositoryTestBase() {
 
     override fun getDatabaseConfig(): DatabaseConfig = testDb
     override fun getRepository(): ListenerRepository = repository
+    override fun getEventRepository(): ListenerEventRepository = eventRepository
 
     companion object {
         private val testDb = PostgresTestDatabaseConfig()
         private val repository: ListenerRepository by lazy {
             ListenerRepository().apply { databaseConfig = testDb }
+        }
+        private val eventRepository: ListenerEventRepository by lazy {
+            ListenerEventRepository().apply { databaseConfig = testDb }
         }
 
         @BeforeAll

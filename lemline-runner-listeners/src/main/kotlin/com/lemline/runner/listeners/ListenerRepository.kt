@@ -42,6 +42,7 @@ import com.lemline.runner.common.repositories.with.WithCleanerRepository
 import com.lemline.runner.common.repositories.with.WithIdRepository
 import com.lemline.runner.common.repositories.with.WithInstanceRepository
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
+import com.lemline.runner.listeners.ListenerEventRepository.Companion.LISTENER_ID_COLUMN
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
@@ -373,7 +374,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                   AND l.$STRATEGY_COLUMN IN ('ONE', 'ANY')
                   AND EXISTS (
                       SELECT 1 FROM $LISTENER_EVENTS_TABLE e
-                      WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                      WHERE e.$LISTENER_ID_COLUMN = l.$ID_COLUMN
                         AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
                   )
             """.trimIndent()
@@ -399,7 +400,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                   AND (
                       SELECT COUNT(DISTINCT e.${ListenerEventRepository.FILTER_INDEX_COLUMN})
                       FROM $LISTENER_EVENTS_TABLE e
-                      WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+                      WHERE e.$LISTENER_ID_COLUMN = l.$ID_COLUMN
                         AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
                   ) >= l.$FILTERS_COUNT_COLUMN
             """.trimIndent()
@@ -483,44 +484,85 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
           AND l.$STRATEGY_COLUMN = 'ANY_UNTIL_EVENT'
           AND NOT EXISTS (
               SELECT 1 FROM $LISTENER_EVENTS_TABLE e
-              WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
+              WHERE e.$LISTENER_ID_COLUMN = l.$ID_COLUMN
                 AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
           )
         """.trimIndent()
     }
 
     /**
-     * Finds ANY_UNTIL_EXPR listeners with completed events needing expression evaluation.
-     * Returns pairs of (listener, list of event data).
+     * Finds ANY_UNTIL_EXPR listeners matching the given query keys with their accumulated events.
+     * Used by ListenerEventService immediately after an event is inserted.
+     *
+     * @param keys Query keys from matching listen tasks (must include ANY_UNTIL_EXPR strategy)
+     * @return Pairs of (listener, accumulated events as JSON strings)
      */
-    suspend fun findListenersForUntilEvaluation(
+    suspend fun findListenersByKeysWithEvents(
+        keys: List<ListenerQueryKey>,
+        connection: Connection? = null
+    ): List<Pair<ListenerModel, List<String>>> {
+        // Filter keys to only include ANY_UNTIL_EXPR strategy
+        val exprKeys = keys.filter { it.listenerStrategy == ListenerStrategy.ANY_UNTIL_EXPR }
+        if (exprKeys.isEmpty()) return emptyList()
+
+        return databaseConfig.withConnection(connection) { conn ->
+            val eventsSubquery = databaseConfig.jsonArrayAggOrderedSubquery(
+                table = LISTENER_EVENTS_TABLE,
+                tableAlias = "e",
+                column = "e.${ListenerEventRepository.EVENT_COLUMN}",
+                orderColumn = "e.$CREATED_AT_COLUMN",
+                whereClause = "e.$LISTENER_ID_COLUMN = l.$ID_COLUMN"
+            )
+
+            val sql = """
+                SELECT l.*, $eventsSubquery as events_json
+                FROM $tableName l
+                WHERE l.$COMPLETED_AT_COLUMN IS NULL
+                  AND (${ListenerQueryKey.buildWhereClause(exprKeys, "l")})
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                ListenerQueryKey.bindAllParameters(exprKeys, stmt, 1)
+                stmt.executeQuery().use { rs ->
+                    buildList {
+                        while (rs.next()) {
+                            val listener = createModel(rs)
+                            val eventsJson = rs.getString("events_json")
+                            val events = parseJsonArrayToList(eventsJson)
+                            add(listener to events)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Finds ALL pending ANY_UNTIL_EXPR listeners for batch until expression evaluation.
+     * Used by the outbox/scheduler for periodic processing.
+     *
+     * @param limit Maximum number of listeners to return
+     * @return Pairs of (listener, accumulated events as JSON strings)
+     */
+    suspend fun findPendingUntilExprListeners(
         limit: Int = 100,
         connection: Connection? = null
     ): List<Pair<ListenerModel, List<String>>> =
         databaseConfig.withConnection(connection) { conn ->
-            // Use ordered JSON array aggregation (ORDER BY inside aggregate for H2 compatibility)
-            val jsonAgg = databaseConfig.jsonArrayAggOrdered(
-                "e.${ListenerEventRepository.EVENT_COLUMN}",
-                "e.$CREATED_AT_COLUMN"
+            val eventsSubquery = databaseConfig.jsonArrayAggOrderedSubquery(
+                table = LISTENER_EVENTS_TABLE,
+                tableAlias = "e",
+                column = "e.${ListenerEventRepository.EVENT_COLUMN}",
+                orderColumn = "e.$CREATED_AT_COLUMN",
+                whereClause = "e.$LISTENER_ID_COLUMN = l.$ID_COLUMN"
             )
 
             val sql = """
                 SELECT l.*,
-                       (SELECT $jsonAgg
-                        FROM $LISTENER_EVENTS_TABLE e
-                        WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
-                          AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
-                       ) as events_json
+                       $eventsSubquery as events_json
                 FROM $tableName l
                 WHERE l.$COMPLETED_AT_COLUMN IS NULL
-                  AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND l.$STRATEGY_COLUMN = 'ANY_UNTIL_EXPR'
-                  AND EXISTS (
-                      SELECT 1 FROM $LISTENER_EVENTS_TABLE e
-                      WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
-                        AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
-                  )
+                  AND l.$STRATEGY_COLUMN = '${ListenerStrategy.ANY_UNTIL_EXPR.name}'
                 LIMIT ?
                 FOR UPDATE SKIP LOCKED
             """.trimIndent()
@@ -568,6 +610,45 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
           AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
           AND $OUTBOX_FAILED_AT_COLUMN IS NULL
         """.trimIndent()
+    }
+
+    /**
+     * Batch marks multiple listeners as completed (after until expression evaluation).
+     * Uses a single UPDATE with IN clause for efficiency.
+     *
+     * @param ids List of listener IDs to mark as completed
+     * @return Number of listeners actually marked as completed
+     */
+    suspend fun batchMarkListenersCompleted(
+        ids: List<IDV7>,
+        connection: Connection? = null
+    ): Int {
+        if (ids.isEmpty()) return 0
+
+        return databaseConfig.withConnection(connection) { conn ->
+            val now = nowTimestamp()
+            val placeholders = ids.joinToString(", ") { "?" }
+            val sql = """
+                UPDATE $tableName
+                SET $COMPLETED_AT_COLUMN = ?,
+                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+                    $UPDATED_AT_COLUMN = ?
+                WHERE $ID_COLUMN IN ($placeholders)
+                  AND $COMPLETED_AT_COLUMN IS NULL
+                  AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
+                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setTimestamp(1, now)
+                stmt.setTimestamp(2, now)
+                stmt.setTimestamp(3, now)
+                ids.forEachIndexed { index, id ->
+                    setIDV7(stmt, 4 + index, id)
+                }
+                stmt.executeUpdate()
+            }
+        }
     }
 
     /**

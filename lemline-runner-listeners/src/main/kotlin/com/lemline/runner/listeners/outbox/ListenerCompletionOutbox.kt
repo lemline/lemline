@@ -145,7 +145,7 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
      * @return Number of listeners marked as completed
      */
     private suspend fun evaluateUntilExpressions(): Int {
-        val listenersWithEvents = listenerRepository.findListenersForUntilEvaluation()
+        val listenersWithEvents = listenerRepository.findPendingUntilExprListeners()
         if (listenersWithEvents.isEmpty()) return 0
 
         var totalMarkedCompleted = 0

@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.core.expressions.JQExpression
-import com.lemline.core.workflows.CachedUntilCondition
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -78,15 +77,7 @@ class ListenerEventService {
         val matchingListenTasks = definitionListenService.findMatchingListenTasks(event, eventDataProvider)
         val matchingUntilEvent = definitionListenService.findMatchingUntilEvents(event, eventDataProvider)
 
-        if (matchingListenTasks.isEmpty() && matchingUntilEvent.isEmpty()) {
-            logger.trace { "No matching definitions for event: $event" }
-            return 0
-        }
-
-        logger.debug {
-            "Definition matching complete: ${matchingListenTasks.size} listen tasks match, and " +
-                "${matchingUntilEvent.size} 'until' definitions match for event: $event"
-        }
+        if (matchingListenTasks.isEmpty() && matchingUntilEvent.isEmpty()) return 0
 
         // ═══════════════════════════════════════════════════════════════════════════════
         // STEP 2: Insert events using simplified 2-path architecture
@@ -144,6 +135,7 @@ class ListenerEventService {
         }
 
         logger.debug { "CloudEvent processing complete: $affectedCount events/listeners affected" }
+
         return affectedCount
     }
 
@@ -245,35 +237,27 @@ class ListenerEventService {
     /**
      * Evaluates until expressions for ANY+until(expression) listeners.
      *
-     * Uses `findListenersForUntilEvaluation()` to get listeners with accumulated events,
-     * evaluates expressions, and marks completed using `markListenerCompleted()`.
+     * Uses `findListenersByKeysWithEvents()` to get listeners matching the current event
+     * with their accumulated events, evaluates expressions, and marks completed in batch.
      *
-     * @param listenTasks Definition matches with expression-based until conditions
+     * @param listenTasks Definition matches used to filter which listeners to evaluate
      * @return Number of listeners that were marked as completed
      */
     private suspend fun processUntilExpressions(
         listenTasks: List<MatchingListenTask>
     ): Int {
-        // Build map of (workflowInfo, position) -> until expression for matching
-        val untilExpressions = listenTasks.associate { def ->
-            val expr = (def.listenTask.until as CachedUntilCondition.Expression).expression
-            Pair(def.workflowInfo, def.nodePosition) to expr
-        }
+        // Build query keys from matched listen tasks
+        val queryKeys = listenTasks.map { it.toQueryKey() }
 
-        // Get listeners with accumulated events that have until expressions
-        val listenersWithEvents = listenerRepository.findListenersForUntilEvaluation()
+        // Get listeners matching these keys with accumulated events
+        val listenersWithEvents = listenerRepository.findListenersByKeysWithEvents(queryKeys)
+        if (listenersWithEvents.isEmpty()) return 0
 
-        var totalMarkedCompleted = 0
-
-        for ((listener, accumulatedEvents) in listenersWithEvents) {
-            // Find matching expression for this listener
-            val positionKey = Pair(listener.workflowInfo, listener.nodePosition)
-            val untilExpr = untilExpressions[positionKey]
-                ?: listener.untilExpression  // Fallback to stored expression
-                ?: continue  // Skip if no expression found
+        // Evaluate expressions and collect IDs of listeners to mark completed
+        val listenersToComplete = listenersWithEvents.mapNotNull { (listener, accumulatedEvents) ->
+            val untilExpr = listener.untilExpression ?: return@mapNotNull null
 
             // Build JSON array of event DATA (extract from stored CloudEvents)
-            // Until expressions operate on event data, not the full envelope
             val eventsArray = JsonArray(accumulatedEvents.map { CloudEventService.extractData(it) })
 
             // Evaluate the until expression
@@ -284,14 +268,13 @@ class ListenerEventService {
                 false
             }
 
-            if (shouldComplete) {
-                val marked = listenerRepository.markListenerCompleted(listener.id)
-                if (marked > 0) {
-                    totalMarkedCompleted++
-                    logger.debug { "ANY+until expression evaluated to true for listener ${listener.id}" }
-                }
-            }
+            if (shouldComplete) listener.id else null
         }
+
+        if (listenersToComplete.isEmpty()) return 0
+
+        // Batch mark all completed listeners
+        val totalMarkedCompleted = listenerRepository.batchMarkListenersCompleted(listenersToComplete)
 
         if (totalMarkedCompleted > 0) {
             logger.info { "Marked $totalMarkedCompleted ANY+until(expr) listeners as completed" }

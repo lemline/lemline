@@ -30,6 +30,7 @@ abstract class ListenerRepositoryTestBase {
 
     protected abstract fun getDatabaseConfig(): DatabaseConfig
     protected abstract fun getRepository(): ListenerRepository
+    protected abstract fun getEventRepository(): ListenerEventRepository
 
     private fun createEntity() = ListenerModel.random()
     private fun modifyEntity(entity: ListenerModel): ListenerModel {
@@ -396,6 +397,271 @@ abstract class ListenerRepositoryTestBase {
 
             // Then
             count shouldBe 0
+        }
+    }
+
+    /**
+     * Tests for findListenersByKeysWithEvents functionality.
+     * Used by ListenerEventService to find listeners matching an event with their accumulated events.
+     */
+    @Nested
+    inner class FindListenersByKeysWithEventsTests {
+
+        private val repository: ListenerRepository by lazy { getRepository() }
+        private val eventRepository: ListenerEventRepository by lazy { getEventRepository() }
+
+        @BeforeEach
+        fun setup() = runTest {
+            eventRepository.deleteAll()
+            repository.deleteAll()
+        }
+
+        private fun createListener(strategy: ListenerStrategy): ListenerModel {
+            return ListenerModel.random().copy(
+                listenerStrategy = strategy,
+            ).apply {
+                completedAt = null
+                outboxCompletedAt = null
+                outboxFailedAt = null
+                outboxDelayedUntil = null
+                untilExpression = "\${ length > 2 }"
+            }
+        }
+
+        private fun createQueryKey(listener: ListenerModel, strategy: ListenerStrategy? = null): ListenerQueryKey {
+            return ListenerQueryKey(
+                workflowInfo = listener.instanceMessage.workflowInfo,
+                position = listener.instanceMessage.workflowState.nodePosition,
+                correlationValuesJson = null,
+                filterIndex = null,
+                listenerStrategy = strategy ?: listener.listenerStrategy
+            )
+        }
+
+        private fun createEvent(
+            listenerId: com.lemline.common.values.IDV7,
+            eventId: String,
+            filterIndex: Int = 0
+        ): ListenerEventModel {
+            return ListenerEventModel(
+                listenerId = listenerId,
+                eventId = eventId,
+                filterIndex = filterIndex,
+                event = """{"type":"test.event","data":{"value":"$eventId"}}"""
+            )
+        }
+
+        @Test
+        fun `should return empty list for empty keys`() = runTest {
+            // Given: An ANY_UNTIL_EXPR listener exists
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener)
+
+            // When
+            val result = repository.findListenersByKeysWithEvents(emptyList())
+
+            // Then
+            result shouldBe emptyList()
+        }
+
+        @Test
+        fun `should return empty list when keys have non-ANY_UNTIL_EXPR strategies`() = runTest {
+            // Given: An ANY_UNTIL_EXPR listener
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener)
+
+            // When: Keys have different strategies
+            val queryKeys = listOf(
+                createQueryKey(listener, ListenerStrategy.ONE),
+                createQueryKey(listener, ListenerStrategy.ANY),
+                createQueryKey(listener, ListenerStrategy.ALL)
+            )
+            val result = repository.findListenersByKeysWithEvents(queryKeys)
+
+            // Then
+            result shouldBe emptyList()
+        }
+
+        @Test
+        fun `should find listener matching query key`() = runTest {
+            // Given: An ANY_UNTIL_EXPR listener
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener)
+
+            val queryKey = createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EXPR)
+
+            // When
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then
+            result.size shouldBe 1
+            result[0].first.id shouldBe listener.id
+        }
+
+        @Test
+        fun `should return accumulated events for listener`() = runTest {
+            // Given: An ANY_UNTIL_EXPR listener with multiple events
+            // Note: Different filter_index values due to unique constraint (listener_id, filter_index)
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener)
+
+            val event1 = createEvent(listener.id, "event-1", filterIndex = 0)
+            val event2 = createEvent(listener.id, "event-2", filterIndex = 1)
+            val event3 = createEvent(listener.id, "event-3", filterIndex = 2)
+            eventRepository.insert(event1)
+            eventRepository.insert(event2)
+            eventRepository.insert(event3)
+
+            val queryKey = createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EXPR)
+
+            // When
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then
+            result.size shouldBe 1
+            result[0].second.size shouldBe 3
+        }
+
+        @Test
+        fun `should return empty events list when listener has no events`() = runTest {
+            // Given: An ANY_UNTIL_EXPR listener with no events
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener)
+
+            val queryKey = createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EXPR)
+
+            // When
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then
+            result.size shouldBe 1
+            result[0].first.id shouldBe listener.id
+            result[0].second shouldBe emptyList()
+        }
+
+        @Test
+        fun `should not return already completed listeners`() = runTest {
+            // Given: An already completed ANY_UNTIL_EXPR listener
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR).apply {
+                completedAt = Clock.System.now()
+            }
+            repository.insert(listener)
+
+            val queryKey = createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EXPR)
+
+            // When
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then
+            result shouldBe emptyList()
+        }
+
+        @Test
+        fun `should only return listeners with matching workflow info`() = runTest {
+            // Given: Two listeners with different workflow info
+            val listener1 = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            val listener2 = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener1)
+            repository.insert(listener2)
+
+            // When: Query with key matching only listener1
+            val queryKey = createQueryKey(listener1, ListenerStrategy.ANY_UNTIL_EXPR)
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then
+            result.size shouldBe 1
+            result[0].first.id shouldBe listener1.id
+        }
+
+        @Test
+        fun `should find multiple listeners with multiple keys`() = runTest {
+            // Given: Multiple ANY_UNTIL_EXPR listeners
+            val listener1 = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            val listener2 = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener1)
+            repository.insert(listener2)
+
+            val queryKeys = listOf(
+                createQueryKey(listener1, ListenerStrategy.ANY_UNTIL_EXPR),
+                createQueryKey(listener2, ListenerStrategy.ANY_UNTIL_EXPR)
+            )
+
+            // When
+            val result = repository.findListenersByKeysWithEvents(queryKeys)
+
+            // Then
+            result.size shouldBe 2
+            result.map { it.first.id }.toSet() shouldBe setOf(listener1.id, listener2.id)
+        }
+
+        @Test
+        fun `should filter keys and only process ANY_UNTIL_EXPR keys`() = runTest {
+            // Given: An ANY_UNTIL_EXPR listener
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener)
+
+            // When: Keys include mixed strategies (only ANY_UNTIL_EXPR should be processed)
+            val queryKeys = listOf(
+                createQueryKey(listener, ListenerStrategy.ALL),
+                createQueryKey(listener, ListenerStrategy.ONE),
+                createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EXPR)
+            )
+            val result = repository.findListenersByKeysWithEvents(queryKeys)
+
+            // Then
+            result.size shouldBe 1
+            result[0].first.id shouldBe listener.id
+        }
+
+        @Test
+        fun `should not return listener with wrong strategy in database`() = runTest {
+            // Given: Listeners with different strategies
+            val oneListener = createListener(ListenerStrategy.ONE)
+            val anyListener = createListener(ListenerStrategy.ANY)
+            val allListener = createListener(ListenerStrategy.ALL)
+            repository.insert(oneListener)
+            repository.insert(anyListener)
+            repository.insert(allListener)
+
+            // When: Query with ANY_UNTIL_EXPR strategy
+            val queryKeys = listOf(
+                createQueryKey(oneListener, ListenerStrategy.ANY_UNTIL_EXPR),
+                createQueryKey(anyListener, ListenerStrategy.ANY_UNTIL_EXPR),
+                createQueryKey(allListener, ListenerStrategy.ANY_UNTIL_EXPR)
+            )
+            val result = repository.findListenersByKeysWithEvents(queryKeys)
+
+            // Then: No listeners should be returned (strategy mismatch in database)
+            result shouldBe emptyList()
+        }
+
+        @Test
+        fun `should return events in order by created_at`() = runTest {
+            // Given: An ANY_UNTIL_EXPR listener with events added in specific order
+            // Note: Different filter_index values due to unique constraint (listener_id, filter_index)
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener)
+
+            // Insert events (created_at is auto-generated in order)
+            val event1 = createEvent(listener.id, "first", filterIndex = 0)
+            val event2 = createEvent(listener.id, "second", filterIndex = 1)
+            val event3 = createEvent(listener.id, "third", filterIndex = 2)
+            eventRepository.insert(event1)
+            eventRepository.insert(event2)
+            eventRepository.insert(event3)
+
+            val queryKey = createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EXPR)
+
+            // When
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then: Events should be returned (order depends on database json_agg implementation)
+            result.size shouldBe 1
+            result[0].second.size shouldBe 3
+            // Verify events contain expected data
+            result[0].second.any { it.contains("first") } shouldBe true
+            result[0].second.any { it.contains("second") } shouldBe true
+            result[0].second.any { it.contains("third") } shouldBe true
         }
     }
 }
