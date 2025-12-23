@@ -27,7 +27,7 @@ import kotlinx.serialization.json.JsonPrimitive
  * ## Simplified Architecture
  *
  * All events (for ALL strategies) are stored in `lemline_listener_events` table.
- * State tracking uses standard outbox columns + `ready_at` for completion.
+ * State tracking uses standard outbox columns + `completed_at` for completion.
  *
  * The listener stores:
  * - Workflow identity (namespace, name, version) for matching against cached workflow definitions
@@ -44,9 +44,10 @@ import kotlinx.serialization.json.JsonPrimitive
  * ## Completion Flow
  *
  * 1. CloudEvents arrive → INSERT into listener_events
- * 2. If hasForeach: ListenerForeachOutbox processes events sequentially
- * 3. When completion criteria met: ready_at is set
- * 4. ListenerCompletionOutbox emits resume command
+ * 2. When completion criteria met: completed_at is set (listener stops collecting events)
+ * 3. If hasForeach: ListenerForeachOutbox processes events sequentially
+ * 4. When all foreach done (or no foreach): outbox_delayed_until is set
+ * 5. ListenerCompletionOutbox picks up listener and emits resume command
  *
  * ## Correlation
  *
@@ -88,8 +89,8 @@ data class ListenerModel(
     /** Correlation baseline values (Mode 2: first-sets-baseline), JSON map */
     var correlationValues: String? = null
 
-    /** Timestamp when completion criteria were met (triggers ListenerCompletionOutbox) */
-    var readyAt: Instant? = null
+    /** Timestamp when listener completed (stops collecting events). Does NOT trigger ListenerCompletionOutbox directly - see outboxDelayedUntil. */
+    var completedAt: Instant? = null
 
     /**
      * Gets the readAs mode from the cached workflow definition.
@@ -128,7 +129,10 @@ data class ListenerModel(
 
     // Outbox fields
     // NOTE: outboxDelayedUntil starts as NULL (waiting state).
-    // It gets set to NOW() when ready_at is set, triggering ListenerCompletionOutbox.
+    // It gets set to NOW() only after:
+    // - For non-foreach: when completed_at is set (simultaneously)
+    // - For foreach: when completed_at is set AND all foreach processing is done
+    // Only outboxDelayedUntil NOT NULL triggers ListenerCompletionOutbox.
     override var outboxScheduledFor: Instant? = null
     override var outboxDelayedUntil: Instant? = null
     override var outboxAttemptCount: Int = 0

@@ -5,7 +5,7 @@ import com.lemline.common.logger.Logger
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.runner.listeners.CloudEventService
-import com.lemline.runner.listeners.ListenerService
+import com.lemline.runner.listeners.ListenerEventService
 import com.lemline.runner.messaging.MessageHandler
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
@@ -19,10 +19,10 @@ import org.eclipse.microprofile.reactive.messaging.Message
  *
  * This handler is a thin adapter that:
  * 1. Deserializes incoming messages to CloudEvent objects
- * 2. Delegates processing to [ListenerService.handleCloudEvent]
+ * 2. Delegates processing to [ListenerEventService.handleCloudEvent]
  *
  * All business logic for CloudEvent processing (matching, inserting events,
- * evaluating until conditions) is in [ListenerService].
+ * evaluating until conditions) is in [ListenerEventService].
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
@@ -34,7 +34,7 @@ internal class CloudEventHandler(
     override val logger: Logger = logger()
 
     @Inject
-    private lateinit var listenerService: ListenerService
+    private lateinit var listenerEventService: ListenerEventService
 
     // Test hooks
     override var onCompleteTest: (Message<String>, CloudEvent?) -> Unit = { _, _ -> }
@@ -49,7 +49,7 @@ internal class CloudEventHandler(
     }
 
     override suspend fun handle(current: CloudEvent): CloudEvent? {
-        listenerService.handleCloudEvent(current)
+        listenerEventService.handleCloudEvent(current)
         // Return null to skip emit - CloudEvents don't produce outbound messages
         return null
     }

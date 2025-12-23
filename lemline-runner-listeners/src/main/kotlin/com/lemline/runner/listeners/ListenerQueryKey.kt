@@ -7,12 +7,13 @@ import com.lemline.runner.common.repositories.ops.WORKFLOW_NAMESPACE_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_NAME_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_POSITION_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_VERSION_COLUMN
+import com.lemline.runner.listeners.ListenerRepository.Companion.CORRELATION_VALUES_COLUMN
 import java.sql.PreparedStatement
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 
 /**
- * Key for batch querying listeners by workflow identity and correlation.
+ * Key for batch querying listeners by workflow identity, correlation, and strategy.
  * Optionally includes filterIndex for ALL strategy event insertion.
  */
 @OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
@@ -21,18 +22,27 @@ data class ListenerQueryKey(
     val position: NodePosition,
     val correlationValuesJson: String?,
     /** Filter index for ALL strategy - indicates which filter matched (null for ONE/ANY) */
-    val filterIndex: Int? = null
+    val filterIndex: Int? = null,
+    /** Strategy for filtering listeners (null to match any strategy) */
+    val listenerStrategy: ListenerStrategy? = null
 ) {
     /**
      * Builds SQL WHERE condition for this key.
      */
     fun toSqlCondition(tableAlias: String = ""): String {
         val prefix = if (tableAlias.isNotEmpty()) "$tableAlias." else ""
-        return if (correlationValuesJson == null) {
-            "(${prefix}${WORKFLOW_NAMESPACE_COLUMN} = ? AND ${prefix}${WORKFLOW_NAME_COLUMN} = ? AND ${prefix}${WORKFLOW_VERSION_COLUMN} = ? AND ${prefix}${WORKFLOW_POSITION_COLUMN} = ?)"
-        } else {
-            "(${prefix}${WORKFLOW_NAMESPACE_COLUMN} = ? AND ${prefix}${WORKFLOW_NAME_COLUMN} = ? AND ${prefix}${WORKFLOW_VERSION_COLUMN} = ? AND ${prefix}${WORKFLOW_POSITION_COLUMN} = ? AND (${prefix}${ListenerRepository.CORRELATION_VALUES_COLUMN} IS NULL OR ${prefix}${ListenerRepository.CORRELATION_VALUES_COLUMN} = ?))"
-        }
+        val baseCondition =
+            "$prefix$WORKFLOW_NAMESPACE_COLUMN = ? AND $prefix$WORKFLOW_NAME_COLUMN = ? AND $prefix$WORKFLOW_VERSION_COLUMN = ? AND $prefix${WORKFLOW_POSITION_COLUMN} = ?"
+
+        val correlationCondition = if (correlationValuesJson != null) {
+            " AND ($prefix$CORRELATION_VALUES_COLUMN IS NULL OR $prefix$CORRELATION_VALUES_COLUMN = ?)"
+        } else ""
+
+        val strategyCondition = if (listenerStrategy != null) {
+            " AND $prefix${ListenerRepository.STRATEGY_COLUMN} = ?"
+        } else ""
+
+        return "($baseCondition$correlationCondition$strategyCondition)"
     }
 
     /**
@@ -44,9 +54,9 @@ data class ListenerQueryKey(
         stmt.setString(idx++, workflowInfo.name.toString())
         stmt.setString(idx++, workflowInfo.version.toString())
         stmt.setString(idx++, position.toString())
-        if (correlationValuesJson != null) {
-            stmt.setString(idx++, correlationValuesJson)
-        }
+        if (correlationValuesJson != null) stmt.setString(idx++, correlationValuesJson)
+        if (listenerStrategy != null) stmt.setString(idx++, listenerStrategy.name)
+        
         return idx
     }
 
@@ -55,7 +65,7 @@ data class ListenerQueryKey(
      */
     fun toSqlConditionWithoutCorrelation(tableAlias: String = ""): String {
         val prefix = if (tableAlias.isNotEmpty()) "$tableAlias." else ""
-        return "(${prefix}${WORKFLOW_NAMESPACE_COLUMN} = ? AND ${prefix}${WORKFLOW_NAME_COLUMN} = ? AND ${prefix}${WORKFLOW_VERSION_COLUMN} = ? AND ${prefix}${WORKFLOW_POSITION_COLUMN} = ?)"
+        return "($prefix${WORKFLOW_NAMESPACE_COLUMN} = ? AND $prefix$WORKFLOW_NAME_COLUMN = ? AND $prefix$WORKFLOW_VERSION_COLUMN = ? AND $prefix${WORKFLOW_POSITION_COLUMN} = ?)"
     }
 
     /**

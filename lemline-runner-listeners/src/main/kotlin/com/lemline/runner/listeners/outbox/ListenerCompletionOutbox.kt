@@ -38,15 +38,18 @@ import kotlinx.serialization.json.booleanOrNull
  * This outbox handles the final step: completing the listen task after
  * all events have been processed (including foreach iterations if applicable).
  *
- * Listeners are picked up when:
- * 1. `ready_at` is set (completion criteria met)
- * 2. `outbox_delayed_until` is set (ready for processing)
+ * Listeners are picked up when `outbox_delayed_until` is set (ready for processing).
+ *
+ * Note: `completed_at` being set only means the listener stopped collecting events.
+ * The outbox waits for `outbox_delayed_until` which is set after all foreach processing
+ * completes (or immediately for non-foreach listeners).
  *
  * ## How it works
  *
  * Before each batch, this outbox calls `batchMarkReady()` to:
  * 1. Check completion criteria for each strategy
- * 2. Set `ready_at` and `outbox_delayed_until` for eligible listeners
+ * 2. For non-foreach: Set both `completed_at` and `outbox_delayed_until`
+ * 3. For foreach: Set `completed_at` only; `outbox_delayed_until` set later after foreach completes
  *
  * Then it processes ready listeners:
  * 1. Aggregates foreach outputs (if applicable) from listener_events
@@ -107,22 +110,22 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
      * then delegates to the standard outbox processing.
      */
     override suspend fun doWork() {
-        // Step 1: Mark eligible ONE/ANY/ALL listeners as ready
-        val markedReady = listenerRepository.batchMarkReady()
-        if (markedReady > 0) {
-            logger.debug { "Marked $markedReady listeners as ready for completion" }
+        // Step 1: Mark eligible ONE/ANY/ALL listeners as completed
+        val markedCompleted = listenerRepository.batchMarkReady()
+        if (markedCompleted > 0) {
+            logger.debug { "Marked $markedCompleted listeners as completed" }
         }
 
         // Step 2: Evaluate until expressions for ANY_UNTIL_EXPR listeners
-        val markedReadyByExpr = evaluateUntilExpressions()
-        if (markedReadyByExpr > 0) {
-            logger.debug { "Marked $markedReadyByExpr ANY+until(expr) listeners as ready via expression evaluation" }
+        val markedCompletedByExpr = evaluateUntilExpressions()
+        if (markedCompletedByExpr > 0) {
+            logger.debug { "Marked $markedCompletedByExpr ANY+until(expr) listeners as completed via expression evaluation" }
         }
 
         // Step 3: Check terminated ANY_UNTIL_EVENT listeners whose foreach processing is now complete
-        val markedReadyByTermination = listenerRepository.batchMarkReadyTerminatedListeners()
-        if (markedReadyByTermination > 0) {
-            logger.debug { "Marked $markedReadyByTermination ANY+until(event) listeners as ready (foreach complete)" }
+        val markedCompletedByTermination = listenerRepository.batchMarkCompletedTerminatedListeners()
+        if (markedCompletedByTermination > 0) {
+            logger.debug { "Marked $markedCompletedByTermination ANY+until(event) listeners as ready for processing (foreach complete)" }
         }
 
         // Step 4: Process ready listeners via standard outbox flow
@@ -139,13 +142,13 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
      * - Foreach.do processing completes events asynchronously
      * - Until expressions should only be evaluated against completed events
      *
-     * @return Number of listeners marked ready
+     * @return Number of listeners marked as completed
      */
     private suspend fun evaluateUntilExpressions(): Int {
         val listenersWithEvents = listenerRepository.findListenersForUntilEvaluation()
         if (listenersWithEvents.isEmpty()) return 0
 
-        var totalMarkedReady = 0
+        var totalMarkedCompleted = 0
 
         for ((listener, accumulatedEvents) in listenersWithEvents) {
             val untilExpr = listener.untilExpression ?: continue
@@ -163,15 +166,15 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
             }
 
             if (shouldComplete) {
-                val marked = listenerRepository.markReady(listener.id)
+                val marked = listenerRepository.markListenerCompleted(listener.id)
                 if (marked > 0) {
-                    totalMarkedReady++
+                    totalMarkedCompleted++
                     logger.debug { "ANY+until expression evaluated to true for listener ${listener.id}" }
                 }
             }
         }
 
-        return totalMarkedReady
+        return totalMarkedCompleted
     }
 
     /**

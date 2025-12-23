@@ -38,9 +38,9 @@ CREATE TABLE lemline_listeners
     -- Timeout handling
     timeout_at              TIMESTAMPTZ(6),
 
-    -- State progression: ready_at is set when completion criteria are met
-    -- This triggers ListenerCompletionOutbox to process the listener
-    ready_at                TIMESTAMPTZ(6),
+    -- State progression: completed_at is set when listener stops collecting events
+    -- NOTE: Does NOT directly trigger ListenerCompletionOutbox - only outbox_delayed_until does
+    completed_at            TIMESTAMPTZ(6),
 
     -- Standard outbox fields (for completion processing)
     -- outbox_delayed_until: NULL = waiting, NOT NULL = ready for processing
@@ -75,10 +75,10 @@ CREATE INDEX idx_lemline_listeners_correlation
     ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position, correlation_values)
     WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
 
--- Index for completion outbox processing (ready listeners)
-CREATE INDEX idx_lemline_listeners_ready
-    ON lemline_listeners (ready_at)
-    WHERE ready_at IS NOT NULL AND outbox_completed_at IS NULL;
+-- Index for completion outbox processing (completed listeners)
+CREATE INDEX idx_lemline_listeners_completed
+    ON lemline_listeners (completed_at)
+    WHERE completed_at IS NOT NULL AND outbox_completed_at IS NULL;
 
 -- Index for timeout processing
 CREATE INDEX idx_lemline_listeners_timeout
@@ -108,4 +108,4 @@ COMMENT ON COLUMN lemline_listeners.has_until IS 'TRUE if listener has an until 
 COMMENT ON COLUMN lemline_listeners.until_expression IS 'JQ expression for ANY_UNTIL_EXPR strategy';
 COMMENT ON COLUMN lemline_listeners.has_foreach IS 'TRUE if listener has foreach.do configured';
 COMMENT ON COLUMN lemline_listeners.correlation_values IS 'Baseline correlation values set by first matching event (Mode 2)';
-COMMENT ON COLUMN lemline_listeners.ready_at IS 'Timestamp when completion criteria were met (triggers ListenerCompletionOutbox)';
+COMMENT ON COLUMN lemline_listeners.completed_at IS 'Timestamp when listener stopped collecting events (does NOT trigger outbox - see outbox_delayed_until)';

@@ -38,9 +38,9 @@ CREATE TABLE lemline_listeners
     -- Timeout handling
     timeout_at              TIMESTAMP(6),
 
-    -- State progression: ready_at is set when completion criteria are met
-    -- This triggers ListenerCompletionOutbox to process the listener
-    ready_at                TIMESTAMP(6),
+    -- State progression: completed_at is set when listener stops collecting events
+    -- NOTE: Does NOT directly trigger ListenerCompletionOutbox - only outbox_delayed_until does
+    completed_at            TIMESTAMP(6),
 
     -- Standard outbox fields (for completion processing)
     -- outbox_delayed_until: NULL = waiting, NOT NULL = ready for processing
@@ -77,9 +77,9 @@ CREATE INDEX idx_lemline_listeners_pending
 CREATE INDEX idx_lemline_listeners_correlation
     ON lemline_listeners (workflow_namespace(50), workflow_name(100), workflow_version(20), workflow_position(400), correlation_values(100));
 
--- Index for completion outbox processing (ready listeners)
-CREATE INDEX idx_lemline_listeners_ready
-    ON lemline_listeners (ready_at);
+-- Index for completion outbox processing (completed listeners)
+CREATE INDEX idx_lemline_listeners_completed
+    ON lemline_listeners (completed_at);
 
 -- Index for timeout processing
 CREATE INDEX idx_lemline_listeners_timeout

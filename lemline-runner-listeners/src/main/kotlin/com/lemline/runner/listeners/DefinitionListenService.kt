@@ -49,12 +49,16 @@ data class MatchingListenTask(
     val strategy: ListenStrategy get() = listenTask.strategy
     val until: CachedUntilCondition? get() = listenTask.until
 
+    /** Database-compatible strategy derived from core strategy + until condition. */
+    val listenerStrategy: ListenerStrategy get() = ListenerStrategy.from(strategy, until)
+
     /** Converts this definition match to a query key for listener lookup. */
     fun toQueryKey() = ListenerQueryKey(
         workflowInfo = workflowInfo,
         position = nodePosition,
         correlationValuesJson = correlationValuesJson,
-        filterIndex = filterIndex
+        filterIndex = filterIndex,
+        listenerStrategy = listenerStrategy
     )
 }
 
@@ -77,7 +81,8 @@ data class MatchingListenTaskUntilEvent(
     fun toQueryKey() = ListenerQueryKey(
         workflowInfo = workflowInfo,
         position = nodePosition,
-        correlationValuesJson = null
+        correlationValuesJson = null,
+        listenerStrategy = ListenerStrategy.ANY_UNTIL_EVENT
     )
 }
 
@@ -217,7 +222,7 @@ class DefinitionListenService {
         eventFilter: EventFilter,
         eventData: JsonElement
     ): String? = extractCorrelationValues(eventFilter, eventData)
-        ?.let { Json.encodeToString(it.toSortedMap()) }
+        ?.let { Json.encodeToString(it.toSortedMap().toMap()) }
 
     /** Extracts correlation values from the event data using the filter's correlation definitions.*/
     private fun extractCorrelationValues(

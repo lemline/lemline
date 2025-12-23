@@ -64,7 +64,7 @@ do:
 │  ListenerStrategy           ← Enum: ONE, ANY, ANY_UNTIL_*, ALL │
 │                                                                 │
 │  outbox/                                                        │
-│  ├── ListenerCompletionOutbox ← Resume when ready_at is set    │
+│  ├── ListenerCompletionOutbox ← Resume when completed_at is set│
 │  ├── ListenerForeachOutbox    ← Process foreach iterations     │
 │  └── ListenerScheduledTimeout ← Handle timeouts                │
 │                                                                 │
@@ -156,7 +156,7 @@ ListenerForeachOutbox  Check completion
     └───────────────────┤
                         ▼
                ┌─────────────────┐
-               │ Set ready_at    │
+               │Set completed_at │
                └────────┬────────┘
                         │
                         ▼
@@ -203,7 +203,7 @@ ListenerForeachOutbox  Check completion
 | `has_foreach` | BOOLEAN | Has foreach.do |
 | `has_until` | BOOLEAN | Has until condition |
 | `until_expression` | TEXT | JQ expression for until |
-| `ready_at` | TIMESTAMP | Completion criteria met |
+| `completed_at` | TIMESTAMP | Listener stopped collecting events |
 | `outbox_*` | Various | Outbox pattern fields |
 | `cleanup_after` | TIMESTAMP | Eligible for deletion |
 

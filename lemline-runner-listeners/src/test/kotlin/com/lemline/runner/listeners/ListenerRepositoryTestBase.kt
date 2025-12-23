@@ -222,4 +222,180 @@ abstract class ListenerRepositoryTestBase {
             timedOut.size shouldBe 2
         }
     }
+
+    /**
+     * Tests for markListenerCompletedByUntilEvent functionality.
+     */
+    @Nested
+    inner class MarkCompletedByUntilEventTests {
+
+        private val repository: ListenerRepository by lazy { getRepository() }
+
+        @BeforeEach
+        fun setup() = runTest {
+            repository.deleteAll()
+        }
+
+        private fun createListener(strategy: ListenerStrategy): ListenerModel {
+            return ListenerModel.random().copy(
+                listenerStrategy = strategy,
+            ).apply {
+                completedAt = null
+                outboxCompletedAt = null
+                outboxFailedAt = null
+                outboxDelayedUntil = null
+            }
+        }
+
+        private fun createQueryKey(listener: ListenerModel, strategy: ListenerStrategy? = null): ListenerQueryKey {
+            return ListenerQueryKey(
+                workflowInfo = listener.instanceMessage.workflowInfo,
+                position = listener.instanceMessage.workflowState.nodePosition,
+                correlationValuesJson = null,
+                filterIndex = null,
+                listenerStrategy = strategy
+            )
+        }
+
+        @Test
+        fun `should mark ANY_UNTIL_EVENT listener as completed`() = runTest {
+            // Given: An ANY_UNTIL_EVENT listener
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EVENT)
+            repository.insert(listener)
+            val queryKey = createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EVENT)
+
+            // When
+            val count = repository.markListenerCompletedByUntilEvent(listOf(queryKey))
+
+            // Then
+            count shouldBe 1
+            val updated = repository.findById(listener.id)
+            updated shouldNotBe null
+            updated!!.completedAt shouldNotBe null
+            updated.outboxDelayedUntil shouldBe null // Should NOT set outbox_delayed_until
+        }
+
+        @Test
+        fun `should return 0 for empty keys list`() = runTest {
+            // Given: An ANY_UNTIL_EVENT listener exists
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EVENT)
+            repository.insert(listener)
+
+            // When
+            val count = repository.markListenerCompletedByUntilEvent(emptyList())
+
+            // Then
+            count shouldBe 0
+            val updated = repository.findById(listener.id)
+            updated!!.completedAt shouldBe null
+        }
+
+        @Test
+        fun `should return 0 when keys have wrong strategy`() = runTest {
+            // Given: An ANY_UNTIL_EVENT listener
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EVENT)
+            repository.insert(listener)
+
+            // When: Keys have ALL strategy (not ANY_UNTIL_EVENT)
+            val queryKey = createQueryKey(listener, ListenerStrategy.ALL)
+            val count = repository.markListenerCompletedByUntilEvent(listOf(queryKey))
+
+            // Then: Should filter out non-ANY_UNTIL_EVENT keys
+            count shouldBe 0
+            val updated = repository.findById(listener.id)
+            updated!!.completedAt shouldBe null
+        }
+
+        @Test
+        fun `should not mark listener with wrong strategy`() = runTest {
+            // Given: Listeners with different strategies
+            val oneListener = createListener(ListenerStrategy.ONE)
+            val anyListener = createListener(ListenerStrategy.ANY)
+            val allListener = createListener(ListenerStrategy.ALL)
+            repository.insert(oneListener)
+            repository.insert(anyListener)
+            repository.insert(allListener)
+
+            // When: Send keys with ANY_UNTIL_EVENT strategy
+            val queryKeys = listOf(
+                createQueryKey(oneListener, ListenerStrategy.ANY_UNTIL_EVENT),
+                createQueryKey(anyListener, ListenerStrategy.ANY_UNTIL_EVENT),
+                createQueryKey(allListener, ListenerStrategy.ANY_UNTIL_EVENT)
+            )
+            val count = repository.markListenerCompletedByUntilEvent(queryKeys)
+
+            // Then: No listeners should be marked (strategy mismatch)
+            count shouldBe 0
+        }
+
+        @Test
+        fun `should skip already completed listeners`() = runTest {
+            // Given: An already completed ANY_UNTIL_EVENT listener
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EVENT).apply {
+                completedAt = Clock.System.now()
+            }
+            repository.insert(listener)
+            val queryKey = createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EVENT)
+
+            // When
+            val count = repository.markListenerCompletedByUntilEvent(listOf(queryKey))
+
+            // Then
+            count shouldBe 0
+        }
+
+        @Test
+        fun `should mark multiple matching listeners`() = runTest {
+            // Given: Multiple ANY_UNTIL_EVENT listeners
+            val listener1 = createListener(ListenerStrategy.ANY_UNTIL_EVENT)
+            val listener2 = createListener(ListenerStrategy.ANY_UNTIL_EVENT)
+            repository.insert(listener1)
+            repository.insert(listener2)
+
+            val queryKeys = listOf(
+                createQueryKey(listener1, ListenerStrategy.ANY_UNTIL_EVENT),
+                createQueryKey(listener2, ListenerStrategy.ANY_UNTIL_EVENT)
+            )
+
+            // When
+            val count = repository.markListenerCompletedByUntilEvent(queryKeys)
+
+            // Then
+            count shouldBe 2
+            repository.findById(listener1.id)!!.completedAt shouldNotBe null
+            repository.findById(listener2.id)!!.completedAt shouldNotBe null
+        }
+
+        @Test
+        fun `should filter keys and only process ANY_UNTIL_EVENT keys`() = runTest {
+            // Given: An ANY_UNTIL_EVENT listener
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EVENT)
+            repository.insert(listener)
+
+            // When: Keys include mixed strategies (only ANY_UNTIL_EVENT should be processed)
+            val queryKeys = listOf(
+                createQueryKey(listener, ListenerStrategy.ALL),  // Should be filtered out
+                createQueryKey(listener, ListenerStrategy.ONE),  // Should be filtered out
+                createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EVENT)  // Should match
+            )
+            val count = repository.markListenerCompletedByUntilEvent(queryKeys)
+
+            // Then
+            count shouldBe 1
+            repository.findById(listener.id)!!.completedAt shouldNotBe null
+        }
+
+        @Test
+        fun `should return 0 when no matching listener exists`() = runTest {
+            // Given: No listeners exist
+            val fakeListener = createListener(ListenerStrategy.ANY_UNTIL_EVENT)
+            val queryKey = createQueryKey(fakeListener, ListenerStrategy.ANY_UNTIL_EVENT)
+
+            // When
+            val count = repository.markListenerCompletedByUntilEvent(listOf(queryKey))
+
+            // Then
+            count shouldBe 0
+        }
+    }
 }

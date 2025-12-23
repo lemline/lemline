@@ -8,6 +8,7 @@ import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CREATED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.CrudRepository
+import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_ATTEMPT_COUNT_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_COMPLETED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_DELAYED_UNTIL_COLUMN
@@ -21,6 +22,9 @@ import com.lemline.runner.common.repositories.ops.outboxColumns
 import com.lemline.runner.common.repositories.ops.readCleanupField
 import com.lemline.runner.common.repositories.ops.readOutboxFields
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
+import com.lemline.runner.listeners.ListenerRepository.Companion.COMPLETED_AT_COLUMN
+import com.lemline.runner.listeners.ListenerRepository.Companion.FILTERS_COUNT_COLUMN
+import com.lemline.runner.listeners.ListenerRepository.Companion.HAS_FOREACH_COLUMN
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
@@ -153,12 +157,16 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         eventJson: String,
         connection: Connection? = null
     ): Int {
-        if (keys.isEmpty()) return 0
+        // Filter keys to only include ONE or ANY strategy - skip query if none
+        val oneAnyKeys = keys.filter {
+            it.listenerStrategy == ListenerStrategy.ONE || it.listenerStrategy == ListenerStrategy.ANY
+        }
+        if (oneAnyKeys.isEmpty()) return 0
 
-        return databaseConfig.withConnection(connection) { conn ->
-            // Single INSERT...SELECT statement
-            // Note: outbox_delayed_until is not set (defaults to NULL) - markReadyForForeach will set it
-            // Note: created_at uses database default (CURRENT_TIMESTAMP)
+        return databaseConfig.withTransaction(connection) { conn ->
+            // Insert event, but only the first one per listener due to UNIQUE(listener_id, filter_index)
+            // If has_foreach: foreach_completed = false, foreach_output = null, outbox_delayed_until is not set (defaults to NULL) - markReadyForForeach will set it
+            // Else: foreach_completed = true, foreach_output = event
             val columns = """
                 $LISTENER_ID_COLUMN, $EVENT_ID_COLUMN, $FILTER_INDEX_COLUMN, $EVENT_COLUMN,
                 $FOREACH_COMPLETED_COLUMN, $FOREACH_OUTPUT_COLUMN, $OUTBOX_SCHEDULED_FOR_COLUMN
@@ -166,30 +174,73 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
             val selectSql = """
                 SELECT
-                    l.id,                                               /* listener_id */
-                    ?,                                                  /* event_id */
-                    0,                                                  /* filter_index = 0 for ONE/ANY */
-                    ?,                                                  /* event */
-                    NOT l.has_foreach,                                  /* foreach_completed = TRUE if no foreach */
-                    CASE WHEN NOT l.has_foreach THEN ? END,             /* foreach_output = event if not has foreach */
-                    CASE WHEN l.has_foreach THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = now if has foreach */
+                    l.$ID_COLUMN,                                               /* listener_id */
+                    ?,                                                          /* event_id */
+                    0,                                                          /* filter_index = 0 for ONE/ANY */
+                    ?,                                                          /* event */
+                    NOT l.$HAS_FOREACH_COLUMN,                                  /* foreach_completed = TRUE if no foreach */
+                    CASE WHEN NOT l.$HAS_FOREACH_COLUMN THEN ? END,             /* foreach_output = event if not has foreach */
+                    CASE WHEN l.$HAS_FOREACH_COLUMN THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = now if has foreach */
                 FROM $LISTENER_TABLE l
-                WHERE l.outbox_completed_at IS NULL
-                  AND l.outbox_failed_at IS NULL
-                  AND l.ready_at IS NULL
-                  AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
+                WHERE l.$COMPLETED_AT_COLUMN IS NULL
+                  AND (${ListenerQueryKey.buildWhereClause(oneAnyKeys, "l")})
             """.trimIndent()
 
             val insertSelectSql = databaseConfig.insertIgnoreSelect(tableName, columns, selectSql)
 
-            conn.prepareStatement(insertSelectSql).use { stmt ->
+            val insertedCount = conn.prepareStatement(insertSelectSql).use { stmt ->
                 var paramIdx = 1
                 stmt.setString(paramIdx++, eventId)
                 stmt.setString(paramIdx++, eventJson)
                 stmt.setString(paramIdx++, eventJson) // foreach_output = event for non-foreach
-                ListenerQueryKey.bindAllParameters(keys, stmt, paramIdx)
+                ListenerQueryKey.bindAllParameters(oneAnyKeys, stmt, paramIdx)
                 stmt.executeUpdate()
             }
+
+            // Mark listeners as completed (first event received = stop collecting)
+            // For ONE/ANY, receiving any event completes the listener
+            if (insertedCount > 0) {
+                markOneAnyListenersCompleted(eventId, oneAnyKeys, conn)
+            }
+
+            insertedCount
+        }
+    }
+
+    /**
+     * Marks ONE/ANY listeners as completed when they have received an event.
+     * Uses the eventId to precisely target only listeners that received this specific event.
+     * Called immediately after inserting events in batchInsertForOneAny.
+     *
+     * Note: Strategy filtering is done in the INSERT (only ONE/ANY listeners get events),
+     * so the eventId check is sufficient to target the right listeners.
+     */
+    private fun markOneAnyListenersCompleted(
+        eventId: String,
+        keys: List<ListenerQueryKey>,
+        conn: Connection
+    ): Int {
+        val now = nowTimestamp()
+
+        val updateSql = """
+            UPDATE $LISTENER_TABLE l
+            SET $COMPLETED_AT_COLUMN = ?,
+                $UPDATED_AT_COLUMN = ?
+            WHERE l.$COMPLETED_AT_COLUMN IS NULL
+              AND EXISTS (
+                  SELECT 1 FROM $tableName e
+                  WHERE e.$LISTENER_ID_COLUMN = l.$ID_COLUMN
+                    AND e.$EVENT_ID_COLUMN = ?
+              )
+              AND (${ListenerQueryKey.buildWhereClause(keys, "l")})
+        """.trimIndent()
+
+        return conn.prepareStatement(updateSql).use { stmt ->
+            stmt.setTimestamp(1, now)
+            stmt.setTimestamp(2, now)
+            stmt.setString(3, eventId)
+            ListenerQueryKey.bindAllParameters(keys, stmt, 4)
+            stmt.executeUpdate()
         }
     }
 
@@ -212,35 +263,40 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
      * @param eventJson Serialized CloudEvent data
      * @return Number of events inserted
      */
-    suspend fun batchInsertForAccumulating(
+    suspend fun batchInsertForAllAnyUntil(
         keys: List<ListenerQueryKey>,
         eventId: String,
         eventJson: String,
         connection: Connection? = null
     ): Int {
-        if (keys.isEmpty()) return 0
+        // Filter keys to only include accumulating strategies - skip query if none
+        val accumulatingStrategies = setOf(
+            ListenerStrategy.ALL,
+            ListenerStrategy.ANY_UNTIL_EXPR,
+            ListenerStrategy.ANY_UNTIL_EVENT
+        )
+        val accumulatingKeys = keys.filter { it.listenerStrategy in accumulatingStrategies }
+        if (accumulatingKeys.isEmpty()) return 0
 
-        return databaseConfig.withConnection(connection) { conn ->
+        return databaseConfig.withTransaction(connection) { conn ->
             // Group by filterIndex for ALL strategy
-            val byFilterIndex = keys.groupBy { it.filterIndex }
+            val byFilterIndex = accumulatingKeys.groupBy { it.filterIndex }
 
             // Build UNION ALL of all filterIndex queries
             // Include has_foreach for completion logic
             val unionParts = byFilterIndex.map { (filterIndex, queryKeys) ->
                 """
                 SELECT
-                    l.id as listener_id,
-                    ${filterIndex ?: 0} as filter_index,
-                    l.has_foreach
+                    l.$ID_COLUMN as $LISTENER_ID_COLUMN,
+                    ${filterIndex ?: 0} as $FILTER_INDEX_COLUMN,
+                    l.$HAS_FOREACH_COLUMN
                 FROM $LISTENER_TABLE l
-                WHERE l.outbox_completed_at IS NULL
-                  AND l.outbox_failed_at IS NULL
-                  AND l.ready_at IS NULL
+                WHERE l.$COMPLETED_AT_COLUMN IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(queryKeys, "l")})
                 """.trimIndent()
             }
 
-            val unionSql = unionParts.joinToString("\n                UNION ALL\n                ")
+            val unionSql = unionParts.joinToString("\nUNION ALL\n")
 
             // Single INSERT...SELECT
             // Note: outbox_delayed_until is not set (defaults to NULL) - markReadyForForeach will set it
@@ -252,13 +308,13 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
             val selectSql = """
                 SELECT
-                    m.listener_id,                                      /* listener_id */
-                    ?,                                                  /* event_id */
-                    m.filter_index,                                     /* filter_index */
-                    ?,                                                  /* event */
-                    NOT m.has_foreach,                                  /* foreach_completed = TRUE if no foreach */
-                    CASE WHEN NOT m.has_foreach THEN ? END,             /* foreach_output = event for non-foreach */
-                    CASE WHEN m.has_foreach THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = NULL if not foreach */
+                    m.$LISTENER_ID_COLUMN,                                      /* listener_id */
+                    ?,                                                          /* event_id */
+                    m.$FILTER_INDEX_COLUMN,                                     /* filter_index */
+                    ?,                                                          /* event */
+                    NOT m.$HAS_FOREACH_COLUMN,                                  /* foreach_completed = TRUE if no foreach */
+                    CASE WHEN NOT m.$HAS_FOREACH_COLUMN THEN ? END,             /* foreach_output = event for non-foreach */
+                    CASE WHEN m.$HAS_FOREACH_COLUMN THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = NULL if not foreach */
                 FROM (
                     $unionSql
                 ) m
@@ -266,7 +322,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
             val insertSelectSql = databaseConfig.insertIgnoreSelect(tableName, columns, selectSql)
 
-            conn.prepareStatement(insertSelectSql).use { stmt ->
+            val insertedCount = conn.prepareStatement(insertSelectSql).use { stmt ->
                 var paramIdx = 1
                 stmt.setString(paramIdx++, eventId)
                 stmt.setString(paramIdx++, eventJson)
@@ -279,6 +335,60 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
                 stmt.executeUpdate()
             }
+
+            // Mark ALL strategy listeners as completed when all filters have events
+            if (insertedCount > 0) {
+                markAllListenersCompleted(eventId, keys, conn)
+            }
+
+            insertedCount
+        }
+    }
+
+    /**
+     * Marks ALL strategy listeners as completed when all filters have at least one event.
+     * Uses the eventId to precisely target only listeners that received this specific event.
+     * Called immediately after inserting events in batchInsertForAccumulating.
+     *
+     * Note: Only targets ALL strategy. ANY_UNTIL_* strategies have separate completion logic
+     * (batchMarkReadyByUntilEvent for ANY_UNTIL_EVENT, markListenerCompleted for ANY_UNTIL_EXPR).
+     */
+    private fun markAllListenersCompleted(
+        eventId: String,
+        keys: List<ListenerQueryKey>,
+        conn: Connection
+    ): Int {
+        // Filter keys to only include ALL strategy - skip query if none
+        val allStrategyKeys = keys.filter { it.listenerStrategy == ListenerStrategy.ALL }
+        if (allStrategyKeys.isEmpty()) return 0
+
+        val now = nowTimestamp()
+
+        val updateSql = """
+            UPDATE $LISTENER_TABLE l
+            SET $COMPLETED_AT_COLUMN = ?,
+                $UPDATED_AT_COLUMN = ?
+            WHERE l.$COMPLETED_AT_COLUMN IS NULL
+              AND l.$FILTERS_COUNT_COLUMN IS NOT NULL
+              AND EXISTS (
+                  SELECT 1 FROM $tableName e
+                  WHERE e.$LISTENER_ID_COLUMN = l.$ID_COLUMN
+                    AND e.$EVENT_ID_COLUMN = ?
+              )
+              AND (
+                  SELECT COUNT(DISTINCT e.$FILTER_INDEX_COLUMN)
+                  FROM $tableName e
+                  WHERE e.$LISTENER_ID_COLUMN = l.$ID_COLUMN
+              ) >= l.$FILTERS_COUNT_COLUMN
+              AND (${ListenerQueryKey.buildWhereClause(allStrategyKeys, "l")})
+        """.trimIndent()
+
+        return conn.prepareStatement(updateSql).use { stmt ->
+            stmt.setTimestamp(1, now)
+            stmt.setTimestamp(2, now)
+            stmt.setString(3, eventId)
+            ListenerQueryKey.bindAllParameters(allStrategyKeys, stmt, 4)
+            stmt.executeUpdate()
         }
     }
 
@@ -464,23 +574,23 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
     private fun markReadyForForeachPostgresql(limit: Int): String = """
         WITH locked_listeners AS (
-            SELECT l.id AS listener_id
+            SELECT l.$ID_COLUMN AS listener_id
             FROM $LISTENER_TABLE l
             WHERE EXISTS (
                 SELECT 1
                 FROM $tableName p
-                WHERE p.$LISTENER_ID_COLUMN = l.id
+                WHERE p.$LISTENER_ID_COLUMN = l.$ID_COLUMN
                   AND p.$FOREACH_COMPLETED_COLUMN = FALSE
                   AND p.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
             )
             AND NOT EXISTS (
                 SELECT 1
                 FROM $tableName b
-                WHERE b.$LISTENER_ID_COLUMN = l.id
+                WHERE b.$LISTENER_ID_COLUMN = l.$ID_COLUMN
                   AND b.$FOREACH_COMPLETED_COLUMN = FALSE
                   AND b.$OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
             )
-            ORDER BY l.id
+            ORDER BY l.$ID_COLUMN
             FOR UPDATE SKIP LOCKED
             LIMIT $limit
         ),
@@ -510,23 +620,23 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 FROM $tableName e
                 JOIN (
                     -- lock listeners (listener-level SKIP LOCKED)
-                    SELECT l.id AS listener_id
+                    SELECT l.$ID_COLUMN AS listener_id
                     FROM $LISTENER_TABLE l
                     WHERE EXISTS (
                         SELECT 1
                         FROM $tableName p
-                        WHERE p.$LISTENER_ID_COLUMN = l.id
+                        WHERE p.$LISTENER_ID_COLUMN = l.$ID_COLUMN
                           AND p.$FOREACH_COMPLETED_COLUMN = FALSE
                           AND p.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
                     )
                     AND NOT EXISTS (
                         SELECT 1
                         FROM $tableName b
-                        WHERE b.$LISTENER_ID_COLUMN = l.id
+                        WHERE b.$LISTENER_ID_COLUMN = l.$ID_COLUMN
                           AND b.$FOREACH_COMPLETED_COLUMN = FALSE
                           AND b.$OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
                     )
-                    ORDER BY l.id
+                    ORDER BY l.$ID_COLUMN
                     LIMIT $limit
                     FOR UPDATE SKIP LOCKED
                 ) ll ON ll.listener_id = e.$LISTENER_ID_COLUMN
@@ -558,23 +668,23 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             FROM $tableName e
             JOIN (
                 -- Find listeners with pending events but no event being processed
-                SELECT l.id AS listener_id
+                SELECT l.$ID_COLUMN AS listener_id
                 FROM $LISTENER_TABLE l
                 WHERE EXISTS (
                     SELECT 1
                     FROM $tableName p
-                    WHERE p.$LISTENER_ID_COLUMN = l.id
+                    WHERE p.$LISTENER_ID_COLUMN = l.$ID_COLUMN
                       AND p.$FOREACH_COMPLETED_COLUMN = FALSE
                       AND p.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
                 )
                 AND NOT EXISTS (
                     SELECT 1
                     FROM $tableName b
-                    WHERE b.$LISTENER_ID_COLUMN = l.id
+                    WHERE b.$LISTENER_ID_COLUMN = l.$ID_COLUMN
                       AND b.$FOREACH_COMPLETED_COLUMN = FALSE
                       AND b.$OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
                 )
-                ORDER BY l.id
+                ORDER BY l.$ID_COLUMN
                 LIMIT $limit
             ) ll ON ll.listener_id = e.$LISTENER_ID_COLUMN
             JOIN (
