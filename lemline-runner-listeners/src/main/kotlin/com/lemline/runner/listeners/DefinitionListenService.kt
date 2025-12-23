@@ -10,9 +10,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.expressions.JQExpression
-import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.workflows.CachedListenTask
-import com.lemline.core.workflows.CachedUntilCondition
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.EventFilter
@@ -46,11 +44,10 @@ data class MatchingListenTask(
     // Delegated properties from CachedListenTask for convenience
     val workflowInfo: WorkflowInfo get() = listenTask.workflowInfo
     val nodePosition: NodePosition get() = listenTask.nodePosition
-    val strategy: ListenStrategy get() = listenTask.strategy
-    val until: CachedUntilCondition? get() = listenTask.until
 
     /** Database-compatible strategy derived from core strategy + until condition. */
-    val listenerStrategy: ListenerStrategy get() = ListenerStrategy.from(strategy, until)
+    val listenerStrategy: ListenerStrategy
+        get() = ListenerStrategy.from(listenTask.strategy, listenTask.until)
 
     /** Converts this definition match to a query key for listener lookup. */
     fun toQueryKey() = ListenerQueryKey(

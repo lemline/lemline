@@ -825,7 +825,7 @@ class DefinitionListenServiceTest {
 
             // Then
             matches shouldHaveSize 1
-            matches[0].strategy.name shouldBe "ANY"
+            matches[0].listenerStrategy shouldBe ListenerStrategy.ANY
         }
 
         @Test
@@ -957,9 +957,9 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event")
             val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
 
-            // Then: Should match the event filter
+            // Then: Should match the event filter with ANY_UNTIL_EVENT strategy
             matches shouldHaveSize 1
-            matches[0].until shouldNotBe null
+            matches[0].listenerStrategy shouldBe ListenerStrategy.ANY_UNTIL_EVENT
         }
     }
 }

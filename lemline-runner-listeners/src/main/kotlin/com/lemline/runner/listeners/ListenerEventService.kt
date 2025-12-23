@@ -5,7 +5,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.core.expressions.JQExpression
-import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.workflows.CachedUntilCondition
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
@@ -102,7 +101,7 @@ class ListenerEventService {
         // - Sets outbox_delayed_until = NOW for foreach listeners
         // ─────────────────────────────────────────────────────────────────────────────
         val oneAnyTasks = matchingListenTasks.filter {
-            it.strategy == ListenStrategy.ONE || (it.strategy == ListenStrategy.ANY && it.until == null)
+            it.listenerStrategy == ListenerStrategy.ONE || it.listenerStrategy == ListenerStrategy.ANY
         }
         if (oneAnyTasks.isNotEmpty()) {
             affectedCount += insertForOneAny(oneAnyTasks, event)
@@ -115,8 +114,11 @@ class ListenerEventService {
         // - Triggers first event for foreach listeners
         // ─────────────────────────────────────────────────────────────────────────────
         val accumulatingTasks = matchingListenTasks.filter {
-            it.strategy == ListenStrategy.ALL ||
-                (it.strategy == ListenStrategy.ANY && it.until != null)
+            it.listenerStrategy in listOf(
+                ListenerStrategy.ALL,
+                ListenerStrategy.ANY_UNTIL_EXPR,
+                ListenerStrategy.ANY_UNTIL_EVENT
+            )
         }
         if (accumulatingTasks.isNotEmpty()) {
             affectedCount += insertForAllAnyUntil(accumulatingTasks, event)
@@ -136,7 +138,7 @@ class ListenerEventService {
         // ─────────────────────────────────────────────────────────────────────────────
         // Until expressions: Evaluate and mark ready if expression is true
         // ─────────────────────────────────────────────────────────────────────────────
-        val exprTasks = accumulatingTasks.filter { it.until is CachedUntilCondition.Expression }
+        val exprTasks = accumulatingTasks.filter { it.listenerStrategy == ListenerStrategy.ANY_UNTIL_EXPR }
         if (exprTasks.isNotEmpty()) {
             affectedCount += processUntilExpressions(exprTasks)
         }
@@ -254,7 +256,8 @@ class ListenerEventService {
     ): Int {
         // Build map of (workflowInfo, position) -> until expression for matching
         val untilExpressions = listenTasks.associate { def ->
-            Pair(def.workflowInfo, def.nodePosition) to (def.until as CachedUntilCondition.Expression).expression
+            val expr = (def.listenTask.until as CachedUntilCondition.Expression).expression
+            Pair(def.workflowInfo, def.nodePosition) to expr
         }
 
         // Get listeners with accumulated events that have until expressions
