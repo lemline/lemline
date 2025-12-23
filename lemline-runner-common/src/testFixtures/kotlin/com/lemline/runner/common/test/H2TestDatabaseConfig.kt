@@ -2,7 +2,7 @@
 package com.lemline.runner.common.test
 
 import com.lemline.runner.common.config.DatabaseConfig
-import com.lemline.runner.common.config.DatabaseConstants
+import com.lemline.runner.common.config.DatabaseType
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import java.sql.Connection
@@ -48,7 +48,7 @@ class H2TestDatabaseConfig(
     databaseName: String = UUID.randomUUID().toString().replace("-", "")
 ) : DatabaseConfig, AutoCloseable {
 
-    override val dbType: String = DatabaseConstants.DB_TYPE_IN_MEMORY
+    override val dbType: DatabaseType = DatabaseType.H2
 
     private val dataSource: HikariDataSource by lazy {
         val config = HikariConfig().apply {

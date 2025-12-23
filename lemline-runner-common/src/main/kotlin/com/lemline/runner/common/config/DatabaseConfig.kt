@@ -14,9 +14,9 @@ import java.sql.Connection
  */
 interface DatabaseConfig {
     /**
-     * The database type identifier (e.g., "postgresql", "mysql", "in-memory").
+     * The database type for this configuration.
      */
-    val dbType: String
+    val dbType: DatabaseType
 
     /**
      * Executes a block of code with a database connection.
@@ -63,26 +63,62 @@ interface DatabaseConfig {
      * @return SQL fragment for JSON array aggregation
      */
     fun jsonArrayAgg(column: String): String = when (dbType) {
-        DatabaseConstants.DB_TYPE_POSTGRESQL -> "json_agg($column::json)"
-        DatabaseConstants.DB_TYPE_MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON))"
-        else -> "JSON_ARRAYAGG($column FORMAT JSON)"
+        DatabaseType.POSTGRESQL -> "json_agg($column::json)"
+        DatabaseType.MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON))"
+        DatabaseType.H2 -> "JSON_ARRAYAGG($column FORMAT JSON)"
     }
 
     /**
      * Returns the database-specific JSON array aggregation function with ordering.
      *
      * - PostgreSQL: json_agg(column::json ORDER BY orderColumn)
-     * - MySQL: JSON_ARRAYAGG(CAST(column AS JSON) ORDER BY orderColumn)
+     * - MySQL: Uses GROUP_CONCAT with ORDER BY, wrapped in JSON_ARRAY parsing
+     *          Note: MySQL's JSON_ARRAYAGG doesn't support ORDER BY inside the function
      * - H2: JSON_ARRAYAGG(column FORMAT JSON ORDER BY orderColumn)
+     *
+     * IMPORTANT: For MySQL, the result needs special parsing as it returns a comma-separated
+     * string that must be wrapped in JSON array format.
      *
      * @param column The column expression containing JSON strings to aggregate
      * @param orderColumn The column to order by
      * @return SQL fragment for ordered JSON array aggregation
      */
     fun jsonArrayAggOrdered(column: String, orderColumn: String): String = when (dbType) {
-        DatabaseConstants.DB_TYPE_POSTGRESQL -> "json_agg($column::json ORDER BY $orderColumn)"
-        DatabaseConstants.DB_TYPE_MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON) ORDER BY $orderColumn)"
-        else -> "JSON_ARRAYAGG($column FORMAT JSON ORDER BY $orderColumn)"
+        DatabaseType.POSTGRESQL -> "json_agg($column::json ORDER BY $orderColumn)"
+        // MySQL: JSON_ARRAYAGG doesn't support ORDER BY, use subquery instead
+        DatabaseType.MYSQL -> "JSON_ARRAYAGG(sub.v)"
+        DatabaseType.H2 -> "JSON_ARRAYAGG($column FORMAT JSON ORDER BY $orderColumn)"
+    }
+
+    /**
+     * Generates a MySQL-compatible subquery for ordered JSON aggregation.
+     * This is needed because MySQL's JSON_ARRAYAGG doesn't support ORDER BY.
+     *
+     * For MySQL, wrap the JSON_ARRAYAGG like:
+     * ```sql
+     * (SELECT JSON_ARRAYAGG(sub.v) FROM (SELECT col AS v FROM table e WHERE ... ORDER BY order_col) sub)
+     * ```
+     *
+     * @param table The table to select from
+     * @param tableAlias The alias for the table (used in column references)
+     * @param column The column to aggregate (should use the tableAlias, e.g., "e.event")
+     * @param orderColumn The column to order by (should use the tableAlias, e.g., "e.created_at")
+     * @param whereClause The WHERE clause (without WHERE keyword, should use tableAlias)
+     * @return Full subquery SQL for MySQL, or just the aggregation for other databases
+     */
+    fun jsonArrayAggOrderedSubquery(
+        table: String,
+        tableAlias: String,
+        column: String,
+        orderColumn: String,
+        whereClause: String
+    ): String = when (dbType) {
+        DatabaseType.POSTGRESQL ->
+            "(SELECT json_agg($column::json ORDER BY $orderColumn) FROM $table $tableAlias WHERE $whereClause)"
+        DatabaseType.MYSQL ->
+            "(SELECT JSON_ARRAYAGG(sub.v) FROM (SELECT $column AS v FROM $table $tableAlias WHERE $whereClause ORDER BY $orderColumn) sub)"
+        DatabaseType.H2 ->
+            "(SELECT JSON_ARRAYAGG($column FORMAT JSON ORDER BY $orderColumn) FROM $table $tableAlias WHERE $whereClause)"
     }
 
     /**
@@ -97,8 +133,8 @@ interface DatabaseConfig {
      * @return Full INSERT...SELECT SQL with conflict handling
      */
     fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
-        DatabaseConstants.DB_TYPE_MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
-        else -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
+        DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
+        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
     }
 
     /**
@@ -113,7 +149,7 @@ interface DatabaseConfig {
      * @return Full INSERT...VALUES SQL with conflict handling
      */
     fun insertIgnoreInto(tableName: String, columns: String, values: String): String = when (dbType) {
-        DatabaseConstants.DB_TYPE_MYSQL -> "INSERT IGNORE INTO $tableName ($columns) VALUES ($values)"
-        else -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
+        DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) VALUES ($values)"
+        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
     }
 }

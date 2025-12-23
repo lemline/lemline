@@ -5,6 +5,7 @@ import com.lemline.common.debug
 import com.lemline.common.logger
 import com.lemline.common.trace
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.config.MigrationManager
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
@@ -27,9 +28,16 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
     private val log = logger()
 
     @ConfigProperty(name = DATABASE_TYPE)
-    private lateinit var _dbType: String
+    private lateinit var _dbTypeConfig: String
 
-    override val dbType: String get() = _dbType
+    override val dbType: DatabaseType by lazy {
+        when (_dbTypeConfig) {
+            DB_TYPE_POSTGRESQL -> DatabaseType.POSTGRESQL
+            DB_TYPE_MYSQL -> DatabaseType.MYSQL
+            DB_TYPE_IN_MEMORY -> DatabaseType.H2
+            else -> throw IllegalStateException("Unknown database type '$_dbTypeConfig'")
+        }
+    }
 
     @Inject
     @IfBuildProfile("test")
@@ -50,22 +58,20 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
         log.trace { "-    Default datasource resolvable: ${h2DataSource.isResolvable}" }
 
         when (dbType) {
-            DB_TYPE_POSTGRESQL -> {
+            DatabaseType.POSTGRESQL -> {
                 if (postgresDataSource.isResolvable) postgresDataSource.get()
                 else throw IllegalStateException("PostgreSQL datasource is not available.")
             }
 
-            DB_TYPE_MYSQL -> {
+            DatabaseType.MYSQL -> {
                 if (mysqlDataSource.isResolvable) mysqlDataSource.get()
                 else throw IllegalStateException("MySQL datasource is not available")
             }
 
-            DB_TYPE_IN_MEMORY -> {
+            DatabaseType.H2 -> {
                 if (h2DataSource.isResolvable) h2DataSource.get()
                 else throw IllegalStateException("H2 datasource is not available")
             }
-
-            else -> throw IllegalStateException("Unknown database type '$dbType'")
         }
     }
 
@@ -88,22 +94,20 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
         log.debug { "-         H2 flyway resolvable: ${h2Flyway.isResolvable}" }
 
         when (dbType) {
-            DB_TYPE_POSTGRESQL -> {
+            DatabaseType.POSTGRESQL -> {
                 if (postgresqlFlyway.isResolvable) postgresqlFlyway.get()
                 else throw IllegalStateException("PostgreSQL flyway is not available.")
             }
 
-            DB_TYPE_MYSQL -> {
+            DatabaseType.MYSQL -> {
                 if (mysqlFlyway.isResolvable) mysqlFlyway.get()
                 else throw IllegalStateException("MySQL flyway is not available")
             }
 
-            DB_TYPE_IN_MEMORY -> {
+            DatabaseType.H2 -> {
                 if (h2Flyway.isResolvable) h2Flyway.get()
                 else throw IllegalStateException("H2 flyway is not available")
             }
-
-            else -> throw IllegalStateException("Unknown database type '$dbType'")
         }
     }
 
@@ -151,9 +155,9 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
      * @return SQL fragment for JSON array aggregation
      */
     override fun jsonArrayAgg(column: String): String = when (dbType) {
-        DB_TYPE_POSTGRESQL -> "json_agg($column::json)"
-        DB_TYPE_MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON))"
-        else -> "JSON_ARRAYAGG($column FORMAT JSON)"
+        DatabaseType.POSTGRESQL -> "json_agg($column::json)"
+        DatabaseType.MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON))"
+        DatabaseType.H2 -> "JSON_ARRAYAGG($column FORMAT JSON)"
     }
 
     /**
@@ -168,9 +172,9 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
      * @return SQL fragment for ordered JSON array aggregation
      */
     override fun jsonArrayAggOrdered(column: String, orderColumn: String): String = when (dbType) {
-        DB_TYPE_POSTGRESQL -> "json_agg($column::json ORDER BY $orderColumn)"
-        DB_TYPE_MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON) ORDER BY $orderColumn)"
-        else -> "JSON_ARRAYAGG($column FORMAT JSON ORDER BY $orderColumn)"
+        DatabaseType.POSTGRESQL -> "json_agg($column::json ORDER BY $orderColumn)"
+        DatabaseType.MYSQL -> "JSON_ARRAYAGG(CAST($column AS JSON) ORDER BY $orderColumn)"
+        DatabaseType.H2 -> "JSON_ARRAYAGG($column FORMAT JSON ORDER BY $orderColumn)"
     }
 
     /**
@@ -183,9 +187,9 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
      * @return SQL fragment for generating a random UUID
      */
     fun randomUuid(): String = when (dbType) {
-        DB_TYPE_POSTGRESQL -> "gen_random_uuid()"
-        DB_TYPE_MYSQL -> "UUID_TO_BIN(UUID())"
-        else -> "RANDOM_UUID()"
+        DatabaseType.POSTGRESQL -> "gen_random_uuid()"
+        DatabaseType.MYSQL -> "UUID_TO_BIN(UUID())"
+        DatabaseType.H2 -> "RANDOM_UUID()"
     }
 
     /**
@@ -200,8 +204,8 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
      * @return Full INSERT...SELECT SQL with conflict handling
      */
     override fun insertIgnoreSelect(tableName: String, columns: String, selectSql: String): String = when (dbType) {
-        DB_TYPE_MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
-        else -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
+        DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) $selectSql"
+        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) $selectSql ON CONFLICT DO NOTHING"
     }
 
     /**
@@ -216,8 +220,8 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
      * @return Full INSERT...VALUES SQL with conflict handling
      */
     override fun insertIgnoreInto(tableName: String, columns: String, values: String): String = when (dbType) {
-        DB_TYPE_MYSQL -> "INSERT IGNORE INTO $tableName ($columns) VALUES ($values)"
-        else -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
+        DatabaseType.MYSQL -> "INSERT IGNORE INTO $tableName ($columns) VALUES ($values)"
+        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "INSERT INTO $tableName ($columns) VALUES ($values) ON CONFLICT DO NOTHING"
     }
 
     /**
@@ -227,8 +231,8 @@ class DatabaseManager : DatabaseConfig, MigrationManager {
      * @return Database-specific NULL::timestamp expression
      */
     fun nullTimestamp(): String = when (dbType) {
-        DB_TYPE_POSTGRESQL -> "NULL::TIMESTAMPTZ"
-        else -> "NULL"
+        DatabaseType.POSTGRESQL -> "NULL::TIMESTAMPTZ"
+        DatabaseType.MYSQL, DatabaseType.H2 -> "NULL"
     }
 
     /**

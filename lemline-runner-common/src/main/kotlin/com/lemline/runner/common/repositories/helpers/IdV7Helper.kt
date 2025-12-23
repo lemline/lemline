@@ -2,9 +2,7 @@
 package com.lemline.runner.common.repositories.helpers
 
 import com.lemline.common.values.IDV7
-import com.lemline.runner.common.config.DatabaseConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.common.config.DatabaseConstants.DB_TYPE_MYSQL
-import com.lemline.runner.common.config.DatabaseConstants.DB_TYPE_POSTGRESQL
+import com.lemline.runner.common.config.DatabaseType
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 import java.sql.Types
@@ -16,30 +14,28 @@ import java.util.*
  * handling the different storage formats across databases (native UUID for PostgreSQL/H2,
  * binary for MySQL).
  *
- * @param dbType The database type identifier
+ * @param dbType The database type
  */
-class IdV7Helper(private val dbType: String) {
+class IdV7Helper(private val dbType: DatabaseType) {
 
     /**
      * Sets an IDV7 value in a PreparedStatement at the given index.
      * Handles database-specific UUID encoding.
      */
     val set: (PreparedStatement, Int, IDV7?) -> Unit = when (dbType) {
-        DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> { stmt, parameterIndex, id ->
+        DatabaseType.H2, DatabaseType.POSTGRESQL -> { stmt, parameterIndex, id ->
             when (id) {
                 null -> stmt.setNull(parameterIndex, Types.OTHER)
                 else -> stmt.setObject(parameterIndex, id.value)
             }
         }
 
-        DB_TYPE_MYSQL -> { stmt, parameterIndex, id ->
+        DatabaseType.MYSQL -> { stmt, parameterIndex, id ->
             when (id) {
                 null -> stmt.setNull(parameterIndex, Types.BINARY)
                 else -> stmt.setBytes(parameterIndex, id.toBytes())
             }
         }
-
-        else -> error("Unsupported database type '$dbType'")
     }
 
     /**
@@ -47,14 +43,12 @@ class IdV7Helper(private val dbType: String) {
      * Handles database-specific UUID decoding.
      */
     val get: (ResultSet, String) -> IDV7? = when (dbType) {
-        DB_TYPE_IN_MEMORY, DB_TYPE_POSTGRESQL -> { rs, columnName ->
+        DatabaseType.H2, DatabaseType.POSTGRESQL -> { rs, columnName ->
             rs.getObject(columnName, UUID::class.java)?.let { IDV7(it) }
         }
 
-        DB_TYPE_MYSQL -> { rs, columnName ->
+        DatabaseType.MYSQL -> { rs, columnName ->
             rs.getBytes(columnName)?.let { IDV7.from(it) }
         }
-
-        else -> error("Unsupported database type '$dbType'")
     }
 }

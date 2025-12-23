@@ -2,7 +2,7 @@
 package com.lemline.runner.common.test
 
 import com.lemline.runner.common.config.DatabaseConfig
-import com.lemline.runner.common.config.DatabaseConstants
+import com.lemline.runner.common.config.DatabaseType
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import java.sql.Connection
@@ -43,7 +43,7 @@ class PostgresTestDatabaseConfig(
     private val migrationLocation: String = "classpath:db/migration/postgresql"
 ) : DatabaseConfig, AutoCloseable {
 
-    override val dbType: String = DatabaseConstants.DB_TYPE_POSTGRESQL
+    override val dbType: DatabaseType = DatabaseType.POSTGRESQL
 
     private val container: PostgreSQLContainer<*> by lazy {
         PostgreSQLContainer(DockerImageName.parse("postgres:14-alpine"))

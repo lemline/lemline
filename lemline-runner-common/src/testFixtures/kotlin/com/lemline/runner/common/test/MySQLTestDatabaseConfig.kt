@@ -2,7 +2,7 @@
 package com.lemline.runner.common.test
 
 import com.lemline.runner.common.config.DatabaseConfig
-import com.lemline.runner.common.config.DatabaseConstants
+import com.lemline.runner.common.config.DatabaseType
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import java.sql.Connection
@@ -43,10 +43,11 @@ class MySQLTestDatabaseConfig(
     private val migrationLocation: String = "classpath:db/migration/mysql"
 ) : DatabaseConfig, AutoCloseable {
 
-    override val dbType: String = DatabaseConstants.DB_TYPE_MYSQL
+    override val dbType: DatabaseType = DatabaseType.MYSQL
 
     private val container: MySQLContainer<*> by lazy {
-        MySQLContainer(DockerImageName.parse("mysql:8.0"))
+        // Use MySQL 8.0.36+ for ORDER BY support in JSON_ARRAYAGG (added in 8.0.14)
+        MySQLContainer(DockerImageName.parse("mysql:8.0.36"))
             .withDatabaseName("lemline_test")
             .withUsername("test")
             .withPassword("test")

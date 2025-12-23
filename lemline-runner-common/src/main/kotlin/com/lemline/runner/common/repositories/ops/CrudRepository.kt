@@ -4,9 +4,7 @@
 package com.lemline.runner.common.repositories.ops
 
 import com.lemline.runner.common.config.DatabaseConfig
-import com.lemline.runner.common.config.DatabaseConstants.DB_TYPE_IN_MEMORY
-import com.lemline.runner.common.config.DatabaseConstants.DB_TYPE_MYSQL
-import com.lemline.runner.common.config.DatabaseConstants.DB_TYPE_POSTGRESQL
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.IdV7Helper
 import com.lemline.runner.common.repositories.with.WithCrudRepository
@@ -128,23 +126,21 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
         val valsCsv = allColumns.joinToString { "?" }
 
         when (databaseConfig.dbType) {
-            DB_TYPE_POSTGRESQL -> """
+            DatabaseType.POSTGRESQL -> """
                 INSERT INTO $tableName ($colsCsv)
                 VALUES ($valsCsv)
                 ON CONFLICT DO NOTHING
             """.trimIndent()
 
-            DB_TYPE_IN_MEMORY -> """
+            DatabaseType.H2 -> """
                 INSERT INTO $tableName ($colsCsv)
                 VALUES ($valsCsv)
             """.trimIndent()
 
-            DB_TYPE_MYSQL -> """
+            DatabaseType.MYSQL -> """
                 INSERT IGNORE INTO $tableName ($colsCsv)
                 VALUES ($valsCsv)
             """.trimIndent()
-
-            else -> error("Unsupported database type '${databaseConfig.dbType}'")
         }
     }
 
@@ -157,7 +153,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
             if (entities.isEmpty()) return@withConnection 0
 
             // For H2, use individual inserts to handle constraint violations per entity
-            if (databaseConfig.dbType == DB_TYPE_IN_MEMORY) {
+            if (databaseConfig.dbType == DatabaseType.H2) {
                 var successCount = 0
                 conn.prepareStatement(insertSql).use { stmt ->
                     for (entity in entities) {
@@ -286,10 +282,9 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
      * Returns the dialect-specific quoting of an SQL identifier.
      */
     protected fun q(id: String): String = when (databaseConfig.dbType) {
-        DB_TYPE_POSTGRESQL -> "\"$id\""
-        DB_TYPE_MYSQL -> "`$id`"
-        DB_TYPE_IN_MEMORY -> id
-        else -> id
+        DatabaseType.POSTGRESQL -> "\"$id\""
+        DatabaseType.MYSQL -> "`$id`"
+        DatabaseType.H2 -> id
     }
 
     /**

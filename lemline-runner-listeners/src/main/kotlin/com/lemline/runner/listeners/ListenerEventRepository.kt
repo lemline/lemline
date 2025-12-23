@@ -3,7 +3,7 @@ package com.lemline.runner.listeners
 
 import com.lemline.common.values.IDV7
 import com.lemline.runner.common.config.DatabaseConfig
-import com.lemline.runner.common.config.DatabaseConstants
+import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CREATED_AT_COLUMN
@@ -562,9 +562,9 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         connection: Connection? = null
     ): Int = databaseConfig.withConnection(connection) { conn ->
         val sql = when (databaseConfig.dbType) {
-            DatabaseConstants.DB_TYPE_POSTGRESQL -> markReadyForForeachPostgresql(limit)
-            DatabaseConstants.DB_TYPE_MYSQL -> markReadyForForeachMySql(limit)
-            else -> markReadyForForeachH2(limit)
+            DatabaseType.POSTGRESQL -> markReadyForForeachPostgresql(limit)
+            DatabaseType.MYSQL -> markReadyForForeachMySql(limit)
+            DatabaseType.H2 -> markReadyForForeachH2(limit)
         }
 
         conn.prepareStatement(sql).use { stmt ->
