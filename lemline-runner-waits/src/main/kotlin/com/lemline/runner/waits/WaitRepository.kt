@@ -53,7 +53,7 @@ class WaitRepository : CrudRepository<WaitModel>(),
 
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
-    
+
     override val tableName = WAIT_TABLE
 
     // Composed operations - initialized lazily to ensure databaseConfig is injected

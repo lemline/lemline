@@ -67,13 +67,10 @@ data class ListenerModel(
     override val instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>,
 
     /** Listen strategy: ONE, ANY, ANY_UNTIL_EXPR, ANY_UNTIL_EVENT, ALL */
-    val strategy: ListenerStrategy,
+    val listenerStrategy: ListenerStrategy,
 
     /** Timestamp when the listener times out (null = no timeout) */
     val timeoutAt: Instant?,
-
-    /** Timestamp when this listener was scheduled for processing */
-    override val outboxScheduledFor: Instant,
 ) : WithId, WithInstanceMessage, WithOutbox, WithCleanup {
 
     /** Total number of filters for ALL strategy (null for other strategies) */
@@ -132,6 +129,7 @@ data class ListenerModel(
     // Outbox fields
     // NOTE: outboxDelayedUntil starts as NULL (waiting state).
     // It gets set to NOW() when ready_at is set, triggering ListenerCompletionOutbox.
+    override var outboxScheduledFor: Instant? = null
     override var outboxDelayedUntil: Instant? = null
     override var outboxAttemptCount: Int = 0
     override var outboxErrorClass: String? = null

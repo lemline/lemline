@@ -165,7 +165,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
 
             // Listener-specific columns
             column(STRATEGY_COLUMN) { stmt, entity, idx ->
-                stmt.setString(idx, entity.strategy.name)
+                stmt.setString(idx, entity.listenerStrategy.name)
             }
             column(TIMEOUT_AT_COLUMN) { stmt, entity, idx ->
                 entity.timeoutAt?.let {
@@ -198,9 +198,8 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
     override fun createModel(rs: ResultSet): ListenerModel = ListenerModel(
         id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowEvent.ListenStarted>(idHelper)!!,
-        strategy = ListenerStrategy.valueOf(rs.getString(STRATEGY_COLUMN)),
+        listenerStrategy = ListenerStrategy.valueOf(rs.getString(STRATEGY_COLUMN)),
         timeoutAt = rs.getInstant(TIMEOUT_AT_COLUMN),
-        outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN)!!,
     ).apply {
         // Listener-specific columns
         filtersCount = rs.getInt(FILTERS_COUNT_COLUMN).takeIf { !rs.wasNull() }
@@ -210,8 +209,8 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         correlationValues = rs.getString(CORRELATION_VALUES_COLUMN)
         readyAt = rs.getInstant(READY_AT_COLUMN)
     }
-        .readCleanupField(rs)
         .readOutboxFields(rs)
+        .readCleanupField(rs)
 
     /**
      * Batch finds active listeners for multiple query keys in a single database round-trip.
@@ -374,9 +373,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                   AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
                   AND l.$STRATEGY_COLUMN IN ('ONE', 'ANY')
                   AND EXISTS (
-                      SELECT 1 FROM $LISTENER_EVENT_TABLE e
+                      SELECT 1 FROM $LISTENER_EVENTS_TABLE e
                       WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
-                        AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NOT NULL
+                        AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
                   )
             """.trimIndent()
 
@@ -400,9 +399,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                   AND l.$FILTERS_COUNT_COLUMN IS NOT NULL
                   AND (
                       SELECT COUNT(DISTINCT e.${ListenerEventRepository.FILTER_INDEX_COLUMN})
-                      FROM $LISTENER_EVENT_TABLE e
+                      FROM $LISTENER_EVENTS_TABLE e
                       WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
-                        AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NOT NULL
+                        AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
                   ) >= l.$FILTERS_COUNT_COLUMN
             """.trimIndent()
 
@@ -442,9 +441,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                 SET $READY_AT_COLUMN = ?,
                     $OUTBOX_DELAYED_UNTIL_COLUMN = CASE
                         WHEN NOT EXISTS (
-                            SELECT 1 FROM $LISTENER_EVENT_TABLE e
+                            SELECT 1 FROM $LISTENER_EVENTS_TABLE e
                             WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
-                              AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NULL
+                              AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
                         ) THEN ?
                         ELSE NULL
                     END,
@@ -499,9 +498,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
           AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
           AND l.$STRATEGY_COLUMN = 'ANY_UNTIL_EVENT'
           AND NOT EXISTS (
-              SELECT 1 FROM $LISTENER_EVENT_TABLE e
+              SELECT 1 FROM $LISTENER_EVENTS_TABLE e
               WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
-                AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NULL
+                AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
           )
         """.trimIndent()
     }
@@ -524,9 +523,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             val sql = """
                 SELECT l.*,
                        (SELECT $jsonAgg
-                        FROM $LISTENER_EVENT_TABLE e
+                        FROM $LISTENER_EVENTS_TABLE e
                         WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
-                          AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NOT NULL
+                          AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
                        ) as events_json
                 FROM $tableName l
                 WHERE l.$READY_AT_COLUMN IS NULL
@@ -534,9 +533,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                   AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
                   AND l.$STRATEGY_COLUMN = 'ANY_UNTIL_EXPR'
                   AND EXISTS (
-                      SELECT 1 FROM $LISTENER_EVENT_TABLE e
+                      SELECT 1 FROM $LISTENER_EVENTS_TABLE e
                       WHERE e.${ListenerEventRepository.LISTENER_ID_COLUMN} = l.$ID_COLUMN
-                        AND e.${ListenerEventRepository.OUTBOX_COMPLETED_AT_COLUMN} IS NOT NULL
+                        AND e.$OUTBOX_COMPLETED_AT_COLUMN IS NOT NULL
                   )
                 LIMIT ?
                 FOR UPDATE SKIP LOCKED

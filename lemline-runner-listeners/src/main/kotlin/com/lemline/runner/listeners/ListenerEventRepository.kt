@@ -8,24 +8,30 @@ import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CREATED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.CrudRepository
+import com.lemline.runner.common.repositories.ops.OUTBOX_ATTEMPT_COUNT_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_COMPLETED_AT_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_DELAYED_UNTIL_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_FAILED_AT_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
 import com.lemline.runner.common.repositories.ops.OutboxRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.getInstant
+import com.lemline.runner.common.repositories.ops.outboxColumns
 import com.lemline.runner.common.repositories.ops.readCleanupField
+import com.lemline.runner.common.repositories.ops.readOutboxFields
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.Timestamp
-import java.sql.Types
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
 import kotlinx.serialization.ExperimentalSerializationApi
 
-const val LISTENER_EVENT_TABLE = "lemline_listener_events"
+const val LISTENER_EVENTS_TABLE = "lemline_listener_events"
 
 /**
  * Repository for managing listener events with FIFO-aware foreach processing.
@@ -57,7 +63,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
-    
+
     // Composed operations - initialized lazily to ensure databaseConfig is injected
     // Uses specialized ListenerEventOutboxRepository for FIFO-aware processing
     private val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig) }
@@ -75,24 +81,17 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         const val FOREACH_COMPLETED_COLUMN = "foreach_completed"
         const val FOREACH_OUTPUT_COLUMN = "foreach_output"
 
-        // Standard outbox columns
-        const val OUTBOX_SCHEDULED_FOR_COLUMN = "outbox_scheduled_for"
-        const val OUTBOX_DELAYED_UNTIL_COLUMN = "outbox_delayed_until"
-        const val OUTBOX_ATTEMPT_COUNT_COLUMN = "outbox_attempt_count"
-        const val OUTBOX_ERROR_CLASS_COLUMN = "outbox_error_class"
-        const val OUTBOX_ERROR_MESSAGE_COLUMN = "outbox_error_message"
-        const val OUTBOX_ERROR_STACKTRACE_COLUMN = "outbox_error_stacktrace"
-        const val OUTBOX_COMPLETED_AT_COLUMN = "outbox_completed_at"
-        const val OUTBOX_FAILED_AT_COLUMN = "outbox_failed_at"
-
         /** Creates a current timestamp for database operations. */
         private fun nowTimestamp(): Timestamp = Timestamp.from(Clock.System.now().toJavaInstant())
     }
 
-    override val tableName = LISTENER_EVENT_TABLE
+    override val tableName = LISTENER_EVENTS_TABLE
 
     override val columns: ColumnBindings<ListenerEventModel> by lazy {
         ColumnBindingsBuilder<ListenerEventModel>().apply {
+            outboxColumns()
+            cleanupColumns()
+
             // Composite key columns (listener_id, event_id, filter_index)
             key(LISTENER_ID_COLUMN) { stmt, entity, idx -> setIDV7(stmt, idx, entity.listenerId) }
             key(EVENT_ID_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.eventId) }
@@ -106,43 +105,6 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             column(FOREACH_OUTPUT_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.foreachOutput)
             }
-
-            // Standard outbox columns
-            column(OUTBOX_SCHEDULED_FOR_COLUMN) { stmt, entity, idx ->
-                entity.outboxScheduledFor?.let {
-                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
-                } ?: stmt.setNull(idx, Types.TIMESTAMP)
-            }
-            column(OUTBOX_DELAYED_UNTIL_COLUMN) { stmt, entity, idx ->
-                entity.outboxDelayedUntil?.let {
-                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
-                } ?: stmt.setNull(idx, Types.TIMESTAMP)
-            }
-            column(OUTBOX_ATTEMPT_COUNT_COLUMN) { stmt, entity, idx ->
-                stmt.setInt(idx, entity.outboxAttemptCount)
-            }
-            column(OUTBOX_ERROR_CLASS_COLUMN) { stmt, entity, idx ->
-                stmt.setString(idx, entity.outboxErrorClass)
-            }
-            column(OUTBOX_ERROR_MESSAGE_COLUMN) { stmt, entity, idx ->
-                stmt.setString(idx, entity.outboxErrorMessage)
-            }
-            column(OUTBOX_ERROR_STACKTRACE_COLUMN) { stmt, entity, idx ->
-                stmt.setString(idx, entity.outboxErrorStackTrace)
-            }
-            column(OUTBOX_COMPLETED_AT_COLUMN) { stmt, entity, idx ->
-                entity.outboxCompletedAt?.let {
-                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
-                } ?: stmt.setNull(idx, Types.TIMESTAMP)
-            }
-            column(OUTBOX_FAILED_AT_COLUMN) { stmt, entity, idx ->
-                entity.outboxFailedAt?.let {
-                    stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
-                } ?: stmt.setNull(idx, Types.TIMESTAMP)
-            }
-
-            // Cleanup
-            cleanupColumns()
         }.build()
     }
 
@@ -156,14 +118,9 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         foreachCompleted = rs.getBoolean(FOREACH_COMPLETED_COLUMN)
         foreachOutput = rs.getString(FOREACH_OUTPUT_COLUMN)
         createdAt = rs.getInstant(CREATED_AT_COLUMN)
-        outboxDelayedUntil = rs.getInstant(OUTBOX_DELAYED_UNTIL_COLUMN)
-        outboxAttemptCount = rs.getInt(OUTBOX_ATTEMPT_COUNT_COLUMN)
-        outboxErrorClass = rs.getString(OUTBOX_ERROR_CLASS_COLUMN)
-        outboxErrorMessage = rs.getString(OUTBOX_ERROR_MESSAGE_COLUMN)
-        outboxErrorStackTrace = rs.getString(OUTBOX_ERROR_STACKTRACE_COLUMN)
-        outboxCompletedAt = rs.getInstant(OUTBOX_COMPLETED_AT_COLUMN)
-        outboxFailedAt = rs.getInstant(OUTBOX_FAILED_AT_COLUMN)
-    }.readCleanupField(rs)
+    }
+        .readOutboxFields(rs)
+        .readCleanupField(rs)
 
     // ========================================
     // Batch Insert Methods

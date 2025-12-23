@@ -11,7 +11,7 @@ import com.lemline.core.orchestrator.StepByStepOrchestrator
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.messaging.InstanceMessage
-import com.lemline.runner.definitions.DefinitionListenService
+import com.lemline.runner.listeners.DefinitionListenService
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerModel

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 @file:OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 
-package com.lemline.runner.common.repositories.helpers
+package com.lemline.runner.common.repositories.ops
 
 import com.lemline.runner.common.models.WithCompletedAt
-import com.lemline.runner.common.repositories.ops.getInstant
+import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.sql.Types

@@ -8,7 +8,6 @@ import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.random.random
-import com.lemline.core.random.randomListenConfig
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.messaging.InstanceMessage
 import kotlin.random.Random
@@ -38,11 +37,11 @@ fun ListenerModel.Companion.random(): ListenerModel {
             workflowInfo = workflowInfo,
             workflowState = listenStarted,
         ),
-        strategy = ListenerStrategy.from(config),
+        listenerStrategy = ListenerStrategy.from(config),
         timeoutAt = config.timeoutAt,
-        outboxScheduledFor = Instant.random(),
     ).also {
         // Don't call randomize() as outboxDelayedUntil starts as null for ListenerModel
+        it.outboxScheduledFor = Instant.random()
         it.outboxAttemptCount = Int.random()
         it.outboxErrorClass = String.nullableRandom()
         it.outboxErrorMessage = String.nullableRandom()

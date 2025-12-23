@@ -13,7 +13,6 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenConfig
 import com.lemline.core.processors.ListenStrategy
-import com.lemline.core.random.random
 import com.lemline.core.states.DoState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
@@ -21,7 +20,6 @@ import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
-import com.lemline.runner.common.test.ops.CrudRepositoryTest
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -36,7 +34,6 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonNull
 import org.junit.jupiter.api.BeforeEach
-import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 
 /**
@@ -130,10 +127,10 @@ abstract class ListenerEventRepositoryTestBase {
                 workflowInfo = workflowInfo,
                 workflowState = listenStarted
             ),
-            strategy = ListenerStrategy.from(config),
+            listenerStrategy = ListenerStrategy.from(config),
             timeoutAt = null,
-            outboxScheduledFor = now
         ).also {
+            it.outboxScheduledFor = now
             it.hasForeach = hasForeach
         }
     }
@@ -384,8 +381,10 @@ abstract class ListenerEventRepositoryTestBase {
             filterIndex = 0
         )
 
-        val inserted1 = getEventRepository().batchInsertForAccumulating(listOf(queryKey), "event-first", """{"first":true}""")
-        val inserted2 = getEventRepository().batchInsertForAccumulating(listOf(queryKey), "event-second", """{"second":true}""")
+        val inserted1 =
+            getEventRepository().batchInsertForAccumulating(listOf(queryKey), "event-first", """{"first":true}""")
+        val inserted2 =
+            getEventRepository().batchInsertForAccumulating(listOf(queryKey), "event-second", """{"second":true}""")
 
         inserted1 shouldBe 1
         inserted2 shouldBe 0

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.messaging.cloudevents
+package com.lemline.runner.listeners
 
 import com.lemline.common.logger.logger
 import io.cloudevents.CloudEvent

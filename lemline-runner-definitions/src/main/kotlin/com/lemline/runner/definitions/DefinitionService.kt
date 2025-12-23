@@ -7,6 +7,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.listeners.DefinitionListenService
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection

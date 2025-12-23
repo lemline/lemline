@@ -25,6 +25,10 @@ dependencies {
     implementation(libs.serverlessworkflow.api)
     implementation(libs.serverlessworkflow.impl.core)
 
+    // CloudEvents SDK (for CloudEvent handling)
+    implementation(libs.cloudevents.core)
+    implementation(libs.cloudevents.json.jackson)
+
     // Testing
     testImplementation(kotlin("test"))
     testImplementation(enforcedPlatform(libs.kotest.bom))

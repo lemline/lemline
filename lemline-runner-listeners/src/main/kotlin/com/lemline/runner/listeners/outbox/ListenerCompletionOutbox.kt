@@ -16,7 +16,7 @@ import com.lemline.runner.listeners.ListenerConfig
 import com.lemline.runner.listeners.ListenerEventRepository
 import com.lemline.runner.listeners.ListenerModel
 import com.lemline.runner.listeners.ListenerRepository
-import com.lemline.runner.listeners.cloudevents.CloudEventService
+import com.lemline.runner.listeners.CloudEventService
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject

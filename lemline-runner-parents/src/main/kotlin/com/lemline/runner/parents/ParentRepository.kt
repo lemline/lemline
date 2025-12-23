@@ -7,18 +7,18 @@ import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
-import com.lemline.runner.common.repositories.helpers.completionColumns
-import com.lemline.runner.common.repositories.helpers.readCompletionField
 import com.lemline.runner.common.repositories.ops.CleanerRepository
 import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.IdRepository
 import com.lemline.runner.common.repositories.ops.InstanceRepository
 import com.lemline.runner.common.repositories.ops.cleanupColumns
+import com.lemline.runner.common.repositories.ops.completionColumns
 import com.lemline.runner.common.repositories.ops.getInstanceMessage
 import com.lemline.runner.common.repositories.ops.idColumn
 import com.lemline.runner.common.repositories.ops.instanceColumns
 import com.lemline.runner.common.repositories.ops.readCleanupField
+import com.lemline.runner.common.repositories.ops.readCompletionField
 import com.lemline.runner.common.repositories.with.WithCleanerRepository
 import com.lemline.runner.common.repositories.with.WithIdRepository
 import com.lemline.runner.common.repositories.with.WithInstanceRepository
@@ -49,7 +49,7 @@ class ParentRepository : CrudRepository<ParentModel>(),
 
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
-    
+
     override val tableName = PARENT_TABLE
 
     // Composed operations - initialized lazily to ensure databaseConfig is injected

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.definitions
+package com.lemline.runner.listeners
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
@@ -14,9 +14,6 @@ import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.workflows.CachedListenTask
 import com.lemline.core.workflows.CachedUntilCondition
 import com.lemline.core.workflows.WorkflowCache
-import com.lemline.runner.listeners.ListenerModel
-import com.lemline.runner.listeners.ListenerQueryKey
-import com.lemline.runner.listeners.ListenerRepository
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.EventFilter
 import io.serverlessworkflow.api.types.ListenTaskConfiguration

@@ -5,7 +5,7 @@ import com.lemline.common.values.IDV7
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
-import com.lemline.runner.common.repositories.helpers.CompletionOps.COMPLETED_AT_COLUMN
+import com.lemline.runner.common.repositories.ops.CompletionOps.COMPLETED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.getInstant
@@ -47,7 +47,7 @@ class ForkBranchRepository : CrudRepository<ForkBranchModel>() {
 
     @Inject
     override lateinit var databaseConfig: DatabaseConfig
-    
+
     override val tableName = FORK_BRANCH_TABLE
 
     override val columns: ColumnBindings<ForkBranchModel> by lazy {

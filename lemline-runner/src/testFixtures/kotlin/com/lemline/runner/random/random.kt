@@ -239,11 +239,11 @@ fun ListenerModel.Companion.random(): ListenerModel {
             workflowInfo = workflowInfo,
             workflowState = listenStarted,
         ),
-        strategy = ListenerStrategy.from(config),
+        listenerStrategy = ListenerStrategy.from(config),
         timeoutAt = config.timeoutAt,
-        outboxScheduledFor = Instant.random(),
     ).also {
         // Don't call randomize() as outboxDelayedUntil starts as null for ListenerModel
+        it.outboxScheduledFor = Instant.random()
         it.outboxAttemptCount = Int.random()
         it.outboxErrorClass = String.nullableRandom()
         it.outboxErrorMessage = String.nullableRandom()

@@ -2,8 +2,8 @@
 package com.lemline.runner.listeners.cleaner
 
 import com.lemline.runner.common.cleaner.AbstractCleaner
-import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.CleanupConfig
+import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.repositories.with.WithCrudRepository
 import com.lemline.runner.listeners.ListenerConfig
 import com.lemline.runner.listeners.ListenerModel
@@ -32,7 +32,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 internal class ListenerCleaner : AbstractCleaner<ListenerModel>() {
 
     @Inject
-    lateinit var listenerFeatureConfig: ListenerConfig
+    lateinit var listenerConfig: ListenerConfig
 
     @Inject
     override lateinit var cleanerRepository: ListenerRepository
@@ -43,8 +43,8 @@ internal class ListenerCleaner : AbstractCleaner<ListenerModel>() {
     override val crudRepository: WithCrudRepository<ListenerModel> get() = cleanerRepository
 
     /** Is this cleaner enabled? */
-    override val enabled: Boolean by lazy { listenerFeatureConfig.enabled }
+    override val enabled: Boolean by lazy { listenerConfig.enabled }
 
     /** Cleanup configuration */
-    override val cleanerConf: CleanupConfig by lazy { listenerFeatureConfig.cleanup }
+    override val cleanerConf: CleanupConfig by lazy { listenerConfig.cleanup }
 }
