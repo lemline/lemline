@@ -45,7 +45,7 @@ CREATE TABLE lemline_listeners
 
     -- Standard outbox fields (for completion processing)
     -- outbox_delayed_until: NULL = waiting, NOT NULL = ready for processing
-    outbox_scheduled_for    TIMESTAMP WITH TIME ZONE NOT NULL,
+    outbox_scheduled_for    TIMESTAMP WITH TIME ZONE,
     outbox_delayed_until    TIMESTAMP WITH TIME ZONE,
     outbox_attempt_count    INTEGER                  NOT NULL DEFAULT 0,
     outbox_error_class      CLOB,

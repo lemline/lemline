@@ -44,7 +44,7 @@ CREATE TABLE lemline_listeners
 
     -- Standard outbox fields (for completion processing)
     -- outbox_delayed_until: NULL = waiting, NOT NULL = ready for processing
-    outbox_scheduled_for    TIMESTAMP(6) NOT NULL,
+    outbox_scheduled_for    TIMESTAMP(6) NULL,
     outbox_delayed_until    TIMESTAMP(6),
     outbox_attempt_count    INTEGER      NOT NULL DEFAULT 0,
     outbox_error_class      TEXT,

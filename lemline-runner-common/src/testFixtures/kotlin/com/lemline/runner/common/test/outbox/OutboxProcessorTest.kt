@@ -83,6 +83,7 @@ abstract class OutboxProcessorTest<T>(
     private val mockedProcessor = mockk<suspend (T) -> Unit>()
     private val outboxRelay: AbstractOutbox<T> by lazy {
         object : AbstractOutbox<T>() {
+            override val jobName = "test-outbox"
             override val outboxRepository = this@OutboxProcessorTest.outboxRepository
             override val crudRepository = this@OutboxProcessorTest.crudRepository
             override val databaseConfig = this@OutboxProcessorTest.databaseConfig
