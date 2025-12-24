@@ -34,6 +34,7 @@ import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.getInstanceMessage
 import com.lemline.runner.common.repositories.ops.getInstant
 import com.lemline.runner.common.repositories.ops.idColumn
+import com.lemline.runner.common.repositories.ops.nowTimestamp
 import com.lemline.runner.common.repositories.ops.instanceColumns
 import com.lemline.runner.common.repositories.ops.outboxColumns
 import com.lemline.runner.common.repositories.ops.readCleanupField
@@ -49,7 +50,6 @@ import java.sql.Connection
 import java.sql.ResultSet
 import java.sql.Timestamp
 import java.sql.Types
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlin.time.toJavaInstant
@@ -151,9 +151,6 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         const val UNTIL_EXPRESSION_COLUMN = "until_expression"
         const val HAS_FOREACH_COLUMN = "has_foreach"
         const val COMPLETED_AT_COLUMN = "completed_at"
-
-        /** Creates a current timestamp for database operations. */
-        private fun nowTimestamp(): Timestamp = Timestamp.from(Clock.System.now().toJavaInstant())
     }
 
     override val columns: ColumnBindings<ListenerModel> by lazy {

@@ -18,6 +18,7 @@ import com.lemline.runner.common.repositories.ops.OutboxRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.getInstant
+import com.lemline.runner.common.repositories.ops.nowTimestamp
 import com.lemline.runner.common.repositories.ops.outboxColumns
 import com.lemline.runner.common.repositories.ops.readCleanupField
 import com.lemline.runner.common.repositories.ops.readOutboxFields
@@ -29,10 +30,7 @@ import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
 import java.sql.ResultSet
-import java.sql.Timestamp
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
-import kotlin.time.toJavaInstant
 import kotlinx.serialization.ExperimentalSerializationApi
 
 const val LISTENER_EVENTS_TABLE = "lemline_listener_events"
@@ -84,9 +82,6 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         const val SORT_KEY_COLUMN = "sort_key"
         const val FOREACH_COMPLETED_COLUMN = "foreach_completed"
         const val FOREACH_OUTPUT_COLUMN = "foreach_output"
-
-        /** Creates a current timestamp for database operations. */
-        private fun nowTimestamp(): Timestamp = Timestamp.from(Clock.System.now().toJavaInstant())
     }
 
     override val tableName = LISTENER_EVENTS_TABLE
@@ -445,18 +440,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         connection: Connection? = null
     ): Int = databaseConfig.withConnection(connection) { conn ->
         val now = nowTimestamp()
-
-        // First, mark current event as completed
-        val updateSql = """
-            UPDATE $tableName
-            SET $FOREACH_COMPLETED_COLUMN = TRUE,
-                $FOREACH_OUTPUT_COLUMN = ?,
-                $OUTBOX_COMPLETED_AT_COLUMN = ?,
-                $UPDATED_AT_COLUMN = ?
-            WHERE $LISTENER_ID_COLUMN = ? AND $EVENT_ID_COLUMN = ?
-        """.trimIndent()
-
-        val updated = conn.prepareStatement(updateSql).use { stmt ->
+        conn.prepareStatement(markCompletedWithOutputSql).use { stmt ->
             stmt.setString(1, output)
             stmt.setTimestamp(2, now)
             stmt.setTimestamp(3, now)
@@ -464,8 +448,17 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             stmt.setString(5, eventId)
             stmt.executeUpdate()
         }
+    }
 
-        updated
+    private val markCompletedWithOutputSql by lazy {
+        """
+        UPDATE $tableName
+        SET $FOREACH_COMPLETED_COLUMN = TRUE,
+            $FOREACH_OUTPUT_COLUMN = ?,
+            $OUTBOX_COMPLETED_AT_COLUMN = ?,
+            $UPDATED_AT_COLUMN = ?
+        WHERE $LISTENER_ID_COLUMN = ? AND $EVENT_ID_COLUMN = ?
+        """.trimIndent()
     }
 
     /**
@@ -503,6 +496,10 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
     /**
      * Finds all events for a listener, ordered by created_at (arrival order).
+     *
+     * @param listenerId The listener ID to query events for
+     * @param connection Optional existing connection to reuse
+     * @return List of events ordered by arrival time, empty list if none found
      */
     suspend fun findByListenerId(
         listenerId: IDV7,
@@ -520,6 +517,10 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
     /**
      * Counts events for a single listener.
+     *
+     * @param listenerId The listener ID to count events for
+     * @param connection Optional existing connection to reuse
+     * @return Number of events for the listener
      */
     suspend fun countByListenerId(
         listenerId: IDV7,

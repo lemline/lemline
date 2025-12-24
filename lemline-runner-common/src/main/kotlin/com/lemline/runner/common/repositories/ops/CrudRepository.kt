@@ -15,6 +15,7 @@ import java.sql.Timestamp
 import java.sql.Types
 import java.time.Instant
 import kotlin.time.ExperimentalTime
+import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
 import kotlinx.serialization.ExperimentalSerializationApi
 
@@ -302,3 +303,9 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
  */
 fun ResultSet.getInstant(col: String): kotlin.time.Instant? =
     getTimestamp(col)?.toInstant()?.toKotlinInstant()
+
+/**
+ * Creates a current timestamp for database operations.
+ * Uses Kotlin's time API for consistency.
+ */
+fun nowTimestamp(): Timestamp = Timestamp.from(kotlin.time.Clock.System.now().toJavaInstant())
