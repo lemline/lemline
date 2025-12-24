@@ -655,13 +655,382 @@ abstract class ListenerRepositoryTestBase {
             // When
             val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
 
-            // Then: Events should be returned (order depends on database json_agg implementation)
+            // Then: Events should be in insertion order (by created_at)
             result.size shouldBe 1
             result[0].second.size shouldBe 3
-            // Verify events contain expected data
-            result[0].second.any { it.contains("first") } shouldBe true
-            result[0].second.any { it.contains("second") } shouldBe true
-            result[0].second.any { it.contains("third") } shouldBe true
+            result[0].second[0].contains("first") shouldBe true
+            result[0].second[1].contains("second") shouldBe true
+            result[0].second[2].contains("third") shouldBe true
+        }
+
+        @Test
+        fun `should not return listener with different position`() = runTest {
+            // Given: An ANY_UNTIL_EXPR listener
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener)
+
+            // When: Query with different position
+            val queryKey = ListenerQueryKey(
+                workflowInfo = listener.instanceMessage.workflowInfo,
+                position = com.lemline.common.values.NodePosition("/different/position"),
+                correlationValuesJson = null,
+                listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR
+            )
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then
+            result shouldBe emptyList()
+        }
+
+        @Test
+        fun `should match listener with null correlation when query has correlation`() = runTest {
+            // Given: A listener with null correlation values
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR).apply {
+                correlationValues = null
+            }
+            repository.insert(listener)
+
+            // When: Query with correlation values (should match null correlation in DB)
+            val queryKey = ListenerQueryKey(
+                workflowInfo = listener.instanceMessage.workflowInfo,
+                position = listener.instanceMessage.workflowState.nodePosition,
+                correlationValuesJson = """{"orderId":"123"}""",
+                listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR
+            )
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then: Should match (null correlation matches any)
+            result.size shouldBe 1
+            result[0].first.id shouldBe listener.id
+        }
+
+        @Test
+        fun `should match listener with matching correlation values`() = runTest {
+            // Given: A listener with specific correlation values
+            val correlationJson = """{"orderId":"123"}"""
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR).apply {
+                correlationValues = correlationJson
+            }
+            repository.insert(listener)
+
+            // When: Query with same correlation values
+            val queryKey = ListenerQueryKey(
+                workflowInfo = listener.instanceMessage.workflowInfo,
+                position = listener.instanceMessage.workflowState.nodePosition,
+                correlationValuesJson = correlationJson,
+                listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR
+            )
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then
+            result.size shouldBe 1
+            result[0].first.id shouldBe listener.id
+        }
+
+        @Test
+        fun `should not match listener with different correlation values`() = runTest {
+            // Given: A listener with specific correlation values
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR).apply {
+                correlationValues = """{"orderId":"123"}"""
+            }
+            repository.insert(listener)
+
+            // When: Query with different correlation values
+            val queryKey = ListenerQueryKey(
+                workflowInfo = listener.instanceMessage.workflowInfo,
+                position = listener.instanceMessage.workflowState.nodePosition,
+                correlationValuesJson = """{"orderId":"456"}""",
+                listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR
+            )
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then
+            result shouldBe emptyList()
+        }
+
+        @Test
+        fun `should not mix events between different listeners`() = runTest {
+            // Given: Two listeners with their own events
+            val listener1 = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            val listener2 = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener1)
+            repository.insert(listener2)
+
+            val event1a = createEvent(listener1.id, "listener1-event-a", filterIndex = 0)
+            val event1b = createEvent(listener1.id, "listener1-event-b", filterIndex = 1)
+            val event2a = createEvent(listener2.id, "listener2-event-a", filterIndex = 0)
+            val event2b = createEvent(listener2.id, "listener2-event-b", filterIndex = 1)
+            eventRepository.insert(event1a)
+            eventRepository.insert(event1b)
+            eventRepository.insert(event2a)
+            eventRepository.insert(event2b)
+
+            // When: Query for both listeners
+            val queryKeys = listOf(
+                createQueryKey(listener1, ListenerStrategy.ANY_UNTIL_EXPR),
+                createQueryKey(listener2, ListenerStrategy.ANY_UNTIL_EXPR)
+            )
+            val result = repository.findListenersByKeysWithEvents(queryKeys)
+
+            // Then: Each listener should only have its own events
+            result.size shouldBe 2
+
+            val result1 = result.find { it.first.id == listener1.id }!!
+            val result2 = result.find { it.first.id == listener2.id }!!
+
+            result1.second.size shouldBe 2
+            result1.second.all { it.contains("listener1") } shouldBe true
+            result1.second.none { it.contains("listener2") } shouldBe true
+
+            result2.second.size shouldBe 2
+            result2.second.all { it.contains("listener2") } shouldBe true
+            result2.second.none { it.contains("listener1") } shouldBe true
+        }
+
+        @Test
+        fun `should be idempotent - multiple calls return same results`() = runTest {
+            // Given: A listener with events
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
+            repository.insert(listener)
+
+            val event1 = createEvent(listener.id, "event-1", filterIndex = 0)
+            val event2 = createEvent(listener.id, "event-2", filterIndex = 1)
+            eventRepository.insert(event1)
+            eventRepository.insert(event2)
+
+            val queryKey = createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EXPR)
+
+            // When: Call multiple times
+            val result1 = repository.findListenersByKeysWithEvents(listOf(queryKey))
+            val result2 = repository.findListenersByKeysWithEvents(listOf(queryKey))
+            val result3 = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then: All calls return identical results
+            result1.size shouldBe 1
+            result2.size shouldBe 1
+            result3.size shouldBe 1
+
+            result1[0].first.id shouldBe result2[0].first.id
+            result2[0].first.id shouldBe result3[0].first.id
+
+            result1[0].second shouldBe result2[0].second
+            result2[0].second shouldBe result3[0].second
+        }
+
+        @Test
+        fun `should match listener when query has no correlation`() = runTest {
+            // Given: A listener with correlation values
+            val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR).apply {
+                correlationValues = """{"orderId":"123"}"""
+            }
+            repository.insert(listener)
+
+            // When: Query without correlation (null)
+            val queryKey = ListenerQueryKey(
+                workflowInfo = listener.instanceMessage.workflowInfo,
+                position = listener.instanceMessage.workflowState.nodePosition,
+                correlationValuesJson = null,  // No correlation in query
+                listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR
+            )
+            val result = repository.findListenersByKeysWithEvents(listOf(queryKey))
+
+            // Then: Should match (no correlation filter applied)
+            result.size shouldBe 1
+            result[0].first.id shouldBe listener.id
+        }
+    }
+
+    /**
+     * Tests for batchMarkListenersCompleted functionality.
+     * Used by ListenerEventService after until expression evaluation.
+     */
+    @Nested
+    inner class BatchMarkListenersCompletedTests {
+
+        private val repository: ListenerRepository by lazy { getRepository() }
+
+        @BeforeEach
+        fun setup() = runTest {
+            repository.deleteAll()
+        }
+
+        private fun createPendingListener(): ListenerModel {
+            return ListenerModel.random().copy(
+                listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR,
+            ).apply {
+                completedAt = null
+                outboxCompletedAt = null
+                outboxFailedAt = null
+                outboxDelayedUntil = null
+            }
+        }
+
+        @Test
+        fun `should return 0 for empty list`() = runTest {
+            // Given: A pending listener exists
+            val listener = createPendingListener()
+            repository.insert(listener)
+
+            // When
+            val result = repository.batchMarkListenersCompleted(emptyList())
+
+            // Then
+            result shouldBe 0
+
+            // Verify listener unchanged
+            val unchanged = repository.findById(listener.id)
+            unchanged?.completedAt shouldBe null
+        }
+
+        @Test
+        fun `should mark single listener as completed`() = runTest {
+            // Given: A pending listener
+            val listener = createPendingListener()
+            repository.insert(listener)
+
+            // When
+            val result = repository.batchMarkListenersCompleted(listOf(listener.id))
+
+            // Then
+            result shouldBe 1
+
+            val updated = repository.findById(listener.id)
+            updated?.completedAt shouldNotBe null
+        }
+
+        @Test
+        fun `should mark multiple listeners as completed`() = runTest {
+            // Given: Multiple pending listeners
+            val listener1 = createPendingListener()
+            val listener2 = createPendingListener()
+            val listener3 = createPendingListener()
+            repository.insert(listener1)
+            repository.insert(listener2)
+            repository.insert(listener3)
+
+            // When
+            val result = repository.batchMarkListenersCompleted(
+                listOf(listener1.id, listener2.id, listener3.id)
+            )
+
+            // Then
+            result shouldBe 3
+
+            repository.findById(listener1.id)?.completedAt shouldNotBe null
+            repository.findById(listener2.id)?.completedAt shouldNotBe null
+            repository.findById(listener3.id)?.completedAt shouldNotBe null
+        }
+
+        @Test
+        fun `should skip already completed listeners`() = runTest {
+            // Given: An already completed listener
+            val listener = createPendingListener().apply {
+                completedAt = Clock.System.now()
+            }
+            repository.insert(listener)
+
+            // When
+            val result = repository.batchMarkListenersCompleted(listOf(listener.id))
+
+            // Then: Should return 0 (already completed)
+            result shouldBe 0
+        }
+
+        @Test
+        fun `should mark outbox-completed listener if not yet completed`() = runTest {
+            // Given: An outbox-completed but not yet completedAt listener
+            val listener = createPendingListener().apply {
+                outboxCompletedAt = Clock.System.now()
+            }
+            repository.insert(listener)
+
+            // When
+            val result = repository.batchMarkListenersCompleted(listOf(listener.id))
+
+            // Then: Should mark as completed (completedAt was null)
+            result shouldBe 1
+            repository.findById(listener.id)?.completedAt shouldNotBe null
+        }
+
+        @Test
+        fun `should mark failed listener if not yet completed`() = runTest {
+            // Given: A failed but not yet completedAt listener
+            val listener = createPendingListener().apply {
+                outboxFailedAt = Clock.System.now()
+            }
+            repository.insert(listener)
+
+            // When
+            val result = repository.batchMarkListenersCompleted(listOf(listener.id))
+
+            // Then: Should mark as completed (completedAt was null)
+            result shouldBe 1
+            repository.findById(listener.id)?.completedAt shouldNotBe null
+        }
+
+        @Test
+        fun `should handle non-existent IDs gracefully`() = runTest {
+            // Given: No listeners exist
+            val nonExistentId = com.lemline.common.values.IDV7.random()
+
+            // When
+            val result = repository.batchMarkListenersCompleted(listOf(nonExistentId))
+
+            // Then: Should return 0, no error
+            result shouldBe 0
+        }
+
+        @Test
+        fun `should return correct count for mixed valid and invalid IDs`() = runTest {
+            // Given: Mix of pending, already completed, and non-existent
+            val pending1 = createPendingListener()
+            val pending2 = createPendingListener()
+            val alreadyCompleted = createPendingListener().apply { completedAt = Clock.System.now() }
+            repository.insert(pending1)
+            repository.insert(pending2)
+            repository.insert(alreadyCompleted)
+            val nonExistentId = com.lemline.common.values.IDV7.random()
+
+            // When
+            val result = repository.batchMarkListenersCompleted(
+                listOf(pending1.id, pending2.id, alreadyCompleted.id, nonExistentId)
+            )
+
+            // Then: Only pending listeners should be marked (already completed and non-existent skipped)
+            result shouldBe 2
+
+            repository.findById(pending1.id)?.completedAt shouldNotBe null
+            repository.findById(pending2.id)?.completedAt shouldNotBe null
+        }
+
+        @Test
+        fun `should be idempotent - second call returns 0`() = runTest {
+            // Given: A pending listener
+            val listener = createPendingListener()
+            repository.insert(listener)
+
+            // When: Call twice
+            val result1 = repository.batchMarkListenersCompleted(listOf(listener.id))
+            val result2 = repository.batchMarkListenersCompleted(listOf(listener.id))
+
+            // Then: First call marks it, second call is no-op
+            result1 shouldBe 1
+            result2 shouldBe 0
+        }
+
+        @Test
+        fun `should not set outboxDelayedUntil`() = runTest {
+            // Given: A pending listener with no outboxDelayedUntil
+            val listener = createPendingListener()
+            listener.outboxDelayedUntil shouldBe null
+            repository.insert(listener)
+
+            // When
+            repository.batchMarkListenersCompleted(listOf(listener.id))
+
+            // Then: outboxDelayedUntil should still be null
+            val updated = repository.findById(listener.id)
+            updated?.outboxDelayedUntil shouldBe null
         }
     }
 }

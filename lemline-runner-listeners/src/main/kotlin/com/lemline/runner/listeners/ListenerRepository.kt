@@ -630,21 +630,16 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             val placeholders = ids.joinToString(", ") { "?" }
             val sql = """
                 UPDATE $tableName
-                SET $COMPLETED_AT_COLUMN = ?,
-                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
-                    $UPDATED_AT_COLUMN = ?
+                SET $COMPLETED_AT_COLUMN = ?, $UPDATED_AT_COLUMN = ?
                 WHERE $ID_COLUMN IN ($placeholders)
                   AND $COMPLETED_AT_COLUMN IS NULL
-                  AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->
                 stmt.setTimestamp(1, now)
                 stmt.setTimestamp(2, now)
-                stmt.setTimestamp(3, now)
                 ids.forEachIndexed { index, id ->
-                    setIDV7(stmt, 4 + index, id)
+                    setIDV7(stmt, 3 + index, id)
                 }
                 stmt.executeUpdate()
             }

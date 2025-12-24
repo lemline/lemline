@@ -287,7 +287,7 @@ class ListenerEventService {
      * Evaluates an until expression against accumulated events.
      * The expression should return a boolean.
      */
-    private fun evaluateUntilExpression(expression: String, events: JsonArray): Boolean {
+    internal fun evaluateUntilExpression(expression: String, events: JsonArray): Boolean {
         return try {
             with(LemlineJson) {
                 val inputNode = events.toJsonNode()
