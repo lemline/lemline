@@ -2,7 +2,6 @@
 package com.lemline.core.workflows
 
 import com.lemline.common.values.NodePosition
-import com.lemline.common.values.Token
 import com.lemline.common.values.Token.CATCH
 import com.lemline.common.values.Token.DO
 import com.lemline.common.values.Token.FOREACH
@@ -292,9 +291,9 @@ private fun parseListenChildren(node: Node<*>): List<Node<*>>? {
     return task.foreach?.`do`?.let {
         listOf(
             Node(
-                position = node.position.addToken(Token.FOR),
+                position = node.position.addToken(FOREACH),
                 task = DoTask(it),
-                name = "${Token.FOR}",
+                name = "$FOREACH",
                 parent = node,
             ),
         )
