@@ -443,7 +443,7 @@ internal object FullOrchestrator {
         // This ensures context exports from previous iterations are visible
         val foreachCommand = WorkflowCommand.ResumeFromTask(
             nodeStack = ctx.currentNodeStack,
-            nodePosition = ctx.listenEvent.nodePosition.addToken(Token.FOR),
+            nodePosition = ctx.listenEvent.nodePosition.addToken(Token.FOREACH),
             rawInput = eventData,
         )
 
@@ -534,7 +534,7 @@ internal object FullOrchestrator {
                 logger.debug { "Accumulated event (count=${rawEvents.size}): type=${cloudEvent.type}" }
 
                 // Evaluate expression against raw events (not foreach outputs)
-                val shouldStop = evaluateExpressionAsBoolean("$expression", JsonArray(rawEvents))
+                val shouldStop = evaluateExpressionAsBoolean(expression, JsonArray(rawEvents))
 
                 if (shouldStop) {
                     logger.debug { "Until expression evaluated to true after ${rawEvents.size} events" }
