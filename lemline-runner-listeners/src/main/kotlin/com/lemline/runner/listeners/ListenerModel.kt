@@ -13,10 +13,6 @@ import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 
 /**
  * Model representing an active listener waiting for CloudEvents.
@@ -92,41 +88,6 @@ data class ListenerModel(
     /** Timestamp when listener completed (stops collecting events). Does NOT trigger ListenerCompletionOutbox directly - see outboxDelayedUntil. */
     var completedAt: Instant? = null
 
-    /**
-     * Gets the readAs mode from the cached workflow definition.
-     * Defaults to DATA if the definition is not found.
-     */
-    val readAs: ListenAndReadAs by lazy {
-        val listenTasks = WorkflowCache.getListenTasks(workflowInfo)
-        val listenTask = listenTasks.find { it.nodePosition == nodePosition }
-
-        listenTask?.readAs ?: ListenAndReadAs.DATA
-    }
-
-    /**
-     * Transforms a given `cloudEvent` into a `JsonElement` based on the `readAs` configuration.
-     *
-     * The transformation behavior depends on the value of `readAs`:
-     * - `ListenAndReadAs.DATA`: Extracts and returns the "data" field from the CloudEvent, or `JsonNull` if it is absent.
-     * - `ListenAndReadAs.ENVELOPE`: Returns the entire `cloudEvent` object.
-     * - `ListenAndReadAs.RAW`: Returns the raw data in base64 (if the "data_base64" field exists), or the "data" field
-     *   as-is transformed into a primitive type string. If none of these fields are present, returns `JsonNull`.
-     *
-     * @param cloudEvent The CloudEvent data as a `JsonObject`.
-     * @return The transformed `JsonElement` based on the configured `readAs` value.
-     */
-    fun applyReadAs(cloudEvent: JsonObject): JsonElement = when (readAs) {
-        ListenAndReadAs.DATA -> cloudEvent["data"] ?: JsonNull
-        ListenAndReadAs.ENVELOPE -> cloudEvent // Return full CloudEvent
-        ListenAndReadAs.RAW -> {
-            // Return raw data as string (for non-JSON payloads)
-            cloudEvent["data_base64"]?.let { return it }
-            cloudEvent["data"]?.let {
-                it as? JsonPrimitive ?: JsonPrimitive(it.toString())
-            } ?: JsonNull
-        }
-    }
-
     // Outbox fields
     // NOTE: outboxDelayedUntil starts as NULL (waiting state).
     // It gets set to NOW() only after:
@@ -142,6 +103,13 @@ data class ListenerModel(
     override var outboxCompletedAt: Instant? = null
     override var outboxFailedAt: Instant? = null
     override var cleanupAfter: Instant? = null
+
+    /** How to read incoming CloudEvents (data, envelope, raw).*/
+    val readAs: ListenAndReadAs by lazy {
+        val listenTasks = WorkflowCache.getListenTasks(workflowInfo)
+        val listenTask = listenTasks.find { it.nodePosition == nodePosition }
+        listenTask?.readAs ?: ListenAndReadAs.DATA
+    }
 
     companion object Companion
 }

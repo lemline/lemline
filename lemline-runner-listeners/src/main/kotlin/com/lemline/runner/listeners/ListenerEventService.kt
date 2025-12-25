@@ -258,7 +258,9 @@ class ListenerEventService {
             val untilExpr = listener.untilExpression ?: return@mapNotNull null
 
             // Build JSON array of event DATA (extract from stored CloudEvents)
-            val eventsArray = JsonArray(accumulatedEvents.map { CloudEventService.extractData(it) })
+            val eventsArray = JsonArray(accumulatedEvents.map {
+                CloudEventService.parseStringAsData(it)
+            })
 
             // Evaluate the until expression
             val shouldComplete = try {

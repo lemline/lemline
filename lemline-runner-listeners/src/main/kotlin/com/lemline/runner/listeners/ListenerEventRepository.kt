@@ -605,7 +605,8 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             ORDER BY e.$LISTENER_ID_COLUMN, e.$SORT_KEY_COLUMN
         )
         UPDATE $tableName t
-        SET $OUTBOX_DELAYED_UNTIL_COLUMN = now(),
+        SET $OUTBOX_SCHEDULED_FOR_COLUMN = now(),
+            $OUTBOX_DELAYED_UNTIL_COLUMN = now(),
             $UPDATED_AT_COLUMN = now()
         FROM heads h
         WHERE t.$LISTENER_ID_COLUMN  = h.$LISTENER_ID_COLUMN
@@ -656,13 +657,15 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         ON t.$LISTENER_ID_COLUMN  = h.$LISTENER_ID_COLUMN
         AND t.$EVENT_ID_COLUMN     = h.$EVENT_ID_COLUMN
         AND t.$FILTER_INDEX_COLUMN = h.$FILTER_INDEX_COLUMN
-        SET t.$OUTBOX_DELAYED_UNTIL_COLUMN = NOW(6),
+        SET t.$OUTBOX_SCHEDULED_FOR_COLUMN = NOW(6),
+            t.$OUTBOX_DELAYED_UNTIL_COLUMN = NOW(6),
             t.$UPDATED_AT_COLUMN = NOW(6)
     """.trimIndent()
 
     private fun markReadyForForeachH2(limit: Int): String = """
         UPDATE $tableName
-        SET $OUTBOX_DELAYED_UNTIL_COLUMN = CURRENT_TIMESTAMP,
+        SET $OUTBOX_SCHEDULED_FOR_COLUMN = CURRENT_TIMESTAMP,
+            $OUTBOX_DELAYED_UNTIL_COLUMN = CURRENT_TIMESTAMP,
             $UPDATED_AT_COLUMN = CURRENT_TIMESTAMP
         WHERE ($LISTENER_ID_COLUMN, $EVENT_ID_COLUMN, $FILTER_INDEX_COLUMN) IN (
             SELECT e.$LISTENER_ID_COLUMN, e.$EVENT_ID_COLUMN, e.$FILTER_INDEX_COLUMN

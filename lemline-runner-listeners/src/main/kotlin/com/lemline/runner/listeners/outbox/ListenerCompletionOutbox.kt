@@ -12,20 +12,18 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.outbox.AbstractOutbox
 import com.lemline.runner.common.repositories.with.WithCrudRepository
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
+import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.listeners.ListenerConfig
 import com.lemline.runner.listeners.ListenerEventRepository
 import com.lemline.runner.listeners.ListenerModel
 import com.lemline.runner.listeners.ListenerRepository
-import com.lemline.runner.listeners.CloudEventService
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -155,7 +153,9 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
 
             // Build JSON array of event DATA (extract from stored CloudEvents)
             // Until expressions operate on event data, not the full envelope
-            val eventsArray = JsonArray(accumulatedEvents.map { extractDataFromStoredEvent(it) })
+            val eventsArray = JsonArray(accumulatedEvents.map {
+                CloudEventService.parseStringAsData(it)
+            })
 
             // Evaluate the until expression
             val shouldComplete = try {
@@ -206,7 +206,7 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
 
         // Apply readAs transformation to each stored CloudEvent
         val outputArray = JsonArray(events.map {
-            entity.applyReadAs(Json.parseToJsonElement(it) as JsonObject)
+            CloudEventService.parseStringAsData(it, entity.readAs)
         })
 
         // Create completion command
@@ -230,11 +230,4 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
         // Mark the listener to be cleaned up
         entity.cleanupAfter = Clock.System.now()
     }
-
-    /**
-     * Extracts the data portion from a stored CloudEvent JSON for until expression evaluation.
-     * Until expressions operate on the event data, not the full envelope.
-     */
-    private fun extractDataFromStoredEvent(eventJson: String): JsonElement =
-        CloudEventService.extractData(eventJson)
 }

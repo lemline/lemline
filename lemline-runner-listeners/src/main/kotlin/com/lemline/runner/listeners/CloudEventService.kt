@@ -4,38 +4,23 @@ package com.lemline.runner.listeners
 import com.lemline.common.logger.logger
 import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
+import java.util.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
- * Centralized service for CloudEvent serialization, deserialization, and data extraction.
+ * Service for CloudEvent serialization, deserialization, and transformation.
  *
- * This object provides a single point of access for all CloudEvent JSON operations,
- * ensuring consistent handling across the codebase.
- *
- * ## Operations
- *
- * - **Serialization**: Convert CloudEvent to JSON string for storage or messaging
- * - **Deserialization**: Parse JSON string back to CloudEvent
- * - **Data extraction**: Extract the `data` field from CloudEvent for expression evaluation
- *
- * ## Usage
- *
- * ```kotlin
- * // Serialize
- * val json = CloudEventService.serialize(cloudEvent)
- *
- * // Deserialize
- * val event = CloudEventService.deserialize(jsonString)
- *
- * // Parse data from CloudEvent object
- * val data = CloudEventService.parseData(cloudEvent)
- *
- * // Extract data from stored JSON string
- * val data = CloudEventService.extractData(storedJson)
- * ```
+ * Provides utilities to:
+ * - Serialize CloudEvents to JSON strings
+ * - Deserialize JSON strings to CloudEvents
+ * - Parse CloudEvent data as JSON
+ * - Transform CloudEvents based on ListenAndReadAs configuration
  */
 object CloudEventService {
     private val logger = logger()
@@ -68,48 +53,89 @@ object CloudEventService {
     }
 
     /**
-     * Parses the data payload from a CloudEvent object.
+     * Parses a CloudEvent JSON string according to the specified ListenAndReadAs mode.
      *
-     * Extracts and parses the `data` field from the CloudEvent as a JsonElement.
-     * Returns [JsonNull] if the data is null, empty, or cannot be parsed as JSON.
+     * Depending on the `readAs` parameter, extracts and returns:
+     * - DATA: The data portion of the CloudEvent as JSON
+     * - ENVELOPE: The entire CloudEvent as a JSON object
+     * - RAW: The raw data as a base64-encoded string
      *
-     * @param event The CloudEvent to extract data from
-     * @return The parsed data as JsonElement, or JsonNull if unavailable
+     * @param str The CloudEvent JSON string to parse
+     * @param readAs The ListenAndReadAs mode for parsing
+     * @return The parsed CloudEvent data as JsonElement
+     */
+    fun parseStringAsData(str: String, readAs: ListenAndReadAs = ListenAndReadAs.DATA): JsonElement {
+        val cloudEvent = deserialize(str)
+
+        return when (readAs) {
+            ListenAndReadAs.RAW -> parseRaw(cloudEvent)
+            ListenAndReadAs.DATA -> parseData(cloudEvent)
+            ListenAndReadAs.ENVELOPE -> parseEnvelope(cloudEvent)
+
+        }
+    }
+
+    /** Parses the raw data of a CloudEvent as a base64-encoded string.
+     *
+     * @param event The CloudEvent from which to parse raw data
+     * @return The raw data as a base64-encoded JsonPrimitive, or JsonNull if no data
+     */
+    fun parseRaw(event: CloudEvent): JsonElement {
+        val data = event.data ?: return JsonNull
+
+        return JsonPrimitive(Base64.getEncoder().encodeToString(data.toBytes()))
+    }
+
+    /**
+     * Parses the data portion of a CloudEvent as JSON.
+     *
+     * Attempts to parse the `data` field of the CloudEvent as a JSON element.
+     * If parsing fails, returns the raw data as a base64-encoded string.
+     *
+     * @param event The CloudEvent from which to parse data
+     * @return The parsed data as JsonElement, or JsonNull if no data
      */
     fun parseData(event: CloudEvent): JsonElement {
         val data = event.data ?: return JsonNull
 
         return try {
-            val bytes = data.toBytes()
-            if (bytes.isEmpty()) {
-                JsonNull
-            } else {
-                Json.parseToJsonElement(String(bytes, Charsets.UTF_8))
-            }
+            Json.parseToJsonElement(String(data.toBytes(), Charsets.UTF_8))
         } catch (e: Exception) {
-            logger.warn(e) { "Failed to parse CloudEvent data as JSON" }
-            JsonNull
+            logger.warn { "Failed to parse CloudEvent data as JSON, returning as base64: id=${event.id}, type=${event.type}, source=${event.source}, contentType=${event.dataContentType}, error=${e.message}" }
+            parseRaw(event)
         }
     }
 
     /**
-     * Extracts the data portion from a stored CloudEvent JSON string.
+     * Parses the entire CloudEvent as a JsonObject envelope.
      *
-     * Parses the stored JSON and extracts only the `data` field.
-     * This is useful for expression evaluation where only the event payload is needed.
+     * Constructs a JsonObject containing all standard CloudEvent attributes,
+     * extension attributes, and the data field.
      *
-     * @param storedJson The stored CloudEvent as JSON string
-     * @return The extracted data as JsonElement, or JsonNull if unavailable
+     * @param cloudEvent The CloudEvent to parse
+     * @return The CloudEvent represented as a JsonObject
      */
-    fun extractData(storedJson: String): JsonElement = try {
-        val cloudEvent = Json.parseToJsonElement(storedJson)
-        if (cloudEvent is JsonObject) {
-            cloudEvent["data"] ?: JsonNull
-        } else {
-            cloudEvent
+    fun parseEnvelope(cloudEvent: CloudEvent): JsonElement = buildJsonObject {
+        // Required attributes
+        put("specversion", cloudEvent.specVersion.toString())
+        put("id", cloudEvent.id)
+        put("source", cloudEvent.source.toString())
+        put("type", cloudEvent.type)
+        // Optional attributes
+        cloudEvent.time?.let { put("time", it.toString()) }
+        cloudEvent.subject?.let { put("subject", it) }
+        cloudEvent.dataContentType?.let { put("datacontenttype", it) }
+        cloudEvent.dataSchema?.let { put("dataschema", it.toString()) }
+        // Extension attributes (custom)
+        for (name in cloudEvent.extensionNames) {
+            when (val value = cloudEvent.getExtension(name)) {
+                is String -> put(name, value)
+                is Number -> put(name, value)
+                is Boolean -> put(name, value)
+                else -> value?.let { put(name, it.toString()) }
+            }
         }
-    } catch (e: Exception) {
-        logger.warn(e) { "Failed to extract data from stored CloudEvent" }
-        JsonNull
+        // Data
+        put("data", parseData(cloudEvent))
     }
 }

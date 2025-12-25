@@ -186,7 +186,7 @@ ListenerForeachOutbox  Check completion
 |-----------------|---------------|
 | **Custom matching logic** | Modify `CloudEventService` |
 | **New strategy** | Add to `ListenerStrategy` enum |
-| **Custom readAs mode** | Extend `ListenerModel.applyReadAs()` |
+| **Custom readAs mode** | Extend `CloudEventService.applyReadAs()` |
 
 ## Database Tables
 

@@ -3,6 +3,7 @@ package com.lemline.runner.listeners.outbox
 
 import com.lemline.common.values.Token
 import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
@@ -10,6 +11,7 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.outbox.AbstractOutbox
 import com.lemline.runner.common.repositories.with.WithCrudRepository
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
+import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.listeners.ListenerConfig
 import com.lemline.runner.listeners.ListenerEventModel
 import com.lemline.runner.listeners.ListenerEventRepository
@@ -21,8 +23,6 @@ import jakarta.inject.Inject
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 
 /**
  * ListenerForeachOutbox is a specialized implementation of AbstractOutbox for handling "foreach" processing pattern.
@@ -118,10 +118,10 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
      * Applies the readAs transformation to the stored CloudEvent.
      */
     private suspend fun process(listenerEvent: ListenerEventModel, listener: ListenerModel) {
-        val listenStarted = listener.instanceMessage.workflowState
+        val listenStarted: WorkflowEvent.ListenStarted = listener.instanceMessage.workflowState
 
         // Apply readAs transformation to stored CloudEvent
-        val eventData = listener.applyReadAs(Json.parseToJsonElement(listenerEvent.event) as JsonObject)
+        val eventData = CloudEventService.parseStringAsData(listenerEvent.event, listener.readAs)
 
         // Build the foreach.do position
         val listenPosition = listenStarted.nodePosition
@@ -140,7 +140,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
         )
 
         // Derive idempotent message ID from listener ID and event ID
-        val messageId = listenerEvent.listenerId.derive("-foreach-${listenerEvent.eventId}-resume")
+        val messageId = listener.id.derive("-foreach-${listenerEvent.eventId}-resume")
 
         commandEmitter.send(resumeMessage, messageId)
 

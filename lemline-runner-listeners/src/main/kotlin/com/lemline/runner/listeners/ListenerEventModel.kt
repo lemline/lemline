@@ -65,7 +65,7 @@ data class ListenerEventModel(
      */
     val filterIndex: Int = 0,
 
-    /** CloudEvent data as JSON string */
+    /** CloudEvent as JSON string */
     val event: String,
 
     /** When outbox processing was scheduled (NULL for non-foreach events) */

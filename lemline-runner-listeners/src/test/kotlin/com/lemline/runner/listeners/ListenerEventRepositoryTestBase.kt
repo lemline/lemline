@@ -676,12 +676,344 @@ abstract class ListenerEventRepositoryTestBase {
         val events = getEventRepository().findByListenerId(listener.id)
         events shouldHaveSize 1
         events.first().outboxDelayedUntil shouldNotBe null
+        events.first().outboxScheduledFor shouldNotBe null // Also set by markReadyForForeach
     }
 
     @Test
     fun `markReadyForForeach should return 0 when no pending events exist`() = runTest {
         val marked = getEventRepository().markReadyForForeach(limit = 100)
         marked shouldBe 0
+    }
+
+    @Test
+    fun `markReadyForForeach should mark same event_id only once when it matches multiple filters`() = runTest {
+        // Scenario: ALL strategy with foreach, a single CloudEvent matches multiple filters
+        // This creates multiple rows with the same event_id but different filter_index
+        // The same event should only be processed ONCE through foreach.do, not once per filter
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        // Insert two rows with the SAME event_id but different filter_index
+        // This simulates a single CloudEvent matching both filters
+        val sameEventId = "single-cloud-event"
+        val event0 = createEvent(listener.id, filterIndex = 0, eventId = sameEventId, eventData = """{"type":"Event"}""")
+        val event1 = createEvent(listener.id, filterIndex = 1, eventId = sameEventId, eventData = """{"type":"Event"}""")
+        getEventRepository().insert(listOf(event0, event1))
+
+        // First call should mark exactly ONE row as ready (the one with lower sort_key)
+        val marked1 = getEventRepository().markReadyForForeach(limit = 100)
+        marked1 shouldBe 1
+
+        val eventsAfterFirstMark = getEventRepository().findByListenerId(listener.id)
+        val readyEvents = eventsAfterFirstMark.filter { it.outboxDelayedUntil != null }
+        readyEvents shouldHaveSize 1
+
+        // Simulate completing the first event's foreach processing
+        // IMPORTANT: markCompletedWithOutput should mark ALL rows with the same event_id as completed
+        val readyEvent = readyEvents.first()
+        getEventRepository().markCompletedWithOutput(
+            listenerId = listener.id,
+            eventId = readyEvent.eventId,
+            output = """{"result":"done"}"""
+        )
+
+        // Verify that BOTH rows are now marked as foreach_completed
+        // (since markCompletedWithOutput uses event_id without filter_index)
+        val allEvents = getEventRepository().findByListenerId(listener.id)
+        val completedEvents = allEvents.filter { it.foreachCompleted }
+        completedEvents shouldHaveSize 2 // Both rows should be completed
+        completedEvents.all { it.eventId == sameEventId } shouldBe true
+
+        // Second call should NOT mark another event as ready
+        val marked2 = getEventRepository().markReadyForForeach(limit = 100)
+        marked2 shouldBe 0
+    }
+
+    @Test
+    fun `markReadyForForeach should not mark second row while first row with same event_id is processing`() = runTest {
+        // This test verifies that while one row is being processed (has outbox_delayed_until set),
+        // other rows with the same event_id are blocked from being marked ready
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val sameEventId = "single-cloud-event"
+        val event0 = createEvent(listener.id, filterIndex = 0, eventId = sameEventId)
+        val event1 = createEvent(listener.id, filterIndex = 1, eventId = sameEventId)
+        getEventRepository().insert(listOf(event0, event1))
+
+        // Mark first row as ready
+        val marked1 = getEventRepository().markReadyForForeach(limit = 100)
+        marked1 shouldBe 1
+
+        // Without calling markCompletedWithOutput (simulating in-progress processing),
+        // the second row should NOT be marked as ready
+        val marked2 = getEventRepository().markReadyForForeach(limit = 100)
+        marked2 shouldBe 0 // Blocked by NOT EXISTS check (first row has outbox_delayed_until set)
+
+        // Verify only one row has outbox_delayed_until set
+        val allEvents = getEventRepository().findByListenerId(listener.id)
+        val readyEvents = allEvents.filter { it.outboxDelayedUntil != null }
+        readyEvents shouldHaveSize 1
+    }
+
+    @Test
+    fun `markReadyForForeach should block second row even after outbox processes first row`() = runTest {
+        // Full flow test: simulate outbox processing the first row (sets outbox_completed_at)
+        // and verify the second row with same event_id is still blocked
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        val sameEventId = "single-cloud-event"
+        val event0 = createEvent(listener.id, filterIndex = 0, eventId = sameEventId)
+        val event1 = createEvent(listener.id, filterIndex = 1, eventId = sameEventId)
+        getEventRepository().insert(listOf(event0, event1))
+
+        // Step 1: markReadyForForeach marks row 0
+        val marked1 = getEventRepository().markReadyForForeach(limit = 100)
+        marked1 shouldBe 1
+
+        // Step 2: Simulate outbox picking up and processing row 0
+        // The outbox would update: outbox_delayed_until = far_future, outbox_completed_at = NOW
+        // We simulate this by calling findEntitiesToProcess (which uses FOR UPDATE SKIP LOCKED)
+        val entities = getEventRepository().findEntitiesToProcess(maxAttempts = 3, limit = 10, connection = null)
+        entities shouldHaveSize 1
+        entities.first().eventId shouldBe sameEventId
+        entities.first().filterIndex shouldBe 0
+
+        // Step 3: Call markReadyForForeach again - row 1 should still be blocked
+        // because row 0 has foreach_completed=FALSE and outbox_delayed_until IS NOT NULL
+        val marked2 = getEventRepository().markReadyForForeach(limit = 100)
+        marked2 shouldBe 0 // Expected: 0 (blocked)
+
+        // Step 4: Only after markCompletedWithOutput should row 1 be unblocked
+        // But since markCompletedWithOutput updates ALL rows with the same event_id,
+        // row 1 will also be marked as completed and won't need processing
+        getEventRepository().markCompletedWithOutput(listener.id, sameEventId, """{"result":"done"}""")
+
+        // Verify BOTH rows are now completed
+        val allEvents = getEventRepository().findByListenerId(listener.id)
+        allEvents.all { it.foreachCompleted } shouldBe true
+
+        // And no more rows to mark
+        val marked3 = getEventRepository().markReadyForForeach(limit = 100)
+        marked3 shouldBe 0
+    }
+
+    @Test
+    fun `markReadyForForeach should process different event_ids independently`() = runTest {
+        // This test verifies that different event_ids are processed correctly
+        // When we have rows with DIFFERENT event_ids, they should be processed one at a time (FIFO)
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ALL, filtersCount = 2)
+        getListenerRepository().insert(listener)
+
+        // Insert rows with DIFFERENT event_ids
+        val eventA = createEvent(listener.id, filterIndex = 0, eventId = "event-A")
+        val eventB = createEvent(listener.id, filterIndex = 1, eventId = "event-B")
+        getEventRepository().insert(listOf(eventA, eventB))
+
+        // First call marks event-A as ready (lower sort_key)
+        val marked1 = getEventRepository().markReadyForForeach(limit = 100)
+        marked1 shouldBe 1
+
+        // While event-A is processing, event-B should be blocked (FIFO per listener)
+        val marked2 = getEventRepository().markReadyForForeach(limit = 100)
+        marked2 shouldBe 0
+
+        // Complete event-A
+        getEventRepository().markCompletedWithOutput(listener.id, "event-A", """{"result":"A"}""")
+
+        // Now event-B should be marked as ready
+        val marked3 = getEventRepository().markReadyForForeach(limit = 100)
+        marked3 shouldBe 1
+
+        val allEvents = getEventRepository().findByListenerId(listener.id)
+        val readyEvents = allEvents.filter { it.outboxDelayedUntil != null && !it.foreachCompleted }
+        readyEvents shouldHaveSize 1
+        readyEvents.first().eventId shouldBe "event-B"
+    }
+
+    @Test
+    fun `markReadyForForeach should respect limit parameter`() = runTest {
+        // Create multiple listeners, each with a pending event
+        val listener1 = createListener(hasForeach = true)
+        val listener2 = createListenerWithDifferentPosition(hasForeach = true)
+        val listener3 = createListenerWithThirdPosition(hasForeach = true)
+        getListenerRepository().insert(listOf(listener1, listener2, listener3))
+
+        // Insert one event per listener
+        val event1 = createEvent(listener1.id, filterIndex = 0, eventId = "event-1")
+        val event2 = createEvent(listener2.id, filterIndex = 0, eventId = "event-2")
+        val event3 = createEvent(listener3.id, filterIndex = 0, eventId = "event-3")
+        getEventRepository().insert(listOf(event1, event2, event3))
+
+        // With limit=2, only 2 listeners should have events marked
+        val marked = getEventRepository().markReadyForForeach(limit = 2)
+        marked shouldBe 2
+
+        // Verify only 2 events have outboxDelayedUntil set
+        val allEvents = listOf(
+            getEventRepository().findByListenerId(listener1.id),
+            getEventRepository().findByListenerId(listener2.id),
+            getEventRepository().findByListenerId(listener3.id)
+        ).flatten()
+        val readyEvents = allEvents.filter { it.outboxDelayedUntil != null }
+        readyEvents shouldHaveSize 2
+    }
+
+    @Test
+    fun `markReadyForForeach should mark one event per listener when multiple listeners have pending events`() = runTest {
+        // Create multiple listeners
+        val listener1 = createListener(hasForeach = true)
+        val listener2 = createListenerWithDifferentPosition(hasForeach = true)
+        getListenerRepository().insert(listOf(listener1, listener2))
+
+        // Insert multiple events per listener
+        val events1 = listOf(
+            createEvent(listener1.id, filterIndex = 0, eventId = "l1-event-1"),
+            createEvent(listener1.id, filterIndex = 1, eventId = "l1-event-2")
+        )
+        val events2 = listOf(
+            createEvent(listener2.id, filterIndex = 0, eventId = "l2-event-1"),
+            createEvent(listener2.id, filterIndex = 1, eventId = "l2-event-2")
+        )
+        getEventRepository().insert(events1 + events2)
+
+        // Should mark exactly one event per listener (2 total)
+        val marked = getEventRepository().markReadyForForeach(limit = 100)
+        marked shouldBe 2
+
+        // Verify each listener has exactly one event marked
+        val listener1Events = getEventRepository().findByListenerId(listener1.id)
+        val listener2Events = getEventRepository().findByListenerId(listener2.id)
+
+        listener1Events.filter { it.outboxDelayedUntil != null } shouldHaveSize 1
+        listener2Events.filter { it.outboxDelayedUntil != null } shouldHaveSize 1
+    }
+
+    @Test
+    fun `markReadyForForeach should respect FIFO ordering by sort_key`() = runTest {
+        val listener = createListener(hasForeach = true)
+        getListenerRepository().insert(listener)
+
+        // Insert events - they will have increasing sort_key values
+        val eventFirst = createEvent(listener.id, filterIndex = 0, eventId = "first-event")
+        val eventSecond = createEvent(listener.id, filterIndex = 1, eventId = "second-event")
+        val eventThird = createEvent(listener.id, filterIndex = 2, eventId = "third-event")
+        getEventRepository().insert(listOf(eventFirst, eventSecond, eventThird))
+
+        // First mark should select the event with lowest sort_key (first inserted)
+        getEventRepository().markReadyForForeach(limit = 100)
+
+        val events = getEventRepository().findByListenerId(listener.id)
+        val readyEvent = events.first { it.outboxDelayedUntil != null }
+        readyEvent.eventId shouldBe "first-event"
+
+        // Complete first event
+        getEventRepository().markCompletedWithOutput(listener.id, "first-event", """{}""")
+
+        // Second mark should select the next event (second inserted)
+        getEventRepository().markReadyForForeach(limit = 100)
+
+        val eventsAfter = getEventRepository().findByListenerId(listener.id)
+        val nextReadyEvent = eventsAfter.first { it.outboxDelayedUntil != null && !it.foreachCompleted }
+        nextReadyEvent.eventId shouldBe "second-event"
+    }
+
+    @Test
+    fun `markReadyForForeach should skip already completed events`() = runTest {
+        val listener = createListener(hasForeach = true)
+        getListenerRepository().insert(listener)
+
+        // Insert an event and mark it as already completed
+        val completedEvent = createEvent(listener.id, filterIndex = 0, eventId = "completed-event")
+        getEventRepository().insert(completedEvent)
+        getEventRepository().markCompletedWithOutput(listener.id, "completed-event", """{"done":true}""")
+
+        // Insert a pending event
+        val pendingEvent = createEvent(listener.id, filterIndex = 1, eventId = "pending-event")
+        getEventRepository().insert(pendingEvent)
+
+        // markReadyForForeach should only mark the pending event
+        val marked = getEventRepository().markReadyForForeach(limit = 100)
+        marked shouldBe 1
+
+        val events = getEventRepository().findByListenerId(listener.id)
+        val readyEvent = events.first { it.outboxDelayedUntil != null && !it.foreachCompleted }
+        readyEvent.eventId shouldBe "pending-event"
+    }
+
+    @Test
+    fun `markReadyForForeach should skip non-foreach listeners`() = runTest {
+        // Create a listener WITHOUT foreach (hasForeach = false)
+        val nonForeachListener = createListener(hasForeach = false)
+        getListenerRepository().insert(nonForeachListener)
+
+        // Insert event - for non-foreach listeners, events are inserted with foreach_completed = true
+        // So we manually insert one with foreach_completed = false to test the skip logic
+        val event = createEvent(nonForeachListener.id, filterIndex = 0, eventId = "event")
+        getEventRepository().insert(event)
+
+        // Create a listener WITH foreach
+        val foreachListener = createListenerWithDifferentPosition(hasForeach = true)
+        getListenerRepository().insert(foreachListener)
+
+        val foreachEvent = createEvent(foreachListener.id, filterIndex = 0, eventId = "foreach-event")
+        getEventRepository().insert(foreachEvent)
+
+        // markReadyForForeach should mark events for both listeners that have pending events
+        val marked = getEventRepository().markReadyForForeach(limit = 100)
+
+        // Both listeners have pending events with foreach_completed = false
+        marked shouldBe 2
+    }
+
+    @Test
+    fun `markReadyForForeach should handle listener with no pending events`() = runTest {
+        // Create a listener with only completed events
+        val listener = createListener(hasForeach = true)
+        getListenerRepository().insert(listener)
+
+        val event = createEvent(listener.id, filterIndex = 0, eventId = "event")
+        getEventRepository().insert(event)
+        getEventRepository().markCompletedWithOutput(listener.id, "event", """{}""")
+
+        // Create another listener with pending events
+        val listener2 = createListenerWithDifferentPosition(hasForeach = true)
+        getListenerRepository().insert(listener2)
+
+        val event2 = createEvent(listener2.id, filterIndex = 0, eventId = "event-2")
+        getEventRepository().insert(event2)
+
+        // Should only mark the pending event from listener2
+        val marked = getEventRepository().markReadyForForeach(limit = 100)
+        marked shouldBe 1
+
+        val events2 = getEventRepository().findByListenerId(listener2.id)
+        events2.first().outboxDelayedUntil shouldNotBe null
+    }
+
+    @Test
+    fun `markReadyForForeach should not mark events for listener already processing an event`() = runTest {
+        val listener = createListener(hasForeach = true)
+        getListenerRepository().insert(listener)
+
+        // Insert first event and mark it as ready (simulating in-progress)
+        val event1 = createEvent(listener.id, filterIndex = 0, eventId = "event-1")
+        getEventRepository().insert(event1)
+        getEventRepository().markReadyForForeach(limit = 100)
+
+        // Insert second event
+        val event2 = createEvent(listener.id, filterIndex = 1, eventId = "event-2")
+        getEventRepository().insert(event2)
+
+        // Second markReadyForForeach should not mark event2 (listener is blocked)
+        val marked = getEventRepository().markReadyForForeach(limit = 100)
+        marked shouldBe 0
+
+        val events = getEventRepository().findByListenerId(listener.id)
+        val readyEvents = events.filter { it.outboxDelayedUntil != null }
+        readyEvents shouldHaveSize 1
+        readyEvents.first().eventId shouldBe "event-1"
     }
 
     // ========== Listener completion tests ==========
