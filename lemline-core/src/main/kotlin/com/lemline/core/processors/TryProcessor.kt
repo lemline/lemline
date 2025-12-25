@@ -14,6 +14,8 @@ import com.lemline.core.states.WorkflowEvent.TaskRetryScheduled
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.utils.toDuration
 import com.lemline.core.utils.toRandomDuration
+import com.lemline.core.workflows.catchBlock
+import com.lemline.core.workflows.tryBlock
 import io.serverlessworkflow.api.types.ConstantBackoff
 import io.serverlessworkflow.api.types.ErrorFilter
 import io.serverlessworkflow.api.types.ExponentialBackOff
@@ -21,8 +23,6 @@ import io.serverlessworkflow.api.types.LinearBackoff
 import io.serverlessworkflow.api.types.RetryPolicy
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.TryTaskCatch
-import com.lemline.core.workflows.catchBlock
-import com.lemline.core.workflows.tryBlock
 import kotlin.math.pow
 import kotlin.time.Clock
 import kotlin.time.Duration
@@ -77,7 +77,7 @@ class TryProcessor(
     /**
      * This state is initialized when entering the TryTask node for the first time
      */
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): TryState = TryState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): TryState = TryState(
         startedAt = Clock.System.now(),
         transformedInput = transformedInput,  // Store for retries/catch
         attemptIndex = 0,  // Ready for first attempt
@@ -88,7 +88,7 @@ class TryProcessor(
     /**
      * Update state when re-entering from child after successful execution of the try block or the catch block.
      */
-    override fun stateEnterFromChild(
+    override fun stateWhenReEnteringFromChild(
         state: TryState,
         output: JsonElement,
         scope: Scope,

@@ -69,7 +69,7 @@ class EmitProcessor(
 
     override val isAsync = true
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = EmitState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = EmitState()
 
     /**
      * Handles the event triggered when a workflow emit task is started.

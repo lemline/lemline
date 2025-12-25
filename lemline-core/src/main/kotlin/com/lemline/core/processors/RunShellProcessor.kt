@@ -61,7 +61,7 @@ class RunShellProcessor(
 
     override val isAsync = true
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): RunState = RunState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): RunState = RunState()
 
     /**
      * Build the shell command execution configuration.

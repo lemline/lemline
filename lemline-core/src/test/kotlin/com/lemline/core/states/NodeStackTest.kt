@@ -171,6 +171,6 @@ class NodeStackTest {
 
         // Then - the catch/do path should be preserved, not become just /do/tryBlock/do
         assertEquals(stack, deserialized)
-        assertEquals(cPos, deserialized.lastPosition)
+        assertEquals(cPos, deserialized.currentPosition)
     }
 }

@@ -36,7 +36,7 @@ class RaiseProcessor(
     node: Node<RaiseTask>
 ) : NodeProcessor<RaiseTask, RaiseState>(node) {
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = RaiseState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = RaiseState(
         startedAt = Clock.System.now()
     )
 

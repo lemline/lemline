@@ -51,7 +51,7 @@ data class NodeStack(
      * The current position (top of stack).
      * Returns root position if stack is empty.
      */
-    val lastPosition: NodePosition by lazy {
+    val currentPosition: NodePosition by lazy {
         frames.last().first
     }
 
@@ -59,7 +59,7 @@ data class NodeStack(
      * The top state of the stack.
      * Returns null if stack is empty.
      */
-    val lastState: NodeState by lazy {
+    val currentState: NodeState by lazy {
         frames.last().second
     }
 
@@ -102,53 +102,39 @@ data class NodeStack(
     fun deriveIdempotentId(suffix: String = ""): IDV7 =
         IDV7.deriveFromPositionAndStep(
             baseId = rootState.workflowId.value,
-            position = lastPosition,
+            position = currentPosition,
             step = rootState.workflowStep,
             suffix = suffix
         )
 
-    /**
-     * Creates a new TaskStack with updated context in the root state.
-     *
-     * @param newContext The new context to set
-     * @return A new TaskStack with the updated context
-     */
+    /** Creates a new TaskStack with updated context in the root state.*/
     fun setContext(newContext: Scope): NodeStack = withRootState(rootState.copyWithContext(newContext))
 
-    /**
-     * Creates a new TaskStack with a new root state, replacing the existing one.
-     *
-     * @param newRoot The new root state
-     * @return A new TaskStack with the updated root
-     */
+    /** Creates a new TaskStack with a new root state, replacing the existing one.*/
     fun withRootState(newRoot: RootState): NodeStack =
         copy(frames = listOf(NodePosition.root to newRoot) + frames.drop(1))
 
-    /**
-     * Push a new frame onto the stack or update an existing frame.
-     */
+    /** Push a new frame onto the stack or update an existing frame.*/
     fun push(pair: Pair<NodePosition, NodeState>): NodeStack = NodeStack(frames + pair)
 
-    /**
-     * Pop the top frame from the stack.
-     */
+    /** Pop the top frame from the stack.*/
     fun pop(): NodeStack = NodeStack(frames.dropLast(1))
 
-    /**
-     * Returns a new StateStack with frames from root up to and including the position.
-     */
+    /** Returns a new StateStack with frames from root up to and including the position.*/
     fun popUntil(position: NodePosition): NodeStack {
         val index = frames.indexOfFirst { it.first == position }
         return if (index < 0) this else NodeStack(frames.take(index + 1))
     }
 
-    /**
-     * Returns a new StateStack with frames from root up to and excluding the position.
-     */
+    /** Returns a new StateStack with frames from root up to and excluding the position.*/
     fun popExcluding(position: NodePosition): NodeStack {
         val index = frames.indexOfFirst { it.first == position }
         return if (index < 0) this else NodeStack(frames.take(index))
     }
+
+    /** Update the current (top) state in the stack.*/
+    fun updateCurrentState(newState: NodeState): NodeStack =
+        NodeStack(frames.dropLast(1) + (currentPosition to newState))
 
     /**
      * Map over all entries (for toString and similar operations).

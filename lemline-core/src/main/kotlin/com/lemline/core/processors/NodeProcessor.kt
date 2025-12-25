@@ -28,12 +28,12 @@ import com.lemline.core.states.WorkflowEvent.ListenForEachCompleted
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
 import com.lemline.core.tasks.toKotlin
+import com.lemline.core.workflows.branches
 import io.serverlessworkflow.api.types.ExportAs
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.InputFrom
-import com.lemline.core.workflows.branches
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.api.types.SchemaUnion
@@ -64,11 +64,9 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * Create the initial state for this node.
      * Subclasses override to create their specific state type.
      */
-    abstract fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): S
+    abstract fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): S
 
-    /**
-     * Execute node action (for activity tasks).
-     */
+    /** Execute node action (for activity tasks).*/
     open suspend fun execute(
         transformedInput: JsonElement,
         scope: Scope,
@@ -77,9 +75,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     open val isAsync: Boolean = false
 
-    /**
-     * return started event for activities
-     */
+    /** return started event for activities*/
     open fun startedEvent(
         nodeStack: NodeStack,
         transformedInput: JsonElement,
@@ -97,43 +93,38 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         rootNode.task.use
     }
 
-    /**
-     * Update state when re-entering from child.
-     * Default: just increment visitCount.
-     */
-    open fun stateEnterFromChild(
+    /** Update state when re-entering from child.*/
+    open fun stateWhenReEnteringFromChild(
         state: S,
         output: JsonElement,
         scope: Scope,
         nodeName: String? = null
     ): S {
         // Default implementation for leaf nodes - just increment visitCount
-        @Suppress("UNCHECKED_CAST")
         return state
     }
 
     /**
-     * Determine where to go next based on current state.
+     * Determine where to go next based on current state. Overridden in control flow nodes.
      * Default: go to parent (leaf node behavior - activities, switch, etc.)
      */
     open fun getNextNode(
         state: S,
         dataset: JsonElement,
         scope: Scope,
-    ): NavigationInfo {
-        return NavigationInfo(
-            nextNode = node.parent,
-            nextDirective = getFlowDirective()
-        )
-    }
+    ) = NavigationInfo(
+        nextNode = node.parent,
+        nextDirective = getFlowDirective()
+    )
 
     // ========================================
     // Entering a Node for the first time
     // ========================================
+
     suspend fun enterFromParent(
         nodeStack: NodeStack,
-        rawInput: JsonElement,
         workflowInfo: WorkflowInfo,
+        rawInput: JsonElement,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         logger.debug { "Entering Down  node=${node.position} - ${node.task::class.simpleName}(input=$rawInput)" }
@@ -176,13 +167,13 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         scope = scope.withTransformedInput(transformedInput)
 
         // state creation
-        val state = stateEnterFromParent(transformedInput, scope)
+        val nodeState = stateWhenEnteringFromParent(transformedInput, scope)
 
         // push the state to the stack
-        val updatedStack = nodeStack.push(node.position to state)
+        val updatedStack = nodeStack.push(node.position to nodeState)
 
         // get the next node and an updated state for the current node
-        return continueTo(state, transformedInput, scope, updatedStack, workflowInfo, lifecycleHook)
+        return continueTo(updatedStack, workflowInfo, transformedInput, scope, lifecycleHook)
     }
 
     // ========================================
@@ -196,62 +187,60 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         }
 
     // here we process the current node, knowing that we come from a child node that output dataset and flow directive
-    internal suspend fun enterFromChild(
+    internal suspend fun reEnterFromChild(
         nodeStack: NodeStack,
+        workflowInfo: WorkflowInfo,
         output: JsonElement,
         flowDirective: FlowDirective?,
-        workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         logger.debug {
             "ReEntering Up  node=${node.position} - ${node.task::class.simpleName}(input=$output${
                 flowDirective?.get()?.let { ", directive=$it" } ?: ""
-            }), state=${nodeStack.lastState}"
+            }), state=${nodeStack.currentState}"
         }
         @Suppress("UNCHECKED_CAST")
-        val state = nodeStack.lastState as S
+        val state = nodeStack.currentState as S
         val scope = nodeStack.stateScope.withTask(node, state.startedAt)
 
-        val updatedState = stateEnterFromChild(state, output, scope, flowDirective.nodeName)
+        val updatedState: S = stateWhenReEnteringFromChild(state, output, scope, flowDirective.nodeName)
+        val updatedStack = nodeStack.updateCurrentState(updatedState)
 
         return when (val directive = flowDirective?.get()) {
             is FlowDirectiveEnum -> when (directive) {
                 // END: Workflow complete - recursive unwinding
                 FlowDirectiveEnum.END -> continueToEnd(
-                    output = output,
-                    nodeStack = nodeStack,
+                    nodeStack = updatedStack,
                     workflowInfo = workflowInfo,
+                    output = output,
                     lifecycleHook = lifecycleHook
                 )
                 // EXIT: exit current node
                 FlowDirectiveEnum.EXIT -> continueToParent(
-                    state = updatedState,
+                    nodeStack = updatedStack,
+                    workflowInfo = workflowInfo,
                     transformedInput = output,
                     currentFlowDirective = getFlowDirective(),
                     scope = scope,
-                    nodeStack = nodeStack,
-                    workflowInfo = workflowInfo,
                     lifecycleHook = lifecycleHook,
                 )
                 // CONTINUE: continue
                 FlowDirectiveEnum.CONTINUE -> continueTo(
-                    state = updatedState,
+                    nodeStack = updatedStack,
+                    workflowInfo = workflowInfo,
                     transformedInput = output,
                     scope = scope,
-                    nodeStack = nodeStack,
-                    workflowInfo = workflowInfo,
                     lifecycleHook = lifecycleHook
                 )
             }
 
             // Goto named sibling or null
             is String, null -> continueTo(
-                state = updatedState,
+                nodeStack = updatedStack,
+                workflowInfo = workflowInfo,
                 transformedInput = output,
                 scope = scope,
-                nodeStack = nodeStack,
-                workflowInfo,
-                lifecycleHook
+                lifecycleHook = lifecycleHook
             )
 
             else -> throw IllegalArgumentException("Unknown flow directive: $directive")
@@ -262,26 +251,29 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // CONTINUE
     // ========================================
     private suspend fun continueTo(
-        state: S,
-        transformedInput: JsonElement,
-        scope: Scope,
         nodeStack: NodeStack,
         workflowInfo: WorkflowInfo,
+        transformedInput: JsonElement,
+        scope: Scope,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
         // Pure navigation - determine where to go next
-        val (nextNode, nextDirective) = getNextNode(state, transformedInput, scope)
+        val (nextNode, nextDirective) = @Suppress("UNCHECKED_CAST") getNextNode(
+            nodeStack.currentState as S,
+            transformedInput,
+            scope
+        )
 
         // check if we should return to parent
+        @Suppress("UNCHECKED_CAST")
         return when (nextNode == node.parent) {
             // case of leaf (activities, switch, ...) OR end of a control flow
             true -> continueToParent(
-                state = state,
+                nodeStack = nodeStack,
+                workflowInfo = workflowInfo,
                 transformedInput = transformedInput,
                 currentFlowDirective = nextDirective,
                 scope = scope,
-                nodeStack = nodeStack,
-                workflowInfo = workflowInfo,
                 lifecycleHook = lifecycleHook,
             )
 
@@ -289,7 +281,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
             false -> continueToChild(
                 childNode = nextNode,
                 childRawInput = transformedInput,
-                updatedState = state,
                 nodeStack = nodeStack
             )
         }
@@ -298,10 +289,9 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     private fun continueToChild(
         childNode: Node<*>?,
         childRawInput: JsonElement,
-        updatedState: NodeState,
         nodeStack: NodeStack
     ) = getNextEvent(
-        nodeStack = nodeStack.pop().push(node.position to updatedState),
+        nodeStack = nodeStack,
         nextNode = childNode,
         nextInput = childRawInput,
         nextDirective = null,
@@ -311,12 +301,11 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // EXIT
     // ========================================
     private suspend fun continueToParent(
-        state: S,
+        nodeStack: NodeStack,
+        workflowInfo: WorkflowInfo,
         transformedInput: JsonElement,
         currentFlowDirective: FlowDirective?,
         scope: Scope,
-        nodeStack: NodeStack,
-        workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
 
@@ -325,7 +314,8 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
         // Execute action (e.g., HTTP call, set data)
         // For flow tasks, this just returns input unchanged
-        val rawOutput = execute(transformedInput, scope, state)
+        @Suppress("UNCHECKED_CAST")
+        val rawOutput = execute(transformedInput, scope, nodeStack.currentState as S)
 
         // Complete the task with the raw output
         return completeTask(rawOutput, currentFlowDirective, scope, nodeStack, workflowInfo, lifecycleHook)
@@ -391,9 +381,9 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // ========================================
 
     private suspend fun continueToEnd(
-        output: JsonElement,
         nodeStack: NodeStack,
         workflowInfo: WorkflowInfo,
+        output: JsonElement,
         lifecycleHook: LifecycleEventHook
     ): WorkflowEvent {
 

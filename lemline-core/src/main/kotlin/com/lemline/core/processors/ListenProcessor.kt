@@ -77,7 +77,7 @@ class ListenProcessor(
 
     override val isAsync = true
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = ListenState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = ListenState()
 
     /**
      * Handles the "started" event for a listen task by creating a `ListenStarted` event

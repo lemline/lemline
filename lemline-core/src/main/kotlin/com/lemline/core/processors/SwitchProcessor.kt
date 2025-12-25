@@ -61,7 +61,7 @@ class SwitchProcessor(
     node: Node<SwitchTask>,
 ) : NodeProcessor<SwitchTask, SwitchState>(node) {
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = SwitchState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = SwitchState()
 
     // SwitchProcessor doesn't need updateState - it's a leaf node that evaluates once
     // The default implementation (returning state unchanged) is sufficient

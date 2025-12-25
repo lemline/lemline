@@ -102,7 +102,7 @@ sealed class WorkflowCommand : WorkflowState() {
     ) : WorkflowCommand() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.currentPosition
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -122,7 +122,7 @@ sealed class WorkflowCommand : WorkflowState() {
     ) : WorkflowCommand() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.currentPosition
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -194,7 +194,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Outcome() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.currentPosition
 
         val exception: Exception get() = InternalException(error)
 
@@ -238,7 +238,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Outcome() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition // Fork position
+        override val nodePosition = nodeStack.currentPosition // Fork position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -262,7 +262,7 @@ sealed class WorkflowEvent : WorkflowState() {
         val exception: InternalException by lazy { InternalException(error) }
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition // Fork position
+        override val nodePosition = nodeStack.currentPosition // Fork position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -346,7 +346,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Suspension() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition // Wait position
+        override val nodePosition = nodeStack.currentPosition // Wait position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -403,7 +403,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Suspension() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition // RunWorkflow position
+        override val nodePosition = nodeStack.currentPosition // RunWorkflow position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -440,7 +440,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Suspension() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition // Fork position
+        override val nodePosition = nodeStack.currentPosition // Fork position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -476,7 +476,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Suspension() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition // Listen position
+        override val nodePosition = nodeStack.currentPosition // Listen position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -534,7 +534,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Outcome() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition // Listen position
+        override val nodePosition = nodeStack.currentPosition // Listen position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -562,7 +562,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : Suspension() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition // Emit position
+        override val nodePosition = nodeStack.currentPosition // Emit position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -596,7 +596,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : ActivityStarted() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.currentPosition
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -621,7 +621,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : ActivityStarted() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.currentPosition
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
@@ -646,7 +646,7 @@ sealed class WorkflowEvent : WorkflowState() {
     ) : ActivityStarted() {
 
         @Transient
-        override val nodePosition = nodeStack.lastPosition
+        override val nodePosition = nodeStack.currentPosition
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +

@@ -58,7 +58,7 @@ class ForProcessor(
     node: Node<ForTask>
 ) : NodeProcessor<ForTask, ForState>(node) {
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = ForState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = ForState(
         startedAt = Clock.System.now(),
         collection = evalForIn(transformedInput, scope),
         index = 0,  // Start at first iteration
@@ -66,7 +66,7 @@ class ForProcessor(
         forAt = node.task.`for`.at ?: "index"
     )
 
-    override fun stateEnterFromChild(
+    override fun stateWhenReEnteringFromChild(
         state: ForState,
         output: JsonElement,
         scope: Scope,

@@ -446,9 +446,9 @@ object StepByStepOrchestrator {
 
         // Execute the task
         val event = if (isFirstEntry) {
-            node.processor.enterFromParent(nodeStack, rawInput, workflowInfo, lifecycleHook)
+            node.processor.enterFromParent(nodeStack, workflowInfo, rawInput, lifecycleHook)
         } else {
-            node.processor.enterFromChild(nodeStack, rawInput, flowDirective, workflowInfo, lifecycleHook)
+            node.processor.reEnterFromChild(nodeStack, workflowInfo, rawInput, flowDirective, lifecycleHook)
         }
 
         return event
@@ -511,7 +511,7 @@ object StepByStepOrchestrator {
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
-        val scope = nodeStack.stateScope.withTask(node, nodeStack.lastState.startedAt)
+        val scope = nodeStack.stateScope.withTask(node, nodeStack.currentState.startedAt)
 
         val event = node.processor.completeTask(
             rawOutput = rawOutput,

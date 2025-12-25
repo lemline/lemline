@@ -80,7 +80,7 @@ class CallHttpProcessor(
 
     override val isAsync = true
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = CallState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = CallState()
 
     /**
      * Build the HTTP call configuration.

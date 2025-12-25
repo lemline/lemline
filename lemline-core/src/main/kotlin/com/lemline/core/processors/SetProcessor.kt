@@ -51,7 +51,7 @@ class SetProcessor(
     node: Node<SetTask>,
 ) : NodeProcessor<SetTask, SetState>(node) {
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope) = SetState()
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope) = SetState()
 
     /**
      * Execute SetTask action.

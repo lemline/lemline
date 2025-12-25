@@ -46,12 +46,12 @@ class DoProcessor(
     node: Node<DoTask>
 ) : NodeProcessor<DoTask, DoState>(node) {
 
-    override fun stateEnterFromParent(transformedInput: JsonElement, scope: Scope): DoState = DoState(
+    override fun stateWhenEnteringFromParent(transformedInput: JsonElement, scope: Scope): DoState = DoState(
         startedAt = Clock.System.now(),
         index = 0  // Start at first child
     )
 
-    override fun stateEnterFromChild(
+    override fun stateWhenReEnteringFromChild(
         state: DoState,
         output: JsonElement,
         scope: Scope,
