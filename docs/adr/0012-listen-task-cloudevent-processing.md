@@ -6,576 +6,905 @@ Accepted
 
 ## Context
 
-The `listen` task in Serverless Workflow DSL enables workflows to wait for CloudEvents before continuing execution.
+The `listen` task in Serverless Workflow DSL enables workflows to wait for CloudEvents before continuing execution. CloudEvent processing operates **independently** from workflow instance execution, using a separate messaging channel and processing pipeline.
+
 When a CloudEvent arrives, the system must:
 
-1. Match the event against workflow definitions to find relevant listen tasks
-2. Route the event to active listener instances waiting for it
+1. Match the event against **workflow definitions** to find relevant listen task configurations
+2. Route the event to **active listener instances** waiting for it
 3. Handle multiple consumption strategies (ONE, ANY, ALL, ANY+until)
-4. Ensure exactly-once semantics despite concurrent processing and retries
-5. Scale to potentially millions of active listeners
+4. Optionally process events through `foreach.do` branches
+5. Ensure exactly-once semantics despite concurrent processing and retries
+6. Scale to potentially millions of active listeners
 
-This ADR describes the architecture for processing incoming CloudEvents and completing listener instances.
+This ADR describes the architecture for:
+- CloudEvent ingestion on a **separate channel** (`cloudevents-in`)
+- Event matching against cached workflow definitions
+- Event storage and listener completion detection
+- Optional sequential `foreach.do` processing
+- Workflow resumption with accumulated event results
+
+### Channel Separation
+
+CloudEvent processing is **completely separate** from workflow command/event messages:
+
+```
+┌──────────────────────────────────────────────────────┐
+│ COMMANDS CHANNEL (lemline-commands)                  │
+│ Purpose: Workflow instance execution                 │
+│ Messages:                                            │
+│   • ResumeFromTask (foreach.do execution)            │
+│   • ResumeWithCompletedTask (listen completion)      │
+└──────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────┐
+│ EVENTS CHANNEL (lemline-events)                      │
+│ Purpose: Workflow lifecycle events                   │
+│ Messages:                                            │
+│   • ListenStarted (create listener record)           │
+│   • ListenForEachCompleted (event processed)         │
+└──────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────┐
+│ CLOUDEVENTS CHANNEL (cloudevents-in) ⚡ SEPARATE!    │
+│ Purpose: External event ingestion                    │
+│ Messages:                                            │
+│   • CloudEvent (any external event)                  │
+│ Processing: Independent from workflow execution      │
+└──────────────────────────────────────────────────────┘
+```
+
+This separation enables:
+- **Independent scaling** of event ingestion vs workflow execution
+- **Non-blocking ingestion** - CloudEvents don't wait for workflow processing
+- **Parallel processing** - Multiple CloudEvents and workflows can process concurrently
 
 ### Feature Overview
 
 The listen task supports four consumption strategies:
 
-| Strategy                    | Description                                    | Completion Condition                              |
-|-----------------------------|------------------------------------------------|---------------------------------------------------|
-| **ONE**                     | Wait for a single event matching one filter    | First matching event                              |
-| **ANY**                     | Wait for first event matching any of N filters | First matching event from any filter              |
-| **ANY + until(expression)** | Accumulate events until expression is true     | Expression evaluates to true on accumulated array |
-| **ANY + until(event)**      | Accumulate events until termination event      | Termination event type arrives                    |
-| **ALL**                     | Wait for one event per filter                  | One event received for each of N filters          |
+| Strategy | Description | Completion Condition |
+|----------|-------------|---------------------|
+| **ONE** | Wait for a single event matching one filter | First matching event |
+| **ANY** | Wait for first event matching any of N filters | First matching event from any filter |
+| **ANY + until(expression)** | Accumulate events until expression is true | Expression evaluates to true on accumulated array |
+| **ANY + until(event)** | Accumulate events until termination event | Termination event type arrives |
+| **ALL** | Wait for one event per filter | One event received for each of N filters |
 
 Each strategy has different requirements for event storage and completion detection.
 
 ## Decision
 
-We implement a **direct database operation architecture** that avoids loading listeners into memory:
+We implement a **modular, event-driven architecture** in the `lemline-runner-listeners` feature module that:
+- Processes CloudEvents on a separate channel
+- Matches events against cached workflow definitions
+- Stores events in database tables with outbox pattern
+- Optionally processes events through `foreach.do` branches (FIFO sequential)
+- Resumes workflows with accumulated results
 
-### Architecture Overview
+### Module Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                            CloudEvent Arrives                                   │
-│                                                                                 │
-│  CloudEventHandler.handleCloudEvent(event)                                      │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                    STEP 1: Definition Matching (In-Memory)                      │
-│                                                                                 │
-│  DefinitionListenService.findMatchingDefinitions(event)                         │
-│                                                                                 │
-│  For each workflow definition in DefinitionCache:                               │
-│    - Check if event matches any filter (type, source, data expressions)         │
-│    - Extract correlation values using correlate.from expressions                │
-│    - Return DefinitionMatch with (workflowInfo, position, correlation, strategy)│
-│                                                                                 │
-│  Also: findDefinitionsUntilEvent(event) for termination filters                 │
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                    STEP 2: Strategy-Specific Processing                          │
-│                                                                                  │
-│  ┌──────────────────────────────────────────────────────────────────────────┐    │
-│  │ ONE / ANY (without until)                                                │    │
-│  │                                                                          │    │
-│  │ processOneAnyDirect():                                                   │    │
-│  │   Direct UPDATE without SELECT                                           │    │
-│  │   Sets event + outbox_delayed_until in single atomic operation           │    │
-│  │                                                                          │    │
-│  │   UPDATE lemline_listeners                                               │    │
-│  │   SET event = '[{...}]',                                                 │    │
-│  │       outbox_delayed_until = NOW()                                       │    │
-│  │   WHERE outbox_delayed_until IS NULL                                     │    │
-│  │     AND outbox_completed_at IS NULL                                      │    │
-│  │     AND (workflow_namespace, name, version, position, correlation)       │    │
-│  │                                                                          │    │
-│  └──────────────────────────────────────────────────────────────────────────┘    │
-│                                                                                  │
-│  ┌──────────────────────────────────────────────────────────────────────────┐    │
-│  │ ANY + until(expression)                                                  │    │
-│  │                                                                          │    │
-│  │ processAnyWithUntilExpressionDirect():                                   │    │
-│  │   1. Bulk INSERT events via INSERT...SELECT (no memory load)             │    │
-│  │   2. Stream listeners with accumulated events (cursor-based)             │    │
-│  │   3. Evaluate JQ expression on each listener's accumulated events        │    │
-│  │   4. Batch UPDATE listeners where expression evaluates to true           │    │
-│  │                                                                          │    │
-│  └──────────────────────────────────────────────────────────────────────────┘    │
-│                                                                                  │
-│  ┌──────────────────────────────────────────────────────────────────────────┐    │
-│  │ ANY + until(event)                                                       │    │
-│  │                                                                          │    │
-│  │ processAnyWithUntilEventDirect():                                        │    │
-│  │   Bulk INSERT events for accumulation (no completion here)               │    │
-│  │                                                                          │    │
-│  │ processTerminationEventsDirect():                                        │    │
-│  │   When termination event arrives:                                        │    │
-│  │   UPDATE with subquery to aggregate accumulated events                   │    │
-│  │                                                                          │    │
-│  └──────────────────────────────────────────────────────────────────────────┘    │
-│                                                                                  │
-│  ┌──────────────────────────────────────────────────────────────────────────┐    │
-│  │ ALL                                                                      │    │
-│  │                                                                          │    │
-│  │ processAllDirect():                                                      │    │
-│  │   1. Bulk INSERT events with filter_index via INSERT...SELECT            │    │
-│  │   2. Direct UPDATE with COUNT subquery:                                  │    │
-│  │      WHERE (SELECT COUNT(*) FROM events) >= filters_count                │    │
-│  │                                                                          │    │
-│  └──────────────────────────────────────────────────────────────────────────┘    │
-│                                                                                  │
-└──────────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                    STEP 3: Outbox Completion                                     │
-│                                                                                  │
-│  ListenerCompletionOutbox polls for listeners with:                              │
-│    outbox_delayed_until <= NOW()                                                 │
-│    outbox_completed_at IS NULL                                                   │
-│                                                                                  │
-│  For each ready listener:                                                        │
-│    1. Read event column (contains JSON array of matched events)                  │
-│    2. Create ResumeWithCompletedTask command                                     │
-│    3. Send to workflow command channel                                           │
-│    4. Mark outbox_completed_at = NOW()                                           │
-│                                                                                  │
-└──────────────────────────────────────────────────────────────────────────────────┘
+lemline-runner-listeners/
+├── CloudEventService         - CloudEvent serialization/transformation
+├── ListenerService          - Listener lifecycle (start, foreach complete)
+├── ListenerEventService     - CloudEvent matching and storage
+├── DefinitionListenService  - Extract listen configs from definitions
+├── ListenerRepository       - lemline_listeners table operations
+├── ListenerEventRepository  - lemline_listener_events table operations
+├── outbox/
+│   ├── ListenerCompletionOutbox  - Resume workflows when complete
+│   └── ListenerForeachOutbox     - Process foreach.do sequentially
+└── cleaner/
+    └── ListenerCleaner      - Cleanup completed listeners
+```
+
+**Integration points:**
+- `CloudEventHandler` (in lemline-runner) delegates to `ListenerEventService`
+- `WorkflowEventHandler` (in lemline-runner) delegates to `ListenerService`
+
+### Complete Workflow Lifecycle
+
+#### Phase 1: Listen Task Initialization
+
+```
+┌─────────────────────────────────────────────────────┐
+│ WORKFLOW EXECUTION (lemline-core)                   │
+└─────────────────────────────────────────────────────┘
+                    ↓
+         Workflow hits listen task
+                    ↓
+      Processor throws ListenStarted event
+                    ↓
+┌─────────────────────────────────────────────────────┐
+│ EVENTS CHANNEL → WorkflowEventHandler               │
+└─────────────────────────────────────────────────────┘
+                    ↓
+      ListenerService.handleListenStarted()
+                    ↓
+         INSERT into lemline_listeners
+                    ↓
+      Stores: workflow identity, position,
+              correlation, strategy, hasForeach,
+              until config, instance state
+```
+
+The listener record contains all information needed to:
+- Match incoming CloudEvents (workflow def + position + filters)
+- Route events to specific instances (correlation values)
+- Detect completion (strategy + filters_count)
+- Resume workflow (serialized InstanceMessage)
+
+#### Phase 2: CloudEvent Processing (⚡ SEPARATE PROCESS)
+
+```
+┌─────────────────────────────────────────────────────┐
+│ CLOUDEVENTS CHANNEL → CloudEventHandler             │
+└─────────────────────────────────────────────────────┘
+                    ↓
+   ListenerEventService.handleCloudEvent()
+                    ↓
+   ┌────────────────────────────────────────┐
+   │ Step 1: Definition Matching (in-memory)│
+   │ DefinitionListenService checks:        │
+   │ • Which workflow defs listen for event │
+   │ • Which workflow defs have until event │
+   │ Returns: matching positions + filters  │
+   └────────────────────────────────────────┘
+                    ↓
+   ┌────────────────────────────────────────┐
+   │ Step 2: Instance Matching (database)   │
+   │ Query lemline_listeners for:           │
+   │ • completed_at IS NULL (still active)  │
+   │ • Matching workflow def + position     │
+   │ • Matching correlation values (if any) │
+   └────────────────────────────────────────┘
+                    ↓
+   ┌────────────────────────────────────────┐
+   │ Step 3: Dual Matching                  │
+   │ Same CloudEvent can match:             │
+   │ • Regular filters → accumulate event   │
+   │ • Until filters → terminate listener   │
+   └────────────────────────────────────────┘
+                    ↓
+   ┌────────────────────────────────────────┐
+   │ Step 4: Event Storage                  │
+   │ For each matching listener:            │
+   │ INSERT into lemline_listener_events    │
+   │ • listener_id (FK)                     │
+   │ • event_id (CloudEvent ID)             │
+   │ • filter_name (which filter matched)   │
+   │ • event (serialized CloudEvent JSON)   │
+   └────────────────────────────────────────┘
+                    ↓
+   ┌────────────────────────────────────────┐
+   │ Step 5: Completion Check               │
+   │ UPDATE lemline_listeners               │
+   │ SET completed_at = NOW()               │
+   │ IF strategy criteria met:              │
+   │ • ONE/ANY: 1 event exists              │
+   │ • ALL: all filters matched             │
+   │ • ANY_UNTIL_EVENT: termination arrived │
+   └────────────────────────────────────────┘
+```
+
+**Key points:**
+- CloudEvent matching happens against **workflow definitions** (not instances)
+- A single CloudEvent can match multiple listener instances
+- A single CloudEvent can match both regular AND termination filters
+- Event storage and completion check are atomic operations
+
+#### Phase 3: Foreach Processing (OPTIONAL - if hasForeach=true)
+
+```
+┌─────────────────────────────────────────────────────┐
+│ ListenerForeachOutbox (scheduled poll)              │
+└─────────────────────────────────────────────────────┘
+                    ↓
+   markReadyForForeach() - per listener:
+     SELECT oldest event (by sort_key)
+     WHERE outbox_completed_at IS NULL
+       AND no event currently processing
+     SET outbox_delayed_until = NOW()
+                    ↓
+              FIFO constraint:
+        Only ONE event at a time per listener
+                    ↓
+   Process ready event:
+     • Apply readAs transformation (DATA/ENVELOPE/RAW)
+     • Create ResumeFromTask command
+     • Position = listenPosition + "FOR" token  
+     • Input = transformed event data
+     • Send to COMMANDS CHANNEL
+                    ↓
+┌─────────────────────────────────────────────────────┐
+│ WORKFLOW EXECUTION (foreach.do branch)              │
+└─────────────────────────────────────────────────────┘
+                    ↓
+      Execute foreach.do tasks with event
+                    ↓
+      Returns ListenForEachCompleted event
+                    ↓
+┌─────────────────────────────────────────────────────┐
+│ EVENTS CHANNEL → WorkflowEventHandler               │
+└─────────────────────────────────────────────────────┘
+                    ↓
+   ListenerService.handleListenForEachCompleted()
+                    ↓
+   UPDATE lemline_listener_events
+   SET outbox_completed_at = NOW(),
+       output = <foreach result>
+                    ↓
+   Next event in FIFO becomes ready (automatic)
+```
+
+**Critical constraint:** Only ONE event processes at a time per listener (FIFO sequential). This ensures:
+- Event processing order matches insertion order
+- No race conditions between foreach iterations
+- Deterministic workflow behavior
+
+#### Phase 4: Listener Completion
+
+```
+┌─────────────────────────────────────────────────────┐
+│ ListenerCompletionOutbox (scheduled poll)           │
+└─────────────────────────────────────────────────────┘
+                    ↓
+   Pre-processing: batchMarkReady()
+     • ONE/ANY: Check 1 event exists
+     • ALL: Check COUNT(DISTINCT filter_name) >= filters_count
+     • ANY_UNTIL_EXPR: Evaluate expression on completed events
+     • ANY_UNTIL_EVENT: Already marked by CloudEventHandler
+                    ↓
+   Find ready listeners:
+     WHERE completed_at IS NOT NULL
+       AND (hasForeach=false 
+            OR all events have outbox_completed_at)
+       AND outbox_delayed_until IS NULL
+                    ↓
+   SET outbox_delayed_until = NOW()
+                    ↓
+   Process listener:
+     • Aggregate foreach outputs from events
+     • Apply readAs transformation
+     • Create ResumeWithCompletedTask command
+     • Output = array of event data/outputs
+     • Send to COMMANDS CHANNEL
+                    ↓
+┌─────────────────────────────────────────────────────┐
+│ WORKFLOW EXECUTION (resume after listen)            │
+└─────────────────────────────────────────────────────┘
+                    ↓
+   Mark: outbox_completed_at, cleanup_after
+```
+
+### Two Independent Outbox Processors
+
+The listen feature uses **two separate outbox processors** with distinct responsibilities:
+
+| Aspect | ListenerForeachOutbox | ListenerCompletionOutbox |
+|--------|----------------------|--------------------------|
+| **Table** | `lemline_listener_events` | `lemline_listeners` |
+| **Purpose** | Process events one-by-one through foreach.do | Resume workflow with all results |
+| **Triggers** | Event inserted AND listener.hasForeach=true | listener.completed_at set AND all foreach done |
+| **Constraint** | FIFO: One event at a time per listener | All events must be processed first |
+| **Sends** | `ResumeFromTask` (execute foreach branch) | `ResumeWithCompletedTask` (resume workflow) |
+| **Channel** | Commands (workflow execution) | Commands (workflow execution) |
+| **Idempotency** | Message ID = `listenerId-foreach-eventId-resume` | Message ID = `listenerId-listen-complete` |
+
+**Critical Flow:**
+```
+CloudEvent arrives → Stored in listener_events
+                ↓
+IF hasForeach=true:
+    ListenerForeachOutbox → Process FIFO → Mark completed
+                ↓
+WHEN all events processed (or no foreach):
+    ListenerCompletionOutbox → Resume workflow
 ```
 
 ### Database Schema
 
-Two tables support the listen task:
-
-**lemline_listeners** (main listener state):
+#### lemline_listeners - Active listener state
 
 ```sql
-CREATE TABLE lemline_listeners
-(
-    id                   UUID PRIMARY KEY,
-
-    -- Workflow definition reference
-    workflow_namespace   VARCHAR(255) NOT NULL,
-    workflow_name        VARCHAR(255) NOT NULL,
-    workflow_version     VARCHAR(255) NOT NULL,
-    workflow_id          UUID         NOT NULL,
-    workflow_position    TEXT         NOT NULL,
-    workflow_state       TEXT         NOT NULL,
-
-    -- Correlation (for event routing)
-    correlation_values   TEXT,           -- JSON: {"orderId":"123"}
-
-    -- Single event storage (ONE/ANY) or aggregated events (ALL/ANY+until)
-    event                TEXT,
-
-    -- ALL strategy completion tracking
-    filters_count        INT,
-
-    -- Timeout
-    timeout_at           TIMESTAMPTZ(6),
-
-    -- Outbox pattern fields
-    outbox_delayed_until TIMESTAMPTZ(6), -- NULL = waiting, NOT NULL = ready
-    outbox_completed_at  TIMESTAMPTZ(6),
-    outbox_failed_at     TIMESTAMPTZ(6),
-    -- ... other outbox fields
+CREATE TABLE lemline_listeners (
+    id UUID PRIMARY KEY,
+    
+    -- Workflow Definition Reference (for CloudEvent matching)
+    workflow_namespace VARCHAR(255) NOT NULL,
+    workflow_name      VARCHAR(255) NOT NULL,
+    workflow_version   VARCHAR(255) NOT NULL,
+    workflow_position  TEXT         NOT NULL,
+    
+    -- Instance Reference (for workflow resumption)
+    instance_message   TEXT         NOT NULL,  -- Serialized InstanceMessage<ListenStarted>
+    workflow_id        UUID         NOT NULL,
+    
+    -- Configuration (extracted from cached workflow definition)
+    strategy           VARCHAR(20)  NOT NULL,  -- ONE/ANY/ANY_UNTIL_EXPR/ANY_UNTIL_EVENT/ALL
+    filters_count      INT,                     -- Number of filters (for ALL strategy)
+    has_foreach        BOOLEAN      NOT NULL DEFAULT FALSE,
+    has_until          BOOLEAN      NOT NULL DEFAULT FALSE,
+    until_expression   TEXT,                    -- JQ expression (if until is expression-based)
+    read_as            VARCHAR(10)  NOT NULL DEFAULT 'DATA',  -- DATA/ENVELOPE/RAW
+    
+    -- Correlation (for instance-specific event routing)
+    correlation_values TEXT,                    -- JSON: {"orderId":"123"}
+    
+    -- Completion Tracking
+    timeout_at         TIMESTAMP,
+    completed_at       TIMESTAMP,               -- Listener stopped collecting events
+    
+    -- Outbox Pattern (for ListenerCompletionOutbox)
+    outbox_scheduled_for   TIMESTAMP NOT NULL,
+    outbox_delayed_until   TIMESTAMP,           -- NULL=not ready, NOT NULL=ready
+    outbox_completed_at    TIMESTAMP,
+    outbox_attempt_count   INT NOT NULL DEFAULT 0,
+    outbox_error_class     VARCHAR(255),
+    outbox_error_message   VARCHAR(500),
+    outbox_error_stacktrace TEXT,
+    
+    -- Cleanup
+    cleanup_after      TIMESTAMP,
+    created_at         TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- Index for CloudEvent matching (active listeners only)
+CREATE INDEX idx_listeners_workflow_position
+    ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position)
+    WHERE completed_at IS NULL;
+
+-- Index for correlation-based matching
+CREATE INDEX idx_listeners_correlation
+    ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, 
+                          workflow_position, correlation_values)
+    WHERE completed_at IS NULL;
+
+-- Index for outbox processing
+CREATE INDEX idx_listeners_ready
+    ON lemline_listeners (outbox_delayed_until)
+    WHERE outbox_completed_at IS NULL AND completed_at IS NOT NULL;
 ```
 
-**lemline_listener_events** (event accumulation for ALL/ANY+until):
+#### lemline_listener_events - Accumulated events
 
 ```sql
-CREATE TABLE lemline_listener_events
-(
-    id            UUID PRIMARY KEY,
-    listener_id   UUID NOT NULL REFERENCES lemline_listeners (id) ON DELETE CASCADE,
-
-    -- Idempotency columns (mutually exclusive usage)
-    filter_index  INT,                  -- For ALL strategy (which filter matched)
-    cloudevent_id VARCHAR(255),         -- For ANY+until (prevent duplicate events)
-
-    event         TEXT NOT NULL,
-    created_at    TIMESTAMPTZ(6) NOT NULL,
-
-    UNIQUE (listener_id, filter_index), -- ONE event per filter for ALL
-    UNIQUE (listener_id, cloudevent_id) -- No duplicate CloudEvents for ANY+until
+CREATE TABLE lemline_listener_events (
+    -- Event Identity
+    listener_id   UUID         NOT NULL,  -- FK to lemline_listeners
+    event_id      VARCHAR(255) NOT NULL,  -- CloudEvent ID (for idempotency)
+    filter_name   VARCHAR(255) NOT NULL,  -- Which filter matched
+    
+    -- Event Data
+    event         TEXT         NOT NULL,  -- Serialized CloudEvent JSON
+    output        TEXT,                    -- Foreach.do output (set by ListenForEachCompleted)
+    
+    -- Ordering (for FIFO foreach processing)
+    sort_key      INT          NOT NULL,  -- Insertion order per listener
+    
+    -- Outbox Pattern (for ListenerForeachOutbox)
+    outbox_scheduled_for   TIMESTAMP NOT NULL,
+    outbox_delayed_until   TIMESTAMP,       -- NULL=pending, NOT NULL=ready
+    outbox_completed_at    TIMESTAMP,       -- Foreach.do completed
+    outbox_attempt_count   INT NOT NULL DEFAULT 0,
+    outbox_error_class     VARCHAR(255),
+    outbox_error_message   VARCHAR(500),
+    outbox_error_stacktrace TEXT,
+    
+    created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+    
+    PRIMARY KEY (listener_id, event_id),
+    
+    -- Constraints
+    UNIQUE (listener_id, filter_name),      -- One event per filter (ALL strategy)
+    FOREIGN KEY (listener_id) REFERENCES lemline_listeners(id) ON DELETE CASCADE
 );
+
+-- Index for foreach outbox processing (FIFO head per listener)
+CREATE INDEX idx_listener_events_foreach
+    ON lemline_listener_events (listener_id, sort_key)
+    WHERE outbox_completed_at IS NULL;
 ```
 
-### Key Design Decisions
+### Strategy-Specific Processing
 
-#### 1. Direct UPDATE Without SELECT (ONE/ANY)
+#### ONE Strategy
 
-For strategies that complete on the first event, we avoid loading listeners into memory:
+**Behavior:**
+- Completes on first matching event
+- Stores single event in `listener_events`
+- Marks `completed_at` immediately
 
-```kotlin
-suspend fun markReadyForCompletionByKeys(keys: List<ListenerQueryKey>, event: String): Int {
-    val sql = """
-        UPDATE lemline_listeners
-        SET event = ?,
-            outbox_delayed_until = ?,
-            updated_at = ?
-        WHERE outbox_delayed_until IS NULL
-          AND outbox_completed_at IS NULL
-          AND outbox_failed_at IS NULL
-          AND (workflow conditions...)
-    """.trimIndent()
-    // Execute and return affected row count
-}
+**Database Operations:**
+```
+1. INSERT into listener_events (event)
+2. UPDATE listeners SET completed_at = NOW()
+   WHERE id = ? AND completed_at IS NULL
 ```
 
-This single UPDATE can mark millions of listeners for completion without loading any into memory.
+**Output:** Array with one event `[event1]`
 
-#### 2. INSERT...SELECT for Bulk Event Insertion
+#### ANY Strategy
 
-For strategies that accumulate events, we use INSERT...SELECT to avoid N+1 queries:
+**Behavior:**
+- Completes on first event from any filter
+- Multiple filters, first to match wins
+- Stores single event in `listener_events`
 
-```kotlin
-val sql = databaseManager.insertIgnoreSelect(
-    tableName = "lemline_listener_events",
-    columns = "id, listener_id, filter_index, cloudevent_id, event, created_at",
-    selectSql = """
-        SELECT gen_random_uuid(), l.id, ?, ?, ?, CURRENT_TIMESTAMP
-        FROM lemline_listeners l
-        WHERE l.outbox_delayed_until IS NULL
-          AND l.outbox_completed_at IS NULL
-          AND (workflow conditions...)
-    """.trimIndent()
-)
+**Database Operations:**
+```
+1. INSERT into listener_events (event, filter_name)
+2. UPDATE listeners SET completed_at = NOW()
+   WHERE id = ? AND completed_at IS NULL
 ```
 
-This generates:
+**Output:** Array with one event `[eventFromFilter2]`
 
-- PostgreSQL: `INSERT INTO ... SELECT ... ON CONFLICT DO NOTHING`
-- MySQL: `INSERT IGNORE INTO ... SELECT ...`
+#### ALL Strategy
 
-#### 3. Cursor-Based Streaming for Expression Evaluation
+**Behavior:**
+- Requires one event per filter
+- UNIQUE constraint on `(listener_id, filter_name)` ensures one per filter
+- Completes when all filters matched
 
-For ANY+until(expression), we need to evaluate JQ expressions against accumulated events.
-Instead of loading all listeners, we stream them:
-
-```kotlin
-fun streamListenersWithEvents(keys: List<ListenerQueryKey>): Flow<ListenerWithEvents> = flow {
-    conn.autoCommit = false  // Enable cursor
-    stmt.fetchSize = 500     // Stream in batches
-
-    while (rs.next()) {
-        val listener = createModel(rs)
-        val events = parseJsonArrayToList(rs.getString("accumulated_events"))
-        emit(ListenerWithEvents(listener, events))
-    }
-}.flowOn(Dispatchers.IO)
+**Database Operations:**
+```
+1. INSERT into listener_events (event, filter_name)
+   ON CONFLICT (listener_id, filter_name) DO NOTHING
+2. Check completion:
+   SELECT COUNT(DISTINCT filter_name) FROM listener_events
+   WHERE listener_id = ?
+3. IF count >= filters_count:
+   UPDATE listeners SET completed_at = NOW()
 ```
 
-This maintains constant memory regardless of how many listeners match.
+**Output:** Array with N events `[filter0Event, filter1Event, filter2Event]`
 
-#### 4. Subquery-Based Completion Check for ALL Strategy
+#### ANY + until(expression) Strategy
 
-Instead of loading listeners to check completion, we use a subquery:
+**Behavior:**
+- Accumulates all matching events
+- Evaluates JQ expression against completed events array
+- Completes when expression returns true
+
+**Database Operations:**
+```
+1. INSERT into listener_events (event, event_id)
+   ON CONFLICT (listener_id, event_id) DO NOTHING
+2. On outbox poll:
+   SELECT events FROM listener_events
+   WHERE listener_id = ? AND outbox_completed_at IS NOT NULL
+   (Only completed foreach events for accuracy)
+3. Evaluate: JQExpression.eval(eventsArray, untilExpression)
+4. IF result == true:
+   UPDATE listeners SET completed_at = NOW()
+```
+
+**Output:** Array with 0 to N events `[event1, event2, ..., eventN]`
+
+**Note:** Expression only evaluated against completed events (foreach processing done).
+
+#### ANY + until(event) Strategy
+
+**Behavior:**
+- Accumulates all matching events
+- Completes when termination event arrives
+- Termination event NOT included in output
+
+**Database Operations:**
+```
+1. Accumulation:
+   INSERT into listener_events (event, event_id)
+   ON CONFLICT (listener_id, event_id) DO NOTHING
+
+2. Termination (CloudEventHandler):
+   UPDATE listeners SET completed_at = NOW()
+   WHERE id = ? AND completed_at IS NULL
+   (Termination event triggers completion immediately)
+```
+
+**Output:** Array with 0 to N events (excludes termination) `[event1, event2, event3]`
+
+### Correlation: Instance-Specific Event Routing
+
+**Problem:**
+Without correlation, ALL workflow instances listening for `order.shipped` receive EVERY `order.shipped` event (broadcast semantics).
+
+**Solution:**
+The `correlate` property creates instance-specific filtering based on workflow context:
+
+```yaml
+listen:
+  to:
+    one:
+      with:
+        type: order.shipped
+      correlate:
+        orderId:
+          from: '${ .orderId }'         # Extract from CloudEvent data
+          expect: '${ $input.orderId }' # Match against workflow input
+```
+
+#### How Correlation Works
+
+**1. Listener Creation** (at listen task start):
+
+```
+ListenerService.handleListenStarted()
+↓
+calculateCorrelationValues(config)
+↓
+Evaluates: expect expressions against workflow context
+Example: $input.orderId = "order-123"
+         $context.customerId = "C1"
+↓
+Stores: {"customerId":"C1","orderId":"order-123"} 
+        in listener.correlation_values
+        (sorted keys for consistent matching)
+```
+
+**2. CloudEvent Matching** (when event arrives):
+
+```
+ListenerEventService.handleCloudEvent(event)
+↓
+For each filter with correlate:
+  Extract: from expression against CloudEvent data
+  Example: event.data.orderId = "order-456"
+           event.data.customerId = "C2"
+↓
+Build: {"customerId":"C2","orderId":"order-456"}
+       (sorted keys to match storage format)
+↓
+Query: SELECT * FROM lemline_listeners
+       WHERE correlation_values = '{"customerId":"C2","orderId":"order-456"}'
+         AND completed_at IS NULL
+↓
+Result: Only listeners with matching correlation receive event
+```
+
+#### Expression Context - Critical Distinction
+
+The key difference between filters and correlation:
+
+| Expression Location | Evaluated Against | Available Variables |
+|---------------------|-------------------|---------------------|
+| `with.data` filter | CloudEvent data | `.` (event data only) |
+| `correlate.from` | CloudEvent data | `.` (event data only) |
+| `correlate.expect` | **Workflow context** | `$input`, `$context`, `$workflow`, `$task` |
+
+**Only `correlate.expect`** can access workflow-specific data to filter events.
+
+#### Complete Correlation Example
+
+```yaml
+do:
+  - waitForShipment:
+      listen:
+        to:
+          one:
+            with:
+              type: order.shipped
+              data: ${ .orderId != null }  # Filter: event must have orderId
+            correlate:
+              orderId:
+                from: '${ .orderId }'           # Extract from event
+                expect: '${ $input.orderId }'   # Match workflow input
+              customerId:
+                from: '${ .customerId }'        # Extract from event
+                expect: '${ $context.customerId }' # Match workflow context
+```
+
+**Execution:**
+
+```
+Instance A: input.orderId="123", context.customerId="C1"
+  → correlation_values = {"customerId":"C1","orderId":"123"}
+
+Instance B: input.orderId="456", context.customerId="C2"
+  → correlation_values = {"customerId":"C2","orderId":"456"}
+
+Event arrives: data = {orderId:"456", customerId:"C2"}
+  → extracted correlation = {"customerId":"C2","orderId":"456"}
+  → Matches only Instance B ✓
+  → Instance A ignored ✓
+```
+
+#### Auto-Correlation (No expect)
+
+When `expect` is omitted, the first event's value becomes the correlation:
+
+```yaml
+correlate:
+  sessionId:
+    from: '${ .sessionId }'
+    # No expect - first event's sessionId becomes the correlation value
+```
+
+**Use case:** Workflow doesn't know correlation value upfront but needs subsequent events to match the first.
+
+**Behavior:**
+
+```
+First event arrives: sessionId = "sess-789"
+  → UPDATE listener SET correlation_values = '{"sessionId":"sess-789"}'
+
+Second event arrives: sessionId = "sess-789"
+  → Matches (correlation now set)
+
+Third event arrives: sessionId = "sess-999"
+  → Does not match (different sessionId)
+```
+
+This is particularly useful for ALL strategy where correlation is established by the first filter match.
+
+#### Database Schema for Correlation
 
 ```sql
-UPDATE lemline_listeners l
-SET event                = (SELECT json_agg(e.event::json)
-                            FROM lemline_listener_events e
-                            WHERE e.listener_id = l.id),
-    outbox_delayed_until = NOW()
-WHERE outbox_delayed_until IS NULL
-  AND outbox_completed_at IS NULL
-  AND filters_count IS NOT NULL
-  AND (SELECT COUNT(*)
-       FROM lemline_listener_events e
-       WHERE e.listener_id = l.id) >= filters_count
-  AND (workflow conditions...)
+-- Stored as sorted JSON string for exact matching
+correlation_values TEXT
+
+-- Example values:
+'{"customerId":"C1","orderId":"123"}'  -- Sorted keys alphabetically
+
+-- Query patterns:
+WHERE correlation_values = ?           -- Exact match (most common)
+  OR correlation_values IS NULL        -- No correlation = match all instances
 ```
 
-## Idempotency Guarantees
+**Why sorted keys?** Ensures consistent string comparison regardless of expression evaluation order.
 
-Idempotency ensures that processing the same event multiple times produces the same result.
+### Sequence Diagrams
 
-### ONE/ANY Strategy
+#### Diagram 1: Simple ONE Strategy (no foreach)
 
-**Mechanism**: WHERE guards on UPDATE
+```
+CloudEvent  CloudEventHandler  ListenerEventService  DB  ListenerCompletionOutbox  Commands
+    |              |                    |              |            |                  |
+    |---event----->|                    |              |            |                  |
+    |              |---handleEvent----->|              |            |                  |
+    |              |                    |--INSERT event|            |                  |
+    |              |                    |--UPDATE completed_at      |                  |
+    |              |<---ok--------------|              |            |                  |
+    |<---ack-------|                    |              |            |                  |
+    |              |                    |              |            |                  |
+    [time passes - outbox polls]                      |            |                  |
+    |              |                    |              |<--poll-----|                  |
+    |              |                    |              |--listeners>|                  |
+    |              |                    |              |            |--ResumeWithCompletedTask->|
+    |              |                    |              |            |                  |
+    |              |                    |              |            |<--ack------------|
+    |              |                    |              |<-mark done-|                  |
+```
+
+#### Diagram 2: ANY + until(event) with foreach
+
+```
+CloudEvent  CloudEventHandler  DB  ListenerForeachOutbox  Workflow  ListenerCompletionOutbox
+    |              |            |            |               |              |
+    |---event1---->|            |            |               |              |
+    |              |--INSERT--->|            |               |              |
+    |<---ack-------|            |            |               |              |
+    |              |            |<--poll-----|               |              |
+    |              |            |--event1--->|               |              |
+    |              |            |            |--ResumeFromTask->             |
+    |              |            |            |            (foreach.do)       |
+    |              |            |            |<--ForEachCompleted--          |
+    |              |            |<-mark done-|               |              |
+    |              |            |            |               |              |
+    |---event2---->|            |            |               |              |
+    |              |--INSERT--->|            |               |              |
+    |<---ack-------|            |            |               |              |
+    |              |            |<--poll-----|               |              |
+    |              |            |--event2--->|               |              |
+    |              |            |            |--ResumeFromTask->             |
+    |              |            |            |<--ForEachCompleted--          |
+    |              |            |<-mark done-|               |              |
+    |              |            |            |               |              |
+    |-termination->|            |            |               |              |
+    |              |-INSERT+--->|            |               |              |
+    |              | completed_at            |               |              |
+    |<---ack-------|            |            |               |              |
+    |              |            |            |               |<--poll-------|
+    |              |            |            |               | (all foreach done)
+    |              |            |            |               |<-aggregate---|
+    |              |            |            |               |--ResumeWithCompletedTask->
+    |              |            |            |               |              |
+```
+
+**Key observations:**
+- Events processed sequentially (FIFO) through foreach
+- Each foreach completes before next starts
+- Termination event marks listener completed
+- ListenerCompletionOutbox waits for all foreach to finish
+
+#### Diagram 3: ALL Strategy
+
+```
+CloudEvent  CloudEventHandler  DB  ListenerCompletionOutbox  Commands
+    |              |            |            |                  |
+    |--filter0---->|            |            |                  |
+    |              |-INSERT---->|            |                  |
+    |              | filter=0   |            |                  |
+    |<---ack-------|            |            |                  |
+    |              |            |            |                  |
+    |--filter1---->|            |            |                  |
+    |              |-INSERT---->|            |                  |
+    |              | filter=1   |            |                  |
+    |              |-CHECK count|            |                  |
+    |              | (2 >= 2)   |            |                  |
+    |              |-UPDATE---->|            |                  |
+    |              | completed_at            |                  |
+    |<---ack-------|            |            |                  |
+    |              |            |<--poll-----|                  |
+    |              |            |--listeners>|                  |
+    |              |            |            |--ResumeWithCompletedTask->|
+```
+
+**Key observations:**
+- Two different events required (one per filter)
+- Completion check after each insert
+- Listener completes when all filters matched
+
+### ReadAs Transformation
+
+The `readAs` property controls how CloudEvent data is extracted before delivery to the workflow:
+
+| Value | Description | Output Content |
+|-------|-------------|----------------|
+| `data` (default) | Extract event payload only | `event.getData()` |
+| `envelope` | Include full CloudEvent | `{ type, source, id, data, ... }` |
+| `raw` | Raw event bytes | Base64-encoded data |
+
+**Applied at:**
+- `ListenerForeachOutbox`: Before sending to foreach.do
+- `ListenerCompletionOutbox`: Before aggregating final output
+
+**Example:**
+```yaml
+listen:
+  to:
+    one:
+      with:
+        type: order.created
+  read: envelope  # Include full CloudEvent metadata
+```
+
+**Implementation:** Handled by `CloudEventService.parseStringAsData()`
+
+### Idempotency Guarantees
+
+Idempotency is achieved through three layers:
+
+#### 1. Database Constraints
 
 ```sql
-WHERE outbox_delayed_until IS NULL   -- Not already marked ready
-  AND outbox_completed_at IS NULL    -- Not already completed
-  AND outbox_failed_at IS NULL       -- Not failed
+-- No duplicate CloudEvents per listener
+UNIQUE (listener_id, event_id)
+
+-- One event per filter (ALL strategy)
+UNIQUE (listener_id, filter_name)
+
+-- WHERE guards on updates
+WHERE completed_at IS NULL  -- Not already completed
 ```
 
-**Behavior**: If the same event is processed twice (e.g., due to consumer rebalance):
-
-1. First processing: UPDATE succeeds, sets `outbox_delayed_until`
-2. Second processing: UPDATE affects 0 rows (guard condition fails)
-
-**Result**: Only one completion message is sent.
-
-### ANY + until Strategies
-
-**Mechanism**: UNIQUE constraint on `cloudevent_id`
-
-```sql
-UNIQUE (listener_id, cloudevent_id)
-```
-
-**Behavior**: If the same CloudEvent is processed twice:
-
-1. First processing: INSERT succeeds
-2. Second processing: INSERT fails with conflict, `ON CONFLICT DO NOTHING` ignores it
-
-**Result**: Each CloudEvent is stored exactly once per listener.
-
-### ALL Strategy
-
-**Mechanism**: UNIQUE constraint on `filter_index`
-
-```sql
-UNIQUE (listener_id, filter_index)
-```
-
-**Behavior**: If the same filter matches twice (impossible per spec, but handled):
-
-1. First processing: INSERT succeeds for filter_index=0
-2. Second processing: INSERT fails with conflict, ignored
-
-**Result**: Each filter can only contribute one event per listener.
-
-### Completion Idempotency
-
-**Mechanism**: Outbox pattern with idempotent message IDs
+#### 2. Outbox Pattern
 
 ```kotlin
+// Idempotent message IDs derived from entity IDs
 val messageId = entity.id.derive("-listen-complete")
 instanceEmitter.send(resumeMessage, messageId)
 ```
 
-**Behavior**: If completion is sent twice:
+- Message broker deduplicates based on message ID
+- Workflow processors handle duplicate commands gracefully
 
-1. Message broker deduplicates based on message ID
-2. Workflow consumer handles duplicate commands gracefully
-
-## Race Condition Prevention
-
-### Scenario 1: Concurrent Events for ONE Listener
-
-Two different events arrive simultaneously, both matching a ONE listener.
-
-```
-Thread A: Event type=order.created
-Thread B: Event type=order.created
-
-Both call markReadyForCompletionByKeys() concurrently
-```
-
-**Protection**: Atomic UPDATE with WHERE guard
+#### 3. FIFO Foreach Processing
 
 ```sql
--- Thread A executes:
-UPDATE...SET outbox_delayed_until = NOW()
-WHERE outbox_delayed_until IS NULL
--- Result: 1 row affected
-
--- Thread B executes (nanoseconds later):
-UPDATE...SET outbox_delayed_until = NOW()
-WHERE outbox_delayed_until IS NULL
--- Result: 0 rows affected (guard condition fails)
+-- Only one event processing at a time per listener
+WHERE outbox_delayed_until IS NULL     -- Not marked ready yet
+  AND outbox_completed_at IS NULL       -- Not completed
+  AND NOT EXISTS (                       -- No other event processing
+      SELECT 1 FROM listener_events e2
+      WHERE e2.listener_id = listener_id
+        AND e2.outbox_delayed_until IS NOT NULL
+        AND e2.outbox_completed_at IS NULL
+  )
 ```
 
-**Outcome**: Only one event completes the listener.
-
-### Scenario 2: Same Event Processed by Multiple Workers
-
-Due to Kafka consumer group rebalance, the same event is processed by two workers.
-
-```
-Worker A: Processes event id=evt-123
-Worker B: Processes event id=evt-123 (redelivery)
-```
-
-**Protection (ANY+until)**: cloudevent_id UNIQUE constraint
-
-```sql
--- Worker A executes:
-INSERT INTO lemline_listener_events (..., cloudevent_id='evt-123', ...)
-ON CONFLICT DO NOTHING
--- Result: 1 row inserted
-
--- Worker B executes:
-INSERT INTO lemline_listener_events (..., cloudevent_id='evt-123', ...)
-ON CONFLICT DO NOTHING
--- Result: 0 rows inserted (conflict ignored)
-```
-
-**Outcome**: Event stored exactly once.
-
-### Scenario 3: ALL Strategy Concurrent Filter Matches
-
-Filter 1 and Filter 2 events arrive simultaneously for the same listener.
-
-```
-Thread A: Event matches filter_index=0
-Thread B: Event matches filter_index=1
-```
-
-**Protection**: Atomic UPDATE with COUNT subquery
-
-```sql
--- Both threads eventually call:
-UPDATE...WHERE (SELECT COUNT (*) FROM events) >= filters_count
-
--- Database evaluates atomically:
--- If Thread A sees count=2, Thread B also sees count=2
--- Both try UPDATE with WHERE outbox_delayed_until IS NULL
--- Only one succeeds
-```
-
-**Outcome**: Listener completed exactly once with both events.
-
-### Scenario 4: Termination Event During Accumulation
-
-Accumulation event and termination event arrive simultaneously.
-
-```
-Thread A: Accumulation event (temperature reading)
-Thread B: Termination event (shift ended)
-```
-
-**Protection**: INSERT before UPDATE ordering + WHERE guards
-
-```
-Thread A: INSERT event into lemline_listener_events (succeeds)
-Thread B: UPDATE with subquery aggregating all events
-
-The UPDATE's subquery includes Thread A's event if it was committed first.
-If not, Thread A's event is lost (acceptable - shift already ended).
-```
-
-**Outcome**: Termination captures all events committed before its UPDATE.
-
-## Performance Characteristics
-
-### Scalability Analysis
-
-| Operation                     | Time Complexity | Database Calls                      | Memory Usage  |
-|-------------------------------|-----------------|-------------------------------------|---------------|
-| ONE/ANY (N listeners)         | O(1)            | 1 UPDATE                            | O(1)          |
-| ALL (N listeners, M filters)  | O(M)            | M INSERTs + 1 UPDATE                | O(M)          |
-| ANY+until(expr) (N listeners) | O(N)            | 1 INSERT + stream + batched UPDATEs | O(batch_size) |
-| ANY+until(event) accumulation | O(1)            | 1 INSERT                            | O(1)          |
-| Termination event             | O(1)            | 1 UPDATE with subquery              | O(1)          |
-
-### Index Strategy
-
-```sql
--- Primary lookup index (partial for efficiency)
-CREATE INDEX idx_listeners_workflow_position
-    ON lemline_listeners (workflow_namespace, workflow_name, workflow_version,
-                          workflow_position) WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
-
--- Correlation-based lookup
-CREATE INDEX idx_listeners_correlation
-    ON lemline_listeners (workflow_namespace, workflow_name, workflow_version,
-                          workflow_position,
-                          correlation_values) WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
-
--- Outbox processing
-CREATE INDEX idx_listeners_processing
-    ON lemline_listeners (outbox_delayed_until) WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
-```
-
-Partial indexes ensure only active listeners are indexed, keeping index size small.
-
-### Batch Processing
-
-For ANY+until(expression), we batch UPDATE operations:
-
-```kotlin
-val batchSize = 1000
-val readyListeners = mutableMapOf<IDV7, String>()
-
-flow.collect { (listener, events) ->
-    if (evaluateExpression(events)) {
-        readyListeners[listener.id] = Json.encodeToString(events)
-
-        if (readyListeners.size >= batchSize) {
-            listenerRepository.batchMarkReadyForCompletionFromEvents(readyListeners)
-            readyListeners.clear()
-        }
-    }
-}
-```
-
-This reduces database round-trips while maintaining bounded memory.
-
-### Potential Bottlenecks
-
-1. **JQ Expression Evaluation**: CPU-bound for complex expressions on large event arrays.
-   Mitigation: Streaming limits concurrent evaluations.
-
-2. **Large WHERE Clauses**: Many ListenerQueryKey entries create large OR conditions.
-   Mitigation: Consider batching if keys exceed ~100.
-
-3. **JSON Aggregation**: `json_agg()` subqueries for ALL strategy completion.
-   Mitigation: Database optimizers handle this efficiently with proper indexing.
+**Result:** Duplicate event processing produces identical state.
 
 ## Consequences
 
 ### Positive
 
-- **Scalability**: Handles millions of listeners without loading into memory
-- **Reliability**: Database constraints guarantee exactly-once semantics
-- **Performance**: Bulk operations minimize database round-trips
-- **Simplicity**: Single responsibility - CloudEventHandler only marks listeners ready
-- **Decoupling**: Outbox pattern separates event matching from workflow resumption
+✅ **Independent Scaling**: CloudEvent ingestion scales separately from workflow execution  
+✅ **Modular Design**: Feature encapsulated in lemline-runner-listeners module  
+✅ **Non-Blocking Ingestion**: CloudEvents don't wait for workflow processing  
+✅ **Ordered Foreach**: FIFO guarantees foreach execution order per listener  
+✅ **Clean Separation**: Three distinct channels for different concerns  
+✅ **Flexible Correlation**: Instance-specific event routing with workflow context
 
 ### Negative
 
-- **Complexity**: Multiple code paths for different strategies
-- **Database Dependency**: Relies on database-specific features (ON CONFLICT, json_agg)
-- **Eventual Consistency**: Listeners may not be completed immediately (outbox polling interval)
-- **Expression Streaming**: ANY+until(expression) requires streaming, adding latency
+❌ **Complex State Machine**: Two outbox processors with interdependencies  
+❌ **Sequential Foreach**: One event at a time per listener (intentional trade-off)  
+❌ **Eventual Consistency**: Completion not immediate (polling intervals)  
+❌ **Memory for Expression Eval**: ANY_UNTIL_EXPR requires loading completed events  
+❌ **Definition Matching Cost**: Every CloudEvent checked against all workflow definitions
 
 ### Neutral
 
-- **Two Tables**: Separation of single events (listeners.event) and accumulated events (listener_events)
-- **Cursor Streaming**: Requires `autoCommit=false` which holds connections longer
+⚖️ **Two Tables**: Separation of listener state vs event accumulation  
+⚖️ **Multiple Queries**: Definition matching + instance matching per CloudEvent  
+⚖️ **Dual Matching**: Same CloudEvent can match regular + termination filters  
+⚖️ **Correlation Evaluation**: Expect expressions evaluated at listener creation
 
 ## Alternatives Considered
 
-### 1. Load All Listeners Into Memory
+### 1. Single Outbox Processor
 
-Load matching listeners, process in-memory, batch update.
+Process both foreach and completion in one outbox.
 
 **Rejected because:**
+- Mixes concerns (event processing vs workflow resumption)
+- Harder to reason about FIFO constraint
+- Polling optimization requires different strategies
 
+### 2. Parallel Foreach Processing
+
+Allow multiple events to process through foreach.do simultaneously.
+
+**Rejected because:**
+- Breaks event ordering guarantees
+- Complicates completion detection
+- Workflow behavior becomes non-deterministic
+
+### 3. In-Memory Event Matching
+
+Load all listeners into memory for event matching.
+
+**Rejected because:**
 - Memory explosion with millions of listeners
 - Out-of-memory crashes under high load
-- No benefit for simple strategies (ONE/ANY)
+- No benefit for database-based persistence
 
-### 2. Message Queue Per Listener
+### 4. CloudEvents in Workflow Channel
 
-Create a dedicated queue/topic per listener for event delivery.
-
-**Rejected because:**
-
-- Millions of queues not practical
-- Complex queue lifecycle management
-- Broker resource exhaustion
-
-### 3. Polling-Based Completion
-
-Listeners poll for their events instead of push-based update.
+Route CloudEvents through commands-in channel.
 
 **Rejected because:**
-
-- Inefficient for rare events
-- Increased database load
-- Higher latency to completion
-
-### 4. Stored Procedures
-
-Move all logic into database stored procedures.
-
-**Rejected because:**
-
-- Harder to test and maintain
-- Database-specific code duplication
-- JQ expression evaluation not available in SQL
+- Couples event ingestion to workflow execution
+- Workflow processing delays affect event ingestion
+- Cannot scale independently
 
 ## References
 
-- [Serverless Workflow Specification - Listen Task](https://github.com/serverlessworkflow/specification)
-- [ADR-0003 Messaging Architecture](./0003-messaging-architecture.md)
-- [ADR-0011 Listen Task Correlation Matching](./0011-listen-correlation-matching.md)
+**Module: lemline-runner-listeners**
+- `ListenerService.kt` - Listener lifecycle operations
+- `ListenerEventService.kt` - CloudEvent matching and storage
+- `CloudEventService.kt` - CloudEvent serialization/transformation
+- `DefinitionListenService.kt` - Extract listen configs from definitions
+- `ListenerRepository.kt` - Listener database operations
+- `ListenerEventRepository.kt` - Event database operations
+- `outbox/ListenerCompletionOutbox.kt` - Resume workflows
+- `outbox/ListenerForeachOutbox.kt` - Process foreach.do
+- `cleaner/ListenerCleaner.kt` - Cleanup completed listeners
+
+**Module: lemline-runner**
+- `messaging/cloudevents/CloudEventHandler.kt` - CloudEvent message handler
+- `messaging/cloudevents/CloudEventSubscriber.kt` - CloudEvent subscriber
+- `messaging/events/WorkflowEventHandler.kt` - Workflow event dispatcher
+
+**Module: lemline-core**
+- `processors/ListenProcessor.kt` - Listen task processor
+- `workflows/WorkflowCache.kt` - Cached workflow definitions
+
+**Documentation:**
 - [Listen Task Documentation](../listen-task.md)
-- `lemline-runner/src/main/kotlin/com/lemline/runner/messaging/cloudevents/CloudEventHandler.kt`
-- `lemline-runner/src/main/kotlin/com/lemline/runner/repositories/ListenerRepository.kt`
-- `lemline-runner/src/main/kotlin/com/lemline/runner/repositories/ListenerEventRepository.kt`
-- `lemline-runner/src/main/kotlin/com/lemline/runner/outbox/ListenerCompletionOutbox.kt`
+- [Serverless Workflow Specification - Listen Task](https://serverlessworkflow.io)
+- [ADR-0003 Messaging Architecture](./0003-messaging-architecture.md)
+- [lemline-runner-listeners README](../../lemline-runner-listeners/README.md)
