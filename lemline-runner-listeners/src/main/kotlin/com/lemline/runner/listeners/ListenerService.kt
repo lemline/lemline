@@ -9,7 +9,6 @@ import com.lemline.core.processors.ListenConfig
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.CachedUntilCondition
 import com.lemline.core.workflows.WorkflowCache
-import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import jakarta.enterprise.context.ApplicationScoped
@@ -28,10 +27,8 @@ import kotlinx.serialization.json.put
  *
  * Provides business logic for:
  * - Starting listeners (creating listener records for CloudEvent consumption)
- * - Handling foreach iteration completion
- * - Evaluating until conditions for listener completion
  *
- * For CloudEvent processing, see [ListenerEventService].
+ * For CloudEvent processing and event completion, see [ListenerEventService].
  */
 @ExperimentalTime
 @ExperimentalSerializationApi
@@ -40,12 +37,6 @@ class ListenerService {
 
     @Inject
     lateinit var listenerRepository: ListenerRepository
-
-    @Inject
-    lateinit var listenerEventRepository: ListenerEventRepository
-
-    @Inject
-    lateinit var databaseConfig: DatabaseConfig
 
     private val logger = logger()
 
@@ -105,43 +96,6 @@ class ListenerService {
                 "at position ${state.nodePosition}"
         }
         return true
-    }
-
-    /**
-     * Handles foreach iteration completion.
-     *
-     * When a foreach.do completes for a single event:
-     * 1. Extract eventId from the listen state in the nodeStack
-     * 2. Mark the event as completed with output using workflowId + position + eventId
-     * 3. The next event in FIFO sequence is triggered automatically
-     *
-     * @param message The instance message containing the listen foreach completed event
-     */
-    suspend fun handleListenForEachCompleted(message: InstanceMessage<WorkflowEvent.ListenForEachCompleted>) {
-        val state = message.workflowState
-        val iterationOutput = state.output
-        val listenPosition = state.nodePosition
-
-        logger.debug { "ListenForEachCompleted: listenPosition=$listenPosition" }
-
-        val listenState = state.nodeStack.currentState as? com.lemline.core.states.ListenState
-            ?: error("Listen state not found at current position")
-
-        val eventId = listenState.eventId
-            ?: error("EventId not set in listen state")
-
-        val outputJson = LemlineJson.encodeToString(iterationOutput)
-
-        listenerEventRepository.markForeachCompleted(
-            message.workflowId,
-            listenPosition,
-            eventId,
-            outputJson
-        )
-
-        logger.info {
-            "Foreach event (workflowId=${message.workflowId}, position=$listenPosition, eventId=$eventId) completed"
-        }
     }
 
     /**

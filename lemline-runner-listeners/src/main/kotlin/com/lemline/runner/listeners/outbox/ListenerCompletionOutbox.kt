@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners.outbox
 
-import com.fasterxml.jackson.databind.node.ObjectNode
-import com.lemline.common.json.LemlineJson
-import com.lemline.core.expressions.JQExpression
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
@@ -15,6 +12,7 @@ import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.listeners.ListenerConfig
 import com.lemline.runner.listeners.ListenerEventRepository
+import com.lemline.runner.listeners.ListenerEventService
 import com.lemline.runner.listeners.ListenerModel
 import com.lemline.runner.listeners.ListenerRepository
 import io.quarkus.runtime.Startup
@@ -24,9 +22,6 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 
 /**
  * Outbox processor for listener completions.
@@ -88,6 +83,9 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
 
     @Inject
     private lateinit var listenerEventRepository: ListenerEventRepository
+
+    @Inject
+    private lateinit var listenerEventService: ListenerEventService
 
     override val outboxRepository: WithOutboxRepository<ListenerModel> get() = listenerRepository
 
@@ -159,7 +157,7 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
 
             // Evaluate the until expression
             val shouldComplete = try {
-                evaluateUntilExpression(untilExpr, eventsArray)
+                listenerEventService.evaluateUntilExpression(untilExpr, eventsArray)
             } catch (e: Exception) {
                 logger.warn(e) { "Failed to evaluate until expression for listener ${listener.id}: $untilExpr" }
                 false
@@ -175,22 +173,6 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
         }
 
         return totalMarkedCompleted
-    }
-
-    /**
-     * Evaluates an until expression against accumulated events.
-     * The expression should return a boolean.
-     */
-    private fun evaluateUntilExpression(expression: String, events: JsonArray): Boolean = try {
-        with(LemlineJson) {
-            val inputNode = events.toJsonNode()
-            val scope = JsonObject(emptyMap()).toJsonNode() as ObjectNode
-            val result = JQExpression.eval(inputNode, expression, scope).toJsonElement()
-            (result as? JsonPrimitive)?.booleanOrNull == true
-        }
-    } catch (e: Exception) {
-        logger.warn(e) { "Failed to evaluate until expression: $expression" }
-        false
     }
 
     /**

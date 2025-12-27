@@ -39,9 +39,12 @@ do:
 ┌─────────────────────────────────────────────────────────────────┐
 │                   lemline-runner-listeners                      │
 ├─────────────────────────────────────────────────────────────────┤
-│  ListenerService            ← Business logic for listen events │
-│  ├── handleListenStarted()  ← Create listener record           │
-│  └── handleListenForEachCompleted() ← Mark iteration done      │
+│  ListenerService            ← Listener lifecycle operations    │
+│  └── handleListenStarted()  ← Create listener record           │
+│                                                                 │
+│  ListenerEventService       ← CloudEvent and event processing  │
+│  ├── handleCloudEvent()     ← Process incoming CloudEvents     │
+│  └── handleListenForEachCompleted() ← Mark foreach iteration done│
 │                                                                 │
 │  ListenerModel              ← Active listener entity            │
 │  ├── id                     ← Derived from position + step     │

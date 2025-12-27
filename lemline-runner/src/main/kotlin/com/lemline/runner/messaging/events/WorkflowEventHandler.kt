@@ -13,6 +13,7 @@ import com.lemline.runner.failures.FailureReasons.DESERIALIZATION_FAILURE
 import com.lemline.runner.failures.FailureReasons.getFailureReason
 import com.lemline.runner.failures.FailureRepository
 import com.lemline.runner.forks.ForkService
+import com.lemline.runner.listeners.ListenerEventService
 import com.lemline.runner.listeners.ListenerService
 import com.lemline.runner.messaging.CompensationException
 import com.lemline.runner.messaging.MessageHandler
@@ -42,7 +43,7 @@ import org.jetbrains.annotations.TestOnly
  * - ForkBranchCompleted → ForkService
  * - ForkBranchFailed → ForkService
  * - ListenStarted → ListenerService
- * - ListenForEachCompleted → ListenerService
+ * - ListenForEachCompleted → ListenerEventService
  */
 @ExperimentalTime
 @ApplicationScoped
@@ -58,6 +59,7 @@ internal class WorkflowEventHandler(
     private val forkService: ForkService,
     private val parentService: ParentService,
     private val listenerService: ListenerService,
+    private val listenerEventService: ListenerEventService,
     private val scheduleService: ScheduleService,
 ) : MessageHandler<InstanceMessage<WorkflowEvent>> {
 
@@ -170,7 +172,7 @@ internal class WorkflowEventHandler(
                 handleWorkflowFailed(current as InstanceMessage<WorkflowEvent.WorkflowFailed>)
 
             is WorkflowEvent.ListenForEachCompleted ->
-                listenerService.handleListenForEachCompleted(current as InstanceMessage<WorkflowEvent.ListenForEachCompleted>)
+                listenerEventService.handleListenForEachCompleted(current as InstanceMessage<WorkflowEvent.ListenForEachCompleted>)
 
             is WorkflowEvent.TaskScheduled ->
                 error("Unexpected state in workflow event handler: $state")
