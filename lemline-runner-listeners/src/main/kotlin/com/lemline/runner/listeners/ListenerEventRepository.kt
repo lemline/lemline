@@ -417,6 +417,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         connection: Connection? = null
     ): Int = databaseConfig.withConnection(connection) { conn ->
         val now = nowTimestamp()
+
         conn.prepareStatement(markForeachCompletedSql).use { stmt ->
             stmt.setString(1, output)
             stmt.setTimestamp(2, now)
@@ -440,6 +441,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
               AND l.$WORKFLOW_POSITION_COLUMN = ?
         )
         AND e.$EVENT_ID_COLUMN = ?
+        AND e.$FOREACH_COMPLETED_COLUMN = FALSE
         """.trimIndent()
     }
 

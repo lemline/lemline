@@ -69,6 +69,7 @@ data class CachedListenTask(
         get() = (until as? CachedUntilCondition.Event)?.filter
 }
 
+@Suppress("unused")
 object WorkflowCache {
 
     private val workflowCache = ConcurrentHashMap<WorkflowInfo, Workflow>()

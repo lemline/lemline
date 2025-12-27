@@ -7,7 +7,6 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.foreachBlock
 import com.lemline.core.workflows.getNode
-import io.serverlessworkflow.api.types.ListenTask
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
@@ -22,6 +21,7 @@ import com.lemline.runner.listeners.ListenerEventRepository
 import com.lemline.runner.listeners.ListenerModel
 import com.lemline.runner.listeners.ListenerRepository
 import io.quarkus.runtime.Startup
+import io.serverlessworkflow.api.types.ListenTask
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.Duration
@@ -139,6 +139,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
             version = listener.workflowVersion
         ) ?: error("Workflow ${listener.workflowInfo} not found in cache")
 
+        @Suppress("UNCHECKED_CAST")
         val listenNode = workflow.getNode(listenStarted.nodePosition) as Node<ListenTask>
         val foreachPosition = listenNode.foreachBlock?.position
             ?: error("Listen task at ${listenStarted.nodePosition} has no foreach block")
