@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners.outbox
 
-import com.lemline.common.values.Token
+import com.lemline.core.nodes.Node
 import com.lemline.core.states.ListenState
 import com.lemline.core.states.WorkflowCommand
-import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.workflows.WorkflowCache
+import com.lemline.core.workflows.foreachBlock
+import com.lemline.core.workflows.getNode
+import io.serverlessworkflow.api.types.ListenTask
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
@@ -119,7 +122,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
      * Applies the readAs transformation to the stored CloudEvent.
      */
     private suspend fun process(listenerEvent: ListenerEventModel, listener: ListenerModel) {
-        val listenStarted: WorkflowEvent.ListenStarted = listener.instanceMessage.workflowState
+        val listenStarted = listener.instanceMessage.workflowState
 
         val eventData = CloudEventService.parseStringAsData(listenerEvent.event, listener.readAs)
 
@@ -130,7 +133,15 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
             currentListenState.copy(eventId = listenerEvent.eventId)
         )
 
-        val foreachPosition = listenStarted.nodePosition.addToken(Token.FOR)
+        val workflow = WorkflowCache.getWorkflow(
+            namespace = listener.workflowNamespace,
+            name = listener.workflowName,
+            version = listener.workflowVersion
+        ) ?: error("Workflow ${listener.workflowInfo} not found in cache")
+
+        val listenNode = workflow.getNode(listenStarted.nodePosition) as Node<ListenTask>
+        val foreachPosition = listenNode.foreachBlock?.position
+            ?: error("Listen task at ${listenStarted.nodePosition} has no foreach block")
 
         val resumeCommand = WorkflowCommand.ResumeFromTask(
             nodeStack = updatedNodeStack,

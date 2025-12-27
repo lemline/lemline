@@ -4,7 +4,6 @@ package com.lemline.core.orchestrator
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
-import com.lemline.common.values.Token
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
@@ -439,11 +438,14 @@ internal object FullOrchestrator {
     ): JsonElement {
         logger.debug { "Processing foreach iteration $iterationIndex with event: $eventData" }
 
-        // Create a command using the CURRENT nodeStack (which may have been updated by previous iterations)
-        // This ensures context exports from previous iterations are visible
+        @Suppress("UNCHECKED_CAST")
+        val listenNode = ctx.workflow.getNode(ctx.listenEvent.nodePosition) as Node<ListenTask>
+        val foreachPosition = listenNode.foreachBlock?.position
+            ?: error("Listen task at ${ctx.listenEvent.nodePosition} has no foreach block")
+
         val foreachCommand = WorkflowCommand.ResumeFromTask(
             nodeStack = ctx.currentNodeStack,
-            nodePosition = ctx.listenEvent.nodePosition.addToken(Token.FOREACH),
+            nodePosition = foreachPosition,
             rawInput = eventData,
         )
 
