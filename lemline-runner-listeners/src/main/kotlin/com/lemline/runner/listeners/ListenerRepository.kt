@@ -150,7 +150,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         const val HAS_UNTIL_COLUMN = "has_until"
         const val UNTIL_EXPRESSION_COLUMN = "until_expression"
         const val HAS_FOREACH_COLUMN = "has_foreach"
-        const val COMPLETED_AT_COLUMN = "completed_at"
+        const val CLOSED_AT_COLUMN = "closed_at"
     }
 
     override val columns: ColumnBindings<ListenerModel> by lazy {
@@ -184,8 +184,8 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             column(CORRELATION_VALUES_COLUMN) { stmt, entity, idx ->
                 stmt.setString(idx, entity.correlationValues)
             }
-            column(COMPLETED_AT_COLUMN) { stmt, entity, idx ->
-                entity.completedAt?.let {
+            column(CLOSED_AT_COLUMN) { stmt, entity, idx ->
+                entity.closedAt?.let {
                     stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
                 } ?: stmt.setNull(idx, Types.TIMESTAMP)
             }
@@ -204,7 +204,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         untilExpression = rs.getString(UNTIL_EXPRESSION_COLUMN)
         hasForeach = rs.getBoolean(HAS_FOREACH_COLUMN)
         correlationValues = rs.getString(CORRELATION_VALUES_COLUMN)
-        completedAt = rs.getInstant(COMPLETED_AT_COLUMN)
+        closedAt = rs.getInstant(CLOSED_AT_COLUMN)
     }
         .readOutboxFields(rs)
         .readCleanupField(rs)
@@ -362,10 +362,10 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             // Mark ONE/ANY listeners as completed (at least one completed event)
             val oneAnySql = """
                 UPDATE $tableName l
-                SET $COMPLETED_AT_COLUMN = ?,
+                SET $CLOSED_AT_COLUMN = ?,
                     $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
                     $UPDATED_AT_COLUMN = ?
-                WHERE l.$COMPLETED_AT_COLUMN IS NULL
+                WHERE l.$CLOSED_AT_COLUMN IS NULL
                   AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
                   AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
                   AND l.$STRATEGY_COLUMN IN ('ONE', 'ANY')
@@ -386,10 +386,10 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             // Mark ALL listeners as completed (all filters matched and all events completed)
             val allSql = """
                 UPDATE $tableName l
-                SET $COMPLETED_AT_COLUMN = ?,
+                SET $CLOSED_AT_COLUMN = ?,
                     $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
                     $UPDATED_AT_COLUMN = ?
-                WHERE l.$COMPLETED_AT_COLUMN IS NULL
+                WHERE l.$CLOSED_AT_COLUMN IS NULL
                   AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
                   AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
                   AND l.$STRATEGY_COLUMN = 'ALL'
@@ -435,9 +435,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             // Note: outbox_delayed_until is NOT set here - done later when foreach events complete
             val sql = """
                 UPDATE $tableName l
-                SET $COMPLETED_AT_COLUMN = ?,
+                SET $CLOSED_AT_COLUMN = ?,
                     $UPDATED_AT_COLUMN = ?
-                WHERE l.$COMPLETED_AT_COLUMN IS NULL
+                WHERE l.$CLOSED_AT_COLUMN IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(untilEventKeys, "l")})
             """.trimIndent()
 
@@ -474,7 +474,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         UPDATE $tableName l
         SET $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
             $UPDATED_AT_COLUMN = ?
-        WHERE l.$COMPLETED_AT_COLUMN IS NOT NULL
+        WHERE l.$CLOSED_AT_COLUMN IS NOT NULL
           AND l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
           AND l.$OUTBOX_COMPLETED_AT_COLUMN IS NULL
           AND l.$OUTBOX_FAILED_AT_COLUMN IS NULL
@@ -514,7 +514,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             val sql = """
                 SELECT l.*, $eventsSubquery as events_json
                 FROM $tableName l
-                WHERE l.$COMPLETED_AT_COLUMN IS NULL
+                WHERE l.$CLOSED_AT_COLUMN IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(exprKeys, "l")})
             """.trimIndent()
 
@@ -558,7 +558,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                 SELECT l.*,
                        $eventsSubquery as events_json
                 FROM $tableName l
-                WHERE l.$COMPLETED_AT_COLUMN IS NULL
+                WHERE l.$CLOSED_AT_COLUMN IS NULL
                   AND l.$STRATEGY_COLUMN = '${ListenerStrategy.ANY_UNTIL_EXPR.name}'
                 LIMIT ?
                 FOR UPDATE SKIP LOCKED
@@ -599,11 +599,11 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
     private val markListenerCompletedSql by lazy {
         """
         UPDATE $tableName
-        SET $COMPLETED_AT_COLUMN = ?,
+        SET $CLOSED_AT_COLUMN = ?,
             $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
             $UPDATED_AT_COLUMN = ?
         WHERE $ID_COLUMN = ?
-          AND $COMPLETED_AT_COLUMN IS NULL
+          AND $CLOSED_AT_COLUMN IS NULL
           AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
           AND $OUTBOX_FAILED_AT_COLUMN IS NULL
         """.trimIndent()
@@ -627,9 +627,9 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             val placeholders = ids.joinToString(", ") { "?" }
             val sql = """
                 UPDATE $tableName
-                SET $COMPLETED_AT_COLUMN = ?, $UPDATED_AT_COLUMN = ?
+                SET $CLOSED_AT_COLUMN = ?, $UPDATED_AT_COLUMN = ?
                 WHERE $ID_COLUMN IN ($placeholders)
-                  AND $COMPLETED_AT_COLUMN IS NULL
+                  AND $CLOSED_AT_COLUMN IS NULL
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->

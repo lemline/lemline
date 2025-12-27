@@ -241,7 +241,7 @@ abstract class ListenerRepositoryTestBase {
             return ListenerModel.random().copy(
                 listenerStrategy = strategy,
             ).apply {
-                completedAt = null
+                closedAt = null
                 outboxCompletedAt = null
                 outboxFailedAt = null
                 outboxDelayedUntil = null
@@ -272,7 +272,7 @@ abstract class ListenerRepositoryTestBase {
             count shouldBe 1
             val updated = repository.findById(listener.id)
             updated shouldNotBe null
-            updated!!.completedAt shouldNotBe null
+            updated!!.closedAt shouldNotBe null
             updated.outboxDelayedUntil shouldBe null // Should NOT set outbox_delayed_until
         }
 
@@ -288,7 +288,7 @@ abstract class ListenerRepositoryTestBase {
             // Then
             count shouldBe 0
             val updated = repository.findById(listener.id)
-            updated!!.completedAt shouldBe null
+            updated!!.closedAt shouldBe null
         }
 
         @Test
@@ -304,7 +304,7 @@ abstract class ListenerRepositoryTestBase {
             // Then: Should filter out non-ANY_UNTIL_EVENT keys
             count shouldBe 0
             val updated = repository.findById(listener.id)
-            updated!!.completedAt shouldBe null
+            updated!!.closedAt shouldBe null
         }
 
         @Test
@@ -333,7 +333,7 @@ abstract class ListenerRepositoryTestBase {
         fun `should skip already completed listeners`() = runTest {
             // Given: An already completed ANY_UNTIL_EVENT listener
             val listener = createListener(ListenerStrategy.ANY_UNTIL_EVENT).apply {
-                completedAt = Clock.System.now()
+                closedAt = Clock.System.now()
             }
             repository.insert(listener)
             val queryKey = createQueryKey(listener, ListenerStrategy.ANY_UNTIL_EVENT)
@@ -363,8 +363,8 @@ abstract class ListenerRepositoryTestBase {
 
             // Then
             count shouldBe 2
-            repository.findById(listener1.id)!!.completedAt shouldNotBe null
-            repository.findById(listener2.id)!!.completedAt shouldNotBe null
+            repository.findById(listener1.id)!!.closedAt shouldNotBe null
+            repository.findById(listener2.id)!!.closedAt shouldNotBe null
         }
 
         @Test
@@ -383,7 +383,7 @@ abstract class ListenerRepositoryTestBase {
 
             // Then
             count shouldBe 1
-            repository.findById(listener.id)!!.completedAt shouldNotBe null
+            repository.findById(listener.id)!!.closedAt shouldNotBe null
         }
 
         @Test
@@ -420,7 +420,7 @@ abstract class ListenerRepositoryTestBase {
             return ListenerModel.random().copy(
                 listenerStrategy = strategy,
             ).apply {
-                completedAt = null
+                closedAt = null
                 outboxCompletedAt = null
                 outboxFailedAt = null
                 outboxDelayedUntil = null
@@ -543,7 +543,7 @@ abstract class ListenerRepositoryTestBase {
         fun `should not return already completed listeners`() = runTest {
             // Given: An already completed ANY_UNTIL_EXPR listener
             val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR).apply {
-                completedAt = Clock.System.now()
+                closedAt = Clock.System.now()
             }
             repository.insert(listener)
 
@@ -858,7 +858,7 @@ abstract class ListenerRepositoryTestBase {
             return ListenerModel.random().copy(
                 listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR,
             ).apply {
-                completedAt = null
+                closedAt = null
                 outboxCompletedAt = null
                 outboxFailedAt = null
                 outboxDelayedUntil = null
@@ -879,7 +879,7 @@ abstract class ListenerRepositoryTestBase {
 
             // Verify listener unchanged
             val unchanged = repository.findById(listener.id)
-            unchanged?.completedAt shouldBe null
+            unchanged?.closedAt shouldBe null
         }
 
         @Test
@@ -895,7 +895,7 @@ abstract class ListenerRepositoryTestBase {
             result shouldBe 1
 
             val updated = repository.findById(listener.id)
-            updated?.completedAt shouldNotBe null
+            updated?.closedAt shouldNotBe null
         }
 
         @Test
@@ -916,16 +916,16 @@ abstract class ListenerRepositoryTestBase {
             // Then
             result shouldBe 3
 
-            repository.findById(listener1.id)?.completedAt shouldNotBe null
-            repository.findById(listener2.id)?.completedAt shouldNotBe null
-            repository.findById(listener3.id)?.completedAt shouldNotBe null
+            repository.findById(listener1.id)?.closedAt shouldNotBe null
+            repository.findById(listener2.id)?.closedAt shouldNotBe null
+            repository.findById(listener3.id)?.closedAt shouldNotBe null
         }
 
         @Test
         fun `should skip already completed listeners`() = runTest {
             // Given: An already completed listener
             val listener = createPendingListener().apply {
-                completedAt = Clock.System.now()
+                closedAt = Clock.System.now()
             }
             repository.insert(listener)
 
@@ -938,7 +938,7 @@ abstract class ListenerRepositoryTestBase {
 
         @Test
         fun `should mark outbox-completed listener if not yet completed`() = runTest {
-            // Given: An outbox-completed but not yet completedAt listener
+            // Given: An outbox-completed but not yet closedAt listener
             val listener = createPendingListener().apply {
                 outboxCompletedAt = Clock.System.now()
             }
@@ -947,14 +947,14 @@ abstract class ListenerRepositoryTestBase {
             // When
             val result = repository.batchMarkListenersCompleted(listOf(listener.id))
 
-            // Then: Should mark as completed (completedAt was null)
+            // Then: Should mark as completed (closedAt was null)
             result shouldBe 1
-            repository.findById(listener.id)?.completedAt shouldNotBe null
+            repository.findById(listener.id)?.closedAt shouldNotBe null
         }
 
         @Test
         fun `should mark failed listener if not yet completed`() = runTest {
-            // Given: A failed but not yet completedAt listener
+            // Given: A failed but not yet closedAt listener
             val listener = createPendingListener().apply {
                 outboxFailedAt = Clock.System.now()
             }
@@ -963,9 +963,9 @@ abstract class ListenerRepositoryTestBase {
             // When
             val result = repository.batchMarkListenersCompleted(listOf(listener.id))
 
-            // Then: Should mark as completed (completedAt was null)
+            // Then: Should mark as completed (closedAt was null)
             result shouldBe 1
-            repository.findById(listener.id)?.completedAt shouldNotBe null
+            repository.findById(listener.id)?.closedAt shouldNotBe null
         }
 
         @Test
@@ -985,7 +985,7 @@ abstract class ListenerRepositoryTestBase {
             // Given: Mix of pending, already completed, and non-existent
             val pending1 = createPendingListener()
             val pending2 = createPendingListener()
-            val alreadyCompleted = createPendingListener().apply { completedAt = Clock.System.now() }
+            val alreadyCompleted = createPendingListener().apply { closedAt = Clock.System.now() }
             repository.insert(pending1)
             repository.insert(pending2)
             repository.insert(alreadyCompleted)
@@ -999,8 +999,8 @@ abstract class ListenerRepositoryTestBase {
             // Then: Only pending listeners should be marked (already completed and non-existent skipped)
             result shouldBe 2
 
-            repository.findById(pending1.id)?.completedAt shouldNotBe null
-            repository.findById(pending2.id)?.completedAt shouldNotBe null
+            repository.findById(pending1.id)?.closedAt shouldNotBe null
+            repository.findById(pending2.id)?.closedAt shouldNotBe null
         }
 
         @Test

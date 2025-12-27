@@ -25,7 +25,7 @@ import com.lemline.runner.common.repositories.ops.outboxColumns
 import com.lemline.runner.common.repositories.ops.readCleanupField
 import com.lemline.runner.common.repositories.ops.readOutboxFields
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
-import com.lemline.runner.listeners.ListenerRepository.Companion.COMPLETED_AT_COLUMN
+import com.lemline.runner.listeners.ListenerRepository.Companion.CLOSED_AT_COLUMN
 import com.lemline.runner.listeners.ListenerRepository.Companion.FILTERS_COUNT_COLUMN
 import com.lemline.runner.listeners.ListenerRepository.Companion.HAS_FOREACH_COLUMN
 import jakarta.enterprise.context.ApplicationScoped
@@ -179,7 +179,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                     CASE WHEN NOT l.$HAS_FOREACH_COLUMN THEN ? END,             /* foreach_output = event if not has foreach */
                     CASE WHEN l.$HAS_FOREACH_COLUMN THEN CURRENT_TIMESTAMP END  /* outbox_scheduled_for = now if has foreach */
                 FROM $LISTENER_TABLE l
-                WHERE l.$COMPLETED_AT_COLUMN IS NULL
+                WHERE l.$CLOSED_AT_COLUMN IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(oneAnyKeys, "l")})
             """.trimIndent()
 
@@ -221,9 +221,9 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
         val updateSql = """
             UPDATE $LISTENER_TABLE l
-            SET $COMPLETED_AT_COLUMN = ?,
+            SET $CLOSED_AT_COLUMN = ?,
                 $UPDATED_AT_COLUMN = ?
-            WHERE l.$COMPLETED_AT_COLUMN IS NULL
+            WHERE l.$CLOSED_AT_COLUMN IS NULL
               AND EXISTS (
                   SELECT 1 FROM $tableName e
                   WHERE e.$LISTENER_ID_COLUMN = l.$ID_COLUMN
@@ -288,7 +288,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                     ${filterIndex ?: 0} as $FILTER_INDEX_COLUMN,
                     l.$HAS_FOREACH_COLUMN
                 FROM $LISTENER_TABLE l
-                WHERE l.$COMPLETED_AT_COLUMN IS NULL
+                WHERE l.$CLOSED_AT_COLUMN IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(queryKeys, "l")})
                 """.trimIndent()
             }
@@ -363,9 +363,9 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
         val updateSql = """
             UPDATE $LISTENER_TABLE l
-            SET $COMPLETED_AT_COLUMN = ?,
+            SET $CLOSED_AT_COLUMN = ?,
                 $UPDATED_AT_COLUMN = ?
-            WHERE l.$COMPLETED_AT_COLUMN IS NULL
+            WHERE l.$CLOSED_AT_COLUMN IS NULL
               AND l.$FILTERS_COUNT_COLUMN IS NOT NULL
               AND EXISTS (
                   SELECT 1 FROM $tableName e

@@ -38,9 +38,9 @@ CREATE TABLE lemline_listeners
     -- Timeout handling
     timeout_at              TIMESTAMPTZ(6),
 
-    -- State progression: completed_at is set when listener stops collecting events
+    -- State progression: closed_at is set when listener stops accepting new events
     -- NOTE: Does NOT directly trigger ListenerCompletionOutbox - only outbox_delayed_until does
-    completed_at            TIMESTAMPTZ(6),
+    closed_at               TIMESTAMPTZ(6),
 
     -- Standard outbox fields (for completion processing)
     -- outbox_delayed_until: NULL = waiting, NOT NULL = ready for processing
@@ -75,10 +75,10 @@ CREATE INDEX idx_lemline_listeners_correlation
     ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position, correlation_values)
     WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
 
--- Index for completion outbox processing (completed listeners)
-CREATE INDEX idx_lemline_listeners_completed
-    ON lemline_listeners (completed_at)
-    WHERE completed_at IS NOT NULL AND outbox_completed_at IS NULL;
+-- Index for completion outbox processing (closed listeners)
+CREATE INDEX idx_lemline_listeners_closed
+    ON lemline_listeners (closed_at)
+    WHERE closed_at IS NOT NULL AND outbox_completed_at IS NULL;
 
 -- Index for timeout processing
 CREATE INDEX idx_lemline_listeners_timeout
@@ -108,4 +108,4 @@ COMMENT ON COLUMN lemline_listeners.has_until IS 'TRUE if listener has an until 
 COMMENT ON COLUMN lemline_listeners.until_expression IS 'JQ expression for ANY_UNTIL_EXPR strategy';
 COMMENT ON COLUMN lemline_listeners.has_foreach IS 'TRUE if listener has foreach.do configured';
 COMMENT ON COLUMN lemline_listeners.correlation_values IS 'Baseline correlation values set by first matching event (Mode 2)';
-COMMENT ON COLUMN lemline_listeners.completed_at IS 'Timestamp when listener stopped collecting events (does NOT trigger outbox - see outbox_delayed_until)';
+COMMENT ON COLUMN lemline_listeners.closed_at IS 'Timestamp when listener stopped accepting new events (does NOT trigger outbox - see outbox_delayed_until)';

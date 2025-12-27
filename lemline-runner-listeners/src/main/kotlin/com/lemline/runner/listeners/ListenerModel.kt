@@ -85,14 +85,14 @@ data class ListenerModel(
     /** Correlation baseline values (Mode 2: first-sets-baseline), JSON map */
     var correlationValues: String? = null
 
-    /** Timestamp when listener completed (stops collecting events). Does NOT trigger ListenerCompletionOutbox directly - see outboxDelayedUntil. */
-    var completedAt: Instant? = null
+    /** Timestamp when listener closed (stops accepting new events). Does NOT trigger ListenerCompletionOutbox directly - see outboxDelayedUntil. */
+    var closedAt: Instant? = null
 
     // Outbox fields
     // NOTE: outboxDelayedUntil starts as NULL (waiting state).
     // It gets set to NOW() only after:
-    // - For non-foreach: when completed_at is set (simultaneously)
-    // - For foreach: when completed_at is set AND all foreach processing is done
+    // - For non-foreach: when closed_at is set (simultaneously)
+    // - For foreach: when closed_at is set AND all foreach processing is done
     // Only outboxDelayedUntil NOT NULL triggers ListenerCompletionOutbox.
     override var outboxScheduledFor: Instant? = null
     override var outboxDelayedUntil: Instant? = null

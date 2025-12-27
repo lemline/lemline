@@ -474,7 +474,7 @@ abstract class ListenerEventRepositoryTestBase {
     @Test
     fun `batchInsertForOneAny should not match completed listener`() = runTest {
         val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE)
-        listener.completedAt = Clock.System.now() // Mark as completed (stops collecting events)
+        listener.closedAt = Clock.System.now() // Mark as completed (stops collecting events)
         getListenerRepository().insert(listener)
 
         val queryKey = createQueryKey(listener)
@@ -583,7 +583,7 @@ abstract class ListenerEventRepositoryTestBase {
     fun `batchInsertForOneAny should only match listeners still collecting events in batch`() = runTest {
         val activeListener = createListener(hasForeach = false, strategy = ListenStrategy.ONE)
         val completedListener = createListenerWithDifferentPosition(hasForeach = false, strategy = ListenStrategy.ONE)
-        completedListener.completedAt = Clock.System.now() // Stopped collecting events
+        completedListener.closedAt = Clock.System.now() // Stopped collecting events
         getListenerRepository().insert(listOf(activeListener, completedListener))
 
         val queryKeys = listOf(
@@ -1049,7 +1049,7 @@ abstract class ListenerEventRepositoryTestBase {
     // ========== Listener completion tests ==========
 
     @Test
-    fun `batchInsertForOneAny should set completed_at on ONE strategy listener`() = runTest {
+    fun `batchInsertForOneAny should set closed_at on ONE strategy listener`() = runTest {
         val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE)
         getListenerRepository().insert(listener)
 
@@ -1060,11 +1060,11 @@ abstract class ListenerEventRepositoryTestBase {
         // Reload listener and verify completed_at is set
         val reloadedListener = getListenerRepository().findById(listener.id)
         reloadedListener shouldNotBe null
-        reloadedListener!!.completedAt shouldNotBe null
+        reloadedListener!!.closedAt shouldNotBe null
     }
 
     @Test
-    fun `batchInsertForOneAny should set completed_at on ANY strategy listener`() = runTest {
+    fun `batchInsertForOneAny should set closed_at on ANY strategy listener`() = runTest {
         val listener = createListener(hasForeach = false, strategy = ListenStrategy.ANY)
         getListenerRepository().insert(listener)
 
@@ -1075,11 +1075,11 @@ abstract class ListenerEventRepositoryTestBase {
         // Reload listener and verify completed_at is set
         val reloadedListener = getListenerRepository().findById(listener.id)
         reloadedListener shouldNotBe null
-        reloadedListener!!.completedAt shouldNotBe null
+        reloadedListener!!.closedAt shouldNotBe null
     }
 
     @Test
-    fun `batchInsertForOneAny should set completed_at on foreach listener too`() = runTest {
+    fun `batchInsertForOneAny should set closed_at on foreach listener too`() = runTest {
         val listener = createListener(hasForeach = true, strategy = ListenStrategy.ONE)
         getListenerRepository().insert(listener)
 
@@ -1087,14 +1087,14 @@ abstract class ListenerEventRepositoryTestBase {
 
         getEventRepository().batchInsertForOneAny(listOf(queryKey), "event-id", """{"data":"test"}""")
 
-        // Reload listener and verify completed_at is set (even for foreach)
+        // Reload listener and verify closed_at is set (even for foreach)
         val reloadedListener = getListenerRepository().findById(listener.id)
         reloadedListener shouldNotBe null
-        reloadedListener!!.completedAt shouldNotBe null
+        reloadedListener!!.closedAt shouldNotBe null
     }
 
     @Test
-    fun `batchInsertForAccumulating should set completed_at on ALL strategy when all filters matched`() = runTest {
+    fun `batchInsertForAccumulating should set closed_at on ALL strategy when all filters matched`() = runTest {
         val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 2)
         getListenerRepository().insert(listener)
 
@@ -1116,7 +1116,7 @@ abstract class ListenerEventRepositoryTestBase {
         // Listener should NOT be completed yet (only 1 of 2 filters matched)
         var reloadedListener = getListenerRepository().findById(listener.id)
         reloadedListener shouldNotBe null
-        reloadedListener!!.completedAt shouldBe null
+        reloadedListener!!.closedAt shouldBe null
 
         // Insert event for filter 1
         getEventRepository().batchInsertForAllAnyUntil(
@@ -1128,11 +1128,11 @@ abstract class ListenerEventRepositoryTestBase {
         // Now listener should be completed (both filters matched)
         reloadedListener = getListenerRepository().findById(listener.id)
         reloadedListener shouldNotBe null
-        reloadedListener!!.completedAt shouldNotBe null
+        reloadedListener!!.closedAt shouldNotBe null
     }
 
     @Test
-    fun `batchInsertForAccumulating should not set completed_at when not all filters matched`() = runTest {
+    fun `batchInsertForAccumulating should not set closed_at when not all filters matched`() = runTest {
         val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL, filtersCount = 3)
         getListenerRepository().insert(listener)
 
@@ -1154,6 +1154,6 @@ abstract class ListenerEventRepositoryTestBase {
         // Listener should NOT be completed (only 2 of 3 filters matched)
         val reloadedListener = getListenerRepository().findById(listener.id)
         reloadedListener shouldNotBe null
-        reloadedListener!!.completedAt shouldBe null
+        reloadedListener!!.closedAt shouldBe null
     }
 }
