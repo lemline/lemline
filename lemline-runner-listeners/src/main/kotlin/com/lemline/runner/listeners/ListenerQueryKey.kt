@@ -56,7 +56,7 @@ data class ListenerQueryKey(
         stmt.setString(idx++, position.toString())
         if (correlationValuesJson != null) stmt.setString(idx++, correlationValuesJson)
         if (listenerStrategy != null) stmt.setString(idx++, listenerStrategy.name)
-        
+
         return idx
     }
 

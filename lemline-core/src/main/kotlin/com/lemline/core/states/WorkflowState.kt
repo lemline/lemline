@@ -528,9 +528,7 @@ sealed class WorkflowEvent : WorkflowState() {
     data class ListenForEachCompleted(
         override val nodeStack: NodeStack,
         /** Output from foreach.do tasks for this iteration */
-        val output: JsonElement,
-        /** iteration index */
-        val index: Int
+        val output: JsonElement
     ) : Outcome() {
 
         @Transient
@@ -539,7 +537,6 @@ sealed class WorkflowEvent : WorkflowState() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", output=$output" +
-            ", index=$index" +
             ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
     }

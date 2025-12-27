@@ -111,47 +111,36 @@ class ListenerService {
      * Handles foreach iteration completion.
      *
      * When a foreach.do completes for a single event:
-     * 1. Find the currently processing event (outbox_delayed_until IS NOT NULL, outbox_completed_at IS NULL)
-     * 2. Mark the event as completed with output
+     * 1. Extract eventId from the listen state in the nodeStack
+     * 2. Mark the event as completed with output using workflowId + position + eventId
      * 3. The next event in FIFO sequence is triggered automatically
      *
      * @param message The instance message containing the listen foreach completed event
      */
     suspend fun handleListenForEachCompleted(message: InstanceMessage<WorkflowEvent.ListenForEachCompleted>) {
         val state = message.workflowState
-        val listenPosition = state.nodePosition
         val iterationOutput = state.output
+        val listenPosition = state.nodePosition
 
         logger.debug { "ListenForEachCompleted: listenPosition=$listenPosition" }
 
-        databaseConfig.withTransaction { conn ->
-            // Find listener by workflowId and position
-            val listener = listenerRepository.findByWorkflowIdAndPosition(
-                message.workflowId,
-                listenPosition,
-                conn
-            ) ?: error("Listener not found for workflow ${message.workflowId} at position $listenPosition")
+        val listenState = state.nodeStack.currentState as? com.lemline.core.states.ListenState
+            ?: error("Listen state not found at current position")
 
-            // Find the currently processing event
-            val processingEvent = listenerEventRepository.findProcessingEvent(listener.id, conn)
-                ?: error("No processing event found for listener ${listener.id}")
+        val eventId = listenState.eventId
+            ?: error("EventId not set in listen state")
 
-            // Mark event as completed with output (this also triggers the next event)
-            val outputJson = LemlineJson.encodeToString(iterationOutput)
+        val outputJson = LemlineJson.encodeToString(iterationOutput)
 
-            listenerEventRepository.markCompletedWithOutput(
-                processingEvent.listenerId,
-                processingEvent.eventId,
-                outputJson,
-                conn
-            )
+        listenerEventRepository.markForeachCompleted(
+            message.workflowId,
+            listenPosition,
+            eventId,
+            outputJson
+        )
 
-            logger.info {
-                "Foreach event (listenerId=${processingEvent.listenerId}, eventId=${processingEvent.eventId}) " +
-                    "completed for listener ${listener.id}"
-            }
-
-            // Note: Listener completion is handled by ListenerCompletionOutbox.batchMarkReady()
+        logger.info {
+            "Foreach event (workflowId=${message.workflowId}, position=$listenPosition, eventId=$eventId) completed"
         }
     }
 

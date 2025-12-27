@@ -487,12 +487,9 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // if nextNode is not a listen task, or if we are entering for the first time
         if (nextNode.task !is ListenTask || nextState == null) return null
 
-        // This is a foreach iteration completing
-        // The iteration index is tracked by the runner (ListenerModel.foreachCurrentIndex)
         return ListenForEachCompleted(
             nodeStack = nodeStack,
-            output = nextInput,
-            index = 0
+            output = nextInput
         )
     }
 

@@ -2,6 +2,7 @@
 package com.lemline.runner.listeners.outbox
 
 import com.lemline.common.values.Token
+import com.lemline.core.states.ListenState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
@@ -120,16 +121,19 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
     private suspend fun process(listenerEvent: ListenerEventModel, listener: ListenerModel) {
         val listenStarted: WorkflowEvent.ListenStarted = listener.instanceMessage.workflowState
 
-        // Apply readAs transformation to stored CloudEvent
         val eventData = CloudEventService.parseStringAsData(listenerEvent.event, listener.readAs)
 
-        // Build the foreach.do position
-        val listenPosition = listenStarted.nodePosition
-        val foreachPosition = listenPosition.addToken(Token.FOR)
+        val currentListenState = listenStarted.nodeStack.currentState as? ListenState
+            ?: error("Listen state not found at current position")
 
-        // Create the resume command to execute foreach.do
+        val updatedNodeStack = listenStarted.nodeStack.updateCurrentState(
+            currentListenState.copy(eventId = listenerEvent.eventId)
+        )
+
+        val foreachPosition = listenStarted.nodePosition.addToken(Token.FOR)
+
         val resumeCommand = WorkflowCommand.ResumeFromTask(
-            nodeStack = listenStarted.nodeStack,
+            nodeStack = updatedNodeStack,
             nodePosition = foreachPosition,
             rawInput = eventData
         )
@@ -139,7 +143,6 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
             workflowState = resumeCommand
         )
 
-        // Derive idempotent message ID from listener ID and event ID
         val messageId = listener.id.derive("-foreach-${listenerEvent.eventId}-resume")
 
         commandEmitter.send(resumeMessage, messageId)

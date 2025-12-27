@@ -2,6 +2,8 @@
 package com.lemline.runner.listeners
 
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.NodePosition
+import com.lemline.common.values.WorkflowId
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
@@ -9,13 +11,13 @@ import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CREATED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
-import com.lemline.runner.common.repositories.ops.OUTBOX_ATTEMPT_COUNT_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_COMPLETED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_DELAYED_UNTIL_COLUMN
-import com.lemline.runner.common.repositories.ops.OUTBOX_FAILED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
 import com.lemline.runner.common.repositories.ops.OutboxRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
+import com.lemline.runner.common.repositories.ops.WORKFLOW_ID_COLUMN
+import com.lemline.runner.common.repositories.ops.WORKFLOW_POSITION_COLUMN
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.getInstant
 import com.lemline.runner.common.repositories.ops.nowTimestamp
@@ -392,72 +394,52 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     // ========================================
 
     /**
-     * Finds the event currently being processed for a listener.
-     * Processing events have:
-     * - outbox_attempt_count > 0: Has been picked up by outbox at least once
-     * - outbox_completed_at IS NULL: Not yet completed (waiting for ListenForEachCompleted)
-     * - outbox_failed_at IS NULL: Not failed
+     * Marks an event as completed with foreach output using workflow identity and position.
+     * Finds the listener by workflowId and position, then updates the event.
      *
-     * Note: outbox_delayed_until is set to far future to prevent re-pickup,
-     * so we don't filter on it here.
-     */
-    suspend fun findProcessingEvent(
-        listenerId: IDV7,
-        connection: Connection? = null
-    ): ListenerEventModel? = databaseConfig.withConnection(connection) { conn ->
-        conn.prepareStatement(findProcessingEventSql).use { stmt ->
-            setIDV7(stmt, 1, listenerId)
-            stmt.executeQuery().use { rs ->
-                if (rs.next()) createModel(rs) else null
-            }
-        }
-    }
-
-    private val findProcessingEventSql by lazy {
-        """
-        SELECT * FROM $tableName
-        WHERE $LISTENER_ID_COLUMN = ?
-          AND $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-          AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-          AND $OUTBOX_ATTEMPT_COUNT_COLUMN > 0
-        ORDER BY $CREATED_AT_COLUMN
-        LIMIT 1
-        """.trimIndent()
-    }
-
-    /**
-     * Marks an event as completed with foreach output and triggers the next event.
+     * This method uses workflow identity (workflowId + position) rather than listenerId,
+     * making it suitable for use in contexts where the nodeStack has been modified
+     * (e.g., after foreach.do execution where step counter has incremented).
      *
-     * @param listenerId Listener ID (part of composite key)
-     * @param eventId CloudEvent ID (part of composite key)
+     * Updates all rows for the given event_id (multiple filter_index values may share the same event_id).
+     *
+     * @param workflowId The workflow instance ID
+     * @param position The listen task position in the workflow tree
+     * @param eventId CloudEvent ID
      * @param output Output from foreach.do iteration
-     * @return Number of rows updated (1 if successful)
+     * @return Number of rows updated (should be >= 1, may be multiple if event matches multiple filters)
      */
-    suspend fun markCompletedWithOutput(
-        listenerId: IDV7,
+    suspend fun markForeachCompleted(
+        workflowId: WorkflowId,
+        position: NodePosition,
         eventId: String,
         output: String?,
         connection: Connection? = null
     ): Int = databaseConfig.withConnection(connection) { conn ->
         val now = nowTimestamp()
-        conn.prepareStatement(markCompletedWithOutputSql).use { stmt ->
+        conn.prepareStatement(markForeachCompletedSql).use { stmt ->
             stmt.setString(1, output)
             stmt.setTimestamp(2, now)
-            stmt.setTimestamp(3, now)
-            setIDV7(stmt, 4, listenerId)
+            setIDV7(stmt, 3, workflowId.value)
+            stmt.setString(4, position.toString())
             stmt.setString(5, eventId)
             stmt.executeUpdate()
         }
     }
 
-    private val markCompletedWithOutputSql by lazy {
+    private val markForeachCompletedSql by lazy {
         """
-        UPDATE $tableName
+        UPDATE $tableName e
         SET $FOREACH_COMPLETED_COLUMN = TRUE,
             $FOREACH_OUTPUT_COLUMN = ?,
-            $OUTBOX_COMPLETED_AT_COLUMN = ?,
             $UPDATED_AT_COLUMN = ?
-        WHERE $LISTENER_ID_COLUMN = ? AND $EVENT_ID_COLUMN = ?
+        WHERE EXISTS (
+            SELECT 1 FROM $LISTENER_TABLE l
+            WHERE l.$ID_COLUMN = e.$LISTENER_ID_COLUMN
+              AND l.$WORKFLOW_ID_COLUMN = ?
+              AND l.$WORKFLOW_POSITION_COLUMN = ?
+        )
+        AND e.$EVENT_ID_COLUMN = ?
         """.trimIndent()
     }
 
