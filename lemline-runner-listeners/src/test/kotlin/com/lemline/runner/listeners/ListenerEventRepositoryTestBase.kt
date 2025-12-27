@@ -1156,4 +1156,158 @@ abstract class ListenerEventRepositoryTestBase {
         reloadedListener shouldNotBe null
         reloadedListener!!.closedAt shouldBe null
     }
+
+    @Test
+    fun `findCompletedOutputsByListeners should return empty map for empty list`() = runTest {
+        val result = getEventRepository().findCompletedOutputsByListeners(emptyList())
+        result shouldBe emptyMap()
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should return outputs for single non-foreach listener`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener)
+
+        val event1 = createEvent(listener.id, filterIndex = 0, eventId = "event-1")
+        event1.foreachOutput = """{"data":"event1"}"""
+        getEventRepository().insert(event1)
+
+        val result = getEventRepository().findCompletedOutputsByListeners(listOf(listener.id))
+
+        result.size shouldBe 1
+        result[listener.id] shouldNotBe null
+        result[listener.id]!! shouldContainExactly listOf("""{"data":"event1"}""")
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should return multiple outputs ordered by sort_key`() = runTest {
+        val listener = createListener(hasForeach = false, strategy = ListenStrategy.ALL)
+        getListenerRepository().insert(listener)
+
+        val event1 = createEvent(listener.id, filterIndex = 0, eventId = "event-1")
+        event1.foreachOutput = """{"order":1}"""
+        getEventRepository().insert(event1)
+
+        val event2 = createEvent(listener.id, filterIndex = 1, eventId = "event-2")
+        event2.foreachOutput = """{"order":2}"""
+        getEventRepository().insert(event2)
+
+        val event3 = createEvent(listener.id, filterIndex = 2, eventId = "event-3")
+        event3.foreachOutput = """{"order":3}"""
+        getEventRepository().insert(event3)
+
+        val result = getEventRepository().findCompletedOutputsByListeners(listOf(listener.id))
+
+        result.size shouldBe 1
+        result[listener.id]!! shouldContainExactly listOf(
+            """{"order":1}""",
+            """{"order":2}""",
+            """{"order":3}"""
+        )
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should handle multiple listeners`() = runTest {
+        val listener1 = createListener(hasForeach = false, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener1)
+
+        val listener2 = createListenerWithDifferentPosition(hasForeach = false, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener2)
+
+        val event1 = createEvent(listener1.id, filterIndex = 0, eventId = "event-1")
+        event1.foreachOutput = """{"listener":"1"}"""
+        getEventRepository().insert(event1)
+
+        val event2 = createEvent(listener2.id, filterIndex = 0, eventId = "event-2")
+        event2.foreachOutput = """{"listener":"2"}"""
+        getEventRepository().insert(event2)
+
+        val result = getEventRepository().findCompletedOutputsByListeners(listOf(listener1.id, listener2.id))
+
+        result.size shouldBe 2
+        result[listener1.id]!! shouldContainExactly listOf("""{"listener":"1"}""")
+        result[listener2.id]!! shouldContainExactly listOf("""{"listener":"2"}""")
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should exclude events without foreach_output`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ALL)
+        getListenerRepository().insert(listener)
+
+        val event1 = createEvent(listener.id, filterIndex = 0, eventId = "event-1")
+        event1.foreachOutput = """{"completed":true}"""
+        getEventRepository().insert(event1)
+
+        val event2 = createEvent(listener.id, filterIndex = 1, eventId = "event-2")
+        event2.foreachOutput = null
+        getEventRepository().insert(event2)
+
+        val result = getEventRepository().findCompletedOutputsByListeners(listOf(listener.id))
+
+        result.size shouldBe 1
+        result[listener.id]!! shouldHaveSize 1
+        result[listener.id]!! shouldContainExactly listOf("""{"completed":true}""")
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should return empty list for listener with no completed events`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener)
+
+        val event = createEvent(listener.id, filterIndex = 0, eventId = "event-1")
+        event.foreachOutput = null
+        getEventRepository().insert(event)
+
+        val result = getEventRepository().findCompletedOutputsByListeners(listOf(listener.id))
+
+        result shouldBe emptyMap()
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should handle mixed foreach and non-foreach listeners`() = runTest {
+        val foreachListener = createListener(hasForeach = true, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(foreachListener)
+
+        val nonForeachListener = createListenerWithDifferentPosition(hasForeach = false, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(nonForeachListener)
+
+        val foreachEvent = createEvent(foreachListener.id, filterIndex = 0, eventId = "foreach-event")
+        foreachEvent.foreachOutput = """{"type":"foreach-result"}"""
+        getEventRepository().insert(foreachEvent)
+
+        val nonForeachEvent = createEvent(nonForeachListener.id, filterIndex = 0, eventId = "non-foreach-event")
+        nonForeachEvent.foreachOutput = """{"type":"cloudEvent","data":"test"}"""
+        getEventRepository().insert(nonForeachEvent)
+
+        val result = getEventRepository().findCompletedOutputsByListeners(
+            listOf(foreachListener.id, nonForeachListener.id)
+        )
+
+        result.size shouldBe 2
+        result[foreachListener.id]!! shouldContainExactly listOf("""{"type":"foreach-result"}""")
+        result[nonForeachListener.id]!! shouldContainExactly listOf("""{"type":"cloudEvent","data":"test"}""")
+    }
+
+    @Test
+    fun `findCompletedOutputsByListeners should query only requested listeners`() = runTest {
+        val listener1 = createListener(hasForeach = false, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener1)
+
+        val listener2 = createListenerWithDifferentPosition(hasForeach = false, strategy = ListenStrategy.ONE)
+        getListenerRepository().insert(listener2)
+
+        val event1 = createEvent(listener1.id, filterIndex = 0, eventId = "event-1")
+        event1.foreachOutput = """{"listener":"1"}"""
+        getEventRepository().insert(event1)
+
+        val event2 = createEvent(listener2.id, filterIndex = 0, eventId = "event-2")
+        event2.foreachOutput = """{"listener":"2"}"""
+        getEventRepository().insert(event2)
+
+        val result = getEventRepository().findCompletedOutputsByListeners(listOf(listener1.id))
+
+        result.size shouldBe 1
+        result[listener1.id]!! shouldContainExactly listOf("""{"listener":"1"}""")
+        result.containsKey(listener2.id) shouldBe false
+    }
 }

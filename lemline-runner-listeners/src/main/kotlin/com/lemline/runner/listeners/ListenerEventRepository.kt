@@ -474,6 +474,55 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         """.trimIndent()
     }
 
+    /**
+     * Batch-loads completed outputs for multiple listeners in a single query.
+     *
+     * Returns a map of listener ID to list of completed outputs (foreach_output for foreach listeners,
+     * event JSON for non-foreach listeners). Outputs are ordered by sort_key for deterministic ordering.
+     *
+     * This method is optimized for outbox completion processing to avoid N+1 queries.
+     *
+     * @param listenerIds List of listener IDs to fetch outputs for
+     * @param connection Optional existing connection to reuse
+     * @return Map of listener ID to list of output strings (empty list if no events)
+     */
+    suspend fun findCompletedOutputsByListeners(
+        listenerIds: List<IDV7>,
+        connection: Connection? = null
+    ): Map<IDV7, List<String>> {
+        if (listenerIds.isEmpty()) return emptyMap()
+
+        return databaseConfig.withConnection(connection) { conn ->
+            val placeholders = listenerIds.joinToString(",") { "?" }
+
+            val sql = """
+                SELECT $LISTENER_ID_COLUMN, $FOREACH_OUTPUT_COLUMN
+                FROM $tableName
+                WHERE $LISTENER_ID_COLUMN IN ($placeholders)
+                  AND $FOREACH_OUTPUT_COLUMN IS NOT NULL
+                ORDER BY $LISTENER_ID_COLUMN, $SORT_KEY_COLUMN
+            """.trimIndent()
+
+            conn.prepareStatement(sql).use { stmt ->
+                listenerIds.forEachIndexed { index, id ->
+                    setIDV7(stmt, index + 1, id)
+                }
+
+                stmt.executeQuery().use { rs ->
+                    val result = mutableMapOf<IDV7, MutableList<String>>()
+                    while (rs.next()) {
+                        val listenerId = getIDV7(rs, LISTENER_ID_COLUMN)!!
+                        val output = rs.getString(FOREACH_OUTPUT_COLUMN)
+                        if (output != null) {
+                            result.getOrPut(listenerId) { mutableListOf() }.add(output)
+                        }
+                    }
+                    result
+                }
+            }
+        }
+    }
+
     // ========================================
     // Query Methods
     // ========================================

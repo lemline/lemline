@@ -12,15 +12,16 @@ import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import com.lemline.runner.listeners.CloudEventService
 import com.lemline.runner.listeners.ListenerConfig
 import com.lemline.runner.listeners.ListenerEventRepository
-import com.lemline.runner.listeners.ListenerEventService
 import com.lemline.runner.listeners.ListenerModel
 import com.lemline.runner.listeners.ListenerRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 
 /**
@@ -65,7 +66,7 @@ import kotlinx.serialization.json.JsonArray
 @ApplicationScoped
 @ExperimentalTime
 @ExperimentalSerializationApi
-class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
+class ListenerOutbox : AbstractOutbox<ListenerModel>() {
 
     override val jobName = "Listeners outbox"
 
@@ -83,9 +84,6 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
 
     @Inject
     private lateinit var listenerEventRepository: ListenerEventRepository
-
-    @Inject
-    private lateinit var listenerEventService: ListenerEventService
 
     override val outboxRepository: WithOutboxRepository<ListenerModel> get() = listenerRepository
 
@@ -106,92 +104,42 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
      * then delegates to the standard outbox processing.
      */
     override suspend fun doWork() {
-        // Step 1: Mark eligible ONE/ANY/ALL listeners as completed
-        val markedCompleted = listenerRepository.batchMarkReady()
+        // Mark eligible ONE/ANY/ALL listeners as completed
+        val markedCompleted = listenerRepository.batchPrepareListenerOutbox()
         if (markedCompleted > 0) {
             logger.debug { "Marked $markedCompleted listeners as completed" }
         }
 
-        // Step 2: Evaluate until expressions for ANY_UNTIL_EXPR listeners
-        val markedCompletedByExpr = evaluateUntilExpressions()
-        if (markedCompletedByExpr > 0) {
-            logger.debug { "Marked $markedCompletedByExpr ANY+until(expr) listeners as completed via expression evaluation" }
-        }
-
-        // Step 3: Check terminated ANY_UNTIL_EVENT listeners whose foreach processing is now complete
-        val markedCompletedByTermination = listenerRepository.batchMarkCompletedTerminatedListeners()
-        if (markedCompletedByTermination > 0) {
-            logger.debug { "Marked $markedCompletedByTermination ANY+until(event) listeners as ready for processing (foreach complete)" }
-        }
-
-        // Step 4: Process ready listeners via standard outbox flow
+        // Process ready listeners via standard outbox flow
         super.doWork()
     }
 
     /**
-     * Evaluates until expressions for ANY_UNTIL_EXPR listeners with completed events.
-     *
-     * This is called from doWork() to check if any listeners have accumulated
-     * enough completed events to satisfy their until condition. This is essential
-     * for foreach processing because:
-     * - CloudEvent arrival only stores events, doesn't complete them
-     * - Foreach.do processing completes events asynchronously
-     * - Until expressions should only be evaluated against completed events
-     *
-     * @return Number of listeners marked as completed
+     * Override processBatch to batch-load all completed outputs in a single query,
+     * avoiding N+1 database queries during completion processing.
      */
-    private suspend fun evaluateUntilExpressions(): Int {
-        val listenersWithEvents = listenerRepository.findPendingUntilExprListeners()
-        if (listenersWithEvents.isEmpty()) return 0
+    override suspend fun processBatch(
+        entities: List<ListenerModel>,
+        maxAttempts: Int,
+        initialDelay: Duration
+    ): Int {
+        val listenerIds = entities.map { it.id }
+        val outputsByListener = listenerEventRepository.findCompletedOutputsByListeners(listenerIds)
 
-        var totalMarkedCompleted = 0
-
-        for ((listener, accumulatedEvents) in listenersWithEvents) {
-            val untilExpr = listener.untilExpression ?: continue
-
-            // Build JSON array of event DATA (extract from stored CloudEvents)
-            // Until expressions operate on event data, not the full envelope
-            val eventsArray = JsonArray(accumulatedEvents.map {
-                CloudEventService.parseStringAsData(it)
-            })
-
-            // Evaluate the until expression
-            val shouldComplete = try {
-                listenerEventService.evaluateUntilExpression(untilExpr, eventsArray)
-            } catch (e: Exception) {
-                logger.warn(e) { "Failed to evaluate until expression for listener ${listener.id}: $untilExpr" }
-                false
-            }
-
-            if (shouldComplete) {
-                val marked = listenerRepository.markListenerCompleted(listener.id)
-                if (marked > 0) {
-                    totalMarkedCompleted++
-                    logger.debug { "ANY+until expression evaluated to true for listener ${listener.id}" }
-                }
-            }
+        return processEntitiesWith(entities, maxAttempts, initialDelay) { listener ->
+            process(listener, outputsByListener[listener.id] ?: emptyList())
         }
-
-        return totalMarkedCompleted
     }
 
-    /**
-     * Process a single listener completion.
-     * Aggregates foreach outputs and sends the resume command.
-     *
-     * Applies the `readAs` transformation to stored CloudEvents based on the
-     * workflow definition configuration.
-     */
-    override suspend fun process(entity: ListenerModel) {
-
-        val events = listenerEventRepository.getCompletedEvents(entity.id)
-
-        // Apply readAs transformation to each stored CloudEvent
-        val outputArray = JsonArray(events.map {
-            CloudEventService.parseStringAsData(it, entity.readAs)
+    private suspend fun process(entity: ListenerModel, completedOutputs: List<String>) {
+        val outputArray = JsonArray(completedOutputs.map { output ->
+            if (entity.hasForeach) {
+                Json.parseToJsonElement(output)
+            } else {
+                CloudEventService.parseStringAsData(output, entity.readAs)
+            }
         })
 
-        // Create completion command
         val resumeCommand = WorkflowCommand.ResumeWithCompletedTask(
             nodeStack = entity.instanceMessage.workflowState.nodeStack,
             rawOutput = outputArray
@@ -202,14 +150,18 @@ class ListenerCompletionOutbox : AbstractOutbox<ListenerModel>() {
             workflowState = resumeCommand
         )
 
-        // Derive idempotent message ID from listener ID
         val messageId = entity.id.derive("-listen-complete")
 
         commandEmitter.send(resumeMessage, messageId)
 
         logger.info { "Listen completion sent for listener ${entity.id}" }
 
-        // Mark the listener to be cleaned up
         entity.cleanupAfter = Clock.System.now()
     }
+
+    /**
+     * Not used - this class overrides processBatch() to use process() with pre-loaded data.
+     */
+    override suspend fun process(entity: ListenerModel): Unit =
+        error("process() should not be called directly; use processBatch() with batch-loaded outputs")
 }
