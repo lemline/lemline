@@ -502,7 +502,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      */
     private fun checkIf(rawInput: JsonElement, scope: Scope): Boolean {
         val ifCondition = node.task.`if` ?: return true
-        return evalBoolean(rawInput, ifCondition, ".if", scope)
+        return evalBoolean(rawInput, ifCondition, "if", scope)
     }
 
     /**
@@ -592,7 +592,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     internal fun runWorkflowInput(data: JsonElement, subFlowInput: SubflowInput?, scope: JsonObject): JsonElement =
         subFlowInput?.let { eval(data, it.additionalProperties.toJsonElement(), scope, false) } ?: data
 
-    protected fun evalBoolean(
+    internal fun evalBoolean(
         data: JsonElement,
         expr: String,
         name: String,
@@ -600,7 +600,19 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     ): Boolean = eval(data, expr, scope).let {
         when (it is JsonPrimitive && it.booleanOrNull != null) {
             true -> it.boolean
-            false -> raiseError(EXPRESSION, "'$name' expression must be a boolean, but is '$it'")
+            false -> raiseError(EXPRESSION, "'.$name' expression must be a boolean, but is '$it'")
+        }
+    }
+
+    internal fun evalString(
+        data: JsonElement,
+        expr: String,
+        name: String,
+        scope: JsonObject
+    ): String = eval(data, expr, scope).let {
+        when (it is JsonPrimitive) {
+            true -> it.content
+            false -> raiseError(EXPRESSION, "'.$name' expression must be a String, but is '$it'")
         }
     }
 

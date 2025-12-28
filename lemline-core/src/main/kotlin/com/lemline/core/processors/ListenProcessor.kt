@@ -3,8 +3,9 @@
 
 package com.lemline.core.processors
 
-import com.lemline.common.json.LemlineJson
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
+import com.lemline.core.errors.WorkflowErrorType.RUNTIME
+import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ListenState
@@ -27,7 +28,7 @@ import io.serverlessworkflow.api.types.Timeout
 import io.serverlessworkflow.api.types.UriTemplate
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
-import java.time.OffsetDateTime
+import java.util.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
@@ -108,17 +109,17 @@ class ListenProcessor(
                     ?: raiseError(CONFIGURATION, "Listen task 'one' strategy missing event filter")
                 Triple(
                     ListenStrategy.ONE,
-                    listOf(convertFilter(filter, transformedInput, scope)),
+                    listOf(convertFilter(filter)),
                     null
                 )
             }
 
             is AnyEventConsumptionStrategy -> {
                 val filterList = strategyValue.any ?: emptyList()
-                val untilCondition = convertUntilCondition(strategyValue.until, transformedInput, scope)
+                val untilCondition = convertUntilCondition(strategyValue.until)
                 Triple(
                     ListenStrategy.ANY,
-                    filterList.map { convertFilter(it, transformedInput, scope) },
+                    filterList.map { convertFilter(it) },
                     untilCondition
                 )
             }
@@ -128,7 +129,7 @@ class ListenProcessor(
                     ?: raiseError(CONFIGURATION, "Listen task 'all' strategy missing event filters")
                 Triple(
                     ListenStrategy.ALL,
-                    filterList.map { convertFilter(it, transformedInput, scope) },
+                    filterList.map { convertFilter(it) },
                     null
                 )
             }
@@ -189,9 +190,7 @@ class ListenProcessor(
      * They will be evaluated against the event at arrival time, not against workflow context.
      */
     private fun convertFilter(
-        apiFilter: ApiEventFilter,
-        transformedInput: JsonElement,
-        scope: Scope
+        apiFilter: ApiEventFilter
     ): EventFilter {
         val eventProps = apiFilter.with
             ?: raiseError(CONFIGURATION, "Event filter missing 'with' properties")
@@ -205,7 +204,7 @@ class ListenProcessor(
             dataschema = resolveDataschemaValue(eventProps.dataschema),
             time = resolveTimeValue(eventProps.time),
             dataFilter = resolveDataFilterValue(eventProps.data),
-            correlations = convertCorrelations(apiFilter, transformedInput, scope)
+            correlations = resolveCorrelations(apiFilter)
         )
     }
 
@@ -218,12 +217,12 @@ class ListenProcessor(
         return when (val value = source.get()) {
             is UriTemplate -> when (val uri = value.get()) {
                 is URI -> uri.toString()
-                is String -> uri  // Expression or literal
-                else -> null
+                is String -> uri
+                else -> raiseError(RUNTIME, "Unsupported UriTemplate value: ${uri?.javaClass?.name}")
             }
 
-            is String -> value  // Expression
-            else -> null
+            is String -> value
+            else -> raiseError(RUNTIME, "Unsupported EventSource type: ${value?.javaClass?.name}")
         }
     }
 
@@ -233,9 +232,14 @@ class ListenProcessor(
     private fun resolveDataschemaValue(dataschema: EventDataschema?): String? {
         if (dataschema == null) return null
         return when (val value = dataschema.get()) {
-            is URI -> value.toString()
-            is String -> value  // Expression
-            else -> null
+            is UriTemplate -> when (val uri = value.get()) {
+                is URI -> uri.toString()
+                is String -> uri
+                else -> raiseError(RUNTIME, "Unsupported UriTemplate value: ${uri?.javaClass?.name}")
+            }
+
+            is String -> value
+            else -> raiseError(RUNTIME, "Unsupported EventDataschema type: ${value?.javaClass?.name}")
         }
     }
 
@@ -245,9 +249,9 @@ class ListenProcessor(
     private fun resolveTimeValue(time: EventTime?): String? {
         if (time == null) return null
         return when (val value = time.get()) {
-            is OffsetDateTime -> value.toString()
-            is String -> value  // Expression
-            else -> null
+            is Date -> value.toInstant().toString()
+            is String -> value
+            else -> raiseError(RUNTIME, "Unsupported EventTime type: ${value?.javaClass?.name}")
         }
     }
 
@@ -284,10 +288,8 @@ class ListenProcessor(
      * The `from` path is stored as-is (evaluated against event at arrival).
      * The `expect` expression is stored as-is (to be evaluated against correlationContext).
      */
-    private fun convertCorrelations(
+    private fun resolveCorrelations(
         apiFilter: ApiEventFilter,
-        transformedInput: JsonElement,
-        scope: Scope
     ): Map<String, CorrelationDef>? {
         val correlate = apiFilter.correlate?.additionalProperties
         if (correlate.isNullOrEmpty()) return null
@@ -304,9 +306,7 @@ class ListenProcessor(
      * Convert the Until condition for accumulation mode.
      */
     private fun convertUntilCondition(
-        until: io.serverlessworkflow.api.types.Until?,
-        transformedInput: JsonElement,
-        scope: Scope
+        until: io.serverlessworkflow.api.types.Until?
     ): UntilCondition? {
         if (until == null) return null
 
@@ -323,7 +323,7 @@ class ListenProcessor(
 
             is EventConsumptionStrategy -> {
                 // Event filter - stop when this event arrives
-                val eventFilter = convertEventConsumptionStrategyToFilter(value, transformedInput, scope)
+                val eventFilter = convertEventConsumptionStrategyToFilter(value)
                 UntilCondition.Event(eventFilter)
             }
 
@@ -340,25 +340,23 @@ class ListenProcessor(
      * to a single filter for the termination event.
      */
     private fun convertEventConsumptionStrategyToFilter(
-        strategy: EventConsumptionStrategy,
-        transformedInput: JsonElement,
-        scope: Scope
+        strategy: EventConsumptionStrategy
     ): EventFilter {
         return when (val strategyValue = strategy.get()) {
             is OneEventConsumptionStrategy -> {
-                strategyValue.one?.let { convertFilter(it, transformedInput, scope) }
+                strategyValue.one?.let { convertFilter(it) }
                     ?: raiseError(CONFIGURATION, "Until 'one' strategy missing event filter")
             }
 
             is AnyEventConsumptionStrategy -> {
                 // Take the first filter from any list
-                strategyValue.any?.firstOrNull()?.let { convertFilter(it, transformedInput, scope) }
+                strategyValue.any?.firstOrNull()?.let { convertFilter(it) }
                     ?: raiseError(CONFIGURATION, "Until 'any' strategy missing event filters")
             }
 
             is AllEventConsumptionStrategy -> {
                 // For 'all' in until, take first filter (unusual case)
-                strategyValue.all?.firstOrNull()?.let { convertFilter(it, transformedInput, scope) }
+                strategyValue.all?.firstOrNull()?.let { convertFilter(it) }
                     ?: raiseError(CONFIGURATION, "Until 'all' strategy missing event filters")
             }
 
