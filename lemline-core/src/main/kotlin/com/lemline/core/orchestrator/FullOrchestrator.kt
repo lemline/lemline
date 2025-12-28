@@ -873,7 +873,7 @@ internal object FullOrchestrator {
             // Expression-capable fields
             if (!matchesExprField(filter.source, event.source?.toString())) return@any false
             if (!matchesExprField(filter.dataschema, event.dataSchema?.toString())) return@any false
-            if (!matchesExprField(filter.time, event.time?.toString())) return@any false
+            if (!matchesTimeField(filter.time, event.time)) return@any false
 
             // Data filter (expression against event payload)
             if (!matchesDataFilter(filter.dataFilter, eventData)) return@any false
@@ -902,6 +902,27 @@ internal object FullOrchestrator {
             evaluateExpressionAsBoolean(filterValue, eventValue?.let { JsonPrimitive(it) } ?: JsonNull)
         } else {
             filterValue == eventValue
+        }
+    }
+
+    private fun matchesTimeField(filterValue: String?, eventTime: OffsetDateTime?): Boolean {
+        if (filterValue == null) return true
+        if (eventTime == null) return false
+
+        return if (ExpressionUtils.isExpr(filterValue)) {
+            evaluateExpressionAsBoolean(filterValue, JsonPrimitive(eventTime.toString()))
+        } else {
+            compareTimestampsNormalized(filterValue, eventTime)
+        }
+    }
+
+    private fun compareTimestampsNormalized(filterValue: String, eventTime: OffsetDateTime): Boolean {
+        return try {
+            val filterTime = OffsetDateTime.parse(filterValue)
+            filterTime.isEqual(eventTime)
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to parse filter time value as OffsetDateTime: $filterValue" }
+            filterValue == eventTime.toString()
         }
     }
 
