@@ -959,7 +959,7 @@ object ListenTestCases {
                 TestMocks.reading2Event,
                 TestMocks.reading3ThresholdEvent
             ),
-            yaml = """
+            yaml = $$"""
                 do:
                   - collectReadings:
                       listen:
@@ -973,8 +973,8 @@ object ListenTestCases {
                           - processReading:
                               set:
                                 processed: true
-                                readingId: ${'$'}{ .readingId }
-                                value: ${'$'}{ .value }
+                                readingId: ${ .readingId }
+                                value: ${ .value }
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "foreach", "until", "expression"),
             validate = expectOutputMatching("array of 3 processed readings") { output ->
