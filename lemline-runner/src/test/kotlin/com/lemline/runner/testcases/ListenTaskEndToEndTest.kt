@@ -15,7 +15,6 @@ import com.lemline.runner.listeners.DefinitionListenService
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerModel
-import com.lemline.runner.listeners.ListenerQueryKey
 import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
@@ -1319,18 +1318,11 @@ internal class ListenTaskEndToEndTest {
         name: WorkflowName,
         version: WorkflowVersion
     ): List<ListenerModel> {
-        val workflowInfo = WorkflowInfo(namespace, name, version)
-        val listenTasks = WorkflowCache.getListenTasks(workflowInfo)
-        if (listenTasks.isEmpty()) return emptyList()
-
-        val keys = listenTasks.map { listenTask ->
-            ListenerQueryKey(
-                workflowInfo = workflowInfo,
-                position = listenTask.nodePosition,
-                correlationValuesJson = null
-            )
+        return listenerRepository.listAll().filter {
+            it.workflowNamespace == namespace &&
+            it.workflowName == name &&
+            it.workflowVersion == version
         }
-        return listenerRepository.findByKeys(keys)
     }
 
     /**

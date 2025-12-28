@@ -18,7 +18,6 @@ import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.messaging.InstanceMessage
-import com.lemline.runner.listeners.ListenerQueryKey
 import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.tests.profiles.InMemoryProfile
 import io.kotest.matchers.shouldBe
@@ -102,15 +101,7 @@ internal class ListenEventHandlerTest {
         workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
 
         // Then
-        val listeners = listenerRepository.findByKeys(
-            listOf(
-                ListenerQueryKey(
-                    workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
-                    position = testNodePosition,
-                    correlationValuesJson = null
-                )
-            )
-        )
+        val listeners = listenerRepository.listAll().filter { it.workflowId == instance.workflowId }
 
         listeners.size shouldBe 1
         val listener = listeners.first()
@@ -139,19 +130,10 @@ internal class ListenEventHandlerTest {
         workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
 
         // Then
-        val listeners = listenerRepository.findByKeys(
-            listOf(
-                ListenerQueryKey(
-                    workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
-                    position = testNodePosition,
-                    correlationValuesJson = null
-                )
-            )
-        )
+        val listeners = listenerRepository.listAll().filter { it.workflowId == instance.workflowId }
 
         listeners.size shouldBe 1
         listeners.first().timeoutAt shouldNotBe null
-        // Allow some tolerance for timestamp comparison
         listeners.first().timeoutAt!!.epochSeconds shouldBe timeoutAt.epochSeconds
     }
 
@@ -173,15 +155,7 @@ internal class ListenEventHandlerTest {
         workflowEventHandler.handle(instance as InstanceMessage<WorkflowEvent>)
 
         // Then - only one row
-        val listeners = listenerRepository.findByKeys(
-            listOf(
-                ListenerQueryKey(
-                    workflowInfo = WorkflowInfo(testNamespace, testName, testVersion),
-                    position = testNodePosition,
-                    correlationValuesJson = null
-                )
-            )
-        )
+        val listeners = listenerRepository.listAll().filter { it.workflowId == instance.workflowId }
         listeners.size shouldBe 1
     }
 

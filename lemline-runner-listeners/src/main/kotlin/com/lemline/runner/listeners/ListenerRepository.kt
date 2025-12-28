@@ -208,30 +208,6 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         .readCleanupField(rs)
 
     /**
-     * Batch finds active listeners for multiple query keys in a single database round-trip.
-     */
-    suspend fun findByKeys(
-        keys: List<ListenerQueryKey>,
-        connection: Connection? = null
-    ): List<ListenerModel> {
-        if (keys.isEmpty()) return emptyList()
-
-        return databaseConfig.withConnection(connection) { conn ->
-            val sql = """
-                SELECT * FROM $tableName
-                WHERE $OUTBOX_COMPLETED_AT_COLUMN IS NULL
-                  AND $OUTBOX_FAILED_AT_COLUMN IS NULL
-                  AND (${ListenerQueryKey.buildWhereClause(keys)})
-            """.trimIndent()
-
-            conn.prepareStatement(sql).use { stmt ->
-                ListenerQueryKey.bindAllParameters(keys, stmt, 1)
-                stmt.executeQuery().use { it.toModels() }
-            }
-        }
-    }
-
-    /**
      * Finds listeners that have timed out.
      */
     suspend fun findTimedOut(limit: Int, connection: Connection? = null): List<ListenerModel> =
