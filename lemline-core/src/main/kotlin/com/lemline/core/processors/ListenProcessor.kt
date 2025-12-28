@@ -4,31 +4,26 @@
 package com.lemline.core.processors
 
 import com.lemline.core.errors.WorkflowErrorType.CONFIGURATION
-import com.lemline.core.errors.WorkflowErrorType.RUNTIME
-import com.lemline.core.json.LemlineJson
 import com.lemline.core.nodes.Node
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.states.ListenState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.ListenStarted
+import com.lemline.core.utils.resolveDataFilterValue
+import com.lemline.core.utils.resolveDataschemaValue
+import com.lemline.core.utils.resolveSourceValue
+import com.lemline.core.utils.resolveTimeValue
 import com.lemline.core.utils.toDuration
 import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
 import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
 import io.serverlessworkflow.api.types.EventConsumptionStrategy
-import io.serverlessworkflow.api.types.EventData
-import io.serverlessworkflow.api.types.EventDataschema
 import io.serverlessworkflow.api.types.EventFilter as ApiEventFilter
-import io.serverlessworkflow.api.types.EventSource
-import io.serverlessworkflow.api.types.EventTime
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
 import io.serverlessworkflow.api.types.Timeout
-import io.serverlessworkflow.api.types.UriTemplate
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
-import java.net.URI
-import java.util.*
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
@@ -206,81 +201,6 @@ class ListenProcessor(
             dataFilter = resolveDataFilterValue(eventProps.data),
             correlations = resolveCorrelations(apiFilter)
         )
-    }
-
-    /**
-     * Resolve source value - can be URI template or expression.
-     * Expressions are stored as-is for later evaluation against event.source.
-     */
-    private fun resolveSourceValue(source: EventSource?): String? {
-        if (source == null) return null
-        return when (val value = source.get()) {
-            is UriTemplate -> when (val uri = value.get()) {
-                is URI -> uri.toString()
-                is String -> uri
-                else -> raiseError(RUNTIME, "Unsupported UriTemplate value: ${uri?.javaClass?.name}")
-            }
-
-            is String -> value
-            else -> raiseError(RUNTIME, "Unsupported EventSource type: ${value?.javaClass?.name}")
-        }
-    }
-
-    /**
-     * Resolve dataschema value - can be URI or expression.
-     */
-    private fun resolveDataschemaValue(dataschema: EventDataschema?): String? {
-        if (dataschema == null) return null
-        return when (val value = dataschema.get()) {
-            is UriTemplate -> when (val uri = value.get()) {
-                is URI -> uri.toString()
-                is String -> uri
-                else -> raiseError(RUNTIME, "Unsupported UriTemplate value: ${uri?.javaClass?.name}")
-            }
-
-            is String -> value
-            else -> raiseError(RUNTIME, "Unsupported EventDataschema type: ${value?.javaClass?.name}")
-        }
-    }
-
-    /**
-     * Resolve time value - can be datetime or expression.
-     */
-    private fun resolveTimeValue(time: EventTime?): String? {
-        if (time == null) return null
-        return when (val value = time.get()) {
-            is Date -> value.toInstant().toString()
-            is String -> value
-            else -> raiseError(RUNTIME, "Unsupported EventTime type: ${value?.javaClass?.name}")
-        }
-    }
-
-    /**
-     * Resolve data filter value - can be literal object or expression.
-     * If it's an expression, store it for evaluation at event arrival.
-     * If it's a literal, convert to JSON string for comparison.
-     */
-    private fun resolveDataFilterValue(data: EventData?): String? {
-        if (data == null) return null
-        return when (val value = data.get()) {
-            is String -> {
-                // Runtime expression - store as-is
-                if (ExpressionUtils.isExpr(value)) {
-                    ExpressionUtils.trimExpr(value)
-                } else {
-                    value
-                }
-            }
-
-            else -> {
-                // Literal object - convert to JSON string
-                if (value != null) {
-                    with(LemlineJson) { value.toJsonElement().toString() }
-                } else {
-                    null
-                }
-            }
-        }
     }
 
     /**

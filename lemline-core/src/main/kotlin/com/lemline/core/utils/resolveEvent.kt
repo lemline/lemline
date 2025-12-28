@@ -2,8 +2,6 @@
 package com.lemline.core.utils
 
 import com.lemline.common.json.LemlineJson
-import com.lemline.core.processors.NodeProcessor
-import com.lemline.core.processors.scope.Scope
 import io.serverlessworkflow.api.types.EventData
 import io.serverlessworkflow.api.types.EventDataschema
 import io.serverlessworkflow.api.types.EventSource
@@ -12,60 +10,51 @@ import io.serverlessworkflow.api.types.UriTemplate
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
 import java.util.*
-import kotlin.time.ExperimentalTime
-import kotlinx.serialization.json.JsonElement
 
-@ExperimentalTime
-fun NodeProcessor<*, *>.resolveSourceValue(
-    source: EventSource?,
-    transformedInput: JsonElement,
-    scope: Scope
-): String? {
+/**
+ * Resolve source value - can be URI template or expression.
+ * Expressions are stored as-is for later evaluation against event.source.
+ */
+fun resolveSourceValue(source: EventSource?): String? {
     if (source == null) return null
     return when (val value = source.get()) {
         is UriTemplate -> when (val uri = value.get()) {
             is URI -> uri.toString()
-            is String -> evalString(transformedInput, uri, "source", scope)
-            else -> null
+            is String -> uri
+            else -> error("Unsupported UriTemplate value: ${uri?.javaClass?.name}")
         }
 
         is String -> value
-        else -> null
+        else -> error("Unsupported EventSource type: ${value?.javaClass?.name}")
     }
 }
 
 /**
  * Resolve dataschema value - can be URI or expression.
  */
-@ExperimentalTime
-fun NodeProcessor<*, *>.resolveDataschemaValue(
-    dataschema: EventDataschema?,
-    transformedInput: JsonElement,
-    scope: Scope
-): String? {
+fun resolveDataschemaValue(dataschema: EventDataschema?): String? {
     if (dataschema == null) return null
-    return when (val schema = dataschema.get()) {
-        is URI -> schema.toString()
-        is String -> evalString(transformedInput, schema, "schema", scope)
-        else -> null
+    return when (val value = dataschema.get()) {
+        is UriTemplate -> when (val uri = value.get()) {
+            is URI -> uri.toString()
+            is String -> uri
+            else -> error("Unsupported UriTemplate value: ${uri?.javaClass?.name}")
+        }
+
+        is String -> value
+        else -> error("Unsupported EventDataschema type: ${value?.javaClass?.name}")
     }
 }
 
 /**
  * Resolve time value - can be datetime or expression.
- * Converts Date to ISO-8601 format (RFC 3339) for CloudEvent compatibility.
  */
-@ExperimentalTime
-fun NodeProcessor<*, *>.resolveTimeValue(
-    time: EventTime?,
-    transformedInput: JsonElement,
-    scope: Scope
-): String? {
+fun resolveTimeValue(time: EventTime?): String? {
     if (time == null) return null
-    return when (val date = time.get()) {
-        is Date -> date.toInstant().toString()
-        is String -> evalString(transformedInput, date, "time", scope)
-        else -> null
+    return when (val value = time.get()) {
+        is Date -> value.toInstant().toString()
+        is String -> value
+        else -> error("Unsupported EventTime type: ${value?.javaClass?.name}")
     }
 }
 
@@ -74,12 +63,7 @@ fun NodeProcessor<*, *>.resolveTimeValue(
  * If it's an expression, store it for evaluation at event arrival.
  * If it's a literal, convert to JSON string for comparison.
  */
-@ExperimentalTime
-fun NodeProcessor<*, *>.resolveDataFilterValue(
-    data: EventData?,
-    transformedInput: JsonElement,
-    scope: Scope
-): String? {
+fun resolveDataFilterValue(data: EventData?): String? {
     if (data == null) return null
     return when (val value = data.get()) {
         is String -> {
