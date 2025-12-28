@@ -11,7 +11,6 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.random.random
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
 import com.lemline.core.states.WorkflowEvent
@@ -20,7 +19,6 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.test.ops.CleanerRepositoryTest
 import com.lemline.runner.common.test.ops.CrudRepositoryTest
 import com.lemline.runner.common.test.ops.IdRepositoryTest
-import com.lemline.runner.common.test.ops.InstanceRepositoryTest
 import io.kotest.matchers.collections.shouldContainAll
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.nulls.shouldBeNull
@@ -383,14 +381,6 @@ abstract class ForkRepositoryTestBase {
         createEntity = ::createEntity,
         getEntityKey = { it.id },
         databaseConfig = { getDatabaseConfig() }
-    )
-
-    @Nested
-    inner class InstanceTests : InstanceRepositoryTest<ForkModel>(
-        instanceRepository = { getRepository() },
-        crudRepository = { getRepository() },
-        createEntity = ::createEntity,
-        getWorkflowId = { it.instanceMessage.workflowId }
     )
 
     // ========== Helper functions ==========

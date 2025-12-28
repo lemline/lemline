@@ -13,7 +13,6 @@ import com.lemline.runner.common.repositories.ops.CleanerRepository
 import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.IdRepository
-import com.lemline.runner.common.repositories.ops.InstanceRepository
 import com.lemline.runner.common.repositories.ops.WORKFLOW_ID_COLUMN
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.completionColumns
@@ -25,7 +24,6 @@ import com.lemline.runner.common.repositories.ops.readCleanupField
 import com.lemline.runner.common.repositories.ops.readCompletionField
 import com.lemline.runner.common.repositories.with.WithCleanerRepository
 import com.lemline.runner.common.repositories.with.WithIdRepository
-import com.lemline.runner.common.repositories.with.WithInstanceRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
@@ -50,7 +48,6 @@ const val FORK_TABLE = "lemline_forks"
 @ApplicationScoped
 class ForkRepository : CrudRepository<ForkModel>(),
     WithIdRepository<ForkModel>,
-    WithInstanceRepository<ForkModel>,
     WithCleanerRepository<ForkModel> {
 
     @Inject
@@ -61,7 +58,6 @@ class ForkRepository : CrudRepository<ForkModel>(),
 
     // Composed operations - initialized lazily to ensure databaseConfig is injected
     val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseConfig) }
-    val instanceRepository by lazy { InstanceRepository(tableName, idHelper, ::createModel, databaseConfig) }
     val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseConfig) }
 
     // Delegate WithIdRepository methods
@@ -70,10 +66,6 @@ class ForkRepository : CrudRepository<ForkModel>(),
 
     override suspend fun deleteById(id: IDV7, connection: Connection?) =
         idRepository.deleteById(id, connection)
-
-    // Delegate WithInstanceRepository methods
-    override suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection?) =
-        instanceRepository.findByWorkflowId(workflowId, connection)
 
     // Delegate WithCleanerRepository methods
     override suspend fun findEntitiesToDelete(cutoffDate: Instant, batchSize: Int, connection: Connection?) =

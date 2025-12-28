@@ -12,7 +12,6 @@ import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.common.test.ops.CleanerRepositoryTest
 import com.lemline.runner.common.test.ops.CrudRepositoryTest
 import com.lemline.runner.common.test.ops.IdRepositoryTest
-import com.lemline.runner.common.test.ops.InstanceRepositoryTest
 import com.lemline.runner.common.test.ops.OutboxRepositoryTest
 import com.lemline.runner.common.test.outbox.OutboxProcessorTest
 import kotlin.random.Random
@@ -61,14 +60,6 @@ abstract class WaitRepositoryTestBase {
         idRepository = { getRepository() },
         crudRepository = { getRepository() },
         createEntity = ::createEntity
-    )
-
-    @Nested
-    inner class InstanceTests : InstanceRepositoryTest<WaitModel>(
-        instanceRepository = { getRepository() },
-        crudRepository = { getRepository() },
-        createEntity = ::createEntity,
-        getWorkflowId = { it.instanceMessage.workflowId }
     )
 
     @Nested

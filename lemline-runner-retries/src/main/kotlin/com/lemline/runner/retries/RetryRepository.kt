@@ -2,7 +2,6 @@
 package com.lemline.runner.retries
 
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowId
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
@@ -11,7 +10,6 @@ import com.lemline.runner.common.repositories.ops.CleanerRepository
 import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.IdRepository
-import com.lemline.runner.common.repositories.ops.InstanceRepository
 import com.lemline.runner.common.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
 import com.lemline.runner.common.repositories.ops.OutboxRepository
 import com.lemline.runner.common.repositories.ops.cleanupColumns
@@ -24,7 +22,6 @@ import com.lemline.runner.common.repositories.ops.readCleanupField
 import com.lemline.runner.common.repositories.ops.readOutboxFields
 import com.lemline.runner.common.repositories.with.WithCleanerRepository
 import com.lemline.runner.common.repositories.with.WithIdRepository
-import com.lemline.runner.common.repositories.with.WithInstanceRepository
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
@@ -47,7 +44,6 @@ const val RETRY_TABLE = "lemline_retries"
 @ExperimentalSerializationApi
 class RetryRepository : CrudRepository<RetryModel>(),
     WithIdRepository<RetryModel>,
-    WithInstanceRepository<RetryModel>,
     WithOutboxRepository<RetryModel>,
     WithCleanerRepository<RetryModel> {
 
@@ -60,7 +56,6 @@ class RetryRepository : CrudRepository<RetryModel>(),
     val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseConfig) }
     val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig) }
     val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseConfig) }
-    val instanceRepository by lazy { InstanceRepository(tableName, idHelper, ::createModel, databaseConfig) }
 
     // Delegate WithIdRepository methods
     override suspend fun findById(id: IDV7, connection: Connection?) =
@@ -68,10 +63,6 @@ class RetryRepository : CrudRepository<RetryModel>(),
 
     override suspend fun deleteById(id: IDV7, connection: Connection?) =
         idRepository.deleteById(id, connection)
-
-    // Delegate WithInstanceRepository methods
-    override suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection?) =
-        instanceRepository.findByWorkflowId(workflowId, connection)
 
     // Delegate WithOutboxRepository methods
     override suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection?) =
