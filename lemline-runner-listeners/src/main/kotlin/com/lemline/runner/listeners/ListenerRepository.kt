@@ -15,7 +15,6 @@ import com.lemline.runner.common.repositories.ops.CleanerRepository
 import com.lemline.runner.common.repositories.ops.CrudRepository
 import com.lemline.runner.common.repositories.ops.ID_COLUMN
 import com.lemline.runner.common.repositories.ops.IdRepository
-import com.lemline.runner.common.repositories.ops.InstanceRepository
 import com.lemline.runner.common.repositories.ops.OUTBOX_COMPLETED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_DELAYED_UNTIL_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_ERROR_CLASS_COLUMN
@@ -38,7 +37,6 @@ import com.lemline.runner.common.repositories.ops.readCleanupField
 import com.lemline.runner.common.repositories.ops.readOutboxFields
 import com.lemline.runner.common.repositories.with.WithCleanerRepository
 import com.lemline.runner.common.repositories.with.WithIdRepository
-import com.lemline.runner.common.repositories.with.WithInstanceRepository
 import com.lemline.runner.common.repositories.with.WithOutboxRepository
 import com.lemline.runner.listeners.ListenerEventRepository.Companion.FOREACH_COMPLETED_COLUMN
 import com.lemline.runner.listeners.ListenerEventRepository.Companion.LISTENER_ID_COLUMN
@@ -75,7 +73,6 @@ const val LISTENER_TABLE = "lemline_listeners"
 @ExperimentalTime
 class ListenerRepository : CrudRepository<ListenerModel>(),
     WithIdRepository<ListenerModel>,
-    WithInstanceRepository<ListenerModel>,
     WithOutboxRepository<ListenerModel>,
     WithCleanerRepository<ListenerModel> {
 
@@ -86,7 +83,6 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
 
     // Composed operations - initialized lazily to ensure databaseConfig is injected
     val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseConfig) }
-    val instanceRepository by lazy { InstanceRepository(tableName, idHelper, ::createModel, databaseConfig) }
     val outboxRepository by lazy { OutboxRepository(tableName, ::createModel, databaseConfig) }
     val cleanerRepository by lazy { CleanerRepository(tableName, ::createModel, databaseConfig) }
 
@@ -127,10 +123,6 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             }
         }
     }
-
-    // Delegate WithInstanceRepository methods
-    override suspend fun findByWorkflowId(workflowId: WorkflowId, connection: Connection?) =
-        instanceRepository.findByWorkflowId(workflowId, connection)
 
     // Delegate WithOutboxRepository methods
     override suspend fun findEntitiesToProcess(maxAttempts: Int, limit: Int, connection: Connection?) =

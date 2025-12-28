@@ -211,7 +211,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         val startTime = System.currentTimeMillis()
 
         while (System.currentTimeMillis() - startTime < listenerWaitTimeoutMs) {
-            val listener = listenerRepository.findByWorkflowId(workflowId)
+            val listener = listenerRepository.listAll().firstOrNull { it.workflowId == workflowId }
             if (listener != null) {
                 logger.debug { "Listener found for workflow $workflowId after ${System.currentTimeMillis() - startTime}ms" }
                 return true

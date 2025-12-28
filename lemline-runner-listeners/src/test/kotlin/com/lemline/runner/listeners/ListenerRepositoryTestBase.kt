@@ -7,7 +7,6 @@ import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.test.ops.CleanerRepositoryTest
 import com.lemline.runner.common.test.ops.CrudRepositoryTest
 import com.lemline.runner.common.test.ops.IdRepositoryTest
-import com.lemline.runner.common.test.ops.InstanceRepositoryTest
 import com.lemline.runner.common.test.ops.OutboxRepositoryTest
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -50,14 +49,6 @@ abstract class ListenerRepositoryTestBase {
         idRepository = { getRepository() },
         crudRepository = { getRepository() },
         createEntity = ::createEntity
-    )
-
-    @Nested
-    inner class InstanceTests : InstanceRepositoryTest<ListenerModel>(
-        instanceRepository = { getRepository() },
-        crudRepository = { getRepository() },
-        createEntity = ::createEntity,
-        getWorkflowId = { it.workflowId }
     )
 
     @Nested

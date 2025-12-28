@@ -134,7 +134,7 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
             // Route messages to allow workflow to progress to the listen task
             routeMessages()
 
-            val listener = listenerRepository.findByWorkflowId(workflowId)
+            val listener = listenerRepository.listAll().firstOrNull { it.workflowId == workflowId }
             if (listener != null) {
                 logger.debug { "Listener found for workflow $workflowId after ${System.currentTimeMillis() - startTime}ms" }
                 return true
