@@ -63,7 +63,7 @@ data class ListenerEventModel(
      * - ALL strategy: Explicit value (0, 1, 2...) for completion check
      * - ONE/ANY strategies: Defaults to 0 (only one event stored per listener)
      */
-    val filterIndex: Int = 0,
+    val filterIndex: Int?,
 
     /** CloudEvent as JSON string */
     val event: String,

@@ -14,6 +14,7 @@ import java.net.URI
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -2037,6 +2038,312 @@ class DefinitionListenServiceTest {
 
             // Then: All three workflows should match
             matches shouldHaveSize 3
+        }
+    }
+
+    @Nested
+    inner class ToQueryKeyTests {
+
+        @Test
+        fun `toQueryKey should use filterIndex 0 for ONE strategy`() {
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event")
+            val matches = service.findMatchingListenTasks(event)
+
+            matches shouldHaveSize 1
+            val queryKey = matches[0].toQueryKey()
+            queryKey.filterIndex shouldBe 0
+            queryKey.listenerStrategy shouldBe ListenerStrategy.ONE
+        }
+
+        @Test
+        fun `toQueryKey should use filterIndex 0 for ANY strategy`() {
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: com.example.Event1
+                            - with:
+                                type: com.example.Event2
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event1")
+            val matches = service.findMatchingListenTasks(event)
+
+            matches shouldHaveSize 1
+            val queryKey = matches[0].toQueryKey()
+            queryKey.filterIndex shouldBe 0
+            queryKey.listenerStrategy shouldBe ListenerStrategy.ANY
+        }
+
+        @Test
+        fun `toQueryKey should use actual filterIndex for ALL strategy - first filter`() {
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          all:
+                            - with:
+                                type: com.example.Event1
+                            - with:
+                                type: com.example.Event2
+                            - with:
+                                type: com.example.Event3
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event1")
+            val matches = service.findMatchingListenTasks(event)
+
+            matches shouldHaveSize 1
+            val queryKey = matches[0].toQueryKey()
+            queryKey.filterIndex shouldBe 0
+            queryKey.listenerStrategy shouldBe ListenerStrategy.ALL
+        }
+
+        @Test
+        fun `toQueryKey should use actual filterIndex for ALL strategy - second filter`() {
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          all:
+                            - with:
+                                type: com.example.Event1
+                            - with:
+                                type: com.example.Event2
+                            - with:
+                                type: com.example.Event3
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event2")
+            val matches = service.findMatchingListenTasks(event)
+
+            matches shouldHaveSize 1
+            val queryKey = matches[0].toQueryKey()
+            queryKey.filterIndex shouldBe 1
+            queryKey.listenerStrategy shouldBe ListenerStrategy.ALL
+        }
+
+        @Test
+        fun `toQueryKey should use actual filterIndex for ALL strategy - third filter`() {
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          all:
+                            - with:
+                                type: com.example.Event1
+                            - with:
+                                type: com.example.Event2
+                            - with:
+                                type: com.example.Event3
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event3")
+            val matches = service.findMatchingListenTasks(event)
+
+            matches shouldHaveSize 1
+            val queryKey = matches[0].toQueryKey()
+            queryKey.filterIndex shouldBe 2
+            queryKey.listenerStrategy shouldBe ListenerStrategy.ALL
+        }
+
+        @Test
+        fun `toQueryKey should use null filterIndex for ANY_UNTIL_EVENT strategy`() {
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: com.example.Event
+                          until:
+                            one:
+                              with:
+                                type: com.example.Terminate
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event")
+            val matches = service.findMatchingListenTasks(event)
+
+            matches shouldHaveSize 1
+            val queryKey = matches[0].toQueryKey()
+            queryKey.filterIndex shouldBe null
+            queryKey.listenerStrategy shouldBe ListenerStrategy.ANY_UNTIL_EVENT
+        }
+
+        @Test
+        fun `toQueryKey should use null filterIndex for ANY_UNTIL_EXPR strategy`() {
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: com.example.Event
+                          until: .count >= 5
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event")
+            val matches = service.findMatchingListenTasks(event)
+
+            matches shouldHaveSize 1
+            val queryKey = matches[0].toQueryKey()
+            queryKey.filterIndex shouldBe null
+            queryKey.listenerStrategy shouldBe ListenerStrategy.ANY_UNTIL_EXPR
+        }
+
+        @Test
+        fun `toQueryKey should preserve correlation values`() {
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                            correlate:
+                              orderId:
+                                from: .orderId
+                              customerId:
+                                from: .customerId
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"orderId": "ORD-123", "customerId": "CUST-456"}"""
+            )
+            val matches = service.findMatchingListenTasks(event)
+
+            matches shouldHaveSize 1
+            val queryKey = matches[0].toQueryKey()
+            queryKey.correlationValuesJson shouldNotBe null
+
+            val correlationJson = Json.parseToJsonElement(queryKey.correlationValuesJson!!)
+            val orderId = correlationJson.jsonObject["orderId"]?.toString()?.trim('"')
+            val customerId = correlationJson.jsonObject["customerId"]?.toString()?.trim('"')
+            orderId shouldBe "ORD-123"
+            customerId shouldBe "CUST-456"
+        }
+
+        @Test
+        fun `toQueryKey should have null correlation when no correlation defined`() {
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event")
+            val matches = service.findMatchingListenTasks(event)
+
+            matches shouldHaveSize 1
+            val queryKey = matches[0].toQueryKey()
+            queryKey.correlationValuesJson shouldBe null
+        }
+
+        @Test
+        fun `toQueryKey should preserve workflow info`() {
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: my-workflow
+                  version: '2.0.0'
+                  namespace: production
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event")
+            val matches = service.findMatchingListenTasks(event)
+
+            matches shouldHaveSize 1
+            val queryKey = matches[0].toQueryKey()
+            queryKey.workflowInfo.name.toString() shouldBe "my-workflow"
+            queryKey.workflowInfo.version.toString() shouldBe "2.0.0"
+            queryKey.workflowInfo.namespace.toString() shouldBe "production"
         }
     }
 

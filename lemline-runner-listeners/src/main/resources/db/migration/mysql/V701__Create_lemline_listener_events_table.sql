@@ -15,7 +15,7 @@ CREATE TABLE lemline_listener_events
     -- Filter index that matched (for ALL strategy completion check)
     -- Defaults to 0 for ONE/ANY strategies (single event per listener)
     -- Part of composite PK to allow same event to match multiple filters
-    filter_index            INT          NOT NULL DEFAULT 0,
+    filter_index            INT,
 
     -- CloudEvent data as JSON string
     event                   MEDIUMTEXT   NOT NULL,
@@ -49,11 +49,6 @@ CREATE TABLE lemline_listener_events
     created_at              TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at              TIMESTAMP(6),
 
-    -- Composite primary key: (listener_id, event_id, filter_index)
-    -- Natural idempotency: same CloudEvent + filter combination cannot be inserted twice
-    -- Allows same event to satisfy multiple filters in ALL strategy
-    PRIMARY KEY (listener_id, event_id, filter_index),
-
     -- Unique key for auto-increment sort_key (required by MySQL)
     UNIQUE KEY uk_lemline_listener_events_sort_key (sort_key),
 
@@ -64,12 +59,19 @@ CREATE TABLE lemline_listener_events
   DEFAULT CHARSET = utf8mb4
   COLLATE = utf8mb4_0900_as_cs;
 
+-- Unique index replacing PRIMARY KEY (listener_id, event_id, filter_index)
+-- Natural idempotency: same CloudEvent + filter combination cannot be inserted twice
+-- Allows same event to satisfy multiple filters in ALL strategy
+CREATE UNIQUE INDEX idx_lemline_listener_events_pk
+    ON lemline_listener_events (listener_id, event_id, filter_index);
+
 -- Index for finding events by listener ordered by arrival time
 CREATE INDEX idx_lemline_listener_events_listener
     ON lemline_listener_events (listener_id, created_at);
 
 -- Unique constraint for ALL strategy idempotency (one event per filter per listener)
 -- For ONE/ANY strategies, filter_index defaults to 0, ensuring only one event is stored
+-- For ANY+Until strategies, filter_index is NULL, allowing multiple events to accumulate
 CREATE UNIQUE INDEX idx_lemline_listener_events_filter_unique
     ON lemline_listener_events (listener_id, filter_index);
 

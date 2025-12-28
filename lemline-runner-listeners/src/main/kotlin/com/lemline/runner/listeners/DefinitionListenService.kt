@@ -60,7 +60,12 @@ data class MatchingListenTask(
         workflowInfo = workflowInfo,
         position = nodePosition,
         correlationValuesJson = correlationValuesJson,
-        filterIndex = filterIndex,
+        filterIndex = when (listenerStrategy) {
+            ListenerStrategy.ALL -> filterIndex             // 0, 1, 2... per filter
+            ListenerStrategy.ONE, ListenerStrategy.ANY -> 0 // Always 0 for uniqueness
+            ListenerStrategy.ANY_UNTIL_EXPR,
+            ListenerStrategy.ANY_UNTIL_EVENT -> null        // NULL for accumulation
+        },
         listenerStrategy = listenerStrategy
     )
 }

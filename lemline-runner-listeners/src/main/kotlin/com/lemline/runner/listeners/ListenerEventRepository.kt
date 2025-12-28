@@ -96,7 +96,13 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             // Composite key columns (listener_id, event_id, filter_index)
             key(LISTENER_ID_COLUMN) { stmt, entity, idx -> setIDV7(stmt, idx, entity.listenerId) }
             key(EVENT_ID_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.eventId) }
-            key(FILTER_INDEX_COLUMN) { stmt, entity, idx -> stmt.setInt(idx, entity.filterIndex) }
+            key(FILTER_INDEX_COLUMN) { stmt, entity, idx ->
+                if (entity.filterIndex != null) {
+                    stmt.setInt(idx, entity.filterIndex)
+                } else {
+                    stmt.setNull(idx, java.sql.Types.INTEGER)
+                }
+            }
 
             // Core columns
             column(EVENT_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.event) }
@@ -112,7 +118,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     override fun createModel(rs: ResultSet): ListenerEventModel = ListenerEventModel(
         listenerId = getIDV7(rs, LISTENER_ID_COLUMN)!!,
         eventId = rs.getString(EVENT_ID_COLUMN),
-        filterIndex = rs.getInt(FILTER_INDEX_COLUMN),
+        filterIndex = rs.getInt(FILTER_INDEX_COLUMN).takeUnless { rs.wasNull() },
         event = rs.getString(EVENT_COLUMN),
         outboxScheduledFor = rs.getInstant(OUTBOX_SCHEDULED_FOR_COLUMN),
     ).apply {
@@ -285,7 +291,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 """
                 SELECT
                     l.$ID_COLUMN as $LISTENER_ID_COLUMN,
-                    ${filterIndex ?: 0} as $FILTER_INDEX_COLUMN,
+                    $filterIndex as $FILTER_INDEX_COLUMN,
                     l.$HAS_FOREACH_COLUMN
                 FROM $LISTENER_TABLE l
                 WHERE l.$CLOSED_AT_COLUMN IS NULL
