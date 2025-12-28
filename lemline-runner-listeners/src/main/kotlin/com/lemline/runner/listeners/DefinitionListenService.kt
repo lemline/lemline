@@ -13,11 +13,17 @@ import com.lemline.core.expressions.JQExpression
 import com.lemline.core.workflows.CachedListenTask
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
+import io.serverlessworkflow.api.types.EventDataschema
 import io.serverlessworkflow.api.types.EventFilter
+import io.serverlessworkflow.api.types.EventSource
+import io.serverlessworkflow.api.types.EventTime
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
+import io.serverlessworkflow.api.types.UriTemplate
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.net.URI
+import java.time.OffsetDateTime
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
@@ -84,17 +90,6 @@ data class MatchingListenTaskUntilEvent(
 }
 
 /**
- * Represents a listener that should be terminated by a termination event.
- * Used for ANY + until(event) strategy where a specific event type triggers completion.
- */
-@ExperimentalTime
-@ExperimentalSerializationApi
-data class TerminationMatch(
-    val listener: ListenerModel,
-    val readAs: ListenTaskConfiguration.ListenAndReadAs
-)
-
-/**
  * Service for finding listen tasks and matching CloudEvents against active listeners.
  *
  * This service:
@@ -151,7 +146,7 @@ class DefinitionListenService {
      */
     fun findMatchingListenTasks(
         event: CloudEvent,
-        eventDataProvider: () -> JsonElement
+        eventDataProvider: () -> JsonElement = { CloudEventService.parseData(event) }
     ): List<MatchingListenTask> {
         logger.debug { "Finding matching listen tasks for CloudEvent: $event" }
 
@@ -186,7 +181,7 @@ class DefinitionListenService {
      */
     fun findMatchingUntilEvents(
         event: CloudEvent,
-        eventDataProvider: () -> JsonElement
+        eventDataProvider: () -> JsonElement = { CloudEventService.parseData(event) }
     ): List<MatchingListenTaskUntilEvent> {
         logger.debug { "Finding matching 'until' for CloudEvent: $event" }
 
@@ -267,7 +262,7 @@ class DefinitionListenService {
         event: CloudEvent,
         eventDataProvider: () -> JsonElement
     ): Boolean {
-        val eventProps = filter.with ?: return true // No filter criteria = match all
+        val eventProps = filter.with ?: return true
 
         // Literal-only fields: exact string match
         if (!matchesLiteralField(eventProps.type, event.type)) return false
@@ -277,19 +272,19 @@ class DefinitionListenService {
 
         // Expression-capable fields
         if (!matchesExprField(
-                eventProps.source?.get()?.toString(),
+                resolveSourceValue(eventProps.source),
                 event.source?.toString()
             )
         ) return false
 
         if (!matchesExprField(
-                eventProps.dataschema?.get()?.toString(),
+                resolveDataschemaValue(eventProps.dataschema),
                 event.dataSchema?.toString()
             )
         ) return false
 
         if (!matchesExprField(
-                eventProps.time?.get()?.toString(),
+                resolveTimeValue(eventProps.time),
                 event.time?.toString()
             )
         ) return false
@@ -301,6 +296,38 @@ class DefinitionListenService {
         ) return false
 
         return true
+    }
+
+    private fun resolveSourceValue(source: EventSource?): String? {
+        if (source == null) return null
+        return when (val value = source.get()) {
+            is UriTemplate -> when (val uri = value.get()) {
+                is URI -> uri.toString()
+                is String -> uri
+                else -> null
+            }
+
+            is String -> value
+            else -> null
+        }
+    }
+
+    private fun resolveDataschemaValue(dataschema: EventDataschema?): String? {
+        if (dataschema == null) return null
+        return when (val value = dataschema.get()) {
+            is URI -> value.toString()
+            is String -> value
+            else -> null
+        }
+    }
+
+    private fun resolveTimeValue(time: EventTime?): String? {
+        if (time == null) return null
+        return when (val value = time.get()) {
+            is OffsetDateTime -> value.toString()
+            is String -> value
+            else -> null
+        }
     }
 
     /**

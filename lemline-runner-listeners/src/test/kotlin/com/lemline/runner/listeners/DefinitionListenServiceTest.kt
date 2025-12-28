@@ -14,7 +14,6 @@ import java.net.URI
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
@@ -49,10 +48,6 @@ class DefinitionListenServiceTest {
         return builder.build()
     }
 
-    private fun eventDataProvider(data: String?): () -> JsonElement = {
-        data?.let { Json.parseToJsonElement(it) } ?: Json.parseToJsonElement("{}")
-    }
-
     @Nested
     inner class FindMatchingUntilEventsTests {
 
@@ -62,7 +57,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Terminate")
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches.shouldBeEmpty()
@@ -90,7 +85,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event")
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches.shouldBeEmpty()
@@ -99,7 +94,7 @@ class DefinitionListenServiceTest {
         @Test
         fun `should return empty list when workflow has until expression not event`() {
             // Given: A workflow with ANY + until expression (not event filter)
-            val yaml = """
+            val yaml = $$"""
                 document:
                   dsl: '1.0.0'
                   name: test-workflow
@@ -112,14 +107,14 @@ class DefinitionListenServiceTest {
                           any:
                             - with:
                                 type: com.example.Event
-                          until: '${'$'}{ .count >= 5 }'
+                          until: '${ .count >= 5 }'
             """.trimIndent()
             WorkflowCache.parseYamlAndPut(yaml)
 
             val event = buildCloudEvent(type = "com.example.Event")
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches.shouldBeEmpty()
@@ -151,7 +146,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Terminate")
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches shouldHaveSize 1
@@ -184,7 +179,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.OtherEvent")
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches.shouldBeEmpty()
@@ -221,7 +216,7 @@ class DefinitionListenServiceTest {
             )
 
             // When
-            val matches = service.findMatchingUntilEvents(nonMatchingEvent, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(nonMatchingEvent)
 
             // Then
             matches.shouldBeEmpty()
@@ -257,7 +252,7 @@ class DefinitionListenServiceTest {
             )
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches shouldHaveSize 1
@@ -310,7 +305,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Terminate")
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches shouldHaveSize 2
@@ -363,7 +358,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Terminate")
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches shouldHaveSize 1
@@ -396,7 +391,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Terminate")
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches shouldHaveSize 1
@@ -437,7 +432,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Terminate")
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches shouldHaveSize 1
@@ -470,7 +465,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Terminate")
 
             // When
-            val matches = service.findMatchingUntilEvents(event, eventDataProvider(null))
+            val matches = service.findMatchingUntilEvents(event)
 
             // Then
             matches shouldHaveSize 1
@@ -489,7 +484,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event")
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches.shouldBeEmpty()
@@ -517,7 +512,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event")
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches shouldHaveSize 1
@@ -547,7 +542,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.DifferentEvent")
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches.shouldBeEmpty()
@@ -576,7 +571,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event", subject = "order-123")
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches shouldHaveSize 1
@@ -605,7 +600,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event", subject = "order-456")
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches.shouldBeEmpty()
@@ -636,7 +631,7 @@ class DefinitionListenServiceTest {
 
             // When: Event B arrives
             val eventB = buildCloudEvent(type = "com.example.EventB")
-            val matches = service.findMatchingListenTasks(eventB, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(eventB)
 
             // Then: Should match with filterIndex 1
             matches shouldHaveSize 1
@@ -668,7 +663,7 @@ class DefinitionListenServiceTest {
 
             // When: Event matching two filters arrives
             val event = buildCloudEvent(type = "com.example.Event")
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then: Should match both filters (index 0 and 2)
             matches shouldHaveSize 2
@@ -714,7 +709,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event")
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches shouldHaveSize 2
@@ -760,7 +755,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event")
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches shouldHaveSize 1
@@ -789,7 +784,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event")
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches shouldHaveSize 1
@@ -821,7 +816,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event")
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches shouldHaveSize 1
@@ -856,7 +851,7 @@ class DefinitionListenServiceTest {
             )
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider("""{"orderId": "ORD-123"}"""))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches shouldHaveSize 1
@@ -891,7 +886,7 @@ class DefinitionListenServiceTest {
             )
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider("""{"customerId": "CUST-456"}"""))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches shouldHaveSize 1
@@ -923,7 +918,7 @@ class DefinitionListenServiceTest {
             val event = buildCloudEvent(type = "com.example.Event")
 
             // When
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then
             matches shouldHaveSize 1
@@ -955,11 +950,1094 @@ class DefinitionListenServiceTest {
 
             // When: Regular event arrives (not termination)
             val event = buildCloudEvent(type = "com.example.Event")
-            val matches = service.findMatchingListenTasks(event, eventDataProvider(null))
+            val matches = service.findMatchingListenTasks(event)
 
             // Then: Should match the event filter with ANY_UNTIL_EVENT strategy
             matches shouldHaveSize 1
             matches[0].listenerStrategy shouldBe ListenerStrategy.ANY_UNTIL_EVENT
         }
     }
+
+    @Nested
+    inner class AdvancedFilterMatchingTests {
+
+        @Test
+        fun `should match event by id`() {
+            // Given: A workflow with id filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              id: specific-event-id
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = CloudEventBuilder.v1()
+                .withId("specific-event-id")
+                .withType("com.example.Event")
+                .withSource(URI.create("https://test.example.com"))
+                .build()
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+        }
+
+        @Test
+        fun `should not match when id does not match`() {
+            // Given: A workflow with id filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              id: expected-id
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = CloudEventBuilder.v1()
+                .withId("different-id")
+                .withType("com.example.Event")
+                .withSource(URI.create("https://test.example.com"))
+                .build()
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches.shouldBeEmpty()
+        }
+
+        @Test
+        fun `should match event by datacontenttype`() {
+            // Given: A workflow with datacontenttype filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              datacontenttype: application/json
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = CloudEventBuilder.v1()
+                .withId("test-id")
+                .withType("com.example.Event")
+                .withSource(URI.create("https://test.example.com"))
+                .withDataContentType("application/json")
+                .build()
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+        }
+
+        @Test
+        fun `should not match when datacontenttype does not match`() {
+            // Given: A workflow with datacontenttype filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              datacontenttype: application/json
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = CloudEventBuilder.v1()
+                .withId("test-id")
+                .withType("com.example.Event")
+                .withSource(URI.create("https://test.example.com"))
+                .withDataContentType("text/plain")
+                .build()
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches.shouldBeEmpty()
+        }
+
+        @Test
+        fun `should match event by source as string`() {
+            // Given: A workflow with source filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              source: https://specific.source.com
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                source = "https://specific.source.com"
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+        }
+
+        @Test
+        fun `should not match when source does not match`() {
+            // Given: A workflow with source filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              source: https://expected.source.com
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                source = "https://different.source.com"
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches.shouldBeEmpty()
+        }
+
+        @Test
+        fun `should match event with source expression`() {
+            // Given: A workflow with source expression filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              source: '${'$'}{ . == "https://test.example.com" }'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                source = "https://test.example.com"
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+        }
+
+        @Test
+        fun `should not match when source expression evaluates to false`() {
+            // Given: A workflow with source expression
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              source: '${'$'}{ . == "https://expected.com" }'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                source = "https://different.com"
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches.shouldBeEmpty()
+        }
+
+        @Test
+        fun `should match event with data expression`() {
+            // Given: A workflow with data expression filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              data: '${'$'}{ .amount > 100 }'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"amount": 150}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+        }
+
+        @Test
+        fun `should not match when data expression evaluates to false`() {
+            // Given: A workflow with data expression filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              data: '${'$'}{ .amount > 100 }'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"amount": 50}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches.shouldBeEmpty()
+        }
+
+        @Test
+        fun `should match event with literal data value`() {
+            // Given: A workflow with literal data filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              data: '{"status":"active"}'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"status":"active"}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+        }
+
+        @Test
+        fun `should not match when literal data value differs`() {
+            // Given: A workflow with literal data filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              data: '{"status":"active"}'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"status":"inactive"}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches.shouldBeEmpty()
+        }
+
+        @Test
+        fun `should handle invalid literal data filter gracefully`() {
+            // Given: A workflow with invalid literal JSON in data filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              data: '{invalid json'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"status":"active"}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then: Should not match (invalid filter never matches)
+            matches.shouldBeEmpty()
+        }
+
+        @Test
+        fun `should match all filter attributes when specified`() {
+            // Given: A workflow with multiple filter attributes
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              source: https://test.example.com
+                              subject: order-123
+                              datacontenttype: application/json
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = CloudEventBuilder.v1()
+                .withId("test-id")
+                .withType("com.example.Event")
+                .withSource(URI.create("https://test.example.com"))
+                .withSubject("order-123")
+                .withDataContentType("application/json")
+                .build()
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+        }
+
+        @Test
+        fun `should not match when one of multiple filter attributes does not match`() {
+            // Given: A workflow with multiple filter attributes
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              source: https://test.example.com
+                              subject: order-123
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                source = "https://test.example.com",
+                subject = "order-456"
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches.shouldBeEmpty()
+        }
+    }
+
+    @Nested
+    inner class ComplexCorrelationTests {
+
+        @Test
+        fun `should extract multiple correlation keys`() {
+            // Given: A workflow with multiple correlation keys
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.OrderEvent
+                            correlate:
+                              orderId:
+                                from: .orderId
+                              customerId:
+                                from: .customerId
+                              region:
+                                from: .region
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.OrderEvent",
+                data = """{"orderId": "ORD-123", "customerId": "CUST-456", "region": "EU"}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+            matches[0].correlationValuesJson shouldBe """{"customerId":"CUST-456","orderId":"ORD-123","region":"EU"}"""
+        }
+
+        @Test
+        fun `should sort correlation keys alphabetically`() {
+            // Given: A workflow with correlation keys in non-alphabetical order
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                            correlate:
+                              zebra:
+                                from: .z
+                              alpha:
+                                from: .a
+                              middle:
+                                from: .m
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"z": "Z", "a": "A", "m": "M"}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+            matches[0].correlationValuesJson shouldBe """{"alpha":"A","middle":"M","zebra":"Z"}"""
+        }
+
+        @Test
+        fun `should handle JQ expression in correlate from`() {
+            // Given: A workflow with JQ expression in correlation
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                            correlate:
+                              userId:
+                                from: '${'$'}{ .user.id }'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"user": {"id": "USER-789"}}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+            matches[0].correlationValuesJson shouldBe """{"userId":"USER-789"}"""
+        }
+
+        @Test
+        fun `should handle complex JQ expression in correlate from`() {
+            // Given: A workflow with complex JQ expression
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                            correlate:
+                              orderId:
+                                from: '${'$'}{ .items[0].orderId }'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"items": [{"orderId": "ORD-999"}]}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+            matches[0].correlationValuesJson shouldBe """{"orderId":"ORD-999"}"""
+        }
+
+        @Test
+        fun `should return null correlation when expression evaluation fails`() {
+            // Given: A workflow with correlation expression that will fail
+            val yaml = $$"""
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                            correlate:
+                              userId:
+                                from: '${ .nonexistent.field }'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent("com.example.Event")
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then: Should still match event, but correlation is null
+            matches shouldHaveSize 1
+            matches[0].correlationValuesJson shouldBe null
+        }
+
+        @Test
+        fun `should skip correlation key when value is null`() {
+            // Given: A workflow with correlation on potentially null field
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                            correlate:
+                              userId:
+                                from: .userId
+                              optionalField:
+                                from: .optional
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"userId": "USER-123"}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then: Should only include non-null values
+            matches shouldHaveSize 1
+            matches[0].correlationValuesJson shouldBe """{"userId":"USER-123"}"""
+        }
+
+        @Test
+        fun `should handle non-string correlation values by converting to string`() {
+            // Given: A workflow with correlation on numeric field
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                            correlate:
+                              orderNumber:
+                                from: .orderNumber
+                              isActive:
+                                from: .active
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(
+                type = "com.example.Event",
+                data = """{"orderNumber": 12345, "active": true}"""
+            )
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then: Should convert non-string values to strings
+            matches shouldHaveSize 1
+            matches[0].correlationValuesJson shouldNotBe null
+        }
+
+        @Test
+        fun `should return null when all correlation keys extract null values`() {
+            // Given: A workflow with correlation on missing fields
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                            correlate:
+                              field1:
+                                from: .missing1
+                              field2:
+                                from: .missing2
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent("com.example.Event")
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+            matches[0].correlationValuesJson shouldBe null
+        }
+
+    }
+
+    @Nested
+    inner class EdgeCasesAndErrorHandlingTests {
+
+        @Test
+        fun `should handle event with null source gracefully`() {
+            // Given: A workflow listening for any event
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = CloudEventBuilder.v1()
+                .withId("test-id")
+                .withType("com.example.Event")
+                .withSource(URI.create("https://test.example.com"))
+                .build()
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then: Should match
+            matches shouldHaveSize 1
+        }
+
+        @Test
+        fun `should handle event with null subject gracefully`() {
+            // Given: A workflow without subject filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event")
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then
+            matches shouldHaveSize 1
+        }
+
+        @Test
+        fun `should handle data expression error gracefully and not match`() {
+            // Given: A workflow with invalid data expression
+            val yaml = $$"""
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              data: '${ invalid jq syntax }'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent("com.example.Event")
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then: Should not match (expression evaluation failed)
+            matches.shouldBeEmpty()
+        }
+
+        @Test
+        fun `should not evaluate event data provider when filter does not match`() {
+            // Given: A workflow listening for a different event type
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.DifferentEvent
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent(type = "com.example.Event")
+
+            var dataProviderCalled = false
+            val lazyDataProvider = {
+                dataProviderCalled = true
+                Json.parseToJsonElement("{}")
+            }
+
+            // When
+            val matches = service.findMatchingListenTasks(event, lazyDataProvider)
+
+            // Then: Should not match, and data provider should NOT be called
+            matches.shouldBeEmpty()
+            dataProviderCalled shouldBe false
+        }
+
+        @Test
+        fun `should evaluate event data provider when data filter is present`() {
+            // Given: A workflow with data filter
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              data: '${'$'}{ .status == "active" }'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent("com.example.Event")
+
+            var dataProviderCalled = false
+            val lazyDataProvider = {
+                dataProviderCalled = true
+                Json.parseToJsonElement("""{"status": "active"}""")
+            }
+
+            // When
+            val matches = service.findMatchingListenTasks(event, lazyDataProvider)
+
+            // Then: Should match and data provider SHOULD be called
+            matches shouldHaveSize 1
+            dataProviderCalled shouldBe true
+        }
+
+        @Test
+        fun `should evaluate event data provider when correlation is present`() {
+            // Given: A workflow with correlation
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                            correlate:
+                              userId:
+                                from: .userId
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent("com.example.Event")
+
+            var dataProviderCalled = false
+            val lazyDataProvider = {
+                dataProviderCalled = true
+                Json.parseToJsonElement("""{"userId": "USER-123"}""")
+            }
+
+            // When
+            val matches = service.findMatchingListenTasks(event, lazyDataProvider)
+
+            // Then: Should match and data provider SHOULD be called for correlation
+            matches shouldHaveSize 1
+            dataProviderCalled shouldBe true
+        }
+
+        @Test
+        fun `should handle expression returning non-boolean as false`() {
+            // Given: A workflow with source expression returning a string
+            val yaml = """
+                document:
+                  dsl: '1.0.0'
+                  name: test-workflow
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+                              source: '${'$'}{ . }'
+            """.trimIndent()
+            WorkflowCache.parseYamlAndPut(yaml)
+
+            val event = buildCloudEvent("com.example.Event")
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then: Non-boolean result treated as false, no match
+            matches.shouldBeEmpty()
+        }
+
+        @Test
+        fun `should match multiple workflows in cache`() {
+            // Given: Multiple workflows cached
+            val yaml1 = """
+                document:
+                  dsl: '1.0.0'
+                  name: workflow-1
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              type: com.example.Event
+            """.trimIndent()
+
+            val yaml2 = """
+                document:
+                  dsl: '1.0.0'
+                  name: workflow-2
+                  version: '2.0.0'
+                  namespace: production
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          any:
+                            - with:
+                                type: com.example.Event
+            """.trimIndent()
+
+            val yaml3 = """
+                document:
+                  dsl: '1.0.0'
+                  name: workflow-3
+                  version: '1.0.0'
+                  namespace: default
+                do:
+                  - waitForEvents:
+                      listen:
+                        to:
+                          all:
+                            - with:
+                                type: com.example.Event
+            """.trimIndent()
+
+            WorkflowCache.parseYamlAndPut(yaml1)
+            WorkflowCache.parseYamlAndPut(yaml2)
+            WorkflowCache.parseYamlAndPut(yaml3)
+
+            val event = buildCloudEvent(type = "com.example.Event")
+
+            // When
+            val matches = service.findMatchingListenTasks(event)
+
+            // Then: All three workflows should match
+            matches shouldHaveSize 3
+        }
+    }
+
 }
