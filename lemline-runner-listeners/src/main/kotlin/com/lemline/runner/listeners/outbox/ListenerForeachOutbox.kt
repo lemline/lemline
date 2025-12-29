@@ -90,7 +90,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
         val maxIterations = 100
         do {
             marked = listenerEventRepository.markReadyForForeach(batchSize)
-            logger.debug { "$marked events marked for foreach" }
+            if (marked > 0 || iterations == 0) logger.debug { "$marked events marked for foreach" }
             iterations++
         } while (marked > 0 && iterations < maxIterations)
 
@@ -159,8 +159,8 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
 
         commandEmitter.send(resumeMessage, messageId)
 
-        logger.info {
-            "Foreach event (listenerId=${listenerEvent.listenerId}, eventId=${listenerEvent.eventId}) sent for processing"
+        logger.debug {
+            "Foreach event (listenerId=${listenerEvent.listenerId}, event=${listenerEvent.event}) sent for processing"
         }
     }
 

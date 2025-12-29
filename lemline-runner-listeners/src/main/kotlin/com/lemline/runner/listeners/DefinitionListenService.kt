@@ -153,7 +153,7 @@ class DefinitionListenService {
         event: CloudEvent,
         eventDataProvider: () -> JsonElement = { CloudEventService.parseData(event) }
     ): List<MatchingListenTask> {
-        logger.debug { "Finding matching listen tasks for CloudEvent: $event" }
+        logger.trace { "Finding matching listen tasks for CloudEvent: $event" }
 
         // Parse event data lazily (only if needed for filter evaluation)
         val eventData by lazy { eventDataProvider() }
@@ -188,7 +188,7 @@ class DefinitionListenService {
         event: CloudEvent,
         eventDataProvider: () -> JsonElement = { CloudEventService.parseData(event) }
     ): List<MatchingListenTaskUntilEvent> {
-        logger.debug { "Finding matching 'until' for CloudEvent: $event" }
+        logger.trace { "Finding matching 'until' for CloudEvent: $event" }
 
         // Parse event data lazily
 

@@ -58,9 +58,8 @@ class ListenerEventService {
      * @return Number of events inserted (approximate affected count)
      */
     suspend fun handleCloudEvent(event: CloudEvent): Int {
-        val eventType: String = event.type
 
-        logger.debug { "Processing CloudEvent: type=$eventType, source=${event.source}, id=${event.id}" }
+        logger.debug { "Processing CloudEvent: $event" }
 
         // ═══════════════════════════════════════════════════════════════════════════════
         // STEP 1: Match event against workflow definitions (in-memory, no database)
@@ -208,7 +207,7 @@ class ListenerEventService {
         )
 
         if (inserted > 0) {
-            logger.info { "Inserted $inserted events for accumulating listeners" }
+            logger.debug { "Inserted $inserted events for accumulating listeners" }
         }
 
         return inserted
@@ -282,7 +281,7 @@ class ListenerEventService {
         val totalMarkedCompleted = listenerRepository.batchMarkListenersCompleted(listenersToComplete)
 
         if (totalMarkedCompleted > 0) {
-            logger.info { "Marked $totalMarkedCompleted ANY+until(expr) listeners as completed" }
+            logger.debug { "Marked $totalMarkedCompleted ANY+until(expr) listeners as completed" }
         }
 
         return totalMarkedCompleted

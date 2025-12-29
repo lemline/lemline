@@ -564,7 +564,7 @@ internal class ListenerEventOutbox : AbstractOutbox<ListenerEventModel>() {
         val messageId = entity.id.derive("-foreach-event")
         instanceEmitter.send(resumeCommand, messageId)
 
-        logger.info {
+        logger.debug {
             "Foreach event ${entity.id} sent for processing, " +
                 "listener ${entity.listenerId}, iteration ${entity.iterationIndex}"
         }

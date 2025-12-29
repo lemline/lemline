@@ -131,22 +131,14 @@ class ListenerOutbox : AbstractOutbox<ListenerModel>() {
     }
 
     private suspend fun process(entity: ListenerModel, completedOutputs: List<String>) {
-        completedOutputs.forEach {
-            logger.debug {
-                "Processing ${
-                    CloudEventService.parseStringAsData(
-                        it,
-                        entity.readAs
-                    )
-                }"
-            }
-        }
         val outputArray = JsonArray(completedOutputs.map { output ->
-            if (entity.hasForeach) {
+            val parsed = if (entity.hasForeach) {
                 Json.parseToJsonElement(output)
             } else {
                 CloudEventService.parseStringAsData(output, entity.readAs)
             }
+            logger.debug { "Processing $parsed" }
+            parsed
         })
 
         val resumeCommand = WorkflowCommand.ResumeWithCompletedTask(
