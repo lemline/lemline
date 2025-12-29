@@ -34,8 +34,10 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
@@ -50,6 +52,20 @@ import org.junit.jupiter.api.Test
 @ExperimentalTime
 @ExperimentalSerializationApi
 private class ListenUntilForeachDebugTest {
+
+    companion object {
+        /** Short delay for database writes to complete */
+        private const val DB_WRITE_DELAY_MS = 200L
+
+        /** Short delay between sequential event sends */
+        private const val EVENT_INTERVAL_MS = 300L
+
+        /** Delay for outbox scheduler to process (1s polling + buffer) */
+        private const val OUTBOX_PROCESSING_DELAY_MS = 3500L
+
+        /** Delay between message processing iterations */
+        private const val PROCESSING_INTERVAL_MS = 50L
+    }
 
     @Inject
     lateinit var definitionRepository: DefinitionRepository
@@ -167,7 +183,7 @@ private class ListenUntilForeachDebugTest {
                 listenerFound = true
                 break
             }
-            delay(20)
+            realDelay(PROCESSING_INTERVAL_MS)
         }
 
         assertTrue(listenerFound, "Listener should be registered")
@@ -212,11 +228,11 @@ private class ListenUntilForeachDebugTest {
             .build()
 
         cloudEventsIn.send(String(cloudEventJsonFormat.serialize(reading1Event), Charsets.UTF_8))
-        delay(50)
+        realDelay(EVENT_INTERVAL_MS)
         cloudEventsIn.send(String(cloudEventJsonFormat.serialize(reading2Event), Charsets.UTF_8))
-        delay(50)
+        realDelay(EVENT_INTERVAL_MS)
         cloudEventsIn.send(String(cloudEventJsonFormat.serialize(reading3Event), Charsets.UTF_8))
-        delay(200)
+        realDelay(OUTBOX_PROCESSING_DELAY_MS)
 
         val allListeners = listenerRepository.listAll()
         println("Listeners count: ${allListeners.size}")
@@ -260,7 +276,7 @@ private class ListenUntilForeachDebugTest {
             } catch (_: TimeoutException) {
             }
 
-            delay(20)
+            realDelay(PROCESSING_INTERVAL_MS)
         }
 
         assertNotNull(result, "Workflow should complete")
@@ -295,20 +311,34 @@ private class ListenUntilForeachDebugTest {
         lifecycleEventsOut: io.smallrye.reactive.messaging.memory.InMemorySink<String>,
         lifecycleEventsIn: io.smallrye.reactive.messaging.memory.InMemorySource<String>
     ) {
-        commandsOut.received().toList().also { commandsOut.clear() }
-            .forEach {
-                commandsIn.send(it.payload)
+        val commands = commandsOut.received().toList()
+        if (commands.isNotEmpty()) {
+            commandsOut.clear()
+            for (cmd in commands) {
+                commandsIn.send(cmd.payload)
             }
+        }
 
-        eventsOut.received().toList().also { eventsOut.clear() }
-            .forEach {
-                eventsIn.send(it.payload)
+        val events = eventsOut.received().toList()
+        if (events.isNotEmpty()) {
+            eventsOut.clear()
+            for (event in events) {
+                eventsIn.send(event.payload)
             }
+        }
 
-        lifecycleEventsOut.received().toList().also { lifecycleEventsOut.clear() }
-            .forEach {
-                println("lifecycleEvents = ${it.payload}")
-                //lifecycleEventsIn.send(it.payload)
+        val lifecycleEvents = lifecycleEventsOut.received().toList()
+        if (lifecycleEvents.isNotEmpty()) {
+            lifecycleEventsOut.clear()
+            for (event in lifecycleEvents) {
+                lifecycleEventsIn.send(event.payload)
             }
+        }
+    }
+
+    private suspend fun realDelay(millis: Long) {
+        withContext(Dispatchers.Default) {
+            delay(millis)
+        }
     }
 }
