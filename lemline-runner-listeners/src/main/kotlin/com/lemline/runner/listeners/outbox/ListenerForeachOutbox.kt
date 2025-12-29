@@ -83,7 +83,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
      * pending event for each listener that has pending events but no event currently being processed,
      * and marks it as ready by setting outbox_delayed_until = NOW.
      */
-    override suspend fun processEntities(batchSize: Int, maxAttempts: Int, initialDelay: Duration) {
+    override suspend fun processEntities(batchSize: Int, maxAttempts: Int, retryDelay: Duration) {
         // Mark pending events as ready for processing (FIFO head per listener)
         // Loop until no more events need to be marked, with safety limit
         var marked: Int
@@ -100,20 +100,20 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
         }
 
         // Now process the marked entities
-        super.processEntities(batchSize, maxAttempts, initialDelay)
+        super.processEntities(batchSize, maxAttempts, retryDelay)
     }
 
     /** Override to batch-load all listeners */
     override suspend fun processBatch(
         entities: List<ListenerEventModel>,
         maxAttempts: Int,
-        initialDelay: Duration
+        retryDelay: Duration
     ): Int {
         // Batch-load all listeners in one query
         val listenerIds = entities.map { it.listenerId }.distinct()
         val listeners = listenerRepository.findByIds(listenerIds)
 
-        return processEntitiesWith(entities, maxAttempts, initialDelay) { listenerEvent ->
+        return processEntitiesWith(entities, maxAttempts, retryDelay) { listenerEvent ->
             process(listenerEvent, listeners[listenerEvent.listenerId]!!)
         }
     }

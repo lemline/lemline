@@ -59,6 +59,10 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
         listenerConfig.outbox?.every ?: 5.seconds
     }
 
+    override val initialDelay: Duration by lazy {
+        listenerConfig.outbox?.randomInitialDelay ?: Duration.ZERO
+    }
+
     /** Batch size for processing */
     private val batchSize by lazy {
         listenerConfig.outbox?.batchSize ?: 100

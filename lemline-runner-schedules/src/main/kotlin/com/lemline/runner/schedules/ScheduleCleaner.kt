@@ -37,7 +37,7 @@ class ScheduleCleaner : AbstractCleaner<ScheduleModel>() {
 
     override val enabled by lazy { scheduleConfig.enabled }
 
-    override val cleanerConf: CleanupConfig by lazy { scheduleConfig.cleanup }
+    override val cleanerConfig: CleanupConfig by lazy { scheduleConfig.cleanup }
 
     override val jobName: String get() = "ScheduleCleaner"
 }

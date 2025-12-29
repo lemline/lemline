@@ -42,7 +42,7 @@ class ForkCleaner : AbstractCleaner<ForkModel>() {
     override val enabled by lazy { forkConfig.enabled }
 
     // Cleanup configuration
-    override val cleanerConf: CleanupConfig by lazy { forkConfig.cleanup }
+    override val cleanerConfig: CleanupConfig by lazy { forkConfig.cleanup }
 
     override val jobName: String get() = "ForkCleaner"
 }

@@ -46,6 +46,8 @@ internal class DefinitionCacheSync : AbstractScheduledTask() {
     /** Sync interval (default: 10s) */
     override val interval: Duration by lazy { definitionConfig.syncEvery }
 
+    override val initialDelay: Duration = Duration.ZERO
+
     /**
      * Load all definitions from the database and ensure they're in the cache.
      */

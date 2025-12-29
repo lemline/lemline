@@ -410,10 +410,18 @@ interface LemlineConfiguration {
         fun batchSize(): Int
 
         /**
-         * Initial delay before starting processing
+         * Maximum random delay before first scheduled poll (0 to this value).
+         * Desynchronizes workers to prevent thundering herd on database.
+         */
+        @WithDefault("3s")
+        fun initialJitter(): String
+
+        /**
+         * Base delay for exponential backoff on failed messages.
+         * Each retry doubles: retry-delay * 2^(attempt-1) with ±20% jitter.
          */
         @WithDefault("30s")
-        fun initialDelay(): String
+        fun retryDelay(): String
 
         /**
          * Maximum number of processing attempts
@@ -425,7 +433,8 @@ interface LemlineConfiguration {
 
         val every get() = every().toDuration()
         val batchSize get() = batchSize()
-        val initialDelay get() = initialDelay().toDuration()
+        val initialJitter get() = initialJitter().toDuration()
+        val retryDelay get() = retryDelay().toDuration()
         val maxAttempts get() = maxAttempts()
     }
 
@@ -439,6 +448,13 @@ interface LemlineConfiguration {
          */
         @WithDefault("1h")
         fun every(): String
+
+        /**
+         * Maximum random delay before first scheduled cleanup (0 to this value).
+         * Desynchronizes workers to prevent thundering herd on database.
+         */
+        @WithDefault("3s")
+        fun initialJitter(): String
 
         /**
          * Age of messages to clean up
@@ -455,6 +471,7 @@ interface LemlineConfiguration {
         fun batchSize(): Int
 
         val every get() = every().toDuration()
+        val initialJitter get() = initialJitter().toDuration()
         val after get() = after().toDuration()
         val batchSize get() = batchSize()
     }

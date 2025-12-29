@@ -78,7 +78,7 @@ abstract class AbstractScheduledTask {
     protected open val gracePeriod = 5000L
 
     /** Initial delay before first execution (0 = run immediately) */
-    protected open val initialDelay: Long = 0L
+    protected abstract val initialDelay: Duration
 
     private val executor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor()
     private val isRunning = AtomicBoolean(false)
@@ -108,14 +108,13 @@ abstract class AbstractScheduledTask {
      * Schedules the main task. Can be overridden by subclasses to add additional scheduling.
      */
     protected open fun scheduleTask() {
-        val intervalSeconds = interval.inWholeSeconds
         executor.scheduleAtFixedRate(
             { scope.launch { execute() } },
-            initialDelay,
-            intervalSeconds,
-            TimeUnit.SECONDS
+            initialDelay.inWholeMilliseconds,
+            interval.inWholeMilliseconds,
+            TimeUnit.MILLISECONDS
         )
-        logger.info { "$jobName scheduled every ${intervalSeconds}s" }
+        logger.info { "$jobName scheduled every $interval" }
     }
 
     /**

@@ -21,7 +21,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
  *
  * Subclasses only need to provide:
  * - [enabled] - whether cleanup is enabled
- * - [cleanerConf] - cleanup configuration (interval, batch size, retention period)
+ * - [cleanerConfig] - cleanup configuration (interval, batch size, retention period)
  * - [cleanerRepository] - repository for the entity type to clean
  *
  * The retention period is applied at query time: entities are eligible for cleanup
@@ -35,14 +35,18 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalSerializationApi
 abstract class AbstractCleaner<T : WithCleanup> : AbstractScheduledTask() {
 
-    protected abstract val cleanerConf: CleanupConfig
+    protected abstract val cleanerConfig: CleanupConfig
     protected abstract val cleanerRepository: WithCleanerRepository<T>
     protected abstract val crudRepository: WithCrudRepository<T>
     protected abstract val databaseConfig: DatabaseConfig
 
     override val jobName: String get() = "Cleaner"
 
-    override val interval: Duration get() = cleanerConf.every
+    override val initialDelay: Duration by lazy {
+        cleanerConfig.randomInitialDelay
+    }
+
+    override val interval: Duration get() = cleanerConfig.every
 
     /**
      * Performs the cleanup by calling [doCleanup].
@@ -62,13 +66,13 @@ abstract class AbstractCleaner<T : WithCleanup> : AbstractScheduledTask() {
         var batchNumber = 0
 
         // Calculate cutoff date by applying retention offset
-        val cutoffDate = Clock.System.now() - cleanerConf.after
+        val cutoffDate = Clock.System.now() - cleanerConfig.after
 
         do {
             batchNumber++
             var toDelete = 0
             databaseConfig.withTransaction { connection ->
-                val entities = cleanerRepository.findEntitiesToDelete(cutoffDate, cleanerConf.batchSize, connection)
+                val entities = cleanerRepository.findEntitiesToDelete(cutoffDate, cleanerConfig.batchSize, connection)
                 toDelete = entities.size
 
                 if (toDelete > 0) {
@@ -77,7 +81,7 @@ abstract class AbstractCleaner<T : WithCleanup> : AbstractScheduledTask() {
                     totalDeleted += deleted
                 }
             }
-        } while (toDelete >= cleanerConf.batchSize)
+        } while (toDelete >= cleanerConfig.batchSize)
 
         logCleanupResults(totalDeleted, totalToDelete, batchNumber)
     } catch (e: Exception) {

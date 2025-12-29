@@ -51,6 +51,10 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
 
     override val interval: Duration get() = outboxConfig?.every ?: Duration.INFINITE
 
+    override val initialDelay: Duration by lazy {
+        outboxConfig?.randomInitialDelay ?: Duration.ZERO
+    }
+
     private val outboxProcessing = AtomicBoolean(false)
 
     /**
@@ -78,7 +82,7 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
             processEntities(
                 batchSize = outboxConfig!!.batchSize,
                 maxAttempts = outboxConfig!!.maxAttempts,
-                initialDelay = outboxConfig!!.initialDelay,
+                retryDelay = outboxConfig!!.retryDelay,
             )
         } catch (e: Exception) {
             logger.error(e) { "Error during outbox processing" }
@@ -103,16 +107,16 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
      * while this one is still handling the results of the `findMessagesToProcess` query.
      *
      * The method uses exponential backoff for retries:
-     * - Initial delay is configurable
+     * - Base delay is configurable via retryDelay
      * - Each retry doubles the previous delay
      * - Maximum retry attempts are configurable
      *
      * @param batchSize Maximum number of messages to process in one batch
      * @param maxAttempts Maximum number of attempts before giving up (>=1)
-     * @param initialDelay Initial delay in seconds before first retry
+     * @param retryDelay Base delay for exponential backoff on retries
      */
     @VisibleForTesting
-    open suspend fun processEntities(batchSize: Int, maxAttempts: Int, initialDelay: Duration) = try {
+    open suspend fun processEntities(batchSize: Int, maxAttempts: Int, retryDelay: Duration) = try {
         var totalToProcess = 0
         var totalProcessed = 0
         var batchNumber = 0
@@ -128,7 +132,7 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
 
                 if (toProcess > 0) {
                     totalToProcess += toProcess
-                    processBatch(messages, maxAttempts, initialDelay)
+                    processBatch(messages, maxAttempts, retryDelay)
                     val processed = crudRepository.update(messages, conn)
                     totalProcessed += processed
                 }
@@ -150,8 +154,8 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
     protected open suspend fun processBatch(
         entities: List<T>,
         maxAttempts: Int,
-        initialDelay: Duration
-    ): Int = processEntitiesWith(entities, maxAttempts, initialDelay) { process(it) }
+        retryDelay: Duration
+    ): Int = processEntitiesWith(entities, maxAttempts, retryDelay) { process(it) }
 
     /**
      * Processes entities concurrently using the provided processor function.
@@ -159,9 +163,9 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
      *
      * Example usage in subclass:
      * ```
-     * override suspend fun processBatch(entities: List<T>, maxAttempts: Int, initialDelay: Duration): Int {
+     * override suspend fun processBatch(entities: List<T>, maxAttempts: Int, retryDelay: Duration): Int {
      *     val cache = repository.findByIds(entities.map { it.parentId }.distinct())
-     *     return processEntitiesWith(entities, maxAttempts, initialDelay) { entity ->
+     *     return processEntitiesWith(entities, maxAttempts, retryDelay) { entity ->
      *         val parent = cache[entity.parentId] ?: error("Not found")
      *         // process with parent...
      *     }
@@ -171,11 +175,11 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
     protected suspend fun processEntitiesWith(
         entities: List<T>,
         maxAttempts: Int,
-        initialDelay: Duration,
+        retryDelay: Duration,
         processor: suspend (T) -> Unit
     ): Int = coroutineScope {
         entities.map { entity ->
-            async { processEntityWith(entity, maxAttempts, initialDelay, processor) }
+            async { processEntityWith(entity, maxAttempts, retryDelay, processor) }
         }
     }.awaitAll().count { it }
 
@@ -185,7 +189,7 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
     private suspend fun processEntityWith(
         entity: T,
         maxAttempts: Int,
-        initialDelay: Duration,
+        retryDelay: Duration,
         processor: suspend (T) -> Unit
     ): Boolean = try {
         entity.outboxAttemptCount++
@@ -206,7 +210,7 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
             logger.error { "Reached maximum retry attempts, marking as failed: $entity" }
         } else {
             // Schedule for retry with exponential backoff
-            val nextDelay = calculateNextAttemptDelay(entity.outboxAttemptCount, initialDelay)
+            val nextDelay = calculateNextAttemptDelay(entity.outboxAttemptCount, retryDelay)
             entity.outboxDelayedUntil = Clock.System.now() + nextDelay
             logger.debug { "Failing processing outbox, retrying in ${nextDelay}ms (attempt ${entity.outboxAttemptCount}): $entity" }
         }
@@ -214,13 +218,13 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
     }
 
     @VisibleForTesting
-    internal fun calculateNextAttemptDelay(attemptCount: Int, initialDelay: Duration): Duration {
-        // Exponential backoff: initialDelay * 2^(attemptCount-1)
-        // e.g., with initialDelay=1000ms (10s):
-        // attempt 1: 1000ms * 2^0 = 1000ms +/- 20%
-        // attempt 2: 1000ms * 2^1 = 2000ms +/- 20%
-        // attempt 3: 1000ms * 2^2 = 4000ms +/- 20%
-        val baseDelay = initialDelay.inWholeMilliseconds * (1L shl (attemptCount - 1))
+    internal fun calculateNextAttemptDelay(attemptCount: Int, retryDelay: Duration): Duration {
+        // Exponential backoff: retryDelay * 2^(attemptCount-1)
+        // e.g., with retryDelay=10s:
+        // attempt 1: 10s * 2^0 = 10s +/- 20%
+        // attempt 2: 10s * 2^1 = 20s +/- 20%
+        // attempt 3: 10s * 2^2 = 40s +/- 20%
+        val baseDelay = retryDelay.inWholeMilliseconds * (1L shl (attemptCount - 1))
 
         // Add jitter of ±20%
         val jitterRange = baseDelay * 0.2 // 20% of base delay

@@ -46,5 +46,5 @@ internal class ListenerCleaner : AbstractCleaner<ListenerModel>() {
     override val enabled: Boolean by lazy { listenerConfig.enabled }
 
     /** Cleanup configuration */
-    override val cleanerConf: CleanupConfig by lazy { listenerConfig.cleanup }
+    override val cleanerConfig: CleanupConfig by lazy { listenerConfig.cleanup }
 }

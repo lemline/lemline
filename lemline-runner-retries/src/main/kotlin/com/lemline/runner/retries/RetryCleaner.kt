@@ -37,7 +37,7 @@ class RetryCleaner : AbstractCleaner<RetryModel>() {
 
     override val enabled by lazy { retryConfig.enabled }
 
-    override val cleanerConf: CleanupConfig by lazy { retryConfig.cleanup }
+    override val cleanerConfig: CleanupConfig by lazy { retryConfig.cleanup }
 
     override val jobName: String get() = "RetryCleaner"
 }

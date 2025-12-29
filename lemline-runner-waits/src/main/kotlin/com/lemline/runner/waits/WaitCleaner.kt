@@ -37,7 +37,7 @@ class WaitCleaner : AbstractCleaner<WaitModel>() {
 
     override val enabled by lazy { waitConfig.enabled }
 
-    override val cleanerConf: CleanupConfig by lazy { waitConfig.cleanup }
+    override val cleanerConfig: CleanupConfig by lazy { waitConfig.cleanup }
 
     override val jobName: String get() = "WaitCleaner"
 }

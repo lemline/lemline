@@ -100,7 +100,7 @@ abstract class OutboxProcessorTest<T>(
     // Default test configuration
     private val batchSize = 10
     private val maxAttempts = 3
-    private val initialDelay = 1.seconds // 1 second
+    private val retryDelay = 1.seconds // 1 second
 
     @BeforeEach
     fun setup() = runTest {
@@ -136,7 +136,7 @@ abstract class OutboxProcessorTest<T>(
         this@OutboxProcessorTest.crudRepository.insert(message)
 
         // Act
-        outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
+        outboxRelay.processEntities(batchSize, maxAttempts, retryDelay)
 
         // Assert
         // Verify the mock was called at least once
@@ -188,7 +188,7 @@ abstract class OutboxProcessorTest<T>(
 
         // Act: First process call (fails)
         val now = Clock.System.now()
-        outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
+        outboxRelay.processEntities(batchSize, maxAttempts, retryDelay)
 
         // Assert: First attempt failed - Check DB state
         coVerify(exactly = 1) { mockedProcessor(any(modelClass)) } // Verify it was called once
@@ -200,7 +200,7 @@ abstract class OutboxProcessorTest<T>(
         updated.outboxErrorMessage shouldContain failureException.message!!
 
         // Calculate expected delay using exponential backoff - 20% jitter
-        val expectedMinDelay = initialDelay.inWholeMilliseconds * 0.8
+        val expectedMinDelay = retryDelay.inWholeMilliseconds * 0.8
         updated.outboxDelayedUntil!! shouldBeAfter (now + expectedMinDelay.milliseconds)
 
         // waiting for the next attempt
@@ -210,7 +210,7 @@ abstract class OutboxProcessorTest<T>(
         coEvery { mockedProcessor(any(modelClass)) } just Runs
 
         // Act: Second process call (should succeed now)
-        outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
+        outboxRelay.processEntities(batchSize, maxAttempts, retryDelay)
 
         // Assert: A second attempt succeeded - Check DB state
         coVerify(exactly = 2) { mockedProcessor(any(modelClass)) } // Verify it was called again
@@ -257,7 +257,7 @@ abstract class OutboxProcessorTest<T>(
         for (attempt in 1..maxAttempts) {
             val now = Clock.System.now()
             // when
-            outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
+            outboxRelay.processEntities(batchSize, maxAttempts, retryDelay)
             // then
             val updated = idRepository.findById(original.id)!!
             if (attempt < maxAttempts) {
@@ -267,7 +267,7 @@ abstract class OutboxProcessorTest<T>(
                 updated.outboxErrorMessage shouldContain failureException.message!!
                 updated.outboxDelayedUntil!! shouldBeAfter lastDelayedUntil
                 // Calculate expected delay using exponential backoff - 20% jitter
-                val expectedMinDelay = (initialDelay.inWholeMilliseconds * (1L shl (attempt - 1)) * 0.8).toLong()
+                val expectedMinDelay = (retryDelay.inWholeMilliseconds * (1L shl (attempt - 1)) * 0.8).toLong()
                 updated.outboxDelayedUntil!! shouldBeAfter (now + expectedMinDelay.milliseconds)
                 lastDelayedUntil = updated.outboxDelayedUntil!!
                 // waiting for the next attempt
@@ -305,7 +305,7 @@ abstract class OutboxProcessorTest<T>(
         this@OutboxProcessorTest.crudRepository.insert(messages)
 
         // Act
-        outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
+        outboxRelay.processEntities(batchSize, maxAttempts, retryDelay)
 
         // Assert
         coVerify(exactly = 5) { mockedProcessor(any(modelClass)) }
@@ -336,7 +336,7 @@ abstract class OutboxProcessorTest<T>(
         // Arrange: No messages persisted (due to setup)
 
         // Act
-        outboxRelay.processEntities(batchSize, maxAttempts, initialDelay)
+        outboxRelay.processEntities(batchSize, maxAttempts, retryDelay)
 
         // Assert
         coVerify(exactly = 0) { mockedProcessor(any(modelClass)) }

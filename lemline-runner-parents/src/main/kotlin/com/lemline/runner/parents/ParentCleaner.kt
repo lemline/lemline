@@ -42,7 +42,7 @@ class ParentCleaner : AbstractCleaner<ParentModel>() {
     override val enabled by lazy { parentConfig.enabled }
 
     // Cleanup configuration
-    override val cleanerConf: CleanupConfig by lazy { parentConfig.cleanup }
+    override val cleanerConfig: CleanupConfig by lazy { parentConfig.cleanup }
 
     override val jobName: String get() = "ParentCleaner"
 }

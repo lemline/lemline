@@ -121,12 +121,12 @@ class ListenerOutbox : AbstractOutbox<ListenerModel>() {
     override suspend fun processBatch(
         entities: List<ListenerModel>,
         maxAttempts: Int,
-        initialDelay: Duration
+        retryDelay: Duration
     ): Int {
         val listenerIds = entities.map { it.id }
         val outputsByListener = listenerEventRepository.findCompletedOutputsByListeners(listenerIds)
 
-        return processEntitiesWith(entities, maxAttempts, initialDelay) { listener ->
+        return processEntitiesWith(entities, maxAttempts, retryDelay) { listener ->
             process(listener, outputsByListener[listener.id] ?: emptyList())
         }
     }

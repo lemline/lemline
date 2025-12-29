@@ -111,19 +111,22 @@ class ConfigProducer {
         object : OutboxConfig {
             override val every: Duration get() = this@toOutboxProcessingConfig.every
             override val batchSize: Int get() = this@toOutboxProcessingConfig.batchSize
-            override val initialDelay: Duration get() = this@toOutboxProcessingConfig.initialDelay
+            override val initialJitter: Duration get() = this@toOutboxProcessingConfig.initialJitter
+            override val retryDelay: Duration get() = this@toOutboxProcessingConfig.retryDelay
             override val maxAttempts: Int get() = this@toOutboxProcessingConfig.maxAttempts
         }
 
     private fun LemlineConfiguration.OutboxCleanupConfig.toOutboxCleanupConfig(): CleanupConfig =
         object : CleanupConfig {
             override val every: Duration get() = this@toOutboxCleanupConfig.every
+            override val initialJitter: Duration get() = this@toOutboxCleanupConfig.initialJitter
             override val after: Duration get() = this@toOutboxCleanupConfig.after
             override val batchSize: Int get() = this@toOutboxCleanupConfig.batchSize
         }
 
     private fun defaultCleanupConfig(): CleanupConfig = object : CleanupConfig {
         override val every: Duration = Duration.parse("1h")
+        override val initialJitter: Duration = Duration.parse("30m")
         override val after: Duration = Duration.parse("7d")
         override val batchSize: Int = 1000
     }
