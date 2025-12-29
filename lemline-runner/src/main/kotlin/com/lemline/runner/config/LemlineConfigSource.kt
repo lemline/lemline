@@ -186,7 +186,7 @@ class LemlineConfigSource : PropertiesConfigSource(
                     val h2 = "quarkus.datasource" // <- default datasource
                     generated["$h2.username"] = H2_USERNAME_DEFAULT
                     generated["$h2.password"] = H2_PASSWORD_DEFAULT
-                    generated["$h2.jdbc.url"] = "jdbc:h2:mem:$H2_DB_NAME_DEFAULT;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"
+                    generated["$h2.jdbc.url"] = "jdbc:h2:mem:$H2_DB_NAME_DEFAULT;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE"
                 }
             }
 
