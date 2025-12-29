@@ -650,7 +650,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         FROM heads h
         WHERE t.$LISTENER_ID_COLUMN  = h.$LISTENER_ID_COLUMN
           AND t.$EVENT_ID_COLUMN     = h.$EVENT_ID_COLUMN
-          AND t.$FILTER_INDEX_COLUMN = h.$FILTER_INDEX_COLUMN
+          AND (t.$FILTER_INDEX_COLUMN = h.$FILTER_INDEX_COLUMN OR (t.$FILTER_INDEX_COLUMN IS NULL AND h.$FILTER_INDEX_COLUMN IS NULL))
     """.trimIndent()
 
     private fun markReadyForForeachMySql(limit: Int): String = """
@@ -695,19 +695,19 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         ) h
         ON t.$LISTENER_ID_COLUMN  = h.$LISTENER_ID_COLUMN
         AND t.$EVENT_ID_COLUMN     = h.$EVENT_ID_COLUMN
-        AND t.$FILTER_INDEX_COLUMN = h.$FILTER_INDEX_COLUMN
+        AND (t.$FILTER_INDEX_COLUMN = h.$FILTER_INDEX_COLUMN OR (t.$FILTER_INDEX_COLUMN IS NULL AND h.$FILTER_INDEX_COLUMN IS NULL))
         SET t.$OUTBOX_SCHEDULED_FOR_COLUMN = NOW(6),
             t.$OUTBOX_DELAYED_UNTIL_COLUMN = NOW(6),
             t.$UPDATED_AT_COLUMN = NOW(6)
     """.trimIndent()
 
     private fun markReadyForForeachH2(limit: Int): String = """
-        UPDATE $tableName
+        UPDATE $tableName AS t
         SET $OUTBOX_SCHEDULED_FOR_COLUMN = CURRENT_TIMESTAMP,
             $OUTBOX_DELAYED_UNTIL_COLUMN = CURRENT_TIMESTAMP,
             $UPDATED_AT_COLUMN = CURRENT_TIMESTAMP
-        WHERE ($LISTENER_ID_COLUMN, $EVENT_ID_COLUMN, $FILTER_INDEX_COLUMN) IN (
-            SELECT e.$LISTENER_ID_COLUMN, e.$EVENT_ID_COLUMN, e.$FILTER_INDEX_COLUMN
+        WHERE EXISTS (
+            SELECT 1
             FROM $tableName e
             JOIN (
                 -- Find listeners with pending events but no event being processed
@@ -729,6 +729,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 )
                 ORDER BY l.$ID_COLUMN
                 LIMIT $limit
+                FOR UPDATE SKIP LOCKED
             ) ll ON ll.listener_id = e.$LISTENER_ID_COLUMN
             JOIN (
                 -- head per listener: MIN(sort_key) among pending
@@ -738,7 +739,10 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                   AND e2.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
                 GROUP BY e2.$LISTENER_ID_COLUMN
             ) m ON m.$LISTENER_ID_COLUMN = e.$LISTENER_ID_COLUMN AND m.min_sort_key = e.$SORT_KEY_COLUMN
-            WHERE e.$FOREACH_COMPLETED_COLUMN = FALSE
+            WHERE e.$LISTENER_ID_COLUMN = t.$LISTENER_ID_COLUMN
+              AND e.$EVENT_ID_COLUMN = t.$EVENT_ID_COLUMN
+              AND (e.$FILTER_INDEX_COLUMN = t.$FILTER_INDEX_COLUMN OR (e.$FILTER_INDEX_COLUMN IS NULL AND t.$FILTER_INDEX_COLUMN IS NULL))
+              AND e.$FOREACH_COMPLETED_COLUMN = FALSE
               AND e.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
         )
     """.trimIndent()
