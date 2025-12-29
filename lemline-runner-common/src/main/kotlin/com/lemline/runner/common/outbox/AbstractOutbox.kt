@@ -233,7 +233,7 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
     private fun logBatches(success: Int, total: Int, batchNumber: Int) {
         val failed = total - success
         when (total) {
-            0 -> logger.debug { "No row to process for $jobName" }
+            0 -> logger.trace { "No row to process for $jobName" }
             else -> when {
                 failed == 0 -> logger.debug { "All ${total.entities()} processed successfully (over ${batchNumber.batches()})" }
                 else -> logger.debug { "${success.entities()} processed successfully and ${failed.entities()} failed (over ${batchNumber.batches()})" }

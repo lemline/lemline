@@ -134,7 +134,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
             registerDependencies(dependencies)
             registerWorkflowInDatabase(yaml, namespace, uniqueName, version)
 
-            val initialMessage = prepareAndStartWorkflow(workflowId, namespace, uniqueName, version, input)
+            prepareAndStartWorkflow(workflowId, namespace, uniqueName, version, input)
 
             if (cloudEvents.isNotEmpty()) {
                 executeWithCloudEvents(workflowId, cloudEvents)

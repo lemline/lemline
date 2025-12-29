@@ -93,14 +93,12 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             outboxColumns()
             cleanupColumns()
 
-            // Composite key columns (listener_id, event_id, filter_index)
             key(LISTENER_ID_COLUMN) { stmt, entity, idx -> setIDV7(stmt, idx, entity.listenerId) }
             key(EVENT_ID_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.eventId) }
-            key(FILTER_INDEX_COLUMN) { stmt, entity, idx ->
-                if (entity.filterIndex != null) {
-                    stmt.setInt(idx, entity.filterIndex)
-                } else {
-                    stmt.setNull(idx, java.sql.Types.INTEGER)
+            nullableKey(FILTER_INDEX_COLUMN) { stmt, entity, idx ->
+                when (val filterIndex = entity.filterIndex) {
+                    null -> stmt.setNull(idx, java.sql.Types.INTEGER)
+                    else -> stmt.setInt(idx, filterIndex)
                 }
             }
 

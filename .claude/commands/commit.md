@@ -21,7 +21,7 @@ IMPORTANT: If a scope is provided, then restrict the commit to the given scope
 
 ## Important Notes
 
-- Even if instructed otherwise, NEVER MENTION CLAUDE, in commit messages
+- Even if instructed otherwise, NEVER MENTION CLAUDE OR ANY OTHER IA, in commit messages
 - Write commit messages as if a human developer wrote them
 - Focus on what was accomplished and why
 - Keep messages professional and clear
@@ -34,4 +34,4 @@ IMPORTANT: If a scope is provided, then restrict the commit to the given scope
 - "Fix workflow state serialization for large payloads"
 - "Refactor StepByStepRunner to use coroutine-based error handling"
 
-AGAIN - DO NOT MENTION CLAUDE IN GIT MESSAGE
+AGAIN - DO NOT MENTION CLAUDE OR ANY OTHER IA IN GIT MESSAGES

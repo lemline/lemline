@@ -48,16 +48,16 @@ class InMemoryProfile : QuarkusTestProfile {
 
             // Enable outbox schedulers for tests that need them (Listen, Wait, Retry, etc.)
             "lemline.outbox.enabled" to "true",
-            // Fast polling for tests (1s interval, 1s initial delay for true E2E testing)
+            // Fast polling for tests (10s initial delay to allow migrations to complete)
             "lemline.outbox.wait.outbox.every" to "1s",
-            "lemline.outbox.wait.outbox.initial-delay" to "1s",
+            "lemline.outbox.wait.outbox.initial-delay" to "10s",
             "lemline.outbox.retry.outbox.every" to "1s",
-            "lemline.outbox.retry.outbox.initial-delay" to "1s",
+            "lemline.outbox.retry.outbox.initial-delay" to "10s",
             "lemline.outbox.schedule.outbox.every" to "1s",
-            "lemline.outbox.schedule.outbox.initial-delay" to "1s",
-            // Listener outbox config (for listen task tests)
+            "lemline.outbox.schedule.outbox.initial-delay" to "10s",
+            // Listener outbox config (for listen task tests, includes foreach processing)
             "lemline.outbox.listener.outbox.every" to "1s",
-            "lemline.outbox.listener.outbox.initial-delay" to "1s"
+            "lemline.outbox.listener.outbox.initial-delay" to "10s"
         )
     }
 

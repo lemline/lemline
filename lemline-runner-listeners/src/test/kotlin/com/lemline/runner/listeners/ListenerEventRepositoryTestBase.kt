@@ -1085,6 +1085,38 @@ abstract class ListenerEventRepositoryTestBase {
         readyEventsAfterSecond.first().eventId shouldBe "event-2"
     }
 
+    @Test
+    fun `update should work with NULL filter_index (critical for outbox processing)`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ANY).copy(
+            listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR
+        ).apply {
+            hasUntil = true
+            untilExpression = ".value > 100"
+        }
+        getListenerRepository().insert(listener)
+
+        val event = createEvent(listener.id, eventId = "event-with-null-filter").copy(filterIndex = null)
+        getEventRepository().insert(event)
+
+        getEventRepository().markReadyForForeach(limit = 100)
+
+        val entities = getEventRepository().findEntitiesToProcess(maxAttempts = 3, limit = 10, connection = null)
+        entities shouldHaveSize 1
+        entities.first().filterIndex shouldBe null
+
+        val entity = entities.first()
+        entity.outboxCompletedAt = Clock.System.now()
+        entity.outboxAttemptCount = 1
+
+        val updated = getEventRepository().update(entity)
+        updated shouldBe 1
+
+        val reloaded = getEventRepository().findByListenerId(listener.id)
+        reloaded shouldHaveSize 1
+        reloaded.first().outboxCompletedAt shouldNotBe null
+        reloaded.first().outboxAttemptCount shouldBe 1
+    }
+
     // ========== Listener completion tests ==========
 
     @Test

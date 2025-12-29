@@ -107,7 +107,7 @@ class ListenerOutbox : AbstractOutbox<ListenerModel>() {
         // Mark eligible ONE/ANY/ALL listeners as completed
         val markedCompleted = listenerRepository.batchPrepareListenerOutbox()
         if (markedCompleted > 0) {
-            logger.debug { "Marked $markedCompleted listeners as completed" }
+            logger.debug { "Marked $markedCompleted listeners as ready for outbox" }
         }
 
         // Process ready listeners via standard outbox flow
@@ -132,6 +132,16 @@ class ListenerOutbox : AbstractOutbox<ListenerModel>() {
     }
 
     private suspend fun process(entity: ListenerModel, completedOutputs: List<String>) {
+        completedOutputs.forEach {
+            logger.debug {
+                "Processing ${
+                    CloudEventService.parseStringAsData(
+                        it,
+                        entity.readAs
+                    )
+                }"
+            }
+        }
         val outputArray = JsonArray(completedOutputs.map { output ->
             if (entity.hasForeach) {
                 Json.parseToJsonElement(output)

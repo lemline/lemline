@@ -3,6 +3,7 @@
 
 package com.lemline.runner.common.repositories.ops
 
+import com.lemline.common.values.IDV7
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
@@ -11,9 +12,11 @@ import com.lemline.runner.common.repositories.with.WithCrudRepository
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
+import java.sql.SQLIntegrityConstraintViolationException
 import java.sql.Timestamp
 import java.sql.Types
 import java.time.Instant
+import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.time.toJavaInstant
 import kotlin.time.toKotlinInstant
@@ -24,55 +27,46 @@ const val UPDATED_AT_COLUMN = "updated_at"
 
 /**
  * Base repository class providing core CRUD operations.
- * Uses composition via [com.lemline.runner.common.repositories.helpers.ColumnBindings] for column configuration instead of inheritance.
+ * Uses composition via [ColumnBindings] for column configuration instead of inheritance.
  *
  * @param T The entity type managed by this repository
  */
 abstract class CrudRepository<T> : WithCrudRepository<T> {
 
-    /**
-     * The database config instance used to access the database.
-     */
+    /** The database config instance used to access the database.*/
     abstract val databaseConfig: DatabaseConfig
 
-    /**
-     * The name of the database table associated with this repository.
-     */
+    /** The name of the database table associated with this repository.*/
     protected abstract val tableName: String
 
-    /**
-     * Column bindings that define how entity properties map to database columns.
-     */
+    /** Column bindings that define how entity properties map to database columns.*/
     protected abstract val columns: ColumnBindings<T>
 
-    /**
-     * Creates a model instance from a ResultSet.
-     */
+    /** Creates a model instance from a ResultSet. */
     protected abstract fun createModel(rs: ResultSet): T
 
-    /**
-     * Helper for IDV7 operations, initialized lazily based on database type.
-     */
+    /** Helper for IDV7 operations, initialized lazily based on database type.*/
     protected val idHelper: IdV7Helper by lazy { IdV7Helper(databaseConfig.dbType) }
 
-    /**
-     * Shorthand for setting IDV7 values in prepared statements.
-     */
-    protected val setIDV7 get() = idHelper.set
+    /** Shorthand for setting IDV7 values in prepared statements.*/
+    protected val setIDV7: (PreparedStatement, Int, IDV7?) -> Unit by lazy { idHelper.set }
 
-    /**
-     * Shorthand for getting IDV7 values from result sets.
-     */
-    protected val getIDV7 get() = idHelper.get
+    /** Shorthand for getting IDV7 values from result sets.*/
+    protected val getIDV7: (ResultSet, String) -> IDV7? by lazy { idHelper.get }
 
-    /**
-     * All columns including auto-managed timestamp columns.
-     */
+    /** NULL-safe equals: `col = NULL` always fails in SQL, use `IS NOT DISTINCT FROM` / `<=>` instead. */
+    private fun nullSafeEquals(column: String): String = when (databaseConfig.dbType) {
+        DatabaseType.MYSQL -> "${q(column)} <=> ?"
+        DatabaseType.POSTGRESQL, DatabaseType.H2 -> "${q(column)} IS NOT DISTINCT FROM ?"
+    }
+    
+    private fun keyEquals(column: String): String =
+        if (column in columns.nullableKeyColumns) nullSafeEquals(column) else "${q(column)} = ?"
+
+    /** All columns including auto-managed timestamp columns.*/
     private val allColumns by lazy { columns.allColumns + CREATED_AT_COLUMN + UPDATED_AT_COLUMN }
 
-    /**
-     * Columns that can be updated (excludes key columns and created_at).
-     */
+    /** Columns that can be updated (excludes key columns and created_at).*/
     private val updatableColumns by lazy {
         allColumns.filter { !columns.keyColumns.contains(it) && it != CREATED_AT_COLUMN }
     }
@@ -116,7 +110,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
                     bindInsert(stmt, entity)
                     stmt.executeUpdate()
                 }
-            } catch (e: java.sql.SQLIntegrityConstraintViolationException) {
+            } catch (e: SQLIntegrityConstraintViolationException) {
                 // H2 throws this for duplicate key violations - treat as "already exists"
                 0
             }
@@ -161,7 +155,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
                         try {
                             bindInsert(stmt, entity)
                             successCount += stmt.executeUpdate()
-                        } catch (e: java.sql.SQLIntegrityConstraintViolationException) {
+                        } catch (e: SQLIntegrityConstraintViolationException) {
                             // Skip duplicates
                         }
                     }
@@ -193,7 +187,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
 
     private val updateSql by lazy {
         val setClause = updatableColumns.joinToString { "${q(it)} = ?" }
-        val whereClause = columns.keyColumns.joinToString(separator = " AND ") { "${q(it)} = ?" }
+        val whereClause = columns.keyColumns.joinToString(separator = " AND ") { keyEquals(it) }
         "UPDATE $tableName SET $setClause WHERE $whereClause"
     }
 
@@ -236,7 +230,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
         }
 
     private val deleteSql: String by lazy {
-        val whereClause = columns.keyColumns.joinToString(separator = " AND ") { "$it = ?" }
+        val whereClause = columns.keyColumns.joinToString(separator = " AND ") { keyEquals(it) }
         "DELETE FROM $tableName WHERE $whereClause"
     }
 
@@ -308,4 +302,4 @@ fun ResultSet.getInstant(col: String): kotlin.time.Instant? =
  * Creates a current timestamp for database operations.
  * Uses Kotlin's time API for consistency.
  */
-fun nowTimestamp(): Timestamp = Timestamp.from(kotlin.time.Clock.System.now().toJavaInstant())
+fun nowTimestamp(): Timestamp = Timestamp.from(Clock.System.now().toJavaInstant())
