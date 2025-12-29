@@ -3,7 +3,8 @@ package com.lemline.runner.common.scheduled
 
 import com.lemline.common.logger.logger
 import io.quarkus.runtime.ShutdownEvent
-import jakarta.annotation.PostConstruct
+import io.quarkus.runtime.StartupEvent
+import jakarta.annotation.Priority
 import jakarta.enterprise.event.Observes
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -89,8 +90,12 @@ abstract class AbstractScheduledTask {
      */
     protected abstract suspend fun doWork()
 
-    @PostConstruct
-    open fun init() {
+    /**
+     * Called when Quarkus application starts, after database migrations complete.
+     * Priority 100 ensures this runs after FlywayMigration (priority 1).
+     */
+    @Suppress("unused")
+    fun onStart(@Observes @Priority(100) event: StartupEvent) {
         if (!enabled) {
             logger.debug { "$jobName disabled by config" }
             return

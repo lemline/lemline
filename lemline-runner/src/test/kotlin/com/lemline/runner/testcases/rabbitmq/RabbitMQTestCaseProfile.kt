@@ -83,16 +83,16 @@ class RabbitMQTestCaseProfile : QuarkusTestProfile {
 
             // Enable outbox schedulers for Wait/Fork/Retry tests
             "lemline.outbox.enabled" to "true",
-            // Fast polling for tests (1s interval, no initial delay)
+            // Fast polling for tests (no initial delay needed - migrations complete before schedulers start)
             "lemline.outbox.wait.outbox.every" to "1s",
-            "lemline.outbox.wait.outbox.initial-delay" to "1s",
+            "lemline.outbox.wait.outbox.initial-delay" to "0s",
             "lemline.outbox.retry.outbox.every" to "1s",
-            "lemline.outbox.retry.outbox.initial-delay" to "1s",
+            "lemline.outbox.retry.outbox.initial-delay" to "0s",
             "lemline.outbox.schedule.outbox.every" to "1s",
-            "lemline.outbox.schedule.outbox.initial-delay" to "1s",
+            "lemline.outbox.schedule.outbox.initial-delay" to "0s",
             // Listener outbox config (for listen task tests)
             "lemline.outbox.listener.outbox.every" to "1s",
-            "lemline.outbox.listener.outbox.initial-delay" to "1s"
+            "lemline.outbox.listener.outbox.initial-delay" to "0s"
         )
     }
 

@@ -79,17 +79,6 @@ private class ListenUntilForeachDebugTest {
     fun `test listen with until expression and foreach`() = runTest {
         lifecycleListener.clear()
 
-        val migrationStartTime = System.currentTimeMillis()
-        val migrationTimeout = 5000L
-        while (System.currentTimeMillis() - migrationStartTime < migrationTimeout) {
-            try {
-                definitionRepository.listAll()
-                break
-            } catch (_: Exception) {
-                delay(100)
-            }
-        }
-
         val namespace = WorkflowNamespace("test")
         val name = WorkflowName("listen-until-foreach-test")
         val version = WorkflowVersion("1.0.0")
