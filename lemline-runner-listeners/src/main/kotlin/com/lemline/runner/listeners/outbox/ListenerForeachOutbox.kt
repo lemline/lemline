@@ -73,8 +73,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
     /** Is this processor enabled? */
     override val enabled by lazy { listenerFeatureConfig.enabled }
 
-    /** Outbox processing configuration */
-    override val outboxConfig: OutboxConfig? by lazy { listenerFeatureConfig.outbox }
+    override val outboxConfig: OutboxConfig by lazy { listenerFeatureConfig.outbox }
 
     /**
      * Override to mark pending events as ready before processing.

@@ -17,9 +17,9 @@ interface OutboxAndCleanupConfig {
     val enabled: Boolean
 
     /**
-     * Outbox processing configuration (null if outbox not supported)
+     * Outbox processing configuration
      */
-    val outbox: OutboxConfig?
+    val outbox: OutboxConfig
 
     /**
      * Cleanup configuration

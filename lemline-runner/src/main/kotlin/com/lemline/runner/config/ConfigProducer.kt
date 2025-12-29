@@ -20,6 +20,9 @@ import jakarta.enterprise.inject.Produces
 import jakarta.inject.Inject
 import kotlin.jvm.optionals.getOrNull
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.days
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 
@@ -49,53 +52,53 @@ class ConfigProducer {
     @Produces
     @ApplicationScoped
     fun waitConfig(): WaitConfig = object : WaitConfig {
-        private val source = config.outbox().wait()
-        override val enabled: Boolean get() = source.enabled().orElse(true)
-        override val outbox: OutboxConfig get() = source.outbox().toOutboxProcessingConfig()
-        override val cleanup: CleanupConfig get() = source.cleanup().toOutboxCleanupConfig()
+        private val source = config.outbox().wait().getOrNull()
+        override val enabled: Boolean get() = source?.enabled() ?: true
+        override val outbox: OutboxConfig get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultOutboxConfig()
+        override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
     }
 
     @Produces
     @ApplicationScoped
     fun retryConfig(): RetryConfig = object : RetryConfig {
-        private val source = config.outbox().retry()
-        override val enabled: Boolean get() = source.enabled().orElse(true)
-        override val outbox: OutboxConfig get() = source.outbox().toOutboxProcessingConfig()
-        override val cleanup: CleanupConfig get() = source.cleanup().toOutboxCleanupConfig()
+        private val source = config.outbox().retry().getOrNull()
+        override val enabled: Boolean get() = source?.enabled() ?: true
+        override val outbox: OutboxConfig get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultOutboxConfig()
+        override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
     }
 
     @Produces
     @ApplicationScoped
     fun scheduleConfig(): ScheduleConfig = object : ScheduleConfig {
-        private val source = config.outbox().schedule()
-        override val enabled: Boolean get() = source.enabled().orElse(true)
-        override val outbox: OutboxConfig get() = source.outbox().toOutboxProcessingConfig()
-        override val cleanup: CleanupConfig get() = source.cleanup().toOutboxCleanupConfig()
+        private val source = config.outbox().schedule().getOrNull()
+        override val enabled: Boolean get() = source?.enabled() ?: true
+        override val outbox: OutboxConfig get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultOutboxConfig()
+        override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
     }
 
     @Produces
     @ApplicationScoped
     fun listenerConfig(): ListenerConfig = object : ListenerConfig {
-        private val source = config.outbox().listener().orElse(null)
-        override val enabled: Boolean get() = source?.enabled()?.orElse(true) ?: true
-        override val outbox: OutboxConfig? get() = source?.outbox()?.toOutboxProcessingConfig()
+        private val source = config.outbox().listener().getOrNull()
+        override val enabled: Boolean get() = source?.enabled() ?: true
+        override val outbox: OutboxConfig get() = source?.outbox()?.toOutboxProcessingConfig() ?: defaultOutboxConfig()
         override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
     }
 
     @Produces
     @ApplicationScoped
     fun parentConfig(): ParentFeatureConfig = object : ParentFeatureConfig {
-        private val source = config.outbox().parent()
-        override val enabled: Boolean get() = source.enabled().orElse(true)
-        override val cleanup: CleanupConfig get() = source.cleanup().toOutboxCleanupConfig()
+        private val source = config.outbox().parent().getOrNull()
+        override val enabled: Boolean get() = source?.enabled() ?: true
+        override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
     }
 
     @Produces
     @ApplicationScoped
     fun forkConfig(): ForkFeatureConfig = object : ForkFeatureConfig {
-        private val source = config.outbox().fork()
-        override val enabled: Boolean get() = source.enabled().orElse(true)
-        override val cleanup: CleanupConfig get() = source.cleanup().toOutboxCleanupConfig()
+        private val source = config.outbox().fork().getOrNull()
+        override val enabled: Boolean get() = source?.enabled() ?: true
+        override val cleanup: CleanupConfig get() = source?.cleanup()?.toOutboxCleanupConfig() ?: defaultCleanupConfig()
     }
 
     @Produces
@@ -125,9 +128,17 @@ class ConfigProducer {
         }
 
     private fun defaultCleanupConfig(): CleanupConfig = object : CleanupConfig {
-        override val every: Duration = Duration.parse("1h")
-        override val initialJitter: Duration = Duration.parse("30m")
-        override val after: Duration = Duration.parse("7d")
+        override val every: Duration = 1.hours
+        override val initialJitter: Duration = 30.minutes
+        override val after: Duration = 7.days
         override val batchSize: Int = 1000
+    }
+
+    private fun defaultOutboxConfig(): OutboxConfig = object : OutboxConfig {
+        override val every: Duration = 10.seconds
+        override val batchSize: Int = 1000
+        override val initialJitter: Duration = 3.seconds
+        override val retryDelay: Duration = 30.seconds
+        override val maxAttempts: Int = 5
     }
 }

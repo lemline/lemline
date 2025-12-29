@@ -45,8 +45,7 @@ class RetryOutbox : AbstractOutbox<RetryModel>() {
     // Is this outbox enabled?
     override val enabled by lazy { retryConfig.enabled }
 
-    // Outbox processing configuration
-    override val outboxConfig: OutboxConfig? by lazy { retryConfig.outbox }
+    override val outboxConfig: OutboxConfig by lazy { retryConfig.outbox }
 
     /**
      * Transform RetryScheduled Event -> ResumeFromTask Command before sending.

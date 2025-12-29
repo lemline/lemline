@@ -92,8 +92,7 @@ class ListenerOutbox : AbstractOutbox<ListenerModel>() {
     /** Is this outbox enabled? */
     override val enabled by lazy { listenerFeatureConfig.enabled }
 
-    /** Outbox processing configuration - fallback to wait config if listener config not set */
-    override val outboxConfig: OutboxConfig? by lazy { listenerFeatureConfig.outbox }
+    override val outboxConfig: OutboxConfig by lazy { listenerFeatureConfig.outbox }
 
     /**
      * Override doWork to check completion criteria before processing.

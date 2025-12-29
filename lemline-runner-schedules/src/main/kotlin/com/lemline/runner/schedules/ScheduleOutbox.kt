@@ -51,8 +51,7 @@ class ScheduleOutbox : AbstractOutbox<ScheduleModel>() {
     // Is this outbox enabled?
     override val enabled by lazy { scheduleConfig.enabled }
 
-    // Outbox processing configuration
-    override val outboxConfig: OutboxConfig? by lazy { scheduleConfig.outbox }
+    override val outboxConfig: OutboxConfig by lazy { scheduleConfig.outbox }
 
     /**
      * Process scheduled workflow by updating next execution time and sending command.

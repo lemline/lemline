@@ -45,8 +45,7 @@ class WaitOutbox : AbstractOutbox<WaitModel>() {
     // Is this outbox enabled?
     override val enabled by lazy { waitConfig.enabled }
 
-    // Outbox processing configuration
-    override val outboxConfig: OutboxConfig? by lazy { waitConfig.outbox }
+    override val outboxConfig: OutboxConfig by lazy { waitConfig.outbox }
 
     /**
      * Transform WaitStarted Event -> ResumeFromStartedTask Command before sending.

@@ -366,28 +366,26 @@ interface LemlineConfiguration {
 
     interface OutboxConfig {
         fun enabled(): Optional<Boolean>
-        fun wait(): ProcessOutboxConfig
-        fun retry(): ProcessOutboxConfig
-        fun schedule(): ProcessOutboxConfig
+        fun wait(): Optional<ProcessOutboxConfig>
+        fun retry(): Optional<ProcessOutboxConfig>
+        fun schedule(): Optional<ProcessOutboxConfig>
         fun listener(): Optional<ProcessOutboxConfig>
-        fun parent(): CleanupOutboxConfig
-        fun fork(): CleanupOutboxConfig
+        fun parent(): Optional<CleanupOutboxConfig>
+        fun fork(): Optional<CleanupOutboxConfig>
     }
 
-    /**
-     * Process and cleanup configuration.
-     */
     interface ProcessOutboxConfig {
-        fun enabled(): Optional<Boolean>
+        @WithDefault("true")
+        fun enabled(): Boolean
+
         fun outbox(): OutboxProcessingConfig
         fun cleanup(): OutboxCleanupConfig
     }
 
-    /**
-     * Only cleanup configuration.
-     */
     interface CleanupOutboxConfig {
-        fun enabled(): Optional<Boolean>
+        @WithDefault("true")
+        fun enabled(): Boolean
+
         fun cleanup(): OutboxCleanupConfig
     }
 

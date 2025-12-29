@@ -47,13 +47,11 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
     protected abstract val commandEmitter: CommandEmitter
     protected abstract val databaseConfig: DatabaseConfig
 
-    protected abstract val outboxConfig: OutboxConfig?
+    protected abstract val outboxConfig: OutboxConfig
 
-    override val interval: Duration get() = outboxConfig?.every ?: Duration.INFINITE
+    override val interval: Duration get() = outboxConfig.every
 
-    override val initialDelay: Duration by lazy {
-        outboxConfig?.randomInitialDelay ?: Duration.ZERO
-    }
+    override val initialDelay: Duration by lazy { outboxConfig.randomInitialDelay }
 
     private val outboxProcessing = AtomicBoolean(false)
 
@@ -80,9 +78,9 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
 
         try {
             processEntities(
-                batchSize = outboxConfig!!.batchSize,
-                maxAttempts = outboxConfig!!.maxAttempts,
-                retryDelay = outboxConfig!!.retryDelay,
+                batchSize = outboxConfig.batchSize,
+                maxAttempts = outboxConfig.maxAttempts,
+                retryDelay = outboxConfig.retryDelay,
             )
         } catch (e: Exception) {
             logger.error(e) { "Error during outbox processing" }

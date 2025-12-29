@@ -2,6 +2,7 @@
 package com.lemline.runner.common.test.outbox
 
 import com.lemline.runner.common.config.DatabaseConfig
+import com.lemline.runner.common.config.OutboxConfig
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.models.WithId
 import com.lemline.runner.common.models.WithOutbox
@@ -20,6 +21,7 @@ import io.mockk.just
 import io.mockk.mockk
 import kotlin.reflect.KClass
 import kotlin.time.Clock
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
@@ -88,7 +90,13 @@ abstract class OutboxProcessorTest<T>(
             override val crudRepository = this@OutboxProcessorTest.crudRepository
             override val databaseConfig = this@OutboxProcessorTest.databaseConfig
             override val commandEmitter = mockk<CommandEmitter>()
-            override val outboxConfig = null // Not used by test methods
+            override val outboxConfig = object : OutboxConfig {
+                override val every: Duration = Duration.INFINITE
+                override val batchSize: Int = 10
+                override val initialJitter: Duration = Duration.ZERO
+                override val retryDelay: Duration = 1.seconds
+                override val maxAttempts: Int = 3
+            }
             override val enabled = true
 
             override suspend fun process(entity: T) {
