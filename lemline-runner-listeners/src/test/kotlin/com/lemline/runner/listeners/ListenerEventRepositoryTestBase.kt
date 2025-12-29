@@ -1046,6 +1046,45 @@ abstract class ListenerEventRepositoryTestBase {
         readyEvents.first().eventId shouldBe "event-1"
     }
 
+    @Test
+    fun `markReadyForForeach should mark events with NULL filter_index (ANY_UNTIL strategies)`() = runTest {
+        val listener = createListener(hasForeach = true, strategy = ListenStrategy.ANY).copy(
+            listenerStrategy = ListenerStrategy.ANY_UNTIL_EXPR
+        ).apply {
+            hasUntil = true
+            untilExpression = ".value > 100"
+        }
+        getListenerRepository().insert(listener)
+
+        val event1 = createEvent(listener.id, eventId = "event-1").copy(filterIndex = null)
+        val event2 = createEvent(listener.id, eventId = "event-2").copy(filterIndex = null)
+        val event3 = createEvent(listener.id, eventId = "event-3").copy(filterIndex = null)
+        getEventRepository().insert(listOf(event1, event2, event3))
+
+        val marked1 = getEventRepository().markReadyForForeach(limit = 100)
+        marked1 shouldBe 1
+
+        val eventsAfterFirstMark = getEventRepository().findByListenerId(listener.id)
+        val readyEvents = eventsAfterFirstMark.filter { it.outboxDelayedUntil != null }
+        readyEvents shouldHaveSize 1
+        readyEvents.first().eventId shouldBe "event-1"
+
+        getEventRepository().markForeachCompleted(
+            workflowId = listener.instanceMessage.workflowId,
+            position = listener.instanceMessage.workflowState.nodePosition,
+            eventId = "event-1",
+            output = """{"result":"done"}"""
+        )
+
+        val marked2 = getEventRepository().markReadyForForeach(limit = 100)
+        marked2 shouldBe 1
+
+        val eventsAfterSecondMark = getEventRepository().findByListenerId(listener.id)
+        val readyEventsAfterSecond = eventsAfterSecondMark.filter { it.outboxDelayedUntil != null && !it.foreachCompleted }
+        readyEventsAfterSecond shouldHaveSize 1
+        readyEventsAfterSecond.first().eventId shouldBe "event-2"
+    }
+
     // ========== Listener completion tests ==========
 
     @Test
