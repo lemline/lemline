@@ -2,7 +2,6 @@
 package com.lemline.runner.listeners
 
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -21,6 +20,7 @@ import com.lemline.runner.common.repositories.ops.OUTBOX_ERROR_CLASS_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_ERROR_MESSAGE_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_ERROR_STACKTRACE_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_FAILED_AT_COLUMN
+import com.lemline.runner.common.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
 import com.lemline.runner.common.repositories.ops.OutboxRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_NAMESPACE_COLUMN
@@ -327,7 +327,8 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             val now = nowTimestamp()
             val sql = """
                 UPDATE $tableName l
-                SET $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
+                SET $OUTBOX_SCHEDULED_FOR_COLUMN = ?,
+                    $OUTBOX_DELAYED_UNTIL_COLUMN = ?,
                     $UPDATED_AT_COLUMN = ?
                 WHERE l.$CLOSED_AT_COLUMN IS NOT NULL
                   AND l.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
@@ -341,6 +342,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
             conn.prepareStatement(sql).use { stmt ->
                 stmt.setTimestamp(1, now)
                 stmt.setTimestamp(2, now)
+                stmt.setTimestamp(3, now)
                 stmt.executeUpdate()
             }
         }
