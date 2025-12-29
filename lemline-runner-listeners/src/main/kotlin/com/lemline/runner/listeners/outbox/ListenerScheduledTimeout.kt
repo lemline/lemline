@@ -40,7 +40,7 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
     override val jobName = "Listener scheduled timeout"
 
     @Inject
-    lateinit var listenerFeatureConfig: ListenerConfig
+    lateinit var listenerConfig: ListenerConfig
 
     @Inject
     private lateinit var listenerRepository: ListenerRepository
@@ -52,16 +52,16 @@ class ListenerScheduledTimeout : AbstractScheduledTask() {
     private lateinit var databaseConfig: DatabaseConfig
 
     /** Is this processor enabled? */
-    override val enabled by lazy { listenerFeatureConfig.enabled }
+    override val enabled by lazy { listenerConfig.enabled }
 
     /** Processing interval */
     override val interval: Duration by lazy {
-        listenerFeatureConfig.outbox?.every ?: 10.seconds
+        listenerConfig.outbox?.every ?: 5.seconds
     }
 
     /** Batch size for processing */
     private val batchSize by lazy {
-        listenerFeatureConfig.outbox?.batchSize ?: 100
+        listenerConfig.outbox?.batchSize ?: 100
     }
 
     /**
