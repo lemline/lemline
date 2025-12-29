@@ -91,6 +91,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
         val maxIterations = 100
         do {
             marked = listenerEventRepository.markReadyForForeach(batchSize)
+            logger.debug { "$marked events marked for foreach" }
             iterations++
         } while (marked > 0 && iterations < maxIterations)
 
@@ -112,7 +113,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
         val listenerIds = entities.map { it.listenerId }.distinct()
         val listeners = listenerRepository.findByIds(listenerIds)
 
-        return processEntitiesWith(entities, maxAttempts, initialDelay) { listenerEvent: ListenerEventModel ->
+        return processEntitiesWith(entities, maxAttempts, initialDelay) { listenerEvent ->
             process(listenerEvent, listeners[listenerEvent.listenerId]!!)
         }
     }
