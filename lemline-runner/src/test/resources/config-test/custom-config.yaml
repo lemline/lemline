@@ -1,0 +1,29 @@
+lemline:
+  database:
+    type: in-memory
+    migrate-at-start: true
+    baseline-on-migrate: true
+
+  messaging:
+    type: in-memory
+
+  outbox:
+    enabled: true
+    wait:
+      outbox:
+        every: "7s"
+        batch-size: 777
+        initial-jitter: "2s"
+        retry-delay: "20s"
+        max-attempts: 7
+      cleanup:
+        every: "3h"
+        after: "5d"
+        batch-size: 333
+
+  metrics:
+    port: 9999
+    path: "/test/metrics"
+
+  orchestrator:
+    mode: all

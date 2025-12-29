@@ -1,0 +1,9 @@
+lemline:
+  database:
+    type: in-memory
+
+  messaging:
+    type: in-memory
+
+  outbox:
+    enabled: true
