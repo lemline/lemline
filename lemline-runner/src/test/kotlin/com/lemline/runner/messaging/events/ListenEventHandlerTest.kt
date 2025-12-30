@@ -58,7 +58,7 @@ internal class ListenEventHandlerTest {
     private val testNamespace = WorkflowNamespace("test-namespace")
     private val testName = WorkflowName("test-workflow")
     private val testVersion = WorkflowVersion("1.0.0")
-    private val testNodePosition = NodePosition("/do/listenTask")
+    private val testNodePosition = NodePosition("/do/0/listenTask")
 
     @BeforeEach
     fun setup() = runTest {

@@ -99,7 +99,7 @@ class ListenerEventServiceTest {
             WorkflowName("test-workflow"),
             WorkflowVersion("1.0.0")
         )
-        val nodePosition = NodePosition("/do/listenTask")
+        val nodePosition = NodePosition("/do/0/listenTask")
 
         val nodeStack = NodeStack(
             listOf(
@@ -109,6 +109,7 @@ class ListenerEventServiceTest {
                     workflowInput = JsonNull
                 ),
                 NodePosition("/do") to DoState(startedAt = now),
+                NodePosition("/do/0") to DoState(startedAt = now),
                 nodePosition to TaskState(startedAt = now)
             )
         )
@@ -158,7 +159,7 @@ class ListenerEventServiceTest {
 
         val cachedListenTask = mockk<CachedListenTask>()
         every { cachedListenTask.workflowInfo } returns workflowInfo
-        every { cachedListenTask.nodePosition } returns NodePosition("/do/listenTask")
+        every { cachedListenTask.nodePosition } returns NodePosition("/do/0/listenTask")
         every { cachedListenTask.strategy } returns when (strategy) {
             ListenerStrategy.ONE -> ListenStrategy.ONE
             ListenerStrategy.ANY, ListenerStrategy.ANY_UNTIL_EXPR, ListenerStrategy.ANY_UNTIL_EVENT -> ListenStrategy.ANY
@@ -188,7 +189,7 @@ class ListenerEventServiceTest {
 
         val cachedListenTask = mockk<CachedListenTask>()
         every { cachedListenTask.workflowInfo } returns workflowInfo
-        every { cachedListenTask.nodePosition } returns NodePosition("/do/listenTask")
+        every { cachedListenTask.nodePosition } returns NodePosition("/do/0/listenTask")
         every { cachedListenTask.readAs } returns ListenAndReadAs.DATA
         every { cachedListenTask.hasForeach } returns false
 

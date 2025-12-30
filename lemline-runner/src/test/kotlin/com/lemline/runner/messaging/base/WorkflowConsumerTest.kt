@@ -277,7 +277,7 @@ internal abstract class WorkflowConsumerTest {
         // Check that a message was sent to the database topic
         receivedEvent().shouldNotBeNull {
             val instance = InstanceMessage.fromJsonString<WorkflowEvent>(this)
-            instance.workflowState.nodePosition.toString() shouldBe "/do/retryCase/try"
+            instance.workflowState.nodePosition.toString() shouldBe "/do/3/retryCase/try"
             val retryingState = instance.workflowState as WorkflowEvent.TaskRetryScheduled
             retryingState.retryAt shouldNotBe null
         }
@@ -319,7 +319,7 @@ internal abstract class WorkflowConsumerTest {
         // Check that a message was sent to the database topic
         receivedEvent().shouldNotBeNull {
             val instance = InstanceMessage.fromJsonString<WorkflowEvent>(this)
-            instance.workflowState.nodePosition.toString() shouldBe "/do/waitCase"
+            instance.workflowState.nodePosition.toString() shouldBe "/do/2/waitCase"
             val waitState = instance.workflowState as WorkflowEvent.WaitStarted
             waitState.config.waitUntil shouldNotBe null
         }

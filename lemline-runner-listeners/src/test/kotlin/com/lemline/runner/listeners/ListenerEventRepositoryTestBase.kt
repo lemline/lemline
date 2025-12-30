@@ -50,9 +50,9 @@ abstract class ListenerEventRepositoryTestBase {
     private val testNamespace = WorkflowNamespace("test-namespace")
     private val testName = WorkflowName("test-workflow")
     private val testVersion = WorkflowVersion("1.0.0")
-    private val testNodePosition = NodePosition("/do/listenTask")
-    private val testNodePosition2 = NodePosition("/do/listenTask2")
-    private val testNodePosition3 = NodePosition("/do/listenTask3")
+    private val testNodePosition = NodePosition("/do/0/listenTask")
+    private val testNodePosition2 = NodePosition("/do/1/listenTask2")
+    private val testNodePosition3 = NodePosition("/do/2/listenTask3")
 
     private var eventIdCounter = 0
 
@@ -530,7 +530,7 @@ abstract class ListenerEventRepositoryTestBase {
                 WorkflowName("non-existent"),
                 WorkflowVersion("0.0.0")
             ),
-            position = NodePosition("/do/nonExistent"),
+            position = NodePosition("/do/0/nonExistent"),
             correlationValuesJson = null,
             filterIndex = null,
             listenerStrategy = ListenerStrategy.ONE
