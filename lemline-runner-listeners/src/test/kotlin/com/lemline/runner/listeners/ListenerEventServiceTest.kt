@@ -87,6 +87,15 @@ class ListenerEventServiceTest {
         return builder.build()
     }
 
+    // Accumulated events must be valid CloudEvent JSON (not just data payloads)
+    private fun buildSerializedCloudEvent(
+        data: String = """{"count":5}""",
+        id: String = "test-event-${IDV7.random()}"
+    ): String {
+        val event = buildCloudEvent(data = data, id = id)
+        return CloudEventService.serialize(event)
+    }
+
     private fun createListenerModel(
         strategy: ListenerStrategy = ListenerStrategy.ONE,
         untilExpression: String? = null,
@@ -628,7 +637,7 @@ class ListenerEventServiceTest {
                 strategy = ListenerStrategy.ANY_UNTIL_EXPR,
                 untilExpression = "length > 0" // Expression that returns true
             )
-            val accumulatedEvents = listOf("""{"data":{"count":5}}""")
+            val accumulatedEvents = listOf(buildSerializedCloudEvent(data = """{"count":5}"""))
 
             every {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
@@ -668,7 +677,7 @@ class ListenerEventServiceTest {
                 strategy = ListenerStrategy.ANY_UNTIL_EXPR,
                 untilExpression = "length > 100" // Expression that returns false
             )
-            val accumulatedEvents = listOf("""{"data":{"count":5}}""")
+            val accumulatedEvents = listOf(buildSerializedCloudEvent(data = """{"count":5}"""))
 
             every {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
@@ -1350,9 +1359,9 @@ class ListenerEventServiceTest {
             coEvery {
                 mockedListenerRepository.findListenersByKeysWithEvents(any(), any())
             } returns listOf(
-                listener1 to listOf("""{"data":"event1"}"""),
-                listener2 to listOf("""{"data":"event2"}"""),
-                listener3 to listOf("""{"data":"event3"}""")
+                listener1 to listOf(buildSerializedCloudEvent(data = """{"data":"event1"}""", id = "event1")),
+                listener2 to listOf(buildSerializedCloudEvent(data = """{"data":"event2"}""", id = "event2")),
+                listener3 to listOf(buildSerializedCloudEvent(data = """{"data":"event3"}""", id = "event3"))
             )
             coEvery {
                 mockedListenerRepository.batchMarkListenersCompleted(any(), any())
