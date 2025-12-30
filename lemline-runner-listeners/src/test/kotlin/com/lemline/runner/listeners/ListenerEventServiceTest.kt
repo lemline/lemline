@@ -16,6 +16,7 @@ import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.states.DoState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
+import com.lemline.core.states.StackFrame
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.CachedListenTask
@@ -110,16 +111,16 @@ class ListenerEventServiceTest {
         )
         val nodePosition = NodePosition("/do/0/listenTask")
 
-        val nodeStack = NodeStack(
+        val nodeStack = NodeStack.fromFrames(
             listOf(
-                NodePosition.root to RootState(
+                StackFrame(NodePosition.root, RootState(
                     startedAt = now,
                     workflowId = workflowId,
                     workflowInput = JsonNull
-                ),
-                NodePosition("/do") to DoState(startedAt = now),
-                NodePosition("/do/0") to DoState(startedAt = now),
-                nodePosition to TaskState(startedAt = now)
+                )),
+                StackFrame(NodePosition("/do"), DoState(startedAt = now)),
+                StackFrame(NodePosition("/do/0"), DoState(startedAt = now)),
+                StackFrame(nodePosition, TaskState(startedAt = now))
             )
         )
 

@@ -26,7 +26,6 @@ data class RootState(
     val workflowInput: JsonElement = buildJsonObject {},
     val context: Scope = buildJsonObject {},
     val hasWaitingParent: Boolean = false,
-    val workflowStep: Int = 0,
 ) : NodeState() {
 
     @Transient

@@ -315,8 +315,7 @@ class CloudEventLifecycleHook(
         timestamp: Instant,
         idSuffix: String,
     ): CloudEvent {
-        val rootState = nodeStack[NodePosition.root] as RootState
-        val eventId = deriveEventId(workflowId, rootState.workflowStep, idSuffix)
+        val eventId = deriveEventId(workflowId, nodeStack.executionKey, idSuffix)
         val sourceUri =
             URI.create("urn:lemline:workflow:${workflowInfo.namespace}:${workflowInfo.name}:${workflowInfo.version}")
 
@@ -338,17 +337,17 @@ class CloudEventLifecycleHook(
     /**
      * Derives a deterministic event ID for idempotency.
      *
-     * The ID is derived from workflow instance, step, and event type to ensure
+     * The ID is derived from workflow instance, execution key, and event type to ensure
      * the same event produces the same ID on replay.
      */
     private fun deriveEventId(
         workflowId: WorkflowId,
-        workflowStep: Int,
+        executionKey: String,
         idSuffix: String,
     ): String {
-        // Use a deterministic format: workflowId-step-suffix
+        // Use a deterministic format: workflowId-executionKey-suffix
         // This ensures idempotent event IDs for replay scenarios
-        return "$workflowId-$workflowStep-$idSuffix"
+        return "$workflowId-$executionKey-$idSuffix"
     }
 
     /**

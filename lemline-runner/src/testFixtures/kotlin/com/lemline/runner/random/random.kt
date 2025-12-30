@@ -18,6 +18,7 @@ import com.lemline.core.processors.WaitConfig
 import com.lemline.core.random.random
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
+import com.lemline.core.states.StackFrame
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowState
@@ -40,14 +41,13 @@ import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonElement
 
-// Helper function to create state stack with RootState
-private fun NodeStack.Companion.random(): NodeStack = NodeStack(
+private fun NodeStack.Companion.random(): NodeStack = NodeStack.fromFrames(
     listOf(
-        NodePosition.root to RootState(
+        StackFrame(NodePosition.root, RootState(
             startedAt = Clock.System.now(),
             workflowId = WorkflowId.random(),
             workflowInput = JsonElement.random()
-        )
+        ))
     )
 )
 

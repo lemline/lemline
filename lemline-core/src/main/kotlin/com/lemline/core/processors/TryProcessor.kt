@@ -190,7 +190,7 @@ class TryProcessor(
                     attemptIndex = state.attemptIndex + 1
                 )
                 TaskRetryScheduled(
-                    nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),
+                    nodeStack = cleanStateStack(updatedState, nodeStack),
                     nodePosition = getDoTry().position,
                     rawInput = state.transformedInput,
                     flowDirective = null,
@@ -204,9 +204,9 @@ class TryProcessor(
                     lastError = error
                 )
                 TaskScheduled(
-                    nodeStack = cleanStateStack(failingNode, updatedState, nodeStack),  // Re-enter try body
+                    nodeStack = cleanStateStack(updatedState, nodeStack),
                     nodePosition = getCatchNode().position,
-                    rawInput = state.transformedInput, // Original input
+                    rawInput = state.transformedInput,
                     flowDirective = null,
                 )
             }
@@ -246,18 +246,8 @@ class TryProcessor(
     private fun getCatchNode(): Node<*> = node.catchBlock
         ?: throw IllegalStateException("No catch child found in TryTask ${node.position}")
 
-    /**
-     * Updates the state stack by popping states from failing node up to the try node,
-     * then updating the try state.
-     */
-    private fun cleanStateStack(
-        failingNode: Node<*>,
-        updatedState: TryState,
-        nodeStack: NodeStack
-    ): NodeStack {
-        // Pop all states up to but not including the try node, then update the try state
-        return nodeStack.popExcluding(node.position).push(node.position to updatedState)
-    }
+    private fun cleanStateStack(updatedState: TryState, nodeStack: NodeStack): NodeStack =
+        nodeStack.popAndReplace(node.position, updatedState)
 
     /**
      * Check if should retry based on retry configuration and current attempt count.

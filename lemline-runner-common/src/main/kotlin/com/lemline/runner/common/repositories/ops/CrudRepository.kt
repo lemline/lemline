@@ -59,7 +59,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
         DatabaseType.MYSQL -> "${q(column)} <=> ?"
         DatabaseType.POSTGRESQL, DatabaseType.H2 -> "${q(column)} IS NOT DISTINCT FROM ?"
     }
-    
+
     private fun keyEquals(column: String): String =
         if (column in columns.nullableKeyColumns) nullSafeEquals(column) else "${q(column)} = ?"
 
@@ -110,7 +110,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
                     bindInsert(stmt, entity)
                     stmt.executeUpdate()
                 }
-            } catch (e: SQLIntegrityConstraintViolationException) {
+            } catch (_: SQLIntegrityConstraintViolationException) {
                 // H2 throws this for duplicate key violations - treat as "already exists"
                 0
             }
@@ -155,7 +155,7 @@ abstract class CrudRepository<T> : WithCrudRepository<T> {
                         try {
                             bindInsert(stmt, entity)
                             successCount += stmt.executeUpdate()
-                        } catch (e: SQLIntegrityConstraintViolationException) {
+                        } catch (_: SQLIntegrityConstraintViolationException) {
                             // Skip duplicates
                         }
                     }

@@ -14,6 +14,7 @@ import com.lemline.core.processors.TryProcessor
 import com.lemline.core.processors.scope.withTask
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
+import com.lemline.core.states.StackFrame
 import com.lemline.core.states.TryState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
@@ -72,7 +73,7 @@ object StepByStepOrchestrator {
             workflowInput = workflowInput,
             hasWaitingParent = hasWaitingParent,
         )
-        val nodeStack = NodeStack(listOf(NodePosition.root to rootState))
+        val nodeStack = NodeStack(listOf(StackFrame(NodePosition.root, rootState)))
 
         return WorkflowCommand.ResumeFromTask(
             nodePosition = NodePosition.doRoot,
@@ -235,20 +236,17 @@ object StepByStepOrchestrator {
         lifecycleHook: LifecycleEventHook,
     ): WorkflowEvent {
 
-        // Increment workflow step counter
-        val updatedStateStack = nodeStack.incrementStep()
-
         return try {
             // run the next task within a try-catch block to handle workflow-caught exceptions
-            tryCatch(node, updatedStateStack, workflowInfo, lifecycleHook) {
-                startTask(updatedStateStack, node, rawInput, flowDirective, workflowInfo, lifecycleHook)
+            tryCatch(node, nodeStack, workflowInfo, lifecycleHook) {
+                startTask(nodeStack, node, rawInput, flowDirective, workflowInfo, lifecycleHook)
             }
         } catch (e: Exception) {
             // Uncaught failure within a fork branch
-            forkBranchFailed(updatedStateStack, node, e)
+            forkBranchFailed(nodeStack, node, e)
             // Uncaught failure
                 ?: WorkflowFailed(
-                    nodeStack = updatedStateStack,
+                    nodeStack = nodeStack,
                     nodePosition = node.position,
                     rawInput = rawInput,
                     rawOutput = null,

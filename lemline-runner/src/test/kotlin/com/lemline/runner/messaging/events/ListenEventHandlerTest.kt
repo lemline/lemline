@@ -14,6 +14,7 @@ import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.states.DoState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
+import com.lemline.core.states.StackFrame
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache
@@ -172,15 +173,18 @@ internal class ListenEventHandlerTest {
 
         // Create a proper NodeStack with the listen task position
         // The stack needs: root → do block → listen task
-        val nodeStack = NodeStack(
+        val nodeStack = NodeStack.fromFrames(
             listOf(
-                NodePosition.root to RootState(
-                    startedAt = now,
-                    workflowId = workflowId,
-                    workflowInput = JsonNull
+                StackFrame(
+                    NodePosition.root,
+                    RootState(
+                        startedAt = now,
+                        workflowId = workflowId,
+                        workflowInput = JsonNull
+                    )
                 ),
-                NodePosition("/do") to DoState(startedAt = now),
-                nodePosition to TaskState(startedAt = now)
+                StackFrame(NodePosition("/do"), DoState(startedAt = now)),
+                StackFrame(nodePosition, TaskState(startedAt = now))
             )
         )
 

@@ -23,6 +23,7 @@ import com.lemline.core.states.ForState
 import com.lemline.core.states.ForkState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.NodeState
+import com.lemline.core.states.StackFrame
 import com.lemline.core.states.RaiseState
 import com.lemline.core.states.RootState
 import com.lemline.core.states.RunState
@@ -219,9 +220,9 @@ fun NodeStack.Companion.random(): NodeStack {
 
     return NodeStack(
         listOf(
-            rootPosition to RootState.random(),
-            childPosition to NodeState.random(),
-            grandchildPosition to NodeState.random()
+            StackFrame(rootPosition, RootState.random()),
+            StackFrame(childPosition, NodeState.random()),
+            StackFrame(grandchildPosition, NodeState.random())
         )
     )
 }

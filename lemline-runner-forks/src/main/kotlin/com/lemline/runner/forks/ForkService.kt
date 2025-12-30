@@ -118,10 +118,10 @@ class ForkService {
             )
 
             // Derive message ID using branch position (unique per branch)
-            val branchMessageId = IDV7.deriveFromPositionAndStep(
+            val branchMessageId = IDV7.deriveIdempotentId(
                 baseId = instance.workflowId.value,
                 position = branchNode.position,
-                step = instance.workflowState.nodeStack.rootState.workflowStep,
+                executionKey = instance.workflowState.nodeStack.executionKey,
                 suffix = "-branch-init"
             )
 

@@ -170,7 +170,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         val nodeState = stateWhenEnteringFromParent(transformedInput, scope)
 
         // push the state to the stack
-        val updatedStack = nodeStack.push(node.position to nodeState)
+        val updatedStack = nodeStack.push(node.position, nodeState)
 
         // get the next node and an updated state for the current node
         return continueTo(updatedStack, workflowInfo, transformedInput, scope, lifecycleHook)

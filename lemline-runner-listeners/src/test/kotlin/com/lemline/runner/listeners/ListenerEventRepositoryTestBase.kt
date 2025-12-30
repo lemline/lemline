@@ -16,6 +16,7 @@ import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.states.DoState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
+import com.lemline.core.states.StackFrame
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
@@ -99,15 +100,15 @@ abstract class ListenerEventRepositoryTestBase {
         val workflowId = WorkflowId(IDV7.random())
         val workflowInfo = WorkflowInfo(testNamespace, testName, testVersion)
 
-        val nodeStack = NodeStack(
+        val nodeStack = NodeStack.fromFrames(
             listOf(
-                NodePosition.root to RootState(
+                StackFrame(NodePosition.root, RootState(
                     startedAt = now,
                     workflowId = workflowId,
                     workflowInput = JsonNull
-                ),
-                NodePosition("/do") to DoState(startedAt = now),
-                testNodePosition to TaskState(startedAt = now)
+                )),
+                StackFrame(NodePosition("/do"), DoState(startedAt = now)),
+                StackFrame(testNodePosition, TaskState(startedAt = now))
             )
         )
 
@@ -167,15 +168,15 @@ abstract class ListenerEventRepositoryTestBase {
         val workflowId = WorkflowId(IDV7.random())
         val workflowInfo = WorkflowInfo(testNamespace, testName, testVersion)
 
-        val nodeStack = NodeStack(
+        val nodeStack = NodeStack.fromFrames(
             listOf(
-                NodePosition.root to RootState(
+                StackFrame(NodePosition.root, RootState(
                     startedAt = now,
                     workflowId = workflowId,
                     workflowInput = JsonNull
-                ),
-                NodePosition("/do") to DoState(startedAt = now),
-                position to TaskState(startedAt = now)
+                )),
+                StackFrame(NodePosition("/do"), DoState(startedAt = now)),
+                StackFrame(position, TaskState(startedAt = now))
             )
         )
 

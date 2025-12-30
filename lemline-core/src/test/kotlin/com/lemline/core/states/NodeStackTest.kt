@@ -27,14 +27,14 @@ class NodeStackTest {
 
         val stack = NodeStack(
             listOf(
-                root to RootState(
+                StackFrame(root, RootState(
                     startedAt = Clock.System.now(),
                     workflowId = WorkflowId.random(),
                     workflowInput = JsonPrimitive("test")
-                ),
-                doPos to DoState(startedAt = Clock.System.now(), index = 0),
-                taskPos to DoState(startedAt = Clock.System.now(), index = 0),
-                nestedPos to TaskState(startedAt = Clock.System.now())
+                )),
+                StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                StackFrame(taskPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                StackFrame(nestedPos, TaskState(startedAt = Clock.System.now()))
             )
         )
 
@@ -57,14 +57,14 @@ class NodeStackTest {
 
         val stack = NodeStack(
             listOf(
-                root to RootState(
+                StackFrame(root, RootState(
                     startedAt = Clock.System.now(),
                     workflowId = WorkflowId.random(),
                     workflowInput = JsonPrimitive("test")
-                ),
-                doPos to DoState(startedAt = Clock.System.now(), index = 0),
-                taskPos to DoState(startedAt = Clock.System.now(), index = 0),
-                nestedPos to TaskState(startedAt = Clock.System.now())
+                )),
+                StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                StackFrame(taskPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                StackFrame(nestedPos, TaskState(startedAt = Clock.System.now()))
             )
         )
 
@@ -82,17 +82,17 @@ class NodeStackTest {
     fun `should handle deep hierarchies`() {
         // Given - a deep stack with RFC 6901 compliant positions
         var position = NodePosition.root
-        val frames = mutableListOf<Pair<NodePosition, NodeState>>(
-            position to RootState(
+        val frames = mutableListOf<StackFrame>(
+            StackFrame(position, RootState(
                 startedAt = Clock.System.now(),
                 workflowId = WorkflowId.random(),
                 workflowInput = JsonPrimitive("test")
-            )
+            ))
         )
 
         repeat(5) { i ->
             position = position.addToken(Token.DO).addIndex(i).addName("level$i")
-            frames.add(position to DoState(startedAt = Clock.System.now(), index = i))
+            frames.add(StackFrame(position, DoState(startedAt = Clock.System.now(), index = i)))
         }
 
         val stack = NodeStack(frames)
@@ -126,11 +126,11 @@ class NodeStackTest {
         // Given - only root
         val stack = NodeStack(
             listOf(
-                NodePosition.root to RootState(
+                StackFrame(NodePosition.root, RootState(
                     startedAt = Clock.System.now(),
                     workflowId = WorkflowId.random(),
                     workflowInput = JsonPrimitive("test")
-                )
+                ))
             )
         )
 
@@ -155,21 +155,21 @@ class NodeStackTest {
 
         val stack = NodeStack(
             listOf(
-                root to RootState(
+                StackFrame(root, RootState(
                     startedAt = Clock.System.now(),
                     workflowId = WorkflowId.random(),
                     workflowInput = JsonPrimitive("test")
-                ),
-                doPos to DoState(startedAt = Clock.System.now(), index = 0),
-                tryTaskPos to TryState(
+                )),
+                StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                StackFrame(tryTaskPos, TryState(
                     startedAt = Clock.System.now(),
                     transformedInput = JsonPrimitive("input"),
                     attemptIndex = 0,
                     runningCatch = true,
                     lastError = null,
                     errorAs = "error"
-                ),
-                recoveryPos to TaskState(startedAt = Clock.System.now())
+                )),
+                StackFrame(recoveryPos, TaskState(startedAt = Clock.System.now()))
             )
         )
 
@@ -199,13 +199,13 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    root to RootState(
+                    StackFrame(root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
                         workflowInput = JsonPrimitive("test")
-                    ),
-                    doPos to DoState(startedAt = Clock.System.now(), index = 0),
-                    taskPos to TaskState(startedAt = Clock.System.now())
+                    )),
+                    StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                    StackFrame(taskPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
@@ -227,13 +227,13 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    root to RootState(
+                    StackFrame(root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
                         workflowInput = JsonPrimitive("test")
-                    ),
-                    doPos to DoState(startedAt = Clock.System.now(), index = 0),
-                    taskPos to TaskState(startedAt = Clock.System.now())
+                    )),
+                    StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                    StackFrame(taskPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
@@ -257,22 +257,22 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    root to RootState(
+                    StackFrame(root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
                         workflowInput = JsonPrimitive("test")
-                    ),
-                    doPos to DoState(startedAt = Clock.System.now(), index = 0),
-                    outerPos to TryState(
+                    )),
+                    StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                    StackFrame(outerPos, TryState(
                         startedAt = Clock.System.now(),
                         transformedInput = JsonPrimitive("input"),
                         attemptIndex = 0,
                         runningCatch = false,
                         lastError = null,
                         errorAs = "error"
-                    ),
-                    tryDoPos to DoState(startedAt = Clock.System.now(), index = 1),
-                    innerPos to TaskState(startedAt = Clock.System.now())
+                    )),
+                    StackFrame(tryDoPos, DoState(startedAt = Clock.System.now(), index = 1)),
+                    StackFrame(innerPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
@@ -297,14 +297,14 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    root to RootState(
+                    StackFrame(root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
                         workflowInput = JsonPrimitive("test")
-                    ),
-                    doPos to DoState(startedAt = Clock.System.now(), index = 0),
-                    forkTaskPos to ForkState(startedAt = Clock.System.now()),
-                    branchPos to TaskState(startedAt = Clock.System.now())
+                    )),
+                    StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                    StackFrame(forkTaskPos, ForkState(startedAt = Clock.System.now())),
+                    StackFrame(branchPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
@@ -326,13 +326,13 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    root to RootState(
+                    StackFrame(root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
                         workflowInput = JsonPrimitive("test")
-                    ),
-                    doPos to DoState(startedAt = Clock.System.now(), index = 2),
-                    taskPos to TaskState(startedAt = Clock.System.now())
+                    )),
+                    StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 2)),
+                    StackFrame(taskPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
@@ -357,21 +357,21 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    root to RootState(
+                    StackFrame(root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
                         workflowInput = JsonPrimitive("test")
-                    ),
-                    doPos to DoState(startedAt = Clock.System.now(), index = 0),
-                    forTaskPos to ForState(
+                    )),
+                    StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                    StackFrame(forTaskPos, ForState(
                         startedAt = Clock.System.now(),
                         collection = listOf(JsonPrimitive(1), JsonPrimitive(2)),
                         index = 0,
                         forEach = "item",
                         forAt = "index"
-                    ),
-                    forDoPos to DoState(startedAt = Clock.System.now(), index = 0),
-                    itemPos to TaskState(startedAt = Clock.System.now())
+                    )),
+                    StackFrame(forDoPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                    StackFrame(itemPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
@@ -393,13 +393,13 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    root to RootState(
+                    StackFrame(root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
                         workflowInput = JsonPrimitive("test")
-                    ),
-                    doPos to DoState(startedAt = Clock.System.now(), index = 0),
-                    taskPos to TaskState(startedAt = Clock.System.now())
+                    )),
+                    StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                    StackFrame(taskPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 
@@ -427,15 +427,15 @@ class NodeStackTest {
 
             val stack = NodeStack(
                 listOf(
-                    root to RootState(
+                    StackFrame(root, RootState(
                         startedAt = Clock.System.now(),
                         workflowId = WorkflowId.random(),
                         workflowInput = JsonPrimitive("test")
-                    ),
-                    doPos to DoState(startedAt = Clock.System.now(), index = 0),
-                    outerPos to DoState(startedAt = Clock.System.now(), index = 0),
-                    middlePos to DoState(startedAt = Clock.System.now(), index = 1),
-                    innerPos to TaskState(startedAt = Clock.System.now())
+                    )),
+                    StackFrame(doPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                    StackFrame(outerPos, DoState(startedAt = Clock.System.now(), index = 0)),
+                    StackFrame(middlePos, DoState(startedAt = Clock.System.now(), index = 1)),
+                    StackFrame(innerPos, TaskState(startedAt = Clock.System.now()))
                 )
             )
 

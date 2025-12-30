@@ -13,6 +13,7 @@ import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.RootState
+import com.lemline.core.states.StackFrame
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
@@ -395,13 +396,13 @@ abstract class ForkRepositoryTestBase {
                 version = WorkflowVersion("1.0")
             ),
             workflowState = WorkflowEvent.ForkStarted(
-                nodeStack = NodeStack(
+                nodeStack = NodeStack.fromFrames(
                     listOf(
-                        NodePosition.root to RootState(
+                        StackFrame(NodePosition.root, RootState(
                             startedAt = Clock.System.now(),
                             workflowId = testWorkflowId,
                             workflowInput = JsonPrimitive("test-input")
-                        )
+                        ))
                     )
                 ),
                 rawInput = JsonPrimitive("test-input")
