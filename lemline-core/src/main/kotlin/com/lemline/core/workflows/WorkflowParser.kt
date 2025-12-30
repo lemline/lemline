@@ -5,6 +5,7 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.Token.CATCH
 import com.lemline.common.values.Token.DO
 import com.lemline.common.values.Token.FOREACH
+import com.lemline.common.values.Token.BRANCHES
 import com.lemline.common.values.Token.FORK
 import com.lemline.common.values.Token.SUBSCRIPTION
 import com.lemline.common.values.Token.TRY
@@ -158,14 +159,16 @@ private fun parseRootChildren(task: RootTask, parent: Node<*>): List<Node<*>> = 
 
 /**
  * DoTask children are the sequential task items in the do block.
+ * Position format per RFC 6901: /do/{index}/{taskName}
  */
 private fun parseDoChildren(node: Node<*>): List<Node<*>> {
     val task = node.task as DoTask
-    return task.`do`.map { taskItem ->
+    return task.`do`.mapIndexed { index, taskItem ->
         val child = taskItem.toTask()
-        val childPosition = node.position.addName(taskItem.name).let {
-            if (child is DoTask) it.addToken(DO) else it
-        }
+        val childPosition = node.position
+            .addIndex(index)
+            .addName(taskItem.name)
+            .let { if (child is DoTask) it.addToken(DO) else it }
 
         Node(
             position = childPosition,
@@ -260,12 +263,13 @@ val Node<TryTask>.catchBlock: Node<DoTask>?
 
 /**
  * ForkTask children are the parallel branch nodes.
+ * Position format per RFC 6901: /fork/branches/{index}/{branchName}
  */
 private fun parseForkChildren(node: Node<*>): List<Node<*>>? {
     val task = node.task as ForkTask
-    return task.fork.branches?.map { taskItem ->
+    return task.fork.branches?.mapIndexed { index, taskItem ->
         Node(
-            position = node.position.addToken(FORK).addName(taskItem.name),
+            position = node.position.addToken(FORK).addToken(BRANCHES).addIndex(index).addName(taskItem.name),
             task = taskItem.toTask(),
             name = taskItem.name,
             parent = node,

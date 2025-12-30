@@ -78,10 +78,10 @@ object DoTaskTestCases {
                         taskRef: ${ $task.reference }
             """.trimIndent(),
             input = kotlinx.serialization.json.JsonPrimitive(42),
-            validate = expectOutputMatching("taskName=taskWithMetadata, taskRef=/do/taskWithMetadata") { output ->
+            validate = expectOutputMatching("taskName=taskWithMetadata, taskRef=/do/0/taskWithMetadata") { output ->
                 val obj = output as? JsonObject ?: return@expectOutputMatching false
                 obj["taskName"]?.jsonPrimitive?.content == "taskWithMetadata" &&
-                    obj["taskRef"]?.jsonPrimitive?.content == "/do/taskWithMetadata"
+                    obj["taskRef"]?.jsonPrimitive?.content == "/do/0/taskWithMetadata"
             }
         ),
 

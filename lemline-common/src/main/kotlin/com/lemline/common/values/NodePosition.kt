@@ -73,6 +73,21 @@ data class NodePosition(private val path: String) {
     }
 
     /**
+     * Adds an array index to the JSON pointer path.
+     *
+     * Per RFC 6901, array elements are referenced by their zero-based index.
+     * Example: "/do" + index 0 → "/do/0"
+     *
+     * @param index The zero-based array index to add
+     * @return A new NodePosition with the added index
+     * @throws IllegalArgumentException if the index is negative
+     */
+    fun addIndex(index: Int): NodePosition {
+        require(index >= 0) { "Index must be non-negative, got: $index" }
+        return NodePosition(if (isRoot) "/$index" else "$path/$index")
+    }
+
+    /**
      * Adds a token to the path.
      * Example: "/do" + Token.TRY → "/do/try"
      *
