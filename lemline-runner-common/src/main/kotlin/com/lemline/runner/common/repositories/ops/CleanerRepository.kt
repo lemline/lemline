@@ -62,6 +62,7 @@ class CleanerRepository<T : WithCleanup>(
             SELECT * FROM $tableName
             WHERE $CLEANUP_AFTER_COLUMN IS NOT NULL
               AND $CLEANUP_AFTER_COLUMN < ?
+            ORDER BY $CLEANUP_AFTER_COLUMN ASC
             LIMIT ?
             FOR UPDATE SKIP LOCKED
         """.trimIndent()

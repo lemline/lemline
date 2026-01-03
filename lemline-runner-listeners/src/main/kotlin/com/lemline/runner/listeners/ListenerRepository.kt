@@ -218,6 +218,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
           AND $OUTBOX_FAILED_AT_COLUMN IS NULL
           AND $TIMEOUT_AT_COLUMN IS NOT NULL
           AND $TIMEOUT_AT_COLUMN <= ?
+        ORDER BY $TIMEOUT_AT_COLUMN ASC
         LIMIT ?
         FOR UPDATE SKIP LOCKED
         """.trimIndent()

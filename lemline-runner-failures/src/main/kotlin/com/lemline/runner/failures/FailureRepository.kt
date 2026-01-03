@@ -129,6 +129,6 @@ class FailureRepository : CrudRepository<FailureModel>(),
         }
 
     private val findByWorkflowIdSql by lazy {
-        "SELECT * FROM $tableName WHERE $WORKFLOW_ID_COLUMN = ?"
+        "SELECT * FROM $tableName WHERE $WORKFLOW_ID_COLUMN = ? ORDER BY $ID_COLUMN"
     }
 }

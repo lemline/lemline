@@ -77,7 +77,9 @@ class DefinitionRepository : CrudRepository<DefinitionModel>() {
         }
     }
 
-    private val listAllInNamespaceSql by lazy { "SELECT * FROM $tableName WHERE $NAMESPACE_COLUMN = ?" }
+    private val listAllInNamespaceSql by lazy {
+        "SELECT * FROM $tableName WHERE $NAMESPACE_COLUMN = ? ORDER BY $NAME_COLUMN, $VERSION_COLUMN"
+    }
 
     /**
      * Deletes all workflows belonging to the given namespace.
@@ -122,7 +124,9 @@ class DefinitionRepository : CrudRepository<DefinitionModel>() {
         }
     }
 
-    private val listByNameSql by lazy { "SELECT * FROM $tableName WHERE $NAMESPACE_COLUMN = ? AND $NAME_COLUMN = ?" }
+    private val listByNameSql by lazy {
+        "SELECT * FROM $tableName WHERE $NAMESPACE_COLUMN = ? AND $NAME_COLUMN = ? ORDER BY $VERSION_COLUMN"
+    }
 
     /**
      * Finds a workflow by name and version.
