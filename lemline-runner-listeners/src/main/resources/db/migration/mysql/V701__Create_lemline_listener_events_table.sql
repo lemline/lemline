@@ -20,8 +20,8 @@ CREATE TABLE lemline_listener_events
     -- CloudEvent data as JSON string
     event                   MEDIUMTEXT   NOT NULL,
 
-    -- Auto-increment sort key for deterministic ordering
-    sort_key                BIGINT       NOT NULL AUTO_INCREMENT,
+    -- Per-listener sort key for deterministic FIFO ordering (0, 1, 2... per listener)
+    sort_key                BIGINT       NOT NULL DEFAULT 0,
 
     -- Whether foreach.do has completed (efficient boolean for indexing)
     foreach_completed       BOOLEAN      NOT NULL DEFAULT FALSE,
@@ -49,9 +49,6 @@ CREATE TABLE lemline_listener_events
     created_at              TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     updated_at              TIMESTAMP(6),
 
-    -- Unique key for auto-increment sort_key (required by MySQL)
-    UNIQUE KEY uk_lemline_listener_events_sort_key (sort_key),
-
     -- Foreign key with CASCADE delete
     CONSTRAINT fk_listener_events_listener
         FOREIGN KEY (listener_id) REFERENCES lemline_listeners (id) ON DELETE CASCADE
@@ -78,6 +75,10 @@ CREATE UNIQUE INDEX idx_lemline_listener_events_filter_unique
 -- Index for cleanup
 CREATE INDEX idx_lemline_listener_events_cleanup
     ON lemline_listener_events (cleanup_after);
+
+-- Unique constraint on (listener_id, sort_key) for FIFO ordering per listener
+CREATE UNIQUE INDEX idx_lemline_listener_events_listener_sort_key
+    ON lemline_listener_events (listener_id, sort_key);
 
 -- Indexes for markReadyForForeach FIFO queue processing
 -- 1) Pending head selection (covers WHERE + GROUP BY + MIN + join back)

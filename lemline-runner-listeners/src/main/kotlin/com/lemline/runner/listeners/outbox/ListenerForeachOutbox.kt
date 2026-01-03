@@ -139,7 +139,7 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
             ?: error("Listen state not found at current position")
 
         val updatedNodeStack = listenStarted.nodeStack
-            .updateCurrentState(currentListenState.copy(eventId = listenerEvent.eventId))
+            .updateCurrentState(currentListenState.copy(eventId = listenerEvent.eventId), listenerEvent.sortKey)
 
         val workflow = WorkflowCache.getWorkflow(
             namespace = listener.workflowNamespace,

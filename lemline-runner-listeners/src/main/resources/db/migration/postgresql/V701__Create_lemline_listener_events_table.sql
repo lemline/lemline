@@ -20,8 +20,8 @@ CREATE TABLE lemline_listener_events
     -- CloudEvent data as JSON string
     event                   TEXT           NOT NULL,
 
-    -- Auto-increment sort key for deterministic ordering
-    sort_key                BIGSERIAL      NOT NULL UNIQUE,
+    -- Per-listener sort key for deterministic FIFO ordering (0, 1, 2... per listener)
+    sort_key                BIGINT         NOT NULL DEFAULT 0,
 
     -- Whether foreach.do has completed (efficient boolean for indexing)
     foreach_completed       BOOLEAN        NOT NULL DEFAULT FALSE,
@@ -70,6 +70,10 @@ CREATE UNIQUE INDEX idx_lemline_listener_events_filter_unique
 CREATE INDEX idx_lemline_listener_events_cleanup
     ON lemline_listener_events (cleanup_after)
     WHERE cleanup_after IS NOT NULL;
+
+-- Unique constraint on (listener_id, sort_key) for FIFO ordering per listener
+CREATE UNIQUE INDEX idx_lemline_listener_events_listener_sort_key
+    ON lemline_listener_events (listener_id, sort_key);
 
 -- Partial indexes for markReadyForForeach FIFO queue processing
 -- For EXISTS subquery and heads CTE (pending events waiting for FIFO turn)

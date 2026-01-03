@@ -72,6 +72,9 @@ data class ListenerEventModel(
     override val outboxScheduledFor: Instant? = null,
 ) : WithOutbox, WithCleanup {
 
+    /** Per-listener sequential sort key (0, 1, 2...) for deterministic FIFO ordering */
+    var sortKey: Int = 0
+
     /** Whether foreach.do has completed for this event (used for efficient indexing) */
     var foreachCompleted: Boolean = false
 

@@ -432,14 +432,17 @@ abstract class ListenerRepositoryTestBase {
         private fun createEvent(
             listenerId: com.lemline.common.values.IDV7,
             eventId: String,
-            filterIndex: Int = 0
+            filterIndex: Int = 0,
+            sortKey: Int = 0
         ): ListenerEventModel {
             return ListenerEventModel(
                 listenerId = listenerId,
                 eventId = eventId,
                 filterIndex = filterIndex,
                 event = """{"type":"test.event","data":{"value":"$eventId"}}"""
-            )
+            ).apply {
+                this.sortKey = sortKey
+            }
         }
 
         @Test
@@ -496,9 +499,9 @@ abstract class ListenerRepositoryTestBase {
             val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
             repository.insert(listener)
 
-            val event1 = createEvent(listener.id, "event-1", filterIndex = 0)
-            val event2 = createEvent(listener.id, "event-2", filterIndex = 1)
-            val event3 = createEvent(listener.id, "event-3", filterIndex = 2)
+            val event1 = createEvent(listener.id, "event-1", filterIndex = 0, sortKey = 0)
+            val event2 = createEvent(listener.id, "event-2", filterIndex = 1, sortKey = 1)
+            val event3 = createEvent(listener.id, "event-3", filterIndex = 2, sortKey = 2)
             eventRepository.insert(event1)
             eventRepository.insert(event2)
             eventRepository.insert(event3)
@@ -634,9 +637,9 @@ abstract class ListenerRepositoryTestBase {
             repository.insert(listener)
 
             // Insert events (created_at is auto-generated in order)
-            val event1 = createEvent(listener.id, "first", filterIndex = 0)
-            val event2 = createEvent(listener.id, "second", filterIndex = 1)
-            val event3 = createEvent(listener.id, "third", filterIndex = 2)
+            val event1 = createEvent(listener.id, "first", filterIndex = 0, sortKey = 0)
+            val event2 = createEvent(listener.id, "second", filterIndex = 1, sortKey = 1)
+            val event3 = createEvent(listener.id, "third", filterIndex = 2, sortKey = 2)
             eventRepository.insert(event1)
             eventRepository.insert(event2)
             eventRepository.insert(event3)
@@ -747,10 +750,10 @@ abstract class ListenerRepositoryTestBase {
             repository.insert(listener1)
             repository.insert(listener2)
 
-            val event1a = createEvent(listener1.id, "listener1-event-a", filterIndex = 0)
-            val event1b = createEvent(listener1.id, "listener1-event-b", filterIndex = 1)
-            val event2a = createEvent(listener2.id, "listener2-event-a", filterIndex = 0)
-            val event2b = createEvent(listener2.id, "listener2-event-b", filterIndex = 1)
+            val event1a = createEvent(listener1.id, "listener1-event-a", filterIndex = 0, sortKey = 0)
+            val event1b = createEvent(listener1.id, "listener1-event-b", filterIndex = 1, sortKey = 1)
+            val event2a = createEvent(listener2.id, "listener2-event-a", filterIndex = 0, sortKey = 0)
+            val event2b = createEvent(listener2.id, "listener2-event-b", filterIndex = 1, sortKey = 1)
             eventRepository.insert(event1a)
             eventRepository.insert(event1b)
             eventRepository.insert(event2a)
@@ -784,8 +787,8 @@ abstract class ListenerRepositoryTestBase {
             val listener = createListener(ListenerStrategy.ANY_UNTIL_EXPR)
             repository.insert(listener)
 
-            val event1 = createEvent(listener.id, "event-1", filterIndex = 0)
-            val event2 = createEvent(listener.id, "event-2", filterIndex = 1)
+            val event1 = createEvent(listener.id, "event-1", filterIndex = 0, sortKey = 0)
+            val event2 = createEvent(listener.id, "event-2", filterIndex = 1, sortKey = 1)
             eventRepository.insert(event1)
             eventRepository.insert(event2)
 

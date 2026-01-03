@@ -219,15 +219,20 @@ abstract class ListenerEventRepositoryTestBase {
         listenerId: IDV7,
         filterIndex: Int = 0,
         eventData: String = """{"type":"com.example.Event"}""",
-        eventId: String = "event-${eventIdCounter++}"
+        eventId: String? = null,
+        sortKey: Int? = null
     ): ListenerEventModel {
+        val counter = eventIdCounter++
         return ListenerEventModel(
             listenerId = listenerId,
-            eventId = eventId,
+            eventId = eventId ?: "event-$counter",
             filterIndex = filterIndex,
             event = eventData,
             outboxScheduledFor = Clock.System.now()
-        )
+        ).apply {
+            // Use auto-incrementing sort_key if not explicitly provided
+            this.sortKey = sortKey ?: counter
+        }
     }
 
     /** Creates a query key from a listener with the correct strategy. */
@@ -1057,9 +1062,9 @@ abstract class ListenerEventRepositoryTestBase {
         }
         getListenerRepository().insert(listener)
 
-        val event1 = createEvent(listener.id, eventId = "event-1").copy(filterIndex = null)
-        val event2 = createEvent(listener.id, eventId = "event-2").copy(filterIndex = null)
-        val event3 = createEvent(listener.id, eventId = "event-3").copy(filterIndex = null)
+        val event1 = createEvent(listener.id, eventId = "event-1").copy(filterIndex = null).apply { sortKey = 0 }
+        val event2 = createEvent(listener.id, eventId = "event-2").copy(filterIndex = null).apply { sortKey = 1 }
+        val event3 = createEvent(listener.id, eventId = "event-3").copy(filterIndex = null).apply { sortKey = 2 }
         getEventRepository().insert(listOf(event1, event2, event3))
 
         val marked1 = getEventRepository().markReadyForForeach(limit = 100)

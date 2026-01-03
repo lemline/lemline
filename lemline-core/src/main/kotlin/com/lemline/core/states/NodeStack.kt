@@ -123,13 +123,13 @@ class NodeStack internal constructor(
     }
 
     /** Update the current (top) state in the stack.*/
-    fun updateCurrentState(newState: NodeState): NodeStack {
+    fun updateCurrentState(newState: NodeState, executionIndex: Int? = null): NodeStack {
         val currentFrame = frames.last()
         return NodeStack(
             frames.dropLast(1) + StackFrame(
                 currentFrame.position,
                 newState,
-                currentFrame.executionIndex + 1
+                executionIndex ?: (currentFrame.executionIndex + 1)
             )
         )
     }
