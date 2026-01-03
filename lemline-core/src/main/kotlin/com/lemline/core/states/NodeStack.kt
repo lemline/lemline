@@ -80,9 +80,6 @@ class NodeStack internal constructor(
     operator fun get(position: NodePosition): NodeState? =
         frames.firstOrNull { it.position == position }?.state
 
-    fun getFrame(position: NodePosition): StackFrame? =
-        frames.firstOrNull { it.position == position }
-
 
     fun deriveIdempotentId(suffix: String = ""): IDV7 =
         IDV7.deriveIdempotentId(
@@ -93,15 +90,15 @@ class NodeStack internal constructor(
         )
 
     /** Creates a new TaskStack with updated context in the root state.*/
-    fun setContext(newContext: Scope): NodeStack = withRootState(rootState.copyWithContext(newContext))
+    fun setContext(newContext: Scope): NodeStack = withRootState(rootState.withContext(newContext))
 
     /** Creates a new TaskStack with a new root state, replacing the existing one.*/
     fun withRootState(newRoot: RootState): NodeStack =
         NodeStack(listOf(StackFrame(NodePosition.root, newRoot)) + frames.drop(1))
 
     /** Push a new frame onto the stack.*/
-    fun push(position: NodePosition, state: NodeState, executionIndex: Int = 0): NodeStack =
-        NodeStack(frames + StackFrame(position, state, executionIndex))
+    fun push(position: NodePosition, state: NodeState): NodeStack =
+        NodeStack(frames + StackFrame(position, state, 0))
 
     /** Pop the top frame and increment the new top frame's executionIndex.*/
     fun pop(): NodeStack = popFrames(frames.dropLast(1))
@@ -128,7 +125,13 @@ class NodeStack internal constructor(
     /** Update the current (top) state in the stack.*/
     fun updateCurrentState(newState: NodeState): NodeStack {
         val currentFrame = frames.last()
-        return NodeStack(frames.dropLast(1) + StackFrame(currentFrame.position, newState, currentFrame.executionIndex))
+        return NodeStack(
+            frames.dropLast(1) + StackFrame(
+                currentFrame.position,
+                newState,
+                currentFrame.executionIndex + 1
+            )
+        )
     }
 
     fun <R> map(transform: (Map.Entry<NodePosition, NodeState>) -> R): List<R> =

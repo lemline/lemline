@@ -78,7 +78,7 @@ class ParentService {
                 connection = conn
             )
             if (rowsInserted == 0) {
-                logger.info { "Parent model $parentId already exists (idempotent insert), skipping" }
+                logger.warn { "Parent model $parentId already exists (idempotent insert), skipping" }
                 return@withTransaction false
             }
 

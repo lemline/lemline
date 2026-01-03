@@ -17,6 +17,7 @@ import com.lemline.runner.listeners.ListenerRepository
 import io.quarkus.runtime.Startup
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.Connection
 import kotlin.time.Clock
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
@@ -120,10 +121,11 @@ class ListenerOutbox : AbstractOutbox<ListenerModel>() {
     override suspend fun processBatch(
         entities: List<ListenerModel>,
         maxAttempts: Int,
-        retryDelay: Duration
+        retryDelay: Duration,
+        conn: Connection
     ): Int {
         val listenerIds = entities.map { it.id }
-        val outputsByListener = listenerEventRepository.findCompletedOutputsByListeners(listenerIds)
+        val outputsByListener = listenerEventRepository.findCompletedOutputsByListeners(listenerIds, conn)
 
         return processEntitiesWith(entities, maxAttempts, retryDelay) { listener ->
             process(listener, outputsByListener[listener.id] ?: emptyList())

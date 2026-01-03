@@ -24,6 +24,7 @@ import io.quarkus.runtime.Startup
 import io.serverlessworkflow.api.types.ListenTask
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
+import java.sql.Connection
 import kotlin.time.Duration
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -106,11 +107,19 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
     override suspend fun processBatch(
         entities: List<ListenerEventModel>,
         maxAttempts: Int,
-        retryDelay: Duration
+        retryDelay: Duration,
+        conn: Connection
     ): Int {
-        // Batch-load all listeners in one query
-        val listenerIds = entities.map { it.listenerId }.distinct()
-        val listeners = listenerRepository.findByIds(listenerIds)
+        // Validate no duplicate listenerIds - each listener should have at most one event per batch
+        val listenerIds = entities.map { it.listenerId }
+        require(listenerIds.size == listenerIds.distinct().size) {
+            "Duplicate listenerIds in batch: ${
+                entities.groupingBy { it.listenerId }.eachCount().filter { it.value > 1 }.keys
+            }"
+        }
+
+        // Batch-load all listeners in one query using the transaction connection
+        val listeners = listenerRepository.findByIds(listenerIds, conn)
 
         return processEntitiesWith(entities, maxAttempts, retryDelay) { listenerEvent ->
             process(listenerEvent, listeners[listenerEvent.listenerId]!!)
@@ -130,7 +139,6 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
             ?: error("Listen state not found at current position")
 
         val updatedNodeStack = listenStarted.nodeStack
-            .incrementCurrentExecutionIndex()
             .updateCurrentState(currentListenState.copy(eventId = listenerEvent.eventId))
 
         val workflow = WorkflowCache.getWorkflow(

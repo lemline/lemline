@@ -3,6 +3,7 @@ package com.lemline.runner.common.outbox
 
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.OutboxConfig
+import java.sql.Connection
 import com.lemline.runner.common.messaging.CommandEmitter
 import com.lemline.runner.common.models.WithOutbox
 import com.lemline.runner.common.repositories.with.WithCrudRepository
@@ -130,7 +131,7 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
 
                 if (toProcess > 0) {
                     totalToProcess += toProcess
-                    processBatch(messages, maxAttempts, retryDelay)
+                    processBatch(messages, maxAttempts, retryDelay, conn)
                     val processed = crudRepository.update(messages, conn)
                     totalProcessed += processed
                 }
@@ -148,11 +149,17 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
      * Processes a list of entities concurrently on separate coroutines for improved performance.
      * Subclasses can override to pre-load related data before processing (e.g., batch-fetch
      * parent entities to avoid N+1 queries), then call [processEntitiesWith] with a custom processor.
+     *
+     * @param entities The entities to process
+     * @param maxAttempts Maximum retry attempts
+     * @param retryDelay Base delay for exponential backoff
+     * @param conn The database connection from the enclosing transaction (for batch-loading related data)
      */
     protected open suspend fun processBatch(
         entities: List<T>,
         maxAttempts: Int,
-        retryDelay: Duration
+        retryDelay: Duration,
+        conn: Connection
     ): Int = processEntitiesWith(entities, maxAttempts, retryDelay) { process(it) }
 
     /**
@@ -161,8 +168,8 @@ abstract class AbstractOutbox<T : WithOutbox> : AbstractScheduledTask() {
      *
      * Example usage in subclass:
      * ```
-     * override suspend fun processBatch(entities: List<T>, maxAttempts: Int, retryDelay: Duration): Int {
-     *     val cache = repository.findByIds(entities.map { it.parentId }.distinct())
+     * override suspend fun processBatch(entities: List<T>, maxAttempts: Int, retryDelay: Duration, conn: Connection): Int {
+     *     val cache = repository.findByIds(entities.map { it.parentId }.distinct(), conn)
      *     return processEntitiesWith(entities, maxAttempts, retryDelay) { entity ->
      *         val parent = cache[entity.parentId] ?: error("Not found")
      *         // process with parent...

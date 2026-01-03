@@ -43,7 +43,7 @@ class RetryService {
             )
         )
         if (rowsInserted == 0) {
-            logger.info { "Retry model $retryId already exists (idempotent insert)" }
+            logger.warn { "Retry model $retryId already exists (idempotent insert)" }
             return false
         }
         return true

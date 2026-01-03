@@ -41,7 +41,7 @@ class WaitService {
             )
         )
         if (rowsInserted == 0) {
-            logger.info { "Wait model $waitId already exists (idempotent insert)" }
+            logger.warn { "Wait model $waitId already exists (idempotent insert)" }
             return false
         }
         return true

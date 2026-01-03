@@ -2,193 +2,153 @@
 
 Guidelines for AI coding agents working in the Lemline repository.
 
-## Project Overview
+**Generated:** 2026-01-02  
+**Branch:** main
 
-Lemline is an event-driven workflow orchestration runtime implementing Serverless Workflow DSL v1.0.
-Written in Kotlin 2.2.10 on Java 17 with Quarkus 3.x. Uses Kotlin coroutines for async operations.
+## Overview
 
-## Build Commands
+Lemline: Event-driven workflow orchestration runtime implementing Serverless Workflow DSL v1.0.  
+Kotlin 2.2.10 + Java 17 + Quarkus 3.x. Stateless workers, dual-channel messaging, outbox pattern.
 
-```bash
-# Build entire project
-./gradlew build
+## Structure
 
-# Build specific module
-./gradlew :lemline-core:build
-./gradlew :lemline-runner:build
+```
+lemline/
+├── lemline-common/          # Shared utilities (IDV7, JSON, logging)
+├── lemline-core/            # DSL parsing, execution engine, processors
+├── lemline-runner/          # Quarkus runtime, messaging, CLI
+├── lemline-runner-cli/      # Picocli CLI commands
+├── lemline-runner-common/   # Shared infrastructure (outbox, cleaner, repos)
+├── lemline-runner-*/        # Feature modules (waits, retries, parents, forks, schedules, listeners, definitions, failures)
+├── lemline-docs/            # Writerside documentation
+├── docs/adr/                # Architecture Decision Records
+├── buildSrc/                # Convention plugins
+└── docker/                  # Docker compose files for dev
 ```
 
-## Test Commands
+## Where to Look
+
+| Task | Location | Notes |
+|------|----------|-------|
+| Add workflow task type | `lemline-core/src/.../processors/` | Create processor + state, use core-dev skill |
+| Add runner feature | Create `lemline-runner-{feature}/` | Follow outbox pattern, use runner-dev skill |
+| Modify messaging | `lemline-runner/src/.../messaging/` | commands/ for execution, events/ for persistence |
+| Add CLI command | `lemline-runner-cli/src/.../cli/` | Picocli commands |
+| Database schema | `lemline-runner-*/src/main/resources/db/migration/` | Flyway, all 3 DBs |
+| Configuration | `lemline-runner/src/.../config/LemlineConfiguration.kt` | Quarkus config |
+| Shared infrastructure | `lemline-runner-common/src/main/kotlin/` | Outbox, cleaner, repos |
+
+## Commands
 
 ```bash
-# Run all tests
-./gradlew test
+# Build
+./gradlew build                           # Full build
+./gradlew :lemline-core:build             # Single module
 
-# Run tests for specific module
-./gradlew :lemline-core:test
-./gradlew :lemline-runner:test
+# Test
+./gradlew test                            # All tests
+./gradlew :lemline-runner:test            # Single module
+./gradlew test --tests "*RepositoryTest"  # Pattern match
 
-# Run specific test class
-./gradlew test --tests "com.lemline.core.orchestrator.OrchestratorTest"
+# Format
+./gradlew spotlessCheck                   # Check
+./gradlew spotlessApply                   # Fix
 
-# Run single test method
-./gradlew test --tests "com.lemline.runner.tests.SomeTest.testMethodName"
-
-# Run with pattern matching
-./gradlew :lemline-runner:test --tests "*RepositoryTest"
+# Dev mode
+./gradlew :lemline-runner:quarkusDev      # Hot reload
 ```
 
-## Lint/Format Commands
-
-```bash
-# Check formatting
-./gradlew spotlessCheck
-
-# Apply formatting
-./gradlew spotlessApply
-```
-
-## Code Style Guidelines
+## Code Style
 
 ### Formatting
+- 4 spaces indent (2 for JSON/YAML)
+- 120 char line length
+- LF line endings, UTF-8
+- `// SPDX-License-Identifier: BUSL-1.1` header required
 
-- **Indentation**: 4 spaces (2 spaces for JSON/YAML)
-- **Line length**: 120 characters max
-- **Line endings**: LF (Unix-style)
-- **Final newline**: Required
-- **Charset**: UTF-8
+### Naming
+| Element | Convention | Example |
+|---------|------------|---------|
+| Classes | PascalCase | `NodeProcessor` |
+| Functions | camelCase | `findById` |
+| Constants | SCREAMING_SNAKE | `MAX_RETRIES` |
 
-### Kotlin Conventions
-
-- Follow [Kotlin Coding Conventions](https://kotlinlang.org/docs/coding-conventions.html)
-- Use `ktlint` with IntelliJ IDEA style (`ktlint_code_style = intellij_idea`)
-- No wildcard imports in Kotlin files (except scripts)
-
-### Imports
-
+### Async
 ```kotlin
-// Correct: explicit imports
-import com.lemline.core.processors.NodeProcessor
-import kotlinx.serialization.json.JsonElement
-
-// Avoid: wildcard imports (disabled by ktlint)
-import com.lemline.core.processors.*
-```
-
-### Naming Conventions
-
-| Element    | Convention           | Example                    |
-|------------|----------------------|----------------------------|
-| Classes    | PascalCase           | `NodeProcessor`            |
-| Interfaces | PascalCase           | `WithIdRepository`         |
-| Functions  | camelCase            | `findById`, `executeTask`  |
-| Properties | camelCase            | `workflowId`, `nodeState`  |
-| Constants  | SCREAMING_SNAKE_CASE | `ID_COLUMN`, `MAX_RETRIES` |
-| Packages   | lowercase            | `com.lemline.core.nodes`   |
-
-### Type Annotations
-
-- Prefer explicit return types on public APIs
-- Use nullable types (`T?`) over null checks
-- Use `IDV7` for all entity identifiers (UUID v7)
-
-```kotlin
-// Correct
-suspend fun findById(id: IDV7): Entity?
-
-// Avoid
-fun findById(id: String): Entity  // Missing suspend, wrong ID type
-```
-
-### Async Operations
-
-**ALWAYS use Kotlin coroutines with `suspend` functions** - NOT Mutiny `Uni`:
-
-```kotlin
-// Correct
+// CORRECT: suspend functions with coroutines
 suspend fun findByUUID(uuid: IDV7): Model?
-suspend fun insertBatch(models: List<Model>)
 
-// Wrong - do not use Mutiny
+// WRONG: Mutiny Uni
 fun findByUUID(uuid: IDV7): Uni<Model?>
 ```
 
-### Error Handling
+### IDs
+All entities use `IDV7` (UUID v7) - time-sortable, globally unique.
 
-- Use sealed classes for domain errors
-- Throw specific exceptions with context
-- Use `WorkflowErrorType` enum for workflow errors
+## Anti-Patterns (This Project)
 
+### NEVER
+- **Mutiny (Uni/Multi)** - Use Kotlin coroutines with `suspend` functions
+- **Hibernate ORM/Panache** - Use native SQL with repositories
+- **Type suppression** - No `as any`, `@ts-ignore`, empty catch blocks
+- **Database-specific SQL** without variants for PostgreSQL, MySQL, H2
+- **Skip migrations** - All schema changes via Flyway
+
+### SQL Warning
 ```kotlin
-// Example error types
-sealed class WorkflowError {
-    data class ValidationError(val message: String) : WorkflowError()
-    data class ExpressionError(val expression: String, val cause: Throwable) : WorkflowError()
+// WRONG: NULL comparison always fails
+WHERE col = NULL
+
+// CORRECT: Use null-safe equals
+WHERE col IS NOT DISTINCT FROM $1  -- PostgreSQL
+WHERE col <=> $1                    -- MySQL
+```
+
+### TODO Items Found
+- `scope.kt`: "Current implementation does not follow spec"
+- `HttpCall.kt`: "authorization_code grant is not yet supported"
+- `InstanceStartCommand.kt`: "This should ideally be transactional"
+
+## Complexity Hotspots
+
+| File | Lines | Issue |
+|------|-------|-------|
+| `FullOrchestrator.kt` | 1024 | Deep nesting, long methods for event collection |
+| `NodeProcessor.kt` | 680 | Complex expression evaluation |
+| `HttpCall.kt` | 640 | OAuth2 state machine, incomplete grant types |
+| `WorkflowState.kt` | 629 | Sealed class hierarchy needs architectural docs |
+| `LemlineConfiguration.kt` | 536 | Extensive config mapping |
+
+## Module Patterns
+
+### Feature Modules (lemline-runner-*)
+Each follows consistent outbox pattern:
+- `*Service.kt` - Business logic
+- `*Model.kt` - Entity with `WithOutbox` interface
+- `*Repository.kt` - SQL operations with `FOR UPDATE SKIP LOCKED`
+- `*Outbox.kt` - Extends `AbstractOutbox<T>`
+- `*Cleaner.kt` - Extends `AbstractCleaner<T>`
+
+### Deviations
+- `lemline-runner-definitions` - Pure CRUD, no outbox (definitions are static)
+- `lemline-runner-failures` - Dead letter storage, no outbox (failures are terminal)
+- `lemline-runner-listeners` - Multiple specialized outboxes
+
+## Testing
+
+### lemline-core
+Kotest + coroutines test:
+```kotlin
+@Test
+fun testWorkflow() = runTest {
+    val processor = getWorkflowProcessor(yaml, input)
+    processor.run()
+    assertEquals(expected, processor.output)
 }
 ```
 
-### Documentation
-
-- Document public APIs with KDoc
-- Add OpenAPI descriptions for REST endpoints
-- Use inline comments for complex logic
-
-```kotlin
-/**
- * Finds an entity by its unique identifier.
- *
- * @param id The unique identifier of the entity to find
- * @return The entity, or null if not found
- */
-suspend fun findById(id: IDV7): Entity?
-```
-
-### License Header
-
-All source files must include the SPDX license header:
-
-```kotlin
-// SPDX-License-Identifier: BUSL-1.1
-```
-
-## Module Structure
-
-| Module                       | Purpose                                    |
-|------------------------------|--------------------------------------------|
-| `lemline-common`             | Shared utilities (logging, JSON, values)   |
-| `lemline-core`               | DSL parsing, execution engine, expressions |
-| `lemline-runner`             | Quarkus runtime, CLI, messaging            |
-| `lemline-runner-common`      | Shared runner infrastructure               |
-| `lemline-runner-definitions` | Workflow definition storage                |
-| `lemline-runner-waits`       | Wait/timer outbox handling                 |
-| `lemline-runner-retries`     | Retry outbox handling                      |
-| `lemline-runner-parents`     | Parent-child workflow tracking             |
-| `lemline-runner-forks`       | Fork/join branch management                |
-| `lemline-runner-schedules`   | Scheduled workflow triggers                |
-| `lemline-runner-listeners`   | Event listener management                  |
-
-## Testing Patterns
-
-### lemline-core Tests
-
-Use Kotest with coroutines:
-
-```kotlin
-@ExperimentalTime
-class OrchestratorTest : FunSpec() {
-    init {
-        test("should execute workflow") {
-            val result = executeWorkflow(yaml, input)
-            assertEquals(expected, result)
-        }
-    }
-}
-```
-
-### lemline-runner Tests
-
-Use `@QuarkusTest` with Kotest:
-
+### lemline-runner
+Kotest + `@QuarkusTest` + Testcontainers:
 ```kotlin
 @QuarkusTest
 @TestProfile(PostgresProfile::class)
@@ -200,20 +160,56 @@ class RepositoryTest : FunSpec({
 })
 ```
 
-## Database Patterns
-
-- **No ORM** - use native SQL with Kotlin coroutines
-- Support PostgreSQL, MySQL, and H2
-- All repositories must implement `suspend fun findById(id: IDV7): T?`
-- Use `FOR UPDATE SKIP LOCKED` for outbox queries
+**Test all 3 databases** when touching persistence layer.
 
 ## Key Files
 
-- **Entry point**: `lemline-runner-cli/src/main/kotlin/.../LemlineApplication.kt`
-- **Orchestrator**: `lemline-core/src/main/kotlin/.../orchestrator/`
-- **Processors**: `lemline-core/src/main/kotlin/.../processors/`
-- **Repositories**: `lemline-runner-*/src/main/kotlin/.../repositories/`
+### Core Execution
+- `lemline-core/src/.../orchestrator/StepByStepOrchestrator.kt` - Step execution
+- `lemline-core/src/.../orchestrator/FullOrchestrator.kt` - Full execution (tests)
+- `lemline-core/src/.../processors/NodeProcessor.kt` - Processor interface
+
+### Runner Infrastructure
+- `lemline-runner/src/.../messaging/commands/WorkflowCommandHandler.kt` - Command handling
+- `lemline-runner/src/.../messaging/events/WorkflowEventHandler.kt` - Event routing
+- `lemline-runner-common/src/.../outbox/AbstractOutbox.kt` - Outbox base class
+
+### Entry Points
+- `lemline-runner/src/.../LemlineApplication.kt` - CLI bootstrap (pre-Quarkus)
+- `lemline-runner-cli/src/.../MainCommand.kt` - Picocli top command
+
+## Skills (Use These)
+
+For detailed development guidance, invoke skills:
+
+| Skill | When to Use |
+|-------|-------------|
+| `core-dev` | Working on lemline-core (processors, orchestrators, states, expressions) |
+| `runner-dev` | Working on lemline-runner-* (messaging, outbox, repositories, CLI) |
+
+Skills provide file references, code patterns, and critical rules.
+
+## Architecture Notes
+
+### Dual-Channel Design
+- **Commands channel** (`commands-in/out`): High-throughput, stateless execution
+- **Events channel** (`events-out`): Durable operations requiring DB (waits, retries, parents)
+
+### State Compression
+Entire workflow state serialized into `InstanceMessage` - enables stateless workers.
+
+### Exception-Driven Control
+- Normal step: Returns `NextStepInfo`
+- Wait needed: Throws `WaitStartedException`
+- Retry needed: Throws `TaskRetriedException`
+- Child workflow: Throws `RunWorkflowStartedException`
+
+### Structural Deviations (Non-Standard)
+- No root `build.gradle.kts` - all via buildSrc convention plugins
+- Extremely granular feature modules (9 tiny outbox modules)
+- Separated CLI module from main runner
+- Dual "common" modules (`lemline-common` + `lemline-runner-common`)
 
 ## Language
 
-Always use English in code, comments, and documentation - regardless of user language.
+Always use English in code, comments, and documentation.

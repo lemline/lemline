@@ -97,7 +97,7 @@ class ForkService {
         // 3. Insert fork and branches atomically
         val rowsInserted = forkRepository.insertForkWithBranches(forkModel, forkBranchModels)
         if (rowsInserted == 0) {
-            logger.info { "Fork model $forkId already exists (idempotent insert)" }
+            logger.warn { "Fork model $forkId already exists (idempotent insert)" }
             return false
         }
 

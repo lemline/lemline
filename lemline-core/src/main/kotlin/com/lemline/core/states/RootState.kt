@@ -55,7 +55,7 @@ data class RootState(
      * @param newContext The new context to use
      * @return A new RootState with the updated context
      */
-    fun copyWithContext(newContext: Scope): RootState {
+    fun withContext(newContext: Scope): RootState {
         val state = copy(context = newContext)
         // copy also transient fields
         if (this::secrets.isInitialized) state.secrets = this.secrets

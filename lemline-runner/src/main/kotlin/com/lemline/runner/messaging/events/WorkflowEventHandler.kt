@@ -23,7 +23,6 @@ import com.lemline.runner.retries.RetryService
 import com.lemline.runner.schedules.ScheduleService
 import com.lemline.runner.waits.WaitService
 import jakarta.enterprise.context.ApplicationScoped
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.eclipse.microprofile.reactive.messaging.Message
@@ -205,7 +204,7 @@ internal class WorkflowEventHandler(
                 conn
             )
             if (rowsInserted == 0) {
-                logger.info { "Failure model $failureId already exists (idempotent insert), skipping" }
+                logger.warn { "Failure model $failureId already exists (idempotent insert), skipping" }
                 return@withTransaction
             }
             // If this workflow has a parent, resume it with the child exception

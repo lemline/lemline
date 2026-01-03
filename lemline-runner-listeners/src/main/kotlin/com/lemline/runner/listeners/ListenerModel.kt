@@ -61,7 +61,7 @@ data class ListenerModel(
     override val id: IDV7,
 
     /** Workflow instance message containing state for resumption */
-    override val instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>,
+    override var instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>,
 
     /** Listen strategy: ONE, ANY, ANY_UNTIL_EXPR, ANY_UNTIL_EVENT, ALL */
     val listenerStrategy: ListenerStrategy,

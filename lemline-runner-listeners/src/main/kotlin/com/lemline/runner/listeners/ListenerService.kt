@@ -87,7 +87,7 @@ class ListenerService {
         val rowsInserted = listenerRepository.insert(listener)
 
         if (rowsInserted == 0) {
-            logger.info { "Listener $listenerId already exists (idempotent insert)" }
+            logger.warn { "Listener $listenerId already exists (idempotent insert)" }
             return false
         }
 
