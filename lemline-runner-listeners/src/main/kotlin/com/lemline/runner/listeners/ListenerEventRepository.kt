@@ -586,10 +586,18 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
      * that has pending events but no event currently being processed, and marks it
      * as ready by setting outbox_delayed_until = NOW.
      *
-     * FIFO ordering is enforced using the sort_key column (auto-increment).
+     * ## FIFO Ordering
      *
-     * Pending events: foreach_output IS NULL AND outbox_delayed_until IS NULL
-     * Processing events: foreach_output IS NULL AND outbox_delayed_until IS NOT NULL
+     * FIFO ordering is enforced using the `sort_key` column (auto-increment).
+     * - **Pending events**: `foreach_completed = FALSE AND outbox_delayed_until IS NULL`
+     * - **Processing events**: `foreach_completed = FALSE AND outbox_delayed_until IS NOT NULL`
+     *
+     * ## Database-Specific Implementation
+     *
+     * Each database uses different syntax for the same logical operation:
+     * - PostgreSQL: CTEs with `DISTINCT ON` for head selection
+     * - MySQL: `UPDATE...JOIN` with derived tables and `MIN(sort_key)`
+     * - H2: `UPDATE...WHERE EXISTS` with correlated subqueries
      *
      * @param limit Maximum number of listeners to process
      * @param connection Optional existing connection to reuse
@@ -599,46 +607,101 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         limit: Int,
         connection: Connection? = null
     ): Int = databaseConfig.withConnection(connection) { conn ->
-        val sql = when (databaseConfig.dbType) {
-            DatabaseType.POSTGRESQL -> markReadyForForeachPostgresql(limit)
-            DatabaseType.MYSQL -> markReadyForForeachMySql(limit)
-            DatabaseType.H2 -> markReadyForForeachH2(limit)
-        }
-
+        val sql = buildMarkReadyForForeachSql(limit)
         conn.prepareStatement(sql).use { stmt ->
             stmt.executeUpdate()
         }
     }
 
-    private fun markReadyForForeachPostgresql(limit: Int): String = """
-        WITH locked_listeners AS (
+    /**
+     * Builds the database-specific SQL for marking events ready for foreach processing.
+     * Extracted for testability and to centralize the database branching.
+     */
+    private fun buildMarkReadyForForeachSql(limit: Int): String = when (databaseConfig.dbType) {
+        DatabaseType.POSTGRESQL -> buildMarkReadyPostgresql(limit)
+        DatabaseType.MYSQL -> buildMarkReadyMySql(limit)
+        DatabaseType.H2 -> buildMarkReadyH2(limit)
+    }
+
+    // ----------------------------------------
+    // Common SQL Fragments
+    // ----------------------------------------
+
+    /** Condition for pending (not yet processing) events */
+    private val pendingEventCondition = "$FOREACH_COMPLETED_COLUMN = FALSE AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NULL"
+
+    /** Condition for events currently being processed */
+    private val processingEventCondition =
+        "$FOREACH_COMPLETED_COLUMN = FALSE AND $OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL"
+
+    /** NULL-safe composite key match for (listener_id, event_id, filter_index) */
+    private val compositeKeyMatch = """
+        t.$LISTENER_ID_COLUMN = h.$LISTENER_ID_COLUMN
+        AND t.$EVENT_ID_COLUMN = h.$EVENT_ID_COLUMN
+        AND (t.$FILTER_INDEX_COLUMN = h.$FILTER_INDEX_COLUMN
+             OR (t.$FILTER_INDEX_COLUMN IS NULL AND h.$FILTER_INDEX_COLUMN IS NULL))
+    """.trimIndent()
+
+    /**
+     * Builds the subquery to find listeners eligible for FIFO processing.
+     * A listener is eligible if it has pending events but no event currently being processed.
+     *
+     * Note: PostgreSQL requires LIMIT after FOR UPDATE, while MySQL/H2 require it before.
+     */
+    private fun buildEligibleListenersSubquery(limit: Int): String {
+        val limitAndLock = when (databaseConfig.dbType) {
+            DatabaseType.POSTGRESQL -> "FOR UPDATE SKIP LOCKED\n        LIMIT $limit"
+            else -> "LIMIT $limit\n        FOR UPDATE SKIP LOCKED"
+        }
+        return """
             SELECT l.$ID_COLUMN AS listener_id
             FROM $LISTENER_TABLE l
             WHERE EXISTS (
-                SELECT 1
-                FROM $tableName p
-                WHERE p.$LISTENER_ID_COLUMN = l.$ID_COLUMN
-                  AND p.$FOREACH_COMPLETED_COLUMN = FALSE
-                  AND p.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                SELECT 1 FROM $tableName p
+                WHERE p.$LISTENER_ID_COLUMN = l.$ID_COLUMN AND p.$pendingEventCondition
             )
             AND NOT EXISTS (
-                SELECT 1
-                FROM $tableName b
-                WHERE b.$LISTENER_ID_COLUMN = l.$ID_COLUMN
-                  AND b.$FOREACH_COMPLETED_COLUMN = FALSE
-                  AND b.$OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
+                SELECT 1 FROM $tableName b
+                WHERE b.$LISTENER_ID_COLUMN = l.$ID_COLUMN AND b.$processingEventCondition
             )
             ORDER BY l.$ID_COLUMN
-            FOR UPDATE SKIP LOCKED
-            LIMIT $limit
+            $limitAndLock
+        """.trimIndent()
+    }
+
+    /**
+     * Builds the subquery to find the head (oldest by sort_key) pending event per listener.
+     * Used by MySQL and H2 which don't support PostgreSQL's DISTINCT ON.
+     *
+     * Note: MySQL aliases the column as 'lid', H2 keeps it as-is for simpler join syntax.
+     */
+    private fun buildHeadPerListenerSubquery(): String {
+        val lidColumn = when (databaseConfig.dbType) {
+            DatabaseType.MYSQL -> "$LISTENER_ID_COLUMN AS lid"
+            else -> LISTENER_ID_COLUMN
+        }
+        return """
+            SELECT e2.$lidColumn, MIN(e2.$SORT_KEY_COLUMN) AS min_sort_key
+            FROM $tableName e2
+            WHERE e2.$pendingEventCondition
+            GROUP BY e2.$LISTENER_ID_COLUMN
+        """.trimIndent()
+    }
+
+    // ----------------------------------------
+    // Database-Specific SQL Builders
+    // ----------------------------------------
+
+    private fun buildMarkReadyPostgresql(limit: Int): String = """
+        WITH locked_listeners AS (
+            ${buildEligibleListenersSubquery(limit)}
         ),
         heads AS (
             SELECT DISTINCT ON (e.$LISTENER_ID_COLUMN)
                    e.$LISTENER_ID_COLUMN, e.$EVENT_ID_COLUMN, e.$FILTER_INDEX_COLUMN
             FROM $tableName e
             JOIN locked_listeners ll ON ll.listener_id = e.$LISTENER_ID_COLUMN
-            WHERE e.$FOREACH_COMPLETED_COLUMN = FALSE
-              AND e.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+            WHERE e.$pendingEventCondition
             ORDER BY e.$LISTENER_ID_COLUMN, e.$SORT_KEY_COLUMN
         )
         UPDATE $tableName t
@@ -646,60 +709,29 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             $OUTBOX_DELAYED_UNTIL_COLUMN = now(),
             $UPDATED_AT_COLUMN = now()
         FROM heads h
-        WHERE t.$LISTENER_ID_COLUMN  = h.$LISTENER_ID_COLUMN
-          AND t.$EVENT_ID_COLUMN     = h.$EVENT_ID_COLUMN
-          AND (t.$FILTER_INDEX_COLUMN = h.$FILTER_INDEX_COLUMN OR (t.$FILTER_INDEX_COLUMN IS NULL AND h.$FILTER_INDEX_COLUMN IS NULL))
+        WHERE $compositeKeyMatch
     """.trimIndent()
 
-    private fun markReadyForForeachMySql(limit: Int): String = """
+    private fun buildMarkReadyMySql(limit: Int): String = """
         UPDATE $tableName t
         JOIN (
             SELECT * FROM (
                 SELECT e.$LISTENER_ID_COLUMN, e.$EVENT_ID_COLUMN, e.$FILTER_INDEX_COLUMN
                 FROM $tableName e
-                JOIN (
-                    -- lock listeners (listener-level SKIP LOCKED)
-                    SELECT l.$ID_COLUMN AS listener_id
-                    FROM $LISTENER_TABLE l
-                    WHERE EXISTS (
-                        SELECT 1
-                        FROM $tableName p
-                        WHERE p.$LISTENER_ID_COLUMN = l.$ID_COLUMN
-                          AND p.$FOREACH_COMPLETED_COLUMN = FALSE
-                          AND p.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                    )
-                    AND NOT EXISTS (
-                        SELECT 1
-                        FROM $tableName b
-                        WHERE b.$LISTENER_ID_COLUMN = l.$ID_COLUMN
-                          AND b.$FOREACH_COMPLETED_COLUMN = FALSE
-                          AND b.$OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
-                    )
-                    ORDER BY l.$ID_COLUMN
-                    LIMIT $limit
-                    FOR UPDATE SKIP LOCKED
-                ) ll ON ll.listener_id = e.$LISTENER_ID_COLUMN
-                JOIN (
-                    -- head per listener: MIN(sort_key) among pending
-                    SELECT e2.$LISTENER_ID_COLUMN AS lid, MIN(e2.$SORT_KEY_COLUMN) AS min_sort_key
-                    FROM $tableName e2
-                    WHERE e2.$FOREACH_COMPLETED_COLUMN = FALSE
-                      AND e2.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                    GROUP BY e2.$LISTENER_ID_COLUMN
-                ) m ON m.lid = e.$LISTENER_ID_COLUMN AND m.min_sort_key = e.$SORT_KEY_COLUMN
-                WHERE e.$FOREACH_COMPLETED_COLUMN = FALSE
-                  AND e.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+                JOIN (${buildEligibleListenersSubquery(limit)}) ll
+                    ON ll.listener_id = e.$LISTENER_ID_COLUMN
+                JOIN (${buildHeadPerListenerSubquery()}) m
+                    ON m.lid = e.$LISTENER_ID_COLUMN AND m.min_sort_key = e.$SORT_KEY_COLUMN
+                WHERE e.$pendingEventCondition
             ) derived_heads
         ) h
-        ON t.$LISTENER_ID_COLUMN  = h.$LISTENER_ID_COLUMN
-        AND t.$EVENT_ID_COLUMN     = h.$EVENT_ID_COLUMN
-        AND (t.$FILTER_INDEX_COLUMN = h.$FILTER_INDEX_COLUMN OR (t.$FILTER_INDEX_COLUMN IS NULL AND h.$FILTER_INDEX_COLUMN IS NULL))
+        ON $compositeKeyMatch
         SET t.$OUTBOX_SCHEDULED_FOR_COLUMN = NOW(6),
             t.$OUTBOX_DELAYED_UNTIL_COLUMN = NOW(6),
             t.$UPDATED_AT_COLUMN = NOW(6)
     """.trimIndent()
 
-    private fun markReadyForForeachH2(limit: Int): String = """
+    private fun buildMarkReadyH2(limit: Int): String = """
         UPDATE $tableName AS t
         SET $OUTBOX_SCHEDULED_FOR_COLUMN = CURRENT_TIMESTAMP,
             $OUTBOX_DELAYED_UNTIL_COLUMN = CURRENT_TIMESTAMP,
@@ -707,41 +739,15 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         WHERE EXISTS (
             SELECT 1
             FROM $tableName e
-            JOIN (
-                -- Find listeners with pending events but no event being processed
-                SELECT l.$ID_COLUMN AS listener_id
-                FROM $LISTENER_TABLE l
-                WHERE EXISTS (
-                    SELECT 1
-                    FROM $tableName p
-                    WHERE p.$LISTENER_ID_COLUMN = l.$ID_COLUMN
-                      AND p.$FOREACH_COMPLETED_COLUMN = FALSE
-                      AND p.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                )
-                AND NOT EXISTS (
-                    SELECT 1
-                    FROM $tableName b
-                    WHERE b.$LISTENER_ID_COLUMN = l.$ID_COLUMN
-                      AND b.$FOREACH_COMPLETED_COLUMN = FALSE
-                      AND b.$OUTBOX_DELAYED_UNTIL_COLUMN IS NOT NULL
-                )
-                ORDER BY l.$ID_COLUMN
-                LIMIT $limit
-                FOR UPDATE SKIP LOCKED
-            ) ll ON ll.listener_id = e.$LISTENER_ID_COLUMN
-            JOIN (
-                -- head per listener: MIN(sort_key) among pending
-                SELECT e2.$LISTENER_ID_COLUMN, MIN(e2.$SORT_KEY_COLUMN) AS min_sort_key
-                FROM $tableName e2
-                WHERE e2.$FOREACH_COMPLETED_COLUMN = FALSE
-                  AND e2.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
-                GROUP BY e2.$LISTENER_ID_COLUMN
-            ) m ON m.$LISTENER_ID_COLUMN = e.$LISTENER_ID_COLUMN AND m.min_sort_key = e.$SORT_KEY_COLUMN
+            JOIN (${buildEligibleListenersSubquery(limit)}) ll
+                ON ll.listener_id = e.$LISTENER_ID_COLUMN
+            JOIN (${buildHeadPerListenerSubquery()}) m
+                ON m.$LISTENER_ID_COLUMN = e.$LISTENER_ID_COLUMN AND m.min_sort_key = e.$SORT_KEY_COLUMN
             WHERE e.$LISTENER_ID_COLUMN = t.$LISTENER_ID_COLUMN
               AND e.$EVENT_ID_COLUMN = t.$EVENT_ID_COLUMN
-              AND (e.$FILTER_INDEX_COLUMN = t.$FILTER_INDEX_COLUMN OR (e.$FILTER_INDEX_COLUMN IS NULL AND t.$FILTER_INDEX_COLUMN IS NULL))
-              AND e.$FOREACH_COMPLETED_COLUMN = FALSE
-              AND e.$OUTBOX_DELAYED_UNTIL_COLUMN IS NULL
+              AND (e.$FILTER_INDEX_COLUMN = t.$FILTER_INDEX_COLUMN
+                   OR (e.$FILTER_INDEX_COLUMN IS NULL AND t.$FILTER_INDEX_COLUMN IS NULL))
+              AND e.$pendingEventCondition
         )
     """.trimIndent()
 }
