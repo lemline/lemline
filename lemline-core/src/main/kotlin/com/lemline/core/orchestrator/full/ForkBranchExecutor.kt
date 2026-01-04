@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.orchestrator
+package com.lemline.core.orchestrator.full
 
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor

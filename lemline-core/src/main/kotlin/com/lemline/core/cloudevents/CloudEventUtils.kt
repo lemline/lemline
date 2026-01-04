@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.orchestrator
+package com.lemline.core.cloudevents
 
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
@@ -9,7 +9,7 @@ import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.EventFilter
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
-import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
+import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
 import java.time.OffsetDateTime
@@ -189,9 +189,9 @@ object CloudEventUtils {
      * @param readAs How to extract event content (DATA, ENVELOPE, RAW)
      * @return The extracted content as JsonElement
      */
-    fun CloudEvent.toJsonElement(readAs: ListenAndReadAs): JsonElement {
+    fun CloudEvent.toJsonElement(readAs: ListenTaskConfiguration.ListenAndReadAs): JsonElement {
         return when (readAs) {
-            ListenAndReadAs.DATA -> {
+            ListenTaskConfiguration.ListenAndReadAs.DATA -> {
                 // Extract just the data payload
                 data?.let {
                     val dataString = String(it.toBytes())
@@ -203,7 +203,7 @@ object CloudEventUtils {
                 } ?: JsonNull
             }
 
-            ListenAndReadAs.ENVELOPE -> {
+            ListenTaskConfiguration.ListenAndReadAs.ENVELOPE -> {
                 // Return the full CloudEvent structure
                 buildJsonObject {
                     put("specversion", JsonPrimitive(specVersion.toString()))
@@ -225,7 +225,7 @@ object CloudEventUtils {
                 }
             }
 
-            ListenAndReadAs.RAW -> {
+            ListenTaskConfiguration.ListenAndReadAs.RAW -> {
                 // Return raw bytes as string
                 data?.let { JsonPrimitive(String(it.toBytes())) } ?: JsonNull
             }
