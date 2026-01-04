@@ -1,0 +1,192 @@
+// SPDX-License-Identifier: BUSL-1.1
+package com.lemline.core.orchestrator
+
+import com.lemline.common.logger.logger
+import com.lemline.common.values.NodePosition
+import com.lemline.core.errors.InternalException
+import com.lemline.core.orchestrator.CloudEventUtils.toJsonElement
+import com.lemline.core.processors.EventFilter
+import com.lemline.core.processors.ListenStrategy
+import com.lemline.core.processors.UntilCondition
+import com.lemline.core.states.NodeStack
+import com.lemline.core.states.WorkflowCommand
+import com.lemline.core.states.WorkflowEvent
+import io.cloudevents.CloudEvent
+import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
+import kotlin.time.ExperimentalTime
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.channels.ReceiveChannel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.produceIn
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+
+@ExperimentalTime
+internal class NodeStackHolder(initial: NodeStack) {
+    var value: NodeStack = initial
+}
+
+@ExperimentalTime
+internal object ListenEventCollector {
+
+    private val logger = logger()
+
+    suspend fun collect(
+        event: WorkflowEvent.ListenStarted,
+        eventFlow: Flow<CloudEvent>,
+        foreachProcessor: (suspend (JsonElement, Int) -> JsonElement)?,
+    ): WorkflowCommand {
+        val processEvent: suspend (CloudEvent, Int) -> JsonElement = { cloudEvent, index ->
+            val eventJson = cloudEvent.toJsonElement(event.config.readAs)
+            foreachProcessor?.invoke(eventJson, index) ?: eventJson
+        }
+
+        val outputs = when (event.config.strategy) {
+            ListenStrategy.ONE -> collectFirst(eventFlow, event.config.filters, processEvent)
+            ListenStrategy.ANY -> collectAny(eventFlow, event, processEvent)
+            ListenStrategy.ALL -> collectAll(eventFlow, event.config.filters, processEvent)
+        }
+
+        return event.resumeCompleted(JsonArray(outputs))
+    }
+
+    private suspend fun collectFirst(
+        eventFlow: Flow<CloudEvent>,
+        filters: List<EventFilter>,
+        processEvent: suspend (CloudEvent, Int) -> JsonElement,
+    ): List<JsonElement> {
+        val cloudEvent = eventFlow
+            .filter { CloudEventUtils.matchesFilters(it, filters) }
+            .first()
+        return listOf(processEvent(cloudEvent, 0))
+    }
+
+    private suspend fun collectAny(
+        eventFlow: Flow<CloudEvent>,
+        event: WorkflowEvent.ListenStarted,
+        processEvent: suspend (CloudEvent, Int) -> JsonElement,
+    ): List<JsonElement> = when (val until = event.config.until) {
+        null -> collectFirst(eventFlow, event.config.filters, processEvent)
+        is UntilCondition.Expression -> collectUntilExpression(
+            eventFlow, event.config.filters, until.expression, event.config.readAs, processEvent
+        )
+
+        is UntilCondition.Event -> collectUntilTermination(
+            eventFlow, event.config.filters, until.filter, event.config.readAs, processEvent
+        )
+    }
+
+    private suspend fun collectAll(
+        eventFlow: Flow<CloudEvent>,
+        filters: List<EventFilter>,
+        processEvent: suspend (CloudEvent, Int) -> JsonElement,
+    ): List<JsonElement> = filters.mapIndexed { index, filter ->
+        val cloudEvent = eventFlow
+            .filter { CloudEventUtils.matchesFilters(it, listOf(filter)) }
+            .first()
+        processEvent(cloudEvent, index)
+    }
+
+    private suspend fun collectUntilExpression(
+        eventFlow: Flow<CloudEvent>,
+        filters: List<EventFilter>,
+        expression: String,
+        readAs: ListenAndReadAs,
+        processEvent: suspend (CloudEvent, Int) -> JsonElement,
+    ): List<JsonElement> {
+        val rawEvents = mutableListOf<JsonElement>()
+        val outputs = mutableListOf<JsonElement>()
+
+        val channel = eventFlow.filtered(filters)
+        try {
+            for (cloudEvent in channel) {
+                rawEvents.add(cloudEvent.toJsonElement(readAs))
+                outputs.add(processEvent(cloudEvent, outputs.size))
+
+                logger.debug { "Accumulated event (count=${rawEvents.size}): type=${cloudEvent.type}" }
+
+                if (CloudEventUtils.evaluateExpressionAsBoolean(expression, JsonArray(rawEvents))) {
+                    logger.debug { "Until expression evaluated to true after ${rawEvents.size} events" }
+                    break
+                }
+            }
+        } finally {
+            channel.cancel()
+        }
+        return outputs
+    }
+
+    private suspend fun collectUntilTermination(
+        eventFlow: Flow<CloudEvent>,
+        filters: List<EventFilter>,
+        terminationFilter: EventFilter,
+        readAs: ListenAndReadAs,
+        processEvent: suspend (CloudEvent, Int) -> JsonElement,
+    ): List<JsonElement> {
+        val outputs = mutableListOf<JsonElement>()
+
+        val channel = eventFlow.toChannel()
+        try {
+            for (cloudEvent in channel) {
+                if (CloudEventUtils.matchesFilters(cloudEvent, listOf(terminationFilter))) {
+                    logger.debug { "Termination event received: type=${cloudEvent.type}, returning ${outputs.size} accumulated events" }
+                    break
+                }
+                if (CloudEventUtils.matchesFilters(cloudEvent, filters)) {
+                    outputs.add(processEvent(cloudEvent, outputs.size))
+                    logger.debug { "Accumulated event (count=${outputs.size}): type=${cloudEvent.type}" }
+                }
+            }
+        } finally {
+            channel.cancel()
+        }
+        return outputs
+    }
+
+    private suspend fun Flow<CloudEvent>.filtered(filters: List<EventFilter>): ReceiveChannel<CloudEvent> {
+        val scope = CoroutineScope(currentCoroutineContext())
+        return this.filter { CloudEventUtils.matchesFilters(it, filters) }.produceIn(scope)
+    }
+
+    private suspend fun Flow<CloudEvent>.toChannel(): ReceiveChannel<CloudEvent> {
+        val scope = CoroutineScope(currentCoroutineContext())
+        return this.produceIn(scope)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun createForeachProcessor(
+        foreachPosition: NodePosition,
+        stackHolder: NodeStackHolder,
+        resumeFn: suspend (WorkflowCommand) -> WorkflowEvent.Outcome,
+    ): (suspend (JsonElement, Int) -> JsonElement) {
+
+        return { eventData, iterationIndex ->
+            logger.debug { "Processing foreach iteration $iterationIndex with event: $eventData" }
+
+            val foreachCommand = WorkflowCommand.ResumeFromTask(
+                nodeStack = stackHolder.value,
+                nodePosition = foreachPosition,
+                rawInput = eventData,
+            )
+
+            when (val outcome = resumeFn(foreachCommand)) {
+                is WorkflowEvent.ForEachCompleted -> {
+                    stackHolder.value = outcome.nodeStack
+                    logger.debug { "Foreach iteration $iterationIndex completed with output: ${outcome.output}" }
+                    outcome.output
+                }
+
+                is WorkflowEvent.WorkflowFailed -> {
+                    stackHolder.value = outcome.nodeStack
+                    logger.debug { "Foreach iteration $iterationIndex failed with error: ${outcome.error}" }
+                    throw InternalException(outcome.error)
+                }
+
+                else -> throw IllegalStateException("Unexpected outcome from foreach iteration: $outcome")
+            }
+        }
+    }
+}
