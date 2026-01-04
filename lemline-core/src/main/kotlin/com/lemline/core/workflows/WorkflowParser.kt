@@ -2,14 +2,15 @@
 package com.lemline.core.workflows
 
 import com.lemline.common.values.NodePosition
+import com.lemline.common.values.Token.BRANCHES
 import com.lemline.common.values.Token.CATCH
 import com.lemline.common.values.Token.DO
 import com.lemline.common.values.Token.FOREACH
-import com.lemline.common.values.Token.BRANCHES
 import com.lemline.common.values.Token.FORK
 import com.lemline.common.values.Token.SUBSCRIPTION
 import com.lemline.common.values.Token.TRY
 import com.lemline.common.values.Token.WITH
+import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.workflows.WorkflowParser.parseChildren
@@ -121,6 +122,7 @@ object WorkflowParser {
             is TryTask -> parseTryChildren(node)
             is ForkTask -> parseForkChildren(node)
             is ListenTask -> parseListenChildren(node)
+            is ForeachTask -> parseForeachChildren(node)
             is CallAsyncAPI -> parseCallAsyncAPIChildren(node)
             else -> null
         }
@@ -287,30 +289,51 @@ val Node<ForkTask>.branches: List<Node<*>>
 // ListenTask Children
 // ============================================================
 
-/**
- * ListenTask has optional foreach DoTask child.
- */
 private fun parseListenChildren(node: Node<*>): List<Node<*>>? {
     val task = node.task as ListenTask
-    return task.foreach?.`do`?.let {
-        listOf(
-            Node(
-                position = node.position.addToken(FOREACH),
-                task = DoTask(it),
-                name = "$FOREACH",
-                parent = node,
+    val foreach = task.foreach
+    val doTasks = foreach?.`do` ?: return null
+
+    return listOf(
+        Node(
+            position = node.position.addToken(FOREACH),
+            task = ForeachTask(
+                itemVar = foreach.item ?: "item",
+                indexVar = foreach.at ?: "index",
+                doTask = DoTask(doTasks),
+                foreachOutput = foreach.output,
+                foreachExport = foreach.export,
             ),
-        )
-    }
+            name = "$FOREACH",
+            parent = node,
+        ),
+    )
 }
 
-/**
- * ListenTask children: optional foreach DoTask.
- */
 @get:JvmName("getForeachBlockForListenTask")
-val Node<ListenTask>.foreachBlock: Node<DoTask>?
+val Node<ListenTask>.foreachBlock: Node<ForeachTask>?
     @Suppress("UNCHECKED_CAST")
-    get() = children?.firstOrNull() as? Node<DoTask>
+    get() = children?.firstOrNull() as? Node<ForeachTask>
+
+// ============================================================
+// ForeachTask Children
+// ============================================================
+
+private fun parseForeachChildren(node: Node<*>): List<Node<*>> {
+    val task = node.task as ForeachTask
+    return listOf(
+        Node(
+            position = node.position.addToken(DO),
+            task = task.doTask,
+            name = "$DO",
+            parent = node,
+        ),
+    )
+}
+
+val Node<ForeachTask>.foreachDoBlock: Node<DoTask>
+    @Suppress("UNCHECKED_CAST")
+    get() = children!!.first() as Node<DoTask>
 
 // ============================================================
 // CallAsyncAPI Children

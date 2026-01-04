@@ -58,7 +58,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 
-
 /**
  * Full orchestrator for synchronous workflow execution.
  *
@@ -66,7 +65,7 @@ import kotlinx.serialization.json.buildJsonObject
  * (activities, waits, forks, child workflows) directly without external coordination.
  */
 @ExperimentalTime
-internal object FullOrchestrator {
+object FullOrchestrator {
 
     private val logger = logger()
 
@@ -116,7 +115,7 @@ internal object FullOrchestrator {
         return when (serdeEvent) {
             is WorkflowEvent.ActivityStarted -> resume(
                 workflow = workflow,
-                command = handle(serdeEvent, activityExecutor),
+                command = handleActivityStarted(serdeEvent, activityExecutor),
                 serde = serde,
                 activityExecutor = activityExecutor,
                 cloudEventHook = cloudEventHook,
@@ -125,7 +124,7 @@ internal object FullOrchestrator {
 
             is WorkflowEvent.EmitStarted -> resume(
                 workflow = workflow,
-                command = handle(serdeEvent, cloudEventHook),
+                command = handleEmitStarted(serdeEvent, cloudEventHook),
                 serde = serde,
                 activityExecutor = activityExecutor,
                 cloudEventHook = cloudEventHook,
@@ -134,7 +133,7 @@ internal object FullOrchestrator {
 
             is WorkflowEvent.WaitStarted -> resume(
                 workflow = workflow,
-                command = handle(serdeEvent),
+                command = handleWaitStarted(serdeEvent),
                 serde = serde,
                 activityExecutor = activityExecutor,
                 cloudEventHook = cloudEventHook,
@@ -143,7 +142,7 @@ internal object FullOrchestrator {
 
             is WorkflowEvent.TaskScheduled -> resume(
                 workflow = workflow,
-                command = handle(serdeEvent),
+                command = handleTaskScheduled(serdeEvent),
                 serde = serde,
                 activityExecutor = activityExecutor,
                 cloudEventHook = cloudEventHook,
@@ -152,7 +151,7 @@ internal object FullOrchestrator {
 
             is WorkflowEvent.TaskRetryScheduled -> resume(
                 workflow = workflow,
-                command = handle(serdeEvent),
+                command = handleTaskRetryScheduled(serdeEvent),
                 serde = serde,
                 activityExecutor = activityExecutor,
                 cloudEventHook = cloudEventHook,
@@ -161,7 +160,7 @@ internal object FullOrchestrator {
 
             is WorkflowEvent.RunWorkflowStarted -> resume(
                 workflow = workflow,
-                command = handle(serdeEvent, serde, activityExecutor, cloudEventHook, lifecycleHook),
+                command = handleRunWorkflowStarted(serdeEvent, serde, activityExecutor, cloudEventHook, lifecycleHook),
                 serde = serde,
                 activityExecutor = activityExecutor,
                 cloudEventHook = cloudEventHook,
@@ -170,7 +169,14 @@ internal object FullOrchestrator {
 
             is WorkflowEvent.ForkStarted -> resume(
                 workflow = workflow,
-                command = handle(workflow, serdeEvent, serde, activityExecutor, cloudEventHook, lifecycleHook),
+                command = handleForkStarted(
+                    workflow,
+                    serdeEvent,
+                    serde,
+                    activityExecutor,
+                    cloudEventHook,
+                    lifecycleHook
+                ),
                 serde = serde,
                 activityExecutor = activityExecutor,
                 cloudEventHook = cloudEventHook,
@@ -179,7 +185,14 @@ internal object FullOrchestrator {
 
             is WorkflowEvent.ListenStarted -> resume(
                 workflow = workflow,
-                command = handle(workflow, serdeEvent, serde, activityExecutor, cloudEventHook, lifecycleHook),
+                command = handleListenStarted(
+                    workflow,
+                    serdeEvent,
+                    serde,
+                    activityExecutor,
+                    cloudEventHook,
+                    lifecycleHook
+                ),
                 serde = serde,
                 activityExecutor = activityExecutor,
                 cloudEventHook = cloudEventHook,
@@ -197,7 +210,7 @@ internal object FullOrchestrator {
      * Activities are executed via the ActivityExecutor interface, which allows for
      * different implementations (real I/O vs mocks for testing).
      */
-    private suspend fun handle(
+    private suspend fun handleActivityStarted(
         event: WorkflowEvent.ActivityStarted,
         activityExecutor: ActivityExecutor
     ): WorkflowCommand {
@@ -216,7 +229,7 @@ internal object FullOrchestrator {
      * Handles a retry event by delaying execution until the scheduled retry time
      * and then resuming the workflow from the specified task.
      */
-    private suspend fun handle(
+    private suspend fun handleTaskRetryScheduled(
         event: WorkflowEvent.TaskRetryScheduled
     ): WorkflowCommand {
         val delayDuration = event.retryAt - Clock.System.now()
@@ -229,7 +242,7 @@ internal object FullOrchestrator {
     /**
      * Handles an EmitStarted event by building a CloudEvent and emitting via CloudEventHook.
      */
-    private suspend fun handle(
+    private suspend fun handleEmitStarted(
         event: WorkflowEvent.EmitStarted,
         cloudEventHook: CloudEventHook
     ): WorkflowCommand {
@@ -272,17 +285,17 @@ internal object FullOrchestrator {
      */
     private class ForeachContext(
         val workflow: Workflow,
-        val listenEvent: WorkflowEvent.ListenStarted,
+        val listenStarted: WorkflowEvent.ListenStarted,
         val serde: Boolean,
         val activityExecutor: ActivityExecutor,
         val cloudEventHook: CloudEventHook,
         val lifecycleHook: LifecycleEventHook,
     ) {
-        var currentNodeStack: NodeStack = listenEvent.nodeStack
+        var currentNodeStack: NodeStack = listenStarted.nodeStack
     }
 
     @Suppress("UNCHECKED_CAST")
-    private suspend fun handle(
+    private suspend fun handleListenStarted(
         workflow: Workflow,
         event: WorkflowEvent.ListenStarted,
         serde: Boolean,
@@ -392,26 +405,19 @@ internal object FullOrchestrator {
                     }
                 }
             }
-        } catch (e: InternalException) {
-            // Error from foreach.do - convert to ResumeWithFailedTask like fork does
-            // This lets the error flow through normal workflow error handling (try/catch, etc.)
-            // Use the updated nodeStack from foreachCtx if available (preserves context from previous iterations)
-            logger.error { "Listen foreach failed: error=$e" }
-            WorkflowCommand.ResumeWithFailedTask(
-                nodeStack = foreachCtx?.currentNodeStack ?: event.nodeStack,
-                error = InternalException.Error.from(e, listenNode.position)
-            )
         } catch (_: TimeoutCancellationException) {
-            logger.error { "Listen timed out waiting for matching events: filters=${event.config.filters}" }
-            event.resumeFailed(
-                InternalException.Error.from(
-                    IllegalStateException("Listen timeout: no matching CloudEvent received within ${timeoutMillis}ms"),
-                    event.nodePosition
-                )
+            val e = IllegalStateException("Listen timeout: no matching CloudEvent received within ${timeoutMillis}ms")
+            logger.debug(e) { "Listen failed" }
+            WorkflowCommand.ResumeWithFailedTask(
+                nodeStack = foreachCtx!!.currentNodeStack.popUntil(event.nodePosition),
+                error = InternalException.Error.from(e, event.nodePosition)
             )
-        } catch (e: Exception) {
-            logger.error(e) { "Listen failed" }
-            event.resumeFailed(InternalException.Error.from(e, event.nodePosition))
+        } catch (e: InternalException) {
+            logger.debug(e) { "Listen failed" }
+            WorkflowCommand.ResumeWithFailedTask(
+                nodeStack = foreachCtx!!.currentNodeStack.popUntil(event.nodePosition),
+                error = InternalException.Error.from(e, event.nodePosition),
+            )
         }
     }
 
@@ -439,9 +445,9 @@ internal object FullOrchestrator {
         logger.debug { "Processing foreach iteration $iterationIndex with event: $eventData" }
 
         @Suppress("UNCHECKED_CAST")
-        val listenNode = ctx.workflow.getNode(ctx.listenEvent.nodePosition) as Node<ListenTask>
+        val listenNode = ctx.workflow.getNode(ctx.listenStarted.nodePosition) as Node<ListenTask>
         val foreachPosition = listenNode.foreachBlock?.position
-            ?: error("Listen task at ${ctx.listenEvent.nodePosition} has no foreach block")
+            ?: error("Listen task at ${ctx.listenStarted.nodePosition} has no foreach block")
 
         val foreachCommand = WorkflowCommand.ResumeFromTask(
             nodeStack = ctx.currentNodeStack,
@@ -460,8 +466,7 @@ internal object FullOrchestrator {
         )
 
         return when (outcome) {
-            is WorkflowEvent.ListenForEachCompleted -> {
-                // Update the nodeStack for the next iteration to preserve context changes
+            is WorkflowEvent.ForEachCompleted -> {
                 ctx.currentNodeStack = outcome.nodeStack
                 val iterationOutput = outcome.output
                 logger.debug { "Foreach iteration $iterationIndex completed with output: $iterationOutput" }
@@ -469,14 +474,12 @@ internal object FullOrchestrator {
             }
 
             is WorkflowEvent.WorkflowFailed -> {
-                // Error occurred in foreach.do - throw so the listen handler can catch it
-                // and create ResumeWithFailedTask (like fork does)
+                ctx.currentNodeStack = outcome.nodeStack
                 logger.debug { "Foreach iteration $iterationIndex failed with error: ${outcome.error}" }
                 throw InternalException(outcome.error)
             }
 
             else -> {
-                // Unexpected outcome - this shouldn't happen in normal execution
                 throw IllegalStateException("Unexpected outcome from foreach iteration: $outcome")
             }
         }
@@ -617,7 +620,7 @@ internal object FullOrchestrator {
      * Handles a `RunWorkflowStarted` event by initiating the corresponding child workflow either
      * synchronously or asynchronously, depending on its configuration.
      */
-    private suspend fun handle(
+    private suspend fun handleRunWorkflowStarted(
         event: WorkflowEvent.RunWorkflowStarted,
         serde: Boolean,
         activityExecutor: ActivityExecutor,
@@ -670,13 +673,13 @@ internal object FullOrchestrator {
     /**
      * Handles the provided `TaskScheduled` event by resuming the workflow from the next task.
      */
-    private fun handle(event: WorkflowEvent.TaskScheduled): WorkflowCommand = event.resume()
+    private fun handleTaskScheduled(event: WorkflowEvent.TaskScheduled): WorkflowCommand = event.resume()
 
     /**
      * Handles the provided `WaitStarted` event by waiting until the specified time
      * and then resumes the workflow from the started task.
      */
-    private suspend fun handle(event: WorkflowEvent.WaitStarted): WorkflowCommand {
+    private suspend fun handleWaitStarted(event: WorkflowEvent.WaitStarted): WorkflowCommand {
         val delayDuration = event.config.waitUntil - Clock.System.now()
         logger.debug { "Waiting for $delayDuration" }
         if (delayDuration > Duration.ZERO) delay(delayDuration)
@@ -690,7 +693,7 @@ internal object FullOrchestrator {
      * operation (compete or cooperative), executing the corresponding branches, and resuming
      * the workflow with the computed output.
      */
-    private suspend fun handle(
+    private suspend fun handleForkStarted(
         workflow: Workflow,
         event: WorkflowEvent.ForkStarted,
         serde: Boolean,

@@ -23,11 +23,11 @@ import com.lemline.core.states.ForState
 import com.lemline.core.states.ForkState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.NodeState
-import com.lemline.core.states.StackFrame
 import com.lemline.core.states.RaiseState
 import com.lemline.core.states.RootState
 import com.lemline.core.states.RunState
 import com.lemline.core.states.SetState
+import com.lemline.core.states.StackFrame
 import com.lemline.core.states.SwitchState
 import com.lemline.core.states.TaskState
 import com.lemline.core.states.TryState
@@ -218,7 +218,7 @@ fun NodeStack.Companion.random(): NodeStack {
     val childPosition = rootPosition.addName(String.random())
     val grandchildPosition = childPosition.addName(String.random())
 
-    return NodeStack(
+    return NodeStack.fromFrames(
         listOf(
             StackFrame(rootPosition, RootState.random()),
             StackFrame(childPosition, NodeState.random()),

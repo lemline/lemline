@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.orchestrator.StepByStepOrchestrator.completeTask
 import com.lemline.core.orchestrator.StepByStepOrchestrator.processInternalWorkflowException
@@ -20,9 +21,9 @@ import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.ActivityStarted
 import com.lemline.core.states.WorkflowEvent.EmitStarted
+import com.lemline.core.states.WorkflowEvent.ForEachCompleted
 import com.lemline.core.states.WorkflowEvent.ForkBranchFailed
 import com.lemline.core.states.WorkflowEvent.ForkStarted
-import com.lemline.core.states.WorkflowEvent.ListenForEachCompleted
 import com.lemline.core.states.WorkflowEvent.ListenStarted
 import com.lemline.core.states.WorkflowEvent.Outcome
 import com.lemline.core.states.WorkflowEvent.RunWorkflowStarted
@@ -36,7 +37,6 @@ import com.lemline.core.tasks.toKotlin
 import com.lemline.core.workflows.getNode
 import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.ForkTask
-import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.TryTask
 import io.serverlessworkflow.api.types.Workflow
 import kotlin.time.Clock
@@ -214,7 +214,7 @@ object StepByStepOrchestrator {
             is EmitStarted -> event
             is WaitStarted -> event
             is ListenStarted -> event
-            is ListenForEachCompleted -> event
+            is ForEachCompleted -> event
             is TaskRetryScheduled -> event
             is RunWorkflowStarted -> event
             is ForkStarted -> event
@@ -412,11 +412,11 @@ object StepByStepOrchestrator {
      * Check if a node is an error boundary.
      * Error boundaries prevent errors from propagating beyond them:
      * - ForkTask: errors in branches are handled by the fork
-     * - ListenTask with foreach: errors in foreach.do are handled by the listen handler
+     * - ForeachTask: errors in foreach.do are handled by the listen handler
      */
     private fun isErrorBoundary(node: Node<*>): Boolean = when (val task = node.task) {
         is ForkTask -> true
-        is ListenTask -> task.foreach != null
+        is ForeachTask -> true
         else -> false
     }
 

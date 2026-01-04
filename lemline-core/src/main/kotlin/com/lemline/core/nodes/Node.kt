@@ -55,6 +55,7 @@ data class Node<T : TaskBase>(val position: NodePosition, val task: T, val name:
         is RootTask,
         is DoTask,
         is ForTask,
+        is ForeachTask,
         is TryTask,
         is ForkTask,
         is RaiseTask,

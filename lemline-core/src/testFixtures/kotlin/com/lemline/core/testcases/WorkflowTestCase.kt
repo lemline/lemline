@@ -3,6 +3,8 @@ package com.lemline.core.testcases
 
 import com.lemline.core.activities.mock.MockConfiguration
 import io.cloudevents.CloudEvent
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
@@ -45,7 +47,8 @@ data class WorkflowTestCase(
     val tags: Set<String> = emptySet(),
     val dependencies: List<WorkflowDependency> = emptyList(),
     val mockConfig: MockConfiguration = MockConfiguration.empty(),
-    val cloudEvents: List<CloudEvent> = emptyList()
+    val cloudEvents: List<CloudEvent> = emptyList(),
+    val timeout: Duration = 5.seconds
 ) {
     companion object
 }

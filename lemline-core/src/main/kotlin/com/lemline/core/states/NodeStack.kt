@@ -97,8 +97,8 @@ class NodeStack internal constructor(
         NodeStack(listOf(StackFrame(NodePosition.root, newRoot)) + frames.drop(1))
 
     /** Push a new frame onto the stack.*/
-    fun push(position: NodePosition, state: NodeState): NodeStack =
-        NodeStack(frames + StackFrame(position, state, 0))
+    fun push(position: NodePosition, state: NodeState, executionIndex: Int = 0): NodeStack =
+        NodeStack(frames + StackFrame(position, state, executionIndex))
 
     /** Pop the top frame and increment the new top frame's executionIndex.*/
     fun pop(): NodeStack = popFrames(frames.dropLast(1))
@@ -141,23 +141,6 @@ class NodeStack internal constructor(
                 override val value: NodeState = frame.state
             })
         }
-
-    val currentExecutionIndex: Int
-        get() = frames.lastOrNull()?.executionIndex ?: 0
-
-    fun incrementCurrentExecutionIndex(): NodeStack {
-        if (frames.isEmpty()) return this
-        val currentFrame = frames.last()
-        val newFrame = currentFrame.copy(executionIndex = currentFrame.executionIndex + 1)
-        return NodeStack(frames.dropLast(1) + newFrame)
-    }
-
-    fun withCurrentExecutionIndex(index: Int): NodeStack {
-        if (frames.isEmpty()) return this
-        val currentFrame = frames.last()
-        val newFrame = currentFrame.copy(executionIndex = index)
-        return NodeStack(frames.dropLast(1) + newFrame)
-    }
 
     internal fun <R> mapFrames(transform: (StackFrame) -> R): List<R> = frames.map(transform)
 

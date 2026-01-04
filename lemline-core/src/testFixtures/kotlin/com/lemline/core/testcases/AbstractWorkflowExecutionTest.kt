@@ -3,7 +3,6 @@ package com.lemline.core.testcases
 
 import io.kotest.core.spec.style.FunSpec
 import kotlinx.serialization.json.JsonElement
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * Abstract base class for workflow execution tests.
@@ -52,7 +51,7 @@ abstract class AbstractWorkflowExecutionTest(
                 }
 
                 if (testConfig != null) {
-                    test(case.name).config(timeout = 5.seconds) {
+                    test(case.name).config(timeout = case.timeout) {
                         val executor = createExecutor()
                         val result = executor.execute(
                             yaml = case.yaml,

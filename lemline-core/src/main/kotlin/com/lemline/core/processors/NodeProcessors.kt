@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.processors
 
+import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.states.NodeState
@@ -43,6 +44,7 @@ object NodeProcessors {
         is RootTask -> RootProcessor(node as Node<RootTask>)
         is DoTask -> DoProcessor(node as Node<DoTask>)
         is ForTask -> ForProcessor(node as Node<ForTask>)
+        is ForeachTask -> ForeachProcessor(node as Node<ForeachTask>)
         is SetTask -> SetProcessor(node as Node<SetTask>)
         is SwitchTask -> SwitchProcessor(node as Node<SwitchTask>)
         is TryTask -> TryProcessor(node as Node<TryTask>)

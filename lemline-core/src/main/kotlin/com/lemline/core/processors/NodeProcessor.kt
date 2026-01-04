@@ -12,6 +12,7 @@ import com.lemline.core.errors.WorkflowErrorType.EXPRESSION
 import com.lemline.core.errors.WorkflowErrorType.VALIDATION
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.lifecycleevents.LifecycleEventHook
+import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
 import com.lemline.core.processors.scope.Scope
@@ -23,8 +24,8 @@ import com.lemline.core.schemas.SchemaValidator
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.NodeState
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.core.states.WorkflowEvent.ForEachCompleted
 import com.lemline.core.states.WorkflowEvent.ForkBranchCompleted
-import com.lemline.core.states.WorkflowEvent.ListenForEachCompleted
 import com.lemline.core.states.WorkflowEvent.TaskScheduled
 import com.lemline.core.states.WorkflowEvent.WorkflowCompleted
 import com.lemline.core.tasks.toKotlin
@@ -34,7 +35,6 @@ import io.serverlessworkflow.api.types.FlowDirective
 import io.serverlessworkflow.api.types.FlowDirectiveEnum
 import io.serverlessworkflow.api.types.ForkTask
 import io.serverlessworkflow.api.types.InputFrom
-import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.OutputAs
 import io.serverlessworkflow.api.types.SchemaUnion
 import io.serverlessworkflow.api.types.SubflowInput
@@ -166,10 +166,8 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // Update context with transformed input
         scope = scope.withTransformedInput(transformedInput)
 
-        // state creation
         val nodeState = stateWhenEnteringFromParent(transformedInput, scope)
 
-        // push the state to the stack
         val updatedStack = nodeStack.push(node.position, nodeState)
 
         // get the next node and an updated state for the current node
@@ -431,8 +429,8 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // Are we now completing a fork branch?
         forkBranchCompleted(nodeStack, nextNode, nextInput)?.let { return it }
 
-        // Are we now completing a listen foreach iteration?
-        listenForEachCompleted(nodeStack, nextNode, nextInput)?.let { return it }
+        // Are we now completing a foreach subscription?
+        forEachCompleted(nodeStack, nextNode, nextInput)?.let { return it }
 
         // Next Task
         return TaskScheduled(
@@ -477,19 +475,19 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
      * the provided node represents a `ListenTask` and whether the node is being re-entered with an existing
      * state. If these conditions are met, it creates and returns a `ListenForEachCompleted` event.
      */
-    private fun listenForEachCompleted(
+    private fun forEachCompleted(
         nodeStack: NodeStack,
         nextNode: Node<*>,
         nextInput: JsonElement,
-    ): ListenForEachCompleted? {
+    ): ForEachCompleted? {
         val nextState = nodeStack[nextNode.position]
 
-        // if nextNode is not a listen task, or if we are entering for the first time
-        if (nextNode.task !is ListenTask || nextState == null) return null
+        // if nextNode is not a foreach task, or if we are entering for the first time
+        if (nextNode.task !is ForeachTask || nextState == null) return null
 
-        return ListenForEachCompleted(
+        return ForEachCompleted(
             nodeStack = nodeStack,
-            output = nextInput
+            output = nextInput,
         )
     }
 

@@ -138,10 +138,10 @@ sealed class WorkflowEvent : WorkflowState() {
          * Extracts the associated value from the [WorkflowEvent.Outcome] based on its type.
          */
 
-        internal fun value(): JsonElement = when (this) {
+        fun value(): JsonElement = when (this) {
             is WorkflowCompleted -> output
             is ForkBranchCompleted -> output
-            is ListenForEachCompleted -> output
+            is ForEachCompleted -> output
             is WorkflowFailed -> throw exception
             is ForkBranchFailed -> throw exception
         }
@@ -498,15 +498,13 @@ sealed class WorkflowEvent : WorkflowState() {
      * @see ListenStarted for the initial listen task event
      */
     @Serializable
-    @SerialName("listenForEachCompleted")
-    data class ListenForEachCompleted(
+    @SerialName("forEachCompleted")
+    data class ForEachCompleted(
         override val nodeStack: NodeStack,
-        /** Output from foreach.do tasks for this iteration */
-        val output: JsonElement
+        val output: JsonElement,
     ) : Outcome() {
 
-        @Transient
-        override val nodePosition = nodeStack.currentPosition // Listen position
+        override val nodePosition by lazy { nodeStack.currentPosition }
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
