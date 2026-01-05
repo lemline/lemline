@@ -21,13 +21,13 @@ data class ForkBranchModel(
     val name: String,
 
     /** Branch execution output as JSON, null until completed */
-    var output: String?,
+    var output: String? = null,
 
     /** Timestamp when the branch completed */
-    override var completedAt: Instant?,
+    override var completedAt: Instant? = null,
 
     /** Timestamp when the branch failed */
-    var failedAt: Instant?,
+    var failedAt: Instant? = null,
 
     /** High-level categorization of the failure reason, null if no failure */
     var errorReason: String? = null,

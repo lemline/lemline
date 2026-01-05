@@ -162,27 +162,6 @@ class ForkRepository : CrudRepository<ForkModel>(),
     }
 
     /**
-     * Find fork by workflow ID and position.
-     */
-    suspend fun findByWorkflowIdAndPosition(
-        workflowId: WorkflowId,
-        forkPosition: NodePosition,
-        connection: Connection? = null
-    ): ForkModel? = databaseConfig.withConnection(connection) { conn ->
-        conn.prepareStatement(findByWorkflowIdAndPositionSql).use { stmt ->
-            setIDV7(stmt, 1, workflowId.value)
-            stmt.setString(2, forkPosition.toString())
-            stmt.executeQuery().use { rs ->
-                if (rs.next()) createModel(rs) else null
-            }
-        }
-    }
-
-    private val findByWorkflowIdAndPositionSql by lazy {
-        "SELECT * FROM $tableName WHERE $WORKFLOW_ID_COLUMN = ? AND $FORK_POSITION_COLUMN = ? LIMIT 1"
-    }
-
-    /**
      * Update a fork branch (typically to mark it as completed or failed).
      * Delegates to [ForkBranchRepository.update].
      */

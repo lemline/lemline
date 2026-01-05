@@ -3,10 +3,10 @@ package com.lemline.runner.forks
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
-import com.lemline.common.values.IDV7
+import com.lemline.core.nodes.Node
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
-import com.lemline.core.workflows.WorkflowCache
+import com.lemline.core.workflows.WorkflowCache.getWorkflow
 import com.lemline.core.workflows.branches
 import com.lemline.core.workflows.getNode
 import com.lemline.runner.common.config.DatabaseConfig
@@ -56,30 +56,21 @@ class ForkService {
      * @return true if the fork was created, false if it already existed (idempotent)
      */
     suspend fun handleForkStarted(instance: InstanceMessage<WorkflowEvent.ForkStarted>): Boolean {
-        val state = instance.workflowState
-
-        // Derive fork model ID from position + step
-        val forkId = instance.workflowState.nodeStack.deriveIdempotentId("-fork")
+        val forkStarted = instance.workflowState
 
         // Get fork node from workflow definition to extract fork configuration
         val workflowInfo = instance.workflowInfo
-        val workflow = WorkflowCache.getWorkflow(
-            namespace = workflowInfo.namespace,
-            name = workflowInfo.name,
-            version = workflowInfo.version
-        )
+        val workflow = workflowInfo.getWorkflow()
             ?: error("Workflow definition not found: ${workflowInfo.namespace}/${workflowInfo.name}/${workflowInfo.version}")
 
         @Suppress("UNCHECKED_CAST")
-        val forkNode = workflow.getNode(state.nodePosition) as com.lemline.core.nodes.Node<ForkTask>
+        val forkNode = workflow.getNode(forkStarted.nodePosition) as Node<ForkTask>
         val isCompete = forkNode.task.fork.isCompete
         val branches = forkNode.branches
 
-        // 1. Create fork metadata model with deterministic ID
+        // 1. Idempotent creation of fork model
         val forkModel = ForkModel(
-            id = forkId,
             instanceMessage = instance,
-            position = state.nodePosition.toString(),
             compete = isCompete
         )
 
@@ -87,22 +78,19 @@ class ForkService {
         val forkBranchModels = branches.map { branchNode ->
             ForkBranchModel(
                 forkId = forkModel.id,
-                name = branchNode.name,
-                output = null,
-                completedAt = null,
-                failedAt = null
+                name = branchNode.position.toString()
             )
         }
 
         // 3. Insert fork and branches atomically
         val rowsInserted = forkRepository.insertForkWithBranches(forkModel, forkBranchModels)
         if (rowsInserted == 0) {
-            logger.warn { "Fork model $forkId already exists (idempotent insert)" }
+            logger.warn { "Fork model $forkModel already exists (idempotent insert)" }
             return false
         }
 
         logger.debug {
-            "Fork started for instance ${instance.workflowId}, position ${state.nodePosition}, " +
+            "Fork started for instance ${instance.workflowId}, position ${forkStarted.nodePosition}, " +
                 "compete=$isCompete, branches=${branches.size}"
         }
 
@@ -117,15 +105,10 @@ class ForkService {
                 ),
             )
 
-            // Derive message ID using branch position (unique per branch)
-            val branchMessageId = IDV7.deriveIdempotentId(
-                baseId = instance.workflowId.value,
-                position = branchNode.position,
-                executionKey = instance.workflowState.nodeStack.executionKey,
-                suffix = "-branch-init"
-            )
+            // Derive message ID using branch name
+            val branchMessageId = forkModel.id.derive("-branch-${branchNode.position}")
 
-            logger.debug { "Scheduling branch ${branchNode.name} at ${branchNode.position}" }
+            logger.debug { "Scheduling branch at ${branchNode.position}: $branchMessageId" }
             commandEmitter.send(branchMessage, branchMessageId)
         }
 
@@ -141,10 +124,10 @@ class ForkService {
      * 5. If not complete, waiting for more branches
      */
     suspend fun handleBranchCompleted(instance: InstanceMessage<WorkflowEvent.ForkBranchCompleted>) {
-        val state = instance.workflowState
-        val forkPosition = state.nodePosition
-        val branchOutput = state.output
-        val branchName = state.branchName
+        val forkBranchCompleted = instance.workflowState
+        val forkPosition = forkBranchCompleted.nodePosition
+        val branchOutput = forkBranchCompleted.output
+        val branchName = forkBranchCompleted.branchPosition
 
         databaseConfig.withTransaction { conn ->
             // Get fork with branches by workflow ID and position (single query)
@@ -247,7 +230,7 @@ class ForkService {
         val state = instance.workflowState
         val forkPosition = state.nodePosition
         val branchError = state.error
-        val branchName = state.branchName
+        val branchName = state.branchPosition
 
         databaseConfig.withTransaction { conn ->
             // Get fork with branches by workflow ID and position (single query)

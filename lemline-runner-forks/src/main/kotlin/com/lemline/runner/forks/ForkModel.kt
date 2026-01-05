@@ -23,13 +23,13 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalSerializationApi
 data class ForkModel(
     /** Unique identifier for this fork execution - must be derived from position + step for idempotency */
-    override val id: IDV7,
+    override val id: IDV7 = instanceMessage.workflowState.nodeStack.deriveIdempotentId("-fork"),
 
     /** Parent workflow state when the fork started */
     override val instanceMessage: InstanceMessage<WorkflowEvent.ForkStarted>,
 
     /** Serialized NodePosition indicating where the fork is in the workflow */
-    val position: String,
+    val position: String = instanceMessage.workflowState.nodePosition.toString(),
 
     /** Whether branches compete (true, first to complete wins) or cooperate (false, all must complete) */
     val compete: Boolean,
@@ -63,9 +63,9 @@ data class ForkModel(
 
 ) : WithId, WithInstanceMessage, WithCompletedAt, WithCleanup {
 
+
     /** Timestamp when the fork completed successfully */
     override var completedAt: Instant? = null
-
 
     /** Timestamp after which this entity can be deleted, set when the fork completes or fails */
     override var cleanupAfter: Instant? = null
