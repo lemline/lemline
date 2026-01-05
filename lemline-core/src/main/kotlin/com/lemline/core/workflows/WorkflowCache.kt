@@ -146,7 +146,12 @@ object WorkflowCache {
         namespace: WorkflowNamespace,
         name: WorkflowName,
         version: WorkflowVersion
-    ): Workflow? = workflowCache[WorkflowInfo(namespace, name, version)]
+    ): Workflow? = WorkflowInfo(namespace, name, version).getWorkflow()
+
+    /**
+     * Retrieves a workflow from the workflow cache using its WorkflowInfo.
+     */
+    fun WorkflowInfo.getWorkflow(): Workflow? = workflowCache[this]
 
     /**
      * Retrieves a map of node positions to their corresponding nodes for a given workflow.

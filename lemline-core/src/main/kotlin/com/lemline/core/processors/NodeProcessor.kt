@@ -458,12 +458,12 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // Find the branch name using typed accessor
         @Suppress("UNCHECKED_CAST")
         val forkNode = nextNode as Node<ForkTask>
-        val branchName = forkNode.branches.find { it.name == node.name }?.name
+        val branchName = forkNode.branches.find { it.position == node.position }?.position?.toString()
             ?: throw IllegalStateException("Fork - can not find ${node.name} in ${forkNode.branches.joinToString { it.name }}")
 
         return ForkBranchCompleted(
             nodeStack = nodeStack,
-            branchName = branchName,
+            branchPosition = branchName,
             output = nextInput,
             completedAt = Clock.System.now(),
         )

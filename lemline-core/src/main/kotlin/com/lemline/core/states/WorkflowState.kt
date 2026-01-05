@@ -219,17 +219,17 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("forkBranchCompleted")
     data class ForkBranchCompleted(
         override val nodeStack: NodeStack,
-        val branchName: String,
+        val branchPosition: String,
         val output: JsonElement,
         val completedAt: Instant,
     ) : Outcome() {
 
         @Transient
-        override val nodePosition = nodeStack.currentPosition // Fork position
+        override val nodePosition = nodeStack.currentPosition // Fork branch position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
-            ", branchName=$branchName" +
+            ", branchPosition=$branchPosition" +
             ", transformedInput=$output" +
             ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"
@@ -242,7 +242,7 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("forkBranchFailed")
     data class ForkBranchFailed(
         override val nodeStack: NodeStack,
-        val branchName: String,
+        val branchPosition: String,
         val error: InternalException.Error,
         val failedAt: Instant
     ) : Outcome() {
@@ -253,7 +253,7 @@ sealed class WorkflowEvent : WorkflowState() {
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
-            ", branchName=$branchName" +
+            ", branchPosition=$branchPosition" +
             ", error=$error" +
             ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
             ")"

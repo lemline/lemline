@@ -540,7 +540,7 @@ object StepByStepOrchestrator {
                 // Pop all states up to and including the fork node
                 return ForkBranchFailed(
                     nodeStack = nodeStack.popUntil(forkNode.position),
-                    branchName = current.name,
+                    branchPosition = current.position.toString(),
                     error = InternalException.Error.from(exception, failingNode.position),
                     failedAt = Clock.System.now(),
                 )
