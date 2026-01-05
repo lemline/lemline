@@ -59,7 +59,6 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
     // Task-Specific Actions
     // ========================================
 
-
     /**
      * Create the initial state for this node.
      * Subclasses override to create their specific state type.
@@ -472,8 +471,8 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
     /**
      * Handles the completion of a "foreach" iteration in a node processing workflow. It verifies whether
-     * the provided node represents a `ListenTask` and whether the node is being re-entered with an existing
-     * state. If these conditions are met, it creates and returns a `ListenForEachCompleted` event.
+     * the provided node represents a [ForeachTask] and whether the node is being re-entered with an existing
+     * state. If these conditions are met, it creates and returns a [ForEachCompleted] event.
      */
     private fun forEachCompleted(
         nodeStack: NodeStack,

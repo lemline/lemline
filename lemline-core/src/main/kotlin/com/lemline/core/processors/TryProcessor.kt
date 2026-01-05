@@ -174,7 +174,6 @@ class TryProcessor(
      * moves to the catch block.
      */
     internal fun handleError(
-        failingNode: Node<*>,
         error: InternalException.Error,
         state: TryState,
         nodeStack: NodeStack

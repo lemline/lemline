@@ -358,7 +358,7 @@ object StepByStepOrchestrator {
      * Walks up the node tree looking for a TryTask that can handle the error.
      * Stops at error boundaries:
      * - Fork tasks act as error boundaries and handle errors internally
-     * - Listen tasks with foreach act as error boundaries for foreach iterations
+     * - Foreach tasks act as error boundaries for foreach iterations
      *
      * Emits `task.retried` when a retry is scheduled.
      */
@@ -382,7 +382,6 @@ object StepByStepOrchestrator {
                 // check that this node actually can handle this error
                 if (processor.isCatching(exception.error, tryState, nodeStack.stateScope)) {
                     val event = processor.handleError(
-                        failingNode = failingNode,
                         error = exception.error,
                         state = tryState,
                         nodeStack = nodeStack
@@ -414,7 +413,7 @@ object StepByStepOrchestrator {
      * - ForkTask: errors in branches are handled by the fork
      * - ForeachTask: errors in foreach.do are handled by the listen handler
      */
-    private fun isErrorBoundary(node: Node<*>): Boolean = when (val task = node.task) {
+    private fun isErrorBoundary(node: Node<*>): Boolean = when (node.task) {
         is ForkTask -> true
         is ForeachTask -> true
         else -> false
