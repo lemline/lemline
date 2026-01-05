@@ -113,25 +113,15 @@ abstract class ForkRepositoryTestBase {
         val branches = createTestBranches(fork, branchCount = 2)
         repository.insertForkWithBranches(fork, branches)
 
-        repository.findByWorkflowIdAndPosition(testWorkflowId, testPosition) shouldNotBe null
+        repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition) shouldNotBe null
 
         repository.deleteById(fork.id)
 
-        repository.findByWorkflowIdAndPosition(testWorkflowId, testPosition).shouldBeNull()
         repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition).shouldBeNull()
     }
 
     @Test
     fun `should return null when fork not found`() = runTest {
-        val fork = getRepository().findByWorkflowIdAndPosition(
-            WorkflowId.random(),
-            NodePosition.root.addName("nonexistent")
-        )
-        fork.shouldBeNull()
-    }
-
-    @Test
-    fun `should return null when fork with branches not found`() = runTest {
         val result = getRepository().findByWorkflowIdAndPositionWithBranches(
             WorkflowId.random(),
             NodePosition.root.addName("nonexistent")
@@ -167,7 +157,7 @@ abstract class ForkRepositoryTestBase {
         }
         repository.update(updatedFork)
 
-        val retrieved = repository.findByWorkflowIdAndPosition(testWorkflowId, testPosition)!!
+        val (retrieved, _) = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)!!
         retrieved.output shouldBe "\"final-result\""
         retrieved.completedAt.shouldNotBeNull()
     }

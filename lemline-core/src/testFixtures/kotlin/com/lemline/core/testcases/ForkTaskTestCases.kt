@@ -378,6 +378,48 @@ object ForkTaskTestCases {
                 obj["caught"]?.jsonPrimitive?.content == "true" &&
                     obj["errorType"]?.jsonPrimitive?.content?.contains("catchableError") == true
             }
+        ),
+
+        WorkflowTestCase(
+            name = "fork task inside for loop executes multiple times with distinct results",
+            yaml = $$"""
+                do:
+                  - init:
+                      set:
+                        results: []
+                  - loopWithFork:
+                      for:
+                        in: ${ [1, 2, 3] }
+                      do:
+                        - parallelInLoop:
+                            fork:
+                              branches:
+                                - branchA:
+                                    set:
+                                      value: ${ $item * 10 }
+                                - branchB:
+                                    set:
+                                      value: ${ $item * 100 }
+                            export:
+                              as:
+                                results: ${ $context.results + [.] }
+                      output:
+                        as: ${ $context }
+            """.trimIndent(),
+            validate = expectOutputMatching("3 iterations with values [10,100], [20,200], [30,300]") { output ->
+                val obj = output as? JsonObject ?: return@expectOutputMatching false
+                val results = obj["results"] as? JsonArray ?: return@expectOutputMatching false
+                if (results.size != 3) return@expectOutputMatching false
+
+                fun JsonArray.containsValues(vararg expected: Int): Boolean {
+                    val actual = this.mapNotNull { it.jsonObject["value"]?.jsonPrimitive?.int }.toSet()
+                    return actual == expected.toSet()
+                }
+
+                (results[0] as? JsonArray)?.containsValues(10, 100) == true &&
+                    (results[1] as? JsonArray)?.containsValues(20, 200) == true &&
+                    (results[2] as? JsonArray)?.containsValues(30, 300) == true
+            }
         )
     )
 }
