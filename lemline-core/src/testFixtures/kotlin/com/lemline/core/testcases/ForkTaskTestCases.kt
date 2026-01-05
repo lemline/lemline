@@ -420,6 +420,32 @@ object ForkTaskTestCases {
                     (results[1] as? JsonArray)?.containsValues(20, 200) == true &&
                     (results[2] as? JsonArray)?.containsValues(30, 300) == true
             }
+        ),
+
+        WorkflowTestCase(
+            name = "fork task with duplicate branch names executes all branches",
+            yaml = """
+                do:
+                  - forkWithDuplicateNames:
+                      fork:
+                        branches:
+                          - sameName:
+                              set:
+                                value: 1
+                          - sameName:
+                              set:
+                                value: 2
+                          - sameName:
+                              set:
+                                value: 3
+            """.trimIndent(),
+            validate = expectOutputMatching("3 branches all executed with values [1,2,3]") { output ->
+                val arr = output as? JsonArray ?: return@expectOutputMatching false
+                if (arr.size != 3) return@expectOutputMatching false
+
+                val values = arr.mapNotNull { it.jsonObject["value"]?.jsonPrimitive?.int }
+                values == listOf(1, 2, 3)
+            }
         )
     )
 }
