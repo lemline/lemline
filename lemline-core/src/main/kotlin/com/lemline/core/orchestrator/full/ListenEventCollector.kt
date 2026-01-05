@@ -86,12 +86,13 @@ internal object ListenEventCollector {
         processEvent: suspend (CloudEvent, Int) -> JsonElement,
     ): List<JsonElement> = when (val until = event.config.until) {
         null -> collectFirst(eventFlow, event.config.filters, processEvent)
+
         is UntilCondition.Expression -> collectUntilExpression(
             eventFlow, event.config.filters, until.expression, event.config.readAs, processEvent
         )
 
         is UntilCondition.Event -> collectUntilTermination(
-            eventFlow, event.config.filters, until.filter, event.config.readAs, processEvent
+            eventFlow, event.config.filters, until.filter, processEvent
         )
     }
 
@@ -139,7 +140,6 @@ internal object ListenEventCollector {
         eventFlow: Flow<CloudEvent>,
         filters: List<EventFilter>,
         terminationFilter: EventFilter,
-        readAs: ListenAndReadAs,
         processEvent: suspend (CloudEvent, Int) -> JsonElement,
     ): List<JsonElement> {
         val outputs = mutableListOf<JsonElement>()

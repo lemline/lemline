@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.cloudevents
 
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.core.expressions.JQExpression
@@ -16,7 +15,6 @@ import java.time.OffsetDateTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -155,7 +153,8 @@ object CloudEventUtils {
             val trimmedExpr = ExpressionUtils.trimExpr(expression)
             val result = with(LemlineJson) {
                 val inputNode = input.toJsonNode()
-                val scope = JsonObject(emptyMap()).toJsonNode() as ObjectNode
+                // There is no scope here, as we evaluate against Cloud Event data only.
+                val scope = LemlineJson.jacksonMapper.createObjectNode()
                 JQExpression.eval(inputNode, trimmedExpr, scope).toJsonElement()
             }
             (result as? JsonPrimitive)?.booleanOrNull == true
@@ -171,12 +170,7 @@ object CloudEventUtils {
     private fun parseEventData(event: CloudEvent): JsonElement {
         val data = event.data ?: return JsonNull
         return try {
-            val bytes = data.toBytes()
-            if (bytes.isEmpty()) {
-                JsonNull
-            } else {
-                Json.parseToJsonElement(String(bytes))
-            }
+            Json.parseToJsonElement(String(data.toBytes()))
         } catch (e: Exception) {
             logger.warn(e) { "Failed to parse CloudEvent data as JSON" }
             JsonNull
