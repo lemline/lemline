@@ -11,9 +11,9 @@ import com.lemline.core.cloudevents.CloudEventUtils
 import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
+import com.lemline.core.orchestrator.full.CollectResult
 import com.lemline.core.orchestrator.full.ForkBranchExecutor
 import com.lemline.core.orchestrator.full.ListenEventCollector
-import com.lemline.core.orchestrator.full.NodeStackHolder
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
@@ -35,6 +35,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.buildJsonObject
 
@@ -208,13 +209,11 @@ object FullOrchestrator {
     ): WorkflowCommand {
         logger.debug { "Listening for CloudEvents: strategy=${listenStarted.config.strategy} filters=${listenStarted.config.filters} until=${listenStarted.config.until}" }
 
-        val stackHolder = NodeStackHolder(listenStarted.nodeStack)
-
         @Suppress("UNCHECKED_CAST")
         val listenNode = workflow.getNode(listenStarted.nodePosition) as Node<ListenTask>
 
         val foreachProcessor = listenNode.foreachBlock?.position?.let { pos ->
-            ListenEventCollector.createForeachProcessor(pos, stackHolder) { cmd ->
+            ListenEventCollector.createForeachProcessor(pos) { cmd ->
                 resume(workflow, cmd, serde, activityExecutor, cloudEventHook, lifecycleHook)
             }
         }
@@ -224,14 +223,15 @@ object FullOrchestrator {
         } ?: Long.MAX_VALUE
 
         return try {
-            withTimeout(timeoutMillis) {
+            when (val result = withTimeout(timeoutMillis) {
                 ListenEventCollector.collect(listenStarted, cloudEventHook.receive(), foreachProcessor)
+            }) {
+                is CollectResult.Success -> listenStarted.resumeCompleted(JsonArray(result.outputs))
+                is CollectResult.Failure -> listenFailed(result.nodeStack, listenStarted.nodePosition, result.error)
             }
         } catch (_: TimeoutCancellationException) {
             val e = IllegalStateException("Listen timeout: no matching CloudEvent received within ${timeoutMillis}ms")
-            listenFailed(stackHolder.value, listenStarted.nodePosition, e)
-        } catch (e: InternalException) {
-            listenFailed(stackHolder.value, listenStarted.nodePosition, e)
+            listenFailed(listenStarted.nodeStack, listenStarted.nodePosition, e)
         }
     }
 
