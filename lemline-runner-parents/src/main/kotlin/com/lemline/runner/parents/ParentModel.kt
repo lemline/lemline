@@ -17,13 +17,13 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalTime
 data class ParentModel(
     /** Unique identifier for this parent-child relationship */
-    override val id: IDV7,
+    override val id: IDV7 = instanceMessage.workflowState.nodeStack.deriveIdempotentId("-parent"),
 
     /** Parent workflow state when the child workflow was started */
     override val instanceMessage: InstanceMessage<WorkflowEvent.RunWorkflowStarted>,
 
     /** The workflow ID of the child workflow that was spawned */
-    val childId: WorkflowId,
+    val childId: WorkflowId = WorkflowId(id.derive("-child"))
 ) : WithId, WithInstanceMessage, WithCompletedAt, WithCleanup {
 
     /** Timestamp when the child workflow completed */

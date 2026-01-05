@@ -61,30 +61,24 @@ class ParentService {
      * @return true if the parent was created, false if it already existed (idempotent)
      */
     suspend fun handleRunWorkflowStarted(instance: InstanceMessage<WorkflowEvent.RunWorkflowStarted>): Boolean {
-        // Derive parent model ID from position + step
-        val parentId = instance.workflowState.nodeStack.deriveIdempotentId("-parent")
+        // Derive parent model
+        val parent = ParentModel(instanceMessage = instance)
 
         return databaseConfig.withTransaction { conn ->
-            // Generate child workflow ID (deterministic from parent ID)
-            val childWorkflowId = WorkflowId(parentId.derive("-child"))
 
             // Insert parent with child_id
             val rowsInserted = parentRepository.insert(
-                entity = ParentModel(
-                    id = parentId,
-                    instanceMessage = instance,
-                    childId = childWorkflowId
-                ),
+                entity = parent,
                 connection = conn
             )
             if (rowsInserted == 0) {
-                logger.warn { "Parent model $parentId already exists (idempotent insert), skipping" }
+                logger.warn { "Parent model $parent already exists (idempotent insert), skipping" }
                 return@withTransaction false
             }
 
             // Create the child + optional schedule
             val preparedWorkflow = starter.prepareWorkflow(
-                workflowId = childWorkflowId,
+                workflowId = parent.childId,
                 workflowNamespace = instance.workflowState.config.namespace,
                 workflowName = instance.workflowState.config.name,
                 optionalVersion = instance.workflowState.config.version,
@@ -98,8 +92,7 @@ class ParentService {
 
             // Emit child to the workflow channel with idempotent message ID
             preparedWorkflow.instanceMessage?.let { child ->
-                val childMessageId = parentId.derive("-child-init")
-                commandEmitter.send(child, childMessageId)
+                commandEmitter.send(child, parent.childId.value)
 
                 // Emit workflow.created lifecycle event for the child workflow
                 preparedWorkflow.onWorkflowCreated(lifecycleHook)
