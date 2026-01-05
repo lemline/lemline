@@ -6,6 +6,7 @@ package com.lemline.runner.activities
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
+import com.lemline.core.cloudevents.CloudEventUtils
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.HttpAuthentication
@@ -19,7 +20,6 @@ import com.lemline.core.states.WorkflowEvent.RunShellStarted
 import com.lemline.core.tasks.runs.Script
 import com.lemline.core.tasks.runs.Shell
 import io.cloudevents.CloudEvent
-import io.cloudevents.core.builder.CloudEventBuilder
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -31,8 +31,6 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.serverlessworkflow.api.types.HTTPArguments.HTTPOutput
 import java.io.File
-import java.net.URI
-import java.time.OffsetDateTime
 import java.util.*
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonElement
@@ -88,36 +86,13 @@ class DefaultActivityExecutor(
     private suspend fun executeEmit(config: EmitConfig, rawOutput: JsonElement): JsonElement {
         logger.debug { "Emitting CloudEvent: type=${config.type}, source=${config.source}" }
 
-        val cloudEvent = buildCloudEvent(config)
+        val cloudEvent = CloudEventUtils.buildCloudEvent(config)
 
         // Emit if callback provided, otherwise no-op (for testing)
         emitCloudEvent?.invoke(cloudEvent)
 
         // Emit is fire-and-forget, return raw output
         return rawOutput
-    }
-
-    private fun buildCloudEvent(config: EmitConfig): CloudEvent {
-        val builder = CloudEventBuilder.v1()
-            .withId(config.id)
-            .withSource(URI.create(config.source))
-            .withType(config.type)
-
-        config.time?.let { builder.withTime(OffsetDateTime.parse(it)) }
-        config.subject?.let { builder.withSubject(it) }
-        config.dataschema?.let { builder.withDataSchema(URI.create(it)) }
-
-        config.data?.let { data ->
-            val contentType = config.datacontenttype ?: "application/json"
-            builder.withDataContentType(contentType)
-            builder.withData(contentType, data.toString().toByteArray())
-        }
-
-        config.extensions?.forEach { (key, value) ->
-            builder.withExtension(key, value)
-        }
-
-        return builder.build()
     }
 
     // ========================================

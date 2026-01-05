@@ -170,8 +170,8 @@ internal class WorkflowEventHandler(
             is WorkflowEvent.WorkflowFailed ->
                 handleWorkflowFailed(current as InstanceMessage<WorkflowEvent.WorkflowFailed>)
 
-            is WorkflowEvent.ListenForEachCompleted ->
-                listenerEventService.handleListenForEachCompleted(current as InstanceMessage<WorkflowEvent.ListenForEachCompleted>)
+            is WorkflowEvent.ForEachCompleted ->
+                listenerEventService.handleForEachCompleted(current as InstanceMessage<WorkflowEvent.ForEachCompleted>)
 
             is WorkflowEvent.TaskScheduled ->
                 error("Unexpected state in workflow event handler: $state")

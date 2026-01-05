@@ -296,7 +296,7 @@ fun WorkflowEvent.ForkStarted.Companion.random() = WorkflowEvent.ForkStarted(
 fun WorkflowEvent.ForkBranchCompleted.Companion.random() =
     WorkflowEvent.ForkBranchCompleted(
         nodeStack = NodeStack.random(),
-        branchName = String.random(),
+        branchPosition = String.random(),
         output = JsonElement.random(),
         completedAt = Clock.System.now(),
     )
