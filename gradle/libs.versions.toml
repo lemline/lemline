@@ -20,6 +20,7 @@ mockk = "1.13.9"
 testcontainers = "1.21.3"
 spotless = "7.0.3"
 cloudevents = "4.0.1"
+smallryeReactiveMessagingApi = "4.31.0"
 
 [libraries]
 spotlessPlugin = { module = "com.diffplug.spotless:spotless-plugin-gradle", version.ref = "spotless" }
@@ -41,6 +42,7 @@ mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 testcontainers-bom = { module = "org.testcontainers:testcontainers-bom", version.ref = "testcontainers" }
 cloudevents-core = { module = "io.cloudevents:cloudevents-core", version.ref = "cloudevents" }
 cloudevents-json-jackson = { module = "io.cloudevents:cloudevents-json-jackson", version.ref = "cloudevents" }
+smallrye-reactive-messaging-api = { module = "io.smallrye.reactive:smallrye-reactive-messaging-api", version.ref = "smallryeReactiveMessagingApi" }
 
 # Libraries bundled together for easier import
 [bundles]

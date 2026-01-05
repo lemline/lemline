@@ -20,8 +20,8 @@ dependencies {
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-scheduler")
 
-    // SmallRye Reactive Messaging API (for Message type)
-    implementation("org.eclipse.microprofile.reactive.messaging:microprofile-reactive-messaging-api:3.0")
+    // SmallRye Reactive Messaging API (for Message type) - provides extended Message interface
+    implementation(libs.smallrye.reactive.messaging.api)
 
     // Serverless Workflow SDK (for InstanceMessage state types)
     implementation(libs.serverlessworkflow.api)
