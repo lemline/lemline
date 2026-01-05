@@ -5,6 +5,7 @@ package com.lemline.core.states
 
 import com.lemline.common.values.IDV7
 import com.lemline.common.values.NodePosition
+import com.lemline.common.values.WorkflowId
 import com.lemline.core.processors.scope.Scope
 import com.lemline.core.processors.scope.merge
 import kotlin.time.ExperimentalTime
@@ -31,7 +32,6 @@ data class StackFrame(
     val executionIndex: Int = 0
 ) {
     fun withIncrementedIndex() = copy(executionIndex = executionIndex + 1)
-
 }
 
 /**
@@ -59,6 +59,10 @@ class NodeStack internal constructor(
         frames.first().state as RootState
     }
 
+    val workflowId: WorkflowId by lazy {
+        rootState.workflowId
+    }
+
     val currentPosition: NodePosition by lazy {
         frames.last().position
     }
@@ -77,8 +81,8 @@ class NodeStack internal constructor(
         frames.joinToString("-") { it.executionIndex.toString() }
     }
 
-    operator fun get(position: NodePosition): NodeState? =
-        frames.firstOrNull { it.position == position }?.state
+    operator fun get(position: NodePosition): StackFrame? =
+        frames.firstOrNull { it.position == position }
 
 
     fun deriveIdempotentId(suffix: String = ""): IDV7 =
@@ -89,12 +93,10 @@ class NodeStack internal constructor(
             suffix = suffix
         )
 
-    /** Creates a new TaskStack with updated context in the root state.*/
-    fun setContext(newContext: Scope): NodeStack = withRootState(rootState.withContext(newContext))
+    fun duplicate(workflowId: WorkflowId): NodeStack = withRootState(rootState.copy(workflowId = workflowId))
 
-    /** Creates a new TaskStack with a new root state, replacing the existing one.*/
-    fun withRootState(newRoot: RootState): NodeStack =
-        NodeStack(listOf(StackFrame(NodePosition.root, newRoot)) + frames.drop(1))
+    /** Creates a new TaskStack with updated context in the root state.*/
+    fun withContext(newContext: Scope): NodeStack = withRootState(rootState.withContext(newContext))
 
     /** Push a new frame onto the stack.*/
     fun push(position: NodePosition, state: NodeState, executionIndex: Int = 0): NodeStack =
@@ -105,21 +107,15 @@ class NodeStack internal constructor(
 
     /** Returns a new StateStack with frames up to and including position, incrementing new top's executionIndex.*/
     fun popUntil(position: NodePosition): NodeStack {
-        val index = frames.indexOfFirst { it.position == position }
-        return if (index < 0) this else popFrames(frames.take(index + 1))
+        val index = indexOfFirst(position)
+        return popFrames(frames.take(index + 1))
     }
 
     /** Pops frames after position, replaces the frame at position with new state, and increments its executionIndex.*/
-    fun popAndReplace(position: NodePosition, newState: NodeState): NodeStack {
-        val index = frames.indexOfFirst { it.position == position }
-        if (index < 0) return this
-        val newFrame = StackFrame(position, newState, frames[index].executionIndex + 1)
+    fun popUntilAndReplace(position: NodePosition, newState: NodeState): NodeStack {
+        val index = indexOfFirst(position)
+        val newFrame = frames[index].withIncrementedIndex().copy(state = newState)
         return NodeStack(frames.take(index) + newFrame)
-    }
-
-    private fun popFrames(remaining: List<StackFrame>): NodeStack {
-        if (remaining.isEmpty()) return NodeStack(remaining)
-        return NodeStack(remaining.dropLast(1) + remaining.last().withIncrementedIndex())
     }
 
     /** Update the current (top) state in the stack.*/
@@ -143,6 +139,21 @@ class NodeStack internal constructor(
         }
 
     internal fun <R> mapFrames(transform: (StackFrame) -> R): List<R> = frames.map(transform)
+
+    private fun indexOfFirst(position: NodePosition): Int {
+        val index = frames.indexOfFirst { it.position == position }
+        if (index < 0) throw NoSuchElementException("Position $position not found within the stack ${frames.joinToString { it.position.toString() }}.")
+        return index
+    }
+
+    private fun popFrames(remaining: List<StackFrame>): NodeStack {
+        if (remaining.isEmpty()) return NodeStack(remaining)
+        return NodeStack(remaining.dropLast(1) + remaining.last().withIncrementedIndex())
+    }
+
+    /** Creates a new TaskStack with a new root state, replacing the existing one.*/
+    private fun withRootState(newRoot: RootState): NodeStack =
+        NodeStack(listOf(StackFrame(NodePosition.root, newRoot)) + frames.drop(1))
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

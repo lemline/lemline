@@ -74,10 +74,7 @@ sealed class WorkflowCommand : WorkflowState() {
 
 
         fun duplicate(workflowId: WorkflowId): ResumeFromTask {
-            val rootState = nodeStack[NodePosition.root] as RootState
-            return copy(
-                nodeStack = nodeStack.withRootState(rootState.copy(workflowId = workflowId))
-            )
+            return copy(nodeStack = nodeStack.duplicate(workflowId = workflowId))
         }
     }
 

@@ -6,7 +6,6 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowInfo
 import com.lemline.core.errors.InternalException
 import com.lemline.core.states.NodeStack
-import com.lemline.core.states.RootState
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import java.net.URI
@@ -76,7 +75,7 @@ class CloudEventLifecycleHook(
         nodeStack: NodeStack,
         startedAt: Instant,
     ) {
-        val rootState = nodeStack[NodePosition.root] as RootState
+        val rootState = nodeStack.rootState
 
         val data = LifecycleEventData.WorkflowStartedData(
             name = workflowInfo.qualifiedName,
@@ -103,8 +102,6 @@ class CloudEventLifecycleHook(
         output: JsonElement,
         completedAt: Instant,
     ) {
-        val rootState = nodeStack[NodePosition.root] as RootState
-
         val data = LifecycleEventData.WorkflowCompletedData(
             name = workflowInfo.qualifiedName,
             output = output,
@@ -114,7 +111,7 @@ class CloudEventLifecycleHook(
         val event = buildCloudEvent(
             eventType = LifecycleEventType.WORKFLOW_COMPLETED,
             workflowInfo = workflowInfo,
-            workflowId = rootState.workflowId,
+            workflowId = nodeStack.workflowId,
             nodeStack = nodeStack,
             data = data,
             timestamp = completedAt,
@@ -130,8 +127,6 @@ class CloudEventLifecycleHook(
         error: InternalException.Error,
         failedAt: Instant,
     ) {
-        val rootState = nodeStack[NodePosition.root] as RootState
-
         val data = LifecycleEventData.WorkflowFaultedData(
             name = workflowInfo.qualifiedName,
             faultedAt = failedAt,
@@ -141,7 +136,7 @@ class CloudEventLifecycleHook(
         val event = buildCloudEvent(
             eventType = LifecycleEventType.WORKFLOW_FAULTED,
             workflowInfo = workflowInfo,
-            workflowId = rootState.workflowId,
+            workflowId = nodeStack.workflowId,
             nodeStack = nodeStack,
             data = data,
             timestamp = failedAt,
@@ -162,8 +157,6 @@ class CloudEventLifecycleHook(
         input: JsonElement,
         createdAt: Instant,
     ) {
-        val rootState = nodeStack[NodePosition.root] as RootState
-
         val data = LifecycleEventData.TaskCreatedData(
             workflow = workflowInfo.qualifiedName,
             task = nodePosition.toJsonPointer(),
@@ -174,7 +167,7 @@ class CloudEventLifecycleHook(
         val event = buildCloudEvent(
             eventType = LifecycleEventType.TASK_CREATED,
             workflowInfo = workflowInfo,
-            workflowId = rootState.workflowId,
+            workflowId = nodeStack.workflowId,
             nodeStack = nodeStack,
             data = data,
             timestamp = createdAt,
@@ -191,8 +184,6 @@ class CloudEventLifecycleHook(
         rawInput: JsonElement,
         startedAt: Instant,
     ) {
-        val rootState = nodeStack[NodePosition.root] as RootState
-
         val data = LifecycleEventData.TaskStartedData(
             workflow = workflowInfo.qualifiedName,
             task = nodePosition.toJsonPointer(),
@@ -202,7 +193,7 @@ class CloudEventLifecycleHook(
         val event = buildCloudEvent(
             eventType = LifecycleEventType.TASK_STARTED,
             workflowInfo = workflowInfo,
-            workflowId = rootState.workflowId,
+            workflowId = nodeStack.workflowId,
             nodeStack = nodeStack,
             data = data,
             timestamp = startedAt,
@@ -219,8 +210,6 @@ class CloudEventLifecycleHook(
         output: JsonElement,
         completedAt: Instant,
     ) {
-        val rootState = nodeStack[NodePosition.root] as RootState
-
         val data = LifecycleEventData.TaskCompletedData(
             workflow = workflowInfo.qualifiedName,
             task = nodePosition.toJsonPointer(),
@@ -231,7 +220,7 @@ class CloudEventLifecycleHook(
         val event = buildCloudEvent(
             eventType = LifecycleEventType.TASK_COMPLETED,
             workflowInfo = workflowInfo,
-            workflowId = rootState.workflowId,
+            workflowId = nodeStack.workflowId,
             nodeStack = nodeStack,
             data = data,
             timestamp = completedAt,
@@ -248,8 +237,6 @@ class CloudEventLifecycleHook(
         error: InternalException.Error,
         failedAt: Instant,
     ) {
-        val rootState = nodeStack[NodePosition.root] as RootState
-
         val data = LifecycleEventData.TaskFaultedData(
             workflow = workflowInfo.qualifiedName,
             task = nodePosition.toJsonPointer(),
@@ -260,7 +247,7 @@ class CloudEventLifecycleHook(
         val event = buildCloudEvent(
             eventType = LifecycleEventType.TASK_FAULTED,
             workflowInfo = workflowInfo,
-            workflowId = rootState.workflowId,
+            workflowId = nodeStack.workflowId,
             nodeStack = nodeStack,
             data = data,
             timestamp = failedAt,
@@ -277,8 +264,6 @@ class CloudEventLifecycleHook(
         retryAt: Instant,
         attemptNumber: Int,
     ) {
-        val rootState = nodeStack[NodePosition.root] as RootState
-
         val data = LifecycleEventData.TaskRetriedData(
             workflow = workflowInfo.qualifiedName,
             task = nodePosition.toJsonPointer(),
@@ -289,7 +274,7 @@ class CloudEventLifecycleHook(
         val event = buildCloudEvent(
             eventType = LifecycleEventType.TASK_RETRIED,
             workflowInfo = workflowInfo,
-            workflowId = rootState.workflowId,
+            workflowId = nodeStack.workflowId,
             nodeStack = nodeStack,
             data = data,
             timestamp = retryAt,

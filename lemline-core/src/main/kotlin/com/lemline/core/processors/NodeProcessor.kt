@@ -362,7 +362,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // State was pushed in enterFromParent, so it's always on the stack
         var updatedStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop()
         if (exportedContext != null) {
-            updatedStack = updatedStack.setContext(exportedContext)
+            updatedStack = updatedStack.withContext(exportedContext)
         }
 
         return getNextEvent(
@@ -450,10 +450,10 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         nextNode: Node<*>,
         nextInput: JsonElement,
     ): ForkBranchCompleted? {
-        val nextState = nodeStack[nextNode.position]
+        val nextFrame = nodeStack[nextNode.position]
 
         // if nextNode is not a fork task, or if we are entering for the first time
-        if (nextNode.task !is ForkTask || nextState == null) return null
+        if (nextNode.task !is ForkTask || nextFrame == null) return null
 
         // Find the branch name using typed accessor
         @Suppress("UNCHECKED_CAST")
@@ -479,10 +479,10 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         nextNode: Node<*>,
         nextInput: JsonElement,
     ): ForEachCompleted? {
-        val nextState = nodeStack[nextNode.position]
+        val nextFrame = nodeStack[nextNode.position]
 
         // if nextNode is not a foreach task, or if we are entering for the first time
-        if (nextNode.task !is ForeachTask || nextState == null) return null
+        if (nextNode.task !is ForeachTask || nextFrame == null) return null
 
         return ForEachCompleted(
             nodeStack = nodeStack,

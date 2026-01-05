@@ -377,7 +377,7 @@ object StepByStepOrchestrator {
             // if yes, we continue from there (retry or catch)
             if (current!!.task is TryTask) {
                 // current state of the try node
-                val tryState = nodeStack[current.position] as TryState
+                val tryState = nodeStack[current.position]?.state as TryState
                 val processor = current.processor as TryProcessor
                 // check that this node actually can handle this error
                 if (processor.isCatching(exception.error, tryState, nodeStack.stateScope)) {
