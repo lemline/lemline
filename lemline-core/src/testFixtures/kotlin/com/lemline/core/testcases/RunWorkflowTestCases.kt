@@ -7,6 +7,7 @@ import com.lemline.core.testcases.WorkflowTestValidators.expectSuccess
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -553,6 +554,52 @@ object RunWorkflowTestCases {
                 obj["handled"]?.jsonPrimitive?.content == "true" &&
                     obj["errorStatus"]?.jsonPrimitive?.int == 404 &&
                     obj["errorType"]?.jsonPrimitive?.content?.contains("not-found") == true
+            }
+        ),
+
+        WorkflowTestCase(
+            name = "run workflow inside for loop executes multiple times with distinct results",
+            yaml = $$"""
+                do:
+                  - init:
+                      set:
+                        results: []
+                  - loopWithRunWorkflow:
+                      for:
+                        in: ${ [1, 2, 3] }
+                      do:
+                        - callMultiplier:
+                            run:
+                              workflow:
+                                namespace: test
+                                name: loop-item-multiplier
+                                version: '0.1.0'
+                                input:
+                                  value: ${ $item }
+                            export:
+                              as:
+                                results: ${ $context.results + [.result] }
+                      output:
+                        as: ${ $context }
+            """.trimIndent(),
+            dependencies = listOf(
+                WorkflowDependency(
+                    name = "loop-item-multiplier",
+                    yaml = $$"""
+                        do:
+                          - multiply:
+                              set:
+                                result: ${ .value * 10 }
+                    """.trimIndent()
+                )
+            ),
+            validate = expectOutputMatching("3 iterations with values [10, 20, 30]") { output ->
+                val obj = output as? JsonObject ?: return@expectOutputMatching false
+                val results = obj["results"]?.jsonArray ?: return@expectOutputMatching false
+                if (results.size != 3) return@expectOutputMatching false
+
+                val values = results.mapNotNull { it.jsonPrimitive.int }
+                values == listOf(10, 20, 30)
             }
         )
     )

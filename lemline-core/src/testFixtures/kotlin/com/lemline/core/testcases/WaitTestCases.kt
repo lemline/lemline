@@ -2,8 +2,10 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 
 /**
@@ -93,6 +95,39 @@ object WaitTestCases {
             validate = expectOutputMatching("result=42") { output ->
                 val obj = output as? JsonObject ?: return@expectOutputMatching false
                 obj["result"]?.jsonPrimitive?.int == 42
+            }
+        ),
+
+        WorkflowTestCase(
+            name = "wait task inside for loop executes multiple times with distinct results",
+            yaml = $$"""
+                do:
+                  - init:
+                      set:
+                        results: []
+                  - loopWithWait:
+                      for:
+                        in: ${ [1, 2, 3] }
+                      do:
+                        - waitInLoop:
+                            wait:
+                              milliseconds: 5
+                        - afterWait:
+                            set:
+                              value: ${ $item * 10 }
+                            export:
+                              as:
+                                results: ${ $context.results + [.value] }
+                      output:
+                        as: ${ $context }
+            """.trimIndent(),
+            validate = expectOutputMatching("3 iterations with values [10, 20, 30]") { output ->
+                val obj = output as? JsonObject ?: return@expectOutputMatching false
+                val results = obj["results"]?.jsonArray ?: return@expectOutputMatching false
+                if (results.size != 3) return@expectOutputMatching false
+
+                val values = results.mapNotNull { it.jsonPrimitive.int }
+                values == listOf(10, 20, 30)
             }
         )
     )
