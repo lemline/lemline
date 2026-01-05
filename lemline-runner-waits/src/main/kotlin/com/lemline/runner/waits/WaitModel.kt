@@ -16,13 +16,13 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalTime
 data class WaitModel(
     /** Unique identifier for this wait operation - must be derived from position + step for idempotency */
-    override val id: IDV7,
+    override val id: IDV7 = instanceMessage.workflowState.nodeStack.deriveIdempotentId("-wait"),
 
     /** Workflow state when the wait was initiated */
     override val instanceMessage: InstanceMessage<WorkflowEvent.WaitStarted>,
 
     /** Timestamp when the wait period should end and workflow should resume */
-    override val outboxScheduledFor: Instant,
+    override val outboxScheduledFor: Instant = instanceMessage.workflowState.config.waitUntil
 ) : WithId, WithInstanceMessage, WithOutbox, WithCleanup {
 
     override var outboxDelayedUntil: Instant? = outboxScheduledFor
