@@ -96,15 +96,49 @@ internal object ListenEventCollector {
         )
     }
 
+    /**
+     * Collect events for ALL strategy: waits until each filter has at least one match.
+     * One event can satisfy multiple filters. Returns unique matched events sorted by
+     * the index of their first matching filter.
+     */
     private suspend fun collectAll(
         eventFlow: Flow<CloudEvent>,
         filters: List<EventFilter>,
         processEvent: suspend (CloudEvent, Int) -> JsonElement,
-    ): List<JsonElement> = filters.mapIndexed { index, filter ->
-        val cloudEvent = eventFlow
-            .filter { CloudEventUtils.matchesFilters(it, listOf(filter)) }
-            .first()
-        processEvent(cloudEvent, index)
+    ): List<JsonElement> {
+        data class MatchedEvent(val firstFilterIndex: Int, val result: JsonElement)
+
+        val matchedEvents = mutableListOf<MatchedEvent>()
+        val unsatisfiedIndices = filters.indices.toMutableSet()
+
+        val channel = eventFlow.toChannel()
+        try {
+            for (cloudEvent in channel) {
+                val matchingIndices = unsatisfiedIndices.filter { index ->
+                    CloudEventUtils.matchesFilters(cloudEvent, listOf(filters[index]))
+                }
+
+                if (matchingIndices.isNotEmpty()) {
+                    val firstMatchingIndex = matchingIndices.min()
+                    val processedResult = processEvent(cloudEvent, firstMatchingIndex)
+                    matchedEvents.add(MatchedEvent(firstMatchingIndex, processedResult))
+
+                    for (index in matchingIndices) {
+                        unsatisfiedIndices.remove(index)
+                        logger.debug { "Filter $index satisfied by event type=${cloudEvent.type}" }
+                    }
+                }
+
+                if (unsatisfiedIndices.isEmpty()) {
+                    logger.debug { "All ${filters.size} filters satisfied" }
+                    break
+                }
+            }
+        } finally {
+            channel.cancel()
+        }
+
+        return matchedEvents.map { it.result }
     }
 
     private suspend fun collectUntilExpression(

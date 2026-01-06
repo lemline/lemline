@@ -705,7 +705,7 @@ object ListenTestCases {
         ),
 
         WorkflowTestCase(
-            name = "listen all strategy waits for all event types, received in disorder",
+            name = "listen all strategy waits for all event types, output preserves the time order of filters",
             cloudEvents = listOf(
                 highTemperatureEvent,
                 orderCreatedCloudEvent,
@@ -723,7 +723,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "all"),
             validate = expectOutputMatching("both order and payment events") { output ->
-                output == JsonArray(listOf(orderCreatedData, highTemperatureData))
+                output == JsonArray(listOf(highTemperatureData, orderCreatedData))
             }
         ),
 
@@ -775,7 +775,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "all"),
             validate = expectOutputMatching("both order and payment events") { output ->
-                output == JsonArray(listOf(orderCreatedData, paymentCompletedData, lowTemperatureData))
+                output == JsonArray(listOf(lowTemperatureData, orderCreatedData, paymentCompletedData))
             }
         ),
 
@@ -797,13 +797,8 @@ object ListenTestCases {
                         read: envelope
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "read", "envelope"),
-            // SKIP: CloudEvent envelope contains dynamic 'id' field (random UUID)
             validate = expectOutputMatching("full CloudEvent envelope") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.isNotEmpty() &&
-                    arr[0].jsonObject["type"]?.jsonPrimitive?.contentOrNull == "order.shipped" &&
-                    arr[0].jsonObject["subject"]?.jsonPrimitive?.contentOrNull == "order/ORD-999" &&
-                    arr[0].jsonObject["data"]?.jsonObject?.get("orderId")?.jsonPrimitive?.contentOrNull == "ORD-999"
+                output == JsonArray(listOf(eventWithSubject.toJsonElement(ListenAndReadAs.ENVELOPE)))
             }
         ),
 
