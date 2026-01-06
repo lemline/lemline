@@ -255,6 +255,20 @@ object TestMocks {
         })
     }
 
+    internal val orderCreatedData2 = buildJsonObject {
+        put("orderId", "ORD-54321")
+        put("customerId", "CUST-002")
+        put("total", 12.34)
+        put("currency", "EUR")
+        put("items", buildJsonArray {
+            add(buildJsonObject {
+                put("productId", "PROD-002")
+                put("quantity", 3)
+                put("price", 29.99)
+            })
+        })
+    }
+
     /** Mock CloudEvent data for user.registered events */
     internal val userRegisteredData = buildJsonObject {
         put("userId", "USR-98765")
@@ -392,6 +406,8 @@ object TestMocks {
 
     /** CloudEvent for order.created */
     val orderCreatedCloudEvent: CloudEvent = buildCloudEvent("order.created", orderCreatedData)
+
+    val orderCreatedCloudEvent2: CloudEvent = buildCloudEvent("order.created", orderCreatedData2)
 
     /** CloudEvent for user.registered */
     val userRegisteredCloudEvent: CloudEvent = buildCloudEvent("user.registered", userRegisteredData)

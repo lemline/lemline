@@ -212,8 +212,8 @@ object FullOrchestrator {
         @Suppress("UNCHECKED_CAST")
         val listenNode = workflow.getNode(listenStarted.nodePosition) as Node<ListenTask>
 
-        val foreachProcessor = listenNode.foreachBlock?.position?.let { pos ->
-            ListenEventCollector.createForeachProcessor(pos) { cmd ->
+        val foreachProcessor = listenNode.foreachBlock?.let { foreachBlock ->
+            ListenEventCollector.createForeachProcessor(foreachBlock.position, foreachBlock.task) { cmd ->
                 resume(workflow, cmd, serde, activityExecutor, cloudEventHook, lifecycleHook)
             }
         }

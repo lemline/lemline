@@ -6,9 +6,11 @@ import com.lemline.common.values.NodePosition
 import com.lemline.core.cloudevents.CloudEventUtils
 import com.lemline.core.cloudevents.CloudEventUtils.toJsonElement
 import com.lemline.core.errors.InternalException
+import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenStrategy
 import com.lemline.core.processors.UntilCondition
+import com.lemline.core.states.ForeachState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
@@ -208,12 +210,39 @@ internal object ListenEventCollector {
 
     fun createForeachProcessor(
         foreachPosition: NodePosition,
+        foreachTask: ForeachTask,
         resumeFn: suspend (WorkflowCommand) -> WorkflowEvent.Outcome,
     ): ForeachProcessor = { nodeStack, eventData, iterationIndex ->
         logger.debug { "Processing foreach iteration $iterationIndex with event: $eventData" }
 
+        val updatedNodeStack: NodeStack
+        val updatedState: ForeachState
+
+        when (iterationIndex) {
+            0 -> {
+                // as we come from the listen node, the foreach state is not yet on the stack
+                updatedState = ForeachState(
+                    item = eventData,
+                    index = iterationIndex,
+                    itemVar = foreachTask.itemVar,
+                    indexVar = foreachTask.indexVar
+                )
+                updatedNodeStack = nodeStack.push(foreachPosition, updatedState)
+            }
+
+            else -> {
+                // we come from the previous iteration, so the foreach state is already on the stack
+                val foreachState = nodeStack.currentState as ForeachState
+                updatedState = foreachState.copy(
+                    item = eventData,
+                    index = iterationIndex
+                )
+                updatedNodeStack = nodeStack.updateTopState(updatedState)
+            }
+        }
+
         val foreachCommand = WorkflowCommand.ResumeFromTask(
-            nodeStack = nodeStack,
+            nodeStack = updatedNodeStack,
             nodePosition = foreachPosition,
             rawInput = eventData,
         )
