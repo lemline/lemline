@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.listeners.outbox
 
+import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.nodes.Node
-import com.lemline.core.states.ListenState
+import com.lemline.core.states.ForeachState
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.workflows.WorkflowCache
 import com.lemline.core.workflows.foreachBlock
@@ -126,20 +127,10 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
         }
     }
 
-    /**
-     * Process a single event by sending ResumeFromTask to execute foreach.do.
-     * Applies the readAs transformation to the stored CloudEvent.
-     */
     private suspend fun process(listenerEvent: ListenerEventModel, listener: ListenerModel) {
         val listenStarted = listener.instanceMessage.workflowState
 
         val eventData = CloudEventService.parseStringAsData(listenerEvent.event, listener.readAs)
-
-        val currentListenState = listenStarted.nodeStack.currentState as? ListenState
-            ?: error("Listen state not found at current position")
-
-        val updatedNodeStack = listenStarted.nodeStack
-            .updateCurrentState(currentListenState.copy(eventId = listenerEvent.eventId), listenerEvent.sortKey)
 
         val workflow = WorkflowCache.getWorkflow(
             namespace = listener.workflowNamespace,
@@ -149,12 +140,26 @@ class ListenerForeachOutbox : AbstractOutbox<ListenerEventModel>() {
 
         @Suppress("UNCHECKED_CAST")
         val listenNode = workflow.getNode(listenStarted.nodePosition) as Node<ListenTask>
-        val foreachPosition = listenNode.foreachBlock?.position
+        val foreachNode = listenNode.foreachBlock
             ?: error("Listen task at ${listenStarted.nodePosition} has no foreach block")
+        val foreachTask = foreachNode.task as ForeachTask
+
+        val foreachState = ForeachState(
+            item = eventData,
+            index = listenerEvent.sortKey,
+            itemVar = foreachTask.itemVar,
+            indexVar = foreachTask.indexVar,
+        )
+
+        val updatedNodeStack = listenStarted.nodeStack.push(
+            position = foreachNode.position,
+            state = foreachState,
+            executionIndex = listenerEvent.sortKey
+        )
 
         val resumeCommand = WorkflowCommand.ResumeFromTask(
             nodeStack = updatedNodeStack,
-            nodePosition = foreachPosition,
+            nodePosition = foreachNode.position,
             rawInput = eventData
         )
 

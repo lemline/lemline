@@ -6,7 +6,7 @@ import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.lifecycleevents.LifecycleEventHook
-import com.lemline.core.testcases.WorkflowTestResult
+import com.lemline.core.testcases.impl.WorkflowTestResult
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
@@ -308,18 +308,29 @@ private class ListenForeachSequentialDebugTest {
                             while (rs.next()) {
                                 println(
                                     "  event_id=${rs.getString(1).take(8)}, completed=${rs.getBoolean(2)}, " +
-                                        "delayed=${rs.getTimestamp(3) != null}, completed_at=${rs.getTimestamp(4) != null}, sort=${rs.getLong(5)}"
+                                        "delayed=${rs.getTimestamp(3) != null}, completed_at=${rs.getTimestamp(4) != null}, sort=${
+                                            rs.getLong(
+                                                5
+                                            )
+                                        }"
                                 )
                             }
                         }
                     }
-                    connection.prepareStatement("SELECT closed_at, outbox_delayed_until FROM lemline_listeners").use { stmt ->
-                        stmt.executeQuery().use { rs ->
-                            while (rs.next()) {
-                                println("  Listener: closed=${rs.getTimestamp(1) != null}, outbox_delayed=${rs.getTimestamp(2) != null}")
+                    connection.prepareStatement("SELECT closed_at, outbox_delayed_until FROM lemline_listeners")
+                        .use { stmt ->
+                            stmt.executeQuery().use { rs ->
+                                while (rs.next()) {
+                                    println(
+                                        "  Listener: closed=${rs.getTimestamp(1) != null}, outbox_delayed=${
+                                            rs.getTimestamp(
+                                                2
+                                            ) != null
+                                        }"
+                                    )
+                                }
                             }
                         }
-                    }
                 }
             }
 

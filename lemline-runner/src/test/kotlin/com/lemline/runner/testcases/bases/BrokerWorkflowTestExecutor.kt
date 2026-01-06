@@ -5,9 +5,10 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
-import com.lemline.core.testcases.WorkflowTestResult
+import com.lemline.core.testcases.impl.WorkflowTestResult
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.DatabaseManager
+import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
@@ -76,6 +77,9 @@ internal class BrokerWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
 
     @Inject
     override lateinit var listenerRepository: ListenerRepository
+
+    @Inject
+    override lateinit var testModeConfiguration: TestModeConfiguration
 
     @Inject
     lateinit var commandEmitter: WorkflowCommandEmitter

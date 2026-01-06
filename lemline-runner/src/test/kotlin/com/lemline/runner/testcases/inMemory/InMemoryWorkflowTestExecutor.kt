@@ -5,7 +5,7 @@ import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
-import com.lemline.core.testcases.WorkflowTestResult
+import com.lemline.core.testcases.impl.WorkflowTestResult
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.definitions.DefinitionRepository
@@ -15,6 +15,7 @@ import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
+import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.starters.Starter
 import com.lemline.runner.testcases.TestLifecycleEventListener
 import com.lemline.runner.testcases.bases.AbstractWorkflowTestExecutor
@@ -71,6 +72,9 @@ internal class InMemoryWorkflowTestExecutor : AbstractWorkflowTestExecutor() {
 
     @Inject
     override lateinit var listenerRepository: ListenerRepository
+
+    @Inject
+    override lateinit var testModeConfiguration: TestModeConfiguration
 
     @Inject
     @Any

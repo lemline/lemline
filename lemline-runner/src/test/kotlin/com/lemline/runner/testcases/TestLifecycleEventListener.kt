@@ -4,7 +4,7 @@ package com.lemline.runner.testcases
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventData
-import com.lemline.core.testcases.WorkflowTestResult
+import com.lemline.core.testcases.impl.WorkflowTestResult
 import com.lemline.core.lifecycleevents.LifecycleEventType
 import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat

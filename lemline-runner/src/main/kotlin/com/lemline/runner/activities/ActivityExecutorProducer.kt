@@ -1,54 +1,39 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.activities
 
-import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
 import com.lemline.core.activities.mock.MockActivityExecutor
+import com.lemline.core.states.WorkflowEvent.ActivityStarted
 import com.lemline.runner.common.activities.TestModeConfiguration
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.enterprise.inject.Produces
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
+import kotlinx.serialization.json.JsonElement
 
-/**
- * CDI producer that selects the appropriate [ActivityExecutor] implementation
- * based on the test mode configuration.
- *
- * When `--mock-config` is provided via CLI, [MockActivityExecutor] is used.
- * Otherwise, [RunnerActivityExecutor] is used for normal operation.
- */
 @ApplicationScoped
 class ActivityExecutorProducer {
-
-    private val logger = logger()
 
     @Inject
     lateinit var testModeConfiguration: TestModeConfiguration
 
-    // Lazy-initialized RunnerActivityExecutor (not a CDI bean)
-    @OptIn(ExperimentalTime::class)
-    private val runnerActivityExecutor: RunnerActivityExecutor by lazy {
-        RunnerActivityExecutor()
-    }
+    @ExperimentalTime
+    private val runnerActivityExecutor by lazy { RunnerActivityExecutor() }
 
-    /**
-     * Produces the appropriate ActivityExecutor based on test mode configuration.
-     */
-    @OptIn(ExperimentalTime::class)
     @Produces
+    @ExperimentalTime
     @ApplicationScoped
-    fun produceActivityExecutor(): ActivityExecutor {
-        return if (testModeConfiguration.isEnabled) {
-            logger.info { "Test mode enabled - using MockActivityExecutor" }
-            val mockConfigPath = testModeConfiguration.mockConfigPath
-            if (mockConfigPath != null) {
-                MockActivityExecutor.fromFile(mockConfigPath)
-            } else {
-                MockActivityExecutor.empty()
+    fun produce(): ActivityExecutor = object : ActivityExecutor {
+        override suspend fun execute(event: ActivityStarted): JsonElement {
+            testModeConfiguration.mockConfiguration?.let {
+                return MockActivityExecutor(it).execute(event)
             }
-        } else {
-            logger.debug { "Normal mode - using RunnerActivityExecutor" }
-            runnerActivityExecutor
+
+            testModeConfiguration.mockConfigPath?.let {
+                return MockActivityExecutor.fromFile(it).execute(event)
+            }
+
+            return runnerActivityExecutor.execute(event)
         }
     }
 }

@@ -2,6 +2,7 @@
 package com.lemline.runner.listeners
 
 import com.lemline.common.values.IDV7
+import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
@@ -23,8 +24,11 @@ import com.lemline.runner.common.repositories.ops.OUTBOX_FAILED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
 import com.lemline.runner.common.repositories.ops.OutboxRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
+import com.lemline.runner.common.repositories.ops.WORKFLOW_ID_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_NAMESPACE_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_NAME_COLUMN
+import com.lemline.runner.common.repositories.ops.WORKFLOW_POSITION_COLUMN
+import com.lemline.runner.common.repositories.ops.WORKFLOW_STATE_COLUMN
 import com.lemline.runner.common.repositories.ops.WORKFLOW_VERSION_COLUMN
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.getInstanceMessage
@@ -221,6 +225,29 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
         ORDER BY $TIMEOUT_AT_COLUMN ASC
         LIMIT ?
         FOR UPDATE SKIP LOCKED
+        """.trimIndent()
+    }
+
+    suspend fun findByWorkflowIdAndPosition(
+        workflowId: WorkflowId,
+        position: String,
+        connection: Connection? = null
+    ): ListenerModel? = databaseConfig.withConnection(connection) { conn ->
+        conn.prepareStatement(findByWorkflowIdAndPositionSql).use { stmt ->
+            idHelper.set(stmt, 1, workflowId.value)
+            stmt.setString(2, position)
+            stmt.executeQuery().use { rs ->
+                if (rs.next()) createModel(rs) else null
+            }
+        }
+    }
+
+    private val findByWorkflowIdAndPositionSql by lazy {
+        """
+        SELECT * FROM $tableName
+        WHERE $WORKFLOW_ID_COLUMN = ?
+          AND $WORKFLOW_POSITION_COLUMN = ?
+        LIMIT 1
         """.trimIndent()
     }
 
@@ -465,6 +492,43 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                 stmt.executeUpdate()
             }
         }
+    }
+
+    /**
+     * Updates the workflow_state for a listener after a foreach iteration completes.
+     *
+     * This is critical for foreach iterations that export to context - the updated
+     * nodeStack (containing new context values) must be persisted so subsequent
+     * foreach iterations see the updated state.
+     *
+     * @param workflowId The workflow ID
+     * @param nodePosition The listen task position
+     * @param newWorkflowState The updated workflow state as JSON string
+     * @return Number of rows updated (1 if successful, 0 if listener not found)
+     */
+    suspend fun updateWorkflowState(
+        workflowId: WorkflowId,
+        nodePosition: String,
+        newWorkflowState: String,
+        connection: Connection? = null
+    ): Int = databaseConfig.withConnection(connection) { conn ->
+        conn.prepareStatement(updateWorkflowStateSql).use { stmt ->
+            stmt.setString(1, newWorkflowState)
+            stmt.setTimestamp(2, nowTimestamp())
+            idHelper.set(stmt, 3, workflowId.value)
+            stmt.setString(4, nodePosition)
+            stmt.executeUpdate()
+        }
+    }
+
+    private val updateWorkflowStateSql by lazy {
+        """
+        UPDATE $tableName
+        SET $WORKFLOW_STATE_COLUMN = ?,
+            $UPDATED_AT_COLUMN = ?
+        WHERE $WORKFLOW_ID_COLUMN = ?
+          AND $WORKFLOW_POSITION_COLUMN = ?
+        """.trimIndent()
     }
 
     /**

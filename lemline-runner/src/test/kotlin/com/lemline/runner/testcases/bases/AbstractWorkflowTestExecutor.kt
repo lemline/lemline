@@ -9,11 +9,13 @@ import com.lemline.common.values.WorkflowVersion
 import com.lemline.core.activities.mock.MockConfiguration
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
-import com.lemline.core.testcases.WorkflowDependency
-import com.lemline.core.testcases.WorkflowTestExecutor
-import com.lemline.core.testcases.WorkflowTestResult
+import com.lemline.core.testcases.impl.WorkflowDependency
+import com.lemline.core.testcases.impl.WorkflowTestExecutor
+import com.lemline.core.testcases.impl.WorkflowTestResult
+import com.lemline.core.workflows.WorkflowCache
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.DatabaseManager
+import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerRepository
@@ -61,6 +63,7 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
     protected abstract val starter: Starter
     protected abstract val lifecycleHook: LifecycleEventHook
     protected abstract val listenerRepository: ListenerRepository
+    protected abstract val testModeConfiguration: TestModeConfiguration
 
     /** Default timeout for workflow completion in seconds */
     protected open val defaultTimeoutSeconds: Long = 5L
@@ -124,15 +127,17 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         version: String,
         dependencies: List<WorkflowDependency>,
         mockConfig: MockConfiguration,
-        cloudEvents: List<CloudEvent>
+        cloudEvents: List<CloudEvent>,
+        validateDefinition: Boolean,
     ): WorkflowTestResult {
         val uniqueName = "workflow-${yaml.hashCode()}"
         val workflowId = WorkflowId.random()
 
+        testModeConfiguration.setMockConfiguration(mockConfig)
         return try {
             lifecycleListener.clear()
-            registerDependencies(dependencies)
-            registerWorkflowInDatabase(yaml, namespace, uniqueName, version)
+            registerDependencies(dependencies, validateDefinition)
+            registerWorkflowInDatabase(yaml, namespace, uniqueName, version, validateDefinition)
 
             prepareAndStartWorkflow(workflowId, namespace, uniqueName, version, input)
 
@@ -146,6 +151,8 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
                 error = e.message ?: e::class.simpleName ?: "Unknown error",
                 exception = e
             )
+        } finally {
+            testModeConfiguration.clearMockConfiguration()
         }
     }
 
@@ -246,9 +253,9 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
     /**
      * Registers workflow dependencies in the database.
      */
-    private suspend fun registerDependencies(dependencies: List<WorkflowDependency>) {
+    private suspend fun registerDependencies(dependencies: List<WorkflowDependency>, validateDefinition: Boolean) {
         dependencies.forEach { dep ->
-            registerWorkflowInDatabase(dep.yaml, dep.namespace, dep.name, dep.version)
+            registerWorkflowInDatabase(dep.yaml, dep.namespace, dep.name, dep.version, validateDefinition)
         }
     }
 
@@ -278,12 +285,19 @@ internal abstract class AbstractWorkflowTestExecutor : WorkflowTestExecutor {
         yaml: String,
         namespace: String,
         name: String,
-        version: String
+        version: String,
+        validateDefinition: Boolean
     ) {
         val ns = WorkflowNamespace(namespace)
         val n = WorkflowName(name)
         val v = WorkflowVersion(version)
         val fullYaml = addDocumentHeader(yaml, namespace, name, version)
+
+        if (validateDefinition) {
+            WorkflowCache.parseYamlAndPut(fullYaml)
+        } else {
+            WorkflowCache.parseYamlAndPutNoValidation(fullYaml)
+        }
 
         databaseManager.withTransaction { conn ->
             val existing = definitionRepository.findByNameAndVersion(ns, n, v, conn)

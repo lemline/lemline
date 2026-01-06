@@ -1,54 +1,38 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.common.activities
 
+import com.lemline.core.activities.mock.MockConfiguration
 import jakarta.enterprise.context.ApplicationScoped
 
 /**
- * Runtime configuration holder for test mode.
+ * Runtime holder for mock configuration used by ActivityExecutor.
  *
- * This singleton captures the CLI flags from ListenCommand and makes them
- * available to CDI beans that need to determine whether test mode is enabled.
+ * Supports two sources:
+ * - File path: Set via CLI `--mock-config=/path/to/mocks.yaml`
+ * - Programmatic: Set via [setMockConfiguration] for per-test mocking
  *
- * Test mode is enabled via `--test-mode` flag on the listen command:
- * ```bash
- * ./lemline-runner listen --test-mode --mock-config=/path/to/mocks.yaml
- * ```
- *
- * When test mode is enabled, TestActivityExecutor is used instead of
- * RunnerActivityExecutor for all activity execution.
+ * Programmatic config takes precedence over file path.
  */
 @ApplicationScoped
 class TestModeConfiguration {
 
-    /**
-     * Whether test mode is enabled.
-     */
     @Volatile
-    private var _isEnabled: Boolean = false
-    val isEnabled: Boolean get() = _isEnabled
+    var mockConfigPath: String? = null
+        private set
 
-    /**
-     * Path to mock configuration file (YAML/JSON).
-     */
     @Volatile
-    private var _mockConfigPath: String? = null
-    val mockConfigPath: String? get() = _mockConfigPath
+    var mockConfiguration: MockConfiguration? = null
+        private set
 
-    /**
-     * Enable test mode with optional mock configuration path.
-     *
-     * @param mockConfigPath Path to mock configuration file (optional)
-     */
     fun enable(mockConfigPath: String? = null) {
-        this._isEnabled = true
-        this._mockConfigPath = mockConfigPath
+        this.mockConfigPath = mockConfigPath
     }
 
-    /**
-     * Disable test mode (primarily for testing).
-     */
-    fun disable() {
-        this._isEnabled = false
-        this._mockConfigPath = null
+    fun setMockConfiguration(config: MockConfiguration?) {
+        this.mockConfiguration = config
+    }
+
+    fun clearMockConfiguration() {
+        this.mockConfiguration = null
     }
 }

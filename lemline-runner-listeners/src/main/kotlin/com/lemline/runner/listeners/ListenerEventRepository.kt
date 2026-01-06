@@ -561,6 +561,48 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     // ========================================
 
     /**
+     * Finds the listener ID for an event using workflow identity and position.
+     *
+     * This method uses the triple (workflowId, position, eventId) to uniquely identify
+     * a listener event and return its parent listener ID. This is the correct way to
+     * find a listener during foreach processing, as workflowId + position alone does
+     * not guarantee uniqueness.
+     *
+     * @param workflowId The workflow instance ID
+     * @param position The listen task position in the workflow tree
+     * @param eventId CloudEvent ID from the listen state
+     * @param connection Optional existing connection to reuse
+     * @return The listener ID if found, null otherwise
+     */
+    suspend fun findListenerIdByEvent(
+        workflowId: WorkflowId,
+        position: NodePosition,
+        eventId: String,
+        connection: Connection? = null
+    ): IDV7? = databaseConfig.withConnection(connection) { conn ->
+        conn.prepareStatement(findListenerIdByEventSql).use { stmt ->
+            setIDV7(stmt, 1, workflowId.value)
+            stmt.setString(2, position.toString())
+            stmt.setString(3, eventId)
+            stmt.executeQuery().use { rs ->
+                if (rs.next()) getIDV7(rs, LISTENER_ID_COLUMN) else null
+            }
+        }
+    }
+
+    private val findListenerIdByEventSql by lazy {
+        """
+        SELECT e.$LISTENER_ID_COLUMN
+        FROM $tableName e
+        JOIN $LISTENER_TABLE l ON l.$ID_COLUMN = e.$LISTENER_ID_COLUMN
+        WHERE l.$WORKFLOW_ID_COLUMN = ?
+          AND l.$WORKFLOW_POSITION_COLUMN = ?
+          AND e.$EVENT_ID_COLUMN = ?
+        LIMIT 1
+        """.trimIndent()
+    }
+
+    /**
      * Finds all events for a listener, ordered by created_at (arrival order).
      *
      * @param listenerId The listener ID to query events for

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.testcases.bases
 
-import com.lemline.core.testcases.WorkflowTestCase
-import com.lemline.core.testcases.WorkflowTestExecutor
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -10,7 +10,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 /**
  * Abstract base class for broker-based workflow execution tests.
  *
- * This class uses JUnit5's dynamic tests to execute shared [com.lemline.core.testcases.WorkflowTestCase]s
+ * This class uses JUnit5's dynamic tests to execute shared [WorkflowTestCase]s
  * from lemline-core's testFixtures against real message brokers (Kafka/RabbitMQ).
  *
  * Unlike [com.lemline.runner.testcases.inMemory.InMemoryWorkflowTest] which uses in-memory channels,

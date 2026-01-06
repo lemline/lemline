@@ -53,9 +53,12 @@ class ListenerService {
      * @return true if the listener was created, false if it already existed (idempotent)
      */
     suspend fun handleListenStarted(instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>): Boolean {
-        val state = instanceMessage.workflowState
-        val config = state.config
-        val listenerId = state.nodeStack.deriveIdempotentId("-listen")
+        val listenStarted = instanceMessage.workflowState
+        val config = listenStarted.config
+
+        // Derive listener ID from node stack (idempotent)
+        // Note: (workflow instance ID + node position) is not sufficient for idempotency
+        val listenerId = listenStarted.nodeStack.deriveIdempotentId("-listen")
 
         // Create listener model - workflow identity derived from instanceMessage
         val listener = ListenerModel(
@@ -73,7 +76,7 @@ class ListenerService {
 
         // Lookup hasForeach and until configuration from cached workflow definition
         val listenTask = WorkflowCache.getListenTasks(instanceMessage.workflowInfo).find {
-            it.nodePosition == state.nodePosition
+            it.nodePosition == listenStarted.nodePosition
         }
         listener.hasForeach = listenTask?.hasForeach ?: false
 
@@ -87,13 +90,13 @@ class ListenerService {
         val rowsInserted = listenerRepository.insert(listener)
 
         if (rowsInserted == 0) {
-            logger.warn { "Listener $listenerId already exists (idempotent insert)" }
+            logger.warn { "Listener already exists (idempotent insert): $listener" }
             return false
         }
 
         logger.debug {
             "Listen task started: $listenerId for workflow ${instanceMessage.workflowId} " +
-                "at position ${state.nodePosition}"
+                "at position ${listenStarted.nodePosition}"
         }
         return true
     }

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.testcases.bases
 
-import com.lemline.core.testcases.WorkflowTestCase
-import com.lemline.core.testcases.WorkflowTestExecutor
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import com.lemline.runner.testcases.PlatformUtils
 import kotlin.time.ExperimentalTime
 import kotlinx.coroutines.runBlocking
@@ -51,7 +51,9 @@ internal abstract class AbstractWorkflowTest(
                             yaml = case.yaml,
                             input = case.input,
                             dependencies = case.dependencies,
-                            cloudEvents = case.cloudEvents
+                            mockConfig = case.mockConfig,
+                            cloudEvents = case.cloudEvents,
+                            validateDefinition = case.validateDefinition
                         )
 
                         val validationError = case.validate(result)

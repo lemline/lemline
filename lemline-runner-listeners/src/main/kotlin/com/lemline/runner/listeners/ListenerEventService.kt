@@ -4,8 +4,8 @@ package com.lemline.runner.listeners
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
+import com.lemline.common.values.IDV7
 import com.lemline.core.expressions.JQExpression
-import com.lemline.core.states.ListenState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.cloudevents.CloudEvent
@@ -305,40 +305,47 @@ class ListenerEventService {
         }
     }
 
-    /**
-     * Handles foreach iteration completion.
-     *
-     * When a foreach.do completes for a single event:
-     * 1. Extract eventId from the listen state in the nodeStack
-     * 2. Mark the event as completed with output using workflowId + position + eventId
-     * 3. The next event in FIFO sequence is triggered automatically
-     *
-     * @param message The instance message containing the listen foreach completed event
-     */
-    suspend fun handleListenForEachCompleted(message: InstanceMessage<WorkflowEvent.ListenForEachCompleted>) {
-        val state = message.workflowState
-        val iterationOutput = state.output
-        val listenPosition = state.nodePosition
+    suspend fun handleForEachCompleted(message: InstanceMessage<WorkflowEvent.ForEachCompleted>) {
+        val forEachCompleted = message.workflowState
+        val forEachOutput = forEachCompleted.output
+        val forEachPosition = forEachCompleted.nodePosition
+        val eventId = IDV7.random().toString() // TODO
 
-        logger.debug { "ListenForEachCompleted: listenPosition=$listenPosition" }
+        logger.debug { "ListenForEachCompleted: listenPosition=$forEachPosition, eventId=$eventId" }
 
-        val listenState = state.nodeStack.currentState as? ListenState
-            ?: error("Listen state not found at current position")
-
-        val eventId = listenState.eventId
-            ?: error("EventId not set in listen state")
-
-        val outputJson = LemlineJson.encodeToString(iterationOutput)
+        val outputJson = LemlineJson.encodeToString(forEachOutput)
 
         listenerEventRepository.markForeachCompleted(
             message.workflowId,
-            listenPosition,
+            forEachPosition,
             eventId,
             outputJson
         )
 
+        val listenerId = listenerEventRepository.findListenerIdByEvent(
+            message.workflowId,
+            forEachPosition,
+            eventId
+        )
+        val listener = listenerId?.let { listenerRepository.findById(it) }
+
+        if (listener != null) {
+            val originalListenStarted = listener.instanceMessage.workflowState
+            val updatedListenStarted = WorkflowEvent.ListenStarted(
+                nodeStack = forEachCompleted.nodeStack,
+                rawOutput = originalListenStarted.rawOutput,
+                config = originalListenStarted.config
+            )
+            listenerRepository.updateWorkflowState(
+                message.workflowId,
+                forEachPosition.toString(),
+                updatedListenStarted.toJsonString()
+            )
+            logger.debug { "Updated listener workflow_state with new nodeStack for context persistence" }
+        }
+
         logger.info {
-            "Foreach event (workflowId=${message.workflowId}, position=$listenPosition, eventId=$eventId) completed"
+            "Foreach event (workflowId=${message.workflowId}, position=$forEachPosition, eventId=$eventId) completed"
         }
     }
 }

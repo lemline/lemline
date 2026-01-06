@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.testcases.inMemory
 
-import com.lemline.core.testcases.WorkflowTestCase
-import com.lemline.core.testcases.WorkflowTestExecutor
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import com.lemline.runner.testcases.bases.AbstractWorkflowTest
 import jakarta.inject.Inject
 import kotlin.time.ExperimentalTime

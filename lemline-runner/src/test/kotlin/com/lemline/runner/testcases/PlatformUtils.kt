@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.testcases
 
-import com.lemline.core.testcases.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestCase
 
 /**
  * Utility functions for platform-specific test filtering.
