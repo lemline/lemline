@@ -300,4 +300,4 @@ class ForkService {
 }
 
 internal fun NodeStack.forkId(): IDV7 = deriveIdempotentId("-fork")
-internal fun NodeStack.previousForkId(): IDV7 = decrementTopFrame().deriveIdempotentId("-fork")
+internal fun NodeStack.previousForkId(): IDV7 = decrementTopCounter().deriveIdempotentId("-fork")
