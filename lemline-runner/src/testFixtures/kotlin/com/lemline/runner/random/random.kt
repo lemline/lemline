@@ -43,11 +43,13 @@ import kotlinx.serialization.json.JsonElement
 
 private fun NodeStack.Companion.random(): NodeStack = NodeStack.fromFrames(
     listOf(
-        StackFrame(NodePosition.root, RootState(
-            startedAt = Clock.System.now(),
-            workflowId = WorkflowId.random(),
-            workflowInput = JsonElement.random()
-        ))
+        StackFrame(
+            NodePosition.root, RootState(
+                startedAt = Clock.System.now(),
+                workflowId = WorkflowId.random(),
+                workflowInput = JsonElement.random()
+            )
+        )
     )
 )
 
@@ -200,21 +202,18 @@ fun WaitModel.Companion.random() = WaitModel(
 }
 
 fun ForkModel.Companion.random() = ForkModel(
-    id = IDV7.random(),
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
         workflowState = WorkflowEvent.ForkStarted.random(),
     ),
-    position = NodePosition.random().toString(),
-    compete = Random.nextBoolean()
+    compete = Random.nextBoolean(),
+    id = IDV7.random(),
+    position = NodePosition.random().toString()
 )
 
 fun ForkBranchModel.Companion.random(forkId: IDV7 = IDV7.random()) = ForkBranchModel(
     forkId = forkId,
-    name = String.random(),
-    output = null,
-    completedAt = null,
-    failedAt = null
+    branchPosition = String.random()
 )
 
 fun ListenerEventModel.Companion.random(
