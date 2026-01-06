@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.testcases
+package com.lemline.core.testcases.impl
 
+import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import io.kotest.core.spec.style.FunSpec
 import kotlinx.serialization.json.JsonElement
 

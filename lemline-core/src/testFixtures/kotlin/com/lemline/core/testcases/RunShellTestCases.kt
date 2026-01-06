@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
-import kotlinx.serialization.json.JsonObject
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for Shell execution.
@@ -168,8 +168,10 @@ object RunShellTestCases {
             """.trimIndent(),
             tags = setOf("shell"),
             validate = expectOutputMatching("data set with shell output") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("data") && obj["hasData"]?.jsonPrimitive?.content == "true"
+                output == buildJsonObject {
+                    put("data", "Hello World")
+                    put("hasData", true)
+                }
             }
         ),
 
@@ -187,8 +189,9 @@ object RunShellTestCases {
             """.trimIndent(),
             tags = setOf("shell"),
             validate = expectOutputMatching("transformed output with result") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("result")
+                output == buildJsonObject {
+                    put("result", "Hello World")
+                }
             }
         ),
 
@@ -211,8 +214,9 @@ object RunShellTestCases {
             """.trimIndent(),
             tags = setOf("shell"),
             validate = expectOutputMatching("result from last command") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("result")
+                output == buildJsonObject {
+                    put("result", "Hello World")
+                }
             }
         ),
 

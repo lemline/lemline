@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import com.lemline.core.testcases.TestMocks.commentsForPost1
+import com.lemline.core.testcases.TestMocks.createdPostResponse
+import com.lemline.core.testcases.TestMocks.deleteResponse
+import com.lemline.core.testcases.TestMocks.post1Response
+import com.lemline.core.testcases.TestMocks.updatedPostResponse
+import com.lemline.core.testcases.TestMocks.user1Response
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for HTTP call execution.
@@ -28,12 +31,8 @@ object CallHttpTestCases {
                         endpoint: https://jsonplaceholder.typicode.com/posts/1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("id=1 with title and body") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["id"]?.jsonPrimitive?.int == 1 &&
-                    obj.containsKey("title") &&
-                    obj.containsKey("body") &&
-                    obj.containsKey("userId")
+            validate = expectOutputMatching("post1 response") { output ->
+                output == post1Response
             }
         ),
 
@@ -51,9 +50,8 @@ object CallHttpTestCases {
                           postId: 1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("array of comments for post 1") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.isNotEmpty() && arr[0].jsonObject["postId"]?.jsonPrimitive?.int == 1
+            validate = expectOutputMatching("comments for post 1") { output ->
+                output == commentsForPost1
             }
         ),
 
@@ -75,12 +73,8 @@ object CallHttpTestCases {
                           userId: 1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("created post with id") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("id") &&
-                    obj["title"]?.jsonPrimitive?.content == "Test Post" &&
-                    obj["body"]?.jsonPrimitive?.content == "This is a test post" &&
-                    obj["userId"]?.jsonPrimitive?.int == 1
+            validate = expectOutputMatching("created post response") { output ->
+                output == createdPostResponse
             }
         ),
 
@@ -101,11 +95,8 @@ object CallHttpTestCases {
                           userId: 1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("updated post") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["id"]?.jsonPrimitive?.int == 1 &&
-                    obj["title"]?.jsonPrimitive?.content == "Updated Title" &&
-                    obj["body"]?.jsonPrimitive?.content == "Updated body"
+            validate = expectOutputMatching("updated post response") { output ->
+                output == updatedPostResponse
             }
         ),
 
@@ -122,7 +113,7 @@ object CallHttpTestCases {
             """.trimIndent(),
             tags = setOf("http", "external"),
             validate = expectOutputMatching("empty object") { output ->
-                output is JsonObject
+                output == deleteResponse
             }
         ),
 
@@ -143,12 +134,10 @@ object CallHttpTestCases {
                       input:
                         from: ${ . }
             """.trimIndent(),
-            input = JsonObject(mapOf("someData" to JsonPrimitive("test"))),
+            input = buildJsonObject { put("someData", "test") },
             tags = setOf("http"),
-            validate = expectOutputMatching("created post with id") { output ->
-                // Mock returns a post with id (actual body values depend on mock config)
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("id") && obj.containsKey("title")
+            validate = expectOutputMatching("created post response") { output ->
+                output == createdPostResponse
             }
         ),
 
@@ -169,11 +158,8 @@ object CallHttpTestCases {
                         endpoint: https://jsonplaceholder.typicode.com/users/1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("user data from second call") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("id") &&
-                    obj.containsKey("name") &&
-                    obj.containsKey("email")
+            validate = expectOutputMatching("user1 response") { output ->
+                output == user1Response
             }
         ),
 
@@ -192,11 +178,8 @@ object CallHttpTestCases {
             tags = setOf("http"),
             // Note: Mock returns body directly, not the full response format.
             // Real execution would return {request, statusCode, headers, content}
-            validate = expectOutputMatching("valid JSON response") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                // With mocks, we get the body directly (id=1 post)
-                // With real execution, we'd get the full response format
-                obj.containsKey("id") || obj.containsKey("content")
+            validate = expectOutputMatching("post1 response (mock returns body)") { output ->
+                output == post1Response
             }
         ),
 
@@ -215,9 +198,8 @@ object CallHttpTestCases {
                           User-Agent: Lemline-Test
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("post with id=1") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["id"]?.jsonPrimitive?.int == 1
+            validate = expectOutputMatching("post1 response") { output ->
+                output == post1Response
             }
         ),
 
@@ -236,10 +218,10 @@ object CallHttpTestCases {
             """.trimIndent(),
             tags = setOf("http", "external"),
             validate = expectOutputMatching("transformed output with postTitle and postId") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("postTitle") &&
-                    obj.containsKey("postId") &&
-                    obj["postId"]?.jsonPrimitive?.int == 1
+                output == buildJsonObject {
+                    put("postTitle", "sunt aut facere repellat provident occaecati excepturi optio reprehenderit")
+                    put("postId", 1)
+                }
             }
         ),
 
@@ -258,10 +240,10 @@ object CallHttpTestCases {
                         result: ${ .title }
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("result contains title") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("result") &&
-                    obj["result"]?.jsonPrimitive?.content?.isNotEmpty() == true
+            validate = expectOutputMatching("result contains title from post1") { output ->
+                output == buildJsonObject {
+                    put("result", "sunt aut facere repellat provident occaecati excepturi optio reprehenderit")
+                }
             }
         )
     )

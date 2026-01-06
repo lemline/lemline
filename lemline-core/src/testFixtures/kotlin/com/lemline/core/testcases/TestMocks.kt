@@ -21,8 +21,7 @@ import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import java.net.URI
 import java.time.OffsetDateTime
-import java.util.UUID
-import kotlinx.serialization.json.JsonArray
+import java.util.*
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -42,7 +41,7 @@ object TestMocks {
     // ─────────────────────────────────────────────────────────────────────────
 
     /** Mock response for GET /posts/1 */
-    private val post1Response = buildJsonObject {
+    internal val post1Response = buildJsonObject {
         put("id", 1)
         put("title", "sunt aut facere repellat provident occaecati excepturi optio reprehenderit")
         put("body", "quia et suscipit\nsuscipit recusandae consequuntur")
@@ -50,7 +49,7 @@ object TestMocks {
     }
 
     /** Mock response for GET /posts/2 */
-    private val post2Response = buildJsonObject {
+    internal val post2Response = buildJsonObject {
         put("id", 2)
         put("title", "qui est esse")
         put("body", "est rerum tempore vitae")
@@ -58,7 +57,7 @@ object TestMocks {
     }
 
     /** Mock response for GET /comments?postId=1 */
-    private val commentsForPost1 = buildJsonArray {
+    internal val commentsForPost1 = buildJsonArray {
         add(buildJsonObject {
             put("id", 1)
             put("postId", 1)
@@ -71,12 +70,12 @@ object TestMocks {
             put("postId", 1)
             put("name", "quo vero reiciendis velit similique earum")
             put("email", "Jayne_Kuhic@sydney.com")
-            put("body", "est natus enim nihil est dolore omnis voluptatem"  )
+            put("body", "est natus enim nihil est dolore omnis voluptatem")
         })
     }
 
     /** Mock response for POST /posts (created post) */
-    private val createdPostResponse = buildJsonObject {
+    internal val createdPostResponse = buildJsonObject {
         put("id", 101)
         put("title", "Test Post")
         put("body", "This is a test post")
@@ -84,7 +83,7 @@ object TestMocks {
     }
 
     /** Mock response for PUT /posts/1 (updated post) */
-    private val updatedPostResponse = buildJsonObject {
+    internal val updatedPostResponse = buildJsonObject {
         put("id", 1)
         put("title", "Updated Title")
         put("body", "Updated body")
@@ -92,10 +91,10 @@ object TestMocks {
     }
 
     /** Mock response for DELETE /posts/1 (empty on success) */
-    private val deleteResponse = buildJsonObject { }
+    internal val deleteResponse = buildJsonObject { }
 
     /** Mock response for full response output format */
-    private val fullResponseOutput = buildJsonObject {
+    internal val fullResponseOutput = buildJsonObject {
         put("request", buildJsonObject {
             put("method", "GET")
             put("uri", "https://jsonplaceholder.typicode.com/posts/1")
@@ -109,7 +108,7 @@ object TestMocks {
     }
 
     /** Mock response for GET /users/1 */
-    private val user1Response = buildJsonObject {
+    internal val user1Response = buildJsonObject {
         put("id", 1)
         put("name", "Leanne Graham")
         put("username", "Bret")
@@ -242,7 +241,7 @@ object TestMocks {
     // ─────────────────────────────────────────────────────────────────────────
 
     /** Mock CloudEvent data for order.created events */
-    private val orderCreatedEvent = buildJsonObject {
+    internal val orderCreatedEvent = buildJsonObject {
         put("orderId", "ORD-12345")
         put("customerId", "CUST-001")
         put("total", 99.99)
@@ -257,7 +256,7 @@ object TestMocks {
     }
 
     /** Mock CloudEvent data for user.registered events */
-    private val userRegisteredEvent = buildJsonObject {
+    internal val userRegisteredEvent = buildJsonObject {
         put("userId", "USR-98765")
         put("email", "user@example.com")
         put("name", "John Doe")
@@ -265,7 +264,7 @@ object TestMocks {
     }
 
     /** Mock CloudEvent data for payment.completed events */
-    private val paymentCompletedEvent = buildJsonObject {
+    internal val paymentCompletedEvent = buildJsonObject {
         put("paymentId", "PAY-54321")
         put("orderId", "ORD-12345")
         put("amount", 99.99)
@@ -274,7 +273,7 @@ object TestMocks {
     }
 
     /** Mock CloudEvent data for sensor.reading events */
-    private val sensorReadingEvent = buildJsonObject {
+    internal val sensorReadingEvent = buildJsonObject {
         put("sensorId", "SENSOR-001")
         put("temperature", 23.5)
         put("humidity", 65)
@@ -282,7 +281,7 @@ object TestMocks {
     }
 
     /** Generic event for wildcard matching */
-    private val genericEvent = buildJsonObject {
+    internal val genericEvent = buildJsonObject {
         put("type", "generic")
         put("data", "mock event data")
         put("timestamp", "2024-01-15T12:00:00Z")

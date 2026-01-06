@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
-import kotlinx.serialization.json.JsonObject
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for Script execution.
@@ -184,8 +184,10 @@ object RunScriptTestCases {
             """.trimIndent(),
             tags = setOf("script", "js"),
             validate = expectOutputMatching("result set with script output") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("result") && obj["hasResult"]?.jsonPrimitive?.content == "true"
+                output == buildJsonObject {
+                    put("result", "mocked js output")
+                    put("hasResult", true)
+                }
             }
         ),
 
@@ -205,8 +207,9 @@ object RunScriptTestCases {
             """.trimIndent(),
             tags = setOf("script", "js"),
             validate = expectOutputMatching("transformed output with scriptResult") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("scriptResult")
+                output == buildJsonObject {
+                    put("scriptResult", "mocked js output")
+                }
             }
         ),
 
@@ -233,8 +236,9 @@ object RunScriptTestCases {
             """.trimIndent(),
             tags = setOf("script"),
             validate = expectOutputMatching("result from last script") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj.containsKey("result")
+                output == buildJsonObject {
+                    put("result", "mocked python output")
+                }
             }
         ),
 

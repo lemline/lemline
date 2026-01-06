@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonObject
 
 /**
  * Test cases for DoTask execution with complete workflows.
@@ -31,11 +32,9 @@ object DoTaskTestCases {
                       set:
                         result: ${ .value + 5 }
             """.trimIndent(),
-            input = JsonObject(emptyMap()),
-            validate = expectOutputMatching("result should be 15, value should not be present") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["value"]?.jsonPrimitive?.int == null &&
-                    obj["result"]?.jsonPrimitive?.int == 15
+            input = buildJsonObject { },
+            validate = expectOutputMatching("result=15") { output ->
+                output == buildJsonObject { put("result", 15) }
             }
         ),
 
@@ -56,15 +55,15 @@ object DoTaskTestCases {
                         items: ${ .items + ["second"] }
                         counter: ${ .counter + 1 }
             """.trimIndent(),
-            input = JsonObject(emptyMap()),
+            input = buildJsonObject { },
             validate = expectOutputMatching("counter=2, items=[first, second]") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val counter = obj["counter"]?.jsonPrimitive?.int
-                val items = obj["items"] as? JsonArray
-                counter == 2 &&
-                    items?.size == 2 &&
-                    items[0].jsonPrimitive.content == "first" &&
-                    items[1].jsonPrimitive.content == "second"
+                output == buildJsonObject {
+                    put("items", buildJsonArray {
+                        add(JsonPrimitive("first"))
+                        add(JsonPrimitive("second"))
+                    })
+                    put("counter", 2)
+                }
             }
         ),
 
@@ -77,11 +76,12 @@ object DoTaskTestCases {
                         taskName: ${ $task.name }
                         taskRef: ${ $task.reference }
             """.trimIndent(),
-            input = kotlinx.serialization.json.JsonPrimitive(42),
+            input = JsonPrimitive(42),
             validate = expectOutputMatching("taskName=taskWithMetadata, taskRef=/do/0/taskWithMetadata") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["taskName"]?.jsonPrimitive?.content == "taskWithMetadata" &&
-                    obj["taskRef"]?.jsonPrimitive?.content == "/do/0/taskWithMetadata"
+                output == buildJsonObject {
+                    put("taskName", "taskWithMetadata")
+                    put("taskRef", "/do/0/taskWithMetadata")
+                }
             }
         ),
 
@@ -95,10 +95,9 @@ object DoTaskTestCases {
                       set:
                         result: ${ $input }
             """.trimIndent(),
-            input = kotlinx.serialization.json.JsonPrimitive(5),
+            input = JsonPrimitive(5),
             validate = expectOutputMatching("result=50") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.int == 50
+                output == buildJsonObject { put("result", 50) }
             }
         ),
 
@@ -121,17 +120,18 @@ object DoTaskTestCases {
                         user: '${ {name: .name, age: .age} }'
                         metadata: '${ {timestamp: .timestamp, version: .version} }'
             """.trimIndent(),
-            input = JsonObject(emptyMap()),
+            input = buildJsonObject { },
             validate = expectOutputMatching("user and metadata objects") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val user = obj["user"]?.jsonObject
-                val metadata = obj["metadata"]?.jsonObject
-                user != null &&
-                    user["name"]?.jsonPrimitive?.content == "Alice" &&
-                    user["age"]?.jsonPrimitive?.int == 30 &&
-                    metadata != null &&
-                    metadata["timestamp"]?.jsonPrimitive?.content == "2025-01-01" &&
-                    metadata["version"]?.jsonPrimitive?.int == 1
+                output == buildJsonObject {
+                    putJsonObject("user") {
+                        put("name", "Alice")
+                        put("age", 30)
+                    }
+                    putJsonObject("metadata") {
+                        put("timestamp", "2025-01-01")
+                        put("version", 1)
+                    }
+                }
             }
         ),
 
@@ -146,10 +146,9 @@ object DoTaskTestCases {
                       set:
                         grade: ${ if .score >= 90 then "A" elif .score >= 80 then "B" else "C" end }
             """.trimIndent(),
-            input = JsonObject(emptyMap()),
+            input = buildJsonObject { },
             validate = expectOutputMatching("grade=B") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["grade"]?.jsonPrimitive?.content == "B"
+                output == buildJsonObject { put("grade", "B") }
             }
         ),
 
@@ -169,10 +168,9 @@ object DoTaskTestCases {
                       set:
                         result: ${ .doubled + 5 }
             """.trimIndent(),
-            input = JsonObject(emptyMap()),
+            input = buildJsonObject { },
             validate = expectOutputMatching("result=25") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.int == 25
+                output == buildJsonObject { put("result", 25) }
             }
         ),
 
@@ -185,11 +183,12 @@ object DoTaskTestCases {
                         hasWorkflowId: ${ $workflow.id != null }
                         hasWorkflowInput: ${ $workflow.input != null }
             """.trimIndent(),
-            input = kotlinx.serialization.json.JsonPrimitive(42),
+            input = JsonPrimitive(42),
             validate = expectOutputMatching("hasWorkflowId=true, hasWorkflowInput=true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["hasWorkflowId"]?.jsonPrimitive?.content?.toBoolean() == true &&
-                    obj["hasWorkflowInput"]?.jsonPrimitive?.content?.toBoolean() == true
+                output == buildJsonObject {
+                    put("hasWorkflowId", true)
+                    put("hasWorkflowInput", true)
+                }
             }
         ),
 
@@ -210,12 +209,9 @@ object DoTaskTestCases {
                       set:
                         final: ${ .added / 2 }
             """.trimIndent(),
-            input = JsonObject(emptyMap()),
-            validate = expectOutputMatching("final=55, base and added should not be present") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["base"]?.jsonPrimitive?.int == null &&
-                    obj["added"]?.jsonPrimitive?.int == null &&
-                    obj["final"]?.jsonPrimitive?.int == 55
+            input = buildJsonObject { },
+            validate = expectOutputMatching("final=55") { output ->
+                output == buildJsonObject { put("final", 55) }
             }
         ),
 
@@ -230,11 +226,12 @@ object DoTaskTestCases {
                       output:
                         as: '${ {result: .value, label: .name} }'
             """.trimIndent(),
-            input = JsonObject(emptyMap()),
+            input = buildJsonObject { },
             validate = expectOutputMatching("result=42, label=test") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.int == 42 &&
-                    obj["label"]?.jsonPrimitive?.content == "test"
+                output == buildJsonObject {
+                    put("result", 42)
+                    put("label", "test")
+                }
             }
         )
     )

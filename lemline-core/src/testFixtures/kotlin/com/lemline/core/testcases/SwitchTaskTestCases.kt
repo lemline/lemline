@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for SwitchTask execution.
@@ -34,8 +34,9 @@ object SwitchTaskTestCases {
                         result: "B"
             """.trimIndent(),
             validate = expectOutputMatching("result=A") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.content == "A"
+                output == buildJsonObject {
+                    put("result", "A")
+                }
             }
         ),
 
@@ -60,8 +61,9 @@ object SwitchTaskTestCases {
                         result: "B"
             """.trimIndent(),
             validate = expectOutputMatching("result=B") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.content == "B"
+                output == buildJsonObject {
+                    put("result", "B")
+                }
             }
         ),
 
@@ -95,8 +97,9 @@ object SwitchTaskTestCases {
                         level: "low"
             """.trimIndent(),
             validate = expectOutputMatching("level=medium") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["level"]?.jsonPrimitive?.content == "medium"
+                output == buildJsonObject {
+                    put("level", "medium")
+                }
             }
         ),
 
@@ -120,8 +123,9 @@ object SwitchTaskTestCases {
                         result: "default"
             """.trimIndent(),
             validate = expectOutputMatching("result=default") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.content == "default"
+                output == buildJsonObject {
+                    put("result", "default")
+                }
             }
         ),
 
@@ -151,10 +155,11 @@ object SwitchTaskTestCases {
                       set:
                         processed: "other"
             """.trimIndent(),
-            input = JsonObject(mapOf("type" to JsonPrimitive("B"))),
+            input = buildJsonObject { put("type", "B") },
             validate = expectOutputMatching("processed=type-B") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["processed"]?.jsonPrimitive?.content == "type-B"
+                output == buildJsonObject {
+                    put("processed", "type-B")
+                }
             }
         )
     )

@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectErrorContaining
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for ForkTask execution.
@@ -33,10 +37,10 @@ object ForkTaskTestCases {
                                 result: "B"
             """.trimIndent(),
             validate = expectOutputMatching("array with 2 results") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 2 &&
-                    arr[0].jsonObject["result"]?.jsonPrimitive?.content == "A" &&
-                    arr[1].jsonObject["result"]?.jsonPrimitive?.content == "B"
+                output == buildJsonArray {
+                    add(buildJsonObject { put("result", "A") })
+                    add(buildJsonObject { put("result", "B") })
+                }
             }
         ),
 
@@ -61,8 +65,7 @@ object ForkTaskTestCases {
                                 winner: "second"
             """.trimIndent(),
             validate = expectOutputMatching("single result with winner") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["winner"]?.jsonPrimitive?.content == "second"
+                output == buildJsonObject { put("winner", "second") }
             }
         ),
 
@@ -84,10 +87,10 @@ object ForkTaskTestCases {
                                 fromInput: ${ .value }
             """.trimIndent(),
             validate = expectOutputMatching("both branches got value=42") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 2 &&
-                    arr[0].jsonObject["fromInput"]?.jsonPrimitive?.int == 42 &&
-                    arr[1].jsonObject["fromInput"]?.jsonPrimitive?.int == 42
+                output == buildJsonArray {
+                    add(buildJsonObject { put("fromInput", 42) })
+                    add(buildJsonObject { put("fromInput", 42) })
+                }
             }
         ),
 
@@ -109,11 +112,11 @@ object ForkTaskTestCases {
                                 order: 3
             """.trimIndent(),
             validate = expectOutputMatching("ordered results [1,2,3]") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 3 &&
-                    arr[0].jsonObject["order"]?.jsonPrimitive?.int == 1 &&
-                    arr[1].jsonObject["order"]?.jsonPrimitive?.int == 2 &&
-                    arr[2].jsonObject["order"]?.jsonPrimitive?.int == 3
+                output == buildJsonArray {
+                    add(buildJsonObject { put("order", 1) })
+                    add(buildJsonObject { put("order", 2) })
+                    add(buildJsonObject { put("order", 3) })
+                }
             }
         ),
 
@@ -135,8 +138,7 @@ object ForkTaskTestCases {
                           total: ${ .[0].value + .[1].value }
             """.trimIndent(),
             validate = expectOutputMatching("total=30") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["total"]?.jsonPrimitive?.int == 30
+                output == buildJsonObject { put("total", 30) }
             }
         ),
 
@@ -160,10 +162,10 @@ object ForkTaskTestCases {
                                 c: 3
             """.trimIndent(),
             validate = expectOutputMatching("nested results") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 2 &&
-                    arr[0].jsonObject["b"]?.jsonPrimitive?.int == 2 &&
-                    arr[1].jsonObject["c"]?.jsonPrimitive?.int == 3
+                output == buildJsonArray {
+                    add(buildJsonObject { put("b", 2) })
+                    add(buildJsonObject { put("c", 3) })
+                }
             }
         ),
 
@@ -181,8 +183,9 @@ object ForkTaskTestCases {
             """.trimIndent(),
             input = JsonObject(mapOf("shouldRun" to JsonPrimitive(true))),
             validate = expectOutputMatching("fork executed") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 1 && arr[0].jsonObject["executed"]?.jsonPrimitive?.content == "true"
+                output == buildJsonArray {
+                    add(buildJsonObject { put("executed", true) })
+                }
             }
         ),
 
@@ -200,8 +203,7 @@ object ForkTaskTestCases {
             """.trimIndent(),
             input = JsonObject(mapOf("shouldRun" to JsonPrimitive(false))),
             validate = expectOutputMatching("fork skipped") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["shouldRun"]?.jsonPrimitive?.content == "false"
+                output == buildJsonObject { put("shouldRun", false) }
             }
         ),
 
@@ -217,8 +219,9 @@ object ForkTaskTestCases {
                                 result: "solo"
             """.trimIndent(),
             validate = expectOutputMatching("single result") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                arr.size == 1 && arr[0].jsonObject["result"]?.jsonPrimitive?.content == "solo"
+                output == buildJsonArray {
+                    add(buildJsonObject { put("result", "solo") })
+                }
             }
         ),
 
@@ -243,8 +246,7 @@ object ForkTaskTestCases {
                         total: ${ $context.forkResults[0].value + $context.forkResults[1].value }
             """.trimIndent(),
             validate = expectOutputMatching("total=30 from context") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["total"]?.jsonPrimitive?.int == 30
+                output == buildJsonObject { put("total", 30) }
             }
         ),
 
@@ -263,7 +265,10 @@ object ForkTaskTestCases {
                                 mode: "cooperative2"
             """.trimIndent(),
             validate = expectOutputMatching("returns array (cooperative)") { output ->
-                output is JsonArray && output.size == 2
+                output == buildJsonArray {
+                    add(buildJsonObject { put("mode", "cooperative1") })
+                    add(buildJsonObject { put("mode", "cooperative2") })
+                }
             }
         ),
 
@@ -290,8 +295,7 @@ object ForkTaskTestCases {
                                     status: 500
             """.trimIndent(),
             validate = expectOutputMatching("winner=success") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["winner"]?.jsonPrimitive?.content == "success"
+                output == buildJsonObject { put("winner", "success") }
             }
         ),
 
@@ -440,11 +444,11 @@ object ForkTaskTestCases {
                                 value: 3
             """.trimIndent(),
             validate = expectOutputMatching("3 branches all executed with values [1,2,3]") { output ->
-                val arr = output as? JsonArray ?: return@expectOutputMatching false
-                if (arr.size != 3) return@expectOutputMatching false
-
-                val values = arr.mapNotNull { it.jsonObject["value"]?.jsonPrimitive?.int }
-                values == listOf(1, 2, 3)
+                output == buildJsonArray {
+                    add(buildJsonObject { put("value", 1) })
+                    add(buildJsonObject { put("value", 2) })
+                    add(buildJsonObject { put("value", 3) })
+                }
             }
         )
     )

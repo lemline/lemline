@@ -1,5 +1,4 @@
-// SPDX-License-Identifier: BUSL-1.1
-package com.lemline.core.testcases
+package com.lemline.core.testcases.impl
 
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.activities.mock.MockActivityExecutor
@@ -8,6 +7,7 @@ import com.lemline.core.cloudevents.InMemoryCloudEventHook
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.FullOrchestrator
 import com.lemline.core.orchestrator.StepByStepOrchestrator
+import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import com.lemline.core.workflows.WorkflowCache
 import io.cloudevents.CloudEvent
 import io.serverlessworkflow.api.types.Workflow
@@ -52,7 +52,7 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
             val workflow = createWorkflow(yaml, namespace, name, version)
 
             val startState = StepByStepOrchestrator.initCmd(
-                workflowId = WorkflowId.random(),
+                workflowId = WorkflowId.Companion.random(),
                 workflowInput = input,
                 hasWaitingParent = false,
                 startedAt = Clock.System.now()
@@ -73,7 +73,7 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
                 serde = true, // For testing, we want to ensure serialization works
                 activityExecutor = activityExecutor,
                 cloudEventHook = cloudEventHook,
-                lifecycleHook = LifecycleEventHook.NOOP
+                lifecycleHook = LifecycleEventHook.Companion.NOOP
             )
 
             WorkflowTestResult.Success(event.value())

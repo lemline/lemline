@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonPrimitive
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for if condition execution.
@@ -24,8 +23,7 @@ object IfConditionTestCases {
                         executed: true
             """.trimIndent(),
             validate = expectOutputMatching("executed=true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["executed"]?.jsonPrimitive?.content == "true"
+                output == buildJsonObject { put("executed", true) }
             }
         ),
 
@@ -42,8 +40,7 @@ object IfConditionTestCases {
                         executed: true
             """.trimIndent(),
             validate = expectOutputMatching("executed not set, initial=1") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                !obj.containsKey("executed") && obj["initial"]?.jsonPrimitive?.int == 1
+                output == buildJsonObject { put("initial", 1) }
             }
         ),
 
@@ -59,10 +56,9 @@ object IfConditionTestCases {
                       set:
                         result: "greater"
             """.trimIndent(),
-            input = JsonObject(emptyMap()),
+            input = buildJsonObject { },
             validate = expectOutputMatching("result=greater") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.content == "greater"
+                output == buildJsonObject { put("result", "greater") }
             }
         ),
 
@@ -75,10 +71,9 @@ object IfConditionTestCases {
                       set:
                         result: "flag was true"
             """.trimIndent(),
-            input = JsonObject(mapOf("flag" to JsonPrimitive(true))),
+            input = buildJsonObject { put("flag", true) },
             validate = expectOutputMatching("result=flag was true") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.content == "flag was true"
+                output == buildJsonObject { put("result", "flag was true") }
             }
         ),
 
@@ -100,9 +95,10 @@ object IfConditionTestCases {
                         pass2: true
             """.trimIndent(),
             validate = expectOutputMatching("pass1=true, pass2 not set") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["pass1"]?.jsonPrimitive?.content == "true" &&
-                    !obj.containsKey("pass2")
+                output == buildJsonObject {
+                    put("pass1", true)
+                    put("value", 15)
+                }
             }
         ),
 
@@ -136,8 +132,7 @@ object IfConditionTestCases {
                         grade: ${ .grade }
             """.trimIndent(),
             validate = expectOutputMatching("grade=C") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["grade"]?.jsonPrimitive?.content == "C"
+                output == buildJsonObject { put("grade", "C") }
             }
         )
     )

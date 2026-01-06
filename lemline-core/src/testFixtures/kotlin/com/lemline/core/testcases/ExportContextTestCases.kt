@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.WorkflowTestValidators.expectOutputMatching
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.int
-import kotlinx.serialization.json.jsonPrimitive
+import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Test cases for export.as directive.
@@ -27,8 +27,9 @@ object ExportContextTestCases {
                         number: ${ $context.ctx.foo }
             """.trimIndent(),
             validate = expectOutputMatching("number=42") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["number"]?.jsonPrimitive?.int == 42
+                output == buildJsonObject {
+                    put("number", 42)
+                }
             }
         ),
 
@@ -47,8 +48,9 @@ object ExportContextTestCases {
                         number: ${ $context.ctx.foo }
             """.trimIndent(),
             validate = expectOutputMatching("number=42") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["number"]?.jsonPrimitive?.int == 42
+                output == buildJsonObject {
+                    put("number", 42)
+                }
             }
         ),
 
@@ -68,8 +70,9 @@ object ExportContextTestCases {
                         fromContext: ${ $context.onlyFoo }
             """.trimIndent(),
             validate = expectOutputMatching("fromContext=42") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["fromContext"]?.jsonPrimitive?.int == 42
+                output == buildJsonObject {
+                    put("fromContext", 42)
+                }
             }
         ),
 
@@ -95,8 +98,9 @@ object ExportContextTestCases {
                         sum: ${ $context.first + $context.second }
             """.trimIndent(),
             validate = expectOutputMatching("sum=30") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["sum"]?.jsonPrimitive?.int == 30
+                output == buildJsonObject {
+                    put("sum", 30)
+                }
             }
         ),
 
@@ -121,8 +125,9 @@ object ExportContextTestCases {
                         result: ${ $context.shared }
             """.trimIndent(),
             validate = expectOutputMatching("result=20") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.int == 20
+                output == buildJsonObject {
+                    put("result", 20)
+                }
             }
         ),
 
@@ -143,8 +148,9 @@ object ExportContextTestCases {
                         result: ${ $context.fromNested }
             """.trimIndent(),
             validate = expectOutputMatching("result=value") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["result"]?.jsonPrimitive?.content == "value"
+                output == buildJsonObject {
+                    put("result", "value")
+                }
             }
         ),
 
@@ -164,8 +170,9 @@ object ExportContextTestCases {
                         doubled: ${ $context.sum * 2 }
             """.trimIndent(),
             validate = expectOutputMatching("doubled=60") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["doubled"]?.jsonPrimitive?.int == 60
+                output == buildJsonObject {
+                    put("doubled", 60)
+                }
             }
         )
     )
