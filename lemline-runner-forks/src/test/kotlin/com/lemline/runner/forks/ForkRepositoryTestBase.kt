@@ -94,7 +94,7 @@ abstract class ForkRepositoryTestBase {
         repository.insertForkWithBranches(fork, branches)
 
         val branch = branches.first().copy(
-            output = "\"result-0\"",
+            branchOutput = "\"result-0\"",
             completedAt = Clock.System.now()
         )
         val updateCount = repository.updateBranch(branch)
@@ -102,8 +102,8 @@ abstract class ForkRepositoryTestBase {
         updateCount shouldBe 1
 
         val (_, retrievedBranches) = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)!!
-        retrievedBranches.find { it.name == branch.name }?.output shouldBe "\"result-0\""
-        retrievedBranches.find { it.name == branch.name }?.completedAt shouldNotBe null
+        retrievedBranches.find { it.branchPosition == branch.branchPosition }?.branchOutput shouldBe "\"result-0\""
+        retrievedBranches.find { it.branchPosition == branch.branchPosition }?.completedAt shouldNotBe null
     }
 
     @Test
@@ -179,7 +179,7 @@ abstract class ForkRepositoryTestBase {
                         conn
                     )!!
 
-                    currentBranches[index].output = "\"result-$index\""
+                    currentBranches[index].branchOutput = "\"result-$index\""
                     currentBranches[index].completedAt = Clock.System.now()
 
                     repository.updateBranch(currentBranches[index], conn)
@@ -199,7 +199,7 @@ abstract class ForkRepositoryTestBase {
             testPosition
         )!!
         finalBranches.count { it.completedAt != null } shouldBe 3
-        finalBranches.map { it.output } shouldContainAll listOf("\"result-0\"", "\"result-1\"", "\"result-2\"")
+        finalBranches.map { it.branchOutput } shouldContainAll listOf("\"result-0\"", "\"result-1\"", "\"result-2\"")
         finalFork.completedAt.shouldNotBeNull()
     }
 
@@ -221,7 +221,7 @@ abstract class ForkRepositoryTestBase {
                     )!!
 
                     val branchToUpdate = currentBranches[index].copy(
-                        output = "\"winner-$index\"",
+                        branchOutput = "\"winner-$index\"",
                         completedAt = Clock.System.now()
                     )
 
@@ -261,7 +261,7 @@ abstract class ForkRepositoryTestBase {
                 )!!
 
                 val updated = currentBranches[0].copy(
-                    output = "\"T1-output\"",
+                    branchOutput = "\"T1-output\"",
                     completedAt = Clock.System.now()
                 )
                 repository.updateBranch(updated, conn)
@@ -277,7 +277,7 @@ abstract class ForkRepositoryTestBase {
                 )!!
 
                 val updated = currentBranches[1].copy(
-                    output = "\"T2-output\"",
+                    branchOutput = "\"T2-output\"",
                     completedAt = Clock.System.now()
                 )
                 repository.updateBranch(updated, conn)
@@ -289,7 +289,7 @@ abstract class ForkRepositoryTestBase {
 
         val (_, finalBranches) = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)!!
         finalBranches.count { it.completedAt != null } shouldBe 2
-        finalBranches.map { it.output } shouldContainAll listOf("\"T1-output\"", "\"T2-output\"")
+        finalBranches.map { it.branchOutput } shouldContainAll listOf("\"T1-output\"", "\"T2-output\"")
     }
 
     @Test
@@ -312,7 +312,7 @@ abstract class ForkRepositoryTestBase {
 
             if (!wasAlreadyCompleted) {
                 val updated = branch.copy(
-                    output = "\"result-0\"",
+                    branchOutput = "\"result-0\"",
                     completedAt = Clock.System.now()
                 )
                 repository.updateBranch(updated, conn)
@@ -333,7 +333,7 @@ abstract class ForkRepositoryTestBase {
 
             if (!wasAlreadyCompleted) {
                 val updated = branch.copy(
-                    output = "\"duplicate-result\"",
+                    branchOutput = "\"duplicate-result\"",
                     completedAt = Clock.System.now()
                 )
                 repository.updateBranch(updated, conn)
@@ -346,7 +346,7 @@ abstract class ForkRepositoryTestBase {
         secondUpdate shouldBe true
 
         val (_, finalBranches) = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)!!
-        finalBranches[0].output shouldBe "\"result-0\""
+        finalBranches[0].branchOutput shouldBe "\"result-0\""
     }
 
     // ========== Nested Standard Repository Tests ==========
@@ -388,11 +388,13 @@ abstract class ForkRepositoryTestBase {
             workflowState = WorkflowEvent.ForkStarted(
                 nodeStack = NodeStack.fromFrames(
                     listOf(
-                        StackFrame(NodePosition.root, RootState(
-                            startedAt = Clock.System.now(),
-                            workflowId = testWorkflowId,
-                            workflowInput = JsonPrimitive("test-input")
-                        ))
+                        StackFrame(
+                            NodePosition.root, RootState(
+                                startedAt = Clock.System.now(),
+                                workflowId = testWorkflowId,
+                                workflowInput = JsonPrimitive("test-input")
+                            )
+                        )
                     )
                 ),
                 rawInput = JsonPrimitive("test-input")
@@ -400,10 +402,10 @@ abstract class ForkRepositoryTestBase {
         )
 
         return ForkModel(
-            id = forkId,
             instanceMessage = instanceMessage,
-            position = testPosition.toString(),
-            compete = compete
+            compete = compete,
+            id = forkId,
+            position = testPosition.toString()
         )
     }
 
@@ -411,10 +413,7 @@ abstract class ForkRepositoryTestBase {
         (0 until branchCount).map { index ->
             ForkBranchModel(
                 forkId = fork.id,
-                name = "branch-$index",
-                output = null,
-                completedAt = null,
-                failedAt = null
+                branchPosition = "branch-$index"
             )
         }
 }

@@ -30,17 +30,12 @@ CREATE TABLE lemline_forks (
 
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP,
-
-    -- Constraints
-    CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, position)
 );
 
 -- Create index for efficient cleanup queries
 CREATE INDEX idx_lemline_forks_cleanup
     ON lemline_forks (cleanup_after)
     WHERE cleanup_after IS NOT NULL;
-
--- Note: (workflow_id, position) has unique constraint, no separate index needed
 
 -- Comments for documentation
 COMMENT ON TABLE lemline_forks IS 'Fork metadata for async parallel execution';

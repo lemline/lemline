@@ -7,8 +7,12 @@ import com.lemline.runner.common.repositories.helpers.ColumnBindings
 import com.lemline.runner.common.repositories.helpers.ColumnBindingsBuilder
 import com.lemline.runner.common.repositories.ops.CompletionOps.COMPLETED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.CrudRepository
+import com.lemline.runner.common.repositories.ops.ID_COLUMN
+import com.lemline.runner.common.repositories.ops.IdRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
 import com.lemline.runner.common.repositories.ops.getInstant
+import com.lemline.runner.common.repositories.ops.idColumn
+import com.lemline.runner.common.repositories.with.WithIdRepository
 import jakarta.enterprise.context.ApplicationScoped
 import jakarta.inject.Inject
 import java.sql.Connection
@@ -24,19 +28,19 @@ const val FORK_BRANCH_TABLE = "lemline_fork_branches"
 /**
  * Repository for managing fork branch execution state.
  * Uses composition pattern with column bindings.
- * Uses composite primary key (fork_id, name) for branch identity.
  *
  * @see ForkBranchModel for the entity model
  */
 @ExperimentalSerializationApi
 @ExperimentalTime
 @ApplicationScoped
-class ForkBranchRepository : CrudRepository<ForkBranchModel>() {
+class ForkBranchRepository : CrudRepository<ForkBranchModel>(),
+    WithIdRepository<ForkBranchModel> {
 
     companion object {
         internal const val FORK_ID_COLUMN = "fork_id"
-        internal const val FORK_NAME_COLUMN = "name"
-        internal const val FORK_OUTPUT_COLUMN = "output"
+        internal const val BRANCH_POSITION_COLUMN = "branch_position"
+        internal const val BRANCH_OUTPUT_COLUMN = "branch_output"
 
         internal const val FAILED_AT_COLUMN = "failed_at"
         internal const val ERROR_REASON_COLUMN = "error_reason"
@@ -50,14 +54,23 @@ class ForkBranchRepository : CrudRepository<ForkBranchModel>() {
 
     override val tableName = FORK_BRANCH_TABLE
 
+    val idRepository by lazy { IdRepository(tableName, idHelper, ::createModel, databaseConfig) }
+
+    override suspend fun findById(id: IDV7, connection: Connection?) =
+        idRepository.findById(id, connection)
+
+    override suspend fun deleteById(id: IDV7, connection: Connection?) =
+        idRepository.deleteById(id, connection)
+
     override val columns: ColumnBindings<ForkBranchModel> by lazy {
         ColumnBindingsBuilder<ForkBranchModel>().apply {
-            // Composite key columns
-            key(FORK_ID_COLUMN) { stmt, entity, idx -> setIDV7(stmt, idx, entity.forkId) }
-            key(FORK_NAME_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.name) }
+            idColumn(idHelper)
+
+            column(FORK_ID_COLUMN) { stmt, entity, idx -> setIDV7(stmt, idx, entity.forkId) }
+            column(BRANCH_POSITION_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.branchPosition) }
 
             // Other columns
-            column(FORK_OUTPUT_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.output) }
+            column(BRANCH_OUTPUT_COLUMN) { stmt, entity, idx -> stmt.setString(idx, entity.branchOutput) }
             column(COMPLETED_AT_COLUMN) { stmt, entity, idx ->
                 entity.completedAt?.let {
                     stmt.setTimestamp(idx, Timestamp.from(it.toJavaInstant()))
@@ -84,8 +97,9 @@ class ForkBranchRepository : CrudRepository<ForkBranchModel>() {
 
     override fun createModel(rs: ResultSet) = ForkBranchModel(
         forkId = getIDV7(rs, FORK_ID_COLUMN)!!,
-        name = rs.getString(FORK_NAME_COLUMN),
-        output = rs.getString(FORK_OUTPUT_COLUMN),
+        branchPosition = rs.getString(BRANCH_POSITION_COLUMN),
+        id = getIDV7(rs, ID_COLUMN)!!,
+        branchOutput = rs.getString(BRANCH_OUTPUT_COLUMN),
         completedAt = rs.getInstant(COMPLETED_AT_COLUMN),
         failedAt = rs.getInstant(FAILED_AT_COLUMN),
         errorReason = rs.getString(ERROR_REASON_COLUMN),
@@ -106,7 +120,7 @@ class ForkBranchRepository : CrudRepository<ForkBranchModel>() {
         }
 
     private val findByForkIdSql by lazy {
-        "SELECT * FROM $tableName WHERE $FORK_ID_COLUMN = ? ORDER BY $FORK_NAME_COLUMN"
+        "SELECT * FROM $tableName WHERE $FORK_ID_COLUMN = ? ORDER BY $BRANCH_POSITION_COLUMN"
     }
 
     /**

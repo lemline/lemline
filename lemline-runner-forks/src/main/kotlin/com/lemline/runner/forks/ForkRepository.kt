@@ -124,10 +124,10 @@ class ForkRepository : CrudRepository<ForkModel>(),
     }
 
     override fun createModel(rs: ResultSet) = ForkModel(
-        id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowEvent.ForkStarted>(idHelper)!!,
-        position = rs.getString(FORK_POSITION_COLUMN),
         compete = rs.getBoolean(FORK_COMPETE_COLUMN),
+        id = getIDV7(rs, ID_COLUMN)!!,
+        position = rs.getString(FORK_POSITION_COLUMN),
         output = rs.getString(FORK_OUTPUT_COLUMN),
         failedAt = rs.getInstant(FORK_FAILED_AT_COLUMN),
         errorReason = rs.getString(FORK_ERROR_REASON_COLUMN),
@@ -212,5 +212,30 @@ class ForkRepository : CrudRepository<ForkModel>(),
         WHERE $WORKFLOW_ID_COLUMN = ? AND $FORK_POSITION_COLUMN = ?
         FOR UPDATE
         """.trimIndent()
+    }
+
+    suspend fun findByIdWithBranches(
+        id: IDV7,
+        connection: Connection? = null
+    ): Pair<ForkModel, List<ForkBranchModel>>? = databaseConfig.withConnection(connection) { conn ->
+        val fork = findByIdForUpdate(id, conn) ?: return@withConnection null
+        val branches = forkBranchRepository.findByForkId(fork.id, conn)
+        Pair(fork, branches)
+    }
+
+    private suspend fun findByIdForUpdate(
+        id: IDV7,
+        connection: Connection
+    ): ForkModel? {
+        return connection.prepareStatement(findByIdForUpdateSql).use { stmt ->
+            setIDV7(stmt, 1, id)
+            stmt.executeQuery().use { rs ->
+                if (rs.next()) createModel(rs) else null
+            }
+        }
+    }
+
+    private val findByIdForUpdateSql by lazy {
+        "SELECT * FROM $tableName WHERE $ID_COLUMN = ? FOR UPDATE"
     }
 }

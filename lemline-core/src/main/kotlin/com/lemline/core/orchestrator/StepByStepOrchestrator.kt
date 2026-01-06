@@ -146,43 +146,44 @@ object StepByStepOrchestrator {
      * - [TaskScheduled] → task.created (only when scheduling a child, not returning to parent)
      */
     private suspend fun emitLifecycleEventsForEvent(
-        event: WorkflowEvent,
+        workflowEvent: WorkflowEvent,
         workflowInfo: WorkflowInfo,
         lifecycleHook: LifecycleEventHook,
     ) {
-        when (event) {
+        when (workflowEvent) {
             is WorkflowCompleted -> {
                 lifecycleHook.onWorkflowCompleted(
                     workflowInfo = workflowInfo,
-                    nodeStack = event.nodeStack,
-                    output = event.output,
-                    completedAt = event.completedAt,
+                    nodeStack = workflowEvent.nodeStack,
+                    output = workflowEvent.output,
+                    completedAt = workflowEvent.completedAt,
                 )
             }
 
             is WorkflowFailed -> {
                 lifecycleHook.onWorkflowFaulted(
                     workflowInfo = workflowInfo,
-                    nodeStack = event.nodeStack,
-                    error = event.error,
-                    failedAt = event.failedAt,
+                    nodeStack = workflowEvent.nodeStack,
+                    error = workflowEvent.error,
+                    failedAt = workflowEvent.failedAt,
                 )
             }
 
             is TaskScheduled -> {
                 // Emit task.created only when scheduling a new task
-                if (event.isNew) {
+                if (workflowEvent.isNew) {
                     lifecycleHook.onTaskCreated(
                         workflowInfo = workflowInfo,
-                        nodeStack = event.nodeStack,
-                        nodePosition = event.nodePosition,
-                        input = event.rawInput,
+                        nodeStack = workflowEvent.nodeStack,
+                        nodePosition = workflowEvent.nodePosition,
+                        input = workflowEvent.rawInput,
                         createdAt = Clock.System.now()
                     )
                 }
             }
 
-            else -> { /* No lifecycle event for other event types */
+            else -> {
+                /* No lifecycle event for other event types */
             }
         }
     }
@@ -540,7 +541,7 @@ object StepByStepOrchestrator {
                 // Pop all states up to and including the fork node
                 return ForkBranchFailed(
                     nodeStack = nodeStack.popUntil(forkNode.position),
-                    branchPosition = current.position.toString(),
+                    branchPosition = current.position,
                     error = InternalException.Error.from(exception, failingNode.position),
                     failedAt = Clock.System.now(),
                 )

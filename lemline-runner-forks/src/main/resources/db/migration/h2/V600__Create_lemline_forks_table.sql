@@ -26,14 +26,9 @@ CREATE TABLE lemline_forks
     error_stacktrace   CLOB,
     -- Timestamps
     created_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at         TIMESTAMP,
-
-    -- Constraints
-    CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, position)
+    updated_at         TIMESTAMP
 );
 
 -- Create index for cleanup queries
 CREATE INDEX idx_lemline_forks_cleanup
     ON lemline_forks (cleanup_after);
-
--- Note: (workflow_id, position) has unique constraint, no separate index needed

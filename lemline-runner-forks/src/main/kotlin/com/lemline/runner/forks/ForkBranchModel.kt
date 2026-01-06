@@ -3,6 +3,7 @@ package com.lemline.runner.forks
 
 import com.lemline.common.values.IDV7
 import com.lemline.runner.common.models.WithCompletedAt
+import com.lemline.runner.common.models.WithId
 import kotlin.time.ExperimentalTime
 import kotlin.time.Instant
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -17,11 +18,14 @@ data class ForkBranchModel(
     /** Reference to parent fork by ID */
     val forkId: IDV7,
 
-    /** Human-readable branch name from the workflow definition */
-    val name: String,
+    /** Branch position in the workflow definition */
+    val branchPosition: String,
+
+    /** Unique identifier for this fork branch */
+    override val id: IDV7 = forkId.derive("-branch-$branchPosition"),
 
     /** Branch execution output as JSON, null until completed */
-    var output: String? = null,
+    var branchOutput: String? = null,
 
     /** Timestamp when the branch completed */
     override var completedAt: Instant? = null,
@@ -39,8 +43,7 @@ data class ForkBranchModel(
     var errorMessage: String? = null,
 
     /** Full stack trace of the exception for debugging, null if no failure */
-    var errorStackTrace: String? = null,
-
-    ) : WithCompletedAt {
+    var errorStackTrace: String? = null
+) : WithId, WithCompletedAt {
     companion object
 }

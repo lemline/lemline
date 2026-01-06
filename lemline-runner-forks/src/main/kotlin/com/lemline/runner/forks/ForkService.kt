@@ -3,7 +3,9 @@ package com.lemline.runner.forks
 
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
+import com.lemline.common.values.IDV7
 import com.lemline.core.nodes.Node
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.WorkflowCache.getWorkflow
@@ -55,13 +57,12 @@ class ForkService {
      *
      * @return true if the fork was created, false if it already existed (idempotent)
      */
-    suspend fun handleForkStarted(instance: InstanceMessage<WorkflowEvent.ForkStarted>): Boolean {
+    suspend fun handleForkStarted(instance: InstanceMessage<WorkflowEvent.ForkStarted>) {
         val forkStarted = instance.workflowState
 
         // Get fork node from workflow definition to extract fork configuration
         val workflowInfo = instance.workflowInfo
-        val workflow = workflowInfo.getWorkflow()
-            ?: error("Workflow definition not found: ${workflowInfo.namespace}/${workflowInfo.name}/${workflowInfo.version}")
+        val workflow = workflowInfo.getWorkflow() ?: error("Workflow definition not found: $workflowInfo")
 
         @Suppress("UNCHECKED_CAST")
         val forkNode = workflow.getNode(forkStarted.nodePosition) as Node<ForkTask>
@@ -74,19 +75,19 @@ class ForkService {
             compete = isCompete
         )
 
-        // 2. Create branch models
+        // 2. Idempotent creation of branch models
         val forkBranchModels = branches.map { branchNode ->
             ForkBranchModel(
                 forkId = forkModel.id,
-                name = branchNode.position.toString()
+                branchPosition = branchNode.position.toString()
             )
         }
 
         // 3. Insert fork and branches atomically
         val rowsInserted = forkRepository.insertForkWithBranches(forkModel, forkBranchModels)
         if (rowsInserted == 0) {
-            logger.warn { "Fork model $forkModel already exists (idempotent insert)" }
-            return false
+            logger.warn { "Fork model already exists (idempotent insert): $forkModel" }
+            return
         }
 
         logger.debug {
@@ -111,8 +112,6 @@ class ForkService {
             logger.debug { "Scheduling branch at ${branchNode.position}: $branchMessageId" }
             commandEmitter.send(branchMessage, branchMessageId)
         }
-
-        return true
     }
 
     /**
@@ -126,33 +125,30 @@ class ForkService {
     suspend fun handleBranchCompleted(instance: InstanceMessage<WorkflowEvent.ForkBranchCompleted>) {
         val forkBranchCompleted = instance.workflowState
         val forkPosition = forkBranchCompleted.nodePosition
-        val branchOutput = forkBranchCompleted.output
-        val branchName = forkBranchCompleted.branchPosition
+        val branchOutput = forkBranchCompleted.branchOutput
+        val branchPosition = forkBranchCompleted.branchPosition
+        val forkId = forkBranchCompleted.nodeStack.previousForkId()
 
+        logger.debug { "Handling branch completed ${instance.workflowState.nodeStack}: $branchOutput" }
         databaseConfig.withTransaction { conn ->
-            // Get fork with branches by workflow ID and position (single query)
-            val (fork, branches) = forkRepository.findByWorkflowIdAndPositionWithBranches(
-                instance.workflowId,
-                forkPosition,
-                conn
-            ) ?: error("Fork not found at $forkPosition for workflow ${instance.workflowId}")
+            val (fork, branches) = forkRepository.findByIdWithBranches(forkId, conn)
+                ?: error("Fork not found with id $forkId")
 
             logger.debug {
-                "Branch '$branchName' completed for fork ${fork.id} at $forkPosition, " +
+                "Branch '$branchPosition' completed for fork ${fork.id} at $forkPosition, " +
                     "output: ${branchOutput.toString().take(100)}"
             }
 
-            // Find the branch by name
-            val branch = branches.firstOrNull { it.name == branchName }
-                ?: error("Branch '$branchName' not found in fork at $forkPosition")
+            val branch = branches.firstOrNull { it.branchPosition == branchPosition.toString() }
+                ?: error("Branch '$branchPosition' not found in fork at $forkPosition")
 
             if (branch.completedAt != null) {
-                logger.info { "Weird, the branch '$branchName' at $forkPosition is already completed" }
+                logger.info { "Weird, the branch '$branchPosition' at $forkPosition is already completed" }
                 return@withTransaction null
             }
 
             // Update branch with completion data
-            branch.output = LemlineJson.encodeToString(branchOutput)
+            branch.branchOutput = LemlineJson.encodeToString(branchOutput)
             branch.completedAt = Clock.System.now()
             // Clean error data if branch was previously failed
             branch.failedAt = null
@@ -171,7 +167,7 @@ class ForkService {
                     fork.compete && completedCount == 1 -> branchOutput
                     !fork.compete && completedCount == branches.size -> {
                         val outputs = branches.map { b ->
-                            val out = b.output ?: error("Branch '${b.name}' has no output")
+                            val out = b.branchOutput ?: error("Branch '${b.branchPosition}' has no output")
                             LemlineJson.decodeFromString<JsonElement>(out)
                         }
                         JsonArray(outputs)
@@ -227,34 +223,30 @@ class ForkService {
      * 4. If fork should fail, resuming parent workflow with error
      */
     suspend fun handleBranchFailed(instance: InstanceMessage<WorkflowEvent.ForkBranchFailed>) {
-        val state = instance.workflowState
-        val forkPosition = state.nodePosition
-        val branchError = state.error
-        val branchName = state.branchPosition
+        val forkBranchFailed = instance.workflowState
+        val forkPosition = forkBranchFailed.nodePosition
+        val branchError = forkBranchFailed.error
+        val branchPosition = forkBranchFailed.branchPosition
+        val forkId = forkBranchFailed.nodeStack.previousForkId()
 
         databaseConfig.withTransaction { conn ->
-            // Get fork with branches by workflow ID and position (single query)
-            val (fork, branches) = forkRepository.findByWorkflowIdAndPositionWithBranches(
-                instance.workflowId,
-                forkPosition,
-                conn
-            ) ?: error("Fork not found at $forkPosition for workflow ${instance.workflowId}")
+            val (fork, branches) = forkRepository.findByIdWithBranches(forkId, conn)
+                ?: error("Fork not found with id $forkId")
 
             logger.debug {
-                "Branch '$branchName' failed for fork ${fork.id} at $forkPosition, " +
+                "Branch '$branchPosition' failed for fork ${fork.id} at $forkPosition, " +
                     "error: ${branchError.title ?: branchError.type}"
             }
 
-            // Find the branch by name
-            val branch = branches.firstOrNull { it.name == branchName }
-                ?: error("Branch '$branchName' not found in fork at $forkPosition")
+            val branch = branches.firstOrNull { it.branchPosition == branchPosition.toString() }
+                ?: error("Branch '$branchPosition' not found in fork at $forkPosition")
 
             if (branch.failedAt != null) {
-                logger.info { "Weird, the branch '$branchName' at $forkPosition is already failed" }
+                logger.info { "Weird, the branch '$branchPosition' at $forkPosition is already failed" }
                 return@withTransaction null
             }
             if (branch.completedAt != null) {
-                logger.info { "Weird, the branch '$branchName' at $forkPosition is already completed" }
+                logger.info { "Weird, the branch '$branchPosition' at $forkPosition is already completed" }
                 return@withTransaction null
             }
 
@@ -306,3 +298,6 @@ class ForkService {
         }
     }
 }
+
+internal fun NodeStack.forkId(): IDV7 = deriveIdempotentId("-fork")
+internal fun NodeStack.previousForkId(): IDV7 = decrementTopFrame().deriveIdempotentId("-fork")

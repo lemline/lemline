@@ -31,7 +31,8 @@ data class StackFrame(
     val state: NodeState,
     val executionIndex: Int = 0
 ) {
-    fun withIncrementedIndex() = copy(executionIndex = executionIndex + 1)
+    fun increment() = copy(executionIndex = executionIndex + 1)
+    fun decrement() = copy(executionIndex = executionIndex - 1)
 }
 
 /**
@@ -84,7 +85,6 @@ class NodeStack internal constructor(
     operator fun get(position: NodePosition): StackFrame? =
         frames.firstOrNull { it.position == position }
 
-
     fun deriveIdempotentId(suffix: String = ""): IDV7 =
         IDV7.deriveIdempotentId(
             baseId = rootState.workflowId.value,
@@ -92,6 +92,10 @@ class NodeStack internal constructor(
             executionKey = executionKey,
             suffix = suffix
         )
+
+    fun decrementTopFrame(): NodeStack = NodeStack(
+        frames.dropLast(1) + frames.last().decrement()
+    )
 
     fun duplicate(workflowId: WorkflowId): NodeStack = withRootState(rootState.copy(workflowId = workflowId))
 
@@ -103,7 +107,7 @@ class NodeStack internal constructor(
         NodeStack(frames + StackFrame(position, state, executionIndex))
 
     /** Pop the top frame and increment the new top frame's executionIndex.*/
-    fun pop(): NodeStack = popFrames(frames.dropLast(1))
+    fun pop(): NodeStack = popFrames(if (frames.size == 1) frames else frames.dropLast(1))
 
     /** Returns a new StateStack with frames up to and including position, incrementing new top's executionIndex.*/
     fun popUntil(position: NodePosition): NodeStack {
@@ -114,7 +118,7 @@ class NodeStack internal constructor(
     /** Pops frames after position, replaces the frame at position with new state, and increments its executionIndex.*/
     fun popUntilAndReplace(position: NodePosition, newState: NodeState): NodeStack {
         val index = indexOfFirst(position)
-        val newFrame = frames[index].withIncrementedIndex().copy(state = newState)
+        val newFrame = frames[index].increment().copy(state = newState)
         return NodeStack(frames.take(index) + newFrame)
     }
 
@@ -148,7 +152,7 @@ class NodeStack internal constructor(
 
     private fun popFrames(remaining: List<StackFrame>): NodeStack {
         if (remaining.isEmpty()) return NodeStack(remaining)
-        return NodeStack(remaining.dropLast(1) + remaining.last().withIncrementedIndex())
+        return NodeStack(remaining.dropLast(1) + remaining.last().increment())
     }
 
     /** Creates a new TaskStack with a new root state, replacing the existing one.*/
@@ -163,7 +167,8 @@ class NodeStack internal constructor(
 
     override fun hashCode(): Int = frames.hashCode()
 
-    override fun toString(): String = "NodeStack(frames=$frames)"
+    override fun toString(): String =
+        "[" + frames.joinToString { it.position.toString() + "(" + it.executionIndex + ")=>" + it.state.toString() } + "]"
 
     companion object {
         fun empty(): NodeStack = NodeStack(emptyList())

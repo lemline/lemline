@@ -69,7 +69,7 @@ sealed class WorkflowCommand : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
 
 
@@ -94,7 +94,7 @@ sealed class WorkflowCommand : WorkflowState() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
     }
 
@@ -114,7 +114,7 @@ sealed class WorkflowCommand : WorkflowState() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", error=$error" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
     }
 }
@@ -137,7 +137,7 @@ sealed class WorkflowEvent : WorkflowState() {
 
         fun value(): JsonElement = when (this) {
             is WorkflowCompleted -> output
-            is ForkBranchCompleted -> output
+            is ForkBranchCompleted -> branchOutput
             is ForEachCompleted -> output
             is WorkflowFailed -> throw exception
             is ForkBranchFailed -> throw exception
@@ -208,7 +208,7 @@ sealed class WorkflowEvent : WorkflowState() {
             ", rawOutput=$rawOutput" +
             ", flowDirective=$flowDirective" +
             ", error=$error" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
     }
 
@@ -219,19 +219,19 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("forkBranchCompleted")
     data class ForkBranchCompleted(
         override val nodeStack: NodeStack,
-        val branchPosition: String,
-        val output: JsonElement,
+        val branchPosition: NodePosition,
+        val branchOutput: JsonElement,
         val completedAt: Instant,
     ) : Outcome() {
 
         @Transient
-        override val nodePosition = nodeStack.currentPosition // Fork branch position
+        override val nodePosition = nodeStack.currentPosition // Fork position
 
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", branchPosition=$branchPosition" +
-            ", transformedInput=$output" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", transformedInput=$branchOutput" +
+            ", stack=$nodeStack" +
             ")"
     }
 
@@ -242,7 +242,7 @@ sealed class WorkflowEvent : WorkflowState() {
     @SerialName("forkBranchFailed")
     data class ForkBranchFailed(
         override val nodeStack: NodeStack,
-        val branchPosition: String,
+        val branchPosition: NodePosition,
         val error: InternalException.Error,
         val failedAt: Instant
     ) : Outcome() {
@@ -255,7 +255,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", branchPosition=$branchPosition" +
             ", error=$error" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
     }
 
@@ -310,7 +310,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
 
         fun resume() = WorkflowCommand.ResumeFromTask(
@@ -339,7 +339,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
             ", config=$config" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
 
         fun resume() = WorkflowCommand.ResumeWithCompletedTask(
@@ -366,7 +366,7 @@ sealed class WorkflowEvent : WorkflowState() {
             ", rawInput=$rawInput" +
             ", flowDirective=$flowDirective" +
             ", retryAt=$retryAt" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
 
         fun resume() = WorkflowCommand.ResumeFromTask(
@@ -396,7 +396,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", transformedInput=$rawInput" +
             ", childConfig=$config" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
 
         fun resumeAsCompleted(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
@@ -432,7 +432,7 @@ sealed class WorkflowEvent : WorkflowState() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", rawInput=$rawInput" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
 
         fun resume(rawOutput: JsonElement) = WorkflowCommand.ResumeWithCompletedTask(
@@ -469,7 +469,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", rawOutput=$rawOutput" +
             ", config=$config" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
 
         fun resumeCompleted(events: JsonArray) = WorkflowCommand.ResumeWithCompletedTask(
@@ -506,7 +506,7 @@ sealed class WorkflowEvent : WorkflowState() {
         override fun toString() = "${this::class.simpleName}(" +
             "nodePosition=$nodePosition" +
             ", output=$output" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
     }
 
@@ -534,7 +534,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", config=$config" +
             ", rawOutput=$input" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
 
         /**
@@ -568,7 +568,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", config=$config" +
             ", input=$input" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
     }
 
@@ -593,7 +593,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", config=$config" +
             ", input=$input" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
     }
 
@@ -618,7 +618,7 @@ sealed class WorkflowEvent : WorkflowState() {
             "nodePosition=$nodePosition" +
             ", config=$config" +
             ", input=$input" +
-            ", stack=${nodeStack.map { it.key.toString() + "=" + it.value }}" +
+            ", stack=$nodeStack" +
             ")"
     }
 }

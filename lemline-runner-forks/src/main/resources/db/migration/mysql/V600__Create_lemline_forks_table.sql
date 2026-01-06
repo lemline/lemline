@@ -30,14 +30,9 @@ CREATE TABLE lemline_forks (
 
     -- Timestamps
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NULL DEFAULT NULL,
-
-    -- Constraints
-    CONSTRAINT uk_forks_workflow_position UNIQUE (workflow_id, `position`(255))
+    updated_at TIMESTAMP NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Create index for cleanup queries
 CREATE INDEX idx_lemline_forks_cleanup
     ON lemline_forks (cleanup_after);
-
--- Note: (workflow_id, position) has unique constraint, no separate index needed

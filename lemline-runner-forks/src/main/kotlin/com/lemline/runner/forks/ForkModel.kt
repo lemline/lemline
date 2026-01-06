@@ -22,17 +22,17 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalTime
 @ExperimentalSerializationApi
 data class ForkModel(
-    /** Unique identifier for this fork execution - must be derived from position + step for idempotency */
-    override val id: IDV7 = instanceMessage.workflowState.nodeStack.deriveIdempotentId("-fork"),
-
     /** Parent workflow state when the fork started */
     override val instanceMessage: InstanceMessage<WorkflowEvent.ForkStarted>,
 
-    /** Serialized NodePosition indicating where the fork is in the workflow */
-    val position: String = instanceMessage.workflowState.nodePosition.toString(),
-
     /** Whether branches compete (true, first to complete wins) or cooperate (false, all must complete) */
     val compete: Boolean,
+
+    /** Unique identifier for this fork execution - derived from position + step for idempotency */
+    override val id: IDV7 = instanceMessage.workflowState.nodeStack.forkId(),
+
+    /** Serialized NodePosition indicating where the fork is in the workflow */
+    val position: String = instanceMessage.workflowState.nodePosition.toString(),
 
     /**
      * Assembled output from completed branches (JSON string)

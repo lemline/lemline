@@ -3,9 +3,7 @@
 
 package com.lemline.runner.forks
 
-import com.lemline.common.random.random
 import com.lemline.common.values.IDV7
-import com.lemline.core.random.random
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.test.ops.CrudRepositoryTest
 import io.kotest.matchers.collections.shouldBeEmpty
@@ -56,7 +54,7 @@ abstract class ForkBranchRepositoryTestBase {
 
     private fun modifyEntity(entity: ForkBranchModel): ForkBranchModel {
         return entity.copy(
-            output = """{"modified": true}""",
+            branchOutput = """{"modified": true}""",
             completedAt = Clock.System.now()
         )
     }
@@ -88,16 +86,16 @@ abstract class ForkBranchRepositoryTestBase {
         getForkRepository().insert(fork)
 
         val branches = listOf(
-            ForkBranchModel.random(fork.id).copy(name = "branch-a"),
-            ForkBranchModel.random(fork.id).copy(name = "branch-b"),
-            ForkBranchModel.random(fork.id).copy(name = "branch-c")
+            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-a"),
+            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-b"),
+            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-c")
         )
         getBranchRepository().insert(branches)
 
         val result = getBranchRepository().findByForkId(fork.id)
 
         result shouldHaveSize 3
-        result.map { it.name } shouldContainExactlyInAnyOrder listOf("branch-a", "branch-b", "branch-c")
+        result.map { it.branchPosition } shouldContainExactlyInAnyOrder listOf("branch-a", "branch-b", "branch-c")
     }
 
     @Test
@@ -106,15 +104,15 @@ abstract class ForkBranchRepositoryTestBase {
         getForkRepository().insert(fork)
 
         val branches = listOf(
-            ForkBranchModel.random(fork.id).copy(name = "zebra"),
-            ForkBranchModel.random(fork.id).copy(name = "alpha"),
-            ForkBranchModel.random(fork.id).copy(name = "beta")
+            ForkBranchModel.random(fork.id).copy(branchPosition = "zebra"),
+            ForkBranchModel.random(fork.id).copy(branchPosition = "alpha"),
+            ForkBranchModel.random(fork.id).copy(branchPosition = "beta")
         )
         getBranchRepository().insert(branches)
 
         val result = getBranchRepository().findByForkId(fork.id)
 
-        result.map { it.name } shouldBe listOf("alpha", "beta", "zebra")
+        result.map { it.branchPosition } shouldBe listOf("alpha", "beta", "zebra")
     }
 
     @Test
@@ -124,11 +122,11 @@ abstract class ForkBranchRepositoryTestBase {
         getForkRepository().insert(listOf(fork1, fork2))
 
         val branches1 = listOf(
-            ForkBranchModel.random(fork1.id).copy(name = "fork1-branch1"),
-            ForkBranchModel.random(fork1.id).copy(name = "fork1-branch2")
+            ForkBranchModel.random(fork1.id).copy(branchPosition = "fork1-branch1"),
+            ForkBranchModel.random(fork1.id).copy(branchPosition = "fork1-branch2")
         )
         val branches2 = listOf(
-            ForkBranchModel.random(fork2.id).copy(name = "fork2-branch1")
+            ForkBranchModel.random(fork2.id).copy(branchPosition = "fork2-branch1")
         )
         getBranchRepository().insert(branches1 + branches2)
 
@@ -153,9 +151,9 @@ abstract class ForkBranchRepositoryTestBase {
         getForkRepository().insert(fork)
 
         val branches = listOf(
-            ForkBranchModel.random(fork.id).copy(name = "branch-1"),
-            ForkBranchModel.random(fork.id).copy(name = "branch-2"),
-            ForkBranchModel.random(fork.id).copy(name = "branch-3")
+            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-1"),
+            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-2"),
+            ForkBranchModel.random(fork.id).copy(branchPosition = "branch-3")
         )
         getBranchRepository().insert(branches)
 
@@ -174,10 +172,10 @@ abstract class ForkBranchRepositoryTestBase {
         getForkRepository().insert(listOf(fork1, fork2))
 
         val branches1 = listOf(
-            ForkBranchModel.random(fork1.id).copy(name = "fork1-branch")
+            ForkBranchModel.random(fork1.id).copy(branchPosition = "fork1-branch")
         )
         val branches2 = listOf(
-            ForkBranchModel.random(fork2.id).copy(name = "fork2-branch")
+            ForkBranchModel.random(fork2.id).copy(branchPosition = "fork2-branch")
         )
         getBranchRepository().insert(branches1 + branches2)
 
@@ -194,22 +192,22 @@ abstract class ForkBranchRepositoryTestBase {
         getForkRepository().insert(fork)
 
         val branch = ForkBranchModel.random(fork.id).copy(
-            name = "test-branch",
-            output = null,
+            branchPosition = "test-branch",
+            branchOutput = null,
             completedAt = null
         )
         getBranchRepository().insert(branch)
 
         val completedAt = Clock.System.now()
         val updated = branch.copy(
-            output = """{"result": "success"}""",
+            branchOutput = """{"result": "success"}""",
             completedAt = completedAt
         )
         val updateCount = getBranchRepository().update(updated)
 
         updateCount shouldBe 1
         val retrieved = getBranchRepository().findByForkId(fork.id).first()
-        retrieved.output shouldBe """{"result": "success"}"""
+        retrieved.branchOutput shouldBe """{"result": "success"}"""
         // Compare truncated to seconds for MySQL compatibility (MySQL DATETIME lacks microsecond precision)
         retrieved.completedAt?.epochSeconds shouldBe completedAt.epochSeconds
     }
@@ -220,8 +218,8 @@ abstract class ForkBranchRepositoryTestBase {
         getForkRepository().insert(fork)
 
         val branch = ForkBranchModel.random(fork.id).copy(
-            name = "failing-branch",
-            output = null,
+            branchPosition = "failing-branch",
+            branchOutput = null,
             completedAt = null,
             failedAt = null
         )

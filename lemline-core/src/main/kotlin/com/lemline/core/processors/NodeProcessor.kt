@@ -360,10 +360,8 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
         // Build the updated state stack: pop the current node's state (but never root)
         // State was pushed in enterFromParent, so it's always on the stack
-        var updatedStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop()
-        if (exportedContext != null) {
-            updatedStack = updatedStack.withContext(exportedContext)
-        }
+        var updatedStack = nodeStack.pop()
+        exportedContext?.let { updatedStack = updatedStack.withContext(it) }
 
         return getNextEvent(
             nodeStack = updatedStack,
@@ -458,13 +456,13 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         // Find the branch name using typed accessor
         @Suppress("UNCHECKED_CAST")
         val forkNode = nextNode as Node<ForkTask>
-        val branchName = forkNode.branches.find { it.position == node.position }?.position?.toString()
-            ?: throw IllegalStateException("Fork - can not find ${node.name} in ${forkNode.branches.joinToString { it.name }}")
+        val branchPosition = forkNode.branches.find { it.position == node.position }?.position
+            ?: error("Fork - can not find ${node.name} in [${forkNode.branches.joinToString { it.name }}]")
 
         return ForkBranchCompleted(
             nodeStack = nodeStack,
-            branchPosition = branchName,
-            output = nextInput,
+            branchPosition = branchPosition,
+            branchOutput = nextInput,
             completedAt = Clock.System.now(),
         )
     }

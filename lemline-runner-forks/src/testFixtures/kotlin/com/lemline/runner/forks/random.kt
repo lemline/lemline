@@ -15,19 +15,16 @@ import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 
 fun ForkModel.Companion.random() = ForkModel(
-    id = IDV7.random(),
     instanceMessage = InstanceMessage(
         workflowInfo = WorkflowInfo.random(),
         workflowState = WorkflowEvent.ForkStarted.random(),
     ),
-    position = NodePosition.random().toString(),
-    compete = Random.nextBoolean()
+    compete = Random.nextBoolean(),
+    id = IDV7.random(),
+    position = NodePosition.random().toString()
 )
 
 fun ForkBranchModel.Companion.random(forkId: IDV7 = IDV7.random()) = ForkBranchModel(
     forkId = forkId,
-    name = String.random(),
-    output = null,
-    completedAt = null,
-    failedAt = null
+    branchPosition = String.random()
 )
