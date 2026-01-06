@@ -4,6 +4,7 @@ package com.lemline.core.cloudevents
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.core.expressions.JQExpression
+import com.lemline.core.processors.CorrelationDef
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.EventFilter
 import io.cloudevents.CloudEvent
@@ -64,8 +65,30 @@ object CloudEventUtils {
      * Supports all CloudEvent filter properties:
      * - Literal-only fields (exact match): type, id, subject, datacontenttype
      * - Expression-capable fields: source, dataschema, time, data (dataFilter)
+     *
+     * Note: This overload doesn't support correlation matching. Use the overload
+     * with correlationContext for correlation-aware filtering.
      */
     fun matchesFilters(event: CloudEvent, filters: List<EventFilter>): Boolean {
+        return matchesFilters(event, filters, correlationContext = null, establishedCorrelations = null)
+    }
+
+    /**
+     * Check if a CloudEvent matches any of the given filters with correlation support.
+     *
+     * @param event The CloudEvent to check
+     * @param filters The list of filters to match against
+     * @param correlationContext Workflow context for evaluating `correlate.expect` expressions (e.g., $input, $context)
+     * @param establishedCorrelations Mutable map tracking established correlation values for Mode 2 (auto-correlation).
+     *        When a filter with correlations but no `expect` matches, its extracted values are stored here.
+     *        Subsequent filters with the same correlation keys must match the established values.
+     */
+    fun matchesFilters(
+        event: CloudEvent,
+        filters: List<EventFilter>,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>?
+    ): Boolean {
         if (filters.isEmpty()) return true // Empty filters = wildcard
 
         // Parse event data once (lazily) for data filter evaluation
@@ -86,7 +109,134 @@ object CloudEventUtils {
             // Data filter (expression against event payload)
             if (!matchesDataFilter(filter.dataFilter, eventData)) return@any false
 
+            // Correlation filter
+            if (!matchesCorrelations(filter.correlations, eventData, correlationContext, establishedCorrelations)) {
+                return@any false
+            }
+
             true
+        }
+    }
+
+    /**
+     * Check if event data matches correlation requirements.
+     *
+     * For each correlation definition:
+     * - Mode 1 (expect present): Extract value from event using `from`, evaluate `expect` against context, compare
+     * - Mode 2 (expect absent): Extract value from event using `from`, compare against established value if exists,
+     *   otherwise establish the value for future matches
+     *
+     * @return true if all correlations match (or no correlations defined)
+     */
+    private fun matchesCorrelations(
+        correlations: Map<String, CorrelationDef>?,
+        eventData: JsonElement,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>?
+    ): Boolean {
+        if (correlations.isNullOrEmpty()) return true
+
+        // Track values to establish after successful match (for Mode 2)
+        val valuesToEstablish = mutableMapOf<String, String>()
+
+        for ((key, def) in correlations) {
+            val eventValue = evaluateFromExpression(def.from, eventData)
+            if (eventValue == null) {
+                logger.debug { "Correlation '$key': failed to extract value from event using '${def.from}'" }
+                return false
+            }
+
+            when {
+                def.expect != null -> {
+                    if (correlationContext == null) {
+                        logger.warn { "Correlation '$key' has expect but no correlationContext provided" }
+                        return false
+                    }
+                    val expectedValue = evaluateExpectExpression(def.expect, correlationContext)
+                    if (expectedValue == null) {
+                        logger.debug { "Correlation '$key': failed to evaluate expect '${def.expect}'" }
+                        return false
+                    }
+                    if (eventValue != expectedValue) {
+                        logger.debug { "Correlation '$key': value mismatch - event='$eventValue', expected='$expectedValue'" }
+                        return false
+                    }
+                }
+
+                else -> {
+                    val established = establishedCorrelations?.get(key)
+                    if (established != null) {
+                        if (eventValue != established) {
+                            logger.debug { "Correlation '$key': value mismatch - event='$eventValue', established='$established'" }
+                            return false
+                        }
+                    } else {
+                        valuesToEstablish[key] = eventValue
+                    }
+                }
+            }
+        }
+
+        // All correlations matched - establish Mode 2 values
+        if (establishedCorrelations != null) {
+            establishedCorrelations.putAll(valuesToEstablish)
+            if (valuesToEstablish.isNotEmpty()) {
+                logger.debug { "Established correlations: $valuesToEstablish" }
+            }
+        }
+
+        return true
+    }
+
+    /**
+     * Evaluate a value which can be either a literal or a JQ expression.
+     * For `from` expressions: evaluates against input data (event payload).
+     */
+    private fun evaluateFromExpression(expression: String, eventData: JsonElement): String? {
+        return if (ExpressionUtils.isExpr(expression)) {
+            try {
+                val trimmedExpr = ExpressionUtils.trimExpr(expression)
+                val result = with(LemlineJson) {
+                    val inputNode = eventData.toJsonNode()
+                    val scope = LemlineJson.jacksonMapper.createObjectNode()
+                    JQExpression.eval(inputNode, trimmedExpr, scope).toJsonElement()
+                }
+                when (result) {
+                    is JsonPrimitive -> result.content
+                    else -> result.toString()
+                }
+            } catch (e: Exception) {
+                logger.warn(e) { "Failed to evaluate from expression: $expression" }
+                null
+            }
+        } else {
+            expression
+        }
+    }
+
+    /**
+     * Evaluate an `expect` expression against workflow scope.
+     * The scope contains `$context`, `$input`, `$workflow`, etc.
+     */
+    private fun evaluateExpectExpression(expression: String, scopeContext: JsonElement): String? {
+        return if (ExpressionUtils.isExpr(expression)) {
+            try {
+                val trimmedExpr = ExpressionUtils.trimExpr(expression)
+                val result = with(LemlineJson) {
+                    val inputNode = LemlineJson.jacksonMapper.createObjectNode()
+                    val scopeNode = scopeContext.toJsonNode() as com.fasterxml.jackson.databind.node.ObjectNode
+                    JQExpression.eval(inputNode, trimmedExpr, scopeNode).toJsonElement()
+                }
+                when (result) {
+                    is JsonPrimitive -> result.content
+                    else -> result.toString()
+                }
+            } catch (e: Exception) {
+                logger.warn(e) { "Failed to evaluate expect expression: $expression" }
+                null
+            }
+        } else {
+            expression
         }
     }
 

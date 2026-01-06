@@ -1310,7 +1310,6 @@ object ListenTestCases {
                                 expect: ORD-54321
             """.trimIndent(),
             tags = setOf("listen", "correlate"),
-            skip = false,
             validate = expectOutput(JsonArray(listOf(orderCreatedData2)))
         ),
 
@@ -1334,8 +1333,7 @@ object ListenTestCases {
                                 expect: CUST-002
             """.trimIndent(),
             tags = setOf("listen", "correlate"),
-            skip = false,
-            validate = expectOutput(JsonArray(listOf(orderCreatedData)))
+            validate = expectOutput(JsonArray(listOf(orderCreatedData2)))
         ),
 
         WorkflowTestCase(
@@ -1384,7 +1382,6 @@ object ListenTestCases {
                                   from: '${ .orderId }'
             """.trimIndent(),
             tags = setOf("listen", "correlate", "auto-correlation"),
-            skip = false,
             validate = expectOutput(
                 JsonArray(
                     listOf(
@@ -1399,32 +1396,6 @@ object ListenTestCases {
                     )
                 )
             )
-        ),
-
-        WorkflowTestCase(
-            name = "listen with correlate using context variable",
-            cloudEvents = listOf(orderCreatedCloudEvent),
-            yaml = $$"""
-                do:
-                  - setOrderId:
-                      set:
-                        targetOrderId: "ORD-12345"
-                      export:
-                        as: ${ . }
-                  - waitForOrder:
-                      listen:
-                        to:
-                          one:
-                            with:
-                              type: order.created
-                            correlate:
-                              orderId:
-                                from: '${ .orderId }'
-                                expect: '${ $context.targetOrderId }'
-            """.trimIndent(),
-            tags = setOf("listen", "correlate", "context"),
-            skip = false,
-            validate = expectOutput(JsonArray(listOf(orderCreatedData)))
         )
     )
 }

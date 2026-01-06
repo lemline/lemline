@@ -59,11 +59,20 @@ internal object ListenEventCollector {
             }
         }
 
+        val correlationContext = event.config.correlationContext
+        val establishedCorrelations = mutableMapOf<String, String>()
+
         return try {
             val outputs = when (event.config.strategy) {
-                ListenStrategy.ONE -> collectFirst(eventFlow, event.config.filters, processEvent)
-                ListenStrategy.ANY -> collectAny(eventFlow, event, processEvent)
-                ListenStrategy.ALL -> collectAll(eventFlow, event.config.filters, processEvent)
+                ListenStrategy.ONE -> collectFirst(
+                    eventFlow, event.config.filters, correlationContext, establishedCorrelations, processEvent
+                )
+                ListenStrategy.ANY -> collectAny(
+                    eventFlow, event, correlationContext, establishedCorrelations, processEvent
+                )
+                ListenStrategy.ALL -> collectAll(
+                    eventFlow, event.config.filters, correlationContext, establishedCorrelations, processEvent
+                )
             }
             CollectResult.Success(outputs)
         } catch (e: InternalException) {
@@ -74,10 +83,12 @@ internal object ListenEventCollector {
     private suspend fun collectFirst(
         eventFlow: Flow<CloudEvent>,
         filters: List<EventFilter>,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>,
         processEvent: suspend (CloudEvent, Int) -> JsonElement,
     ): List<JsonElement> {
         val cloudEvent = eventFlow
-            .filter { CloudEventUtils.matchesFilters(it, filters) }
+            .filter { CloudEventUtils.matchesFilters(it, filters, correlationContext, establishedCorrelations) }
             .first()
         return listOf(processEvent(cloudEvent, 0))
     }
@@ -85,16 +96,22 @@ internal object ListenEventCollector {
     private suspend fun collectAny(
         eventFlow: Flow<CloudEvent>,
         event: WorkflowEvent.ListenStarted,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>,
         processEvent: suspend (CloudEvent, Int) -> JsonElement,
     ): List<JsonElement> = when (val until = event.config.until) {
-        null -> collectFirst(eventFlow, event.config.filters, processEvent)
+        null -> collectFirst(
+            eventFlow, event.config.filters, correlationContext, establishedCorrelations, processEvent
+        )
 
         is UntilCondition.Expression -> collectUntilExpression(
-            eventFlow, event.config.filters, until.expression, event.config.readAs, processEvent
+            eventFlow, event.config.filters, until.expression, event.config.readAs,
+            correlationContext, establishedCorrelations, processEvent
         )
 
         is UntilCondition.Event -> collectUntilTermination(
-            eventFlow, event.config.filters, until.filter, processEvent
+            eventFlow, event.config.filters, until.filter,
+            correlationContext, establishedCorrelations, processEvent
         )
     }
 
@@ -106,6 +123,8 @@ internal object ListenEventCollector {
     private suspend fun collectAll(
         eventFlow: Flow<CloudEvent>,
         filters: List<EventFilter>,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>,
         processEvent: suspend (CloudEvent, Int) -> JsonElement,
     ): List<JsonElement> {
         data class MatchedEvent(val firstFilterIndex: Int, val result: JsonElement)
@@ -117,7 +136,9 @@ internal object ListenEventCollector {
         try {
             for (cloudEvent in channel) {
                 val matchingIndices = unsatisfiedIndices.filter { index ->
-                    CloudEventUtils.matchesFilters(cloudEvent, listOf(filters[index]))
+                    CloudEventUtils.matchesFilters(
+                        cloudEvent, listOf(filters[index]), correlationContext, establishedCorrelations
+                    )
                 }
 
                 if (matchingIndices.isNotEmpty()) {
@@ -148,12 +169,14 @@ internal object ListenEventCollector {
         filters: List<EventFilter>,
         expression: String,
         readAs: ListenAndReadAs,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>,
         processEvent: suspend (CloudEvent, Int) -> JsonElement,
     ): List<JsonElement> {
         val rawEvents = mutableListOf<JsonElement>()
         val outputs = mutableListOf<JsonElement>()
 
-        val channel = eventFlow.filtered(filters)
+        val channel = eventFlow.filtered(filters, correlationContext, establishedCorrelations)
         try {
             for (cloudEvent in channel) {
                 rawEvents.add(cloudEvent.toJsonElement(readAs))
@@ -176,6 +199,8 @@ internal object ListenEventCollector {
         eventFlow: Flow<CloudEvent>,
         filters: List<EventFilter>,
         terminationFilter: EventFilter,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>,
         processEvent: suspend (CloudEvent, Int) -> JsonElement,
     ): List<JsonElement> {
         val outputs = mutableListOf<JsonElement>()
@@ -187,7 +212,9 @@ internal object ListenEventCollector {
                     logger.debug { "Termination event received: type=${cloudEvent.type}, returning ${outputs.size} accumulated events" }
                     break
                 }
-                if (CloudEventUtils.matchesFilters(cloudEvent, filters)) {
+                if (CloudEventUtils.matchesFilters(
+                        cloudEvent, filters, correlationContext, establishedCorrelations
+                    )) {
                     outputs.add(processEvent(cloudEvent, outputs.size))
                     logger.debug { "Accumulated event (count=${outputs.size}): type=${cloudEvent.type}" }
                 }
@@ -198,9 +225,15 @@ internal object ListenEventCollector {
         return outputs
     }
 
-    private suspend fun Flow<CloudEvent>.filtered(filters: List<EventFilter>): ReceiveChannel<CloudEvent> {
+    private suspend fun Flow<CloudEvent>.filtered(
+        filters: List<EventFilter>,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>
+    ): ReceiveChannel<CloudEvent> {
         val scope = CoroutineScope(currentCoroutineContext())
-        return this.filter { CloudEventUtils.matchesFilters(it, filters) }.produceIn(scope)
+        return this.filter {
+            CloudEventUtils.matchesFilters(it, filters, correlationContext, establishedCorrelations)
+        }.produceIn(scope)
     }
 
     private suspend fun Flow<CloudEvent>.toChannel(): ReceiveChannel<CloudEvent> {
