@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.testcases.TestMocks.commentsForPost1
-import com.lemline.core.testcases.TestMocks.createdPostResponse
-import com.lemline.core.testcases.TestMocks.deleteResponse
-import com.lemline.core.testcases.TestMocks.post1Response
-import com.lemline.core.testcases.TestMocks.updatedPostResponse
-import com.lemline.core.testcases.TestMocks.user1Response
+import com.lemline.core.testcases.impl.TestMocks
+import com.lemline.core.testcases.impl.TestMocks.commentsForPost1
+import com.lemline.core.testcases.impl.TestMocks.createdPostResponse
+import com.lemline.core.testcases.impl.TestMocks.deleteResponse
+import com.lemline.core.testcases.impl.TestMocks.post1Response
+import com.lemline.core.testcases.impl.TestMocks.updatedPostResponse
+import com.lemline.core.testcases.impl.TestMocks.user1Response
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlinx.serialization.json.buildJsonObject
