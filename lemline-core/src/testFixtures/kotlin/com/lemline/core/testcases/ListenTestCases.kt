@@ -29,7 +29,6 @@ import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -904,7 +903,7 @@ object ListenTestCases {
 
         WorkflowTestCase(
             name = "listen with foreach and empty events returns empty array",
-            cloudEvents = listOf(stopMonitoringEvent),
+            cloudEvents = listOf(orderCreatedCloudEvent, stopMonitoringEvent),
             yaml = """
                 do:
                   - monitorReadings:
@@ -937,6 +936,7 @@ object ListenTestCases {
                 do:
                   - waitForOrderAndPayment:
                       listen:
+                        read: envelope
                         to:
                           all:
                             - with:
@@ -951,12 +951,11 @@ object ListenTestCases {
                                 eventType: ${ .type }
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "foreach", "all"),
-            // Note: .type is null for data-only events (no envelope)
             validate = expectOutput(
                 JsonArray(
                     listOf(
-                        buildJsonObject { put("processed", true); put("eventType", JsonNull) },
-                        buildJsonObject { put("processed", true); put("eventType", JsonNull) }
+                        buildJsonObject { put("processed", true); put("eventType", "order.created") },
+                        buildJsonObject { put("processed", true); put("eventType", "payment.completed") }
                     ))
             )
         ),
@@ -1211,7 +1210,7 @@ object ListenTestCases {
                           any:
                             - with:
                                 type: sensor.reading
-                          until: . | any(.value > 100)
+                          until: any(.value > 100)
                       foreach:
                         item: reading
                         at: index
@@ -1224,7 +1223,7 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "foreach", "at", "index", "not-implemented"),
             validateDefinition = false,
-            skip = true,
+            skip = false,
             validate = expectOutput(
                 JsonArray(
                     listOf(
