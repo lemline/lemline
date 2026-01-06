@@ -103,13 +103,15 @@ object WorkflowCache {
         return jsonMapper.treeToValue(jsonNode, Workflow::class.java)
     }
 
-    /**
-     * Parses the given workflow definition string in YAML format
-     * and puts it into the cache.
-     */
     @JvmStatic
     fun parseYamlAndPut(definition: String): Workflow = WorkflowReader
         .validation()
+        .read(definition, WorkflowFormat.YAML)
+        .also { workflow -> cacheWorkflow(workflow) }
+
+    @JvmStatic
+    fun parseYamlAndPutNoValidation(definition: String): Workflow = WorkflowReader
+        .noValidation()
         .read(definition, WorkflowFormat.YAML)
         .also { workflow -> cacheWorkflow(workflow) }
 

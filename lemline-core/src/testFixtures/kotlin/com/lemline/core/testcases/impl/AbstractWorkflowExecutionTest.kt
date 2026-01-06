@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases.impl
 
-import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import io.kotest.core.spec.style.FunSpec
 import kotlinx.serialization.json.JsonElement
 
@@ -59,7 +58,8 @@ abstract class AbstractWorkflowExecutionTest(
                             input = case.input,
                             dependencies = case.dependencies,
                             mockConfig = case.mockConfig,
-                            cloudEvents = case.cloudEvents
+                            cloudEvents = case.cloudEvents,
+                            validateDefinition = case.validateDefinition
                         )
 
                         // Run custom validation if provided
@@ -117,7 +117,7 @@ object WorkflowTestValidators {
         when (result) {
             is WorkflowTestResult.Success -> {
                 if (!predicate(result.output)) {
-                    "Output did not match: $description\nActual output: ${result.output}"
+                    "Output did not match: $description"
                 } else null
             }
 

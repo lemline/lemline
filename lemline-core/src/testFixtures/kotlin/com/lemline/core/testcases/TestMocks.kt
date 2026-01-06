@@ -241,7 +241,7 @@ object TestMocks {
     // ─────────────────────────────────────────────────────────────────────────
 
     /** Mock CloudEvent data for order.created events */
-    internal val orderCreatedEvent = buildJsonObject {
+    internal val orderCreatedData = buildJsonObject {
         put("orderId", "ORD-12345")
         put("customerId", "CUST-001")
         put("total", 99.99)
@@ -256,7 +256,7 @@ object TestMocks {
     }
 
     /** Mock CloudEvent data for user.registered events */
-    internal val userRegisteredEvent = buildJsonObject {
+    internal val userRegisteredData = buildJsonObject {
         put("userId", "USR-98765")
         put("email", "user@example.com")
         put("name", "John Doe")
@@ -264,7 +264,7 @@ object TestMocks {
     }
 
     /** Mock CloudEvent data for payment.completed events */
-    internal val paymentCompletedEvent = buildJsonObject {
+    internal val paymentCompletedData = buildJsonObject {
         put("paymentId", "PAY-54321")
         put("orderId", "ORD-12345")
         put("amount", 99.99)
@@ -273,7 +273,7 @@ object TestMocks {
     }
 
     /** Mock CloudEvent data for sensor.reading events */
-    internal val sensorReadingEvent = buildJsonObject {
+    internal val sensorReadingData = buildJsonObject {
         put("sensorId", "SENSOR-001")
         put("temperature", 23.5)
         put("humidity", 65)
@@ -281,10 +281,22 @@ object TestMocks {
     }
 
     /** Generic event for wildcard matching */
-    internal val genericEvent = buildJsonObject {
+    internal val genericData = buildJsonObject {
         put("type", "generic")
         put("data", "mock event data")
         put("timestamp", "2024-01-15T12:00:00Z")
+    }
+
+    internal val lowTemperatureData = buildJsonObject {
+        put("sensorId", "TEMP-002")
+        put("temperature", 18.0)
+        put("unit", "celsius")
+    }
+
+    internal val highTemperatureData = buildJsonObject {
+        put("sensorId", "TEMP-001")
+        put("temperature", 42.5)
+        put("unit", "celsius")
     }
 
     /** Listen mock rules */
@@ -292,27 +304,27 @@ object TestMocks {
         // order.created events
         ListenMockRule(
             match = ListenMockMatcher(type = "order.created"),
-            response = ListenMockResponse(data = orderCreatedEvent)
+            response = ListenMockResponse(data = orderCreatedData)
         ),
         // user.registered events
         ListenMockRule(
             match = ListenMockMatcher(type = "user.registered"),
-            response = ListenMockResponse(data = userRegisteredEvent)
+            response = ListenMockResponse(data = userRegisteredData)
         ),
         // payment.completed events
         ListenMockRule(
             match = ListenMockMatcher(type = "payment.completed"),
-            response = ListenMockResponse(data = paymentCompletedEvent)
+            response = ListenMockResponse(data = paymentCompletedData)
         ),
         // sensor.reading events
         ListenMockRule(
             match = ListenMockMatcher(type = "sensor.reading"),
-            response = ListenMockResponse(data = sensorReadingEvent)
+            response = ListenMockResponse(data = sensorReadingData)
         ),
         // Catch-all for any event type
         ListenMockRule(
             match = ListenMockMatcher(),
-            response = ListenMockResponse(data = genericEvent)
+            response = ListenMockResponse(data = genericData)
         )
     )
 
@@ -334,15 +346,6 @@ object TestMocks {
 
     /** Full mock configuration for shell tests */
     val shellConfig = MockConfiguration(shellMocks = shellMocks)
-
-    /** Combined mock configuration for tests that use multiple activity types */
-    val allMocks = MockConfiguration(
-        emitMocks = emitMocks,
-        listenMocks = listenMocks,
-        httpMocks = httpMocks,
-        scriptMocks = scriptMocks,
-        shellMocks = shellMocks
-    )
 
     // ─────────────────────────────────────────────────────────────────────────
     // CloudEvent Builders - For listen task tests
@@ -388,19 +391,16 @@ object TestMocks {
     }
 
     /** CloudEvent for order.created */
-    val orderCreatedCloudEvent: CloudEvent = buildCloudEvent("order.created", orderCreatedEvent)
+    val orderCreatedCloudEvent: CloudEvent = buildCloudEvent("order.created", orderCreatedData)
 
     /** CloudEvent for user.registered */
-    val userRegisteredCloudEvent: CloudEvent = buildCloudEvent("user.registered", userRegisteredEvent)
+    val userRegisteredCloudEvent: CloudEvent = buildCloudEvent("user.registered", userRegisteredData)
 
     /** CloudEvent for payment.completed */
-    val paymentCompletedCloudEvent: CloudEvent = buildCloudEvent("payment.completed", paymentCompletedEvent)
+    val paymentCompletedCloudEvent: CloudEvent = buildCloudEvent("payment.completed", paymentCompletedData)
 
     /** CloudEvent for sensor.reading */
-    val sensorReadingCloudEvent: CloudEvent = buildCloudEvent("sensor.reading", sensorReadingEvent)
-
-    /** CloudEvent for generic/wildcard matching */
-    val genericCloudEvent: CloudEvent = buildCloudEvent("some.unknown.type", genericEvent)
+    val sensorReadingCloudEvent: CloudEvent = buildCloudEvent("sensor.reading", sensorReadingData)
 
     // ─────────────────────────────────────────────────────────────────────────
     // Specialized CloudEvents for Comprehensive Filter Testing
@@ -457,21 +457,13 @@ object TestMocks {
     /** High temperature sensor event for data expression filter tests */
     val highTemperatureEvent: CloudEvent = buildCloudEvent(
         type = "sensor.reading",
-        data = buildJsonObject {
-            put("sensorId", "TEMP-001")
-            put("temperature", 42.5)
-            put("unit", "celsius")
-        }
+        data = highTemperatureData
     )
 
     /** Low temperature sensor event for data expression filter tests */
     val lowTemperatureEvent: CloudEvent = buildCloudEvent(
         type = "sensor.reading",
-        data = buildJsonObject {
-            put("sensorId", "TEMP-002")
-            put("temperature", 18.0)
-            put("unit", "celsius")
-        }
+        data = lowTemperatureData
     )
 
     /** Critical alert event for data expression filter tests */

@@ -37,6 +37,8 @@ data class WorkflowDependency(
  * @property dependencies Workflows that need to be registered before the main workflow runs
  * @property mockConfig Mock configuration for activity execution (HTTP, script, shell mocks)
  * @property cloudEvents CloudEvents to emit before workflow execution (for listen task tests)
+ * @property validateDefinition Whether to validate the workflow definition against the SDK schema (default true).
+ *           Set to false for tests with edge-case YAML that may not pass SDK validation but should still execute.
  */
 data class WorkflowTestCase(
     val name: String,
@@ -48,7 +50,8 @@ data class WorkflowTestCase(
     val dependencies: List<WorkflowDependency> = emptyList(),
     val mockConfig: MockConfiguration = MockConfiguration.empty(),
     val cloudEvents: List<CloudEvent> = emptyList(),
-    val timeout: Duration = 5.seconds
+    val timeout: Duration = 5.seconds,
+    val validateDefinition: Boolean = true
 ) {
     companion object
 }

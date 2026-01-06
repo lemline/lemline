@@ -42,14 +42,15 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
         version: String,
         dependencies: List<WorkflowDependency>,
         mockConfig: MockConfiguration,
-        cloudEvents: List<CloudEvent>
+        cloudEvents: List<CloudEvent>,
+        validateDefinition: Boolean
     ): WorkflowTestResult {
         return try {
             // Register dependencies first
             dependencies.forEach { dep ->
-                createWorkflow(dep.yaml, dep.namespace, dep.name, dep.version)
+                createWorkflow(dep.yaml, dep.namespace, dep.name, dep.version, validateDefinition)
             }
-            val workflow = createWorkflow(yaml, namespace, name, version)
+            val workflow = createWorkflow(yaml, namespace, name, version, validateDefinition)
 
             val startState = StepByStepOrchestrator.initCmd(
                 workflowId = WorkflowId.Companion.random(),
@@ -86,20 +87,12 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
     }
 
     companion object {
-        /**
-         * Creates a Workflow from a YAML do section.
-         *
-         * @param doYaml The workflow do section in YAML format
-         * @param namespace Workflow namespace
-         * @param name Workflow name
-         * @param version Workflow version
-         * @return Parsed Workflow
-         */
         fun createWorkflow(
             doYaml: String,
             namespace: String = "test",
             name: String = "workflow-${doYaml.hashCode()}",
-            version: String = "0.1.0"
+            version: String = "0.1.0",
+            validate: Boolean = true
         ): Workflow {
             val document = """
                 document:
@@ -109,7 +102,11 @@ class FullOrchestratorTestExecutor : WorkflowTestExecutor {
                   version: $version
             """.trimIndent()
             val workflowYaml = document + "\n" + doYaml.trimIndent()
-            return WorkflowCache.parseYamlAndPut(workflowYaml)
+            return if (validate) {
+                WorkflowCache.parseYamlAndPut(workflowYaml)
+            } else {
+                WorkflowCache.parseYamlAndPutNoValidation(workflowYaml)
+            }
         }
     }
 }
