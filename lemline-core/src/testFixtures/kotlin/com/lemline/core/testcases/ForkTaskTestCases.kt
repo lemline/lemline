@@ -3,6 +3,7 @@ package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -36,12 +37,12 @@ object ForkTaskTestCases {
                               set:
                                 result: "B"
             """.trimIndent(),
-            validate = expectOutputMatching("array with 2 results") { output ->
-                output == buildJsonArray {
+            validate = expectOutput(
+                buildJsonArray {
                     add(buildJsonObject { put("result", "A") })
                     add(buildJsonObject { put("result", "B") })
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -64,9 +65,7 @@ object ForkTaskTestCases {
                               set:
                                 winner: "second"
             """.trimIndent(),
-            validate = expectOutputMatching("single result with winner") { output ->
-                output == buildJsonObject { put("winner", "second") }
-            }
+            validate = expectOutput(buildJsonObject { put("winner", "second") })
         ),
 
         WorkflowTestCase(
@@ -86,12 +85,12 @@ object ForkTaskTestCases {
                               set:
                                 fromInput: ${ .value }
             """.trimIndent(),
-            validate = expectOutputMatching("both branches got value=42") { output ->
-                output == buildJsonArray {
+            validate = expectOutput(
+                buildJsonArray {
                     add(buildJsonObject { put("fromInput", 42) })
                     add(buildJsonObject { put("fromInput", 42) })
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -111,13 +110,13 @@ object ForkTaskTestCases {
                               set:
                                 order: 3
             """.trimIndent(),
-            validate = expectOutputMatching("ordered results [1,2,3]") { output ->
-                output == buildJsonArray {
+            validate = expectOutput(
+                buildJsonArray {
                     add(buildJsonObject { put("order", 1) })
                     add(buildJsonObject { put("order", 2) })
                     add(buildJsonObject { put("order", 3) })
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -137,9 +136,7 @@ object ForkTaskTestCases {
                         as:
                           total: ${ .[0].value + .[1].value }
             """.trimIndent(),
-            validate = expectOutputMatching("total=30") { output ->
-                output == buildJsonObject { put("total", 30) }
-            }
+            validate = expectOutput(buildJsonObject { put("total", 30) })
         ),
 
         WorkflowTestCase(
@@ -161,12 +158,12 @@ object ForkTaskTestCases {
                               set:
                                 c: 3
             """.trimIndent(),
-            validate = expectOutputMatching("nested results") { output ->
-                output == buildJsonArray {
+            validate = expectOutput(
+                buildJsonArray {
                     add(buildJsonObject { put("b", 2) })
                     add(buildJsonObject { put("c", 3) })
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -182,11 +179,11 @@ object ForkTaskTestCases {
                                 executed: true
             """.trimIndent(),
             input = JsonObject(mapOf("shouldRun" to JsonPrimitive(true))),
-            validate = expectOutputMatching("fork executed") { output ->
-                output == buildJsonArray {
+            validate = expectOutput(
+                buildJsonArray {
                     add(buildJsonObject { put("executed", true) })
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -202,9 +199,7 @@ object ForkTaskTestCases {
                                 executed: true
             """.trimIndent(),
             input = JsonObject(mapOf("shouldRun" to JsonPrimitive(false))),
-            validate = expectOutputMatching("fork skipped") { output ->
-                output == buildJsonObject { put("shouldRun", false) }
-            }
+            validate = expectOutput(buildJsonObject { put("shouldRun", false) })
         ),
 
         WorkflowTestCase(
@@ -218,11 +213,11 @@ object ForkTaskTestCases {
                               set:
                                 result: "solo"
             """.trimIndent(),
-            validate = expectOutputMatching("single result") { output ->
-                output == buildJsonArray {
+            validate = expectOutput(
+                buildJsonArray {
                     add(buildJsonObject { put("result", "solo") })
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -245,9 +240,7 @@ object ForkTaskTestCases {
                       set:
                         total: ${ $context.forkResults[0].value + $context.forkResults[1].value }
             """.trimIndent(),
-            validate = expectOutputMatching("total=30 from context") { output ->
-                output == buildJsonObject { put("total", 30) }
-            }
+            validate = expectOutput(buildJsonObject { put("total", 30) })
         ),
 
         WorkflowTestCase(
@@ -264,12 +257,12 @@ object ForkTaskTestCases {
                               set:
                                 mode: "cooperative2"
             """.trimIndent(),
-            validate = expectOutputMatching("returns array (cooperative)") { output ->
-                output == buildJsonArray {
+            validate = expectOutput(
+                buildJsonArray {
                     add(buildJsonObject { put("mode", "cooperative1") })
                     add(buildJsonObject { put("mode", "cooperative2") })
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -294,9 +287,7 @@ object ForkTaskTestCases {
                                     type: https://serverlessworkflow.io/spec/1.0.0/errors/communication
                                     status: 500
             """.trimIndent(),
-            validate = expectOutputMatching("winner=success") { output ->
-                output == buildJsonObject { put("winner", "success") }
-            }
+            validate = expectOutput(buildJsonObject { put("winner", "success") })
         ),
 
         WorkflowTestCase(
@@ -443,13 +434,13 @@ object ForkTaskTestCases {
                               set:
                                 value: 3
             """.trimIndent(),
-            validate = expectOutputMatching("3 branches all executed with values [1,2,3]") { output ->
-                output == buildJsonArray {
+            validate = expectOutput(
+                buildJsonArray {
                     add(buildJsonObject { put("value", 1) })
                     add(buildJsonObject { put("value", 2) })
                     add(buildJsonObject { put("value", 3) })
                 }
-            }
+            )
         )
     )
 }

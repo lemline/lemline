@@ -2,6 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -35,9 +36,7 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("sum=15") { output ->
-                output == buildJsonObject { put("sum", 15) }
-            }
+            validate = expectOutput(buildJsonObject { put("sum", 15) })
         ),
 
         WorkflowTestCase(
@@ -57,15 +56,15 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("items array with value/index pairs") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("items", buildJsonArray {
                         add(buildJsonObject { put("value", "a"); put("index", 0) })
                         add(buildJsonObject { put("value", "b"); put("index", 1) })
                         add(buildJsonObject { put("value", "c"); put("index", 2) })
                     })
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -86,11 +85,11 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("evens=[2,4,6]") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("evens", JsonArray(listOf(JsonPrimitive(2), JsonPrimitive(4), JsonPrimitive(6))))
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -112,9 +111,7 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("total=60") { output ->
-                output == buildJsonObject { put("total", 60) }
-            }
+            validate = expectOutput(buildJsonObject { put("total", 60) })
         ),
 
         WorkflowTestCase(
@@ -134,11 +131,11 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("doubled=[2,4,6]") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("doubled", JsonArray(listOf(JsonPrimitive(2), JsonPrimitive(4), JsonPrimitive(6))))
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -191,11 +188,11 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("names=[Alice, Bob]") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("names", JsonArray(listOf(JsonPrimitive("Alice"), JsonPrimitive("Bob"))))
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -215,11 +212,11 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("taskNames=[capture, capture]") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("taskNames", JsonArray(listOf(JsonPrimitive("capture"), JsonPrimitive("capture"))))
                 }
-            }
+            )
         )
     )
 }

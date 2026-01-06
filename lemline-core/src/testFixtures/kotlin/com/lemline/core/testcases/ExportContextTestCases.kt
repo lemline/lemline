@@ -2,7 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -26,11 +26,7 @@ object ExportContextTestCases {
                       set:
                         number: ${ $context.ctx.foo }
             """.trimIndent(),
-            validate = expectOutputMatching("number=42") { output ->
-                output == buildJsonObject {
-                    put("number", 42)
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("number", 42) })
         ),
 
         WorkflowTestCase(
@@ -47,11 +43,7 @@ object ExportContextTestCases {
                       set:
                         number: ${ $context.ctx.foo }
             """.trimIndent(),
-            validate = expectOutputMatching("number=42") { output ->
-                output == buildJsonObject {
-                    put("number", 42)
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("number", 42) })
         ),
 
         WorkflowTestCase(
@@ -69,11 +61,7 @@ object ExportContextTestCases {
                       set:
                         fromContext: ${ $context.onlyFoo }
             """.trimIndent(),
-            validate = expectOutputMatching("fromContext=42") { output ->
-                output == buildJsonObject {
-                    put("fromContext", 42)
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("fromContext", 42) })
         ),
 
         WorkflowTestCase(
@@ -97,11 +85,7 @@ object ExportContextTestCases {
                       set:
                         sum: ${ $context.first + $context.second }
             """.trimIndent(),
-            validate = expectOutputMatching("sum=30") { output ->
-                output == buildJsonObject {
-                    put("sum", 30)
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("sum", 30) })
         ),
 
         WorkflowTestCase(
@@ -124,11 +108,7 @@ object ExportContextTestCases {
                       set:
                         result: ${ $context.shared }
             """.trimIndent(),
-            validate = expectOutputMatching("result=20") { output ->
-                output == buildJsonObject {
-                    put("result", 20)
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("result", 20) })
         ),
 
         WorkflowTestCase(
@@ -147,11 +127,7 @@ object ExportContextTestCases {
                       set:
                         result: ${ $context.fromNested }
             """.trimIndent(),
-            validate = expectOutputMatching("result=value") { output ->
-                output == buildJsonObject {
-                    put("result", "value")
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("result", "value") })
         ),
 
         WorkflowTestCase(
@@ -169,11 +145,7 @@ object ExportContextTestCases {
                       set:
                         doubled: ${ $context.sum * 2 }
             """.trimIndent(),
-            validate = expectOutputMatching("doubled=60") { output ->
-                output == buildJsonObject {
-                    put("doubled", 60)
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("doubled", 60) })
         )
     )
 }

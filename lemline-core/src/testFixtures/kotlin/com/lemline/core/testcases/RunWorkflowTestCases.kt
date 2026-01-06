@@ -4,6 +4,7 @@ package com.lemline.core.testcases
 import com.lemline.core.testcases.impl.WorkflowDependency
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectSuccess
 import kotlinx.serialization.json.JsonObject
@@ -45,9 +46,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("result=10") { output ->
-                output == buildJsonObject { put("result", 10) }
-            }
+            validate = expectOutput(buildJsonObject { put("result", 10) })
         ),
 
         WorkflowTestCase(
@@ -77,9 +76,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("greeting=Hello, Alice!") { output ->
-                output == buildJsonObject { put("greeting", "Hello, Alice!") }
-            }
+            validate = expectOutput(buildJsonObject { put("greeting", "Hello, Alice!") })
         ),
 
         WorkflowTestCase(
@@ -150,9 +147,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("n=120 (5!)") { output ->
-                output == buildJsonObject { put("n", 120) }
-            }
+            validate = expectOutput(buildJsonObject { put("n", 120) })
         ),
 
         WorkflowTestCase(
@@ -197,9 +192,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("result=20 ((3+7)*2)") { output ->
-                output == buildJsonObject { put("result", 20) }
-            }
+            validate = expectOutput(buildJsonObject { put("result", 20) })
         ),
 
         WorkflowTestCase(
@@ -231,12 +224,12 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("finalValue=60, wasProcessed=true") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("finalValue", 60)
                     put("wasProcessed", true)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -264,9 +257,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("result=42, no status") { output ->
-                output == buildJsonObject { put("result", 42) }
-            }
+            validate = expectOutput(buildJsonObject { put("result", 42) })
         ),
 
         WorkflowTestCase(
@@ -296,12 +287,12 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("fullName=John Doe, age=30") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("fullName", "John Doe")
                     put("age", 30)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -356,9 +347,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("result=17 (((5+3)*2)+1)") { output ->
-                output == buildJsonObject { put("result", 17) }
-            }
+            validate = expectOutput(buildJsonObject { put("result", 17) })
         ),
 
         WorkflowTestCase(
@@ -383,9 +372,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("value=10") { output ->
-                output == buildJsonObject { put("value", 10) }
-            }
+            validate = expectOutput(buildJsonObject { put("value", 10) })
         ),
 
         WorkflowTestCase(
@@ -414,9 +401,7 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("continued=true, no completed") { output ->
-                output == buildJsonObject { put("continued", true) }
-            }
+            validate = expectOutput(buildJsonObject { put("continued", true) })
         ),
 
         WorkflowTestCase(
@@ -447,12 +432,12 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("doubled=30, parentValue=15") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("doubled", 30)
                     put("parentValue", 15)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -591,15 +576,15 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("3 iterations with values [10, 20, 30]") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("results", buildJsonArray {
                         add(JsonPrimitive(10))
                         add(JsonPrimitive(20))
                         add(JsonPrimitive(30))
                     })
                 }
-            }
+            )
         )
     )
 }

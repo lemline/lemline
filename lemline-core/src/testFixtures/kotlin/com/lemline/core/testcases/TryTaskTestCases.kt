@@ -3,6 +3,7 @@ package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -34,12 +35,12 @@ object TryTaskTestCases {
                                 caught: true
                                 errorHandled: "yes"
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true, errorHandled=yes") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("caught", true)
                     put("errorHandled", "yes")
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -85,9 +86,7 @@ object TryTaskTestCases {
                               set:
                                 caught: true
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true") { output ->
-                output == buildJsonObject { put("caught", true) }
-            }
+            validate = expectOutput(buildJsonObject { put("caught", true) })
         ),
 
         WorkflowTestCase(
@@ -133,9 +132,7 @@ object TryTaskTestCases {
                               set:
                                 caught: true
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true") { output ->
-                output == buildJsonObject { put("caught", true) }
-            }
+            validate = expectOutput(buildJsonObject { put("caught", true) })
         ),
 
         WorkflowTestCase(
@@ -156,12 +153,12 @@ object TryTaskTestCases {
                                 errorType: ${ $error.type }
                                 errorStatus: ${ $error.status }
             """.trimIndent(),
-            validate = expectOutputMatching("errorType and errorStatus set") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("errorType", "https://serverlessworkflow.io/spec/1.0.0/errors/runtime")
                     put("errorStatus", 500)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -183,12 +180,12 @@ object TryTaskTestCases {
                                 issueType: ${ $issue.type }
                                 issueStatus: ${ $issue.status }
             """.trimIndent(),
-            validate = expectOutputMatching("issueType and issueStatus set") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("issueType", "https://serverlessworkflow.io/spec/1.0.0/errors/runtime")
                     put("issueStatus", 500)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -209,9 +206,7 @@ object TryTaskTestCases {
                               set:
                                 caught: true
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true") { output ->
-                output == buildJsonObject { put("caught", true) }
-            }
+            validate = expectOutput(buildJsonObject { put("caught", true) })
         ),
 
         WorkflowTestCase(
@@ -282,9 +277,7 @@ object TryTaskTestCases {
                               set:
                                 caught: true
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true") { output ->
-                output == buildJsonObject { put("caught", true) }
-            }
+            validate = expectOutput(buildJsonObject { put("caught", true) })
         ),
 
         WorkflowTestCase(
@@ -310,9 +303,7 @@ object TryTaskTestCases {
                               set:
                                 receivedValue: ${ .initialValue }
             """.trimIndent(),
-            validate = expectOutputMatching("receivedValue=42") { output ->
-                output == buildJsonObject { put("receivedValue", 42) }
-            }
+            validate = expectOutput(buildJsonObject { put("receivedValue", 42) })
         )
     )
 }

@@ -2,6 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -167,12 +168,12 @@ object RunShellTestCases {
                         hasData: true
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("data set with shell output") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("data", "Hello World")
                     put("hasData", true)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -188,11 +189,7 @@ object RunShellTestCases {
                         as: '${ {result: .} }'
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("transformed output with result") { output ->
-                output == buildJsonObject {
-                    put("result", "Hello World")
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("result", "Hello World") })
         ),
 
         WorkflowTestCase(
@@ -213,11 +210,7 @@ object RunShellTestCases {
                         result: ${ . }
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("result from last command") { output ->
-                output == buildJsonObject {
-                    put("result", "Hello World")
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("result", "Hello World") })
         ),
 
         WorkflowTestCase(

@@ -108,6 +108,22 @@ object WorkflowTestValidators {
     }
 
     /**
+     * Validates that the workflow output equals the expected value exactly.
+     * On failure, displays both expected and actual values for easy debugging.
+     */
+    fun expectOutput(expected: JsonElement): (WorkflowTestResult) -> String? = { result ->
+        when (result) {
+            is WorkflowTestResult.Success -> {
+                if (result.output != expected) {
+                    "Output mismatch:\n  Expected: $expected\n  Actual:   ${result.output}"
+                } else null
+            }
+
+            is WorkflowTestResult.Failure -> "Expected success but got failure: ${result.error}"
+        }
+    }
+
+    /**
      * Validates the successful output with a custom predicate.
      */
     fun expectOutputMatching(

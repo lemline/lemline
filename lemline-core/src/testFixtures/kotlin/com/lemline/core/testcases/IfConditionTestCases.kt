@@ -2,7 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -22,9 +22,7 @@ object IfConditionTestCases {
                       set:
                         executed: true
             """.trimIndent(),
-            validate = expectOutputMatching("executed=true") { output ->
-                output == buildJsonObject { put("executed", true) }
-            }
+            validate = expectOutput(buildJsonObject { put("executed", true) })
         ),
 
         WorkflowTestCase(
@@ -39,9 +37,7 @@ object IfConditionTestCases {
                       set:
                         executed: true
             """.trimIndent(),
-            validate = expectOutputMatching("executed not set, initial=1") { output ->
-                output == buildJsonObject { put("initial", 1) }
-            }
+            validate = expectOutput(buildJsonObject { put("initial", 1) })
         ),
 
         WorkflowTestCase(
@@ -57,9 +53,7 @@ object IfConditionTestCases {
                         result: "greater"
             """.trimIndent(),
             input = buildJsonObject { },
-            validate = expectOutputMatching("result=greater") { output ->
-                output == buildJsonObject { put("result", "greater") }
-            }
+            validate = expectOutput(buildJsonObject { put("result", "greater") })
         ),
 
         WorkflowTestCase(
@@ -72,9 +66,7 @@ object IfConditionTestCases {
                         result: "flag was true"
             """.trimIndent(),
             input = buildJsonObject { put("flag", true) },
-            validate = expectOutputMatching("result=flag was true") { output ->
-                output == buildJsonObject { put("result", "flag was true") }
-            }
+            validate = expectOutput(buildJsonObject { put("result", "flag was true") })
         ),
 
         WorkflowTestCase(
@@ -94,12 +86,12 @@ object IfConditionTestCases {
                       set:
                         pass2: true
             """.trimIndent(),
-            validate = expectOutputMatching("pass1=true, pass2 not set") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("pass1", true)
                     put("value", 15)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -131,9 +123,7 @@ object IfConditionTestCases {
                       set:
                         grade: ${ .grade }
             """.trimIndent(),
-            validate = expectOutputMatching("grade=C") { output ->
-                output == buildJsonObject { put("grade", "C") }
-            }
+            validate = expectOutput(buildJsonObject { put("grade", "C") })
         )
     )
 }

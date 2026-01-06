@@ -2,6 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -183,12 +184,12 @@ object RunScriptTestCases {
                         hasResult: true
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutputMatching("result set with script output") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("result", "mocked js output")
                     put("hasResult", true)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -206,11 +207,7 @@ object RunScriptTestCases {
                         as: '${ {scriptResult: .} }'
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutputMatching("transformed output with scriptResult") { output ->
-                output == buildJsonObject {
-                    put("scriptResult", "mocked js output")
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("scriptResult", "mocked js output") })
         ),
 
         WorkflowTestCase(
@@ -235,11 +232,7 @@ object RunScriptTestCases {
                         result: ${ . }
             """.trimIndent(),
             tags = setOf("script"),
-            validate = expectOutputMatching("result from last script") { output ->
-                output == buildJsonObject {
-                    put("result", "mocked python output")
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("result", "mocked python output") })
         ),
 
         WorkflowTestCase(

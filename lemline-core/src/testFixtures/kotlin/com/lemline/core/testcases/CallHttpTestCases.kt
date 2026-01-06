@@ -8,7 +8,7 @@ import com.lemline.core.testcases.TestMocks.post1Response
 import com.lemline.core.testcases.TestMocks.updatedPostResponse
 import com.lemline.core.testcases.TestMocks.user1Response
 import com.lemline.core.testcases.impl.WorkflowTestCase
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -31,9 +31,7 @@ object CallHttpTestCases {
                         endpoint: https://jsonplaceholder.typicode.com/posts/1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("post1 response") { output ->
-                output == post1Response
-            }
+            validate = expectOutput(post1Response)
         ),
 
         WorkflowTestCase(
@@ -50,9 +48,7 @@ object CallHttpTestCases {
                           postId: 1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("comments for post 1") { output ->
-                output == commentsForPost1
-            }
+            validate = expectOutput(commentsForPost1)
         ),
 
         WorkflowTestCase(
@@ -73,9 +69,7 @@ object CallHttpTestCases {
                           userId: 1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("created post response") { output ->
-                output == createdPostResponse
-            }
+            validate = expectOutput(createdPostResponse)
         ),
 
         WorkflowTestCase(
@@ -95,9 +89,7 @@ object CallHttpTestCases {
                           userId: 1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("updated post response") { output ->
-                output == updatedPostResponse
-            }
+            validate = expectOutput(updatedPostResponse)
         ),
 
         WorkflowTestCase(
@@ -112,9 +104,7 @@ object CallHttpTestCases {
                         endpoint: https://jsonplaceholder.typicode.com/posts/1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("empty object") { output ->
-                output == deleteResponse
-            }
+            validate = expectOutput(deleteResponse)
         ),
 
         WorkflowTestCase(
@@ -136,9 +126,7 @@ object CallHttpTestCases {
             """.trimIndent(),
             input = buildJsonObject { put("someData", "test") },
             tags = setOf("http"),
-            validate = expectOutputMatching("created post response") { output ->
-                output == createdPostResponse
-            }
+            validate = expectOutput(createdPostResponse)
         ),
 
         WorkflowTestCase(
@@ -158,9 +146,7 @@ object CallHttpTestCases {
                         endpoint: https://jsonplaceholder.typicode.com/users/1
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("user1 response") { output ->
-                output == user1Response
-            }
+            validate = expectOutput(user1Response)
         ),
 
         WorkflowTestCase(
@@ -178,9 +164,7 @@ object CallHttpTestCases {
             tags = setOf("http"),
             // Note: Mock returns body directly, not the full response format.
             // Real execution would return {request, statusCode, headers, content}
-            validate = expectOutputMatching("post1 response (mock returns body)") { output ->
-                output == post1Response
-            }
+            validate = expectOutput(post1Response)
         ),
 
         WorkflowTestCase(
@@ -198,9 +182,7 @@ object CallHttpTestCases {
                           User-Agent: Lemline-Test
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("post1 response") { output ->
-                output == post1Response
-            }
+            validate = expectOutput(post1Response)
         ),
 
         WorkflowTestCase(
@@ -217,12 +199,12 @@ object CallHttpTestCases {
                         as: '${ {postTitle: .title, postId: .id} }'
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("transformed output with postTitle and postId") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("postTitle", "sunt aut facere repellat provident occaecati excepturi optio reprehenderit")
                     put("postId", 1)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -240,11 +222,11 @@ object CallHttpTestCases {
                         result: ${ .title }
             """.trimIndent(),
             tags = setOf("http", "external"),
-            validate = expectOutputMatching("result contains title from post1") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("result", "sunt aut facere repellat provident occaecati excepturi optio reprehenderit")
                 }
-            }
+            )
         )
     )
 }

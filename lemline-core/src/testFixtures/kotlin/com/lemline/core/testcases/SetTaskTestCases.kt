@@ -2,7 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -26,13 +26,13 @@ object SetTaskTestCases {
                         text: "hello"
                         flag: true
             """.trimIndent(),
-            validate = expectOutputMatching("number=42, text=hello, flag=true") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("number", 42)
                     put("text", "hello")
                     put("flag", true)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -43,9 +43,7 @@ object SetTaskTestCases {
                       set:
                         result: ${ 10 + 20 }
             """.trimIndent(),
-            validate = expectOutputMatching("result=30") { output ->
-                output == buildJsonObject { put("result", 30) }
-            }
+            validate = expectOutput(buildJsonObject { put("result", 30) })
         ),
 
         WorkflowTestCase(
@@ -59,9 +57,7 @@ object SetTaskTestCases {
                       set:
                         value: 20
             """.trimIndent(),
-            validate = expectOutputMatching("value=20") { output ->
-                output == buildJsonObject { put("value", 20) }
-            }
+            validate = expectOutput(buildJsonObject { put("value", 20) })
         ),
 
         WorkflowTestCase(
@@ -74,14 +70,14 @@ object SetTaskTestCases {
                           name: Alice
                           age: 30
             """.trimIndent(),
-            validate = expectOutputMatching("user.name=Alice, user.age=30") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     putJsonObject("user") {
                         put("name", "Alice")
                         put("age", 30)
                     }
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -93,8 +89,8 @@ object SetTaskTestCases {
                         numbers: [1, 2, 3]
                         strings: ["a", "b", "c"]
             """.trimIndent(),
-            validate = expectOutputMatching("arrays created") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put(
                         "numbers", JsonArray(
                             listOf(
@@ -114,7 +110,7 @@ object SetTaskTestCases {
                         )
                     )
                 }
-            }
+            )
         )
     )
 }

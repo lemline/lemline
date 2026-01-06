@@ -2,7 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -29,9 +29,7 @@ object WaitTestCases {
                       set:
                         step: 2
             """.trimIndent(),
-            validate = expectOutputMatching("step=2") { output ->
-                output == buildJsonObject { put("step", 2) }
-            }
+            validate = expectOutput(buildJsonObject { put("step", 2) })
         ),
 
         WorkflowTestCase(
@@ -45,9 +43,7 @@ object WaitTestCases {
                       set:
                         completed: true
             """.trimIndent(),
-            validate = expectOutputMatching("completed=true") { output ->
-                output == buildJsonObject { put("completed", true) }
-            }
+            validate = expectOutput(buildJsonObject { put("completed", true) })
         ),
 
         WorkflowTestCase(
@@ -70,9 +66,7 @@ object WaitTestCases {
                       set:
                         counter: ${ .counter + 1 }
             """.trimIndent(),
-            validate = expectOutputMatching("counter=2") { output ->
-                output == buildJsonObject { put("counter", 2) }
-            }
+            validate = expectOutput(buildJsonObject { put("counter", 2) })
         ),
 
         WorkflowTestCase(
@@ -89,9 +83,7 @@ object WaitTestCases {
                       set:
                         result: ${ .value }
             """.trimIndent(),
-            validate = expectOutputMatching("result=42") { output ->
-                output == buildJsonObject { put("result", 42) }
-            }
+            validate = expectOutput(buildJsonObject { put("result", 42) })
         ),
 
         WorkflowTestCase(
@@ -117,8 +109,8 @@ object WaitTestCases {
                       output:
                         as: ${ $context }
             """.trimIndent(),
-            validate = expectOutputMatching("3 iterations with values [10, 20, 30]") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put(
                         "results", JsonArray(
                             listOf(
@@ -129,7 +121,7 @@ object WaitTestCases {
                         )
                     )
                 }
-            }
+            )
         )
     )
 }

@@ -2,7 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
@@ -33,9 +33,7 @@ object DoTaskTestCases {
                         result: ${ .value + 5 }
             """.trimIndent(),
             input = buildJsonObject { },
-            validate = expectOutputMatching("result=15") { output ->
-                output == buildJsonObject { put("result", 15) }
-            }
+            validate = expectOutput(buildJsonObject { put("result", 15) })
         ),
 
         WorkflowTestCase(
@@ -56,15 +54,15 @@ object DoTaskTestCases {
                         counter: ${ .counter + 1 }
             """.trimIndent(),
             input = buildJsonObject { },
-            validate = expectOutputMatching("counter=2, items=[first, second]") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("items", buildJsonArray {
                         add(JsonPrimitive("first"))
                         add(JsonPrimitive("second"))
                     })
                     put("counter", 2)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -77,12 +75,12 @@ object DoTaskTestCases {
                         taskRef: ${ $task.reference }
             """.trimIndent(),
             input = JsonPrimitive(42),
-            validate = expectOutputMatching("taskName=taskWithMetadata, taskRef=/do/0/taskWithMetadata") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("taskName", "taskWithMetadata")
                     put("taskRef", "/do/0/taskWithMetadata")
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -96,9 +94,7 @@ object DoTaskTestCases {
                         result: ${ $input }
             """.trimIndent(),
             input = JsonPrimitive(5),
-            validate = expectOutputMatching("result=50") { output ->
-                output == buildJsonObject { put("result", 50) }
-            }
+            validate = expectOutput(buildJsonObject { put("result", 50) })
         ),
 
         WorkflowTestCase(
@@ -121,8 +117,8 @@ object DoTaskTestCases {
                         metadata: '${ {timestamp: .timestamp, version: .version} }'
             """.trimIndent(),
             input = buildJsonObject { },
-            validate = expectOutputMatching("user and metadata objects") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     putJsonObject("user") {
                         put("name", "Alice")
                         put("age", 30)
@@ -132,7 +128,7 @@ object DoTaskTestCases {
                         put("version", 1)
                     }
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -147,9 +143,7 @@ object DoTaskTestCases {
                         grade: ${ if .score >= 90 then "A" elif .score >= 80 then "B" else "C" end }
             """.trimIndent(),
             input = buildJsonObject { },
-            validate = expectOutputMatching("grade=B") { output ->
-                output == buildJsonObject { put("grade", "B") }
-            }
+            validate = expectOutput(buildJsonObject { put("grade", "B") })
         ),
 
         WorkflowTestCase(
@@ -169,9 +163,7 @@ object DoTaskTestCases {
                         result: ${ .doubled + 5 }
             """.trimIndent(),
             input = buildJsonObject { },
-            validate = expectOutputMatching("result=25") { output ->
-                output == buildJsonObject { put("result", 25) }
-            }
+            validate = expectOutput(buildJsonObject { put("result", 25) })
         ),
 
         WorkflowTestCase(
@@ -184,12 +176,12 @@ object DoTaskTestCases {
                         hasWorkflowInput: ${ $workflow.input != null }
             """.trimIndent(),
             input = JsonPrimitive(42),
-            validate = expectOutputMatching("hasWorkflowId=true, hasWorkflowInput=true") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("hasWorkflowId", true)
                     put("hasWorkflowInput", true)
                 }
-            }
+            )
         ),
 
         WorkflowTestCase(
@@ -210,9 +202,7 @@ object DoTaskTestCases {
                         final: ${ .added / 2 }
             """.trimIndent(),
             input = buildJsonObject { },
-            validate = expectOutputMatching("final=55") { output ->
-                output == buildJsonObject { put("final", 55) }
-            }
+            validate = expectOutput(buildJsonObject { put("final", 55) })
         ),
 
         WorkflowTestCase(
@@ -227,12 +217,12 @@ object DoTaskTestCases {
                         as: '${ {result: .value, label: .name} }'
             """.trimIndent(),
             input = buildJsonObject { },
-            validate = expectOutputMatching("result=42, label=test") { output ->
-                output == buildJsonObject {
+            validate = expectOutput(
+                buildJsonObject {
                     put("result", 42)
                     put("label", "test")
                 }
-            }
+            )
         )
     )
 }

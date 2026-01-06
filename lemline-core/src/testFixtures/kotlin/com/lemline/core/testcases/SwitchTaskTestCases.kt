@@ -2,7 +2,7 @@
 package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -33,11 +33,7 @@ object SwitchTaskTestCases {
                       set:
                         result: "B"
             """.trimIndent(),
-            validate = expectOutputMatching("result=A") { output ->
-                output == buildJsonObject {
-                    put("result", "A")
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("result", "A") })
         ),
 
         WorkflowTestCase(
@@ -60,11 +56,7 @@ object SwitchTaskTestCases {
                       set:
                         result: "B"
             """.trimIndent(),
-            validate = expectOutputMatching("result=B") { output ->
-                output == buildJsonObject {
-                    put("result", "B")
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("result", "B") })
         ),
 
         WorkflowTestCase(
@@ -96,11 +88,7 @@ object SwitchTaskTestCases {
                       set:
                         level: "low"
             """.trimIndent(),
-            validate = expectOutputMatching("level=medium") { output ->
-                output == buildJsonObject {
-                    put("level", "medium")
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("level", "medium") })
         ),
 
         WorkflowTestCase(
@@ -122,11 +110,7 @@ object SwitchTaskTestCases {
                       set:
                         result: "default"
             """.trimIndent(),
-            validate = expectOutputMatching("result=default") { output ->
-                output == buildJsonObject {
-                    put("result", "default")
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("result", "default") })
         ),
 
         WorkflowTestCase(
@@ -156,11 +140,7 @@ object SwitchTaskTestCases {
                         processed: "other"
             """.trimIndent(),
             input = buildJsonObject { put("type", "B") },
-            validate = expectOutputMatching("processed=type-B") { output ->
-                output == buildJsonObject {
-                    put("processed", "type-B")
-                }
-            }
+            validate = expectOutput(buildJsonObject { put("processed", "type-B") })
         )
     )
 }
