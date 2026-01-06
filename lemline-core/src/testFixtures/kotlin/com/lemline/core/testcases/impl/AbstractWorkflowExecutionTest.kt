@@ -51,21 +51,24 @@ abstract class AbstractWorkflowExecutionTest(
                 }
 
                 if (testConfig != null) {
-                    test(case.name).config(timeout = case.timeout) {
-                        val executor = createExecutor()
-                        val result = executor.execute(
-                            yaml = case.yaml,
-                            input = case.input,
-                            dependencies = case.dependencies,
-                            mockConfig = case.mockConfig,
-                            cloudEvents = case.cloudEvents,
-                            validateDefinition = case.validateDefinition
-                        )
+                    if (case.skip) {
+                        xtest(case.name) { }
+                    } else {
+                        test(case.name).config(timeout = case.timeout) {
+                            val executor = createExecutor()
+                            val result = executor.execute(
+                                yaml = case.yaml,
+                                input = case.input,
+                                dependencies = case.dependencies,
+                                mockConfig = case.mockConfig,
+                                cloudEvents = case.cloudEvents,
+                                validateDefinition = case.validateDefinition
+                            )
 
-                        // Run custom validation if provided
-                        val validationError = case.validate(result)
-                        if (validationError != null) {
-                            throw AssertionError("Validation failed for '${case.name}': $validationError\nResult: $result")
+                            val validationError = case.validate(result)
+                            if (validationError != null) {
+                                throw AssertionError("Validation failed for '${case.name}': $validationError")
+                            }
                         }
                     }
                 }
@@ -126,14 +129,13 @@ object WorkflowTestValidators {
     /**
      * Validates the successful output with a custom predicate.
      */
-    fun expectOutputMatching(
-        description: String,
+    fun validateOutput(
         predicate: (JsonElement) -> Boolean
     ): (WorkflowTestResult) -> String? = { result ->
         when (result) {
             is WorkflowTestResult.Success -> {
                 if (!predicate(result.output)) {
-                    "Output did not match: $description"
+                    "Output mismatch:\n   Actual:   ${result.output}"
                 } else null
             }
 

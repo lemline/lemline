@@ -4,7 +4,7 @@ package com.lemline.core.testcases
 import com.lemline.core.testcases.impl.TestMocks
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -32,9 +32,7 @@ object RunScriptTestCases {
                             console.log('Hello from JavaScript');
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -50,9 +48,7 @@ object RunScriptTestCases {
                             print('Hello from Python')
             """.trimIndent(),
             tags = setOf("script", "python"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked python output"))
         ),
 
         WorkflowTestCase(
@@ -77,9 +73,7 @@ object RunScriptTestCases {
                             "--name": Alice
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -103,9 +97,7 @@ object RunScriptTestCases {
                             "--name": Bob
             """.trimIndent(),
             tags = setOf("script", "python"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked python output"))
         ),
 
         WorkflowTestCase(
@@ -123,9 +115,7 @@ object RunScriptTestCases {
                             MY_VAR: TestValue
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -144,9 +134,7 @@ object RunScriptTestCases {
                             MY_VAR: PythonValue
             """.trimIndent(),
             tags = setOf("script", "python"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked python output"))
         ),
 
         WorkflowTestCase(
@@ -163,9 +151,7 @@ object RunScriptTestCases {
                         return: stdout
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -250,9 +236,7 @@ object RunScriptTestCases {
                             console.log(result);
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutputMatching("computation result") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -269,9 +253,7 @@ object RunScriptTestCases {
                             print(result)
             """.trimIndent(),
             tags = setOf("script", "python"),
-            validate = expectOutputMatching("computation result") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked python output"))
         ),
 
         WorkflowTestCase(
@@ -289,9 +271,7 @@ object RunScriptTestCases {
                             console.log('Line 3');
             """.trimIndent(),
             tags = setOf("script", "js"),
-            validate = expectOutputMatching("multi-line output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked js output"))
         ),
 
         WorkflowTestCase(
@@ -309,9 +289,7 @@ object RunScriptTestCases {
                             print('Line 3')
             """.trimIndent(),
             tags = setOf("script", "python"),
-            validate = expectOutputMatching("multi-line output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked python output"))
         )
     )
 }

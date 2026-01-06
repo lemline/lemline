@@ -5,7 +5,7 @@ import com.lemline.core.testcases.impl.WorkflowDependency
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectSuccess
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -532,12 +532,13 @@ object RunWorkflowTestCases {
                     """.trimIndent()
                 )
             ),
-            validate = expectOutputMatching("handled=true, errorStatus=404") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["handled"]?.jsonPrimitive?.content == "true" &&
-                    obj["errorStatus"]?.jsonPrimitive?.int == 404 &&
-                    obj["errorType"]?.jsonPrimitive?.content?.contains("not-found") == true
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("handled", true)
+                    put("errorStatus", 404)
+                    put("errorType", "https://serverlessworkflow.io/errors/not-found")
+                }
+            )
         ),
 
         WorkflowTestCase(

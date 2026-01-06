@@ -5,14 +5,16 @@ import com.lemline.core.testcases.impl.AbstractWorkflowExecutionTest
 import com.lemline.core.testcases.impl.FullOrchestratorTestExecutor
 import com.lemline.core.testcases.impl.TestMocks
 import com.lemline.core.testcases.impl.WorkflowTestCase
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Tests for HTTP call execution using FullOrchestrator.
@@ -121,14 +123,13 @@ class TestExecutionTest : AbstractWorkflowExecutionTest(
                                 processedBeforeError: ${ $context.processedCount }
             """.trimIndent(),
             tags = setOf("listen", "cloudevents", "foreach", "error", "fail-fast"),
-            validate = expectOutputMatching("only 1 event processed before error, third event skipped") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                // Verify error was caught
-                obj["failed"]?.jsonPrimitive?.booleanOrNull == true &&
-                    obj["errorType"]?.jsonPrimitive?.contentOrNull?.contains("processing") == true &&
-                    // Only 1 event was processed (event 1), event 2 failed, event 3 was never processed
-                    obj["processedBeforeError"]?.jsonPrimitive?.intOrNull == 1
-            },
+            validate = expectOutput(
+                buildJsonObject {
+                    put("failed", true)
+                    put("errorType", "https://serverlessworkflow.io/errors/processing")
+                    put("processedBeforeError", 1)
+                }
+            ),
             timeout = 100.seconds
         )
     )

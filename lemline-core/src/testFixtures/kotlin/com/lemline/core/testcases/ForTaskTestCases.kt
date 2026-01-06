@@ -3,7 +3,7 @@ package com.lemline.core.testcases
 
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -164,11 +164,16 @@ object ForTaskTestCases {
                       output:
                         as: ${ . }
             """.trimIndent(),
-            validate = expectOutputMatching("pairs has 4 items") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val pairs = obj["pairs"]?.jsonArray ?: return@expectOutputMatching false
-                pairs.size == 4
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("pairs", buildJsonArray {
+                        add(buildJsonObject { put("num", "a"); put("letter", "a") })
+                        add(buildJsonObject { put("num", "b"); put("letter", "b") })
+                        add(buildJsonObject { put("num", "a"); put("letter", "a") })
+                        add(buildJsonObject { put("num", "b"); put("letter", "b") })
+                    })
+                }
+            )
         ),
 
         WorkflowTestCase(

@@ -4,7 +4,7 @@ package com.lemline.core.testcases
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectErrorContaining
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -368,11 +368,12 @@ object ForkTaskTestCases {
                                   caught: true
                                   errorType: ${ $failure.type }
             """.trimIndent(),
-            validate = expectOutputMatching("caught=true, errorType contains catchableError") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                obj["caught"]?.jsonPrimitive?.content == "true" &&
-                    obj["errorType"]?.jsonPrimitive?.content?.contains("catchableError") == true
-            }
+            validate = expectOutput(
+                buildJsonObject {
+                    put("caught", true)
+                    put("errorType", "https://serverlessworkflow.io/spec/1.0.0/errors/catchableError")
+                }
+            )
         ),
 
         WorkflowTestCase(
@@ -401,20 +402,24 @@ object ForkTaskTestCases {
                       output:
                         as: ${ $context }
             """.trimIndent(),
-            validate = expectOutputMatching("3 iterations with values [10,100], [20,200], [30,300]") { output ->
-                val obj = output as? JsonObject ?: return@expectOutputMatching false
-                val results = obj["results"] as? JsonArray ?: return@expectOutputMatching false
-                if (results.size != 3) return@expectOutputMatching false
-
-                fun JsonArray.containsValues(vararg expected: Int): Boolean {
-                    val actual = this.mapNotNull { it.jsonObject["value"]?.jsonPrimitive?.int }.toSet()
-                    return actual == expected.toSet()
+            validate = expectOutput(
+                buildJsonObject {
+                    put("results", buildJsonArray {
+                        add(buildJsonArray {
+                            add(buildJsonObject { put("value", 10) })
+                            add(buildJsonObject { put("value", 100) })
+                        })
+                        add(buildJsonArray {
+                            add(buildJsonObject { put("value", 20) })
+                            add(buildJsonObject { put("value", 200) })
+                        })
+                        add(buildJsonArray {
+                            add(buildJsonObject { put("value", 30) })
+                            add(buildJsonObject { put("value", 300) })
+                        })
+                    })
                 }
-
-                (results[0] as? JsonArray)?.containsValues(10, 100) == true &&
-                    (results[1] as? JsonArray)?.containsValues(20, 200) == true &&
-                    (results[2] as? JsonArray)?.containsValues(30, 300) == true
-            }
+            )
         ),
 
         WorkflowTestCase(

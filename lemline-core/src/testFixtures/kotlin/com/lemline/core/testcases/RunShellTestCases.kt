@@ -4,7 +4,7 @@ package com.lemline.core.testcases
 import com.lemline.core.testcases.impl.TestMocks
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
-import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutputMatching
+import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -30,9 +30,7 @@ object RunShellTestCases {
                           command: echo Hello World
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("Hello World"))
         ),
 
         WorkflowTestCase(
@@ -48,9 +46,7 @@ object RunShellTestCases {
                             "Hello": World
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("Hello World"))
         ),
 
         WorkflowTestCase(
@@ -68,9 +64,7 @@ object RunShellTestCases {
                             MY_VAR: TestValue
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked output"))
         ),
 
         WorkflowTestCase(
@@ -85,9 +79,7 @@ object RunShellTestCases {
                         return: stdout
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("Hello World"))
         ),
 
         WorkflowTestCase(
@@ -105,9 +97,7 @@ object RunShellTestCases {
                           command: ${ "echo " + .greeting + " " + .name }
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("Hello World"))
         ),
 
         WorkflowTestCase(
@@ -126,9 +116,7 @@ object RunShellTestCases {
                             "Hello": ${ .name }
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("Hello World"))
         ),
 
         WorkflowTestCase(
@@ -149,9 +137,7 @@ object RunShellTestCases {
                             MY_VAR: ${ .varValue }
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("string output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("mocked output"))
         ),
 
         WorkflowTestCase(
@@ -227,9 +213,7 @@ object RunShellTestCases {
                             "": /tmp
             """.trimIndent(),
             tags = setOf("shell"),
-            validate = expectOutputMatching("file list output") { output ->
-                output is JsonPrimitive
-            }
+            validate = expectOutput(JsonPrimitive("file1.txt\nfile2.txt\ndir1"))
         )
     )
 }
