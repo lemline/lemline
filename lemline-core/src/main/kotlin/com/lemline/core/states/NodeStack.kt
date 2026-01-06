@@ -17,22 +17,23 @@ import kotlinx.serialization.descriptors.SerialDescriptor
 import kotlinx.serialization.encoding.Decoder
 import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.json.buildJsonObject
+import org.jetbrains.annotations.TestOnly
 
 /**
  * A single frame in the node stack.
  *
  * @property position The node's position in the workflow tree
  * @property state The node's execution state
- * @property executionIndex Increments on re-entry (loops, retries, goto). Used for idempotent ID derivation.
+ * @property counter Increments on re-entry (loops, retries, goto). Used for idempotent ID derivation.
  */
 @Serializable
 data class StackFrame(
     val position: NodePosition,
     val state: NodeState,
-    val executionIndex: Int = 0
+    val counter: Int = 0
 ) {
-    fun increment() = copy(executionIndex = executionIndex + 1)
-    fun decrement() = copy(executionIndex = executionIndex - 1)
+    fun increment() = copy(counter = counter + 1)
+    fun decrement() = copy(counter = counter - 1)
 }
 
 /**
@@ -54,7 +55,7 @@ data class StackFrame(
 @Serializable(with = NodeStackSerializer::class)
 class NodeStack internal constructor(
     private val frames: List<StackFrame> = emptyList()
-) {
+) : Iterable<StackFrame> by frames {
 
     val rootState: RootState by lazy {
         frames.first().state as RootState
@@ -79,21 +80,23 @@ class NodeStack internal constructor(
     }
 
     val executionKey: String by lazy {
-        frames.joinToString("-") { it.executionIndex.toString() }
+        frames.joinToString("-") { it.counter.toString() }
     }
 
-    operator fun get(position: NodePosition): StackFrame? =
-        frames.firstOrNull { it.position == position }
+    operator fun get(position: NodePosition): StackFrame? = frames.firstOrNull { it.position == position }
 
-    fun deriveIdempotentId(suffix: String = ""): IDV7 =
-        IDV7.deriveIdempotentId(
-            baseId = rootState.workflowId.value,
-            position = currentPosition,
-            executionKey = executionKey,
-            suffix = suffix
-        )
+    fun deriveIdempotentId(suffix: String = ""): IDV7 = IDV7.deriveIdempotentId(
+        baseId = rootState.workflowId.value,
+        position = currentPosition,
+        executionKey = executionKey,
+        suffix = suffix
+    )
 
-    fun decrementTopFrame(): NodeStack = NodeStack(
+    fun incrementTopCounter(): NodeStack = NodeStack(
+        frames.dropLast(1) + frames.last().increment()
+    )
+
+    fun decrementTopCounter(): NodeStack = NodeStack(
         frames.dropLast(1) + frames.last().decrement()
     )
 
@@ -107,52 +110,24 @@ class NodeStack internal constructor(
         NodeStack(frames + StackFrame(position, state, executionIndex))
 
     /** Pop the top frame and increment the new top frame's executionIndex.*/
-    fun pop(): NodeStack = popFrames(if (frames.size == 1) frames else frames.dropLast(1))
+    fun pop(): NodeStack = when (frames.size) {
+        1 -> this
+        else -> NodeStack(frames.dropLast(1)).incrementTopCounter()
+    }
 
     /** Returns a new StateStack with frames up to and including position, incrementing new top's executionIndex.*/
     fun popUntil(position: NodePosition): NodeStack {
-        val index = indexOfFirst(position)
-        return popFrames(frames.take(index + 1))
-    }
-
-    /** Pops frames after position, replaces the frame at position with new state, and increments its executionIndex.*/
-    fun popUntilAndReplace(position: NodePosition, newState: NodeState): NodeStack {
-        val index = indexOfFirst(position)
-        val newFrame = frames[index].increment().copy(state = newState)
-        return NodeStack(frames.take(index) + newFrame)
+        return NodeStack(frames.take(indexOfFirst(position) + 1)).incrementTopCounter()
     }
 
     /** Update the current (top) state in the stack.*/
-    fun updateCurrentState(newState: NodeState, executionIndex: Int? = null): NodeStack {
-        val currentFrame = frames.last()
-        return NodeStack(
-            frames.dropLast(1) + StackFrame(
-                currentFrame.position,
-                newState,
-                executionIndex ?: (currentFrame.executionIndex + 1)
-            )
-        )
-    }
-
-    fun <R> map(transform: (Map.Entry<NodePosition, NodeState>) -> R): List<R> =
-        frames.map { frame ->
-            transform(object : Map.Entry<NodePosition, NodeState> {
-                override val key: NodePosition = frame.position
-                override val value: NodeState = frame.state
-            })
-        }
-
-    internal fun <R> mapFrames(transform: (StackFrame) -> R): List<R> = frames.map(transform)
+    fun updateTopState(newState: NodeState): NodeStack =
+        NodeStack(frames.dropLast(1) + frames.last().copy(state = newState))
 
     private fun indexOfFirst(position: NodePosition): Int {
         val index = frames.indexOfFirst { it.position == position }
         if (index < 0) throw NoSuchElementException("Position $position not found within the stack ${frames.joinToString { it.position.toString() }}.")
         return index
-    }
-
-    private fun popFrames(remaining: List<StackFrame>): NodeStack {
-        if (remaining.isEmpty()) return NodeStack(remaining)
-        return NodeStack(remaining.dropLast(1) + remaining.last().increment())
     }
 
     /** Creates a new TaskStack with a new root state, replacing the existing one.*/
@@ -168,11 +143,10 @@ class NodeStack internal constructor(
     override fun hashCode(): Int = frames.hashCode()
 
     override fun toString(): String =
-        "[" + frames.joinToString { it.position.toString() + "(" + it.executionIndex + ")=>" + it.state.toString() } + "]"
+        "[" + frames.joinToString { it.position.toString() + "(" + it.counter + ")=>" + it.state.toString() } + "]"
 
     companion object {
-        fun empty(): NodeStack = NodeStack(emptyList())
-
+        @TestOnly
         fun fromFrames(frames: List<StackFrame>): NodeStack = NodeStack(frames)
     }
 }
@@ -193,7 +167,7 @@ internal object NodeStackSerializer : KSerializer<NodeStack> {
 
     override fun serialize(encoder: Encoder, value: NodeStack) {
         var previousPath = ""
-        val compactFrames = value.mapFrames { frame ->
+        val compactFrames = value.map { frame ->
             val currentPath = frame.position.toString()
             val suffix = if (previousPath.isEmpty() || previousPath == "/") {
                 currentPath.removePrefix("/")
@@ -201,7 +175,7 @@ internal object NodeStackSerializer : KSerializer<NodeStack> {
                 currentPath.removePrefix("$previousPath/")
             }
             previousPath = currentPath
-            CompactFrame(p = suffix, s = frame.state, i = frame.executionIndex)
+            CompactFrame(p = suffix, s = frame.state, i = frame.counter)
         }
         delegateSerializer.serialize(encoder, compactFrames)
     }

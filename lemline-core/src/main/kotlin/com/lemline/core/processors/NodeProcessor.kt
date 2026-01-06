@@ -201,7 +201,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
         val scope = nodeStack.stateScope.withTask(node, state.startedAt)
 
         val updatedState: S = stateWhenReEnteringFromChild(state, output, scope, flowDirective.nodeName)
-        val updatedStack = nodeStack.updateCurrentState(updatedState)
+        val updatedStack = nodeStack.updateTopState(updatedState).incrementTopCounter()
 
         return when (val directive = flowDirective?.get()) {
             is FlowDirectiveEnum -> when (directive) {
