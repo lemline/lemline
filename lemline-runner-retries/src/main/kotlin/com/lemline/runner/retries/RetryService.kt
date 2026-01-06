@@ -31,21 +31,18 @@ class RetryService {
      * @param instance The instance message containing the retry scheduled event
      * @return true if the retry was created, false if it already existed (idempotent)
      */
-    suspend fun handleRetryScheduled(instance: InstanceMessage<WorkflowEvent.TaskRetryScheduled>): Boolean {
+    suspend fun handleRetryScheduled(instance: InstanceMessage<WorkflowEvent.TaskRetryScheduled>) {
         val retryId = instance.workflowState.nodeStack.deriveIdempotentId("-retry")
-        val rowsInserted = retryRepository.insert(
-            RetryModel.from(
-                id = retryId,
-                instance = instance,
-                scheduledFor = instance.workflowState.retryAt,
-                error = IllegalStateException("Task failed and will be retried"), // TODO: This is not the correct exception
-                reason = "Task retry"
-            )
+
+        val retryModel = RetryModel.from(
+            id = retryId,
+            instance = instance,
+            scheduledFor = instance.workflowState.retryAt,
+            error = IllegalStateException("Task failed and will be retried"), // TODO: This is not the correct exception
+            reason = "Task retry"
         )
-        if (rowsInserted == 0) {
-            logger.warn { "Retry model $retryId already exists (idempotent insert)" }
-            return false
-        }
-        return true
+        val rowsInserted = retryRepository.insert(retryModel)
+
+        if (rowsInserted == 0) logger.warn { "Retry model already exists (idempotent insert): $retryModel" }
     }
 }

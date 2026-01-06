@@ -31,16 +31,12 @@ class WaitService {
      * @param instance The instance message containing the wait started event
      * @return true if the wait was created, false if it already existed (idempotent)
      */
-    suspend fun handleWaitStarted(instance: InstanceMessage<WorkflowEvent.WaitStarted>): Boolean {
+    suspend fun handleWaitStarted(instance: InstanceMessage<WorkflowEvent.WaitStarted>) {
         // Derive wait from node stack (idempotent)
         val wait = WaitModel(instanceMessage = instance)
 
         val rowsInserted = waitRepository.insert(wait)
 
-        if (rowsInserted == 0) {
-            logger.warn { "Wait model $wait already exists (idempotent insert)" }
-            return false
-        }
-        return true
+        if (rowsInserted == 0) logger.warn { "Wait model already exists (idempotent insert): $wait" }
     }
 }

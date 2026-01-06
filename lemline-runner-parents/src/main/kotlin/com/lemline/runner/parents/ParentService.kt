@@ -60,7 +60,7 @@ class ParentService {
      * @param instance The instance message containing the run workflow started event
      * @return true if the parent was created, false if it already existed (idempotent)
      */
-    suspend fun handleRunWorkflowStarted(instance: InstanceMessage<WorkflowEvent.RunWorkflowStarted>): Boolean {
+    suspend fun handleRunWorkflowStarted(instance: InstanceMessage<WorkflowEvent.RunWorkflowStarted>) {
         // Derive parent model
         val parent = ParentModel(instanceMessage = instance)
 
@@ -72,8 +72,8 @@ class ParentService {
                 connection = conn
             )
             if (rowsInserted == 0) {
-                logger.warn { "Parent model $parent already exists (idempotent insert), skipping" }
-                return@withTransaction false
+                logger.warn { "Parent model already exists (idempotent insert): $parent" }
+                return@withTransaction
             }
 
             // Create the child + optional schedule
@@ -97,8 +97,6 @@ class ParentService {
                 // Emit workflow.created lifecycle event for the child workflow
                 preparedWorkflow.onWorkflowCreated(lifecycleHook)
             }
-
-            true
         }
     }
 
