@@ -112,12 +112,12 @@ class NodeStack internal constructor(
     /** Pop the top frame and increment the new top frame's executionIndex.*/
     fun pop(): NodeStack = when (frames.size) {
         1 -> this
-        else -> NodeStack(frames.dropLast(1)).incrementTopCounter()
+        else -> NodeStack(frames.dropLast(1))
     }
 
     /** Returns a new StateStack with frames up to and including position, incrementing new top's executionIndex.*/
     fun popUntil(position: NodePosition): NodeStack {
-        return NodeStack(frames.take(indexOfFirst(position) + 1)).incrementTopCounter()
+        return NodeStack(frames.take(indexOfFirst(position) + 1))
     }
 
     /** Update the current (top) state in the stack.*/

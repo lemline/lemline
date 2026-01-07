@@ -233,11 +233,11 @@ fun ListenerModel.Companion.random(): ListenerModel {
     val config = listenStarted.config
 
     return ListenerModel(
-        id = IDV7.random(),
         instanceMessage = InstanceMessage(
             workflowInfo = workflowInfo,
             workflowState = listenStarted,
         ),
+        id = IDV7.random(),
         listenerStrategy = ListenerStrategy.from(config),
         timeoutAt = config.timeoutAt,
     ).also {

@@ -102,11 +102,13 @@ abstract class ListenerEventRepositoryTestBase {
 
         val nodeStack = NodeStack.fromFrames(
             listOf(
-                StackFrame(NodePosition.root, RootState(
-                    startedAt = now,
-                    workflowId = workflowId,
-                    workflowInput = JsonNull
-                )),
+                StackFrame(
+                    NodePosition.root, RootState(
+                        startedAt = now,
+                        workflowId = workflowId,
+                        workflowInput = JsonNull
+                    )
+                ),
                 StackFrame(NodePosition("/do"), DoState(startedAt = now)),
                 StackFrame(testNodePosition, TaskState(startedAt = now))
             )
@@ -128,11 +130,11 @@ abstract class ListenerEventRepositoryTestBase {
         )
 
         return ListenerModel(
-            id = IDV7.random(),
             instanceMessage = InstanceMessage(
                 workflowInfo = workflowInfo,
                 workflowState = listenStarted
             ),
+            id = IDV7.random(),
             listenerStrategy = ListenerStrategy.from(config),
             timeoutAt = null,
         ).also {
@@ -170,11 +172,13 @@ abstract class ListenerEventRepositoryTestBase {
 
         val nodeStack = NodeStack.fromFrames(
             listOf(
-                StackFrame(NodePosition.root, RootState(
-                    startedAt = now,
-                    workflowId = workflowId,
-                    workflowInput = JsonNull
-                )),
+                StackFrame(
+                    NodePosition.root, RootState(
+                        startedAt = now,
+                        workflowId = workflowId,
+                        workflowInput = JsonNull
+                    )
+                ),
                 StackFrame(NodePosition("/do"), DoState(startedAt = now)),
                 StackFrame(position, TaskState(startedAt = now))
             )
@@ -199,11 +203,11 @@ abstract class ListenerEventRepositoryTestBase {
         )
 
         return ListenerModel(
-            id = IDV7.random(),
             instanceMessage = InstanceMessage(
                 workflowInfo = workflowInfo,
                 workflowState = listenStarted
             ),
+            id = IDV7.random(),
             listenerStrategy = ListenerStrategy.from(config),
             timeoutAt = null,
         ).also {
@@ -718,25 +722,23 @@ abstract class ListenerEventRepositoryTestBase {
         readyEvents shouldHaveSize 1
 
         // Simulate completing the first event's foreach processing
-        // IMPORTANT: markCompletedWithOutputByWorkflow should mark ALL rows with the same event_id as completed
+        // markForeachCompleted uses listenerId + sortKey to mark exactly one row
         val readyEvent = readyEvents.first()
         getEventRepository().markForeachCompleted(
-            workflowId = listener.instanceMessage.workflowId,
-            position = listener.instanceMessage.workflowState.nodePosition,
-            eventId = readyEvent.eventId,
+            listenerId = listener.id,
+            sortKey = readyEvent.sortKey,
             output = """{"result":"done"}"""
         )
 
-        // Verify that BOTH rows are now marked as foreach_completed
-        // (since markCompletedWithOutputByWorkflow uses event_id without filter_index)
+        // Verify that only the specific row (by sortKey) is marked as completed
         val allEvents = getEventRepository().findByListenerId(listener.id)
         val completedEvents = allEvents.filter { it.foreachCompleted }
-        completedEvents shouldHaveSize 2 // Both rows should be completed
-        completedEvents.all { it.eventId == sameEventId } shouldBe true
+        completedEvents shouldHaveSize 1
+        completedEvents.first().sortKey shouldBe readyEvent.sortKey
 
-        // Second call should NOT mark another event as ready
+        // Second call should mark the next pending event as ready
         val marked2 = getEventRepository().markReadyForForeach(limit = 100)
-        marked2 shouldBe 0
+        marked2 shouldBe 1
     }
 
     @Test
@@ -795,23 +797,21 @@ abstract class ListenerEventRepositoryTestBase {
         val marked2 = getEventRepository().markReadyForForeach(limit = 100)
         marked2 shouldBe 0 // Expected: 0 (blocked)
 
-        // Step 4: Only after markCompletedWithOutputByWorkflow should row 1 be unblocked
-        // But since markCompletedWithOutputByWorkflow updates ALL rows with the same event_id,
-        // row 1 will also be marked as completed and won't need processing
+        // Step 4: Mark first row (sortKey=0) as completed
         getEventRepository().markForeachCompleted(
-            workflowId = listener.instanceMessage.workflowId,
-            position = listener.instanceMessage.workflowState.nodePosition,
-            eventId = sameEventId,
+            listenerId = listener.id,
+            sortKey = 0,
             output = """{"result":"done"}"""
         )
 
-        // Verify BOTH rows are now completed
+        // Verify first row is completed, second row is still pending
         val allEvents = getEventRepository().findByListenerId(listener.id)
-        allEvents.all { it.foreachCompleted } shouldBe true
+        allEvents.first { it.sortKey == 0 }.foreachCompleted shouldBe true
+        allEvents.first { it.sortKey == 1 }.foreachCompleted shouldBe false
 
-        // And no more rows to mark
+        // Now second row should be marked as ready
         val marked3 = getEventRepository().markReadyForForeach(limit = 100)
-        marked3 shouldBe 0
+        marked3 shouldBe 1
     }
 
     @Test
@@ -834,11 +834,10 @@ abstract class ListenerEventRepositoryTestBase {
         val marked2 = getEventRepository().markReadyForForeach(limit = 100)
         marked2 shouldBe 0
 
-        // Complete event-A
+        // Complete event-A (sortKey = 0)
         getEventRepository().markForeachCompleted(
-            workflowId = listener.instanceMessage.workflowId,
-            position = listener.instanceMessage.workflowState.nodePosition,
-            eventId = "event-A",
+            listenerId = listener.id,
+            sortKey = eventA.sortKey,
             output = """{"result":"A"}"""
         )
 
@@ -931,9 +930,8 @@ abstract class ListenerEventRepositoryTestBase {
 
         // Complete first event
         getEventRepository().markForeachCompleted(
-            workflowId = listener.instanceMessage.workflowId,
-            position = listener.instanceMessage.workflowState.nodePosition,
-            eventId = "first-event",
+            listenerId = listener.id,
+            sortKey = eventFirst.sortKey,
             output = """{}"""
         )
 
@@ -954,9 +952,8 @@ abstract class ListenerEventRepositoryTestBase {
         val completedEvent = createEvent(listener.id, filterIndex = 0, eventId = "completed-event")
         getEventRepository().insert(completedEvent)
         getEventRepository().markForeachCompleted(
-            workflowId = listener.instanceMessage.workflowId,
-            position = listener.instanceMessage.workflowState.nodePosition,
-            eventId = "completed-event",
+            listenerId = listener.id,
+            sortKey = completedEvent.sortKey,
             output = """{"done":true}"""
         )
 
@@ -1007,9 +1004,8 @@ abstract class ListenerEventRepositoryTestBase {
         val event = createEvent(listener.id, filterIndex = 0, eventId = "event")
         getEventRepository().insert(event)
         getEventRepository().markForeachCompleted(
-            workflowId = listener.instanceMessage.workflowId,
-            position = listener.instanceMessage.workflowState.nodePosition,
-            eventId = "event",
+            listenerId = listener.id,
+            sortKey = event.sortKey,
             output = """{}"""
         )
 
@@ -1076,9 +1072,8 @@ abstract class ListenerEventRepositoryTestBase {
         readyEvents.first().eventId shouldBe "event-1"
 
         getEventRepository().markForeachCompleted(
-            workflowId = listener.instanceMessage.workflowId,
-            position = listener.instanceMessage.workflowState.nodePosition,
-            eventId = "event-1",
+            listenerId = listener.id,
+            sortKey = event1.sortKey,
             output = """{"result":"done"}"""
         )
 
@@ -1086,7 +1081,8 @@ abstract class ListenerEventRepositoryTestBase {
         marked2 shouldBe 1
 
         val eventsAfterSecondMark = getEventRepository().findByListenerId(listener.id)
-        val readyEventsAfterSecond = eventsAfterSecondMark.filter { it.outboxDelayedUntil != null && !it.foreachCompleted }
+        val readyEventsAfterSecond =
+            eventsAfterSecondMark.filter { it.outboxDelayedUntil != null && !it.foreachCompleted }
         readyEventsAfterSecond shouldHaveSize 1
         readyEventsAfterSecond.first().eventId shouldBe "event-2"
     }

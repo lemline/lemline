@@ -4,8 +4,10 @@ package com.lemline.runner.listeners
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
+import com.lemline.common.values.IDV7
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.ListenConfig
+import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.workflows.CachedUntilCondition
 import com.lemline.core.workflows.WorkflowCache
@@ -52,21 +54,12 @@ class ListenerService {
      * @param instanceMessage The instance message containing the listen started event
      * @return true if the listener was created, false if it already existed (idempotent)
      */
-    suspend fun handleListenStarted(instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>): Boolean {
+    suspend fun handleListenStarted(instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>) {
         val listenStarted = instanceMessage.workflowState
         val config = listenStarted.config
 
-        // Derive listener ID from node stack (idempotent)
-        // Note: (workflow instance ID + node position) is not sufficient for idempotency
-        val listenerId = listenStarted.nodeStack.deriveIdempotentId("-listen")
-
-        // Create listener model - workflow identity derived from instanceMessage
-        val listener = ListenerModel(
-            id = listenerId,
-            instanceMessage = instanceMessage,
-            listenerStrategy = ListenerStrategy.from(config),
-            timeoutAt = config.timeoutAt,
-        )
+        // Idempotent creation of listener model
+        val listener = ListenerModel(instanceMessage = instanceMessage)
 
         // Calculate correlation values from expect expressions
         listener.correlationValues = calculateCorrelationValues(config)
@@ -91,14 +84,10 @@ class ListenerService {
 
         if (rowsInserted == 0) {
             logger.warn { "Listener already exists (idempotent insert): $listener" }
-            return false
+            return
         }
 
-        logger.debug {
-            "Listen task started: $listenerId for workflow ${instanceMessage.workflowId} " +
-                "at position ${listenStarted.nodePosition}"
-        }
-        return true
+        logger.debug { "Listen task started at position ${listenStarted.nodePosition}: $listener " }
     }
 
     /**
@@ -167,3 +156,6 @@ class ListenerService {
         }.let { Json.encodeToString(it) }
     }
 }
+
+internal fun NodeStack.listenerId(): IDV7 = deriveIdempotentId("-listen")
+internal fun NodeStack.previousListenerId(): IDV7 = decrementTopCounter().deriveIdempotentId("-listen")

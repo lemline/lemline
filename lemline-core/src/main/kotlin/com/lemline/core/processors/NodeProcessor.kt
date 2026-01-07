@@ -360,7 +360,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
         // Build the updated state stack: pop the current node's state (but never root)
         // State was pushed in enterFromParent, so it's always on the stack
-        var updatedStack = nodeStack.pop()
+        var updatedStack = nodeStack.pop().incrementTopCounter()
         exportedContext?.let { updatedStack = updatedStack.withContext(it) }
 
         return getNextEvent(
@@ -395,7 +395,7 @@ abstract class NodeProcessor<T : TaskBase, S : NodeState>(
 
         return getNextEvent(
             // Pop the current node's state (but never root) - state was pushed in enterFromParent
-            nodeStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop(),
+            nodeStack = if (node.position == NodePosition.root) nodeStack else nodeStack.pop().incrementTopCounter(),
             nextNode = node.parent,
             nextInput = output,
             nextDirective = FlowDirective().apply { flowDirectiveEnum = FlowDirectiveEnum.END } // Pass END up the chain

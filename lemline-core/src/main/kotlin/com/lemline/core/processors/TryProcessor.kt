@@ -246,7 +246,7 @@ class TryProcessor(
         ?: throw IllegalStateException("No catch child found in TryTask ${node.position}")
 
     private fun cleanStateStack(updatedState: TryState, nodeStack: NodeStack): NodeStack =
-        nodeStack.popUntil(node.position).updateTopState(updatedState)
+        nodeStack.popUntil(node.position).incrementTopCounter().updateTopState(updatedState)
 
     /**
      * Check if should retry based on retry configuration and current attempt count.

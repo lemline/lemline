@@ -2,8 +2,6 @@
 package com.lemline.runner.listeners
 
 import com.lemline.common.values.IDV7
-import com.lemline.common.values.NodePosition
-import com.lemline.common.values.WorkflowId
 import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.config.DatabaseType
 import com.lemline.runner.common.repositories.helpers.ColumnBindings
@@ -15,8 +13,6 @@ import com.lemline.runner.common.repositories.ops.OUTBOX_DELAYED_UNTIL_COLUMN
 import com.lemline.runner.common.repositories.ops.OUTBOX_SCHEDULED_FOR_COLUMN
 import com.lemline.runner.common.repositories.ops.OutboxRepository
 import com.lemline.runner.common.repositories.ops.UPDATED_AT_COLUMN
-import com.lemline.runner.common.repositories.ops.WORKFLOW_ID_COLUMN
-import com.lemline.runner.common.repositories.ops.WORKFLOW_POSITION_COLUMN
 import com.lemline.runner.common.repositories.ops.cleanupColumns
 import com.lemline.runner.common.repositories.ops.getInstant
 import com.lemline.runner.common.repositories.ops.nowTimestamp
@@ -198,6 +194,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
                 stmt.setString(paramIdx++, eventJson)
                 stmt.setString(paramIdx++, eventJson) // foreach_output = event for non-foreach
                 ListenerQueryKey.bindAllParameters(oneAnyKeys, stmt, paramIdx)
+
                 stmt.executeUpdate()
             }
 
@@ -456,25 +453,19 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     // ========================================
 
     /**
-     * Marks an event as completed with foreach output using workflow identity and position.
-     * Finds the listener by workflowId and position, then updates the event.
+     * Marks a specific foreach event as completed with output.
      *
-     * This method uses workflow identity (workflowId + position) rather than listenerId,
-     * making it suitable for use in contexts where the nodeStack has been modified
-     * (e.g., after foreach.do execution where step counter has incremented).
+     * Used after foreach.do completes for a CloudEvent.
+     * Sets foreach_completed = TRUE so next event can be processed.
      *
-     * Updates all rows for the given event_id (multiple filter_index values may share the same event_id).
-     *
-     * @param workflowId The workflow instance ID
-     * @param position The listen task position in the workflow tree
-     * @param eventId CloudEvent ID
+     * @param listenerId Listener ID (from nodeStack)
+     * @param sortKey Sort key identifying the event (from ForeachState.index)
      * @param output Output from foreach.do iteration
-     * @return Number of rows updated (should be >= 1, may be multiple if event matches multiple filters)
+     * @return Number of rows updated (should be 1)
      */
     suspend fun markForeachCompleted(
-        workflowId: WorkflowId,
-        position: NodePosition,
-        eventId: String,
+        listenerId: IDV7,
+        sortKey: Int,
         output: String?,
         connection: Connection? = null
     ): Int = databaseConfig.withConnection(connection) { conn ->
@@ -483,27 +474,21 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
         conn.prepareStatement(markForeachCompletedSql).use { stmt ->
             stmt.setString(1, output)
             stmt.setTimestamp(2, now)
-            setIDV7(stmt, 3, workflowId.value)
-            stmt.setString(4, position.toString())
-            stmt.setString(5, eventId)
+            setIDV7(stmt, 3, listenerId)
+            stmt.setInt(4, sortKey)
             stmt.executeUpdate()
         }
     }
 
     private val markForeachCompletedSql by lazy {
         """
-        UPDATE $tableName e
+        UPDATE $tableName
         SET $FOREACH_COMPLETED_COLUMN = TRUE,
             $FOREACH_OUTPUT_COLUMN = ?,
             $UPDATED_AT_COLUMN = ?
-        WHERE EXISTS (
-            SELECT 1 FROM $LISTENER_TABLE l
-            WHERE l.$ID_COLUMN = e.$LISTENER_ID_COLUMN
-              AND l.$WORKFLOW_ID_COLUMN = ?
-              AND l.$WORKFLOW_POSITION_COLUMN = ?
-        )
-        AND e.$EVENT_ID_COLUMN = ?
-        AND e.$FOREACH_COMPLETED_COLUMN = FALSE
+        WHERE $LISTENER_ID_COLUMN = ?
+          AND $SORT_KEY_COLUMN = ?
+          AND $FOREACH_COMPLETED_COLUMN = FALSE
         """.trimIndent()
     }
 
@@ -560,48 +545,6 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     // ========================================
     // Query Methods
     // ========================================
-
-    /**
-     * Finds the listener ID for an event using workflow identity and position.
-     *
-     * This method uses the triple (workflowId, position, eventId) to uniquely identify
-     * a listener event and return its parent listener ID. This is the correct way to
-     * find a listener during foreach processing, as workflowId + position alone does
-     * not guarantee uniqueness.
-     *
-     * @param workflowId The workflow instance ID
-     * @param position The listen task position in the workflow tree
-     * @param eventId CloudEvent ID from the listen state
-     * @param connection Optional existing connection to reuse
-     * @return The listener ID if found, null otherwise
-     */
-    suspend fun findListenerIdByEvent(
-        workflowId: WorkflowId,
-        position: NodePosition,
-        eventId: String,
-        connection: Connection? = null
-    ): IDV7? = databaseConfig.withConnection(connection) { conn ->
-        conn.prepareStatement(findListenerIdByEventSql).use { stmt ->
-            setIDV7(stmt, 1, workflowId.value)
-            stmt.setString(2, position.toString())
-            stmt.setString(3, eventId)
-            stmt.executeQuery().use { rs ->
-                if (rs.next()) getIDV7(rs, LISTENER_ID_COLUMN) else null
-            }
-        }
-    }
-
-    private val findListenerIdByEventSql by lazy {
-        """
-        SELECT e.$LISTENER_ID_COLUMN
-        FROM $tableName e
-        JOIN $LISTENER_TABLE l ON l.$ID_COLUMN = e.$LISTENER_ID_COLUMN
-        WHERE l.$WORKFLOW_ID_COLUMN = ?
-          AND l.$WORKFLOW_POSITION_COLUMN = ?
-          AND e.$EVENT_ID_COLUMN = ?
-        LIMIT 1
-        """.trimIndent()
-    }
 
     /**
      * Finds all events for a listener, ordered by created_at (arrival order).

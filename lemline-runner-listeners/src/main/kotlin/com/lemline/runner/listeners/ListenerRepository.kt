@@ -187,8 +187,8 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
     }
 
     override fun createModel(rs: ResultSet): ListenerModel = ListenerModel(
-        id = getIDV7(rs, ID_COLUMN)!!,
         instanceMessage = rs.getInstanceMessage<WorkflowEvent.ListenStarted>(idHelper)!!,
+        id = getIDV7(rs, ID_COLUMN)!!,
         listenerStrategy = ListenerStrategy.valueOf(rs.getString(STRATEGY_COLUMN)),
         timeoutAt = rs.getInstant(TIMEOUT_AT_COLUMN),
     ).apply {

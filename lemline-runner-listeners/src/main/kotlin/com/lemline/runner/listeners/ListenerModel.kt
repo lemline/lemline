@@ -57,17 +57,17 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalSerializationApi
 @ExperimentalTime
 data class ListenerModel(
-    /** Unique identifier for this listener */
-    override val id: IDV7,
-
     /** Workflow instance message containing state for resumption */
     override var instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>,
 
+    /** Unique identifier for this listener */
+    override val id: IDV7 = instanceMessage.workflowState.nodeStack.listenerId(),
+
     /** Listen strategy: ONE, ANY, ANY_UNTIL_EXPR, ANY_UNTIL_EVENT, ALL */
-    val listenerStrategy: ListenerStrategy,
+    val listenerStrategy: ListenerStrategy = ListenerStrategy.from(instanceMessage.workflowState.config),
 
     /** Timestamp when the listener times out (null = no timeout) */
-    val timeoutAt: Instant?,
+    val timeoutAt: Instant? = instanceMessage.workflowState.config.timeoutAt,
 ) : WithId, WithInstanceMessage, WithOutbox, WithCleanup {
 
     /** Total number of filters for ALL strategy (null for other strategies) */

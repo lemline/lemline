@@ -113,11 +113,13 @@ class ListenerEventServiceTest {
 
         val nodeStack = NodeStack.fromFrames(
             listOf(
-                StackFrame(NodePosition.root, RootState(
-                    startedAt = now,
-                    workflowId = workflowId,
-                    workflowInput = JsonNull
-                )),
+                StackFrame(
+                    NodePosition.root, RootState(
+                        startedAt = now,
+                        workflowId = workflowId,
+                        workflowInput = JsonNull
+                    )
+                ),
                 StackFrame(NodePosition("/do"), DoState(startedAt = now)),
                 StackFrame(NodePosition("/do/0"), DoState(startedAt = now)),
                 StackFrame(nodePosition, TaskState(startedAt = now))
@@ -142,11 +144,11 @@ class ListenerEventServiceTest {
         )
 
         return ListenerModel(
-            id = IDV7.random(),
             instanceMessage = InstanceMessage(
                 workflowInfo = workflowInfo,
                 workflowState = listenStarted
             ),
+            id = IDV7.random(),
             listenerStrategy = strategy,
             timeoutAt = null,
         ).apply {

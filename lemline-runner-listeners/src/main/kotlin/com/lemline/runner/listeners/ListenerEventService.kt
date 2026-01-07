@@ -4,8 +4,8 @@ package com.lemline.runner.listeners
 import com.fasterxml.jackson.databind.node.ObjectNode
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
-import com.lemline.common.values.IDV7
 import com.lemline.core.expressions.JQExpression
+import com.lemline.core.states.ForeachState
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.cloudevents.CloudEvent
@@ -309,43 +309,19 @@ class ListenerEventService {
         val forEachCompleted = message.workflowState
         val forEachOutput = forEachCompleted.output
         val forEachPosition = forEachCompleted.nodePosition
-        val eventId = IDV7.random().toString() // TODO
+        val foreachState = forEachCompleted.nodeStack.currentState as ForeachState
+        val listenerId = forEachCompleted.nodeStack.pop().listenerId()
 
-        logger.debug { "ListenForEachCompleted: listenPosition=$forEachPosition, eventId=$eventId" }
+        logger.debug { "ListenForEachCompleted: listenPosition=$forEachPosition, listenerId=$listenerId, sortKey=${foreachState.index}" }
 
         val outputJson = LemlineJson.encodeToString(forEachOutput)
 
-        listenerEventRepository.markForeachCompleted(
-            message.workflowId,
-            forEachPosition,
-            eventId,
+        val updated = listenerEventRepository.markForeachCompleted(
+            listenerId,
+            foreachState.index,
             outputJson
         )
 
-        val listenerId = listenerEventRepository.findListenerIdByEvent(
-            message.workflowId,
-            forEachPosition,
-            eventId
-        )
-        val listener = listenerId?.let { listenerRepository.findById(it) }
-
-        if (listener != null) {
-            val originalListenStarted = listener.instanceMessage.workflowState
-            val updatedListenStarted = WorkflowEvent.ListenStarted(
-                nodeStack = forEachCompleted.nodeStack,
-                rawOutput = originalListenStarted.rawOutput,
-                config = originalListenStarted.config
-            )
-            listenerRepository.updateWorkflowState(
-                message.workflowId,
-                forEachPosition.toString(),
-                updatedListenStarted.toJsonString()
-            )
-            logger.debug { "Updated listener workflow_state with new nodeStack for context persistence" }
-        }
-
-        logger.debug {
-            "Foreach event (workflowId=${message.workflowId}, position=$forEachPosition, eventId=$eventId) completed"
-        }
+        if (updated == 0) logger.warn { "Failed to mark listener foreach completed for listenerId=$listenerId, sortKey=${foreachState.index}: $message" }
     }
 }

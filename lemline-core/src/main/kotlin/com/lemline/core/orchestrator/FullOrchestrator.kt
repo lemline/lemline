@@ -238,7 +238,7 @@ object FullOrchestrator {
     private fun listenFailed(nodeStack: NodeStack, position: NodePosition, e: Exception): WorkflowCommand {
         logger.debug(e) { "Listen failed" }
         return WorkflowCommand.ResumeWithFailedTask(
-            nodeStack = nodeStack.popUntil(position),
+            nodeStack = nodeStack.popUntil(position).incrementTopCounter(),
             error = InternalException.Error.from(e, position)
         )
     }
