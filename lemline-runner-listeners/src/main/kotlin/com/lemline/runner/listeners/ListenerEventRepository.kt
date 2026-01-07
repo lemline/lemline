@@ -543,54 +543,6 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
     }
 
     // ========================================
-    // Query Methods
-    // ========================================
-
-    /**
-     * Finds all events for a listener, ordered by created_at (arrival order).
-     *
-     * @param listenerId The listener ID to query events for
-     * @param connection Optional existing connection to reuse
-     * @return List of events ordered by arrival time, empty list if none found
-     */
-    suspend fun findByListenerId(
-        listenerId: IDV7,
-        connection: Connection? = null
-    ): List<ListenerEventModel> = databaseConfig.withConnection(connection) { conn ->
-        conn.prepareStatement(findByListenerIdSql).use { stmt ->
-            setIDV7(stmt, 1, listenerId)
-            stmt.executeQuery().use { rs -> rs.toModels() }
-        }
-    }
-
-    private val findByListenerIdSql by lazy {
-        "SELECT * FROM $tableName WHERE $LISTENER_ID_COLUMN = ? ORDER BY $CREATED_AT_COLUMN"
-    }
-
-    /**
-     * Counts events for a single listener.
-     *
-     * @param listenerId The listener ID to count events for
-     * @param connection Optional existing connection to reuse
-     * @return Number of events for the listener
-     */
-    suspend fun countByListenerId(
-        listenerId: IDV7,
-        connection: Connection? = null
-    ): Int = databaseConfig.withConnection(connection) { conn ->
-        conn.prepareStatement(countByListenerIdSql).use { stmt ->
-            setIDV7(stmt, 1, listenerId)
-            stmt.executeQuery().use { rs ->
-                if (rs.next()) rs.getInt(1) else 0
-            }
-        }
-    }
-
-    private val countByListenerIdSql by lazy {
-        "SELECT COUNT(*) FROM $tableName WHERE $LISTENER_ID_COLUMN = ?"
-    }
-
-    // ========================================
     // FIFO Queue Processing Methods
     // ========================================
 
