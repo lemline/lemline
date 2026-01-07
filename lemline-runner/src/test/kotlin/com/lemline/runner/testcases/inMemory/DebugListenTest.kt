@@ -1,6 +1,9 @@
+// SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.testcases.inMemory
 
-import com.lemline.core.testcases.impl.TestMocks.orderCreatedCloudEvent
+import com.lemline.core.testcases.impl.TestMocks.reading1Event
+import com.lemline.core.testcases.impl.TestMocks.reading2Event
+import com.lemline.core.testcases.impl.TestMocks.reading3ThresholdEvent
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import com.lemline.runner.tests.profiles.InMemoryProfile
@@ -18,29 +21,48 @@ import kotlinx.serialization.json.put
 internal class DebugListenTest : InMemoryWorkflowTest(
     listOf(
         WorkflowTestCase(
-            name = "listen one with foreach processes event through nested tasks",
-            cloudEvents = listOf(orderCreatedCloudEvent),
+            name = "listen foreach processes events sequentially with delay preserving order",
+            cloudEvents = listOf(
+                reading1Event,
+                reading2Event,
+                reading3ThresholdEvent
+            ),
             yaml = $$"""
                 do:
-                  - waitForOrder:
+                  - setContext:
+                      set:
+                        value: 0
+                      export:
+                        as: ${ . }
+                  - collectReadings:
                       listen:
                         to:
-                          one:
-                            with:
-                              type: order.created
+                          any:
+                            - with:
+                                type: sensor.reading
+                          until: . | any(.value > 100)
                       foreach:
                         do:
-                          - processOrder:
+                          - captureContext:
                               set:
-                                processed: true
-                                orderId: ${ .orderId }
+                                value: ${ $context.value }
+                          - simulateSlowProcessing:
+                              wait:
+                                milliseconds: 400
+                          - returnResult:
+                              set:
+                                value: ${ .value + 1 }
+                              export:
+                                as: ${ . }
             """.trimIndent(),
-            tags = setOf("listen", "foreach", "one"),
+            tags = setOf("listen", "foreach", "sequential"),
             validate = expectOutput(
-                JsonArray(listOf(buildJsonObject {
-                    put("processed", true)
-                    put("orderId", "ORD-12345")
-                }))
+                JsonArray(
+                    listOf(
+                        buildJsonObject { put("value", 1) },
+                        buildJsonObject { put("value", 2) },
+                        buildJsonObject { put("value", 3) }
+                    ))
             )
         ),
     )

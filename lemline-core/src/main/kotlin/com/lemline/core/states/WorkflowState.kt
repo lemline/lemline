@@ -24,6 +24,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * Result types returned by WorkflowOrchestrator when it detects a stopping point
@@ -482,6 +483,9 @@ sealed class WorkflowEvent : WorkflowState() {
             error = error,
         )
 
+        fun withContext(context: JsonObject): ListenStarted {
+            return this.copy(nodeStack = nodeStack.withContext(context))
+        }
     }
 
     /**

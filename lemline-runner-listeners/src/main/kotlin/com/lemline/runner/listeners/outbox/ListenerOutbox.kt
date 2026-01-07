@@ -104,13 +104,11 @@ class ListenerOutbox : AbstractOutbox<ListenerModel>() {
      * then delegates to the standard outbox processing.
      */
     override suspend fun doWork() {
-        // Mark eligible ONE/ANY/ALL listeners as completed
         val markedCompleted = listenerRepository.batchPrepareListenerOutbox()
         if (markedCompleted > 0) {
             logger.debug { "Marked $markedCompleted listeners as ready for outbox" }
         }
 
-        // Process ready listeners via standard outbox flow
         super.doWork()
     }
 

@@ -352,7 +352,6 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
      */
     suspend fun batchPrepareListenerOutbox(connection: Connection? = null): Int =
         databaseConfig.withConnection(connection) { conn ->
-            val now = nowTimestamp()
             val sql = """
                 UPDATE $tableName l
                 SET $OUTBOX_SCHEDULED_FOR_COLUMN = ?,
@@ -363,10 +362,11 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                   AND NOT EXISTS (
                       SELECT 1 FROM $LISTENER_EVENTS_TABLE e
                       WHERE e.$LISTENER_ID_COLUMN = l.$ID_COLUMN
-                        AND NOT e.$FOREACH_COMPLETED_COLUMN
+                        AND e.$FOREACH_COMPLETED_COLUMN = FALSE
                   )
             """.trimIndent()
 
+            val now = nowTimestamp()
             conn.prepareStatement(sql).use { stmt ->
                 stmt.setTimestamp(1, now)
                 stmt.setTimestamp(2, now)
@@ -442,6 +442,7 @@ class ListenerRepository : CrudRepository<ListenerModel>(),
                 FROM $tableName l
                 WHERE l.$CLOSED_AT_COLUMN IS NULL
                   AND (${ListenerQueryKey.buildWhereClause(exprKeys, "l")})
+                FOR UPDATE
             """.trimIndent()
 
             conn.prepareStatement(sql).use { stmt ->

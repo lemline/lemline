@@ -52,62 +52,24 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalSerializationApi
 @ExperimentalTime
 data class ListenerEventModel(
-    /** Reference to the parent listener (part of composite PK) */
     val listenerId: IDV7,
-
-    /** CloudEvent ID from the CloudEvent spec 'id' field (part of composite PK) */
     val eventId: String,
-
-    /**
-     * Filter index that matched (part of composite PK).
-     * - ALL strategy: Explicit value (0, 1, 2...) for completion check
-     * - ONE/ANY strategies: Defaults to 0 (only one event stored per listener)
-     */
     val filterIndex: Int?,
-
-    /** CloudEvent as JSON string */
     val event: String,
-
-    /** When outbox processing was scheduled (NULL for non-foreach events) */
+    var sortKey: Int = 0,
+    var foreachCompleted: Boolean = false,
+    var foreachOutput: String? = null,
+    var createdAt: Instant? = null,
     override val outboxScheduledFor: Instant? = null,
+    override var outboxDelayedUntil: Instant? = null,
+    override var outboxAttemptCount: Int = 0,
+    override var outboxErrorClass: String? = null,
+    override var outboxErrorMessage: String? = null,
+    override var outboxErrorStackTrace: String? = null,
+    override var outboxCompletedAt: Instant? = null,
+    override var outboxFailedAt: Instant? = null,
+    override var cleanupAfter: Instant? = null,
 ) : WithOutbox, WithCleanup {
-
-    /** Per-listener sequential sort key (0, 1, 2...) for deterministic FIFO ordering */
-    var sortKey: Int = 0
-
-    /** Whether foreach.do has completed for this event (used for efficient indexing) */
-    var foreachCompleted: Boolean = false
-
-    /** Output from foreach.do iteration (captured after completion) */
-    var foreachOutput: String? = null
-
-    /** Creation timestamp */
-    var createdAt: Instant? = null
-
-    // Standard outbox fields for foreach processing
-    /** NULL = waiting for FIFO turn, NOT NULL = ready for processing */
-    override var outboxDelayedUntil: Instant? = null
-
-    /** Number of processing attempts */
-    override var outboxAttemptCount: Int = 0
-
-    /** Error class from last failed attempt */
-    override var outboxErrorClass: String? = null
-
-    /** Error message from last failed attempt */
-    override var outboxErrorMessage: String? = null
-
-    /** Error stack trace from last failed attempt */
-    override var outboxErrorStackTrace: String? = null
-
-    /** When foreach.do completed for this event (or immediate if no foreach) */
-    override var outboxCompletedAt: Instant? = null
-
-    /** When foreach.do permanently failed for this event */
-    override var outboxFailedAt: Instant? = null
-
-    /** When to delete this event */
-    override var cleanupAfter: Instant? = null
 
     companion object
 }

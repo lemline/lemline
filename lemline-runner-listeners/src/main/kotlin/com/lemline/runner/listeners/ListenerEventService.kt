@@ -7,6 +7,7 @@ import com.lemline.common.logger.logger
 import com.lemline.core.expressions.JQExpression
 import com.lemline.core.states.ForeachState
 import com.lemline.core.states.WorkflowEvent
+import com.lemline.runner.common.config.DatabaseConfig
 import com.lemline.runner.common.messaging.InstanceMessage
 import io.cloudevents.CloudEvent
 import jakarta.enterprise.context.ApplicationScoped
@@ -39,6 +40,9 @@ class ListenerEventService {
 
     @Inject
     lateinit var definitionListenService: DefinitionListenService
+
+    @Inject
+    lateinit var databaseConfig: DatabaseConfig
 
     private val logger = logger()
 
@@ -245,46 +249,46 @@ class ListenerEventService {
      * @param listenTasks Definition matches used to filter which listeners to evaluate
      * @return Number of listeners that were marked as completed
      */
+    /**
+     * Evaluates until expressions for ANY_UNTIL_EXPR listeners.
+     * Uses transaction + FOR UPDATE to prevent race when concurrent CloudEvents trigger evaluation.
+     */
     private suspend fun processUntilExpressions(
         listenTasks: List<MatchingListenTask>
     ): Int {
-        // Build query keys from matched listen tasks
         val queryKeys = listenTasks.map { it.toQueryKey() }
 
-        // Get listeners matching these keys with accumulated events
-        val listenersWithEvents = listenerRepository.findListenersByKeysWithEvents(queryKeys)
-        if (listenersWithEvents.isEmpty()) return 0
+        return databaseConfig.withTransaction { conn ->
+            val listenersWithEvents = listenerRepository.findListenersByKeysWithEvents(queryKeys, conn)
+            if (listenersWithEvents.isEmpty()) return@withTransaction 0
 
-        // Evaluate expressions and collect IDs of listeners to mark completed
-        val listenersToComplete = listenersWithEvents.mapNotNull { (listener, accumulatedEvents) ->
-            val untilExpr = listener.untilExpression ?: return@mapNotNull null
+            val listenersToComplete = listenersWithEvents.mapNotNull { (listener, accumulatedEvents) ->
+                val untilExpr = listener.untilExpression ?: return@mapNotNull null
 
-            // Build JSON array of event DATA (extract from stored CloudEvents)
-            val eventsArray = JsonArray(accumulatedEvents.map {
-                CloudEventService.parseStringAsData(it)
-            })
+                val eventsArray = JsonArray(accumulatedEvents.map {
+                    CloudEventService.parseStringAsData(it)
+                })
 
-            // Evaluate the until expression
-            val shouldComplete = try {
-                evaluateUntilExpression(untilExpr, eventsArray)
-            } catch (e: Exception) {
-                logger.warn(e) { "Failed to evaluate until expression for listener ${listener.id}: $untilExpr" }
-                false
+                val shouldComplete = try {
+                    evaluateUntilExpression(untilExpr, eventsArray)
+                } catch (e: Exception) {
+                    logger.warn(e) { "Failed to evaluate until expression for listener ${listener.id}: $untilExpr" }
+                    false
+                }
+
+                if (shouldComplete) listener.id else null
             }
 
-            if (shouldComplete) listener.id else null
+            if (listenersToComplete.isEmpty()) return@withTransaction 0
+
+            val totalMarkedCompleted = listenerRepository.batchMarkListenersCompleted(listenersToComplete, conn)
+
+            if (totalMarkedCompleted > 0) {
+                logger.debug { "Marked $totalMarkedCompleted ANY+until(expr) listeners as closed" }
+            }
+
+            totalMarkedCompleted
         }
-
-        if (listenersToComplete.isEmpty()) return 0
-
-        // Batch mark all completed listeners
-        val totalMarkedCompleted = listenerRepository.batchMarkListenersCompleted(listenersToComplete)
-
-        if (totalMarkedCompleted > 0) {
-            logger.debug { "Marked $totalMarkedCompleted ANY+until(expr) listeners as completed" }
-        }
-
-        return totalMarkedCompleted
     }
 
     /**
@@ -311,17 +315,40 @@ class ListenerEventService {
         val forEachPosition = forEachCompleted.nodePosition
         val foreachState = forEachCompleted.nodeStack.currentState as ForeachState
         val listenerId = forEachCompleted.nodeStack.pop().listenerId()
-
         logger.debug { "ListenForEachCompleted: listenPosition=$forEachPosition, listenerId=$listenerId, sortKey=${foreachState.index}" }
 
-        val outputJson = LemlineJson.encodeToString(forEachOutput)
+        val listener = listenerRepository.findById(listenerId)
 
-        val updated = listenerEventRepository.markForeachCompleted(
-            listenerId,
-            foreachState.index,
-            outputJson
-        )
+        logger.info { "ListenForEachCompleted: listener=$listener, closedAt = ${listener?.closedAt}" }
 
-        if (updated == 0) logger.warn { "Failed to mark listener foreach completed for listenerId=$listenerId, sortKey=${foreachState.index}: $message" }
+        if (listener == null) {
+            logger.warn { "Listener not found for $listenerId - message=$message" }
+            return
+        }
+
+        databaseConfig.withTransaction { conn ->
+            val outputJson = LemlineJson.encodeToString(forEachOutput)
+
+            val updated = listenerEventRepository.markForeachCompleted(
+                listenerId,
+                foreachState.index,
+                outputJson,
+                conn
+            )
+
+            if (updated == 0) logger.warn {
+                "Failed to mark foreach completed for listenerId=$listenerId, sortKey=${foreachState.index} - message=$message"
+            }
+
+            val listenerState = listener.workflowState as WorkflowEvent.ListenStarted
+            val newContext = forEachCompleted.nodeStack.rootState.context
+            if (listenerState.nodeStack.rootState.context != newContext) {
+                logger.debug { "Context changed in ForEachCompleted, updating listener state" }
+                listener.instanceMessage = listener.instanceMessage.copy(
+                    workflowState = listenerState.withContext(newContext)
+                )
+                listenerRepository.update(listener, conn)
+            }
+        }
     }
 }

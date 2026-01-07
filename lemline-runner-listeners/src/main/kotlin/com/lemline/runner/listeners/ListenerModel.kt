@@ -57,54 +57,27 @@ import kotlinx.serialization.ExperimentalSerializationApi
 @ExperimentalSerializationApi
 @ExperimentalTime
 data class ListenerModel(
-    /** Workflow instance message containing state for resumption */
     override var instanceMessage: InstanceMessage<WorkflowEvent.ListenStarted>,
-
-    /** Unique identifier for this listener */
     override val id: IDV7 = instanceMessage.workflowState.nodeStack.listenerId(),
-
-    /** Listen strategy: ONE, ANY, ANY_UNTIL_EXPR, ANY_UNTIL_EVENT, ALL */
     val listenerStrategy: ListenerStrategy = ListenerStrategy.from(instanceMessage.workflowState.config),
-
-    /** Timestamp when the listener times out (null = no timeout) */
     val timeoutAt: Instant? = instanceMessage.workflowState.config.timeoutAt,
+    var filtersCount: Int? = null,
+    var hasUntil: Boolean = false,
+    var untilExpression: String? = null,
+    var hasForeach: Boolean = false,
+    var correlationValues: String? = null,
+    var closedAt: Instant? = null,
+    override var outboxScheduledFor: Instant? = null,
+    override var outboxDelayedUntil: Instant? = null,
+    override var outboxAttemptCount: Int = 0,
+    override var outboxErrorClass: String? = null,
+    override var outboxErrorMessage: String? = null,
+    override var outboxErrorStackTrace: String? = null,
+    override var outboxCompletedAt: Instant? = null,
+    override var outboxFailedAt: Instant? = null,
+    override var cleanupAfter: Instant? = null,
 ) : WithId, WithInstanceMessage, WithOutbox, WithCleanup {
 
-    /** Total number of filters for ALL strategy (null for other strategies) */
-    var filtersCount: Int? = null
-
-    /** TRUE if listener has an until condition */
-    var hasUntil: Boolean = false
-
-    /** JQ expression for ANY_UNTIL_EXPR strategy (null for other strategies) */
-    var untilExpression: String? = null
-
-    /** TRUE if listener has foreach.do configured */
-    var hasForeach: Boolean = false
-
-    /** Correlation baseline values (Mode 2: first-sets-baseline), JSON map */
-    var correlationValues: String? = null
-
-    /** Timestamp when listener closed (stops accepting new events). Does NOT trigger ListenerCompletionOutbox directly - see outboxDelayedUntil. */
-    var closedAt: Instant? = null
-
-    // Outbox fields
-    // NOTE: outboxDelayedUntil starts as NULL (waiting state).
-    // It gets set to NOW() only after:
-    // - For non-foreach: when closed_at is set (simultaneously)
-    // - For foreach: when closed_at is set AND all foreach processing is done
-    // Only outboxDelayedUntil NOT NULL triggers ListenerCompletionOutbox.
-    override var outboxScheduledFor: Instant? = null
-    override var outboxDelayedUntil: Instant? = null
-    override var outboxAttemptCount: Int = 0
-    override var outboxErrorClass: String? = null
-    override var outboxErrorMessage: String? = null
-    override var outboxErrorStackTrace: String? = null
-    override var outboxCompletedAt: Instant? = null
-    override var outboxFailedAt: Instant? = null
-    override var cleanupAfter: Instant? = null
-
-    /** How to read incoming CloudEvents (data, envelope, raw).*/
     val readAs: ListenAndReadAs by lazy {
         val listenTasks = WorkflowCache.getListenTasks(workflowInfo)
         val listenTask = listenTasks.find { it.nodePosition == nodePosition }
