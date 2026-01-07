@@ -529,7 +529,7 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
             val placeholders = listenerIds.joinToString(",") { "?" }
 
             val sql = """
-                SELECT $LISTENER_ID_COLUMN, $FOREACH_OUTPUT_COLUMN
+                SELECT $LISTENER_ID_COLUMN, $EVENT_ID_COLUMN, $FOREACH_OUTPUT_COLUMN
                 FROM $tableName
                 WHERE $LISTENER_ID_COLUMN IN ($placeholders)
                   AND $FOREACH_OUTPUT_COLUMN IS NOT NULL
@@ -543,12 +543,13 @@ class ListenerEventRepository : CrudRepository<ListenerEventModel>(),
 
                 stmt.executeQuery().use { rs ->
                     val result = mutableMapOf<IDV7, MutableList<String>>()
+                    val seenEvents = mutableSetOf<Pair<IDV7, String>>()
                     while (rs.next()) {
                         val listenerId = getIDV7(rs, LISTENER_ID_COLUMN)!!
+                        val eventId = rs.getString(EVENT_ID_COLUMN)
                         val output = rs.getString(FOREACH_OUTPUT_COLUMN)
-                        if (output != null) {
-                            result.getOrPut(listenerId) { mutableListOf() }.add(output)
-                        }
+                        val key = listenerId to eventId
+                        if (seenEvents.add(key)) result.getOrPut(listenerId) { mutableListOf() }.add(output)
                     }
                     result
                 }
