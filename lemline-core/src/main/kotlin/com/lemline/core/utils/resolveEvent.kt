@@ -2,13 +2,17 @@
 package com.lemline.core.utils
 
 import com.lemline.common.json.LemlineJson
+import com.lemline.core.processors.CorrelationDef
+import com.lemline.core.processors.EventFilter
 import io.serverlessworkflow.api.types.EventData
 import io.serverlessworkflow.api.types.EventDataschema
 import io.serverlessworkflow.api.types.EventSource
 import io.serverlessworkflow.api.types.EventTime
 import io.serverlessworkflow.api.types.UriTemplate
+import io.serverlessworkflow.api.types.EventFilter as SdkEventFilter
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
 import java.net.URI
+import java.time.OffsetDateTime
 import java.util.*
 
 /**
@@ -59,15 +63,28 @@ fun resolveTimeValue(time: EventTime?): String? {
 }
 
 /**
- * Resolve data filter value - can be literal object or expression.
- * If it's an expression, store it for evaluation at event arrival.
- * If it's a literal, convert to JSON string for comparison.
+ * Compare a filter time value against a CloudEvent time using normalized temporal comparison.
+ *
+ * This handles the case where string representations may differ but represent the same instant
+ * (e.g., "2024-06-15T14:30:00Z" vs "2024-06-15T14:30Z").
+ *
+ * @param filterValue The filter time value (literal string, not an expression)
+ * @param eventTime The CloudEvent's time attribute
+ * @return true if times are equal, false otherwise
  */
+fun compareTimestampsNormalized(filterValue: String, eventTime: OffsetDateTime): Boolean {
+    return try {
+        val filterTime = OffsetDateTime.parse(filterValue)
+        filterTime.isEqual(eventTime)
+    } catch (_: Exception) {
+        filterValue == eventTime.toString()
+    }
+}
+
 fun resolveDataFilterValue(data: EventData?): String? {
     if (data == null) return null
     return when (val value = data.get()) {
         is String -> {
-            // Runtime expression - store as-is
             if (ExpressionUtils.isExpr(value)) {
                 ExpressionUtils.trimExpr(value)
             } else {
@@ -76,12 +93,38 @@ fun resolveDataFilterValue(data: EventData?): String? {
         }
 
         else -> {
-            // Literal object - convert to JSON string
             if (value != null) {
                 with(LemlineJson) { value.toJsonElement().toString() }
             } else {
                 null
             }
         }
+    }
+}
+
+fun convertFilter(sdkFilter: SdkEventFilter): EventFilter {
+    val eventProps = sdkFilter.with
+    return EventFilter(
+        type = eventProps?.type,
+        source = resolveSourceValue(eventProps?.source),
+        subject = eventProps?.subject,
+        id = eventProps?.id,
+        datacontenttype = eventProps?.datacontenttype,
+        dataschema = resolveDataschemaValue(eventProps?.dataschema),
+        time = resolveTimeValue(eventProps?.time),
+        dataFilter = resolveDataFilterValue(eventProps?.data),
+        correlations = convertCorrelations(sdkFilter)
+    )
+}
+
+private fun convertCorrelations(sdkFilter: SdkEventFilter): Map<String, CorrelationDef>? {
+    val correlate = sdkFilter.correlate?.additionalProperties
+    if (correlate.isNullOrEmpty()) return null
+
+    return correlate.mapValues { (_, prop) ->
+        CorrelationDef(
+            from = prop.from ?: error("Correlation missing 'from' expression"),
+            expect = prop.expect
+        )
     }
 }

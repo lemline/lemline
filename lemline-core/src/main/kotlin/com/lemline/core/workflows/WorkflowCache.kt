@@ -13,19 +13,21 @@ import com.lemline.common.values.namespace
 import com.lemline.common.values.version
 import com.lemline.core.nodes.Node
 import com.lemline.core.nodes.RootTask
+import com.lemline.core.processors.EventFilter
 import com.lemline.core.processors.ListenStrategy
+import com.lemline.core.utils.convertFilter
 import io.serverlessworkflow.api.WorkflowFormat
 import io.serverlessworkflow.api.WorkflowReader
 import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
 import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
 import io.serverlessworkflow.api.types.EventConsumptionStrategy
-import io.serverlessworkflow.api.types.EventFilter
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
 import io.serverlessworkflow.api.types.Until
 import io.serverlessworkflow.api.types.Workflow
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
+import io.serverlessworkflow.api.types.EventFilter as SdkEventFilter
 import java.util.concurrent.ConcurrentHashMap
 import org.jetbrains.annotations.TestOnly
 
@@ -258,7 +260,7 @@ object WorkflowCache {
             val listenTask = node.task as? ListenTask ?: continue
             val listenTo = listenTask.listen?.to?.get() ?: continue
 
-            val (strategy, filters, until) = when (listenTo) {
+            val (strategy, sdkFilters, until) = when (listenTo) {
                 is OneEventConsumptionStrategy -> Triple(
                     ListenStrategy.ONE,
                     listOfNotNull(listenTo.one),
@@ -280,7 +282,7 @@ object WorkflowCache {
                 else -> continue
             }
 
-            if (filters.isNotEmpty()) {
+            if (sdkFilters.isNotEmpty()) {
                 val readAs = listenTask.listen?.read
                     ?: ListenTaskConfiguration.ListenAndReadAs.DATA
 
@@ -288,7 +290,7 @@ object WorkflowCache {
                     CachedListenTask(
                         workflowInfo = workflowInfo,
                         nodePosition = position,
-                        filters = filters,
+                        filters = sdkFilters.map { convertFilter(it) },
                         strategy = strategy,
                         readAs = readAs,
                         until = until,
@@ -329,18 +331,14 @@ object WorkflowCache {
         }
     }
 
-    /**
-     * Extracts the event filter from an until EventConsumptionStrategy.
-     * The spec allows nested consumption strategies for until, but we simplify
-     * to a single filter for the termination event.
-     */
     private fun extractUntilEventFilter(strategy: EventConsumptionStrategy): EventFilter? {
-        return when (val strategyValue = strategy.get()) {
+        val sdkFilter: SdkEventFilter? = when (val strategyValue = strategy.get()) {
             is OneEventConsumptionStrategy -> strategyValue.one
             is AnyEventConsumptionStrategy -> strategyValue.any?.firstOrNull()
             is AllEventConsumptionStrategy -> strategyValue.all?.firstOrNull()
             else -> null
         }
+        return sdkFilter?.let { convertFilter(it) }
     }
 
     @TestOnly

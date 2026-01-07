@@ -222,7 +222,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns emptyList()
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
 
             // When
@@ -249,7 +249,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns emptyList()
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
 
             // When
@@ -278,7 +278,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any())
@@ -309,7 +309,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any())
@@ -343,7 +343,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns matchingTasks
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any())
@@ -377,7 +377,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
 
             val capturedEventJson = slot<String>()
@@ -407,7 +407,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns matchingTasks
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any())
@@ -437,7 +437,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any())
@@ -476,7 +476,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -511,7 +511,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns matchingTasks
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -542,7 +542,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -574,7 +574,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -608,7 +608,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -644,7 +644,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -684,7 +684,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -718,7 +718,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -756,7 +756,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -787,7 +787,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(terminationEvent, any())
             } returns emptyList()
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(terminationEvent, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(terminationEvent)
             } returns listOf(matchingUntilEvent)
             coEvery {
                 mockedListenerRepository.markListenerCompletedByUntilEvent(any(), any())
@@ -817,7 +817,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingListenTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns listOf(matchingUntilEvent)
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -843,7 +843,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(terminationEvent, any())
             } returns emptyList()
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(terminationEvent, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(terminationEvent)
             } returns listOf(matchingUntilEvent)
             coEvery {
                 mockedListenerRepository.markListenerCompletedByUntilEvent(any(), any())
@@ -876,7 +876,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(oneTask, allTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any())
@@ -912,7 +912,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(allTask, exprTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -954,7 +954,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns tasks
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns listOf(untilEvent)
             coEvery {
                 mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any())
@@ -998,7 +998,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
 
             val capturedKeys = slot<List<ListenerQueryKey>>()
@@ -1027,7 +1027,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
 
             val capturedKeys = slot<List<ListenerQueryKey>>()
@@ -1234,7 +1234,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())
@@ -1270,7 +1270,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any())
@@ -1294,7 +1294,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any())
@@ -1317,7 +1317,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForOneAny(any(), any(), any(), any())
@@ -1352,7 +1352,7 @@ class ListenerEventServiceTest {
                 mockedDefinitionListenService.findMatchingListenTasks(event, any())
             } returns listOf(matchingTask)
             every {
-                mockedDefinitionListenService.findMatchingUntilEvents(event, any())
+                mockedDefinitionListenService.findMatchingUntilEvents(event)
             } returns emptyList()
             coEvery {
                 mockedListenerEventRepository.batchInsertForAllAnyUntil(any(), any(), any(), any())

@@ -7,10 +7,15 @@ import com.lemline.core.expressions.JQExpression
 import com.lemline.core.processors.CorrelationDef
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.EventFilter
+import com.lemline.core.utils.compareTimestampsNormalized
+import com.lemline.core.utils.resolveDataschemaValue
+import com.lemline.core.utils.resolveSourceValue
+import com.lemline.core.utils.resolveTimeValue
 import io.cloudevents.CloudEvent
 import io.cloudevents.core.builder.CloudEventBuilder
 import io.serverlessworkflow.api.types.ListenTaskConfiguration
 import io.serverlessworkflow.impl.expressions.ExpressionUtils
+import io.serverlessworkflow.api.types.EventFilter as SdkEventFilter
 import java.net.URI
 import java.time.OffsetDateTime
 import kotlinx.serialization.json.Json
@@ -73,6 +78,14 @@ object CloudEventUtils {
         return matchesFilters(event, filters, correlationContext = null, establishedCorrelations = null)
     }
 
+    fun matchesFilters(
+        event: CloudEvent,
+        filters: List<EventFilter>,
+        eventDataProvider: () -> JsonElement
+    ): Boolean {
+        return matchesFiltersWithData(event, filters, eventDataProvider, null, null)
+    }
+
     /**
      * Check if a CloudEvent matches any of the given filters with correlation support.
      *
@@ -89,10 +102,21 @@ object CloudEventUtils {
         correlationContext: JsonElement?,
         establishedCorrelations: MutableMap<String, String>?
     ): Boolean {
-        if (filters.isEmpty()) return true // Empty filters = wildcard
+        return matchesFiltersWithData(
+            event, filters, { parseEventData(event) }, correlationContext, establishedCorrelations
+        )
+    }
 
-        // Parse event data once (lazily) for data filter evaluation
-        val eventData by lazy { parseEventData(event) }
+    private fun matchesFiltersWithData(
+        event: CloudEvent,
+        filters: List<EventFilter>,
+        eventDataProvider: () -> JsonElement,
+        correlationContext: JsonElement?,
+        establishedCorrelations: MutableMap<String, String>?
+    ): Boolean {
+        if (filters.isEmpty()) return true
+
+        val eventData by lazy { eventDataProvider() }
 
         return filters.any { filter ->
             // Literal-only fields: exact string match
@@ -136,7 +160,12 @@ object CloudEventUtils {
     ): Boolean {
         if (correlations.isNullOrEmpty()) return true
 
-        // Track values to establish after successful match (for Mode 2)
+        // When no correlation context is provided, we're doing definition matching only.
+        // Correlation extraction happens separately - don't reject filters based on extraction failures.
+        if (correlationContext == null && establishedCorrelations == null) {
+            return true
+        }
+
         val valuesToEstablish = mutableMapOf<String, String>()
 
         for ((key, def) in correlations) {
@@ -188,29 +217,45 @@ object CloudEventUtils {
         return true
     }
 
-    /**
-     * Evaluate a value which can be either a literal or a JQ expression.
-     * For `from` expressions: evaluates against input data (event payload).
-     */
-    private fun evaluateFromExpression(expression: String, eventData: JsonElement): String? {
-        return if (ExpressionUtils.isExpr(expression)) {
-            try {
-                val trimmedExpr = ExpressionUtils.trimExpr(expression)
-                val result = with(LemlineJson) {
-                    val inputNode = eventData.toJsonNode()
-                    val scope = LemlineJson.jacksonMapper.createObjectNode()
-                    JQExpression.eval(inputNode, trimmedExpr, scope).toJsonElement()
-                }
-                when (result) {
-                    is JsonPrimitive -> result.content
-                    else -> result.toString()
-                }
-            } catch (e: Exception) {
-                logger.warn(e) { "Failed to evaluate from expression: $expression" }
-                null
+    fun evaluateFromExpression(expression: String, eventData: JsonElement): String? {
+        return try {
+            val jqExpr = if (ExpressionUtils.isExpr(expression)) {
+                ExpressionUtils.trimExpr(expression)
+            } else {
+                expression
             }
-        } else {
-            expression
+            val result = with(LemlineJson) {
+                val inputNode = eventData.toJsonNode()
+                val scope = LemlineJson.jacksonMapper.createObjectNode()
+                JQExpression.eval(inputNode, jqExpr, scope).toJsonElement()
+            }
+            when (result) {
+                is JsonNull -> null
+                is JsonPrimitive -> result.content
+                else -> result.toString()
+            }
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to evaluate from expression: $expression" }
+            null
+        }
+    }
+
+    fun extractCorrelationValues(filter: EventFilter, eventData: JsonElement): Map<String, String>? {
+        val correlations = filter.correlations
+        if (correlations.isNullOrEmpty()) return null
+
+        return try {
+            val extracted = mutableMapOf<String, String>()
+            for ((key, def) in correlations) {
+                val value = evaluateFromExpression(def.from, eventData)
+                if (value != null) {
+                    extracted[key] = value
+                }
+            }
+            extracted.ifEmpty { null }
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to extract correlation values from event" }
+            null
         }
     }
 
@@ -240,30 +285,38 @@ object CloudEventUtils {
         }
     }
 
-    /**
-     * Matches a literal-only field (exact string match).
-     */
-    private fun matchesLiteralField(filterValue: String?, eventValue: String?): Boolean {
+    fun matchesLiteralField(filterValue: String?, eventValue: String?): Boolean {
         if (filterValue == null) return true
         return filterValue == eventValue
     }
 
-    /**
-     * Matches an expression-capable field.
-     * If the filter value is an expression (starts with ${), evaluate it against the event value.
-     * Otherwise, do exact string match.
-     */
-    private fun matchesExprField(filterValue: String?, eventValue: String?): Boolean {
+    fun matchesExprField(filterValue: String?, eventValue: String?): Boolean {
         if (filterValue == null) return true
+        if (eventValue == null) return false
 
         return if (ExpressionUtils.isExpr(filterValue)) {
-            evaluateExpressionAsBoolean(filterValue, eventValue?.let { JsonPrimitive(it) } ?: JsonNull)
+            evaluateExpressionAsBoolean(filterValue, JsonPrimitive(eventValue))
         } else {
             filterValue == eventValue
         }
     }
 
-    private fun matchesTimeField(filterValue: String?, eventTime: OffsetDateTime?): Boolean {
+    fun matchesExprField(filterValue: String?, eventValue: JsonElement): Boolean {
+        if (filterValue == null) return true
+        if (eventValue == JsonNull) return false
+
+        return if (ExpressionUtils.isExpr(filterValue)) {
+            evaluateExpressionAsBoolean(filterValue, eventValue)
+        } else {
+            try {
+                Json.parseToJsonElement(filterValue)
+            } catch (_: Exception) {
+                null
+            } == eventValue
+        }
+    }
+
+    fun matchesTimeField(filterValue: String?, eventTime: OffsetDateTime?): Boolean {
         if (filterValue == null) return true
         if (eventTime == null) return false
 
@@ -274,25 +327,34 @@ object CloudEventUtils {
         }
     }
 
-    private fun compareTimestampsNormalized(filterValue: String, eventTime: OffsetDateTime): Boolean {
-        return try {
-            val filterTime = OffsetDateTime.parse(filterValue)
-            filterTime.isEqual(eventTime)
-        } catch (e: Exception) {
-            logger.warn(e) { "Failed to parse filter time value as OffsetDateTime: $filterValue" }
-            filterValue == eventTime.toString()
-        }
-    }
-
     /**
-     * Matches data filter expression against event payload.
-     * The filter expression is evaluated against the event data and must return boolean.
+     * Matches data filter against event payload.
+     *
+     * The filter can be either:
+     * - A **literal JSON value** (starts with `{` or `[`) - compared for equality with event data
+     * - A **JQ expression** - evaluated against event data and must return boolean true
      */
     private fun matchesDataFilter(dataFilter: String?, eventData: JsonElement): Boolean {
         if (dataFilter == null) return true
         if (eventData == JsonNull) return false
 
-        return evaluateExpressionAsBoolean("\${$dataFilter}", eventData)
+        // Detect if it's a literal JSON value (object or array) vs an expression
+        val trimmed = dataFilter.trim()
+        val isLiteralJson = trimmed.startsWith("{") || trimmed.startsWith("[")
+
+        return if (isLiteralJson) {
+            // Literal JSON comparison
+            try {
+                val filterJson = Json.parseToJsonElement(dataFilter)
+                eventData == filterJson
+            } catch (e: Exception) {
+                logger.warn(e) { "Failed to parse data filter as JSON literal: $dataFilter" }
+                false
+            }
+        } else {
+            // JQ expression evaluation
+            evaluateExpressionAsBoolean("\${$dataFilter}", eventData)
+        }
     }
 
     /**

@@ -77,7 +77,7 @@ class ListenerEventService {
 
         // No database requests are done here, we just inspect the workflow definition
         val matchingListenTasks = definitionListenService.findMatchingListenTasks(event, eventDataProvider)
-        val matchingUntilEvent = definitionListenService.findMatchingUntilEvents(event, eventDataProvider)
+        val matchingUntilEvent = definitionListenService.findMatchingUntilEvents(event)
 
         if (matchingListenTasks.isEmpty() && matchingUntilEvent.isEmpty()) return 0
 
@@ -171,7 +171,7 @@ class ListenerEventService {
         )
 
         if (inserted > 0) {
-            logger.info { "Inserted $inserted events for ONE/ANY listeners" }
+            logger.debug { "Inserted $inserted events for ONE/ANY listeners" }
         }
 
         return inserted
@@ -344,7 +344,7 @@ class ListenerEventService {
             logger.debug { "Updated listener workflow_state with new nodeStack for context persistence" }
         }
 
-        logger.info {
+        logger.debug {
             "Foreach event (workflowId=${message.workflowId}, position=$forEachPosition, eventId=$eventId) completed"
         }
     }

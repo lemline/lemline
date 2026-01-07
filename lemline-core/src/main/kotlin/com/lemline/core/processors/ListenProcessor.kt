@@ -10,10 +10,7 @@ import com.lemline.core.states.ListenState
 import com.lemline.core.states.NodeStack
 import com.lemline.core.states.WorkflowEvent
 import com.lemline.core.states.WorkflowEvent.ListenStarted
-import com.lemline.core.utils.resolveDataFilterValue
-import com.lemline.core.utils.resolveDataschemaValue
-import com.lemline.core.utils.resolveSourceValue
-import com.lemline.core.utils.resolveTimeValue
+import com.lemline.core.utils.convertFilter
 import com.lemline.core.utils.toDuration
 import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
 import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
@@ -179,48 +176,7 @@ class ListenProcessor(
         )
     }
 
-    /**
-     * Convert an API EventFilter to our internal EventFilter.
-     * Note: Filter expressions (with.source, with.data, etc.) are stored as-is.
-     * They will be evaluated against the event at arrival time, not against workflow context.
-     */
-    private fun convertFilter(
-        apiFilter: ApiEventFilter
-    ): EventFilter {
-        val eventProps = apiFilter.with
-            ?: raiseError(CONFIGURATION, "Event filter missing 'with' properties")
 
-        return EventFilter(
-            type = eventProps.type,
-            source = resolveSourceValue(eventProps.source),
-            subject = eventProps.subject,
-            id = eventProps.id,
-            datacontenttype = eventProps.datacontenttype,
-            dataschema = resolveDataschemaValue(eventProps.dataschema),
-            time = resolveTimeValue(eventProps.time),
-            dataFilter = resolveDataFilterValue(eventProps.data),
-            correlations = resolveCorrelations(apiFilter)
-        )
-    }
-
-    /**
-     * Convert correlation definitions.
-     * The `from` path is stored as-is (evaluated against event at arrival).
-     * The `expect` expression is stored as-is (to be evaluated against correlationContext).
-     */
-    private fun resolveCorrelations(
-        apiFilter: ApiEventFilter,
-    ): Map<String, CorrelationDef>? {
-        val correlate = apiFilter.correlate?.additionalProperties
-        if (correlate.isNullOrEmpty()) return null
-
-        return correlate.mapValues { (_, prop) ->
-            CorrelationDef(
-                from = prop.from ?: raiseError(CONFIGURATION, "Correlation missing 'from' expression"),
-                expect = prop.expect  // May be null for Mode 2 (first-sets-baseline)
-            )
-        }
-    }
 
     /**
      * Convert the Until condition for accumulation mode.
