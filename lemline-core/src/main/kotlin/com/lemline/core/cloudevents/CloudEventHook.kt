@@ -10,13 +10,11 @@ import kotlinx.coroutines.flow.Flow
  *
  * This separates CloudEvent handling from activities (HTTP, script, shell),
  * allowing different implementations:
- * - [InMemoryCloudEventHook] for testing (FullOrchestrator)
+ * - InMemoryCloudEventHook for testing (in testFixtures)
  * - Real messaging implementation for production (Runner)
  *
  * The hook is a pure transport layer - filtering and strategy handling
  * is done by the orchestrator based on [com.lemline.core.processors.ListenConfig].
- *
- * @see InMemoryCloudEventHook for test implementation
  */
 @ExperimentalTime
 interface CloudEventHook {
