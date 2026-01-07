@@ -6,8 +6,8 @@ import com.lemline.common.values.NodePosition
 import com.lemline.common.values.WorkflowId
 import com.lemline.common.values.info
 import com.lemline.core.activities.ActivityExecutor
+import com.lemline.core.cloudevents.CloudEventFactory
 import com.lemline.core.cloudevents.CloudEventHook
-import com.lemline.core.cloudevents.CloudEventUtils
 import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.nodes.Node
@@ -186,7 +186,7 @@ object FullOrchestrator {
         cloudEventHook: CloudEventHook
     ): WorkflowCommand {
         logger.debug { "Emitting CloudEvent: type=${event.config.type} source=${event.config.source}" }
-        val cloudEvent = CloudEventUtils.buildCloudEvent(event.config)
+        val cloudEvent = CloudEventFactory.build(event.config)
         cloudEventHook.emit(cloudEvent)
         return event.resume()
     }

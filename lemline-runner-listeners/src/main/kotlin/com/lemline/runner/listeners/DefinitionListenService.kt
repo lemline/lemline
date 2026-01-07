@@ -7,7 +7,7 @@ import com.lemline.common.values.WorkflowInfo
 import com.lemline.common.values.WorkflowName
 import com.lemline.common.values.WorkflowNamespace
 import com.lemline.common.values.WorkflowVersion
-import com.lemline.core.cloudevents.CloudEventUtils
+import com.lemline.core.cloudevents.CloudEventMatcher
 import com.lemline.core.processors.EventFilter
 import com.lemline.core.workflows.CachedListenTask
 import com.lemline.core.workflows.WorkflowCache
@@ -145,7 +145,7 @@ class DefinitionListenService {
 
         val matches = WorkflowCache.getAllListenTasks().flatMap { listenTask ->
             listenTask.filters.mapIndexedNotNull { index, filter ->
-                if (!CloudEventUtils.matchesFilters(event, listOf(filter)) { eventData }) {
+                if (!CloudEventMatcher.matchesFilters(event, listOf(filter)) { eventData }) {
                     return@mapIndexedNotNull null
                 }
 
@@ -166,7 +166,7 @@ class DefinitionListenService {
 
         val matches = WorkflowCache.getAllListenTasks().mapNotNull { listenTask ->
             val terminationFilter = listenTask.untilEventFilter ?: return@mapNotNull null
-            if (!CloudEventUtils.matchesFilters(event, listOf(terminationFilter))) return@mapNotNull null
+            if (!CloudEventMatcher.matchesFilters(event, listOf(terminationFilter))) return@mapNotNull null
             MatchingListenTaskUntilEvent(listenTask = listenTask)
         }
 
@@ -175,7 +175,7 @@ class DefinitionListenService {
     }
 
     private fun extractCorrelationJson(filter: EventFilter, eventData: JsonElement): String? =
-        CloudEventUtils.extractCorrelationValues(filter, eventData)
+        CloudEventMatcher.extractCorrelationValues(filter, eventData)
             ?.toSortedMap()
             ?.let { Json.encodeToString(it.toMap()) }
 

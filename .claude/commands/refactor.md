@@ -51,6 +51,110 @@ Parse arguments as: /refactor [scope]
 - Use sealed classes for state enums where appropriate
 - Avoid nullable types where defaults make sense
 
+## Idiomatic Kotlin
+
+When refactoring, apply these Kotlin idioms to improve code quality:
+
+### Null Safety
+- Prefer `?.let { }` over `if (x != null)`
+- Use `?:` (Elvis) for defaults: `value ?: defaultValue`
+- Use `?.also { }` for side effects on nullable values
+- Avoid `!!` except in tests or when failure is truly impossible
+
+### Scope Functions
+| Function | Use Case |
+|----------|----------|
+| `let` | Transform nullable, introduce scope |
+| `run` | Execute block, return result |
+| `with` | Multiple operations on same object |
+| `apply` | Configure object, return same object |
+| `also` | Side effects, return same object |
+
+```kotlin
+// PREFER
+config.endpoint?.let { url -> client.connect(url) }
+val result = runCatching { parse(input) }.getOrNull()
+
+// AVOID
+if (config.endpoint != null) { client.connect(config.endpoint) }
+val result = try { parse(input) } catch (e: Exception) { null }
+```
+
+### Collections
+- Prefer `map`, `filter`, `flatMap` over manual loops
+- Use `associate`, `groupBy`, `partition` for transformations
+- Use `firstOrNull`, `singleOrNull` over `find` with index checks
+- Prefer `buildList`, `buildMap`, `buildSet` for complex construction
+- Use sequences (`asSequence()`) for large collections with multiple operations
+
+```kotlin
+// PREFER
+val names = users.filter { it.active }.map { it.name }
+val byId = items.associateBy { it.id }
+
+// AVOID
+val names = mutableListOf<String>()
+for (user in users) { if (user.active) names.add(user.name) }
+```
+
+### Extension Functions
+- Extract repeated operations as extension functions
+- Keep extensions close to their usage (same file or dedicated `Extensions.kt`)
+- Prefer extension functions over utility classes with static methods
+
+```kotlin
+// PREFER
+fun String.toSlug() = lowercase().replace(" ", "-")
+fun JsonElement.asStringOrNull() = (this as? JsonPrimitive)?.contentOrNull
+
+// AVOID
+object StringUtils { fun toSlug(s: String) = s.lowercase().replace(" ", "-") }
+```
+
+### Data Classes & Destructuring
+- Use `copy()` for immutable updates
+- Use destructuring in lambdas: `map { (key, value) -> ... }`
+- Prefer data classes over manual `equals`/`hashCode`/`toString`
+
+### Control Flow
+- Use `when` over chained `if-else`
+- Use `when` with sealed classes for exhaustive matching
+- Prefer expression form: `val x = when { ... }` over statement + assignment
+
+```kotlin
+// PREFER
+val result = when {
+    value < 0 -> "negative"
+    value == 0 -> "zero"
+    else -> "positive"
+}
+
+// AVOID
+val result: String
+if (value < 0) result = "negative"
+else if (value == 0) result = "zero"
+else result = "positive"
+```
+
+### Coroutines
+- Use `suspend` functions, not callbacks
+- Prefer `withContext` for dispatcher switching
+- Use `coroutineScope` for parallel decomposition
+- Avoid `GlobalScope` - use structured concurrency
+
+### Anti-Patterns to Fix
+| Anti-Pattern | Idiomatic Alternative |
+|--------------|----------------------|
+| `if (x != null) x.foo() else null` | `x?.foo()` |
+| `if (x != null) x else default` | `x ?: default` |
+| `list.filter { }.size > 0` | `list.any { }` |
+| `list.filter { }.size == 0` | `list.none { }` |
+| `for (i in 0 until list.size)` | `for (item in list)` or `list.forEach` |
+| `list.get(0)` | `list.first()` or `list[0]` |
+| `synchronized(lock) { }` | `Mutex` with coroutines |
+| `try { } catch (e: Exception) { }` | `runCatching { }` |
+| Manual StringBuilder loops | `joinToString()` or `buildString { }` |
+
 ## Constraints
 
 - Preserve all existing functionality

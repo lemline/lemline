@@ -3,8 +3,8 @@ package com.lemline.core.orchestrator.full
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.NodePosition
-import com.lemline.core.cloudevents.CloudEventUtils
-import com.lemline.core.cloudevents.CloudEventUtils.toJsonElement
+import com.lemline.core.cloudevents.CloudEventMatcher
+import com.lemline.core.cloudevents.CloudEventParser.toJsonElement
 import com.lemline.core.errors.InternalException
 import com.lemline.core.nodes.ForeachTask
 import com.lemline.core.processors.EventFilter
@@ -88,7 +88,7 @@ internal object ListenEventCollector {
         processEvent: suspend (CloudEvent, Int) -> JsonElement,
     ): List<JsonElement> {
         val cloudEvent = eventFlow
-            .filter { CloudEventUtils.matchesFilters(it, filters, correlationContext, establishedCorrelations) }
+            .filter { CloudEventMatcher.matchesFilters(it, filters, correlationContext, establishedCorrelations) }
             .first()
         return listOf(processEvent(cloudEvent, 0))
     }
@@ -136,7 +136,7 @@ internal object ListenEventCollector {
         try {
             for (cloudEvent in channel) {
                 val matchingIndices = unsatisfiedIndices.filter { index ->
-                    CloudEventUtils.matchesFilters(
+                    CloudEventMatcher.matchesFilters(
                         cloudEvent, listOf(filters[index]), correlationContext, establishedCorrelations
                     )
                 }
@@ -184,7 +184,7 @@ internal object ListenEventCollector {
 
                 logger.debug { "Accumulated event (count=${rawEvents.size}): type=${cloudEvent.type}" }
 
-                if (CloudEventUtils.evaluateExpressionAsBoolean(expression, JsonArray(rawEvents))) {
+                if (CloudEventMatcher.evaluateExpressionAsBoolean(expression, JsonArray(rawEvents))) {
                     logger.debug { "Until expression evaluated to true after ${rawEvents.size} events" }
                     break
                 }
@@ -208,11 +208,11 @@ internal object ListenEventCollector {
         val channel = eventFlow.toChannel()
         try {
             for (cloudEvent in channel) {
-                if (CloudEventUtils.matchesFilters(cloudEvent, listOf(terminationFilter))) {
+                if (CloudEventMatcher.matchesFilters(cloudEvent, listOf(terminationFilter))) {
                     logger.debug { "Termination event received: type=${cloudEvent.type}, returning ${outputs.size} accumulated events" }
                     break
                 }
-                if (CloudEventUtils.matchesFilters(
+                if (CloudEventMatcher.matchesFilters(
                         cloudEvent, filters, correlationContext, establishedCorrelations
                     )) {
                     outputs.add(processEvent(cloudEvent, outputs.size))
@@ -232,7 +232,7 @@ internal object ListenEventCollector {
     ): ReceiveChannel<CloudEvent> {
         val scope = CoroutineScope(currentCoroutineContext())
         return this.filter {
-            CloudEventUtils.matchesFilters(it, filters, correlationContext, establishedCorrelations)
+            CloudEventMatcher.matchesFilters(it, filters, correlationContext, establishedCorrelations)
         }.produceIn(scope)
     }
 

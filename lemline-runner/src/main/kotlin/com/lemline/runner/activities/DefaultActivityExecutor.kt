@@ -6,7 +6,7 @@ package com.lemline.runner.activities
 import com.lemline.common.json.LemlineJson
 import com.lemline.common.logger.logger
 import com.lemline.core.activities.ActivityExecutor
-import com.lemline.core.cloudevents.CloudEventUtils
+import com.lemline.core.cloudevents.CloudEventFactory
 import com.lemline.core.processors.CallHttpConfig
 import com.lemline.core.processors.EmitConfig
 import com.lemline.core.processors.HttpAuthentication
@@ -86,7 +86,7 @@ class DefaultActivityExecutor(
     private suspend fun executeEmit(config: EmitConfig, rawOutput: JsonElement): JsonElement {
         logger.debug { "Emitting CloudEvent: type=${config.type}, source=${config.source}" }
 
-        val cloudEvent = CloudEventUtils.buildCloudEvent(config)
+        val cloudEvent = CloudEventFactory.build(config)
 
         // Emit if callback provided, otherwise no-op (for testing)
         emitCloudEvent?.invoke(cloudEvent)

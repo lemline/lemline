@@ -4,7 +4,7 @@ package com.lemline.runner.messaging.commands
 import com.lemline.common.logger.logger
 import com.lemline.common.values.IDV7
 import com.lemline.core.activities.ActivityExecutor
-import com.lemline.core.cloudevents.CloudEventUtils
+import com.lemline.core.cloudevents.CloudEventFactory
 import com.lemline.core.errors.InternalException
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.orchestrator.StepByStepOrchestrator
@@ -456,7 +456,7 @@ internal class WorkflowCommandHandler(
             return
         }
 
-        val cloudEvent = CloudEventUtils.buildCloudEvent(event.config)
+        val cloudEvent = CloudEventFactory.build(event.config)
         logger.debug { "Emitting CloudEvent: type=${event.config.type} source=${event.config.source}" }
 
         cloudEventsEmitter.get().send(

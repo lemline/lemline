@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.core.testcases
 
-import com.lemline.core.cloudevents.CloudEventUtils.toJsonElement
+import com.lemline.core.cloudevents.CloudEventParser.toJsonElement
 import com.lemline.core.testcases.impl.TestMocks.buildCloudEvent
 import com.lemline.core.testcases.impl.TestMocks.criticalAlertEvent
 import com.lemline.core.testcases.impl.TestMocks.eventWithDataSchema
