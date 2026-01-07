@@ -241,7 +241,7 @@ object TestMocks {
     // ─────────────────────────────────────────────────────────────────────────
 
     /** Mock CloudEvent data for order.created events */
-    internal val orderCreatedData = buildJsonObject {
+    val orderCreatedData = buildJsonObject {
         put("orderId", "ORD-12345")
         put("customerId", "CUST-001")
         put("total", 99.99)
@@ -307,7 +307,7 @@ object TestMocks {
         put("unit", "celsius")
     }
 
-    internal val highTemperatureData = buildJsonObject {
+    val highTemperatureData = buildJsonObject {
         put("sensorId", "TEMP-001")
         put("temperature", 42.5)
         put("unit", "celsius")

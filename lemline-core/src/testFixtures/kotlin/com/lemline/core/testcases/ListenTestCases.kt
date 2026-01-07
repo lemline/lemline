@@ -178,7 +178,7 @@ object ListenTestCases {
         ),
 
         WorkflowTestCase(
-            name = "listen can filter by source with expression (startswith via slice)",
+            name = "listen can filter by source (expression)",
             cloudEvents = listOf(orderCreatedCloudEvent, eventWithSpecificSource),
             yaml = $$"""
                 do:

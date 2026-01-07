@@ -282,7 +282,9 @@ object WorkflowCache {
                 else -> continue
             }
 
-            if (sdkFilters.isNotEmpty()) {
+            // Allow empty filters for ANY strategy (any: [] means "match any event")
+            // For ONE and ALL strategies, filters are required
+            if (sdkFilters.isNotEmpty() || strategy == ListenStrategy.ANY) {
                 val readAs = listenTask.listen?.read
                     ?: ListenTaskConfiguration.ListenAndReadAs.DATA
 

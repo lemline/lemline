@@ -1,7 +1,9 @@
 package com.lemline.runner.testcases.inMemory
 
-import com.lemline.core.testcases.impl.TestMocks.eventWithTime
+import com.lemline.core.testcases.impl.TestMocks.highTemperatureData
+import com.lemline.core.testcases.impl.TestMocks.highTemperatureEvent
 import com.lemline.core.testcases.impl.TestMocks.orderCreatedCloudEvent
+import com.lemline.core.testcases.impl.TestMocks.orderCreatedData
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
 import com.lemline.runner.tests.profiles.InMemoryProfile
@@ -10,8 +12,6 @@ import io.quarkus.test.junit.TestProfile
 import kotlin.time.ExperimentalTime
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 
 @OptIn(ExperimentalTime::class, ExperimentalSerializationApi::class)
 @QuarkusTest
@@ -19,19 +19,26 @@ import kotlinx.serialization.json.put
 internal class DebugTest : InMemoryWorkflowTest(
     listOf(
         WorkflowTestCase(
-            name = "listen can filter by time (literal match)",
-            cloudEvents = listOf(orderCreatedCloudEvent, eventWithTime),
-            yaml = """
+            name = "listen all strategy waits for all event types, an event matching multiple filters",
+            cloudEvents = listOf(
+                orderCreatedCloudEvent,
+                highTemperatureEvent,
+            ),
+            yaml = $$"""
                 do:
-                  - waitForScheduledTask:
+                  - waitForOrderAndPayment:
                       listen:
                         to:
-                          one:
-                            with:
-                              time: "2024-06-15T14:30:00Z"
+                          all:
+                            - with:
+                                type: order.created
+                            - with:
+                                type: sensor.reading
+                            - with:
+                                data:  ${ .temperature > 30 }
             """.trimIndent(),
-            tags = setOf("listen", "filter", "time"),
-            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("taskId", "TASK-001") })))
+            tags = setOf("listen", "all"),
+            validate = expectOutput(JsonArray(listOf(orderCreatedData, highTemperatureData)))
         ),
     )
 )

@@ -15,7 +15,6 @@ import com.lemline.core.utils.toDuration
 import io.serverlessworkflow.api.types.AllEventConsumptionStrategy
 import io.serverlessworkflow.api.types.AnyEventConsumptionStrategy
 import io.serverlessworkflow.api.types.EventConsumptionStrategy
-import io.serverlessworkflow.api.types.EventFilter as ApiEventFilter
 import io.serverlessworkflow.api.types.ListenTask
 import io.serverlessworkflow.api.types.ListenTaskConfiguration.ListenAndReadAs
 import io.serverlessworkflow.api.types.OneEventConsumptionStrategy
@@ -86,8 +85,6 @@ class ListenProcessor(
         transformedInput: JsonElement,
         scope: Scope,
     ): WorkflowEvent {
-        logger.debug { "Building listen config for task: ${node.name}" }
-
         val listenConfig = node.task.listen
             ?: raiseError(CONFIGURATION, "Listen task missing 'listen' configuration")
 
@@ -167,7 +164,7 @@ class ListenProcessor(
             correlationContext = correlationContext
         )
 
-        logger.debug { "Listen config built: strategy=${config.strategy}, filters=${config.filters.size}, timeout=${config.timeoutAt}" }
+        logger.debug { "Listen config built: task=${node.name}, config=$config" }
 
         return ListenStarted(
             nodeStack = nodeStack,
@@ -175,7 +172,6 @@ class ListenProcessor(
             config = config,
         )
     }
-
 
 
     /**

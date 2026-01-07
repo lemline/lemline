@@ -1,6 +1,5 @@
 package com.lemline.runner.testcases.inMemory
 
-import com.lemline.core.testcases.impl.TestMocks.eventWithTime
 import com.lemline.core.testcases.impl.TestMocks.orderCreatedCloudEvent
 import com.lemline.core.testcases.impl.WorkflowTestCase
 import com.lemline.core.testcases.impl.WorkflowTestValidators.expectOutput
@@ -19,19 +18,30 @@ import kotlinx.serialization.json.put
 internal class DebugListenTest : InMemoryWorkflowTest(
     listOf(
         WorkflowTestCase(
-            name = "listen can filter by time (literal match)",
-            cloudEvents = listOf(orderCreatedCloudEvent, eventWithTime),
-            yaml = """
+            name = "listen one with foreach processes event through nested tasks",
+            cloudEvents = listOf(orderCreatedCloudEvent),
+            yaml = $$"""
                 do:
-                  - waitForScheduledTask:
+                  - waitForOrder:
                       listen:
                         to:
                           one:
                             with:
-                              time: "2024-06-15T14:30:00Z"
+                              type: order.created
+                      foreach:
+                        do:
+                          - processOrder:
+                              set:
+                                processed: true
+                                orderId: ${ .orderId }
             """.trimIndent(),
-            tags = setOf("listen", "filter", "time"),
-            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("taskId", "TASK-001") })))
+            tags = setOf("listen", "foreach", "one"),
+            validate = expectOutput(
+                JsonArray(listOf(buildJsonObject {
+                    put("processed", true)
+                    put("orderId", "ORD-12345")
+                }))
+            )
         ),
     )
 )

@@ -144,16 +144,26 @@ class DefinitionListenService {
         val eventData by lazy { eventDataProvider() }
 
         val matches = WorkflowCache.getAllListenTasks().flatMap { listenTask ->
-            listenTask.filters.mapIndexedNotNull { index, filter ->
-                if (!CloudEventMatcher.matchesFilters(event, listOf(filter)) { eventData }) {
-                    return@mapIndexedNotNull null
-                }
-
-                MatchingListenTask(
-                    listenTask = listenTask,
-                    correlationValuesJson = extractCorrelationJson(filter, eventData),
-                    filterIndex = index
+            if (listenTask.filters.isEmpty()) {
+                listOf(
+                    MatchingListenTask(
+                        listenTask = listenTask,
+                        correlationValuesJson = null,
+                        filterIndex = 0
+                    )
                 )
+            } else {
+                listenTask.filters.mapIndexedNotNull { index, filter ->
+                    if (!CloudEventMatcher.matchesFilters(event, listOf(filter)) { eventData }) {
+                        return@mapIndexedNotNull null
+                    }
+
+                    MatchingListenTask(
+                        listenTask = listenTask,
+                        correlationValuesJson = extractCorrelationJson(filter, eventData),
+                        filterIndex = index
+                    )
+                }
             }
         }
 
