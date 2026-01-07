@@ -4,8 +4,8 @@ package com.lemline.runner.testcases
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventData
-import com.lemline.core.testcases.impl.WorkflowTestResult
 import com.lemline.core.lifecycleevents.LifecycleEventType
+import com.lemline.core.testcases.impl.WorkflowTestResult
 import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat
 import io.quarkus.runtime.Startup
@@ -74,10 +74,7 @@ class TestLifecycleEventListener {
             val cloudEvent = cloudEventFormat.deserialize(payload.toByteArray())
             val workflowId = cloudEvent.getExtension("lemlineworkflowid")?.toString()
 
-            logger.debug {
-                "Test captured lifecycle event from broker: id=${cloudEvent.id}, " +
-                    "type=${cloudEvent.type}, workflowId=$workflowId"
-            }
+            logger.debug { "Test captured lifecycle event from broker: $cloudEvent" }
 
             _events.add(cloudEvent)
 

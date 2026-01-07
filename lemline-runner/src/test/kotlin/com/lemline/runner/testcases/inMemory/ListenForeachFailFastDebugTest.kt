@@ -160,10 +160,10 @@ private class ListenForeachFailFastDebugTest {
                             processedBeforeError: ${ $context.processedCount }
         """.trimIndent()
 
-        val existing = definitionRepository.findByNameAndVersion(namespace, name, version)
-        if (existing != null) {
-            definitionRepository.delete(existing)
+        definitionRepository.findByNameAndVersion(namespace, name, version)?.let {
+            definitionRepository.delete(it)
         }
+
         definitionRepository.insert(
             DefinitionModel(
                 namespace = namespace,

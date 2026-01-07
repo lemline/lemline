@@ -238,11 +238,28 @@ object ListenTestCases {
             validate = expectOutput(JsonArray(listOf(buildJsonObject { put("taskId", "TASK-001") })))
         ),
 
-        // NOTE: Time expression tests (e.g., time: '${ contains("2024") }') are not supported
-        // because the Serverless Workflow SDK uses JSON Schema Draft 2020-12 where format
-        // validation is annotation-only by default. This causes oneOf validation to fail
-        // with "2 are valid" because format:date-time doesn't actually reject runtime
-        // expressions. Once the SDK enables format assertions, these tests can be added back.
+        WorkflowTestCase(
+            name = "listen can filter by time (expression)",
+            cloudEvents = listOf(orderCreatedCloudEvent, eventWithTime),
+            yaml = $$"""
+                do:
+                  - waitForRecentEvent:
+                      listen:
+                        to:
+                          one:
+                            with:
+                              time: ${ . > "2024-01-01T00:00:00Z" }
+            """.trimIndent(),
+            tags = setOf("listen", "filter", "time", "expression"),
+            // NOTE: Time expression tests (e.g., time: '${ contains("2024") }') are not supported
+            // because the Serverless Workflow SDK uses JSON Schema Draft 2020-12 where format
+            // validation is annotation-only by default. This causes oneOf validation to fail
+            // with "2 are valid" because format:date-time doesn't actually reject runtime
+            // expressions.
+            validateDefinition = false,
+            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("taskId", "TASK-001") })))
+        ),
+
 
         // ─────────────────────────────────────────────────────────────────────────
         // Filter by DataContentType (exact string match)
@@ -593,9 +610,6 @@ object ListenTestCases {
             validate = expectOutput(JsonArray(listOf(criticalAlertEvent.toJsonElement(ListenAndReadAs.DATA))))
         ),
 
-        // NOTE: Test for "any: []" (empty filter array) has validateDefinition = false because the
-        // validation has an issue with this syntax. The test still verifies runtime behavior.
-
         WorkflowTestCase(
             name = "listen any[] strategy matches any event",
             cloudEvents = listOf(orderCreatedCloudEvent, criticalAlertEvent),
@@ -608,6 +622,8 @@ object ListenTestCases {
             """.trimIndent(),
             tags = setOf("listen", "any", "multiple-filters"),
             validate = expectOutput(JsonArray(listOf(orderCreatedCloudEvent.toJsonElement(ListenAndReadAs.DATA)))),
+            // NOTE: Test for "any: []" (empty filter array) has validateDefinition = false because the
+            // validation has an issue with this syntax. The test still verifies runtime behavior.
             validateDefinition = false
         ),
 
@@ -1224,7 +1240,6 @@ object ListenTestCases {
                                 value: ${ $reading.value }
             """.trimIndent(),
             tags = setOf("listen", "foreach", "at", "index"),
-            validateDefinition = false,
             validate = expectOutput(
                 JsonArray(
                     listOf(
@@ -1261,7 +1276,6 @@ object ListenTestCases {
                                 orderId: ${ $evt.orderId }
             """.trimIndent(),
             tags = setOf("listen", "foreach", "item", "at", "all"),
-            validateDefinition = false,
             validate = expectOutput(
                 JsonArray(
                     listOf(
@@ -1269,24 +1283,6 @@ object ListenTestCases {
                         buildJsonObject { put("position", 1); put("orderId", "ORD-12345") }
                     ))
             )
-        ),
-
-        WorkflowTestCase(
-            name = "listen can filter by time with expression",
-            cloudEvents = listOf(orderCreatedCloudEvent, eventWithTime),
-            yaml = $$"""
-                do:
-                  - waitForRecentEvent:
-                      listen:
-                        to:
-                          one:
-                            with:
-                              time: '${ . > "2024-01-01T00:00:00Z" }'
-            """.trimIndent(),
-            tags = setOf("listen", "filter", "time", "expression"),
-            // Disabled due to SDK JSON Schema validation issue with time expressions
-            validateDefinition = false,
-            validate = expectOutput(JsonArray(listOf(buildJsonObject { put("taskId", "TASK-001") })))
         ),
 
         // ─────────────────────────────────────────────────────────────────────────

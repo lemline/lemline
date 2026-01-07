@@ -3,8 +3,8 @@ package com.lemline.runner.messaging.lifecycle
 
 import com.lemline.common.logger.logger
 import com.lemline.core.lifecycleevents.LifecycleEventEmitter
-import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.config.LIFECYCLEEVENTS_OUT_CHANNEL
+import com.lemline.runner.config.LIFECYCLE_EVENTS_PRODUCER_ENABLED
 import com.lemline.runner.listeners.CloudEventService
 import io.cloudevents.CloudEvent
 import io.quarkus.arc.properties.IfBuildProperty
@@ -42,19 +42,14 @@ class LifecycleEventEmitterImpl : LifecycleEventEmitter {
     override suspend fun emit(cloudEvent: CloudEvent) {
         val payload = CloudEventService.serialize(cloudEvent)
 
-        logger.debug {
-            "Emitting lifecycle event: id=${cloudEvent.id}, type=${cloudEvent.type}, source=${cloudEvent.source}"
-        }
-
+        logger.trace { "Emitting lifecycle event: $cloudEvent" }
         try {
             emitter.sendMessage(Message.of(payload)).awaitSuspending()
-            logger.trace { "Lifecycle event sent: id=${cloudEvent.id}" }
+            logger.debug { "Lifecycle event sent: $cloudEvent" }
         } catch (e: Exception) {
             // Fire-and-forget: log warning but never throw
             // Lifecycle events are observability data - failures should not impact workflow execution
-            logger.warn(e) {
-                "Failed to emit lifecycle event: id=${cloudEvent.id}, type=${cloudEvent.type}"
-            }
+            logger.warn(e) { "Failed to emit lifecycle event: $cloudEvent" }
         }
     }
 }

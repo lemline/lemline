@@ -59,7 +59,7 @@ internal abstract class AbstractWorkflowTest(
                         val validationError = case.validate(result)
                         if (validationError != null) {
                             throw AssertionError(
-                                "Validation failed for '${case.name}': $validationError\nResult: $result"
+                                "Validation failed for '${case.name}': $validationError"
                             )
                         }
                     }
