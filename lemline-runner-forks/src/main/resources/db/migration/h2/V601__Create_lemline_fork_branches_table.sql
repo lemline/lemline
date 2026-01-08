@@ -28,4 +28,8 @@ CREATE TABLE lemline_fork_branches
             ON DELETE CASCADE
 );
 
+-- Index for efficient branch lookup by fork_id (used by deleteByForkId)
 CREATE INDEX idx_lemline_fork_branches_fork_id ON lemline_fork_branches (fork_id);
+
+-- Composite index for efficient branch retrieval with ORDER BY branch_position (used by findByForkId)
+CREATE INDEX idx_lemline_fork_branches_fork_position ON lemline_fork_branches (fork_id, branch_position);

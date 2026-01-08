@@ -21,3 +21,11 @@ CREATE TABLE IF NOT EXISTS lemline_failures
 CREATE INDEX IF NOT EXISTS idx_lemline_failures_workflow_id
     ON lemline_failures (workflow_id);
 
+-- Index for error analysis queries (by reason, ordered by time)
+CREATE INDEX IF NOT EXISTS idx_lemline_failures_reason_time
+    ON lemline_failures (error_reason, created_at DESC);
+
+-- Index for workflow definition-level debugging
+CREATE INDEX IF NOT EXISTS idx_lemline_failures_workflow_def
+    ON lemline_failures (workflow_namespace, workflow_name, created_at DESC);
+

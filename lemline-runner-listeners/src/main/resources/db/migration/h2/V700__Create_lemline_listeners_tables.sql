@@ -66,11 +66,15 @@ CREATE TABLE lemline_listeners
 CREATE INDEX idx_lemline_listeners_workflow_id
     ON lemline_listeners (workflow_id);
 
+-- Composite index for efficient lookup by workflow definition (used by deleteByWorkflowDefinition)
+CREATE INDEX idx_lemline_listeners_definition
+    ON lemline_listeners (workflow_namespace, workflow_name, workflow_version);
+
 -- Index for finding pending listeners by workflow identity (for event routing)
 CREATE INDEX idx_lemline_listeners_pending
     ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position);
 
--- Index for correlation-based lookup
+-- Index for correlation-based lookup (H2 lacks partial index support)
 CREATE INDEX idx_lemline_listeners_correlation
     ON lemline_listeners (workflow_namespace, workflow_name, workflow_version, workflow_position, correlation_values);
 
@@ -78,9 +82,9 @@ CREATE INDEX idx_lemline_listeners_correlation
 CREATE INDEX idx_lemline_listeners_closed
     ON lemline_listeners (closed_at);
 
--- Index for timeout processing
+-- Index for timeout processing (H2 lacks partial index support)
 CREATE INDEX idx_lemline_listeners_timeout
-    ON lemline_listeners (timeout_at);
+    ON lemline_listeners (timeout_at, outbox_completed_at, outbox_failed_at);
 
 -- Index for outbox processing
 CREATE INDEX idx_lemline_listeners_processing

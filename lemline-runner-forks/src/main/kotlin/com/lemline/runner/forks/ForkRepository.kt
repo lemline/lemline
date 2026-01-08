@@ -168,52 +168,6 @@ class ForkRepository : CrudRepository<ForkModel>(),
     suspend fun updateBranch(branch: ForkBranchModel, connection: Connection? = null): Int =
         forkBranchRepository.update(branch, connection)
 
-    /**
-     * Find fork with all its branches by workflow ID and position.
-     *
-     * Uses FOR UPDATE to acquire a row-level lock on the fork, preventing concurrent workers from
-     * processing branch completions with stale data.
-     */
-    suspend fun findByWorkflowIdAndPositionWithBranches(
-        workflowId: WorkflowId,
-        forkPosition: NodePosition,
-        connection: Connection? = null
-    ): Pair<ForkModel, List<ForkBranchModel>>? = databaseConfig.withConnection(connection) { conn ->
-        // 1. Find and lock the fork
-        val fork = findByWorkflowIdAndPositionForUpdate(workflowId, forkPosition, conn)
-            ?: return@withConnection null
-
-        // 2. Find all branches for this fork
-        val branches = forkBranchRepository.findByForkId(fork.id, conn)
-
-        Pair(fork, branches)
-    }
-
-    /**
-     * Find fork by workflow ID and position with pessimistic locking.
-     */
-    private suspend fun findByWorkflowIdAndPositionForUpdate(
-        workflowId: WorkflowId,
-        forkPosition: NodePosition,
-        connection: Connection
-    ): ForkModel? {
-        return connection.prepareStatement(findByWorkflowIdAndPositionForUpdateSql).use { stmt ->
-            setIDV7(stmt, 1, workflowId.value)
-            stmt.setString(2, forkPosition.toString())
-            stmt.executeQuery().use { rs ->
-                if (rs.next()) createModel(rs) else null
-            }
-        }
-    }
-
-    private val findByWorkflowIdAndPositionForUpdateSql by lazy {
-        """
-        SELECT * FROM $tableName
-        WHERE $WORKFLOW_ID_COLUMN = ? AND $FORK_POSITION_COLUMN = ?
-        FOR UPDATE
-        """.trimIndent()
-    }
-
     suspend fun findByIdWithBranches(
         id: IDV7,
         connection: Connection? = null

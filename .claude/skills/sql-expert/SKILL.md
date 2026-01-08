@@ -1,8 +1,6 @@
 ---
 name: sql-expert
-description: SQL query optimization, indexing strategies, and EXPLAIN analysis for Lemline's multi-database
-architecture (PostgreSQL, MySQL, H2). Use when debugging slow queries, designing indexes, optimizing outbox patterns, or
-ensuring cross-database compatibility.
+description: SQL query optimization, indexing strategies, and EXPLAIN analysis for Lemline's multi-database  architecture (PostgreSQL, MySQL, H2). Use when debugging slow queries, designing indexes, optimizing outbox patterns, or  ensuring cross-database compatibility.
 ---
 
 # SQL Optimization Expert for Lemline
@@ -131,7 +129,8 @@ IF query has ORDER BY:
 
 IF filtering on NULL status (outbox pattern):
     PostgreSQL: Use partial index with WHERE clause
-    MySQL/H2: Include status columns in composite index
+    MySQL: Include status columns in composite index (no partial index support)
+    H2: Include status columns in composite index (no partial index support)
 ```
 
 **Step 3: Create Cross-Database DDL**
@@ -142,11 +141,11 @@ Always provide index DDL for all three databases:
 -- PostgreSQL (with partial index)
 CREATE INDEX idx_tablename_purpose ON tablename (col1, col2) WHERE status_col IS NULL;
 
--- MySQL (no partial indexes)
+-- MySQL (no partial index support)
 CREATE INDEX idx_tablename_purpose ON tablename (status_col, col1, col2);
 
--- H2 (similar to PostgreSQL)
-CREATE INDEX idx_tablename_purpose ON tablename (col1, col2) WHERE status_col IS NULL;
+-- H2 (no partial index support)
+CREATE INDEX idx_tablename_purpose ON tablename (status_col, col1, col2);
 ```
 
 ---
@@ -334,8 +333,9 @@ CREATE INDEX idx_lemline_waits_pending ON lemline_waits (outbox_delayed_until) W
 CREATE INDEX idx_lemline_waits_pending ON lemline_waits
     (outbox_completed_at, outbox_failed_at, outbox_delayed_until, outbox_attempt_count);
 
--- H2: Partial index
-CREATE INDEX idx_lemline_waits_pending ON lemline_waits (outbox_delayed_until) WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
+-- H2: Composite index (no partial index support)
+CREATE INDEX idx_lemline_waits_pending ON lemline_waits
+    (outbox_completed_at, outbox_failed_at, outbox_delayed_until, outbox_attempt_count);
 ```
 
 ### UUID v7 Considerations
@@ -590,7 +590,7 @@ WHERE table_name LIKE 'lemline%';
 | Boolean true  | `TRUE`                 | `1`                 | `TRUE`                 |
 | String concat | `\|\|`                 | `CONCAT()`          | `\|\|`                 |
 | Null-safe =   | `IS NOT DISTINCT FROM` | `<=>`               | `IS NOT DISTINCT FROM` |
-| Partial index | Supported              | Not supported       | Supported              |
+| Partial index | Supported              | Not supported       | Not supported          |
 | SKIP LOCKED   | Full support           | Full support (8.0+) | Limited                |
 | JSON type     | `JSONB`                | `JSON`              | `JSON`                 |
 | Array type    | `ARRAY[]`              | Not native          | `ARRAY[]`              |
@@ -600,7 +600,7 @@ WHERE table_name LIKE 'lemline%';
 ## Best Practices Summary
 
 1. **Always test on all 3 databases** before merging SQL changes
-2. **Use partial indexes in PostgreSQL/H2** for outbox tables
+2. **Use partial indexes in PostgreSQL only** for outbox tables (MySQL/H2 need composite indexes)
 3. **Never use `= NULL`** - always `IS NULL` or `IS NOT NULL`
 4. **Provide database variants** for any non-standard SQL
 5. **Use UUID v7 ordering** for pagination instead of OFFSET

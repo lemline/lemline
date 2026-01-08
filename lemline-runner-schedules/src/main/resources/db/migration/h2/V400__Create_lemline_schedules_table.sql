@@ -30,8 +30,9 @@ CREATE INDEX IF NOT EXISTS idx_lemline_schedules_workflow_id
     ON lemline_schedules (workflow_id);
 
 -- Create composite index for efficient querying of pending messages
+-- Includes outbox_attempt_count for filtering without additional table scans
 CREATE INDEX idx_lemline_schedules_processing
-    ON lemline_schedules (outbox_completed_at, outbox_failed_at, outbox_delayed_until);
+    ON lemline_schedules (outbox_completed_at, outbox_failed_at, outbox_delayed_until, outbox_attempt_count);
 
 -- Create index for cleanup queries
 CREATE INDEX idx_lemline_schedules_cleanup

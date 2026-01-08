@@ -67,23 +67,29 @@ CREATE TABLE lemline_listeners
 CREATE INDEX idx_lemline_listeners_workflow_id
     ON lemline_listeners (workflow_id);
 
+-- Composite index for efficient lookup by workflow definition (used by deleteByWorkflowDefinition)
+CREATE INDEX idx_lemline_listeners_definition
+    ON lemline_listeners (workflow_namespace(50), workflow_name(100), workflow_version(20));
+
 -- Index for finding pending listeners by workflow identity (for event routing)
 -- Using prefixes to stay within MySQL's 3072 byte key limit (utf8mb4 = 4 bytes/char)
 CREATE INDEX idx_lemline_listeners_pending
     ON lemline_listeners (workflow_namespace(50), workflow_name(100), workflow_version(20), workflow_position(500));
 
--- Index for correlation-based lookup
+-- Index for correlation-based lookup (optimized for active listeners)
 -- Prefix lengths reduced to stay within MySQL's 3072 byte key limit (utf8mb4 = 4 bytes/char)
+-- Includes status columns first for efficient filtering (MySQL doesn't support partial indexes)
 CREATE INDEX idx_lemline_listeners_correlation
-    ON lemline_listeners (workflow_namespace(50), workflow_name(100), workflow_version(20), workflow_position(400), correlation_values(100));
+    ON lemline_listeners (outbox_completed_at, outbox_failed_at, closed_at, workflow_namespace(50), workflow_name(100), workflow_version(20), workflow_position(400), correlation_values(100));
 
 -- Index for completion outbox processing (closed listeners)
 CREATE INDEX idx_lemline_listeners_closed
     ON lemline_listeners (closed_at);
 
--- Index for timeout processing
+-- Index for timeout processing (optimized for active listeners with timeout)
+-- MySQL doesn't support partial indexes, so include filter columns in composite index
 CREATE INDEX idx_lemline_listeners_timeout
-    ON lemline_listeners (timeout_at);
+    ON lemline_listeners (outbox_completed_at, outbox_failed_at, timeout_at);
 
 -- Index for outbox processing
 CREATE INDEX idx_lemline_listeners_processing

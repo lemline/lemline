@@ -51,7 +51,6 @@ abstract class ForkRepositoryTestBase {
     protected abstract fun getRepository(): ForkRepository
 
     private val testWorkflowId = WorkflowId.random()
-    private val testPosition = NodePosition.root.addName("fork1")
     private var testForkId: IDV7? = null
 
     private fun createEntity() = ForkModel.random()
@@ -76,7 +75,7 @@ abstract class ForkRepositoryTestBase {
 
         repository.insertForkWithBranches(fork, branches)
 
-        val retrievedResult = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)
+        val retrievedResult = repository.findByIdWithBranches(fork.id)
         retrievedResult shouldNotBe null
 
         val (retrievedFork, retrievedBranches) = retrievedResult!!
@@ -101,7 +100,7 @@ abstract class ForkRepositoryTestBase {
 
         updateCount shouldBe 1
 
-        val (_, retrievedBranches) = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)!!
+        val (_, retrievedBranches) = repository.findByIdWithBranches(fork.id)!!
         retrievedBranches.find { it.branchPosition == branch.branchPosition }?.branchOutput shouldBe "\"result-0\""
         retrievedBranches.find { it.branchPosition == branch.branchPosition }?.completedAt shouldNotBe null
     }
@@ -113,19 +112,16 @@ abstract class ForkRepositoryTestBase {
         val branches = createTestBranches(fork, branchCount = 2)
         repository.insertForkWithBranches(fork, branches)
 
-        repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition) shouldNotBe null
+        repository.findByIdWithBranches(fork.id) shouldNotBe null
 
         repository.deleteById(fork.id)
 
-        repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition).shouldBeNull()
+        repository.findByIdWithBranches(fork.id).shouldBeNull()
     }
 
     @Test
     fun `should return null when fork not found`() = runTest {
-        val result = getRepository().findByWorkflowIdAndPositionWithBranches(
-            WorkflowId.random(),
-            NodePosition.root.addName("nonexistent")
-        )
+        val result = getRepository().findByIdWithBranches(IDV7.random())
         result.shouldBeNull()
     }
 
@@ -135,7 +131,7 @@ abstract class ForkRepositoryTestBase {
         val fork = createTestFork()
         repository.insertForkWithBranches(fork, emptyList())
 
-        val result = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)
+        val result = repository.findByIdWithBranches(fork.id)
 
         result shouldNotBe null
         val (retrievedFork, retrievedBranches) = result!!
@@ -157,7 +153,7 @@ abstract class ForkRepositoryTestBase {
         }
         repository.update(updatedFork)
 
-        val (retrieved, _) = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)!!
+        val (retrieved, _) = repository.findByIdWithBranches(fork.id)!!
         retrieved.output shouldBe "\"final-result\""
         retrieved.completedAt.shouldNotBeNull()
     }
@@ -173,11 +169,7 @@ abstract class ForkRepositoryTestBase {
         val updates = (0..2).map { index ->
             async {
                 databaseConfig.withTransaction { conn ->
-                    val (currentFork, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
-                        testWorkflowId,
-                        testPosition,
-                        conn
-                    )!!
+                    val (currentFork, currentBranches) = repository.findByIdWithBranches(fork.id, conn)!!
 
                     currentBranches[index].branchOutput = "\"result-$index\""
                     currentBranches[index].completedAt = Clock.System.now()
@@ -194,10 +186,7 @@ abstract class ForkRepositoryTestBase {
 
         updates.awaitAll()
 
-        val (finalFork, finalBranches) = repository.findByWorkflowIdAndPositionWithBranches(
-            testWorkflowId,
-            testPosition
-        )!!
+        val (finalFork, finalBranches) = repository.findByIdWithBranches(fork.id)!!
         finalBranches.count { it.completedAt != null } shouldBe 3
         finalBranches.map { it.branchOutput } shouldContainAll listOf("\"result-0\"", "\"result-1\"", "\"result-2\"")
         finalFork.completedAt.shouldNotBeNull()
@@ -214,11 +203,7 @@ abstract class ForkRepositoryTestBase {
         val completionResults = (0..2).map { index ->
             async {
                 databaseConfig.withTransaction { conn ->
-                    val (_, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
-                        testWorkflowId,
-                        testPosition,
-                        conn
-                    )!!
+                    val (_, currentBranches) = repository.findByIdWithBranches(fork.id, conn)!!
 
                     val branchToUpdate = currentBranches[index].copy(
                         branchOutput = "\"winner-$index\"",
@@ -240,7 +225,7 @@ abstract class ForkRepositoryTestBase {
         val firstCompletions = results.filter { it.second }
         firstCompletions.size shouldNotBe 0
 
-        val (_, finalBranches) = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)!!
+        val (_, finalBranches) = repository.findByIdWithBranches(fork.id)!!
         finalBranches.count { it.completedAt != null } shouldBe 3
     }
 
@@ -254,11 +239,7 @@ abstract class ForkRepositoryTestBase {
 
         val transaction1 = async {
             databaseConfig.withTransaction { conn ->
-                val (_, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
-                    testWorkflowId,
-                    testPosition,
-                    conn
-                )!!
+                val (_, currentBranches) = repository.findByIdWithBranches(fork.id, conn)!!
 
                 val updated = currentBranches[0].copy(
                     branchOutput = "\"T1-output\"",
@@ -270,11 +251,7 @@ abstract class ForkRepositoryTestBase {
 
         val transaction2 = async {
             databaseConfig.withTransaction { conn ->
-                val (_, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
-                    testWorkflowId,
-                    testPosition,
-                    conn
-                )!!
+                val (_, currentBranches) = repository.findByIdWithBranches(fork.id, conn)!!
 
                 val updated = currentBranches[1].copy(
                     branchOutput = "\"T2-output\"",
@@ -287,7 +264,7 @@ abstract class ForkRepositoryTestBase {
         transaction1.await()
         transaction2.await()
 
-        val (_, finalBranches) = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)!!
+        val (_, finalBranches) = repository.findByIdWithBranches(fork.id)!!
         finalBranches.count { it.completedAt != null } shouldBe 2
         finalBranches.map { it.branchOutput } shouldContainAll listOf("\"T1-output\"", "\"T2-output\"")
     }
@@ -301,11 +278,7 @@ abstract class ForkRepositoryTestBase {
         repository.insertForkWithBranches(fork, branches)
 
         val firstUpdate = databaseConfig.withTransaction { conn ->
-            val (_, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
-                testWorkflowId,
-                testPosition,
-                conn
-            )!!
+            val (_, currentBranches) = repository.findByIdWithBranches(fork.id, conn)!!
 
             val branch = currentBranches[0]
             val wasAlreadyCompleted = branch.completedAt != null
@@ -322,11 +295,7 @@ abstract class ForkRepositoryTestBase {
         }
 
         val secondUpdate = databaseConfig.withTransaction { conn ->
-            val (_, currentBranches) = repository.findByWorkflowIdAndPositionWithBranches(
-                testWorkflowId,
-                testPosition,
-                conn
-            )!!
+            val (_, currentBranches) = repository.findByIdWithBranches(fork.id, conn)!!
 
             val branch = currentBranches[0]
             val wasAlreadyCompleted = branch.completedAt != null
@@ -345,7 +314,7 @@ abstract class ForkRepositoryTestBase {
         firstUpdate shouldBe false
         secondUpdate shouldBe true
 
-        val (_, finalBranches) = repository.findByWorkflowIdAndPositionWithBranches(testWorkflowId, testPosition)!!
+        val (_, finalBranches) = repository.findByIdWithBranches(fork.id)!!
         finalBranches[0].branchOutput shouldBe "\"result-0\""
     }
 
@@ -378,6 +347,7 @@ abstract class ForkRepositoryTestBase {
     private fun createTestFork(compete: Boolean = false): ForkModel {
         val forkId = IDV7.random()
         testForkId = forkId
+        val testPosition = NodePosition.root.addName("fork1")
 
         val instanceMessage = InstanceMessage(
             workflowInfo = WorkflowInfo(

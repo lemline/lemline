@@ -30,8 +30,9 @@ CREATE INDEX IF NOT EXISTS idx_lemline_retries_workflow_id
     ON lemline_retries (workflow_id);
 
 -- Create composite index for efficient querying of pending messages
+-- Includes outbox_attempt_count for filtering without additional table scans
 CREATE INDEX IF NOT EXISTS idx_lemline_retries_processing
-    ON lemline_retries (outbox_completed_at, outbox_failed_at, outbox_delayed_until)
+    ON lemline_retries (outbox_completed_at, outbox_failed_at, outbox_delayed_until, outbox_attempt_count)
     WHERE outbox_completed_at IS NULL AND outbox_failed_at IS NULL;
 
 -- Create index for cleanup queries
