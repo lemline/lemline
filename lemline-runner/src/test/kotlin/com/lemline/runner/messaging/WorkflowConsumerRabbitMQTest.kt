@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.messaging
 
-import com.lemline.common.EnabledOnlyIfDockerAvailable
+import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.messaging.base.WorkflowConsumerTest
 import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Tag
 @QuarkusTest
 @TestProfile(RabbitMQProfile::class)
 @Tag("integration")
-@EnabledOnlyIfDockerAvailable
+@RequiresDocker
 @ExperimentalTime
 @ExperimentalSerializationApi
 internal class WorkflowConsumerRabbitMQTest : WorkflowConsumerTest() {

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.profiles
 
+import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.config.LemlineConfigConstants.DB_TYPE_MYSQL
 import com.lemline.runner.config.LemlineConfigConstants.MSG_TYPE_IN_MEMORY
 import com.lemline.runner.config.LemlineConfiguration
@@ -10,6 +11,7 @@ import jakarta.inject.Inject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
+@RequiresDocker
 @TestProfile(MySQLProfile::class)
 @QuarkusTest
 class MySQLProfileTest {

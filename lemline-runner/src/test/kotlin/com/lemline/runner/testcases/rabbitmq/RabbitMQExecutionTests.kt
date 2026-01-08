@@ -17,6 +17,7 @@ import com.lemline.core.testcases.SetTaskTestCases
 import com.lemline.core.testcases.SwitchTaskTestCases
 import com.lemline.core.testcases.TryTaskTestCases
 import com.lemline.core.testcases.WaitTestCases
+import com.lemline.runner.common.test.RequiresDocker
 import com.lemline.runner.testcases.bases.BrokerWorkflowTest
 import io.quarkus.test.junit.QuarkusTest
 import io.quarkus.test.junit.TestProfile
@@ -30,30 +31,37 @@ import kotlinx.serialization.ExperimentalSerializationApi
  * a real RabbitMQ broker with loopback configuration (same queue for in/out channels).
  */
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQCallHttpExecutionTest : BrokerWorkflowTest(CallHttpTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQDoExecutionTest : BrokerWorkflowTest(DoTaskTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQExportContextExecutionTest : BrokerWorkflowTest(ExportContextTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQForExecutionTest : BrokerWorkflowTest(ForTaskTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQForkExecutionTest : BrokerWorkflowTest(ForkTaskTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQIfExecutionTest : BrokerWorkflowTest(IfConditionTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQRunScriptExecutionTest : BrokerWorkflowTest(
@@ -61,6 +69,7 @@ internal class RabbitMQRunScriptExecutionTest : BrokerWorkflowTest(
     excludeTags = setOf("windows-only")
 )
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQRunShellExecutionTest : BrokerWorkflowTest(
@@ -68,26 +77,32 @@ internal class RabbitMQRunShellExecutionTest : BrokerWorkflowTest(
     excludeTags = setOf("windows-only")
 )
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQRunWorkflowExecutionTest : BrokerWorkflowTest(RunWorkflowTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQSetExecutionTest : BrokerWorkflowTest(SetTaskTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQSwitchExecutionTest : BrokerWorkflowTest(SwitchTaskTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQTryExecutionTest : BrokerWorkflowTest(TryTaskTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQWaitExecutionTest : BrokerWorkflowTest(WaitTestCases.cases)
 
+@RequiresDocker
 @QuarkusTest
 @TestProfile(RabbitMQTestCaseProfile::class)
 internal class RabbitMQListenExecutionTest : BrokerWorkflowTest(ListenTestCases.cases)

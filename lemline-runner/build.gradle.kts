@@ -134,6 +134,7 @@ dependencies {
     // ─────────────────────────────────────────────────────────────────────────
     testImplementation(testFixtures(project(":lemline-common")))
     testImplementation(testFixtures(project(":lemline-core")))
+    testImplementation(testFixtures(project(":lemline-runner-common")))
     testImplementation(project(":lemline-runner-definitions"))
 
     testImplementation(kotlin("test"))

@@ -6,6 +6,7 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.testcases.impl.WorkflowTestResult
+import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.DatabaseManager
 import com.lemline.runner.definitions.DefinitionRepository
@@ -15,10 +16,9 @@ import com.lemline.runner.messaging.commands.COMMANDS_IN_CHANNEL
 import com.lemline.runner.messaging.commands.COMMANDS_OUT_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_IN_CHANNEL
 import com.lemline.runner.messaging.events.EVENTS_OUT_CHANNEL
-import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.TestLifecycleEventListener
 import com.lemline.runner.testcases.bases.AbstractWorkflowTestExecutor
+import com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener
 import io.smallrye.reactive.messaging.memory.InMemoryConnector
 import jakarta.enterprise.inject.Any
 import jakarta.inject.Inject

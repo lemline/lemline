@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.resources
 
+import com.lemline.runner.common.test.DockerAvailability
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
-/**
- * Test resource for PostgreSQL database.
- * This spins up a PostgreSQL container for tests.
- */
 class PostgresTestResource : QuarkusTestResourceLifecycleManager {
     private lateinit var postgres: PostgreSQLContainer<*>
 
     override fun start(): Map<String, String> {
+        if (!DockerAvailability.isAvailable) {
+            return emptyMap()
+        }
+
         postgres = PostgreSQLContainer(DockerImageName.parse("postgres:14-alpine"))
             .withDatabaseName("lemline_test")
             .withUsername("test")

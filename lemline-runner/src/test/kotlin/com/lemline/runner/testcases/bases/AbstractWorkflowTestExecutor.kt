@@ -13,14 +13,14 @@ import com.lemline.core.testcases.impl.WorkflowDependency
 import com.lemline.core.testcases.impl.WorkflowTestExecutor
 import com.lemline.core.testcases.impl.WorkflowTestResult
 import com.lemline.core.workflows.WorkflowCache
+import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.definitions.DefinitionModel
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.TestLifecycleEventListener
+import com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener
 import io.cloudevents.CloudEvent
 import io.cloudevents.jackson.JsonFormat
 import java.util.concurrent.TimeoutException

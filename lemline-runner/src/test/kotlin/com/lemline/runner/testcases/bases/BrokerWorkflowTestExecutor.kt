@@ -6,15 +6,15 @@ import com.lemline.common.values.WorkflowId
 import com.lemline.core.lifecycleevents.LifecycleEventHook
 import com.lemline.core.states.WorkflowCommand
 import com.lemline.core.testcases.impl.WorkflowTestResult
+import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.common.messaging.InstanceMessage
 import com.lemline.runner.config.DatabaseManager
-import com.lemline.runner.common.activities.TestModeConfiguration
 import com.lemline.runner.definitions.DefinitionRepository
 import com.lemline.runner.listeners.ListenerRepository
 import com.lemline.runner.messaging.cloudevents.CLOUDEVENTS_OUT_CHANNEL
 import com.lemline.runner.messaging.commands.WorkflowCommandEmitter
 import com.lemline.runner.starters.Starter
-import com.lemline.runner.testcases.TestLifecycleEventListener
+import com.lemline.runner.testcases.lifecycleevents.TestLifecycleEventListener
 import io.smallrye.mutiny.coroutines.awaitSuspending
 import io.smallrye.reactive.messaging.MutinyEmitter
 import jakarta.enterprise.inject.Instance

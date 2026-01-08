@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.resources
 
+import com.lemline.runner.common.test.DockerAvailability
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.MySQLContainer
 import org.testcontainers.utility.DockerImageName
 
-/**
- * Test resource for MySQL database.
- * This spins up a MySQL container for tests.
- */
 class MySQLTestResource : QuarkusTestResourceLifecycleManager {
     private lateinit var mysql: MySQLContainer<*>
 
     override fun start(): Map<String, String> {
+        if (!DockerAvailability.isAvailable) {
+            return emptyMap()
+        }
+
         mysql = MySQLContainer(DockerImageName.parse("mysql:8.0"))
             .withDatabaseName("swruntime_test")
             .withUsername("test")

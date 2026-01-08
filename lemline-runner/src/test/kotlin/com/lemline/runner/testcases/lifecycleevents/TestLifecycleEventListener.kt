@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: BUSL-1.1
-package com.lemline.runner.testcases
+package com.lemline.runner.testcases.lifecycleevents
 
 import com.lemline.common.logger.logger
 import com.lemline.common.values.WorkflowId
@@ -46,7 +46,7 @@ class TestLifecycleEventListener {
      * A thread-safe mapping between workflow IDs and channels used for awaiting specific lifecycle events.
      *
      * This data structure allows suspending functions to wait for particular events related to workflows.
-     * Each entry maps a workflow ID (as a String) to a [Channel] of [CloudEvent]s.
+     * Each entry maps a workflow ID (as a String) to a [kotlinx.coroutines.channels.Channel] of [CloudEvent]s.
      *
      * Typically used to coordinate asynchronous event processing workflows for testing lifecycle scenarios.
      */
@@ -117,12 +117,12 @@ class TestLifecycleEventListener {
      * Waits for a workflow to complete or fail by observing lifecycle CloudEvents.
      *
      * This method polls for `workflow.completed` or `workflow.faulted` events
-     * and returns the appropriate [WorkflowTestResult].
+     * and returns the appropriate [com.lemline.core.testcases.impl.WorkflowTestResult].
      *
      * @param workflowId The workflow ID to wait for
      * @param timeout Maximum time to wait for completion
-     * @return [WorkflowTestResult.Success] with output, or [WorkflowTestResult.Failure] with error
-     * @throws TimeoutException if the workflow doesn't complete within the timeout
+     * @return [com.lemline.core.testcases.impl.WorkflowTestResult.Success] with output, or [com.lemline.core.testcases.impl.WorkflowTestResult.Failure] with error
+     * @throws java.util.concurrent.TimeoutException if the workflow doesn't complete within the timeout
      */
     suspend fun awaitWorkflowResult(
         workflowId: WorkflowId,

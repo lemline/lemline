@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: BUSL-1.1
 package com.lemline.runner.tests.resources
 
+import com.lemline.runner.common.test.DockerAvailability
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager
 import org.testcontainers.containers.KafkaContainer
 import org.testcontainers.containers.Network
@@ -12,6 +13,10 @@ class KafkaTestResource : QuarkusTestResourceLifecycleManager {
     private lateinit var network: Network
 
     override fun start(): Map<String, String> {
+        if (!DockerAvailability.isAvailable) {
+            return emptyMap()
+        }
+
         // Create a network for Kafka
         network = Network.newNetwork()
 
