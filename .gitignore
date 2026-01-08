@@ -33,6 +33,7 @@ build/
 ### other local docs 
 references/
 articles/
+tmp/
 
 ### cursor rules
 .cursorrules
